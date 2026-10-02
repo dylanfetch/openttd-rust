@@ -41,6 +41,8 @@ def compare_generators(env):
     for name, tool_dir in tools.items():
         out = OUT / (name + "-generated")
         out.mkdir(exist_ok=True)
+        for filename in ("strings.h", "settings.h", "english.lng", "french.lng"):
+            (out / filename).unlink(missing_ok=True)
         strgen = str(tool_dir / "strgen/strgen")
         settingsgen = str(tool_dir / "settingsgen/settingsgen")
         invocations = [
@@ -115,9 +117,9 @@ def main():
         assert outputs[0].stdout == outputs[1].stdout and outputs[0].stderr == outputs[1].stderr
         fatal_cases.append({"input": record.decode().strip(), "exit_code": 2, "stdout": outputs[0].stdout.decode()})
     generators = compare_generators(env)
+    MIGRATION["ensure_reference"]()
     report = {"baseline": MIGRATION["BASELINE"], "candidate_commit": MIGRATION["git"]("rev-parse", "HEAD"), "cases": len(corpus), "fatal_cases": fatal_cases, "generators": generators, "reference_sources_sha256": {name: hashlib.sha256((REFERENCE / name).read_bytes()).hexdigest() for name in ("src/core/string_consumer.hpp", "src/core/string_consumer.cpp")}, "passed": True}
     (OUT / "report.json").write_text(json.dumps(report, indent=2) + "\n")
-    MIGRATION["ensure_reference"]()
     print(f"Integer comparisons passed: {len(corpus)} API cases, {len(fatal_cases)} fatal diagnostic cases; {OUT / 'report.json'}")
 
 
