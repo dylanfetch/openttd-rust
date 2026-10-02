@@ -19,10 +19,7 @@
 [[nodiscard]] std::pair<size_t, char32_t> DecodeUtf8(std::string_view buf);
 
 /* Check if the given character is part of a UTF8 sequence */
-inline bool IsUtf8Part(char c)
-{
-	return GB(c, 6, 2) == 2;
-}
+bool IsUtf8Part(char c);
 
 /**
  * Constant span of UTF-8 encoded data.
@@ -77,15 +74,7 @@ public:
 			return len > 0 ? c : '?';
 		}
 
-		iterator& operator++()
-		{
-			auto size = this->src.size();
-			assert(this->position < size);
-			do {
-				++this->position;
-			} while (this->position < size && IsUtf8Part(this->src[this->position]));
-			return *this;
-		}
+		iterator& operator++();
 
 		iterator operator++(int)
 		{
@@ -94,14 +83,7 @@ public:
 			return result;
 		}
 
-		iterator& operator--()
-		{
-			assert(this->position > 0);
-			do {
-				--this->position;
-			} while (this->position > 0 && IsUtf8Part(this->src[this->position]));
-			return *this;
-		}
+		iterator& operator--();
 
 		iterator operator--(int)
 		{

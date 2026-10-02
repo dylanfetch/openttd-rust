@@ -11,6 +11,9 @@
 
 #include "../stdafx.h"
 #include "utf8.hpp"
+#ifdef WITH_RUST
+#include "../rust/utf8_ffi.h"
+#endif
 #include "../safeguards.h"
 
 /**
@@ -20,6 +23,14 @@
  */
 [[nodiscard]] std::pair<char[4], size_t> EncodeUtf8(char32_t c)
 {
+#ifdef WITH_RUST
+	static_assert(sizeof(char32_t) == sizeof(uint32_t));
+	auto encoded = openttd_rust_encode_utf8(static_cast<uint32_t>(c));
+	std::pair<char[4], size_t> result{};
+	std::copy(std::begin(encoded.bytes), std::end(encoded.bytes), std::begin(result.first));
+	result.second = encoded.length;
+	return result;
+#else
 	std::pair<char[4], size_t> result{};
 	auto &[buf, len] = result;
 	if (c < 0x80) {
@@ -38,6 +49,7 @@
 		buf[len++] = 0x80 + GB(c,  0, 6);
 	}
 	return result;
+#endif
 }
 
 /**
@@ -47,6 +59,10 @@
  */
 [[nodiscard]] std::pair<size_t, char32_t> DecodeUtf8(std::string_view buf)
 {
+#ifdef WITH_RUST
+	auto decoded = openttd_rust_decode_utf8(reinterpret_cast<const uint8_t *>(buf.data()), buf.size());
+	return {decoded.length, static_cast<char32_t>(decoded.codepoint)};
+#else
 	if (buf.size() >= 1 && !HasBit(buf[0], 7)) {
 		/* Single byte character: 0xxxxxxx */
 		char32_t c = buf[0];
@@ -71,6 +87,7 @@
 		}
 	}
 	return {};
+#endif
 }
 
 /**
@@ -83,10 +100,51 @@
 Utf8View::iterator Utf8View::GetIterAtByte(size_t offset) const
 {
 	assert(offset <= this->src.size());
+#ifdef WITH_RUST
+	return iterator(this->src, openttd_rust_utf8_at_byte(reinterpret_cast<const uint8_t *>(this->src.data()), this->src.size(), offset));
+#else
 	if (offset >= this->src.size()) return this->end();
 
 	/* Sanitize iterator to point to the start of a codepoint */
 	auto it = iterator(this->src, offset + 1);
 	--it;
 	return it;
+#endif
+}
+
+/* Check if the given character is part of a UTF8 sequence. */
+bool IsUtf8Part(char c)
+{
+#ifdef WITH_RUST
+	return openttd_rust_is_utf8_part(static_cast<uint8_t>(c)) != 0;
+#else
+	return GB(c, 6, 2) == 2;
+#endif
+}
+
+Utf8View::iterator& Utf8View::iterator::operator++()
+{
+	auto size = this->src.size();
+	assert(this->position < size);
+#ifdef WITH_RUST
+	this->position = openttd_rust_utf8_next(reinterpret_cast<const uint8_t *>(this->src.data()), size, this->position);
+#else
+	do {
+		++this->position;
+	} while (this->position < size && IsUtf8Part(this->src[this->position]));
+#endif
+	return *this;
+}
+
+Utf8View::iterator& Utf8View::iterator::operator--()
+{
+	assert(this->position > 0);
+#ifdef WITH_RUST
+	this->position = openttd_rust_utf8_previous(reinterpret_cast<const uint8_t *>(this->src.data()), this->src.size(), this->position);
+#else
+	do {
+		--this->position;
+	} while (this->position > 0 && IsUtf8Part(this->src[this->position]));
+#endif
+	return *this;
 }
