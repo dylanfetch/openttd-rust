@@ -173,6 +173,11 @@ void StringConsumer::SkipUntilUtf8(char32_t c, SeparatorUsage sep)
 
 void StringConsumer::SkipIntegerBase(int base)
 {
+#ifdef WITH_RUST
+	assert(base == 0 || base == 8 || base == 10 || base == 16);
+	auto input = this->GetLeftData();
+	this->Skip(openttd_rust_skip_integer(reinterpret_cast<const uint8_t *>(input.data()), input.size(), base));
+#else
 	this->SkipIf("-");
 	if (base == 0) {
 		if (this->ReadIf("0x") || this->ReadIf("0X")) { // boolean short-circuit ensures only one prefix is read
@@ -195,4 +200,5 @@ void StringConsumer::SkipIntegerBase(int base)
 			this->SkipUntilCharNotIn("0123456789abcdefABCDEF");
 			break;
 	}
+#endif
 }

@@ -99,6 +99,10 @@ endif()
 
 include(AddCustomXXXTimestamp)
 
+if(OPTION_RUST)
+    include(Rust)
+endif()
+
 if(OPTION_TOOLS_ONLY)
     if(HOST_BINARY_DIR)
         unset(HOST_BINARY_DIR CACHE)
@@ -238,7 +242,7 @@ include(MSVCFilters)
 
 add_library(openttd_lib OBJECT ${GENERATED_SOURCE_FILES})
 if(OPTION_RUST)
-    include(Rust)
+    target_link_libraries(openttd_lib openttd_rust)
 endif()
 add_executable(openttd WIN32)
 add_executable(openttd_test)

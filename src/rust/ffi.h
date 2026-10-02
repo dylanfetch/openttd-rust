@@ -11,6 +11,7 @@
 #define RUST_FFI_H
 
 #include <stdint.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -22,6 +23,27 @@ extern "C" {
  * Rust never unwinds into C++; panic aborts. Actual heights are at most 16.
  */
 uint32_t openttd_rust_get_partial_pixel_z(int32_t x, int32_t y, uint8_t corners);
+
+/** Integer result: width-sized value bits, parse length, and diagnostic byte spans. */
+typedef struct OpenTTDRustIntegerResult {
+	uint64_t value_bits;
+	size_t length;
+	size_t error_offset;
+	size_t error_length;
+	uint8_t error_kind; ///< 0 = none, 1 = invalid, 2 = range, 3 = negative-hex range.
+} OpenTTDRustIntegerResult;
+
+/**
+ * Borrow readable bytes in one allocation, length <= PTRDIFF_MAX, for this call
+ * only; no retention/ownership transfer or concurrent modification.
+ * Zero length permits NULL. Arbitrary bytes and embedded NULs are accepted.
+ * Base is 0/8/10/16; width is the native integer bit width (at most 64).
+ * Signed/clamp are 0/1. Rust never unwinds into C++; panic aborts.
+ */
+OpenTTDRustIntegerResult openttd_rust_parse_integer(const uint8_t *src, size_t length, uint8_t base, uint8_t width, uint8_t is_signed, uint8_t clamp);
+
+/** Independent lexical skip, with the same byte-borrow/base contract. */
+size_t openttd_rust_skip_integer(const uint8_t *src, size_t length, uint8_t base);
 
 #ifdef __cplusplus
 }

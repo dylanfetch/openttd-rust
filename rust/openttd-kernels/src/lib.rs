@@ -7,7 +7,10 @@
 
 //! Scalar game kernels exposed through the ABI documented in `src/rust/ffi.h`.
 
+mod integer;
 mod landscape;
+
+pub use integer::IntegerResult;
 
 /// Height at a coordinate within a tile, preserving `OpenTTD`'s slope rounding.
 ///
@@ -26,4 +29,55 @@ pub extern "C" fn openttd_rust_get_partial_pixel_z(x: i32, y: i32, corners: u8) 
         return u32::MAX;
     }
     landscape::partial_pixel_z(x, y, corners).unwrap_or(u32::MAX)
+}
+
+/// Parse borrowed arbitrary bytes using the original integer grammar.
+///
+/// # Safety
+/// For nonzero length, `src` must point to `length` readable bytes in a single
+/// live allocation, with length at most `isize::MAX` and no concurrent mutation
+/// during the call. Zero length
+/// permits a null pointer. No pointer is retained or allocation transferred.
+/// Base must be 0/8/10/16 and width 1..=64; the C++ adapter supplies native integer
+/// widths and preserves the original base assertion. Signed/clamp are 0 or 1.
+/// This C ABI never unwinds; workspace build profiles abort on panic.
+#[allow(unsafe_code)] // Export and the one borrowed-slice construction only.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_parse_integer(
+    src: *const u8,
+    length: usize,
+    base: u8,
+    width: u8,
+    signed: u8,
+    clamp: u8,
+) -> IntegerResult {
+    let bytes = if length == 0 {
+        &[]
+    } else {
+        // SAFETY: The caller guarantees the readable allocation for this call.
+        unsafe { std::slice::from_raw_parts(src, length) }
+    };
+    integer::parse(bytes, base, width, signed != 0, clamp != 0)
+}
+
+/// Return lexical integer skip length, independently of parse success/length.
+///
+/// # Safety
+/// The pointer/length borrow has the same requirements as
+/// `openttd_rust_parse_integer`; base must be 0/8/10/16. No pointer is retained.
+/// Empty input permits null. This C ABI never unwinds.
+#[allow(unsafe_code)] // Export and the one borrowed-slice construction only.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_skip_integer(
+    src: *const u8,
+    length: usize,
+    base: u8,
+) -> usize {
+    let bytes = if length == 0 {
+        &[]
+    } else {
+        // SAFETY: The caller guarantees the readable allocation for this call.
+        unsafe { std::slice::from_raw_parts(src, length) }
+    };
+    integer::skip(bytes, base)
 }
