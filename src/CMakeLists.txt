@@ -244,6 +244,7 @@ add_files(
     ini_type.h
     intro_gui.cpp
     landscape.cpp
+    rust/ffi.h
     landscape.h
     landscape_cmd.h
     landscape_type.h

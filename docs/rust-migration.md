@@ -23,10 +23,10 @@ reference source. Builds go into `build-reference` and `build-rust`; neither
 changes reference source. Updating the baseline is a separate deliberate task.
 Never change candidate behavior and expected results together to make checks pass.
 
-The premature Rust integer-square-root implementation, crate, linkage, and dedicated
-comparison test have been removed. The current candidate uses the original C++
-implementation throughout. Rust toolchain/bootstrap setup remains available for
-future work; no first Rust component has been selected. Preserve the complete game,
+The premature Rust integer-square-root implementation was removed before component
+selection. The first selected replacement is `GetPartialPixelZ`, the scalar
+landscape height kernel, implemented in `rust/openttd-kernels` behind its original
+C++ interface. This does not complete the landscape subsystem. Preserve the complete game,
 including networking, saves, NewGRF mods, graphics, and shared random-number behavior.
 
 ## Build and verification
@@ -34,8 +34,11 @@ including networking, saves, NewGRF mods, graphics, and shared random-number beh
 The current verification setup targets native Linux and needs a C++20 compiler,
 CMake, Ninja, Python 3.11 or newer, SDL2 development files, and the normal OpenTTD
 libraries described in `COMPILING.md`. OpenGFX supplies free graphics for regression
-games; commercial game assets are unnecessary. Rust is not required by the current
-build or verification driver.
+games; commercial game assets are unnecessary. The verification driver requires
+the pinned Rust toolchain and always configures the candidate with `OPTION_RUST=ON`.
+Ordinary CMake builds default to `OPTION_RUST=OFF`, preserving the original portable
+C++ path. Rust linkage currently supports native Linux; other platforms and cross
+compilation remain outstanding migration work and reject an enabled Rust option.
 
 On Ubuntu with administrator access:
 
@@ -54,16 +57,18 @@ python3 tools/migration.py verify
 ```
 
 The bootstrap downloads Ubuntu packages into `.local/downloads`, extracts them into
-`.local/deps`, and installs Rust into `.local/cargo` and `.local/rustup`. This retained
-future Rust setup is separate from the current C++ build requirements. The bootstrap
+`.local/deps`, and installs Rust into `.local/cargo` and `.local/rustup`. The bootstrap
 changes no shell profiles or system packages. It relies on installed compiler/runtime
 libraries and host-specific package names; it is not a portable installer.
-`rust-toolchain.toml` pins future Cargo compiler, formatting, and lint tools.
+`rust-toolchain.toml` pins Cargo compiler, formatting, and lint tools. CI installs
+that same toolchain before verification. The crate has no external dependencies.
 
-The driver builds both graphical executables, runs both CTest suites (upstream unit
+The driver's `verify` action requires all four Cargo checks below, builds both graphical executables,
+runs both CTest suites (upstream unit
 and scripted game tests), and requires the candidate to retain all reference test
 names. Empty test inventories fail verification. CI runs this native verification
-and uploads its evidence.
+and uploads its evidence. The candidate Rust option is checked in the CMake cache
+and recorded in the report; a C++ fallback cannot pass as a migrated candidate.
 
 The inherited platform CI also remains in place. Windows CI selects Windows 2022
 and Visual Studio 2022 because the pinned breakpad dependency uses
@@ -80,11 +85,12 @@ python3 tools/migration.py verify --jobs 6
 Each invocation retains command logs, test reports, executable hashes, source revision,
 and local changes under `.local/verification/<timestamp>/`. Passing establishes only
 covered behavior. The driver does not itself compare every game state or prove full
-game equivalence. Removal of the premature port has received focused checks; no
-post-removal full build/test pass is claimed here.
+game equivalence. PRs record exact checks and limits for each reviewed commit.
 
-The fork executable is `build-rust/openttd-rust`; the directory name does not imply
-that any current component uses Rust. The reference executable is
+The fork executable is `build-rust/openttd-rust`; Cargo artifacts reside in the
+ignored `build-rust/cargo` directory. CMake tracks the Rust sources, manifests,
+lockfile, and toolchain file to rebuild the archive and affected executables.
+The reference executable is
 `build-reference/openttd`. Most in-game branding remains original. When using this
 host's extracted dependencies, launch with their library path:
 
@@ -96,6 +102,26 @@ LD_LIBRARY_PATH="$PWD/.local/deps/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$L
 `-X` avoids global game folders. Use separate development configuration and saves.
 
 ## Selecting and validating components
+
+`GetPartialPixelZ` is tested through its unchanged C++ entry point by 32 upstream
+cases, including fixed expected grids at all 256 tile positions, addition
+properties, ordinary and steep slopes, and half-tile foundations. Small Rust tests
+cover the direct flat/elevated gap and unusual half-tile/invalid-input handling.
+These tests establish only this kernel's covered behavior, not whole-game equivalence.
+
+The ABI takes two `int32_t` coordinates and one `uint8_t` slope, returning `uint32_t`.
+There are no pointers, allocations, shared state, or ownership transfers. The C++
+adapter asserts integer widths, tile dimensions, and slope/corner encodings. For
+documented coordinates 0 through 15, arithmetic stays within 0 through 32 and
+heights within 0 through 16. The Rust kernel preserves half-tile returns before
+base-slope validation, clears all upper slope bits, and retains asymmetric rounding.
+The reserved `UINT32_MAX` result invokes the existing C++ `NOT_REACHED` fatal handler
+for an unsupported base slope or an out-of-contract coordinate. The coordinate
+guard is new: the original may compute a height for some out-of-range inputs,
+whereas Rust rejects them. Equivalence is limited to the original documented
+coordinate range; callers inspected for this port use 0 through 15. Both Rust build profiles
+abort on panic; the non-unwinding C ABI prevents unwinding into C++. Unsafe code is
+denied except for the scoped export-symbol attribute; the implementation is safe Rust.
 
 Start with dependency and test inventories. Prefer bounded, heavily tested modules
 whose unchanged upstream tests can exercise replacements through their existing
@@ -144,9 +170,8 @@ platform approval needs separate
 reviewer credentials. Normal fork issues, PRs, and review reports are authorized;
 upstream contact and submissions are outside this experiment.
 
-Current automation enforces native build/tests, nonempty test inventories, and
-reference test-name preservation.
-When a Rust crate is introduced, add CI checks for formatting, compiler checking,
+Current automation enforces native build/tests, nonempty test inventories, reference
+test-name preservation, and these Cargo checks for formatting, compiler checking,
 Clippy with warnings denied, and tests:
 
 ```sh
@@ -160,7 +185,7 @@ Keep unsafe/FFI code narrow and document safety, ownership, lifetimes, and panic
 behavior. Define overflow and integer conversions explicitly to preserve behavior.
 Avoid unrelated blanket C++ warning changes. Server-side branch protection and required
 review rules are separate repository controls; these documents do not claim they have
-been configured. Rust checks above are future requirements, not checks currently run.
+been configured.
 
 Preserve OpenTTD copyright notices, credits, and GPLv2. Agent-generated work is welcome
 in this fork; upstream submission policies govern contributions to OpenTTD itself.
