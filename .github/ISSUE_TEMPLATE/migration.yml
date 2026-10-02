@@ -1,0 +1,58 @@
+name: Migration task
+description: Propose a bounded C++ to Rust migration task
+title: "[Migration]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe a bounded migration candidate. The original game is the behavioral specification; preserve observed behavior, including quirks.
+  - type: input
+    id: attribution
+    attributes:
+      label: Agent attribution
+      description: For an agent-authored issue, identify the agent, exact model, and reasoning effort. Human authors may enter "Human".
+      placeholder: "Agent: /root/implementation | Model: gpt-6.1-sol | Reasoning effort: high"
+    validations:
+      required: true
+  - type: input
+    id: owner
+    attributes:
+      label: Task owner
+      description: Identify the agent or person responsible for the implementation and its draft PR targeting rust-migration.
+    validations:
+      required: true
+  - type: input
+    id: component
+    attributes:
+      label: Component or coupled group
+      description: Name the C++ component(s) proposed for migration.
+    validations:
+      required: true
+  - type: textarea
+    id: boundary
+    attributes:
+      label: Proposed dependency boundary
+      description: Describe callers, callees, shared state, and the intended Rust/C++ interface. Include dependencies that may need to move together.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Existing test and comparison evidence
+      description: List relevant existing tests, reference comparisons, and the behavior they cover. Note gaps in current evidence.
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Behavior and FFI risks
+      description: Identify observable behavior, state, ownership, ABI, or FFI risks, including quirks that must remain unchanged.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: State the behavior evidence, integration, and checks required before accepting the replacement.
+    validations:
+      required: true

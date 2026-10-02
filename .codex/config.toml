@@ -1,0 +1,11 @@
+# Root effort keeps every delegated Astra planning/review task below root.
+model = "gpt-6-astra"
+model_reasoning_effort = "xhigh"
+
+# Eight workers plus the orchestrator: nine agents total.
+# Existing sessions may retain limits supplied by their host.
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 8
+default_subagent_model = "gpt-6.1-sol"
+default_subagent_reasoning_effort = "high"
