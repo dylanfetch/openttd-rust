@@ -24,7 +24,21 @@ jobs:
           sudo apt-get install -y ninja-build libsdl2-dev liblzma-dev libpng-dev \
             libcurl4-openssl-dev libfreetype-dev libfontconfig-dev libharfbuzz-dev \
             libicu-dev liblzo2-dev openttd-opengfx
-      - name: Compare original and migration builds
+      - name: Install pinned Rust compiler and checks
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import tomllib
+          toolchain = tomllib.loads(Path("rust-toolchain.toml").read_text())["toolchain"]
+          subprocess.run([
+              "rustup", "toolchain", "install", toolchain["channel"],
+              "--profile", toolchain["profile"],
+              "--component", ",".join(toolchain["components"]),
+          ], check=True)
+          PY
+      # The driver requires cargo fmt/check/clippy/test before native builds.
+      - name: Check Rust and compare original and migration builds
         run: python3 tools/migration.py verify --jobs 4
       - name: Retain comparison evidence
         if: always()

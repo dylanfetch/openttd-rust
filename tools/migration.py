@@ -80,6 +80,7 @@ def main():
         parser.error("--jobs must be positive")
     ensure_reference()
     env = environment()
+    env["CARGO_TARGET_DIR"] = str(ROOT / "build-rust/cargo")
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
     evidence = LOCAL / "verification" / stamp
     evidence.mkdir(parents=True)
@@ -88,6 +89,7 @@ def main():
         "candidate_commit": git("rev-parse", "HEAD"),
         "candidate_status": git("status", "--short"),
         "action": args.action,
+        "candidate_rust_enabled": True,
         "started_at": stamp,
         "commands": [],
         "passed": False,
@@ -119,19 +121,30 @@ def main():
             raise RuntimeError(f"{name} failed; see {log}")
         return log
 
-    builds = {"reference": ROOT / "build-reference", "candidate": ROOT / "build-rust"}
+    builds = {"reference": (ROOT / "build-reference").resolve(), "candidate": ROOT / "build-rust"}
     try:
+        if args.action == "verify":
+            for name, command in (
+                ("rust-fmt", ["cargo", "fmt", "--all", "--", "--check"]),
+                ("rust-check", ["cargo", "check", "--workspace", "--all-targets", "--locked"]),
+                ("rust-clippy", ["cargo", "clippy", "--workspace", "--all-targets", "--locked", "--", "-D", "warnings"]),
+                ("rust-tests", ["cargo", "test", "--workspace", "--locked"]),
+            ):
+                run(name, command)
         common = [
             "-G", "Ninja", "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
             "-DOPTION_USE_ASSERTS=ON", "-DOPTION_DEDICATED=OFF",
             "-DCMAKE_DISABLE_FIND_PACKAGE_Grfcodec=ON", "-DBUILD_TESTING=ON",
         ]
         for name, build in builds.items():
-            source = REFERENCE if name == "reference" else ROOT
+            source = REFERENCE.resolve() if name == "reference" else ROOT
             extra = [] if name == "reference" else [
                 "-DBINARY_NAME=openttd-rust",
+                "-DOPTION_RUST=ON",
             ]
             run(f"{name}-configure", ["cmake", "-S", str(source), "-B", str(build), *common, *extra])
+            if name == "candidate" and "OPTION_RUST:BOOL=ON" not in (build / "CMakeCache.txt").read_text():
+                raise RuntimeError("Candidate Rust option was not enabled; refusing fallback verification")
             supply_graphics(build)
             run(f"{name}-build", ["cmake", "--build", str(build), "--parallel", str(args.jobs)])
             binary = build / ("openttd" if name == "reference" else "openttd-rust")

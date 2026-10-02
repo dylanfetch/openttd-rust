@@ -46,6 +46,10 @@
 
 #include <unordered_set>
 
+#ifdef WITH_RUST
+#include "rust/ffi.h"
+#endif
+
 #include "safeguards.h"
 
 extern const TileTypeProcs
@@ -231,6 +235,21 @@ uint ApplyFoundationToSlope(Foundation f, Slope &s)
  */
 uint GetPartialPixelZ(int x, int y, Slope corners)
 {
+#ifdef WITH_RUST
+	static_assert(sizeof(int) == sizeof(int32_t) && sizeof(uint) == sizeof(uint32_t));
+	static_assert(sizeof(Slope) == sizeof(uint8_t));
+	static_assert(TILE_SIZE == 16 && TILE_HEIGHT == 8);
+	static_assert(CORNER_W == 0 && CORNER_S == 1 && CORNER_E == 2 && CORNER_N == 3);
+	static_assert(SLOPE_FLAT == 0x00 && SLOPE_W == 0x01 && SLOPE_S == 0x02 && SLOPE_E == 0x04 && SLOPE_N == 0x08);
+	static_assert(SLOPE_NW == 0x09 && SLOPE_SW == 0x03 && SLOPE_SE == 0x06 && SLOPE_NE == 0x0C);
+	static_assert(SLOPE_EW == 0x05 && SLOPE_NS == 0x0A && SLOPE_ELEVATED == 0x0F);
+	static_assert(SLOPE_NWS == 0x0B && SLOPE_WSE == 0x07 && SLOPE_SEN == 0x0E && SLOPE_ENW == 0x0D);
+	static_assert(SLOPE_STEEP == 0x10 && SLOPE_HALFTILE == 0x20 && SLOPE_HALFTILE_MASK == 0xE0);
+	static_assert(SLOPE_STEEP_W == 0x1B && SLOPE_STEEP_S == 0x17 && SLOPE_STEEP_E == 0x1E && SLOPE_STEEP_N == 0x1D);
+	uint32_t result = openttd_rust_get_partial_pixel_z(x, y, static_cast<uint8_t>(corners));
+	if (result == UINT32_MAX) NOT_REACHED();
+	return result;
+#else
 	if (IsHalftileSlope(corners)) {
 		/* A foundation is placed on half the tile at a specific corner. This means that,
 		 * depending on the corner, that one half of the tile is at the maximum height. */
@@ -291,6 +310,7 @@ uint GetPartialPixelZ(int x, int y, Slope corners)
 
 		default: NOT_REACHED();
 	}
+#endif
 }
 
 /**

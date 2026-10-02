@@ -75,12 +75,13 @@ agent-generated work; upstream contribution policies apply to upstream submissio
 `python3 tools/migration.py verify` builds and tests the pinned original and fork,
 checks that the candidate retains reference test names, and records evidence under
 `.local/`. `python3 tools/migration.py build` builds both without running tests.
-Currently both builds use C++; the premature Rust implementation was removed.
+The reference uses C++; the candidate explicitly enables `OPTION_RUST` and links
+the migrated kernels into both the game and test executable.
 
-When Rust is introduced, require reproducible `cargo fmt --all -- --check`,
+Rust changes require reproducible `cargo fmt --all -- --check`,
 `cargo check --workspace --all-targets --locked`,
 `cargo clippy --workspace --all-targets --locked -- -D warnings`, and
-`cargo test --workspace --locked` checks. Add their CI enforcement with the crate.
+`cargo test --workspace --locked` checks. The migration driver and CI enforce them.
 Keep unsafe/FFI boundaries narrow and document safety, ownership, lifetimes, and
 panic behavior. Make overflow and integer-conversion behavior explicit and faithful
 to the original. Avoid unrelated C++ warning cleanup or blanket warning changes.

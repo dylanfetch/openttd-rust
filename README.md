@@ -5,8 +5,10 @@ progressively replacing C++ components with Rust while preserving game behavior.
 The migration starts from OpenTTD 15.3 and keeps the complete original game as a
 working host and comparison baseline. This is not an official OpenTTD release.
 
-The current fork retains the original C++ implementation; the premature first Rust
-port has been removed while component selection is reassessed.
+The native Linux migration build replaces the partial-pixel landscape height
+kernel with Rust through its existing C++ interface. The rest of the game remains
+C++; other platform builds retain the original kernel until their Rust linkage
+is validated. See the migration guide for the explicit build option and limits.
 
 See [the migration guide](docs/rust-migration.md) for setup, verification, scope,
 and team process. The original game documentation follows below.
