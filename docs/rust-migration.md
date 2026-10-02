@@ -27,8 +27,9 @@ The premature Rust integer-square-root implementation was removed before compone
 selection. The first selected replacement is `GetPartialPixelZ`, the scalar
 landscape height kernel, implemented in `rust/openttd-kernels` behind its original
 C++ interface. The shared crate also implements StringConsumer's integer parsing
-and lexical skipping, including native string/settings generator uses. Neither
-replacement completes its containing subsystem. Preserve the complete game,
+and lexical skipping and alternating-iterator traversal. Native string/settings
+generators link the shared archive. These replacements do not complete their
+containing subsystems. Preserve the complete game,
 including networking, saves, NewGRF mods, graphics, and shared random-number behavior.
 
 ## Build and verification
