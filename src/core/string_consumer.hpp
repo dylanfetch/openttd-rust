@@ -13,6 +13,10 @@
 #define STRING_CONSUMER_HPP
 
 #include <charconv>
+#ifdef WITH_RUST
+#include <bit>
+#include "../rust/ffi.h"
+#endif
 #include "format.hpp"
 
 /**
@@ -799,6 +803,23 @@ private:
 	template <class T>
 	[[nodiscard]] static std::pair<size_type, T> ParseIntegerBase(std::string_view src, int base, bool clamp, bool log_errors)
 	{
+#ifdef WITH_RUST
+		assert(base == 0 || base == 8 || base == 10 || base == 16);
+		using Unsigned = std::make_unsigned_t<T>;
+		auto result = openttd_rust_parse_integer(reinterpret_cast<const uint8_t *>(src.data()), src.size(), base,
+			std::numeric_limits<Unsigned>::digits, std::is_signed_v<T>, clamp);
+		if (log_errors && result.error_kind != 0) {
+			auto part = src.substr(result.error_offset);
+			if (result.error_kind == 3) {
+				LogError(fmt::format("Integer out of range: '{}'", part.substr(0, result.error_length)));
+			} else {
+				LogError(fmt::format("{}: '{}'+'{}'", result.error_kind == 2 ? "Integer out of range" : "Cannot parse integer",
+					part.substr(0, result.error_length), part.substr(result.error_length, 4)));
+			}
+		}
+		if (result.length == 0) return {};
+		return {result.length, std::bit_cast<T>(static_cast<Unsigned>(result.value_bits))};
+#else
 		if (base == 0) {
 			/* Try positive hex */
 			if (src.starts_with("0x") || src.starts_with("0X")) {
@@ -846,6 +867,7 @@ private:
 			return {};
 		}
 		return {len, value};
+#endif
 	}
 
 public:

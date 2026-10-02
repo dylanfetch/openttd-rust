@@ -38,12 +38,20 @@ jobs:
           ], check=True)
           PY
       # The driver requires cargo fmt/check/clippy/test before native builds.
+      - name: Build native Rust generators without the game
+        run: |
+          cmake -S . -B .local/build-tools-rust -G Ninja -DOPTION_TOOLS_ONLY=ON -DOPTION_RUST=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          cmake --build .local/build-tools-rust --target tools --parallel 4
       - name: Check Rust and compare original and migration builds
         run: python3 tools/migration.py verify --jobs 4
+      - name: Compare integer parser behavior with pinned original
+        run: python3 tools/compare-integers.py
       - name: Retain comparison evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: migration-evidence
-          path: .local/verification/
+          path: |
+            .local/verification/
+            .local/integer-comparison/
           include-hidden-files: true
