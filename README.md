@@ -6,7 +6,7 @@ The migration starts from OpenTTD 15.3 and keeps the complete original game as a
 working host and comparison baseline. This is not an official OpenTTD release.
 
 The native Linux migration build replaces the partial-pixel landscape height
-kernel and StringConsumer integer algorithms with Rust through their existing
+kernel and alternating-iterator traversal and StringConsumer integer algorithms with Rust through their existing
 C++ interfaces. Native string/settings generators use the same Rust algorithms.
 The rest of the game remains C++; other platforms retain the original algorithms
 until their Rust linkage is validated. See the migration guide for options and limits.

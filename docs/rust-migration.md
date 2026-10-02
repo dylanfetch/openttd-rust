@@ -178,6 +178,29 @@ the fresh Rust tools build and comparisons. The eleven unchanged upstream
 StringConsumer cases remain the primary existing tests. Other consumer/builder/UTF8
 algorithms, C++ adapters, and non-Linux Rust integration remain migration work.
 
+Alternating-iterator traversal also uses the shared Rust archive. Rust owns initial
+position/selectors, logical advancement, side selection, end transitions, and
+position comparison. C++ retains the typed iterators, range identity assertions,
+dereferencing, and container lifetimes. Each increment recomputes the live range
+distance, Rust requests a typed move, C++ applies that move and queries only the
+requested live boundary, then Rust completes the next-side state. This preserves
+the original operation order without caching size or requiring random access;
+stable noncontiguous iterators remain supported after insertion.
+
+The scalar ABI in `src/rust/alternating_ffi.h` maps size_t to Rust usize and explicit
+uint8 selectors (0 before, 1 after). Nonnegative distances retain the original
+size_t conversion; there is no additional range cap. State copies are independent;
+no pointer, allocation, container element, or ownership crosses the ABI. Valid
+range/iterator preconditions remain; panic aborts and never unwinds into C++.
+Logical end skips movement/completion, preserving the last selected Base iterator,
+while separately constructed end retains middle. They compare equal by position.
+
+The fifteen original fixed sequences remain unchanged. Small additional public
+interface tests cover empty/singleton, independent copies/postfix/prefix identity,
+position ordering, distinct end Base values, stable-list insertion, and typed
+operation counts. The original C++ algorithm remains under the explicit fallback;
+other generic iterator/container and text-file owner code remains C++.
+
 Start with dependency and test inventories. Prefer bounded, heavily tested modules
 whose unchanged upstream tests can exercise replacements through their existing
 interfaces. Assess ownership, data representation, conversion/overflow behavior,
