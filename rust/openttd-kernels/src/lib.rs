@@ -5,7 +5,7 @@
  * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
  */
 
-//! Scalar game kernels exposed through the ABI documented in `src/rust/ffi.h`.
+//! Migrated game and text kernels exposed through the documented `src/rust` ABIs.
 
 mod integer;
 mod landscape;
