@@ -14,7 +14,9 @@ jobs:
   windows:
     name: CI
 
-    runs-on: windows-latest
+    # The pinned breakpad dependency uses stdext::checked_array_iterator,
+    # which newer Visual Studio standard libraries removed.
+    runs-on: windows-2022
 
     steps:
     - name: Checkout
@@ -47,11 +49,14 @@ jobs:
       uses: ilammy/msvc-dev-cmd@v1
       with:
         arch: ${{ inputs.arch }}
+        vsversion: '2022'
 
     - name: Build
       shell: bash
       env:
         NINJA_STATUS: "[%f/%t -- %e] " # [finished_edges/total_edges -- elapsed_time], default value is "[%f/%t] "
+        # Upstream setup configures a Packages feed this fork does not maintain.
+        VCPKG_BINARY_SOURCES: clear
       run: |
         mkdir build
         cd build
@@ -73,3 +78,13 @@ jobs:
       run: |
         cd build
         ctest --timeout 120
+
+    - name: Retain dependency and configure failure logs
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-vcpkg-${{ inputs.arch }}-logs
+        path: |
+          ${{ steps.vcpkg.outputs.vcpkg-location }}/buildtrees/**/*.log
+          build/vcpkg-manifest-install.log
+          build/CMakeFiles/CMakeConfigureLog.yaml

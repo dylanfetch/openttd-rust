@@ -6,6 +6,6 @@ docs/gamedocs/*
 docs/source/*
 /out
 /vcpkg_installed
-/.local/
+/.local
 /target/
 __pycache__/

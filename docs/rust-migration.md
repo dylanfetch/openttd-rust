@@ -65,6 +65,13 @@ and scripted game tests), and requires the candidate to retain all reference tes
 names. Empty test inventories fail verification. CI runs this native verification
 and uploads its evidence.
 
+The inherited platform CI also remains in place. Windows CI selects Windows 2022
+and Visual Studio 2022 because the pinned breakpad dependency uses
+`stdext::checked_array_iterator`, removed by the newer Visual Studio runner.
+It builds dependencies without the inherited GitHub Packages cache and retains
+dependency/configuration failure logs. The dependency manifest and game behavior
+are unchanged by this runner correction.
+
 ```sh
 python3 tools/migration.py build --jobs 6
 python3 tools/migration.py verify --jobs 6
