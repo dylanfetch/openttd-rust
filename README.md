@@ -1,4 +1,19 @@
-# OpenTTD
+# OpenTTD-Rust
+
+An independent experimental fork of [OpenTTD](https://github.com/OpenTTD/OpenTTD),
+progressively replacing C++ components with Rust while preserving game behavior.
+The migration starts from OpenTTD 15.3 and keeps the complete original game as a
+working host and comparison baseline. This is not an official OpenTTD release.
+
+The current fork retains the original C++ implementation; the premature first Rust
+port has been removed while component selection is reassessed.
+
+See [the migration guide](docs/rust-migration.md) for setup, verification, scope,
+and team process. The original game documentation follows below.
+
+```sh
+python3 tools/migration.py verify
+```
 
 ## Table of contents
 

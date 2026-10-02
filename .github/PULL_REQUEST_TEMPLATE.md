@@ -1,58 +1,39 @@
-<!--
-Commit message:
+## Issue and scope
 
-- Please use Feature / Add / Change / Fix for player-facing changes. E.g.: "Feature: My cool new feature".
-- Please use Feature / Add / Change / Fix followed by "[NewGRF]" or "[Script]" for moddable changes. E.g.: "Feature: [NewGRF] My cool new NewGRF addition".
-- Please use Codechange / Codefix for developer-facing changes. E.g.: "Codefix #1234: Validate against nullptr properly".
+<!-- Target rust-migration. Link the issue and state the bounded change this PR makes. -->
 
-See https://github.com/OpenTTD/OpenTTD/blob/master/CODINGSTYLE.md#commit-message for more details.
--->
+## Agent attribution
 
-## Motivation / Problem
+<!-- Every agent-authored PR and follow-up comment needs its author's attribution. -->
+- Agent identifier:
+- Exact model:
+- Reasoning effort:
 
-<!--
-Describe here shortly
-* For bug fixes:
-    * What problem does this solve?
-    * If there is already an issue, link the issue, otherwise describe the problem here.
-* For features or gameplay changes:
-    * What was the motivation to develop this feature?
-    * Does this address any problem with the gameplay or interface?
-    * Which group of players do you think would enjoy this feature?
--->
+## Original behavior and fidelity
 
+<!-- Describe the original behavior this change preserves or reproduces. Call out any quirks retained for compatibility. -->
 
-## Description
+## Implementation
 
-<!--
-Describe here shortly
-* For bug fixes:
-    * How is the problem solved?
-* For features or gameplay changes:
-    * What does this feature do?
-    * How does it improve/solve the situation described under 'motivation'.
--->
+<!-- Summarize the Rust/C++ boundary and any relevant state or ownership changes. -->
 
+## Validation
 
-## Limitations
+<!-- List the exact commands and comparison evidence. Include the reference revision or verification report when relevant. -->
 
-<!--
-Describe here
-* Is the problem solved in all scenarios?
-* Is this feature complete? Are there things that could be added in the future?
-* Are there things that are intentionally left out?
-* Do you know of a bug or corner case that does not work?
--->
+## Limits and known discrepancies
 
+<!-- State what this validation does not cover and any remaining differences. -->
 
-## Checklist for review
+## Independent review
 
-Some things are not automated, and forgotten often. This list is a reminder for the reviewers.
-* The bug fix is important enough to be backported? (label: 'backport requested')
-* This PR touches english.txt or translations? Check the [guidelines](https://github.com/OpenTTD/OpenTTD/blob/master/docs/eints.md)
-* This PR affects the GS/AI API? (label 'needs review: Script API')
-    * ai_changelog.hpp, game_changelog.hpp need updating.
-    * The compatibility wrappers (compat_*.nut) need updating.
-* This PR affects the NewGRF API? (label 'needs review: NewGRF')
-    * newgrf_debug_data.h may need updating.
-    * [PR must be added to API tracker](https://wiki.openttd.org/en/Development/NewGRF/Specification%20Status)
+<!-- Reviewer: complete this separately after reviewing the PR. Tie the report to the commit reviewed. -->
+- Reviewer agent identifier:
+- Exact model:
+- Reasoning effort:
+- Reviewed commit SHA:
+- Disposition: ready to integrate / changes required
+- Checks and behavioral evidence reviewed:
+- Findings or follow-up:
+
+<!-- Shared credentials require an attributed report, not a GitHub platform approval. -->

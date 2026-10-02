@@ -1,0 +1,35 @@
+name: Migration baseline validation
+
+on:
+  push:
+    branches: [rust-migration]
+  pull_request:
+    branches: [rust-migration]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libsdl2-dev liblzma-dev libpng-dev \
+            libcurl4-openssl-dev libfreetype-dev libfontconfig-dev libharfbuzz-dev \
+            libicu-dev liblzo2-dev openttd-opengfx
+      - name: Compare original and migration builds
+        run: python3 tools/migration.py verify --jobs 4
+      - name: Retain comparison evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: migration-evidence
+          path: .local/verification/
+          include-hidden-files: true

@@ -1,0 +1,44 @@
+name: Deferred behavior improvement
+description: Record a possible behavior change for consideration after Rust reproduction is nearly complete
+title: "[Deferred improvement]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This form records a possible future behavior change. Filing it does not authorize changing game behavior during the migration. Reconsider it after the Rust implementation is close to reproducing the original game.
+  - type: input
+    id: attribution
+    attributes:
+      label: Agent attribution
+      description: For an agent-authored issue, identify the agent, exact model, and reasoning effort. Human authors may enter "Human".
+      placeholder: "Agent: /root/analysis | Model: gpt-6.1-sol | Reasoning effort: high"
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: Current behavior
+      description: Describe what the original game does, including relevant quirks.
+    validations:
+      required: true
+  - type: textarea
+    id: potential
+    attributes:
+      label: Potential change
+      description: Describe the behavior change that could be considered later.
+    validations:
+      required: true
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Fidelity rationale
+      description: Explain why the current behavior should remain during migration and why this change may be worth revisiting afterward.
+    validations:
+      required: true
+  - type: checkboxes
+    id: deferral
+    attributes:
+      label: Deferral acknowledgement
+      options:
+        - label: I understand that filing this issue does not authorize a behavior change; reconsideration is deferred until near-full Rust reproduction.
+          required: true
