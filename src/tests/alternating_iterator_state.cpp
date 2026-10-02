@@ -108,11 +108,15 @@ public:
 	bool operator==(const ObservedIterator &rhs) const { return this->position == rhs.position; }
 	ObservedIterator &operator++() { ++this->operations->increments; ++this->position; return *this; }
 	ObservedIterator &operator--() { ++this->operations->decrements; --this->position; return *this; }
+	ObservedIterator operator++(int) { auto old = *this; ++*this; return old; }
+	ObservedIterator operator--(int) { auto old = *this; --*this; return old; }
 
 private:
 	int *position;
 	IteratorOperations *operations;
 };
+
+static_assert(std::bidirectional_iterator<ObservedIterator>);
 
 } // namespace
 
