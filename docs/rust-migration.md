@@ -26,7 +26,9 @@ Never change candidate behavior and expected results together to make checks pas
 The premature Rust integer-square-root implementation was removed before component
 selection. The first selected replacement is `GetPartialPixelZ`, the scalar
 landscape height kernel, implemented in `rust/openttd-kernels` behind its original
-C++ interface. This does not complete the landscape subsystem. Preserve the complete game,
+C++ interface. The shared crate also implements StringConsumer's integer parsing
+and lexical skipping, including native string/settings generator uses. Neither
+replacement completes its containing subsystem. Preserve the complete game,
 including networking, saves, NewGRF mods, graphics, and shared random-number behavior.
 
 ## Build and verification
@@ -123,6 +125,59 @@ coordinate range; callers inspected for this port use 0 through 15. Both Rust bu
 abort on panic; the non-unwinding C ABI prevents unwinding into C++. Unsafe code is
 denied except for the scoped export-symbol attribute; the implementation is safe Rust.
 
+StringConsumer's integer parser and lexical skipper retain their C++ public
+templates, optional/pair/string-view adapters, cursor updates, and formatted
+logging. Rust owns the complete base selection, digit scanning, width-aware
+conversion, overflow/clamping, and independent lexical-skip algorithms. The
+inspected integer types are 8/16/32/64-bit signed and unsigned types; native `int`,
+`uint`, `size_t`, and used enum-underlying aliases fall within those widths.
+Unsigned 64-bit values do not pass through a signed intermediate. Negative automatic
+hexadecimal parsing first converts/clamps to the matching unsigned width, then
+negates/narrows and checks the resulting signed value, matching integer promotions
+and the original modular conversion. Signed `0x-1` still parses length four but
+lexically skips only two bytes; free ParseInteger rejects its remaining suffix.
+
+The integer ABI borrows arbitrary bytes for one call, including NUL/non-UTF8 bytes.
+For nonempty input, the caller supplies one readable allocation with length at most
+`PTRDIFF_MAX`, without concurrent mutation; empty views may supply null. No pointers
+are retained and no allocation ownership crosses the boundary. `repr(C)` metadata
+returns zero-extended value bits, matched length, and diagnostic kind/byte spans.
+C++ formats the original prefix-relative messages and four-byte previews before
+advancing the cursor. Errors remain diagnostic in the game and fatal in generators.
+Unsafe slice construction/export attributes have scoped exceptions to the unsafe
+lint; panic still aborts and the C ABI never unwinds.
+
+The shared Rust target initializes before the tools-only return and propagates
+`WITH_RUST` to game, tests, strgen, and settingsgen, including inline parser users.
+Game, tests, and strgen instantiate the integer parser. Settingsgen currently has
+no integer-template call; its shared StringConsumer source compiles with
+`WITH_RUST` and links the Rust archive, including lexical skipping. Fresh settings
+output comparison verifies generator integration without claiming a parser call.
+Each native build directory owns one archive. Imported `HOST_BINARY_DIR` tools
+remain independent already-built executables; this does not add cross compilation.
+To reproduce a fresh tools-only build with the local bootstrap toolchain:
+
+```sh
+export CARGO_HOME="$PWD/.local/cargo"
+export RUSTUP_HOME="$PWD/.local/rustup"
+export PATH="$CARGO_HOME/bin:$PATH"
+cmake -S . -B .local/build-tools-rust -G Ninja -DOPTION_TOOLS_ONLY=ON -DOPTION_RUST=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo
+cmake --build .local/build-tools-rust --target tools --parallel 6
+python3 tools/compare-integers.py
+```
+
+Run full verification before the comparison so the reference generators exist.
+The comparison compiles the same small probe against unchanged pinned headers/source
+and the candidate. It covers 8/16-bit extrema, modular negative-hex boundaries,
+recursive/invalid prefixes, empty/NUL input, long overflow runs, both clamp settings,
+peek/read/try/skip and free ParseInteger, and byte-encoded messages/cursors. It also
+compares fatal logging adapters, real malformed strgen diagnostics, and fresh
+settings/string headers plus English/French language output on unchanged reference
+inputs. Evidence and source hashes live under `.local/integer-comparison/`; CI runs
+the fresh Rust tools build and comparisons. The eleven unchanged upstream
+StringConsumer cases remain the primary existing tests. Other consumer/builder/UTF8
+algorithms, C++ adapters, and non-Linux Rust integration remain migration work.
+
 Start with dependency and test inventories. Prefer bounded, heavily tested modules
 whose unchanged upstream tests can exercise replacements through their existing
 interfaces. Assess ownership, data representation, conversion/overflow behavior,
@@ -183,9 +238,13 @@ cargo test --workspace --locked
 
 Keep unsafe/FFI code narrow and document safety, ownership, lifetimes, and panic
 behavior. Define overflow and integer conversions explicitly to preserve behavior.
-Avoid unrelated blanket C++ warning changes. Server-side branch protection and required
-review rules are separate repository controls; these documents do not claim they have
-been configured.
+Avoid unrelated blanket C++ warning changes. Server-side protection on `rust-migration`
+requires all platform matrix, native comparison, commit, and annotation checks, a
+branch current with its base, and resolved conversations. Force pushes and branch
+deletion are disallowed, including for administrators. The approving-review count
+is zero because agents share credentials; the separate, attributed independent
+review report remains a process gate before root integrates. Repository controls
+are enforced separately from these documents.
 
 Preserve OpenTTD copyright notices, credits, and GPLv2. Agent-generated work is welcome
 in this fork; upstream submission policies govern contributions to OpenTTD itself.
