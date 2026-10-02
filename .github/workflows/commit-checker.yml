@@ -16,7 +16,8 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v6
       with:
-        fetch-depth: 4
+        # Integration merges can place PR commits beyond a shallow ancestry.
+        fetch-depth: 0
 
     - name: Get pull-request commits
       uses: OpenTTD/actions/checkout-pull-request@v6
