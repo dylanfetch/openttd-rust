@@ -72,6 +72,10 @@ agent-generated work; upstream contribution policies apply to upstream submissio
 
 ## Standards and commands
 
+C/C++ uses tabs; Rust uses `cargo fmt`. The inherited commit checker examines
+every commit's diff and title: fix style in the introducing commit, and use
+supported prefixes such as `Add:`, `Change:`, `Fix:`, `Doc:`, or `Update:`.
+
 `python3 tools/migration.py verify` builds and tests the pinned original and fork,
 checks that the candidate retains reference test names, and records evidence under
 `.local/`. `python3 tools/migration.py build` builds both without running tests.
