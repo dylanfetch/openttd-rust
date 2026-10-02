@@ -116,8 +116,10 @@ documented coordinates 0 through 15, arithmetic stays within 0 through 32 and
 heights within 0 through 16. The Rust kernel preserves half-tile returns before
 base-slope validation, clears all upper slope bits, and retains asymmetric rounding.
 The reserved `UINT32_MAX` result invokes the existing C++ `NOT_REACHED` fatal handler
-for an unsupported base slope or an out-of-contract coordinate. No defined behavior
-for coordinates outside the documented range is promised. Both Rust build profiles
+for an unsupported base slope or an out-of-contract coordinate. The coordinate
+guard is new: the original may compute a height for some out-of-range inputs,
+whereas Rust rejects them. Equivalence is limited to the original documented
+coordinate range; callers inspected for this port use 0 through 15. Both Rust build profiles
 abort on panic; the non-unwinding C ABI prevents unwinding into C++. Unsafe code is
 denied except for the scoped export-symbol attribute; the implementation is safe Rust.
 
