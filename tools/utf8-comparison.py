@@ -36,8 +36,9 @@ def main():
             raise RuntimeError(f"{name} failed: {result.stdout}")
         return result.stdout
 
-    run(["cargo", "build", "--release", "--locked"], "rust-build")
-    archive = output / "cargo/release/libopenttd_kernels.a"
+    configuration = migration.rust_configuration(migration.ROOT / "build-rust")
+    run(["cargo", "build", "--release", "--locked", "--target", configuration["target"]], "rust-build")
+    archive = migration.rust_archive(migration.ROOT / "build-rust", target_dir=output / "cargo")
     fixture = migration.ROOT / "tools/migration/utf8-comparison.cpp"
     report = {"baseline": migration.BASELINE, "candidate_commit": migration.git("rev-parse", "HEAD"),
               "candidate_status": migration.git("status", "--short"), "commands": records,

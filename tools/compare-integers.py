@@ -162,7 +162,7 @@ def main():
     MIGRATION["ensure_reference"]()
     OUT.mkdir(parents=True, exist_ok=True)
     env = MIGRATION["environment"]()
-    archive = ROOT / ".local/build-tools-rust/cargo/release/libopenttd_kernels.a"
+    archive = MIGRATION["rust_archive"](ROOT / ".local/build-tools-rust")
     if not archive.exists():
         raise RuntimeError("Build the native Rust tools first; see migration guide")
     binaries = {}
