@@ -928,3 +928,65 @@ CRT and assertion commands, maps, ABI execution, refusal/freshness reports, none
 test inventories, JUnit and fresh generated files. Parser unit checks and Linux
 ABI/Cargo checks are preliminary evidence; actual x86/x64 Windows artifacts and
 existing macOS checks are required before claiming platform support or integration.
+
+## Authentication and streaming owners
+
+The X25519 session and encryption-owner migration (#35) uses a versioned,
+primitive-only host function table. The bundled Monocypher algorithms remain
+unchanged. Rust owns stable key/session allocations and vendor-context storage;
+C++ supplies each vendor context's actual size/alignment and starts its trivial
+object lifetime before initialization or copying. This avoids a Rust mirror of
+platform-dependent vendor structs and adds no vendor-symbol dependency to other
+Rust archive consumers. Packet, RNG, policy and logging calls happen after each
+Rust call returns, so application exceptions cannot unwind through Rust.
+
+Secret fields are initialized directly in their final allocation. Deep copies
+copy heap to heap; assignment overwrites existing fixed storage as the original
+C++ member assignment did. Rvalue facade copies preserve the original source
+state. Destruction invokes bundled volatile wiping before Rust deallocation,
+including the original reverse session-field order. Hash finalization performs
+its original context wipe. Temporary shared secrets have independently wiped
+stable storage. Opaque streaming contexts retain the bundled successful-rekey
+behavior; their counter does not advance, and failed authentication leaves the
+context and output unchanged. Allocation failure/panics abort as for the other
+Rust kernels. Register spills, caller-held input copies and the vendor
+algorithms' internal temporaries remain outside this owner-storage guarantee;
+this does not claim complete deallocation security.
+
+Borrowed fixed-width views retain their address across completed mutation and
+assignment, until owner destruction. Callers serialize access and never read a
+view during a mutating call. Exchange extra payload may alias existing derived
+key bytes because all input hashing precedes key replacement. Callers provide
+initialized readable/writable buffers and byte lengths
+no greater than `PTRDIFF_MAX`, and keep MAC/message regions disjoint. Encryption
+is in place through raw primitive pointers; Rust never creates overlapping
+shared and mutable message slices. Empty variable spans may use null pointers.
+The existing short nonempty `Packet::Recv_bytes` path is undefined because its
+callback takes an unchecked subspan; deferred fork issue #41 records this
+separately. Zero-length, full-length and trailing-data paths are defined and
+remain within #35's reproduction contract.
+
+`python3 tools/auth-comparison.py` compiles the actual pinned and candidate
+session/Packet/vendor sources into separate endpoints. Both mixed directions,
+Rust/Rust and portable C++ are compared with original/original transcripts:
+request/response/enable bytes, derived halves, results/cursor/diagnostic bytes,
+prescribed RNG traces, failure/retry state and independent stream keys/counters.
+The corpus includes empty and block-boundary messages, wrong/empty/NUL payload,
+low-order peers, exact-size errors, tampering, copy/assignment/self/rvalue copies,
+self-key-payload aliasing, span stability, and cleanup after first/second RNG,
+packet/output allocation and logger exceptions. Primitive observers invoke the
+real bundled algorithms, use fixed-capacity nonthrowing records, and check
+outer wiping order and hash-final zero bytes. Fixture observations retain only
+known test values. They do not establish constant-time execution or whole-system
+secret erasure. The C++ fixture/vendor/Packet/adapter sanitizer run also observes
+Rust allocator leaks, but does not instrument Rust memory accesses.
+
+Clean core `f308ac2cda` passed all four Cargo gates and full 97-reference /
+110-candidate tests, including the five unchanged network cases. Fresh native
+Rust/portable tools and all inherited comparison suites passed. The focused
+corpus passed 1,800 mixed endpoint records plus both sanitizer directions before
+its final evidence commit; exact final-head evidence and platform review remain
+required. Original source hashes, commands and transcripts are retained under
+`.local/auth-comparison/`; `.local/auth-linkage.json` records actual Rust calls in
+both game/test binaries. The migration workflow runs the authentication
+comparison unconditionally and retains its evidence.

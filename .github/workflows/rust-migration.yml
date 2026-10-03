@@ -104,6 +104,8 @@ jobs:
           python3 tools/math-extension-comparison.py
       - name: Compare generic history behavior with pinned original
         run: python3 tools/history-comparison.py
+      - name: Compare X25519 authentication and streaming with mixed original endpoints
+        run: python3 tools/auth-comparison.py
       - name: Save validated protected-branch compilation artifacts
         if: success() && env.MIGRATION_CCACHE == 'true' && github.ref == 'refs/heads/rust-migration' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && steps.compiler-cache-restore.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
@@ -127,4 +129,5 @@ jobs:
             .local/math-comparison/
             .local/math-extension-comparison/
             .local/history-comparison/
+            .local/auth-comparison/
           include-hidden-files: true
