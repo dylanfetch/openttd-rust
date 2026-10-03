@@ -36,9 +36,10 @@ fork; the remaining upstream documentation explains behavior and architecture.
   only back up operations that cannot overflow in the original. This applies to
   new work; known divergences in existing ports are tracked as issues (#75).
 - Evidence for game-logic ports is the semantic simulation harness
-  (`python3 tools/migration.py simulate`, #72) plus the existing tests; a
+  (`python3 tools/migration.py simulate`, #72) plus the existing tests; a new
   game-logic port integrates only after the harness exists and its scenarios
-  exercise the component. Extend the harness's scenarios rather than writing a
+  exercise the component. Fidelity fixes to existing ports (such as #75) are
+  not new ports and do not wait for it. Extend the harness's scenarios rather than writing a
   new per-component comparison tool. Add a narrow comparison against unchanged
   reference bodies only for a concrete gap the harness cannot reach, and say
   in the PR which gap.
@@ -102,6 +103,9 @@ For substantive changes:
    recording exact validation commands and limitations.
 3. Assign a separate reviewer agent to examine the final commit and check evidence.
    Resolve findings, then review the resulting commit again before integration.
+   Updating a reviewed PR from its base needs no new review when the update has
+   no conflicts in `src/` or `rust/` and CI passes; otherwise the reviewer checks
+   only the conflict resolution.
 4. Root integrates after review and required checks, and records completion.
 
 Do not self-approve or imply that agents sharing GitHub credentials are independent

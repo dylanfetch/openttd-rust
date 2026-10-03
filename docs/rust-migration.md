@@ -619,16 +619,17 @@ secret erasure is not claimed.
 
 Borrowed fixed-width views keep their address until owner destruction; callers
 serialize access. Exchange extra payload may alias derived key bytes. MAC and
-message regions must be disjoint; encryption is in place through raw pointers. The
-original short nonempty `Packet::Recv_bytes` path is undefined; deferred #41 tracks
+message regions must be disjoint; encryption is in place through raw pointers, and
+Rust never forms overlapping shared and mutable message slices. Views are never
+read during a mutating call. The original short nonempty `Packet::Recv_bytes` path is undefined; deferred #41 tracks
 it.
 
 Evidence: the five unchanged network cases, plus `python3 tools/auth-comparison.py`:
 pinned and candidate session/Packet/vendor sources as separate endpoints, both mixed
 directions, Rust/Rust and portable C++ against original transcripts (wire bytes,
 derived keys, RNG traces, failure/retry, copies, aliasing, exception cleanup), with
-a C++ sanitizer run that also checks Rust allocator leaks. Not constant-time or
-erasure evidence. Evidence: `.local/auth-comparison/`.
+a C++ sanitizer run that also checks Rust allocator leaks but does not instrument
+Rust memory accesses. Not constant-time or erasure evidence. Evidence: `.local/auth-comparison/`.
 
 ### Paired Script Admin conversion
 
@@ -706,8 +707,13 @@ end-marker assertion; the `WITH_ASSERT`-only trailing-parts exception stays
 separate. Window construction clears shade first, queries caption then shade only
 with a remaining body, and writes the shade pointer before building the body; the
 inserted stacked wrapper keeps INVALID_WIDGET and its vertical body container.
-Exceptions keep already-committed children; the shade output is not reset. The
-shared Rust archive imports no widget-library callbacks.
+The initial `unique_ptr&&` stays a C++ reference until successful return.
+Exceptions keep already-committed children in the caller's container; stable C++
+slots hold unattached objects and temporaries, and RAII destroys them in reverse
+construction order without running pending parser actions. The shade output is
+not reset. Rust owns only control allocations and their destroy function; no
+descriptor pointer survives completion, and exceptions never unwind through a
+Rust frame. The shared Rust archive imports no widget-library callbacks.
 
 Evidence: all four unchanged `test_window_desc.cpp` bodies (every registered
 WindowDesc through the production parser), plus `python3
@@ -760,7 +766,8 @@ ownership remain C++.
 A caller-owned 16-byte collector (uint32 amount/previous, uint16 station IDs
 including 0xFFFF, byte selector/finalized) is asserted in C++ and ABI layout ID 18;
 Windows x86 uses explicit cdecl. Rust borrows the destination only during
-feed/finalize. A C++ RAII finalizer flushes the last positive run on normal exit,
+feed/finalize, and the destination outlives the collector; no world pointer,
+STL/VM layout, iterator, callback or C++ exception enters or survives a Rust call. A C++ RAII finalizer flushes the last positive run on normal exit,
 early return or unwinding; finalization is idempotent, with no rollback. Filtering
 precedes key changes; equal-key totals and share differences wrap modulo 2^32;
 previous resets per origin and advances on every visited share, including filtered

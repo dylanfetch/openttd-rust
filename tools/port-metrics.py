@@ -35,7 +35,7 @@ def classify(text):
     stack, tags = [], []
     for line in text.splitlines():
         match = DIRECTIVE.match(line)
-        kind, rest = (match.group(1), match.group(2).split("//")[0].strip()) if match else (None, "")
+        kind, rest = (match.group(1), re.sub(r"/\*.*?\*/", " ", match.group(2)).split("//")[0].strip()) if match else (None, "")
         if kind in ("if", "ifdef", "ifndef"):
             if (kind == "ifdef" and rest == "WITH_RUST") or (kind == "if" and POSITIVE.match(rest)):
                 frame = "rust"
@@ -69,16 +69,14 @@ def state(stack):
 
 
 def show(rev, path):
-    try:
-        return git("show", f"{rev}:{path}")
-    except subprocess.CalledProcessError:
-        return ""
+    result = subprocess.run(["git", "show", f"{rev}:{path}"], cwd=ROOT, capture_output=True, text=True, errors="replace")
+    return result.stdout if result.returncode == 0 else ""
 
 
-def added_lines(base, head, path):
-    """Return 1-based HEAD line numbers added relative to base."""
+def added_lines(base, head, old, new):
+    """Return 1-based line numbers of `new` at head not present in `old` at base."""
     numbers = []
-    for line in git("diff", "-U0", base, head, "--", path).splitlines():
+    for line in git("diff", "-U0", "-M", base, head, "--", *dict.fromkeys((old, new))).splitlines():
         hunk = re.match(r"^@@ -\S+ \+(\d+)(?:,(\d+))? @@", line)
         if hunk:
             start, count = int(hunk.group(1)), int(hunk.group(2) or "1")
@@ -86,29 +84,44 @@ def added_lines(base, head, path):
     return numbers
 
 
+def changes(base, head):
+    """Yield (status, old path, new path) with renames paired, NUL-safe."""
+    fields = git("diff", "--name-status", "-z", "-M", base, head).split("\0")
+    i = 0
+    while i < len(fields) - 1:
+        status = fields[i]
+        if status[0] in "RC":
+            yield status[0], fields[i + 1], fields[i + 2]
+            i += 3
+        else:
+            yield status[0], fields[i + 1], fields[i + 1]
+            i += 2
+
+
 def metrics(base, head="HEAD"):
     result = {"rust": 0, "tooling": 0, "glue": 0, "retired": 0}
-    for row in git("diff", "--numstat", base, head).splitlines():
-        added, _, path = row.split("\t", 2)
-        if added == "-":
+    sources = (".cpp", ".h", ".hpp", ".c", ".cc", ".mm")
+    retired_delta = 0
+    for status, old, new in changes(base, head):
+        before, after = ("" if status == "A" else show(base, old)), ("" if status == "D" else show(head, new))
+        # Lines of `new` that do not come from `old` (all of them for an added file).
+        numbers = [] if status == "D" else added_lines(base, head, old, new)
+        if new.startswith(("rust/", "tools/")):
+            result["rust" if new.startswith("rust/") else "tooling"] += len(numbers)
+        if not (old.startswith("src/") or new.startswith("src/")) or not new.endswith(sources):
             continue
-        if path.startswith("rust/"):
-            result["rust"] += int(added)
-        elif path.startswith("tools/"):
-            result["tooling"] += int(added)
-    for row in git("diff", "--name-status", "--no-renames", base, head, "--", "src").splitlines():
-        status, path = row.split("\t", 1)
-        if not path.endswith((".cpp", ".h", ".hpp", ".c")):
-            continue
-        before = show(base, path)
         if status == "D":
-            result["retired"] += len(before.splitlines())
+            # Deleting original C++ retires it; deleting earlier glue does not.
+            retired_delta += sum(1 for tag in classify(before) if tag != "rust")
             continue
-        head_tags = classify(show(head, path))
-        base_tags = classify(before)
-        result["retired"] += max(0, head_tags.count("cpp") - base_tags.count("cpp"))
-        result["glue"] += sum(1 for n in added_lines(base, head, path) if n <= len(head_tags) and head_tags[n - 1] != "cpp")
+        head_tags, base_tags = classify(after), classify(before)
+        retired_delta += head_tags.count("cpp") - base_tags.count("cpp")
+        result["glue"] += sum(1 for n in numbers if n <= len(head_tags) and head_tags[n - 1] != "cpp")
+    result["retired"] = max(0, retired_delta)
     return result
+
+
+
 
 
 def main():

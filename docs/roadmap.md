@@ -62,10 +62,12 @@ simulate`; it must not match the `tools/*-comparison.py` glob, which would run
 it a second time inside the comparisons step.
 
 Reference vs reference must be clean before #72 lands. A reference-vs-candidate
-divergence caused by an existing port does not block #72: file it as a bug,
-list that scenario as a known failure naming the issue, and land. The CI job
-fails on any divergence not on that list, and the list is emptied by fixing
-the ports, never by masking fields.
+divergence caused by an existing port does not block #72: file it as a bug and
+record it as a known failure by its exact first divergence (scenario, chunk,
+field, the issue), then land. "Clean" means no divergence outside that list,
+and CI fails on any other. The list is emptied by fixing the ports, never by
+masking fields. Those bug fixes are phase 1 items and take priority over new
+phase 2 or 3 work.
 
 ## Phase 2: first game-logic ports with Rust-owned state
 
@@ -87,10 +89,11 @@ game-visible and deterministic, with a clean ownership boundary.
 Both issues set a budget for C++ glue, and both require the C++ body to be
 compiled only in the portable build.
 
-## Phase 3 candidates (root selects after phase 2)
+## Phase 3 candidates
 
-Choose by what phase 2 teaches about callback-heavy boundaries. The candidates
-are roughly in order of increasing coupling:
+Start these after #73 or #74 integrates, choosing by what it taught about
+callback-heavy boundaries. The candidates are roughly in order of increasing
+coupling:
 
 - Town name generation (`townname.cpp`): pure, and can be compared exhaustively.
 - Tree tile loop and tree placement (`tree_cmd.cpp`): tile-loop callbacks and
@@ -111,13 +114,11 @@ accepts it by merging it like any other PR.
 
 Take the first unblocked item from the earliest phase that has one. Work
 already in CI or review is not blocking: start the next item while it runs.
-Phases 1 and 2 and the design note run concurrently. Paused, deferred and
-out-of-scope issues are not fallbacks; when every listed item is in progress,
-root picks the next phase 3 candidate and adds its issue here.
-
-Updating a reviewed PR from its base needs no new review when the update has
-no conflicts in `src/` or `rust/` and CI passes. Otherwise the reviewer checks
-only the conflict resolution.
+Phases 1 and 2 and the design note run concurrently. At most two ports may sit
+implemented but unintegrated while they wait for #72; put spare capacity into
+#72, its harness scenarios and the bugs it finds. Paused, deferred and
+out-of-scope issues are not fallbacks. Once #73 or #74 integrates, root picks
+the next phase 3 candidate and adds its issue here.
 
 ## Out of scope for the near term
 
