@@ -380,8 +380,11 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
                         for role in ("reference", "candidate")}
                 exits = [runs[role]["snapshots"][-1] if runs[role]["snapshots"] and runs[role]["snapshots"][-1].name == "exit.sav"
                          else None for role in ("reference", "candidate")]
-                same_end = all(exits) and save_moment(exits[0]) == save_moment(exits[1])
-                if same_end:
+                # Retry only a clean pair whose end moments differ; a crash, hang
+                # or missing save on any attempt is kept and reported.
+                clean = all(exits) and all(run["exit"] == 0 for run in runs.values())
+                same_end = clean and save_moment(exits[0]) == save_moment(exits[1])
+                if same_end or not clean:
                     break
             for role, run in runs.items():
                 result[f"{mode}_{role}_seconds"] = run["seconds"]
@@ -396,7 +399,7 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
                 result["problems"].append(f"{mode}: an exit save is missing")
             periodic = [[p.name for p in runs[role]["snapshots"] if p.name != "exit.sav"] for role in ("reference", "candidate")]
             shorter = min(periodic, key=len)
-            if periodic[0][:len(shorter)] != periodic[1][:len(shorter)]:
+            if periodic[0][:len(shorter)] != periodic[1][:len(shorter)] or (same_end and periodic[0] != periodic[1]):
                 result["problems"].append(f"{mode}: snapshot dates differ: {first_difference(*periodic)}")
             elif len(periodic[0]) != len(periodic[1]):
                 result["notes"].append(f"{mode}: runs reached different dates ({len(periodic[0])} vs {len(periodic[1])} snapshots)")
@@ -447,7 +450,10 @@ def main():
     parser.add_argument("--list", action="store_true")
     args = parser.parse_args()
 
-    scenarios = [s for s in scenario_list(args.soak) if not args.names or any(n in s["name"] for n in args.names)]
+    every = scenario_list(args.soak)
+    # An exact scenario name selects only that scenario; anything else is a substring filter.
+    scenarios = [s for s in every if not args.names or any(
+        n == s["name"] if any(n == t["name"] for t in every) else n in s["name"] for n in args.names)]
     if not scenarios:
         parser.error(f"no scenario matches {args.names}; see --list")
     if args.list:
