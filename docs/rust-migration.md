@@ -898,6 +898,10 @@ tracked under issue #3. `OPTION_RUST=OFF` retains its existing configuration.
 The unchanged CMake ordering gives Windows RelWithDebInfo game/tests both
 `NDEBUG` and `WITH_ASSERT`, while generators have `NDEBUG` alone. Evidence checks
 actual role-specific compile commands rather than adding generator definitions.
+The x86 RelWithDebInfo build exposed six existing narrowing assignments in station
+expansion, snow-line calculation, map-height selection and old-save station loading.
+Explicit casts to their existing unsigned destinations retain the original modulo
+conversion after the complete expression, without changing arithmetic or ordering.
 The ABI fixture compares all current C++ struct sizes, alignments and field offsets
 against Rust, and executes high-bit scalars, by-value returns, pointer-sized
 sentinels, null/empty inputs and Rust allocation/view/destroy paths. Its deliberately
