@@ -468,6 +468,48 @@ to Rust, they should use the internal byte algorithms directly; after the last c
 moves, remove the C++ view/pair facade and files. Neither this slice nor its reference
 comparison completes the entire string subsystem.
 
+## Generic history structural engine
+
+The issue #29 history port moves descriptor-driven validity, rotation scheduling,
+and query traversal into `history.rs`. HistoryRange constexpr construction/layout,
+HistoryData typed ownership, every SumHistory specialization, graph fillers, and
+GetAndResetAccumulatedAverage remain in C++. Production averaging keeps its exact
+literal-0 int accumulators and nested reduction grouping; this port does not
+complete history/economy statistics or change saves.
+
+Rust owns an arbitrary-depth scalar frame stack. Its staged operation stream asks
+C++ to describe immutable range objects by value, then selects child/parent order,
+slots, move-backward/copy/reset/reduce scheduling, query scratch boundaries, and
+validity. Opaque uintptr identity tokens round-trip to pointers only in C++; Rust
+never dereferences them, mirrors the C++ layout, or borrows typed history storage.
+The acyclic descriptor chain must remain live/immutable until engine destruction;
+original valid-index/divisor/bit-shift preconditions apply, without a three-level
+or built-in-range restriction. Unsigned index arithmetic wraps at native uint32,
+and GB's uint32 extraction truncation remains even for uint64 validity masks.
+
+C++ executes every typed operation after Rust returns. Query aggregates retain the
+original full std::array scratch default construction at stable stack addresses,
+then supply the live global month to Rust. Nested reductions/assignments and
+scratch destruction finish before subsequent child scheduling and phase reads.
+Generic constructors, copies/moves, reducers and destructors may therefore affect
+phase or throw without crossing an extern-C stack. C++ RAII returns the opaque
+engine to Rust exactly once during normal return or typed unwinding; scalar frame
+reallocation moves no typed elements. Rust allocation/OOM/panic aborts; equivalent
+resource-exhaustion timing is not claimed. No C++ allocator or layout ownership
+crosses the boundary.
+
+Update and rotation independently use explicit cur_month; queries use the live
+TimerGameEconomy::month. Children update/rotate first even for saturated/skipped
+parents, no-prerequisite higher rotations still shift, query validity ORs all
+children while IsValidHistory chooses only the first, invalid children still
+contribute data, and invalid query ages retain the original C++ fatal dispatch
+rather than validity's false return. Result/history aliasing and partial typed
+writes follow the original operation order.
+
+The unchanged 288-month upstream test remains primary evidence. Its standalone
+reference/Rust/fallback runs each pass 86 assertions; focused gap evidence and
+full linked-game verification are recorded in the issue/PR as they complete.
+
 ## Team process and engineering standards
 
 `AGENTS.md` defines durable agent instructions. Root orchestrates, delegates heavily,
