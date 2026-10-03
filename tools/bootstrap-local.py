@@ -13,7 +13,7 @@ PACKAGES = (
     "libsdl2-dev", "liblzma-dev", "libpng-dev", "libcurl4-openssl-dev",
     "libfreetype-dev", "libfontconfig-dev", "libharfbuzz-dev", "libicu-dev",
     "libicu78", "liblzo2-dev", "pkgconf", "pkgconf-bin", "libpkgconf7",
-    "openttd-opengfx",
+    "openttd-opengfx", "ccache", "libfmt10", "libhiredis1.1.0",
 )
 
 

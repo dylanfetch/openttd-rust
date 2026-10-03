@@ -2,6 +2,7 @@
 """Build the pinned original and migration fork, retaining validation evidence."""
 
 import argparse
+from contextlib import contextmanager, nullcontext
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -15,7 +16,23 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCAL = ROOT / ".local"
-REFERENCE = LOCAL / "reference/openttd"
+
+
+def _common_root():
+    """The main checkout; linked worktrees share its reference and caches."""
+    try:
+        common = subprocess.check_output(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+                                         cwd=ROOT, text=True, stderr=subprocess.DEVNULL).strip()
+    except (OSError, subprocess.CalledProcessError):
+        return ROOT
+    return Path(common).parent
+
+
+COMMON_ROOT = _common_root()
+COMMON_LOCAL = COMMON_ROOT / ".local"
+# One pinned reference checkout and build per clone, shared by every worktree.
+REFERENCE = COMMON_LOCAL / "reference/openttd"
+REFERENCE_BUILD = COMMON_LOCAL / "build-reference"
 BASELINE = json.loads((ROOT / "migration/baseline.json").read_text())
 
 
@@ -25,11 +42,16 @@ def environment():
     def prepend(name, value):
         env[name] = str(value) + (os.pathsep + env[name] if env.get(name) else "")
 
-    if (LOCAL / "cargo/bin").exists():
-        env["CARGO_HOME"] = str(LOCAL / "cargo")
-        env["RUSTUP_HOME"] = str(LOCAL / "rustup")
-        prepend("PATH", LOCAL / "cargo/bin")
-    deps = LOCAL / "deps"
+    # Bootstrapped toolchains/dependencies live in the main checkout; worktrees
+    # use them directly instead of needing per-worktree symlinks.
+    def bootstrapped(name):
+        return LOCAL / name if (LOCAL / name).exists() else COMMON_LOCAL / name
+
+    if (bootstrapped("cargo") / "bin").exists():
+        env["CARGO_HOME"] = str(bootstrapped("cargo"))
+        env["RUSTUP_HOME"] = str(bootstrapped("rustup"))
+        prepend("PATH", bootstrapped("cargo") / "bin")
+    deps = bootstrapped("deps")
     if deps.exists():
         prepend("PATH", deps / "usr/bin")
         prepend("LD_LIBRARY_PATH", deps / "usr/lib/x86_64-linux-gnu")
@@ -90,9 +112,15 @@ def rust_archive(build: Path, *, target_dir: Path | None = None) -> Path:
 
 
 CCACHE_POLICY = {
-    "compiler_check": "content", "direct_mode": "false", "depend_mode": "false",
-    "sloppiness": "", "hash_dir": "true", "base_dir": "", "remote_storage": "",
+    "compiler_check": "content", "direct_mode": "true", "depend_mode": "false",
+    "sloppiness": "", "hash_dir": "false", "remote_storage": "",
 }
+
+
+def compiler_cache_base(role):
+    """Root containing the role's source and build trees. ccache rewrites paths
+    below it to relative ones, so separate worktrees share cache entries."""
+    return COMMON_ROOT.resolve() if role == "reference" else ROOT.resolve()
 
 
 def compiler_cache_environment(env, role, *, bypass=False):
@@ -101,7 +129,8 @@ def compiler_cache_environment(env, role, *, bypass=False):
         raise ValueError("Compiler cache role must be reference or candidate")
     result = {key: value for key, value in env.items() if not key.startswith("CCACHE_")}
     result["CCACHE_CONFIGPATH"] = str(ROOT / "migration/ccache.conf")
-    result["CCACHE_DIR"] = str(LOCAL / "compiler-cache" / role)
+    result["CCACHE_DIR"] = str(COMMON_LOCAL / "compiler-cache" / role)
+    result["CCACHE_BASEDIR"] = str(compiler_cache_base(role))
     if bypass:
         result["CCACHE_DISABLE"] = "1"
     return result
@@ -112,10 +141,11 @@ def compiler_cache_settings(executable, env):
     output = subprocess.check_output([executable, "--show-config"], env=env, text=True)
     settings = {}
     for line in output.splitlines():
-        if ") " in line and " = " in line:
-            key, value = line.split(") ", 1)[1].split(" = ", 1)
-            settings[key] = value
-    for key, expected in CCACHE_POLICY.items():
+        if ") " in line and " =" in line:
+            key, _, value = line.split(") ", 1)[1].partition(" =")
+            settings[key] = value.strip()
+    expected_policy = dict(CCACHE_POLICY, base_dir=env.get("CCACHE_BASEDIR", ""))
+    for key, expected in expected_policy.items():
         if settings.get(key) != expected:
             raise RuntimeError(f"Unsafe ccache setting {key}: {settings.get(key)!r}, expected {expected!r}")
     expected_disable = "true" if env.get("CCACHE_DISABLE") else "false"
@@ -136,12 +166,28 @@ def compiler_cache_options(executable):
             f"-DCMAKE_DISABLE_PRECOMPILE_HEADERS={'ON' if executable else 'OFF'}"]
 
 
-def verify_compiler_cache_options(build, executable):
+def cmake_cache(build):
     cache = {}
     for line in (build / "CMakeCache.txt").read_text().splitlines():
         if line and not line.startswith(("#", "//")) and "=" in line:
             key, value = line.split("=", 1)
             cache[key.split(":", 1)[0]] = value
+    return cache
+
+
+def configured_as(build, source, command):
+    """Whether an existing build tree already holds every requested -D value."""
+    if not (build / "build.ninja").exists() or not (build / "CMakeCache.txt").exists():
+        return False
+    cache = cmake_cache(build)
+    if Path(cache.get("CMAKE_HOME_DIRECTORY", "")).resolve() != Path(source).resolve():
+        return False
+    requested = dict(argument[2:].split("=", 1) for argument in command if argument.startswith("-D"))
+    return all(cache.get(key.split(":", 1)[0]) == value for key, value in requested.items())
+
+
+def verify_compiler_cache_options(build, executable):
+    cache = cmake_cache(build)
     expected = {"CMAKE_C_COMPILER_LAUNCHER": executable or "",
                 "CMAKE_CXX_COMPILER_LAUNCHER": executable or "",
                 "CMAKE_DISABLE_PRECOMPILE_HEADERS": "ON" if executable else "OFF"}
@@ -152,19 +198,17 @@ def verify_compiler_cache_options(build, executable):
 
 
 def compiler_cache_compatibility(env=None):
-    """Fingerprint the runtime/policy, leaving source contents to the compiler cache."""
+    """Key for restoring cache directories. ccache itself hashes compiler content,
+    arguments and every included file, so this only groups compatible entries;
+    it deliberately excludes workflow and driver files that component PRs edit."""
     env = environment() if env is None else env
     tools = {}
-    for name in (env.get("CC", "cc"), env.get("CXX", "c++"), "ccache", "cmake", "ninja", "ld", "ar", "rustc", "cargo"):
+    for name in (env.get("CC", "cc"), env.get("CXX", "c++"), "ccache"):
         tools[name] = subprocess.check_output([name, "--version"], env=env, text=True)
-    dependencies = subprocess.check_output([
-        "dpkg-query", "-W", "-f=${binary:Package}=${Version}\n",
-    ], env=env, text=True)
-    files = ("migration/ccache.conf", "tools/migration.py", ".github/workflows/rust-migration.yml")
+    files = ("migration/ccache.conf",)
     policy = {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in files}
     identity = {"os": platform.system(), "architecture": platform.machine(),
-                "baseline": BASELINE["commit"], "policy": policy,
-                "tools": tools, "installed_dependencies": dependencies}
+                "baseline": BASELINE["commit"], "policy": policy, "tools": tools}
     digest = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
     identity["prefix"] = f"compiler-v1-{identity['os']}-{identity['architecture']}-{BASELINE['commit']}-{digest}"
     return identity
@@ -172,6 +216,23 @@ def compiler_cache_compatibility(env=None):
 
 def git(*args, cwd=ROOT):
     return subprocess.check_output(["git", *args], cwd=cwd, text=True).strip()
+
+
+@contextmanager
+def reference_lock():
+    """Serialize reference checkout/build/test across concurrent worktree runs."""
+    try:
+        import fcntl
+    except ImportError:  # Windows CI imports this module but never builds the reference.
+        yield
+        return
+    COMMON_LOCAL.mkdir(parents=True, exist_ok=True)
+    with (COMMON_LOCAL / "reference.lock").open("w") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)
 
 
 def ensure_reference():
@@ -189,6 +250,7 @@ def ensure_reference():
 def supply_graphics(build):
     candidates = [
         LOCAL / "deps/usr/share/games/openttd/baseset/opengfx",
+        COMMON_LOCAL / "deps/usr/share/games/openttd/baseset/opengfx",
         Path("/usr/share/games/openttd/baseset/opengfx"),
         Path("/usr/share/openttd/baseset/opengfx"),
     ]
@@ -205,19 +267,22 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=("build", "verify", "tools"), nargs="?", default="verify")
     parser.add_argument("--jobs", type=int, default=min(6, os.cpu_count() or 1))
-    parser.add_argument("--ccache", action="store_true", help="Use conservative separate compiler caches with PCH disabled")
-    parser.add_argument("--ccache-bypass", action="store_true", help="Measure the same no-PCH configuration without cache reuse (requires --ccache)")
+    parser.add_argument("--ccache", action="store_true", help="Require the shared compiler cache (default: use it when ccache is available)")
+    parser.add_argument("--no-ccache", action="store_true", help="Ordinary builds without the compiler cache (PCH enabled)")
+    parser.add_argument("--ccache-bypass", action="store_true", help="Measure the same no-PCH configuration without cache reuse")
     args = parser.parse_args()
-    if args.ccache_bypass and not args.ccache:
-        parser.error("--ccache-bypass requires --ccache")
+    if args.no_ccache and (args.ccache or args.ccache_bypass):
+        parser.error("--no-ccache conflicts with --ccache/--ccache-bypass")
     if args.jobs < 1:
         parser.error("--jobs must be positive")
     started = time.monotonic()
-    ensure_reference()
+    with reference_lock():
+        ensure_reference()
     env = environment()
-    cache_executable = shutil.which("ccache", path=env["PATH"]) if args.ccache else None
-    if args.ccache and cache_executable is None:
+    cache_executable = None if args.no_ccache else shutil.which("ccache", path=env["PATH"])
+    if (args.ccache or args.ccache_bypass) and cache_executable is None:
         parser.error("--ccache requires ccache on PATH")
+    args.ccache = cache_executable is not None
     env["CARGO_TARGET_DIR"] = str(ROOT / "build-rust/cargo")
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
     evidence = LOCAL / "verification" / stamp
@@ -265,7 +330,7 @@ def main():
             raise RuntimeError(f"{name} failed; see {log}")
         return log
 
-    builds = {"reference": (ROOT / "build-reference").resolve(), "candidate": ROOT / "build-rust"}
+    builds = {"reference": REFERENCE_BUILD.resolve(), "candidate": ROOT / "build-rust"}
     original_environment = env.copy()
     cache_before = {}
 
@@ -297,43 +362,51 @@ def main():
             common = ["-G", "Ninja", "-DCMAKE_BUILD_TYPE=RelWithDebInfo", "-DOPTION_USE_ASSERTS=OFF"]
         common.extend(compiler_cache_options(cache_executable))
         for name, build in builds.items():
-            select_role(name)
-            source = REFERENCE.resolve() if name == "reference" else ROOT
-            extra = [] if name == "reference" else [
-                "-DBINARY_NAME=openttd-rust",
-                "-DOPTION_RUST=ON",
-            ]
-            if args.action == "tools":
-                extra.append("-DOPTION_TOOLS_ONLY=ON")
-            run(f"{name}-configure", ["cmake", "-S", str(source), "-B", str(build), *common, *extra])
-            report[f"{name}_compiler_settings"] = verify_compiler_cache_options(build, cache_executable)
-            if name == "candidate":
-                report["rust_configuration"] = rust_configuration(build)
-            if args.action != "tools":
-                supply_graphics(build)
-            run(f"{name}-build", ["cmake", "--build", str(build), "--parallel", str(args.jobs)])
-            if args.action == "tools":
-                binaries = [build / "src/strgen/strgen", build / "src/settingsgen/settingsgen"]
-                report[f"{name}_binary_sha256"] = {
-                    str(binary.relative_to(build)): hashlib.sha256(binary.read_bytes()).hexdigest()
-                    for binary in binaries
-                }
-            else:
-                binary = build / ("openttd" if name == "reference" else "openttd-rust")
-                report[f"{name}_binary_sha256"] = hashlib.sha256(binary.read_bytes()).hexdigest()
+            with reference_lock() if name == "reference" else nullcontext():
+                select_role(name)
+                source = REFERENCE.resolve() if name == "reference" else ROOT
+                extra = [] if name == "reference" else [
+                    "-DBINARY_NAME=openttd-rust",
+                    "-DOPTION_RUST=ON",
+                ]
+                if args.action == "tools":
+                    extra.append("-DOPTION_TOOLS_ONLY=ON")
+                configure = ["cmake", "-S", str(source), "-B", str(build), *common, *extra]
+                # Ninja reruns CMake itself when any CMake input changes, so an
+                # explicit configure is only needed when the cache lacks a requested value.
+                if configured_as(build, source, configure):
+                    print(f"{name}-configure: CMakeCache already matches; reusing {build}", flush=True)
+                else:
+                    run(f"{name}-configure", configure)
+                report[f"{name}_compiler_settings"] = verify_compiler_cache_options(build, cache_executable)
+                if name == "candidate":
+                    report["rust_configuration"] = rust_configuration(build)
+                if args.action != "tools":
+                    supply_graphics(build)
+                run(f"{name}-build", ["cmake", "--build", str(build), "--parallel", str(args.jobs)])
+                if args.action == "tools":
+                    binaries = [build / "src/strgen/strgen", build / "src/settingsgen/settingsgen"]
+                    report[f"{name}_binary_sha256"] = {
+                        str(binary.relative_to(build)): hashlib.sha256(binary.read_bytes()).hexdigest()
+                        for binary in binaries
+                    }
+                else:
+                    binary = build / ("openttd" if name == "reference" else "openttd-rust")
+                    report[f"{name}_binary_sha256"] = hashlib.sha256(binary.read_bytes()).hexdigest()
 
         if args.action == "verify":
             inventories = {}
             for name, build in builds.items():
-                log = run(f"{name}-test-inventory", ["ctest", "--show-only=json-v1"], cwd=build)
-                inventories[name] = {test["name"] for test in json.loads(log.read_text())["tests"]}
-                report[f"{name}_test_count"] = len(inventories[name])
-                if not inventories[name]:
-                    raise RuntimeError(f"{name.capitalize()} CTest inventory is empty; refusing untested verification")
-                run(f"{name}-tests", [
-                    "ctest", "--output-on-failure", "--parallel", str(args.jobs),
-                    "--output-junit", str(evidence / f"{name}-tests.xml"),
-                ], cwd=build)
+                with reference_lock() if name == "reference" else nullcontext():
+                    log = run(f"{name}-test-inventory", ["ctest", "--show-only=json-v1"], cwd=build)
+                    inventories[name] = {test["name"] for test in json.loads(log.read_text())["tests"]}
+                    report[f"{name}_test_count"] = len(inventories[name])
+                    if not inventories[name]:
+                        raise RuntimeError(f"{name.capitalize()} CTest inventory is empty; refusing untested verification")
+                    run(f"{name}-tests", [
+                        "ctest", "--output-on-failure", "--parallel", str(args.jobs),
+                        "--output-junit", str(evidence / f"{name}-tests.xml"),
+                    ], cwd=build)
             missing = inventories["reference"] - inventories["candidate"]
             if missing:
                 raise RuntimeError(f"Candidate removed reference tests: {sorted(missing)}")
