@@ -13,6 +13,7 @@ mod consumer;
 mod history;
 mod integer;
 mod landscape;
+mod script_list;
 
 pub use alternating::{AlternatingState, AlternatingStep};
 pub use consumer::{

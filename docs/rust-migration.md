@@ -693,3 +693,25 @@ binary `nm` inspection are not suppressed. These checks
 validate native linkage and covered behavior; Linux results alone do not establish
 Darwin support. Actual macOS CI evidence and independent review are required before
 integration.
+
+The ScriptList owner migration (#44) moves both deterministic item/value indexes,
+all four sort modes, live pending-cursor/end state, mutation accounting, filters
+and list algebra into Rust. C++ retains script identity/bindings, pool enumeration,
+VM/error/operation charging and save/load adapters. Valuation and serialization
+read copied ascending-item scalars; every Rust borrow ends before a VM operation
+can reenter the list. The mutation token is validated after the original callback
+return-type check; SetValue occurs before the original pop and five-operation
+charge. Earlier commits and callback side effects remain on failure.
+
+The scalar/pointer ABI avoids aggregate-return layout differences on 32-bit
+hosts; items/values are explicitly signed 64-bit and modification tokens signed
+32-bit. Two-list operations recognize self-aliasing before creating references.
+Rust allocation/panics abort. Defined-input reproduction excludes original signed
+modification-counter overflow, nonempty rank decrement overflow and overflowing
+Count()-count, and callbacks that leave original iterators invalid while evading
+its modification check. Resource-exhaustion exception behavior is not promised
+identical. Clone content uses the original target sort/initialization flow;
+saving traverses item order without resetting public iteration. The original
+mixed-type load validation remains unchanged. Initial Cargo checks and both
+Rust-enabled/portable C++ source compilation pass; unchanged regressions and
+bounded owner/VM/persistence gap evidence remain pending.

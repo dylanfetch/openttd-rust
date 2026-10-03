@@ -14,6 +14,7 @@
 
 #include "../../safeguards.h"
 
+#ifndef WITH_RUST
 /**
  * Base class for any ScriptList sorter.
  */
@@ -330,18 +331,44 @@ public:
 
 
 
+#endif
+
+#ifdef WITH_RUST
+static_assert(sizeof(SQInteger) == sizeof(int64_t) && std::is_signed_v<SQInteger>);
+static_assert(sizeof(int) == sizeof(int32_t));
+#endif
+
 bool ScriptList::SaveObject(HSQUIRRELVM vm)
 {
 	sq_pushstring(vm, "List");
 	sq_newarray(vm, 0);
+#ifdef WITH_RUST
+	uint8_t ascending;
+	sq_pushinteger(vm, openttd_rust_list_policy(this->owner.get(), &ascending));
+#else
 	sq_pushinteger(vm, this->sorter_type);
+#endif
 	sq_arrayappend(vm, -2);
+#ifdef WITH_RUST
+	sq_pushbool(vm, ascending ? SQTrue : SQFalse);
+#else
 	sq_pushbool(vm, this->sort_ascending ? SQTrue : SQFalse);
+#endif
 	sq_arrayappend(vm, -2);
 	sq_newtable(vm);
+#ifdef WITH_RUST
+	int64_t key = 0, value;
+	int32_t token;
+	uint8_t has_after = 0;
+	while (openttd_rust_list_read(this->owner.get(), has_after, key, &key, &value, &token) != 0) {
+		has_after = 1;
+		sq_pushinteger(vm, key);
+		sq_pushinteger(vm, value);
+#else
 	for (const auto &item : this->items) {
 		sq_pushinteger(vm, item.first);
 		sq_pushinteger(vm, item.second);
+#endif
 		sq_rawset(vm, -3);
 	}
 	sq_arrayappend(vm, -2);
@@ -389,11 +416,18 @@ ScriptObject *ScriptList::CloneObject()
 
 void ScriptList::CopyList(const ScriptList *list)
 {
+#ifdef WITH_RUST
+	openttd_rust_list_combine(this->owner.get(), list->owner.get(), 4);
+#else
 	this->Sort(list->sorter_type, list->sort_ascending);
 	this->items = list->items;
 	this->values = list->values;
+#endif
 }
 
+#ifdef WITH_RUST
+ScriptList::ScriptList() : owner(openttd_rust_list_new(), openttd_rust_list_destroy) {}
+#else
 ScriptList::ScriptList()
 {
 	/* Default sorter */
@@ -403,6 +437,7 @@ ScriptList::ScriptList()
 	this->initialized    = false;
 	this->modifications  = 0;
 }
+#endif
 
 ScriptList::~ScriptList()
 {
@@ -410,30 +445,46 @@ ScriptList::~ScriptList()
 
 bool ScriptList::HasItem(SQInteger item)
 {
+#ifdef WITH_RUST
+	int64_t value;
+	return openttd_rust_list_get(this->owner.get(), item, &value) != 0;
+#else
 	return this->items.count(item) == 1;
+#endif
 }
 
 void ScriptList::Clear()
 {
+#ifdef WITH_RUST
+	openttd_rust_list_clear(this->owner.get());
+#else
 	this->modifications++;
 
 	this->items.clear();
 	this->values.clear();
 	this->sorter->End();
+#endif
 }
 
 void ScriptList::AddItem(SQInteger item, SQInteger value)
 {
+#ifdef WITH_RUST
+	openttd_rust_list_add(this->owner.get(), item, value);
+#else
 	this->modifications++;
 
 	if (this->HasItem(item)) return;
 
 	this->items[item] = value;
 	this->values.emplace(value, item);
+#endif
 }
 
 void ScriptList::RemoveItem(SQInteger item)
 {
+#ifdef WITH_RUST
+	openttd_rust_list_remove(this->owner.get(), item);
+#else
 	this->modifications++;
 
 	auto item_iter = this->items.find(item);
@@ -446,50 +497,89 @@ void ScriptList::RemoveItem(SQInteger item)
 	assert(value_iter != this->values.end());
 	this->values.erase(value_iter);
 	this->items.erase(item_iter);
+#endif
 }
 
 SQInteger ScriptList::Begin()
 {
+#ifdef WITH_RUST
+	int64_t value;
+	openttd_rust_list_iter(this->owner.get(), 0, &value);
+	return value;
+#else
 	this->initialized = true;
 	return this->sorter->Begin().value_or(0);
+#endif
 }
 
 SQInteger ScriptList::Next()
 {
+#ifdef WITH_RUST
+	int64_t value;
+	if (openttd_rust_list_iter(this->owner.get(), 1, &value) == 0) Debug(script, 0, "Next() is invalid as Begin() is never called");
+	return value;
+#else
 	if (!this->initialized) {
 		Debug(script, 0, "Next() is invalid as Begin() is never called");
 		return 0;
 	}
 	return this->sorter->Next().value_or(0);
+#endif
 }
 
 bool ScriptList::IsEmpty()
 {
+#ifdef WITH_RUST
+	return openttd_rust_list_count(this->owner.get()) == 0;
+#else
 	return this->items.empty();
+#endif
 }
 
 bool ScriptList::IsEnd()
 {
+#ifdef WITH_RUST
+	int64_t value;
+	if (openttd_rust_list_iter(this->owner.get(), 2, &value) == 0) {
+		Debug(script, 0, "IsEnd() is invalid as Begin() is never called");
+		return true;
+	}
+	return value != 0;
+#else
 	if (!this->initialized) {
 		Debug(script, 0, "IsEnd() is invalid as Begin() is never called");
 		return true;
 	}
 	return this->sorter->IsEnd();
+#endif
 }
 
 SQInteger ScriptList::Count()
 {
+#ifdef WITH_RUST
+	return openttd_rust_list_count(this->owner.get());
+#else
 	return this->items.size();
+#endif
 }
 
 SQInteger ScriptList::GetValue(SQInteger item)
 {
+#ifdef WITH_RUST
+	int64_t value = 0;
+	openttd_rust_list_get(this->owner.get(), item, &value);
+	return value;
+#else
 	auto item_iter = this->items.find(item);
 	return item_iter == this->items.end() ? 0 : item_iter->second;
+#endif
 }
 
 bool ScriptList::SetValue(SQInteger item, SQInteger value)
 {
+#ifdef WITH_RUST
+	return openttd_rust_list_set(this->owner.get(), item, value) != 0;
+#else
 	this->modifications++;
 
 	auto item_iter = this->items.find(item);
@@ -507,10 +597,14 @@ bool ScriptList::SetValue(SQInteger item, SQInteger value)
 	this->values.insert(std::move(node_handle));
 
 	return true;
+#endif
 }
 
 void ScriptList::Sort(SorterType sorter, bool ascending)
 {
+#ifdef WITH_RUST
+	openttd_rust_list_sort(this->owner.get(), sorter, ascending);
+#else
 	this->modifications++;
 
 	if (sorter != SORT_BY_VALUE && sorter != SORT_BY_ITEM) return;
@@ -538,10 +632,14 @@ void ScriptList::Sort(SorterType sorter, bool ascending)
 	this->sorter_type    = sorter;
 	this->sort_ascending = ascending;
 	this->initialized    = false;
+#endif
 }
 
 void ScriptList::AddList(ScriptList *list)
 {
+#ifdef WITH_RUST
+	openttd_rust_list_combine(this->owner.get(), list->owner.get(), 0);
+#else
 	if (list == this) return;
 
 	if (this->IsEmpty()) {
@@ -555,10 +653,14 @@ void ScriptList::AddList(ScriptList *list)
 			this->SetValue(item.first, item.second);
 		}
 	}
+#endif
 }
 
 void ScriptList::SwapList(ScriptList *list)
 {
+#ifdef WITH_RUST
+	openttd_rust_list_combine(this->owner.get(), list->owner.get(), 1);
+#else
 	if (list == this) return;
 
 	this->items.swap(list->items);
@@ -570,50 +672,70 @@ void ScriptList::SwapList(ScriptList *list)
 	std::swap(this->modifications, list->modifications);
 	this->sorter->Retarget(this);
 	list->sorter->Retarget(list);
+#endif
 }
 
 void ScriptList::RemoveAboveValue(SQInteger value)
 {
+#ifdef WITH_RUST
+	openttd_rust_list_filter(this->owner.get(), 0, value, 0);
+#else
 	this->modifications++;
 
 	for (ScriptListMap::iterator next_iter, iter = this->items.begin(); iter != this->items.end(); iter = next_iter) {
 		next_iter = std::next(iter);
 		if (iter->second > value) this->RemoveItem(iter->first);
 	}
+#endif
 }
 
 void ScriptList::RemoveBelowValue(SQInteger value)
 {
+#ifdef WITH_RUST
+	openttd_rust_list_filter(this->owner.get(), 1, value, 0);
+#else
 	this->modifications++;
 
 	for (ScriptListMap::iterator next_iter, iter = this->items.begin(); iter != this->items.end(); iter = next_iter) {
 		next_iter = std::next(iter);
 		if (iter->second < value) this->RemoveItem(iter->first);
 	}
+#endif
 }
 
 void ScriptList::RemoveBetweenValue(SQInteger start, SQInteger end)
 {
+#ifdef WITH_RUST
+	openttd_rust_list_filter(this->owner.get(), 2, start, end);
+#else
 	this->modifications++;
 
 	for (ScriptListMap::iterator next_iter, iter = this->items.begin(); iter != this->items.end(); iter = next_iter) {
 		next_iter = std::next(iter);
 		if (iter->second > start && iter->second < end) this->RemoveItem(iter->first);
 	}
+#endif
 }
 
 void ScriptList::RemoveValue(SQInteger value)
 {
+#ifdef WITH_RUST
+	openttd_rust_list_filter(this->owner.get(), 3, value, 0);
+#else
 	this->modifications++;
 
 	for (ScriptListMap::iterator next_iter, iter = this->items.begin(); iter != this->items.end(); iter = next_iter) {
 		next_iter = std::next(iter);
 		if (iter->second == value) this->RemoveItem(iter->first);
 	}
+#endif
 }
 
 void ScriptList::RemoveTop(SQInteger count)
 {
+#ifdef WITH_RUST
+	openttd_rust_list_rank(this->owner.get(), 0, count);
+#else
 	this->modifications++;
 
 	if (!this->sort_ascending) {
@@ -639,10 +761,14 @@ void ScriptList::RemoveTop(SQInteger count)
 			}
 			break;
 	}
+#endif
 }
 
 void ScriptList::RemoveBottom(SQInteger count)
 {
+#ifdef WITH_RUST
+	openttd_rust_list_rank(this->owner.get(), 1, count);
+#else
 	this->modifications++;
 
 	if (!this->sort_ascending) {
@@ -668,10 +794,14 @@ void ScriptList::RemoveBottom(SQInteger count)
 			}
 			break;
 	}
+#endif
 }
 
 void ScriptList::RemoveList(ScriptList *list)
 {
+#ifdef WITH_RUST
+	openttd_rust_list_combine(this->owner.get(), list->owner.get(), 2);
+#else
 	this->modifications++;
 
 	if (list == this) {
@@ -681,64 +811,92 @@ void ScriptList::RemoveList(ScriptList *list)
 			this->RemoveItem(item.first);
 		}
 	}
+#endif
 }
 
 void ScriptList::KeepAboveValue(SQInteger value)
 {
+#ifdef WITH_RUST
+	openttd_rust_list_filter(this->owner.get(), 4, value, 0);
+#else
 	this->modifications++;
 
 	for (ScriptListMap::iterator next_iter, iter = this->items.begin(); iter != this->items.end(); iter = next_iter) {
 		next_iter = std::next(iter);
 		if (iter->second <= value) this->RemoveItem(iter->first);
 	}
+#endif
 }
 
 void ScriptList::KeepBelowValue(SQInteger value)
 {
+#ifdef WITH_RUST
+	openttd_rust_list_filter(this->owner.get(), 5, value, 0);
+#else
 	this->modifications++;
 
 	for (ScriptListMap::iterator next_iter, iter = this->items.begin(); iter != this->items.end(); iter = next_iter) {
 		next_iter = std::next(iter);
 		if (iter->second >= value) this->RemoveItem(iter->first);
 	}
+#endif
 }
 
 void ScriptList::KeepBetweenValue(SQInteger start, SQInteger end)
 {
+#ifdef WITH_RUST
+	openttd_rust_list_filter(this->owner.get(), 6, start, end);
+#else
 	this->modifications++;
 
 	for (ScriptListMap::iterator next_iter, iter = this->items.begin(); iter != this->items.end(); iter = next_iter) {
 		next_iter = std::next(iter);
 		if (iter->second <= start || iter->second >= end) this->RemoveItem(iter->first);
 	}
+#endif
 }
 
 void ScriptList::KeepValue(SQInteger value)
 {
+#ifdef WITH_RUST
+	openttd_rust_list_filter(this->owner.get(), 7, value, 0);
+#else
 	this->modifications++;
 
 	for (ScriptListMap::iterator next_iter, iter = this->items.begin(); iter != this->items.end(); iter = next_iter) {
 		next_iter = std::next(iter);
 		if (iter->second != value) this->RemoveItem(iter->first);
 	}
+#endif
 }
 
 void ScriptList::KeepTop(SQInteger count)
 {
+#ifdef WITH_RUST
+	openttd_rust_list_rank(this->owner.get(), 2, count);
+#else
 	this->modifications++;
 
 	this->RemoveBottom(this->Count() - count);
+#endif
 }
 
 void ScriptList::KeepBottom(SQInteger count)
 {
+#ifdef WITH_RUST
+	openttd_rust_list_rank(this->owner.get(), 3, count);
+#else
 	this->modifications++;
 
 	this->RemoveTop(this->Count() - count);
+#endif
 }
 
 void ScriptList::KeepList(ScriptList *list)
 {
+#ifdef WITH_RUST
+	openttd_rust_list_combine(this->owner.get(), list->owner.get(), 3);
+#else
 	if (list == this) return;
 
 	this->modifications++;
@@ -747,6 +905,7 @@ void ScriptList::KeepList(ScriptList *list)
 	tmp.AddList(this);
 	tmp.RemoveList(list);
 	this->RemoveList(&tmp);
+#endif
 }
 
 SQInteger ScriptList::_get(HSQUIRRELVM vm)
@@ -756,10 +915,16 @@ SQInteger ScriptList::_get(HSQUIRRELVM vm)
 	SQInteger idx;
 	sq_getinteger(vm, 2, &idx);
 
+#ifdef WITH_RUST
+	int64_t value;
+	if (openttd_rust_list_get(this->owner.get(), idx, &value) == 0) return SQ_ERROR;
+	sq_pushinteger(vm, value);
+#else
 	auto item_iter = this->items.find(idx);
 	if (item_iter == this->items.end()) return SQ_ERROR;
 
 	sq_pushinteger(vm, item_iter->second);
+#endif
 	return 1;
 }
 
@@ -827,7 +992,11 @@ SQInteger ScriptList::_nexti(HSQUIRRELVM vm)
 
 SQInteger ScriptList::Valuate(HSQUIRRELVM vm)
 {
+#ifdef WITH_RUST
+	openttd_rust_list_touch(this->owner.get());
+#else
 	this->modifications++;
+#endif
 
 	/* The first parameter is the instance of ScriptList. */
 	int nparam = sq_gettop(vm) - 1;
@@ -854,14 +1023,26 @@ SQInteger ScriptList::Valuate(HSQUIRRELVM vm)
 	/* Push the function to call */
 	sq_push(vm, 2);
 
+#ifdef WITH_RUST
+	int64_t item_key = 0, item_value;
+	int32_t previous_modification_count;
+	uint8_t has_after = 0;
+	while (openttd_rust_list_read(this->owner.get(), has_after, item_key, &item_key, &item_value, &previous_modification_count) != 0) {
+		has_after = 1;
+#else
 	for (const auto &item : this->items) {
 		/* Check for changing of items. */
 		int previous_modification_count = this->modifications;
+#endif
 
 		/* Push the root table as instance object, this is what squirrel does for meta-functions. */
 		sq_pushroottable(vm);
 		/* Push all arguments for the valuator function. */
+#ifdef WITH_RUST
+		sq_pushinteger(vm, item_key);
+#else
 		sq_pushinteger(vm, item.first);
+#endif
 		for (int i = 0; i < nparam - 1; i++) {
 			sq_push(vm, i + 3);
 		}
@@ -895,14 +1076,22 @@ SQInteger ScriptList::Valuate(HSQUIRRELVM vm)
 		}
 
 		/* Was something changed? */
+#ifdef WITH_RUST
+		if (previous_modification_count != openttd_rust_list_token(this->owner.get())) {
+#else
 		if (previous_modification_count != this->modifications) {
+#endif
 			/* See below for explanation. The extra pop is the return value. */
 			sq_pop(vm, nparam + 4);
 
 			return sq_throwerror(vm, "modifying valuated list outside of valuator function");
 		}
 
+#ifdef WITH_RUST
+		this->SetValue(item_key, value);
+#else
 		this->SetValue(item.first, value);
+#endif
 
 		/* Pop the return value. */
 		sq_poptop(vm);

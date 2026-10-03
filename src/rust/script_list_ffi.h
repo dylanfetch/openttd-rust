@@ -1,0 +1,59 @@
+/*
+ * This file is part of OpenTTD.
+ * OpenTTD is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, version 2.
+ * OpenTTD is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
+ */
+
+/** @file script_list_ffi.h Rust-owned list with scalar, synchronous operations. */
+#ifndef OPENTTD_RUST_SCRIPT_LIST_FFI_H
+#define OPENTTD_RUST_SCRIPT_LIST_FFI_H
+#include <stdint.h>
+#if defined(_MSC_VER)
+#define OPENTTD_LIST_CALL __cdecl
+#elif defined(__i386__)
+#define OPENTTD_LIST_CALL __attribute__((cdecl))
+#else
+#define OPENTTD_LIST_CALL
+#endif
+#ifdef __cplusplus
+extern "C" {
+#endif
+struct OpenTTDScriptList;
+/* Owners are allocated/freed only in Rust. Each pointer is live/aligned and
+ * operations are serialized. Scalar output pointers are valid, writable and
+ * disjoint. No borrow survives return; no callback or VM/world operation runs
+ * under Rust. Mutations during an external callback finish before the next call.
+ * Combine recognizes self-aliasing before creating Rust references. Panics/OOM
+ * abort; original signed-overflow and invalidated valuation-iterator cases are
+ * outside the defined-input contract. No collection layout crosses this ABI. */
+struct OpenTTDScriptList *OPENTTD_LIST_CALL openttd_rust_list_new(void);
+void OPENTTD_LIST_CALL openttd_rust_list_destroy(struct OpenTTDScriptList *);
+void OPENTTD_LIST_CALL openttd_rust_list_touch(struct OpenTTDScriptList *);
+int32_t OPENTTD_LIST_CALL openttd_rust_list_token(const struct OpenTTDScriptList *);
+int64_t OPENTTD_LIST_CALL openttd_rust_list_count(const struct OpenTTDScriptList *);
+uint8_t OPENTTD_LIST_CALL openttd_rust_list_get(const struct OpenTTDScriptList *, int64_t, int64_t *);
+void OPENTTD_LIST_CALL openttd_rust_list_add(struct OpenTTDScriptList *, int64_t, int64_t);
+void OPENTTD_LIST_CALL openttd_rust_list_remove(struct OpenTTDScriptList *, int64_t);
+uint8_t OPENTTD_LIST_CALL openttd_rust_list_set(struct OpenTTDScriptList *, int64_t, int64_t);
+void OPENTTD_LIST_CALL openttd_rust_list_clear(struct OpenTTDScriptList *);
+void OPENTTD_LIST_CALL openttd_rust_list_sort(struct OpenTTDScriptList *, int32_t, uint8_t);
+int32_t OPENTTD_LIST_CALL openttd_rust_list_policy(const struct OpenTTDScriptList *, uint8_t *);
+/* Iteration 0=Begin, 1=Next, 2=IsEnd. Status zero means never initialized for
+ * Next/IsEnd (C++ emits original diagnostic); value is otherwise the result. */
+uint8_t OPENTTD_LIST_CALL openttd_rust_list_iter(struct OpenTTDScriptList *, uint8_t, int64_t *);
+/* Filter: Remove above/below/between/equal=0..3, Keep equivalents=4..7. */
+void OPENTTD_LIST_CALL openttd_rust_list_filter(struct OpenTTDScriptList *, uint8_t, int64_t, int64_t);
+/* Rank: RemoveTop/RemoveBottom/KeepTop/KeepBottom=0..3. */
+void OPENTTD_LIST_CALL openttd_rust_list_rank(struct OpenTTDScriptList *, uint8_t, int64_t);
+/* Combine: Add/Swap/Remove/Keep/CopyContents=0..4. CopyContents retains target's
+ * original sort/init flow; it is used on freshly constructed clone targets. */
+void OPENTTD_LIST_CALL openttd_rust_list_combine(struct OpenTTDScriptList *, struct OpenTTDScriptList *, uint8_t);
+/* Ascending item read for valuation/save, independent of public iteration.
+ * Returns absent/present; copies key/value/modification token and retains none.
+ * has_after is 0/1. This does not reset or mutate the public live cursor. */
+uint8_t OPENTTD_LIST_CALL openttd_rust_list_read(const struct OpenTTDScriptList *, uint8_t, int64_t, int64_t *, int64_t *, int32_t *);
+#ifdef __cplusplus
+}
+#endif
+#endif /* OPENTTD_RUST_SCRIPT_LIST_FFI_H */
