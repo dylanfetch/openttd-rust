@@ -553,7 +553,10 @@ explains why final C++ links require these system dependencies. The crate retain
 its release abort-on-panic profile and explicit overflow checks in both C++ modes.
 
 The existing required macOS ARM jobs activate Rust through the reusable workflow's
-explicit `rust` input. Debug enables `OPTION_USE_ASSERTS`; release disables it.
+explicit `rust` input. Debug enables `OPTION_USE_ASSERTS`; release disables it. The original CMake
+ordering gives game/tests `WITH_ASSERT` in Debug, while generators retain ordinary
+C++ assertions with neither `WITH_ASSERT` nor `NDEBUG`. Release defines `NDEBUG`
+for every consumer. Evidence verifies these roles without changing their policies.
 Both run the four targeted Cargo checks, nonempty CTest inventories and scripted
 regressions, then build and execute fresh native tools. The evidence artifact
 retains JUnit, compiler/SDK/target metadata, compile commands, link scripts, native
