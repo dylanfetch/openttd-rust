@@ -63,8 +63,72 @@ static void Probe(std::string_view src, int base, bool clamp)
 	std::cout << '\n';
 }
 
-int main()
+/* Only the audited short-buffer, borrowed-offset, and fatal-timing gaps. */
+static int ConsumerMain()
 {
+	unsigned operation;
+	size_t offset, requested;
+	std::string hex;
+	while (std::cin >> operation >> offset >> requested >> hex) {
+		std::string input;
+		if (hex != "-") {
+			for (size_t i = 0; i < hex.size(); i += 2) input += static_cast<char>(std::stoi(hex.substr(i, 2), nullptr, 16));
+		}
+		std::string_view src = input.empty() ? std::string_view{} : std::string_view(input);
+		StringConsumer consumer(src);
+		logging_consumer = &consumer;
+		messages.clear();
+		consumer.Skip(offset);
+		std::string observation;
+		bool pointer_at_cursor = true;
+		const char *expected_pointer = src.data();
+		if (offset != 0) expected_pointer += offset;
+		switch (operation) {
+			case 0:
+			case 1: {
+				auto view = operation == 0 ? consumer.Peek(requested) : consumer.Read(requested);
+				observation = Hex(view);
+				pointer_at_cursor = view.data() == expected_pointer;
+				break;
+			}
+			case 2: consumer.Skip(requested); break;
+			case 3: observation = std::to_string(consumer.ReadUint8(42)); break;
+			case 4: observation = std::to_string(consumer.ReadUint16LE(42)); break;
+			case 5: observation = std::to_string(consumer.ReadUint32LE(42)); break;
+			case 6: observation = std::to_string(consumer.ReadUint64LE(42)); break;
+			case 7: {
+				auto value = consumer.TryReadUint32LE();
+				observation = std::to_string(value.has_value()) + ":" + std::to_string(value.value_or(42));
+				break;
+			}
+			case 8: observation = std::to_string(Bits(consumer.ReadChar(42))); break;
+			case 9: {
+				auto value = consumer.TryReadUint16LE();
+				observation = std::to_string(value.has_value()) + ":" + std::to_string(value.value_or(42));
+				break;
+			}
+			case 10: {
+				auto value = consumer.TryReadSint32LE();
+				observation = std::to_string(value.has_value()) + ":" + std::to_string(Bits(value.value_or(42)));
+				break;
+			}
+			case 11: {
+				auto value = consumer.TryReadSint64LE();
+				observation = std::to_string(value.has_value()) + ":" + std::to_string(Bits(value.value_or(42)));
+				break;
+			}
+			default: std::abort();
+		}
+		std::cout << operation << ' ' << (observation.empty() ? "-" : observation) << ' ' << pointer_at_cursor << ' ' << consumer.GetBytesRead() << ' ' << messages.size();
+		for (const auto &[position, message] : messages) std::cout << ' ' << position << ' ' << Hex(message);
+		std::cout << '\n';
+	}
+	return 0;
+}
+
+int main(int argc, char **argv)
+{
+	if (argc == 2 && std::string_view(argv[1]) == "--consumer") return ConsumerMain();
 	unsigned width, is_signed, base, clamp;
 	std::string hex;
 	while (std::cin >> width >> is_signed >> base >> clamp >> hex) {
