@@ -10,10 +10,115 @@
 #include "core/utf8.hpp"
 #include "core/string_consumer.hpp"
 #include <iostream>
+#include <cstdlib>
+#include <stdexcept>
 
 // The bounded consumer inputs never trigger error logging. Abort if that changes,
 // so this standalone adapter needs neither the game logger nor its runtime state.
 void DebugPrint(std::string_view, int, std::string &&) { std::abort(); }
+
+/* The actual unchanged source exposes its local shared loop to this bounded
+ * fixture, allowing observation of consumer-before-output and typed failures. */
+static bool fail_cpp_allocation;
+void *operator new(size_t size)
+{
+	if (fail_cpp_allocation) throw std::bad_alloc{};
+	if (void *result = std::malloc(size == 0 ? 1 : size)) return result;
+	throw std::bad_alloc{};
+}
+void operator delete(void *pointer) noexcept { std::free(pointer); }
+void operator delete(void *pointer, size_t) noexcept { std::free(pointer); }
+[[noreturn]] void NOT_REACHED(const std::source_location) { throw std::runtime_error("NOT_REACHED"); }
+#include "string.cpp"
+
+static void Hex(std::string_view bytes)
+{
+	static constexpr char alphabet[] = "0123456789abcdef";
+	for (uint8_t byte : bytes) std::cout << alphabet[byte >> 4] << alphabet[byte & 15];
+	std::cout << '/';
+}
+static void Pair(const char *name, InPlaceReplacement &pair, std::span<const char> buffer)
+{
+	std::cout << name << ' ' << pair.consumer.GetBytesRead() << ' ' << pair.builder.GetBytesWritten()
+			  << ' ' << pair.builder.GetBytesUnused() << ' ' << pair.builder.AnyBytesUnused() << ' ';
+	Hex({buffer.data(), buffer.size()}); std::cout << '\n';
+}
+struct ObservedBuilder : BaseStringBuilder {
+	StringConsumer &consumer;
+	std::string output;
+	std::array<size_t, 100> progress{};
+	size_t calls = 0;
+	bool reenter = false;
+	explicit ObservedBuilder(StringConsumer &consumer) : consumer(consumer) {}
+	void PutBuffer(std::span<const char> bytes) override
+	{
+		progress[calls++] = this->consumer.GetBytesRead();
+		if (reenter) { reenter = false; auto nested = StrMakeValid("inner"sv); if (nested != "inner") std::abort(); this->consumer.Skip(1); }
+		output.append(bytes.data(), bytes.size());
+	}
+};
+static void Validation()
+{
+	using namespace std::literals::string_literals;
+	std::vector<std::string> corpus{{}, "plain", "\r\n\r\t\n", "\0tail"s, "a\0bad\xFF"s,
+		"\x80\xBF\xC0\x80"s, "\xE0\x80\x80"s, "\xF0\x80\x80\x80"s,
+		"a\xC2"s, "\xE1\x80"s, "\xF1\x80\x80"s, "\xF4\x90\x80\x80"s,
+		"x\xFF\x80y"s, "\xED\xA0\x80\xED\xBF\xBF"s};
+	const char32_t boundaries[]{0,1,9,10,13,0x1E,0x1F,0x20,0x7F,0x80,0xD7FF,0xD800,0xDFFF,0xE000,0xE001,0xE002,0xE003,0xE004,0xE1FF,0xE200,0xE2FF,0xE300,0x10FFFF};
+	std::string mixed = "a\r\n\r\t\n";
+	for (char32_t codepoint : boundaries) {
+		auto [bytes, length] = EncodeUtf8(codepoint); corpus.emplace_back(bytes, length);
+		if (codepoint != 0) mixed.append(bytes, length);
+	}
+	corpus.push_back(mixed);
+	for (uint8_t flags = 0; flags < 16; ++flags) for (uint8_t unknown : {uint8_t{0}, uint8_t{0xF0}}) {
+		StringValidationSettings settings(static_cast<uint8_t>(flags | unknown));
+		for (size_t index = 0; index < corpus.size(); ++index) {
+			auto input = corpus[index]; auto output = StrMakeValid(std::string_view(input), settings);
+			auto inplace = input; StrMakeValidInPlace(inplace, settings);
+			std::vector<char> cstring(input.begin(), input.end()); cstring.push_back('\0'); cstring.push_back('T'); cstring.push_back('!');
+			StrMakeValidInPlace(cstring.data(), settings);
+			std::cout << "validation " << unsigned(flags | unknown) << ' ' << index << ' '; Hex(output); Hex(inplace); Hex({cstring.data(),cstring.size()}); std::cout << '\n';
+		}
+	}
+	for (size_t index = 0; index < corpus.size(); ++index) {
+		auto terminated = corpus[index]; terminated.push_back('\0'); terminated.append("\xFFtail", 5);
+		std::cout << "valid " << index << ' ' << StrValid(std::span(corpus[index].data(), corpus[index].size()))
+				  << ' ' << StrValid(std::span(terminated.data(), terminated.size())) << '\n';
+	}
+	for (bool fail : {false,true}) for (bool reenter : {false,true}) {
+		std::string input(40, 'A'); StringConsumer consumer(input); ObservedBuilder builder(consumer); builder.reenter = reenter;
+		bool threw = false; fail_cpp_allocation = fail;
+		try { StrMakeValid(builder, consumer, StringValidationSetting::ReplaceWithQuestionMark); } catch (const std::bad_alloc &) { threw = true; }
+		fail_cpp_allocation = false;
+		std::cout << "append-progress " << fail << ' ' << reenter << ' ' << threw << ' ' << consumer.GetBytesRead() << ' ' << builder.output.size() << ' ' << builder.calls;
+		for (size_t call = 0; call < builder.calls; ++call) std::cout << ' ' << builder.progress[call];
+		std::cout << '\n';
+	}
+	{
+		std::array<char,8> buffer{'a','b','c','d','e','f','g','h'}; InPlaceReplacement first(buffer);
+		first.consumer.Skip(4); first.builder.Put("12"sv); InPlaceReplacement copy(first);
+		first.consumer.Skip(2); first.builder.PutChar('A'); copy.builder.PutChar('B'); copy.consumer.Skip(1); copy.builder.PutChar('C');
+		Pair("pair-first",first,buffer); Pair("pair-copy",copy,buffer);
+		std::array<char,8> other{}; InPlaceReplacement assigned(other); assigned = first;
+		assigned.consumer.Skip(1); assigned.builder.PutChar('D'); first = first;
+		Pair("pair-assigned",assigned,buffer); Pair("pair-self",first,buffer); Pair("pair-copy-after",copy,buffer);
+		InPlaceReplacement rvalue(std::move(copy)); rvalue.consumer.Skip(1); rvalue.builder.PutChar('E');
+		Pair("pair-rvalue",rvalue,buffer); Pair("pair-rvalue-source",copy,buffer);
+	}
+	{
+		std::array<char,8> buffer{'a','b','c','d','e','f','g','h'}; InPlaceReplacement pair(buffer);
+		pair.consumer.Skip(6); pair.builder.PutBuffer(std::span(buffer).subspan(2,4)); Pair("left-overlap",pair,buffer);
+		/* Reassigning the public consumer exposes original native subtraction wrap. */
+		pair.consumer = StringConsumer(std::span<const char>(buffer)); pair.consumer.Skip(1); pair.builder.PutChar('Z'); Pair("live-wrap-capacity",pair,buffer);
+	}
+	{
+		std::array<char,4> buffer{'a','b','c','d'}; InPlaceReplacement pair(buffer); bool threw = false;
+		try { pair.builder.PutChar('X'); } catch (const std::runtime_error &) { threw = true; }
+		std::cout << "overtake " << threw << '\n'; Pair("overtake-state",pair,buffer);
+		pair.builder.PutBuffer({}); Pair("zero-write",pair,buffer);
+	}
+}
 
 static void Decode(std::string_view bytes)
 {
@@ -66,6 +171,7 @@ static void Iterate(std::string_view bytes)
 
 int main()
 {
+	Validation();
 	const uint32_t boundaries[] = {
 		0, 1, 0x7e, 0x7f, 0x80, 0x81, 0x7fe, 0x7ff, 0x800, 0x801,
 		0xd7ff, 0xd800, 0xd801, 0xdffe, 0xdfff, 0xe000,

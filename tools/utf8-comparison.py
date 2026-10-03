@@ -43,16 +43,17 @@ def main():
     report = {"baseline": migration.BASELINE, "candidate_commit": migration.git("rev-parse", "HEAD"),
               "candidate_status": migration.git("status", "--short"), "commands": records,
               "reference_sources": {}, "passed": False}
-    for name in ("src/core/utf8.cpp", "src/core/utf8.hpp", "src/core/string_consumer.cpp", "src/core/string_consumer.hpp"):
+    for name in ("src/core/utf8.cpp", "src/core/utf8.hpp", "src/core/string_consumer.cpp", "src/core/string_consumer.hpp", "src/string.cpp", "src/core/string_inplace.cpp", "src/core/string_inplace.hpp", "src/core/string_builder.cpp", "src/string_type.h", "src/table/control_codes.h"):
         report["reference_sources"][name] = hashlib.sha256((reference / name).read_bytes()).hexdigest()
     try:
         for mode in ("asserts", "ndebug"):
             streams = {}
-            for label, source in (("reference", reference), ("candidate", migration.ROOT)):
+            for label, source in (("reference", reference), ("candidate", migration.ROOT), ("candidate-cpp", migration.ROOT)):
                 executable = output / f"{label}-{mode}"
                 command = ["c++", "-std=c++20", "-O2", "-ffunction-sections", "-fdata-sections", "-DFMT_HEADER_ONLY",
                            "-I", str(source / "src"), str(fixture),
                            str(source / "src/core/utf8.cpp"), str(source / "src/core/string_consumer.cpp"),
+                           str(source / "src/core/string_builder.cpp"), str(source / "src/core/string_inplace.cpp"),
                            "-Wl,--gc-sections", "-o", str(executable)]
                 if mode == "ndebug":
                     command.append("-DNDEBUG")
@@ -60,7 +61,7 @@ def main():
                     command.extend(["-DWITH_RUST", str(archive), "-ldl", "-lpthread", "-lm"])
                 run(command, f"compile-{label}-{mode}")
                 streams[label] = run([str(executable)], f"{label}-{mode}")
-            if streams["reference"] != streams["candidate"]:
+            if not streams["reference"] == streams["candidate"] == streams["candidate-cpp"]:
                 diff = "".join(difflib.unified_diff(streams["reference"].splitlines(keepends=True),
                                                    streams["candidate"].splitlines(keepends=True),
                                                    fromfile="reference", tofile="candidate"))
@@ -70,6 +71,7 @@ def main():
             report[f"{mode}_sha256"] = hashlib.sha256(streams["reference"].encode()).hexdigest()
         if migration.git("status", "--porcelain", "--untracked-files=all", cwd=reference):
             raise RuntimeError("Reference became dirty during comparison")
+        report["validation_limits"] = ["Historical byte codec; all 16 flag combinations and ignored unknown bits.", "In-place copy only original defined disjoint/left-overlap domain; exact/right destination-inside-input overlap excluded.", "Bounded ordinary C++ append failure and live-consumer/copy observations, not arbitrary allocator failures.", "Packet text loops and other string algorithms remain unchanged."]
         report["passed"] = True
     finally:
         (output / "report.json").write_text(json.dumps(report, indent=2) + "\n")

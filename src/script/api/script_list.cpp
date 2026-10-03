@@ -338,45 +338,146 @@ static_assert(sizeof(SQInteger) == sizeof(int64_t) && std::is_signed_v<SQInteger
 static_assert(sizeof(int) == sizeof(int32_t));
 #endif
 
+#ifdef WITH_RUST
+static_assert(sizeof(SQRESULT) == sizeof(int64_t) && std::is_signed_v<SQRESULT>);
+static_assert(sizeof(SQBool) == sizeof(uint64_t) && std::is_unsigned_v<SQBool>);
+static_assert(OT_NULL == 0x01000001 && OT_INTEGER == 0x05000002 && OT_BOOL == 0x01000008);
+static_assert(OT_TABLE == 0x0A000020 && OT_ARRAY == 0x08000040);
+static_assert(OT_CLOSURE == 0x08000100 && OT_NATIVECLOSURE == 0x08000200);
+static_assert(SQ_ERROR == -1 && SQTrue == 1 && SQFalse == 0);
+
+ScriptList::VMControl::VMControl(HSQUIRRELVM vm, ScriptList *list, uint8_t operation) :
+	vm(vm), list(list), control(openttd_rust_list_control_new(operation), openttd_rust_list_control_destroy)
+{
+}
+
+SQInteger ScriptList::VMControl::Drive()
+{
+	this->needs_index = false;
+	for (;;) {
+		OpenTTDListControlAction action{};
+		openttd_rust_list_control_step(this->control.get(), this->list->owner.get(), &this->input, &action);
+		this->input = {};
+		/* No Rust stack or borrow exists while these real VM/RAII operations
+		 * execute. Exceptions retain the original stack and partial list state. */
+		switch (action.kind) {
+			case LC_RETURN: return action.a;
+			case LC_ITEM: return 0;
+			case LC_INDEX: this->needs_index = true; return 0;
+			case LC_TOP: this->input.a = sq_gettop(this->vm); break;
+			case LC_TYPE: this->input.kind = static_cast<uint32_t>(sq_gettype(this->vm, action.a)); break;
+			case LC_GET_INT: {
+				SQInteger value;
+				/* _nexti ignores failure and the value. Do not read that local
+				 * on failure; load's historical ignored getters stay below. */
+				if (SQ_SUCCEEDED(sq_getinteger(this->vm, action.a, &value))) this->input.a = value;
+				break;
+			}
+			case LC_GET_BOOL: {
+				SQBool value;
+				sq_getbool(this->vm, action.a, &value);
+				this->input.flag = value;
+				break;
+			}
+			case LC_GET_PAIR: {
+				/* Preserve the original AND type predicate and ignored getter
+				 * results. Defined mixed numeric values convert in the actual VM.
+				 * A nonnumeric side paired with integer can read an uninitialized
+				 * local upstream, and remains outside the defined-input contract. */
+				SQInteger key, value;
+				sq_getinteger(this->vm, -2, &key);
+				sq_getinteger(this->vm, -1, &value);
+				this->input.a = key;
+				this->input.b = value;
+				break;
+			}
+			case LC_PUSH: sq_push(this->vm, action.a); break;
+			case LC_ROOT: sq_pushroottable(this->vm); break;
+			case LC_PUSH_INT: sq_pushinteger(this->vm, action.a); break;
+			case LC_PUSH_BOOL: sq_pushbool(this->vm, action.a != 0 ? SQTrue : SQFalse); break;
+			case LC_PUSH_NULL: sq_pushnull(this->vm); break;
+			case LC_TAG: sq_pushstring(this->vm, "List"); break;
+			case LC_NEW_ARRAY: sq_newarray(this->vm, 0); break;
+			case LC_NEW_TABLE: sq_newtable(this->vm); break;
+			case LC_APPEND: sq_arrayappend(this->vm, action.a); break;
+			case LC_RAW_SET: sq_rawset(this->vm, action.a); break;
+			case LC_NEXT: this->input.flag = SQ_SUCCEEDED(sq_next(this->vm, action.a)); break;
+			case LC_POP: sq_pop(this->vm, action.a); break;
+			case LC_POP_TOP: sq_poptop(this->vm); break;
+			case LC_CALL: this->input.flag = SQ_SUCCEEDED(sq_call(this->vm, action.a, SQTrue, SQFalse)); break;
+			case LC_CHARGE: Squirrel::DecreaseOps(this->vm, static_cast<int>(action.a)); break;
+			case LC_DISABLE: this->disabler.emplace(); break;
+			case LC_LIMIT: this->limiter.emplace(this->vm, MAX_VALUATE_OPS, action.a == 0 ? "valuator function" : "list filter function"); break;
+			case LC_THROW_RESULT: throw static_cast<SQInteger>(action.a);
+			case LC_ERROR:
+			case LC_THROW_ERROR: {
+				const char *message;
+				switch (action.a) {
+					case 1: message = "You need to give at least a Valuator as parameter to ScriptList::Valuate"; break;
+					case 2: message = "parameter 1 has an invalid type (expected function)"; break;
+					case 3: message = "return value of valuator is not valid (not integer/bool)"; break;
+					case 4: message = "modifying valuated list outside of valuator function"; break;
+					case 5: message = "return value of filter is not valid (not bool)"; break;
+					case 6: message = "you can only assign integers to this list"; break;
+					default: NOT_REACHED();
+				}
+				SQInteger result = sq_throwerror(this->vm, message);
+				if (action.kind == LC_THROW_ERROR) throw result;
+				return result;
+			}
+			case LC_LOG_NEXT: Debug(script, 0, "Next() is invalid as Begin() is never called"); break;
+			case LC_LOG_END: Debug(script, 0, "IsEnd() is invalid as Begin() is never called"); break;
+			default: NOT_REACHED();
+		}
+	}
+}
+
+void ScriptList::VMControl::Item(bool valid)
+{
+	this->input.flag = valid ? 2 : 1;
+	this->Drive();
+}
+
+void ScriptList::VMControl::Index(SQInteger index)
+{
+	this->input.a = index;
+	this->Drive();
+}
+
+void ScriptList::VMControl::Finish()
+{
+	this->input.flag = 0;
+	this->Drive();
+}
+#endif
+
 bool ScriptList::SaveObject(HSQUIRRELVM vm)
 {
+#ifdef WITH_RUST
+	return VMControl(vm, this, 2).Drive() != 0;
+#else
 	sq_pushstring(vm, "List");
 	sq_newarray(vm, 0);
-#ifdef WITH_RUST
-	uint8_t ascending;
-	sq_pushinteger(vm, openttd_rust_list_policy(this->owner.get(), &ascending));
-#else
 	sq_pushinteger(vm, this->sorter_type);
-#endif
 	sq_arrayappend(vm, -2);
-#ifdef WITH_RUST
-	sq_pushbool(vm, ascending ? SQTrue : SQFalse);
-#else
 	sq_pushbool(vm, this->sort_ascending ? SQTrue : SQFalse);
-#endif
 	sq_arrayappend(vm, -2);
 	sq_newtable(vm);
-#ifdef WITH_RUST
-	int64_t key = 0, value;
-	int32_t token;
-	uint8_t has_after = 0;
-	while (openttd_rust_list_read(this->owner.get(), has_after, key, &key, &value, &token) != 0) {
-		has_after = 1;
-		sq_pushinteger(vm, key);
-		sq_pushinteger(vm, value);
-#else
 	for (const auto &item : this->items) {
 		sq_pushinteger(vm, item.first);
 		sq_pushinteger(vm, item.second);
-#endif
 		sq_rawset(vm, -3);
 	}
 	sq_arrayappend(vm, -2);
 	return true;
+#endif
 }
 
 bool ScriptList::LoadObject(HSQUIRRELVM vm)
 {
+#ifdef WITH_RUST
+	return VMControl(vm, this, 3).Drive() != 0;
+#else
 	if (sq_gettype(vm, -1) != OT_ARRAY) return false;
 	sq_pushnull(vm);
 	if (SQ_FAILED(sq_next(vm, -2))) return false;
@@ -405,6 +506,7 @@ bool ScriptList::LoadObject(HSQUIRRELVM vm)
 	sq_pop(vm, 1);
 	this->Sort(static_cast<SorterType>(type), order == SQTrue);
 	return true;
+#endif
 }
 
 ScriptObject *ScriptList::CloneObject()
@@ -910,26 +1012,27 @@ void ScriptList::KeepList(ScriptList *list)
 
 SQInteger ScriptList::_get(HSQUIRRELVM vm)
 {
+#ifdef WITH_RUST
+	return VMControl(vm, this, 4).Drive();
+#else
 	if (sq_gettype(vm, 2) != OT_INTEGER) return SQ_ERROR;
 
 	SQInteger idx;
 	sq_getinteger(vm, 2, &idx);
 
-#ifdef WITH_RUST
-	int64_t value;
-	if (openttd_rust_list_get(this->owner.get(), idx, &value) == 0) return SQ_ERROR;
-	sq_pushinteger(vm, value);
-#else
 	auto item_iter = this->items.find(idx);
 	if (item_iter == this->items.end()) return SQ_ERROR;
 
 	sq_pushinteger(vm, item_iter->second);
-#endif
 	return 1;
+#endif
 }
 
 SQInteger ScriptList::_set(HSQUIRRELVM vm)
 {
+#ifdef WITH_RUST
+	return VMControl(vm, this, 5).Drive();
+#else
 	if (sq_gettype(vm, 2) != OT_INTEGER) return SQ_ERROR;
 
 	SQInteger idx;
@@ -964,10 +1067,14 @@ SQInteger ScriptList::_set(HSQUIRRELVM vm)
 
 	this->SetValue(idx, val);
 	return 0;
+#endif
 }
 
 SQInteger ScriptList::_nexti(HSQUIRRELVM vm)
 {
+#ifdef WITH_RUST
+	return VMControl(vm, this, 6).Drive();
+#else
 	if (sq_gettype(vm, 2) == OT_NULL) {
 		if (this->IsEmpty()) {
 			sq_pushnull(vm);
@@ -988,15 +1095,15 @@ SQInteger ScriptList::_nexti(HSQUIRRELVM vm)
 
 	sq_pushinteger(vm, val);
 	return 1;
+#endif
 }
 
 SQInteger ScriptList::Valuate(HSQUIRRELVM vm)
 {
 #ifdef WITH_RUST
-	openttd_rust_list_touch(this->owner.get());
+	return VMControl(vm, this, 0).Drive();
 #else
 	this->modifications++;
-#endif
 
 	/* The first parameter is the instance of ScriptList. */
 	int nparam = sq_gettop(vm) - 1;
@@ -1023,26 +1130,14 @@ SQInteger ScriptList::Valuate(HSQUIRRELVM vm)
 	/* Push the function to call */
 	sq_push(vm, 2);
 
-#ifdef WITH_RUST
-	int64_t item_key = 0, item_value;
-	int32_t previous_modification_count;
-	uint8_t has_after = 0;
-	while (openttd_rust_list_read(this->owner.get(), has_after, item_key, &item_key, &item_value, &previous_modification_count) != 0) {
-		has_after = 1;
-#else
 	for (const auto &item : this->items) {
 		/* Check for changing of items. */
 		int previous_modification_count = this->modifications;
-#endif
 
 		/* Push the root table as instance object, this is what squirrel does for meta-functions. */
 		sq_pushroottable(vm);
 		/* Push all arguments for the valuator function. */
-#ifdef WITH_RUST
-		sq_pushinteger(vm, item_key);
-#else
 		sq_pushinteger(vm, item.first);
-#endif
 		for (int i = 0; i < nparam - 1; i++) {
 			sq_push(vm, i + 3);
 		}
@@ -1076,22 +1171,14 @@ SQInteger ScriptList::Valuate(HSQUIRRELVM vm)
 		}
 
 		/* Was something changed? */
-#ifdef WITH_RUST
-		if (previous_modification_count != openttd_rust_list_token(this->owner.get())) {
-#else
 		if (previous_modification_count != this->modifications) {
-#endif
 			/* See below for explanation. The extra pop is the return value. */
 			sq_pop(vm, nparam + 4);
 
 			return sq_throwerror(vm, "modifying valuated list outside of valuator function");
 		}
 
-#ifdef WITH_RUST
-		this->SetValue(item_key, value);
-#else
 		this->SetValue(item.first, value);
-#endif
 
 		/* Pop the return value. */
 		sq_poptop(vm);
@@ -1106,4 +1193,5 @@ SQInteger ScriptList::Valuate(HSQUIRRELVM vm)
 	sq_pop(vm, nparam + 3);
 
 	return 0;
+#endif
 }

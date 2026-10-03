@@ -17,6 +17,7 @@
 
 #ifdef WITH_RUST
 #	include "rust/byte_strings_ffi.h"
+#	include "rust/string_validation_ffi.h"
 #endif
 
 #include "table/control_codes.h"
@@ -122,6 +123,7 @@ std::string FormatArrayAsHex(std::span<const uint8_t> data)
  * @param c Character to test.
  * @returns True iff the character is an encoded string control code.
  */
+#ifndef WITH_RUST
 static bool IsSccEncodedCode(char32_t c)
 {
 	switch (c) {
@@ -137,6 +139,8 @@ static bool IsSccEncodedCode(char32_t c)
 	}
 }
 
+#endif
+
 /**
  * Copies the valid (UTF-8) characters from \c consumer to the \c builder.
  * Depending on the \c settings invalid characters can be replaced with a
@@ -149,6 +153,23 @@ static bool IsSccEncodedCode(char32_t c)
 template <class Builder>
 static void StrMakeValid(Builder &builder, StringConsumer &consumer, StringValidationSettings settings)
 {
+#ifdef WITH_RUST
+	static_assert(sizeof(char32_t) == sizeof(uint32_t));
+	static_assert(StringValidationSettings(StringValidationSetting::ReplaceWithQuestionMark).base() == 1);
+	static_assert(StringValidationSettings(StringValidationSetting::AllowNewline).base() == 2);
+	static_assert(StringValidationSettings(StringValidationSetting::AllowControlCode).base() == 4);
+	static_assert(StringValidationSettings(StringValidationSetting::ReplaceTabCrNlWithSpace).base() == 8);
+	static_assert(SCC_RECORD_SEPARATOR == 0x1E && SCC_ENCODED == 0xE000 && SCC_ENCODED_INTERNAL == 0xE001 && SCC_ENCODED_NUMERIC == 0xE002 && SCC_ENCODED_STRING == 0xE003);
+	static_assert(SCC_SPRITE_START == 0xE200 && SCC_SPRITE_END == 0xE2FF);
+	while (consumer.AnyBytesLeft()) {
+		auto input = consumer.GetLeftData();
+		auto step = openttd_rust_validation_step(reinterpret_cast<const uint8_t *>(input.data()), input.size(), settings.base());
+		/* Commit to the real consumer before any possibly throwing builder operation. */
+		consumer.Skip(step.consumed);
+		if (step.stopped) break;
+		if (step.output.length != 0) builder.PutBuffer({reinterpret_cast<const char *>(step.output.bytes), step.output.length});
+	}
+#else
 	/* Assume the ABSOLUTE WORST to be in str as it comes from the outside. */
 	while (consumer.AnyBytesLeft()) {
 		auto c = consumer.TryReadUtf8();
@@ -176,6 +197,7 @@ static void StrMakeValid(Builder &builder, StringConsumer &consumer, StringValid
 	}
 
 	/* String termination, if needed, is left to the caller of this function. */
+#endif
 }
 
 /**
@@ -235,6 +257,9 @@ std::string StrMakeValid(std::string_view str, StringValidationSettings settings
  */
 bool StrValid(std::span<const char> str)
 {
+#ifdef WITH_RUST
+	return openttd_rust_validation_valid(reinterpret_cast<const uint8_t *>(str.data()), str.size()) != 0;
+#else
 	/* Assume the ABSOLUTE WORST to be in str as it comes from the outside. */
 	StringConsumer consumer(str);
 	while (consumer.AnyBytesLeft()) {
@@ -247,6 +272,7 @@ bool StrValid(std::span<const char> str)
 	}
 
 	return false; // missing NUL termination
+#endif
 }
 
 /**

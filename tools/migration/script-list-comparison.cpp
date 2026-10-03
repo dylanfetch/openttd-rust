@@ -37,6 +37,9 @@ public:
 	using ScriptList::SaveObject;
 	using ScriptList::LoadObject;
 	using ScriptList::CloneObject;
+#ifdef WITH_RUST
+	OpenTTDScriptList *Owner() { return this->GetRustListOwner(); }
+#endif
 };
 class TestTileList : public ScriptTileList {
 public:
@@ -66,6 +69,14 @@ template <CargoModificationTag::type Pointer> struct CargoModificationAccess {
 template struct CargoModificationAccess<&ScriptList::modifications>;
 #endif
 static int CargoToken(CargoProbeList &list)
+{
+#ifdef WITH_RUST
+	return openttd_rust_list_token(list.Owner());
+#else
+	return list.*CargoModificationMember(CargoModificationTag{});
+#endif
+}
+static int ListToken(TestList &list)
 {
 #ifdef WITH_RUST
 	return openttd_rust_list_token(list.Owner());
@@ -378,7 +389,189 @@ static void Persistence(std::string_view tag)
 		sq_close(vm); Require(EndAllocator() == 0);
 	}
 }
+/* Only the issue #65 uncovered VM/control paths; bundled VM and owner are real. */
+struct FilterItem {
+	SQInteger index;
+	static auto &Items() { static FilterItem items[] = {{1}, {2}, {3}, {4}}; return items; }
+	static auto Iterate()
+	{
+		auto &items = Items();
+		static const FilterItem *const pointers[] = {&items[0], &items[1], &items[2], &items[3]};
+		return std::span(pointers);
+	}
+};
+static std::vector<SQInteger> validation_calls;
+static bool throw_validation;
+class FilterList : public TestList {
+public:
+	void Filter(HSQUIRRELVM vm)
+	{
+		this->FillList<FilterItem>(vm, this, [](const FilterItem *item) {
+			Require(!allow_commands);
+			validation_calls.push_back(item->index);
+			if (throw_validation && item->index == 3) throw std::runtime_error("typed predicate");
+			return item->index != 2;
+		});
+	}
+};
+static void Expression(HSQUIRRELVM vm, std::string_view expression)
+{
+	Require(SQ_SUCCEEDED(sq_compilebuffer(vm, "return " + std::string(expression) + ";", "control-gap", SQFalse)));
+	sq_pushroottable(vm);
+	Require(SQ_SUCCEEDED(sq_call(vm, 1, SQTrue, SQFalse)));
+	sq_remove(vm, -2);
+}
+static std::string Stack(HSQUIRRELVM vm)
+{
+	std::string out;
+	for (SQInteger slot = 1; slot <= sq_gettop(vm); ++slot) out += VMValue(vm, slot) + ";";
+	return out;
+}
+static void ControlObservation(std::string_view label, unsigned number, HSQUIRRELVM vm, TestList &list, SQInteger result, std::string_view thrown)
+{
+	auto stack = Stack(vm);
+	sq_getlasterror(vm); auto error = VMValue(vm, -1); sq_poptop(vm);
+	std::cout << "vm-control " << label << ' ' << number << " result=" << result << " thrown=" << thrown
+			<< " token=" << ListToken(list) << " content=" << Content(list) << " stack=" << stack << " error=" << error
+			<< " allow=" << allow_commands << " calls=";
+	for (auto key : calls) std::cout << key << ',';
+	std::cout << " valid=";
+	for (auto key : validation_calls) std::cout << key << ',';
+	std::cout << " charge=";
+	for (auto charge : charges) std::cout << charge << ',';
+	std::cout << " logs=";
+	for (auto &message : diagnostics) std::cout << Hex(message) << ',';
+	std::cout << '\n'; diagnostics.clear();
+}
+static SQInteger CheckRoot(HSQUIRRELVM vm)
+{
+	sq_push(vm, 2); sq_pushroottable(vm); Require(sq_cmp(vm) == 0); sq_pop(vm, 2); return 0;
+}
+static SQInteger BoolFilter(HSQUIRRELVM vm)
+{
+	RecordItem(vm); SQInteger key; sq_getinteger(vm, 2, &key); sq_pushbool(vm, key != 3); return 1;
+}
+static SQInteger Reindex(HSQUIRRELVM vm)
+{
+	SQInteger key; sq_getinteger(vm, 2, &key);
+	if (key == 1) FilterItem::Items()[0].index = 6;
+	return 0;
+}
+static void FilterGaps()
+{
+	const std::string_view expressions[] = {
+		"", "7", "null", "function(k) { Record(k); return k != 3; }",
+		"function(k,a,b) { Record(k); CheckRoot(this); if (a != 17 || b != 23) throw \"args\"; return true; }",
+		"function(k) { Record(k); return 1; }",
+		"function(k) { Record(k); if (k == 3) throw \"later filter\"; return true; }",
+		"function(k) { Record(k); if (k == 3) return null; return true; }",
+		"function(k) { Record(k); return true; }",
+		"BoolFilter",
+		"function(k) { Record(k); Reindex(k); return true; }",
+	};
+	for (unsigned i = 0; i != std::size(expressions); ++i) {
+		BeginAllocator(); auto vm = sq_open(1024); FilterList list;
+		for (unsigned n = 0; n != 4; ++n) FilterItem::Items()[n].index = n + 1;
+		Native(vm, "Record", RecordItem); Native(vm, "CheckRoot", CheckRoot); Native(vm, "BoolFilter", BoolFilter); Native(vm, "Reindex", Reindex); sq_pushnull(vm);
+		if (!expressions[i].empty()) Expression(vm, expressions[i]);
+		if (i == 4) { sq_pushinteger(vm, 17); sq_pushinteger(vm, 23); }
+		calls.clear(); charges.clear(); validation_calls.clear(); throw_validation = i == 8;
+		std::string thrown; SQInteger result = 0;
+		try { list.Filter(vm); if (i == 4) Require(list.Count() == 3); } catch (SQInteger value) { result = value; thrown = "integer"; }
+		catch (const std::runtime_error &error) { thrown = error.what(); }
+		Require(allow_commands);
+		ControlObservation("filter", i, vm, list, result, thrown);
+		throw_validation = false; sq_close(vm); Require(EndAllocator() == 0);
+	}
+	/* Missing/nonfunction valuation validates before constructing host scopes. */
+	for (unsigned i = 0; i != 3; ++i) {
+		BeginAllocator(); auto vm = sq_open(1024); TestList list; list.AddItem(1, 7);
+		sq_pushnull(vm); if (i == 1) sq_pushinteger(vm, 7); if (i == 2) sq_pushnull(vm);
+		calls.clear(); charges.clear(); validation_calls.clear();
+		auto result = list.Valuate(vm); Require(allow_commands);
+		ControlObservation("valuate-arguments", i, vm, list, result, "");
+		sq_close(vm); Require(EndAllocator() == 0);
+	}
+}
+static void LoadGaps()
+{
+	const std::string_view expressions[] = {
+		"null", "{}", "[]", "[true]", "[0]", "[0, 1]", "[0, false]", "[0, false, []]",
+		"[0, false, {}]", "[1, true, {[1]=8, [3]=9}]", "[1, true, {[1]=8, [3]=9}, 99]",
+		"[0, false, {[1]=2.75, [3.75]=4}]", "[1, false, {[1]=-2.75, [-1.75]=4}]",
+		"[0, true, {[1.25]=2.75}]", "[0, false, {[\"bad\"]=\"bad\"}]",
+		"[1, true, {[1]=8, [3]=9, [\"bad\"]=\"bad\"}]",
+		"[1, true, {[0]=8, [4]=9, [\"bad\"]=\"bad\"}]",
+		"[2, true, {[1]=8}]",
+	};
+	for (unsigned i = 0; i != std::size(expressions); ++i) {
+		BeginAllocator(); auto vm = sq_open(1024); TestList list;
+		list.AddItem(1, 71); list.AddItem(6, 66); list.Sort(ScriptList::SORT_BY_ITEM, true); list.Begin();
+		sq_pushinteger(vm, 55); Expression(vm, expressions[i]);
+		calls.clear(); charges.clear(); validation_calls.clear();
+		auto result = list.LoadObject(vm);
+		ControlObservation("load", i, vm, list, result, "");
+		Record("load-live-next", list, list.Next());
+		Record("load-live-begin", list, list.Begin());
+		sq_close(vm); Require(EndAllocator() == 0);
+	}
+}
+static void MetamethodGaps()
+{
+	for (unsigned i = 0; i != 15; ++i) {
+		BeginAllocator(); auto vm = sq_open(1024); TestList list; list.AddItem(1, 7); list.AddItem(3, 8);
+		sq_pushnull(vm);
+		if (i == 0 || i == 3 || i == 12) sq_pushstring(vm, "key");
+		else if (i == 1 || i == 5) sq_pushinteger(vm, 99);
+		else if (i == 7 || i == 9) sq_pushinteger(vm, 4);
+		else if (i == 11 || i == 14) sq_pushnull(vm);
+		else sq_pushinteger(vm, 1);
+		if (i == 4 || i == 5) sq_pushnull(vm);
+		if (i == 6 || i == 7) sq_pushbool(vm, i == 6 ? SQTrue : SQFalse);
+		if (i == 8 || i == 9) sq_pushinteger(vm, INT64_MIN);
+		if (i == 3 || i == 10) sq_pushstring(vm, "wrong");
+		if (i == 14) list.Clear();
+		if (i == 13) { list.Sort(ScriptList::SORT_BY_ITEM, true); list.Begin(); list.Next(); list.Next(); }
+		calls.clear(); charges.clear(); validation_calls.clear();
+		SQInteger result = i < 3 ? list._get(vm) : i < 11 ? list._set(vm) : list._nexti(vm);
+		ControlObservation("metamethod", i, vm, list, result, "");
+		Record("meta-live-next", list, list.Next());
+		sq_close(vm); Require(EndAllocator() == 0);
+	}
+}
+static std::vector<std::string> nested_observations;
+static unsigned nested_mode;
+static SQInteger NestedControl(HSQUIRRELVM vm)
+{
+	FilterList nested; nested.AddItem(4, 44);
+	for (unsigned n = 0; n != 4; ++n) FilterItem::Items()[n].index = n + 1;
+	SQInteger result = 0;
+	if (nested_mode == 0) result = nested.Valuate(vm);
+	else nested.Filter(vm);
+	Require(!allow_commands);
+	nested_observations.push_back(Content(nested));
+	return result;
+}
+static void NestedGaps()
+{
+	for (unsigned mode = 0; mode != 2; ++mode) {
+		BeginAllocator(); auto vm = sq_open(1024); TestList list;
+		list.AddItem(1, 7); list.AddItem(3, 8); active = &list; nested_mode = mode;
+		Native(vm, "RunValuate", RunValuate); Native(vm, "Record", RecordItem); Native(vm, "Nested", NestedControl); Native(vm, "CheckRoot", CheckRoot);
+		std::string script = mode == 0
+			? "return RunValuate(function(k,a) { Record(k); CheckRoot(this); if (a != 17) throw \"args\"; Nested(function(n,b) { Record(n); return n+b; },23); return k+a; },17);"
+			: "return RunValuate(function(k) { Record(k); Nested(function(n,b) { Record(n); return n != b; },3); return true; });";
+		Require(SQ_SUCCEEDED(sq_compilebuffer(vm, script, "nested-control", SQFalse))); sq_pushroottable(vm);
+		calls.clear(); charges.clear(); validation_calls.clear(); nested_observations.clear();
+		auto result = sq_call(vm, 1, SQTrue, SQFalse); Require(SQ_SUCCEEDED(result) && allow_commands);
+		ControlObservation("nested", mode, vm, list, result, "");
+		std::cout << "vm-control nested-results " << mode << ' ';
+		for (auto &observation : nested_observations) std::cout << observation << ';';
+		std::cout << '\n'; sq_close(vm); Require(EndAllocator() == 0);
+	}
+}
 int main()
 {
 	OwnerGaps(); CargoGaps(); ValuationGaps(); Persistence<TestList>("List"); Persistence<TestTileList>("TileList");
+	FilterGaps(); LoadGaps(); MetamethodGaps(); NestedGaps();
 }

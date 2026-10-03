@@ -54,6 +54,14 @@ pub fn layout(type_id: u8, item: u8) -> usize {
             layout!(crate::station_cargo::Collector, item; amount, previous, last_key, other, origin, selector, finalized)
         }
         19..=21 => crate::crypto_primitives::abi_layout(type_id, item),
+        22 => crate::blake2b::abi_layout(item),
+        23 => layout!(crate::packet::State, item; limit, position),
+        24 => layout!(crate::packet::Frame, item; message, payload),
+        25 => crate::x25519::abi_layout(item),
+        26 => layout!(crate::string_validation::Step, item; consumed, output, stopped),
+        27 => layout!(crate::string_validation::Write, item; position, accepted),
+        29 => layout!(crate::script_list::control::Input, item; a, b, flag, kind),
+        30 => layout!(crate::script_list::control::Action, item; a, kind),
         _ => usize::MAX,
     }
 }
