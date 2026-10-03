@@ -24,6 +24,13 @@ static_assert(SoftClamp<int8_t>(0, -1, -3) == 126);
 static_assert(SoftClamp<int16_t>(0, -1, -3) == 32766);
 static_assert(SoftClamp<uint64_t>(0, UINT64_MAX, 0) == (uint64_t(1) << 63));
 
+#ifdef __SIZEOF_INT128__
+using WideUnsigned = unsigned __int128;
+static_assert(ClampTo<WideUnsigned>(uint64_t(7)) == 7);
+static_assert(ClampTo<WideUnsigned>(UINT64_MAX) == WideUnsigned(UINT64_MAX));
+static_assert(ClampTo<WideUnsigned>(true) == 1);
+#endif
+
 #ifdef MATH_ROUTE_PROBE
 static uint64_t sqrt_calls = 0, clamp_calls = 0, soft_calls = 0;
 extern "C" uint32_t __real_openttd_rust_int_sqrt(uint32_t);
@@ -82,6 +89,18 @@ template <typename From> static void ClampDestinations()
 	ClampCases<size_t, From>(); ClampCases<ptrdiff_t, From>();
 }
 
+#ifdef __SIZEOF_INT128__
+template <typename From> static void WideUnsignedCases()
+{
+	const From values[] = {From(0), From(1), From(2), From(std::numeric_limits<From>::max() - 1), std::numeric_limits<From>::max()};
+	for (From value : values) {
+		const WideUnsigned result = ClampTo<WideUnsigned>(value);
+		Emit(static_cast<uint64_t>(result));
+		Emit(static_cast<uint64_t>(result >> 64));
+	}
+}
+#endif
+
 template <typename T> static void SoftCases()
 {
 	const T low = std::numeric_limits<T>::lowest(), high = std::numeric_limits<T>::max();
@@ -97,6 +116,18 @@ int main()
 	if (sqrt_calls != 1 || clamp_calls != 1 || soft_calls != 1) return 2;
 #else
 	Emit(IntSqrt(25)); Emit(ClampTo<uint8_t>(256)); Emit(SoftClamp(0, 1500, 1000));
+#endif
+#ifdef __SIZEOF_INT128__
+#ifdef MATH_ROUTE_PROBE
+	const uint64_t wide_calls_before = clamp_calls;
+#endif
+	WideUnsignedCases<uint8_t>(); WideUnsignedCases<uint16_t>();
+	WideUnsignedCases<uint32_t>(); WideUnsignedCases<uint64_t>(); WideUnsignedCases<bool>();
+	WideUnsignedCases<char8_t>(); WideUnsignedCases<char16_t>(); WideUnsignedCases<char32_t>();
+	WideUnsignedCases<size_t>();
+#ifdef MATH_ROUTE_PROBE
+	if (clamp_calls != wide_calls_before + 45) return 4;
+#endif
 #endif
 	uint64_t roots = 0;
 	for (uint64_t k = 0; k <= 65535; k++) {

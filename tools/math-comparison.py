@@ -27,13 +27,14 @@ def main():
     env["CARGO_TARGET_DIR"] = str(output / "cargo")
     records = []
 
-    def run(command, name):
+    def run(command, name, *, expected_failure=False):
         result = subprocess.run(command, cwd=migration.ROOT, env=env, text=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         (output / f"{name}.log").write_text(result.stdout)
-        records.append({"name": name, "argv": list(map(str, command)), "exit_code": result.returncode})
-        if result.returncode:
-            raise RuntimeError(f"{name} failed: {result.stdout}")
+        records.append({"name": name, "argv": list(map(str, command)), "exit_code": result.returncode,
+                        "expected_failure": expected_failure})
+        if bool(result.returncode) != expected_failure:
+            raise RuntimeError(f"{name} had unexpected status {result.returncode}: {result.stdout}")
         return result.stdout
 
     configuration = migration.rust_configuration(migration.ROOT / "build-rust")
@@ -75,6 +76,22 @@ def main():
                     raise RuntimeError(f"Math mismatch: {output / f'difference-{label}-{mode}.diff'}")
             report[f"{mode}_lines"] = len(streams["reference"].splitlines())
             report[f"{mode}_sha256"] = hashlib.sha256(streams["reference"].encode()).hexdigest()
+        # These strict-mode extended-type combinations were never accepted by
+        # the pinned template; preserve failures while accepting unsigned widening.
+        rejected = {
+            "wide-signed-source": "ClampTo<unsigned __int128>(int64_t(-1))",
+            "wide-signed-destination": "ClampTo<__int128>(uint64_t(7))",
+            "wide-source": "ClampTo<uint64_t>(static_cast<unsigned __int128>(7))",
+        }
+        for name, expression in rejected.items():
+            source_file = output / f"{name}.cpp"
+            source_file.write_text('#include "stdafx.h"\n#include "core/math_func.hpp"\nauto result = ' + expression + ';\n')
+            for label, source in (("reference", reference), ("portable", migration.ROOT), ("candidate", migration.ROOT)):
+                command = ["c++", "-std=c++20", "-fsyntax-only", "-I", str(source / "src"), str(source_file)]
+                if label == "candidate":
+                    command.append("-DWITH_RUST")
+                run(command, f"reject-{label}-{name}", expected_failure=True)
+        report["preserved_rejections"] = list(rejected)
         if migration.git("status", "--porcelain", "--untracked-files=all", cwd=reference):
             raise RuntimeError("Reference became dirty during comparison")
         report["passed"] = True

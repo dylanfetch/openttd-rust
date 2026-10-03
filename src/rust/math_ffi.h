@@ -23,6 +23,8 @@ uint32_t openttd_rust_int_sqrt(uint32_t value);
  * Widths are 1 (bool), 8, 16, 32, or 64; signed selectors are 0/1.
  * Values enter as modulo-2^64 bits; Rust masks/sign-interprets the source width.
  * Returns destination value bits; C++20 typed conversion reconstructs the result.
+ * Accepted wider unsigned C++ destinations request width 64, retaining the entire
+ * standard source value, then widen that result in C++.
  * bool values are 0/1. No signed intermediate is used for unsigned uint64 values.
  * No pointers, allocations, ownership, state, callbacks, or exceptions cross
  * these functions. Rust arithmetic uses explicit bounded or wrapping operations;

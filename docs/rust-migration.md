@@ -543,7 +543,9 @@ C++: its potentially overflowing signed intermediates require separate work.
 The public saturation templates retain their original C++ bodies for constant
 evaluation, dispatched with `std::is_constant_evaluated()`. The StrongType and
 OverflowSafeInt overloads retain their original unwrap-and-forward behavior.
-Portable builds retain the original complete bodies. These are explicit remaining
+Portable builds retain the original complete bodies. Accepted wider extension
+sources/signed destinations and SoftClamp also retain the original runtime bodies.
+These are explicit remaining
 C++ implementations; this slice does not complete all math migration.
 
 Source inventory finds ClampTo destinations uint8/uint16/uint32/int32, the int32
@@ -555,8 +557,17 @@ bool saturation, explicit narrow SoftClamp instantiation, or wider compiler
 integer extension appears in these call sites. The standard integral public
 contracts also include signed/unsigned char, wchar_t and char8/16/32_t aliases.
 The Rust adapter explicitly checks eight-bit bytes, a 32-bit int promotion model
-for SoftClamp, and widths no larger than uint64_t. Unsupported wider extension
-instantiations produce a compile-time failure rather than silently bypass Rust.
+for SoftClamp, and routes standard widths through uint64_t to Rust. An accepted wider unsigned
+destination uses Rust's unsigned64 saturation followed by C++ widening. Wider
+ClampTo sources/signed destinations and wider SoftClamp types retain the original
+C++ runtime body when accepted by the compiler/library. No new source/destination
+width precondition is imposed. Non-builtin integer-like destinations accepted by
+`numeric_limits` retain the original body and constructor/conversion selection.
+Strict GCC/libstdc++ originally rejects signed
+sources for unsigned128 destinations, signed128 destinations and 128-bit sources
+through its traits; libc++ supports a broader extension domain. The bounded
+extension comparison below checks each library's actual accepted domain rather
+than assuming GCC defines every supported platform's public API.
 
 The ABI is pointer-free and scalar-only: modulo-2^64 value bits, explicit widths
 and signedness, and result bits reconstructed by C++20 integral conversion.
@@ -589,13 +600,25 @@ against its unchanged math source/header and both Rust and portable candidate
 bodies, in assertion-enabled and NDEBUG modes. It compares exact ordered results
 for every uint32 integer-root square and adjacent rounding transition, UINT32_MAX,
 8/16/32/64-bit signedness/width extrema, bool and standard character/size aliases,
-StrongType/OverflowSafeInt adapters, normal/equal/reversed SoftClamp intervals,
+StrongType/OverflowSafeInt adapters, accepted unsigned 128-bit destinations
+(including both result words and runtime routing), normal/equal/reversed SoftClamp intervals,
 and all reversed signed 8-bit pairs. Static assertions retain constexpr evidence.
 GNU linker wrappers count actual calls to each Rust symbol, including initial
 literal calls at -O2; retained nm output supplies symbol evidence. Source hashes,
 commands, outputs, and routing counts reside in `.local/math-comparison/` and CI
 retains them. The probe is a native GNU/Linux comparison, not a new simulation
 framework or a proof over all math inputs, platform ABIs, or whole-game behavior.
+
+`python3 tools/math-extension-comparison.py` additionally compiles the same small
+wide-template fixture against pinned, portable and Rust candidate headers on the
+native compiler/library. It covers the GCC accepted unsigned128 widening path;
+on libc++ it also checks accepted signed/unsigned128 sources, signed destinations,
+saturation beyond uint64 limits, negative values and wide SoftClamp intervals.
+Both result words and constexpr assertions are checked. A tiny integer-like
+numeric_limits destination also checks the original constructor selection. Native macOS Rust CI runs
+this comparison with `--build build` and retains it in the macOS evidence bundle.
+Library-dependent extension coverage is reported by each fixture output; wider
+C++ fallback behavior is explicitly remaining migration work.
 
 ## Team process and engineering standards
 
