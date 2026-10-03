@@ -41,8 +41,9 @@ libraries described in `COMPILING.md`. OpenGFX supplies free graphics for regres
 games; commercial game assets are unnecessary. The verification driver requires
 the pinned Rust toolchain and always configures the candidate with `OPTION_RUST=ON`.
 Ordinary CMake builds default to `OPTION_RUST=OFF`, preserving the original portable
-C++ path. Rust linkage currently supports native Linux; other platforms and cross
-compilation remain outstanding migration work and reject an enabled Rust option.
+C++ path. Rust linkage supports native GNU/Linux (64-bit x86 or ARM) and native macOS arm64.
+Other platforms, cross compilation, and macOS universal/Intel configurations reject
+an enabled Rust option; their portable fallback remains migration work.
 
 On Ubuntu with administrator access:
 
@@ -178,7 +179,7 @@ settings/string headers plus English/French language output on unchanged referen
 inputs. Evidence and source hashes live under `.local/integer-comparison/`; CI runs
 the fresh Rust tools build and comparisons. The eleven unchanged upstream
 StringConsumer cases remain the primary existing parser tests. In-place ownership,
-other builder algorithms, C++ adapters, and non-Linux Rust integration remain migration work.
+other builder algorithms and C++ adapters remain migration work.
 
 Alternating-iterator traversal also uses the shared Rust archive. Rust owns initial
 position/selectors, logical advancement, side selection, end transitions, and
@@ -522,3 +523,37 @@ are enforced separately from these documents.
 
 Preserve OpenTTD copyright notices, credits, and GPLv2. Agent-generated work is welcome
 in this fork; upstream submission policies govern contributions to OpenTTD itself.
+
+## Native macOS arm64 Rust linkage
+
+CMake verifies the pinned `rustc -vV` host against the actual C++ platform,
+architecture and 64-bit pointer width, then passes an explicit Cargo `--target`.
+On macOS it requires exactly `CMAKE_OSX_ARCHITECTURES=arm64` and a deployment
+minimum of 11.0 or newer, with the same resolved SDK and minimum supplied to Rust
+through `SDKROOT` and `MACOSX_DEPLOYMENT_TARGET`. Rust's [Darwin target documentation](https://doc.rust-lang.org/rustc/platform-support/apple-darwin.html)
+specifies the supported minimum and these environment inputs. Intel packaging,
+Windows CRT policy and Emscripten host/target builds remain separate tasks.
+
+Archives live at `<build>/cargo/<validated-target>/release/libopenttd_kernels.a`.
+`tools/migration.py` exposes `rust_configuration(build)` and `rust_archive(build)`;
+all comparison consumers use this cache-validated lookup. Reconfigure existing
+build directories when adopting this layout. Imported `HOST_BINARY_DIR` tools
+remain previously built executables and do not consume the target archive.
+
+The pinned compiler's `--print=native-static-libs` output supplies final link
+flags instead of applying Linux libraries to Darwin. Configuration retains
+`rust-toolchain.txt` and `rust-native-libs.log`; archive builds retain
+`rust-build.log`, including the actual crate's native-library output. Rust's
+[static-library linkage documentation](https://doc.rust-lang.org/reference/linkage.html#linkstaticlib)
+explains why final C++ links require these system dependencies. The crate retains
+its release abort-on-panic profile and explicit overflow checks in both C++ modes.
+
+The existing required macOS ARM jobs activate Rust through the reusable workflow's
+explicit `rust` input. Debug enables `OPTION_USE_ASSERTS`; release disables it.
+Both run the four targeted Cargo checks, nonempty CTest inventories and scripted
+regressions, then build and execute fresh native tools. The evidence artifact
+retains JUnit, compiler/SDK/target metadata, compile commands, link scripts, native
+libraries, Mach-O archive/symbol checks and fresh generated files. These checks
+validate native linkage and covered behavior; Linux results alone do not establish
+Darwin support. Actual macOS CI evidence and independent review are required before
+integration.
