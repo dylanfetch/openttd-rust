@@ -712,6 +712,18 @@ Count()-count, and callbacks that leave original iterators invalid while evading
 its modification check. Resource-exhaustion exception behavior is not promised
 identical. Clone content uses the original target sort/initialization flow;
 saving traverses item order without resetting public iteration. The original
-mixed-type load validation remains unchanged. Initial Cargo checks and both
-Rust-enabled/portable C++ source compilation pass; unchanged regressions and
-bounded owner/VM/persistence gap evidence remain pending.
+mixed-type load validation remains unchanged. The unchanged full-game regressions
+`regression_regression` and `regression_stationlist` pass alongside all reference
+tests. `python3 tools/script-list-comparison.py` compares only the identified gaps
+against the actual pinned C++ implementation, with separate original, Rust-enabled
+and portable binaries at O0/O2. It covers active/ended cursor swaps and insertions,
+self operations, pending removals/value changes, no-op mutations, empty-list
+union, strict/reversed/equal filters and zero/negative ranks. The actual bundled
+Squirrel VM and allocator exercise callback failure/error precedence, partial
+commits, operation charges and command-scope restoration. Valid List and TileList
+save/load representations and independent clones are compared without resetting
+the source cursor. The fixture substitutes only a command-permission bool for the
+full game instance and extracts unchanged TileList persistence bodies without
+simulating world population. This evidence does not establish arbitrary VM,
+savegame or allocation-failure equivalence. CI retains these comparisons along
+with the existing checks.
