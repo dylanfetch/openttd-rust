@@ -141,9 +141,9 @@ def compiler_cache_settings(executable, env):
     output = subprocess.check_output([executable, "--show-config"], env=env, text=True)
     settings = {}
     for line in output.splitlines():
-        if ") " in line and " = " in line:
-            key, value = line.split(") ", 1)[1].split(" = ", 1)
-            settings[key] = value
+        if ") " in line and " =" in line:
+            key, _, value = line.split(") ", 1)[1].partition(" =")
+            settings[key] = value.strip()
     expected_policy = dict(CCACHE_POLICY, base_dir=env.get("CCACHE_BASEDIR", ""))
     for key, expected in expected_policy.items():
         if settings.get(key) != expected:
