@@ -39,6 +39,17 @@ impl Default for List {
 }
 
 impl List {
+    pub(crate) fn cargo_merge(&mut self, key: i64, amount: i64) {
+        if let Some(value) = self.items.get(&key).copied() {
+            self.set(
+                key,
+                value.checked_add(amount).expect("defined cargo list value"),
+            );
+        } else {
+            self.add(key, amount);
+        }
+    }
+
     fn touch(&mut self) {
         // Original signed int overflow is undefined; only representable counts are in contract.
         self.modifications = self

@@ -17,6 +17,7 @@
 #include "rust/byte_strings_ffi.h"
 #include "rust/history_ffi.h"
 #include "rust/math_ffi.h"
+#include "rust/station_cargo_ffi.h"
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -69,6 +70,7 @@ static void Layouts()
 	CHECK(openttd_rust_abi_layout(255, 0) == SIZE_MAX);
 	CHECK(static_cast<size_t>(PTRDIFF_MAX) == (SIZE_MAX >> 1));
 	std::printf("pointer_bytes %zu sentinel %zu borrow_limit %zu\n", sizeof(void *), SIZE_MAX, static_cast<size_t>(PTRDIFF_MAX));
+	Layout(18, "OpenTTDCargoCollector", {sizeof(OpenTTDCargoCollector), alignof(OpenTTDCargoCollector), offsetof(OpenTTDCargoCollector, amount), offsetof(OpenTTDCargoCollector, previous), offsetof(OpenTTDCargoCollector, last_key), offsetof(OpenTTDCargoCollector, other), offsetof(OpenTTDCargoCollector, origin), offsetof(OpenTTDCargoCollector, selector), offsetof(OpenTTDCargoCollector, finalized)});
 }
 
 static void Calls()
@@ -265,6 +267,33 @@ static void Math()
 	std::printf("math int_sqrt, clamp_to and soft_clamp scalar high-bit, width and boundary calls passed\n");
 }
 
+static void StationCargo()
+{
+	auto list = std::unique_ptr<OpenTTDScriptList, decltype(&openttd_rust_list_destroy)>(openttd_rust_list_new(), openttd_rust_list_destroy);
+	OpenTTDCargoCollector state;
+	CHECK(openttd_rust_cargo_plan(0, 1) == 1 && openttd_rust_cargo_plan(1, 3) == 3);
+	CHECK(openttd_rust_cargo_plan(9, 0) == UINT8_MAX);
+	openttd_rust_cargo_init(&state, 0, UINT16_MAX);
+	openttd_rust_cargo_packet(&state, list.get(), UINT16_MAX, 2, UINT32_MAX);
+	openttd_rust_cargo_packet(&state, list.get(), UINT16_MAX, 2, 2);
+	openttd_rust_cargo_packet(&state, list.get(), 3, 2, 7);
+	int64_t value = 0;
+	CHECK(openttd_rust_list_get(list.get(), UINT16_MAX, &value) == 1 && value == 1);
+	openttd_rust_cargo_finish(&state, list.get());
+	CHECK(openttd_rust_list_get(list.get(), 3, &value) == 1 && value == 7);
+	auto token = openttd_rust_list_token(list.get());
+	openttd_rust_cargo_finish(&state, list.get());
+	CHECK(openttd_rust_list_token(list.get()) == token);
+	openttd_rust_cargo_init(&state, 2, 0);
+	openttd_rust_cargo_origin(&state, 10);
+	openttd_rust_cargo_share(&state, list.get(), 4, UINT32_MAX);
+	openttd_rust_cargo_origin(&state, 11);
+	openttd_rust_cargo_share(&state, list.get(), 4, 1);
+	openttd_rust_cargo_finish(&state, list.get());
+	CHECK(openttd_rust_list_get(list.get(), 4, &value) == 0);
+	std::printf("station_cargo scalar layout, uint32 wrapping, origin reset and finalization passed\n");
+}
+
 int main()
 {
 	Layouts();
@@ -272,6 +301,7 @@ int main()
 	Encoded();
 	History();
 	Math();
+	StationCargo();
 	Locale();
 	std::printf("ABI audit passed\n");
 }

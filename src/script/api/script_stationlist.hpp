@@ -33,6 +33,9 @@ public:
  * @ingroup ScriptList
  */
 class ScriptStationList_Cargo : public ScriptList {
+#ifdef WITH_RUST
+	friend class CargoCollector;
+#endif
 public:
 	/**
 	 * Criteria of selecting and grouping cargo at a station.
@@ -64,6 +67,9 @@ public:
 	ScriptStationList_Cargo(ScriptStationList_Cargo::CargoMode mode, ScriptStationList_Cargo::CargoSelector selector, StationID station_id, CargoType cargo, StationID other_station);
 
 protected:
+#ifdef WITH_RUST
+	void AddCargo(CargoMode mode, CargoSelector selector, StationID station_id, CargoType cargo, StationID other_station = StationID::Invalid());
+#endif
 
 	/**
 	 * Creates an empty list.

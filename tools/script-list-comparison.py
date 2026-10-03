@@ -51,6 +51,40 @@ def main():
         raise RuntimeError("TileList persistence/clone changed")
     tile = OUT / "tile-persistence.cpp"
     tile.write_text('#include "stdafx.h"\n#include "script/api/script_tilelist.hpp"\n' + "\n".join(bodies) + "\n")
+    # Scalar cargo gaps use exact original Update/SetValue/destructor and planned
+    # traversal bodies. Only direct collector construction omits world lookup;
+    # saved-game regressions remain the actual station/cargo validity evidence.
+    station_source = (REFERENCE / "src/script/api/script_stationlist.cpp").read_text()
+    candidate_station = (ROOT / "src/script/api/script_stationlist.cpp").read_text()
+    validation = extract(station_source, "CargoCollector::CargoCollector(")
+    validation_body = validation[validation.index("{") + 1:validation.rfind("}")].strip()
+    active_station = candidate_station.split("#else\n\nclass CargoCollector", 1)[0]
+    if validation_body.replace("\n\t", "\n\t\t") not in active_station:
+        raise RuntimeError("Station-before-cargo validation body/order changed")
+    guards = "if (collector.GE() == nullptr) return;\n\tif (!collector.GE()->HasData()) return;"
+    if guards not in active_station or guards not in station_source:
+        raise RuntimeError("Null goods / HasData guard order changed")
+    cargo_signatures = ("class CargoCollector {", "CargoCollector::~CargoCollector()",
+                        "void CargoCollector::SetValue()", "void CargoCollector::Update(")
+    cargo_bodies = {signature: extract(station_source, signature) for signature in cargo_signatures}
+    if any(body not in candidate_station for body in cargo_bodies.values()):
+        raise RuntimeError("Portable cargo reducer changed")
+    initializer = station_source[station_source.index("CargoCollector::CargoCollector("):]
+    initializer = initializer[:initializer.index("{")]
+    cargo_text = "\n".join(body + (";" if name == "class CargoCollector {" else "") for name, body in cargo_bodies.items())
+    cargo_text = cargo_text.replace(cargo_bodies["void CargoCollector::Update("],
+                                    "template <ScriptStationList_Cargo::CargoSelector Tselector>\n" + cargo_bodies["void CargoCollector::Update("])
+    cargo_text += "\n" + initializer + "{ /* Direct fixture: no world access. */ }\n"
+    planned = extract(station_source, "void ScriptStationList_CargoPlanned::Add(")
+    planned_loop = planned[planned.index("FlowStatMap::const_iterator iter"):planned.rfind("}")]
+    planned_loop = planned_loop.replace("collector.GE()->GetData().flows", "flows")
+    cargo_text += "\ntemplate <ScriptStationList_Cargo::CargoSelector Tselector>\nvoid OriginalCargoPlanned(CargoCollector &collector, const FlowStatMap &flows) {\n" + planned_loop + "}\n"
+    filtered = extract(station_source, "ScriptStationList_CargoPlannedFromByVia::ScriptStationList_CargoPlannedFromByVia(")
+    filtered_loop = filtered[filtered.index("FlowStatMap::const_iterator iter"):filtered.rfind("}")]
+    filtered_loop = filtered_loop.replace("collector.GE()->GetData().flows", "flows")
+    cargo_text += "\nvoid OriginalCargoFind(CargoCollector &collector, const FlowStatMap &flows, StationID from) {\nconstexpr auto CS_FROM_BY_VIA = ScriptStationList_Cargo::CS_FROM_BY_VIA;\n" + filtered_loop + "}\n"
+    cargo_text = cargo_text.replace("CargoCollector", "ReferenceCargoCollector")
+    (OUT / "cargo-reducer.hpp").write_text(cargo_text)
     vm_sources = sorted((REFERENCE / "src/3rdparty/squirrel/squirrel").glob("*.cpp"))
     for source in vm_sources:
         if source.read_bytes() != (ROOT / source.relative_to(REFERENCE)).read_bytes():
@@ -64,7 +98,7 @@ def main():
 
     # VM and allocator are real unchanged code. Each label uses its actual string helpers.
     flags = ["g++", "-std=c++20", "-DFMT_HEADER_ONLY", "-DUNIX", "-DPOINTER_IS_64BIT", "-Wno-multichar",
-             "-ffunction-sections", "-fdata-sections"]
+             "-ffunction-sections", "-fdata-sections", "-I", str(OUT), "-I", str(ROOT / "build-rust/generated")]
     objects = {}
     for group, source_root in (("reference", REFERENCE), ("rust", ROOT)):
         objects[group] = []
@@ -109,13 +143,20 @@ def main():
               "modes": ["O0", "O2"], "source_sha256": {
                   name: hashlib.sha256((REFERENCE / name).read_bytes()).hexdigest() for name in
                   ("src/script/api/script_list.cpp", "src/script/api/script_list.hpp", "src/script/api/script_tilelist.cpp", "src/script/squirrel.cpp")},
+              "cargo_unchanged_validation_sha256": hashlib.sha256(validation_body.encode()).hexdigest(),
+              "cargo_unchanged_goods_guards_sha256": hashlib.sha256(guards.encode()).hexdigest(),
+              "cargo_original_body_sha256": {name: hashlib.sha256(body.encode()).hexdigest() for name, body in cargo_bodies.items()},
+              "cargo_original_planned_sha256": hashlib.sha256(planned.encode()).hexdigest(),
+              "cargo_original_find_sha256": hashlib.sha256(filtered.encode()).hexdigest(),
               "allocator_body_sha256": hashlib.sha256(allocator_body.encode()).hexdigest(),
               "fixture_sha256": hashlib.sha256(fixture.read_bytes()).hexdigest(),
               "outputs_sha256": {f"{label}-{mode}": hashlib.sha256(output).hexdigest() for (label, mode), output in outputs.items()},
               "limits": ["Full unchanged game regressions are primary; this only closes listed gaps",
                          "Command-disabling scope uses a host bool sentinel; actual VM/allocator/operation limit remain unchanged",
                          "Save/clone TileList bodies are extracted unchanged; world population is not simulated",
-                         "Undefined signed-overflow/evaded invalid-iterator valuation cases excluded"], "passed": True}
+                         "Undefined signed-overflow/evaded invalid-iterator valuation cases excluded",
+                         "Cargo fixture directly initializes scalar collector without world validation; unchanged stationlist saved-game regression is world/query adapter evidence",
+                         "Failed station/cargo/company policy and missing HasData supplemental probes are unexecuted; typed validation and goods-guard bodies/order are checked unchanged"], "passed": True}
     (OUT / "report.json").write_text(json.dumps(report, indent=2) + "\n")
     print(f"ScriptList comparisons passed: {len(records)} records at O0/O2; {OUT / 'report.json'}")
 
