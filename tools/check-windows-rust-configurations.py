@@ -32,6 +32,9 @@ def main():
                                    "environment": {key: run_env.get(key) for key in ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_PROFILE_RELEASE_CODEGEN_UNITS")}})
         return result
 
+    tools = args.tools.resolve()
+    configuration = migration.rust_configuration(tools)
+
     refusals = [
         ("debug", ["-DCMAKE_BUILD_TYPE=Debug"], {}, "RelWithDebInfo and OPTION_USE_ASSERTS=ON"),
         ("release", ["-DCMAKE_BUILD_TYPE=Release"], {}, "RelWithDebInfo and OPTION_USE_ASSERTS=ON"),
@@ -61,13 +64,14 @@ def main():
     clang = shutil.which("clang-cl") or str(Path(r"C:\Program Files\LLVM\bin\clang-cl.exe"))
     if not Path(clang).is_file():
         raise RuntimeError("Native clang-cl is required to exercise the non-MSVC refusal")
-    result = run([*common, "-B", str(output / "reject-clang"), f"-DCMAKE_CXX_COMPILER={clang}"], "reject-clang")
+    # clang-cl defaults to the host architecture. Use this job's actual target so
+    # its compiler smoke test succeeds before our unsupported-compiler guard.
+    result = run([*common, "-B", str(output / "reject-clang"), f"-DCMAKE_CXX_COMPILER={clang}",
+                  f"-DCMAKE_CXX_COMPILER_TARGET={configuration['target']}"], "reject-clang")
     if result.returncode == 0 or b"VS 2022 MSVC" not in result.stdout:
         raise RuntimeError("Non-MSVC compiler refusal failed")
     report["refusals"].append({"name": "clang-cl", "diagnostic": "VS 2022 MSVC"})
 
-    tools = args.tools.resolve()
-    configuration = migration.rust_configuration(tools)
     # Temporarily hide only std rlibs on this ephemeral CI toolchain, then restore
     # in finally. rustc itself remains usable; no shared reference/source changes.
     stdlib = Path(subprocess.check_output(["rustc", "--print", "target-libdir", "--target", configuration["target"]], text=True).strip())
