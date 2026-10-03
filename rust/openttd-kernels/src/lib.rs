@@ -7,9 +7,14 @@
 
 //! Migrated game and text kernels exposed through the documented `src/rust` ABIs.
 
+mod consumer;
 mod integer;
 mod landscape;
 
+pub use consumer::{
+    BoundResult as ConsumerBound, ByteResult as ConsumerByte, MatchResult as ConsumerMatch,
+    SeparatorResult as ConsumerSeparator,
+};
 pub use integer::IntegerResult;
 
 /// Height at a coordinate within a tile, preserving `OpenTTD`'s slope rounding.
@@ -159,4 +164,115 @@ pub unsafe extern "C" fn openttd_rust_utf8_at_byte(
 ) -> usize {
     // SAFETY: The caller supplies the immutable span described above.
     utf8::at_byte(unsafe { utf8::borrow(data, length) }, offset)
+}
+
+/// Bound requested bytes and decide shortfall before C++ logs/commits the cursor.
+/// Position must not exceed size. `usize::MAX` requests all remaining bytes.
+/// No pointer, allocation, callback, or ownership crosses this non-unwinding ABI.
+#[allow(unsafe_code)] // Exported symbol attribute only.
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_consumer_bound(
+    size: usize,
+    position: usize,
+    requested: usize,
+) -> ConsumerBound {
+    consumer::bound(size, position, requested)
+}
+
+/// Read unsigned little-endian bits without signed conversion or cursor changes.
+/// # Safety
+/// Data addresses one allocation of readable immutable bytes for the call only,
+/// length <= `isize::MAX`; empty spans permit null. Width is 1/2/4/8 bytes.
+/// No pointer is retained, no callback occurs while borrowing, and panic aborts.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_consumer_little_endian(
+    data: *const u8,
+    length: usize,
+    width: u8,
+) -> ConsumerByte {
+    // SAFETY: The caller guarantees the call-local read-only span above.
+    consumer::little_endian(unsafe { utf8::borrow(data, length) }, width)
+}
+
+/// Match a prefix, including an empty prefix, and return conditional consumption.
+/// # Safety
+/// Both spans have the same borrow contract as `openttd_rust_consumer_little_endian`;
+/// they may overlap read-only. Empty patterns are valid. No pointer is retained.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_consumer_prefix(
+    data: *const u8,
+    length: usize,
+    pattern: *const u8,
+    pattern_length: usize,
+) -> ConsumerMatch {
+    // SAFETY: Both spans are call-local and immutable under the caller contract.
+    consumer::prefix(unsafe { utf8::borrow(data, length) }, unsafe {
+        utf8::borrow(pattern, pattern_length)
+    })
+}
+
+/// Find a substring, member byte, or nonmember byte; not-found is `usize::MAX`.
+/// # Safety
+/// Both spans have the prefix borrow contract, including read-only overlap.
+/// Pattern must be nonempty; mode is 0 substring, 1 membership, 2 nonmembership.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_consumer_find(
+    data: *const u8,
+    length: usize,
+    pattern: *const u8,
+    pattern_length: usize,
+    mode: u8,
+) -> usize {
+    // SAFETY: Both spans are call-local and immutable under the caller contract.
+    consumer::find(
+        unsafe { utf8::borrow(data, length) },
+        unsafe { utf8::borrow(pattern, pattern_length) },
+        mode,
+    )
+}
+
+/// Test byte membership and return its unsigned bits only when it matches.
+/// # Safety
+/// Both spans have the prefix borrow contract, including read-only overlap.
+/// Pattern must be nonempty; member is 0/1. No pointer or allocation is retained.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_consumer_character(
+    data: *const u8,
+    length: usize,
+    pattern: *const u8,
+    pattern_length: usize,
+    member: u8,
+) -> ConsumerByte {
+    // SAFETY: Both spans are call-local and immutable under the caller contract.
+    consumer::character(
+        unsafe { utf8::borrow(data, length) },
+        unsafe { utf8::borrow(pattern, pattern_length) },
+        member != 0,
+    )
+}
+
+/// Decide returned and consumed lengths for whole, nonoverlapping separators.
+/// # Safety
+/// Both spans have the prefix borrow contract, including read-only overlap.
+/// Separator must be nonempty. Policies 0..4 follow C++ `SeparatorUsage`; all other
+/// values retain KEEP behavior. No pointer is retained and panic aborts.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_consumer_separator(
+    data: *const u8,
+    length: usize,
+    pattern: *const u8,
+    pattern_length: usize,
+    policy: i32,
+) -> ConsumerSeparator {
+    // SAFETY: Both spans are call-local and immutable under the caller contract.
+    consumer::separator(
+        unsafe { utf8::borrow(data, length) },
+        unsafe { utf8::borrow(pattern, pattern_length) },
+        policy,
+    )
 }
