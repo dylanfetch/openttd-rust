@@ -8,6 +8,7 @@
 //! Migrated game and text kernels exposed through the documented `src/rust` ABIs.
 
 mod alternating;
+mod byte_strings;
 mod consumer;
 mod integer;
 mod landscape;

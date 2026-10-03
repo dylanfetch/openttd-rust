@@ -9,6 +9,10 @@ on:
       full_arch:
         required: true
         type: string
+      rust:
+        required: false
+        type: boolean
+        default: false
       extra-cmake-parameters:
         required: false
         type: string
@@ -23,7 +27,7 @@ jobs:
 
     runs-on: macos-latest
     env:
-      MACOSX_DEPLOYMENT_TARGET: 10.13
+      MACOSX_DEPLOYMENT_TARGET: ${{ inputs.rust && '11.0' || '10.13' }}
 
     steps:
     - name: Setup Xcode version
@@ -33,6 +37,26 @@ jobs:
 
     - name: Checkout
       uses: actions/checkout@v6
+
+    - name: Install pinned Rust and select native SDK
+      if: inputs.rust
+      run: |
+        test "$(uname -m)" = arm64
+        channel=$(python3 -c 'import tomllib; print(tomllib.load(open("rust-toolchain.toml", "rb"))["toolchain"]["channel"])')
+        rustup toolchain install "$channel" --profile minimal --component rustfmt,clippy --target aarch64-apple-darwin
+        echo "SDKROOT=$(xcrun --sdk macosx --show-sdk-path)" >> "$GITHUB_ENV"
+        mkdir -p .local/macos-evidence
+        rustc -vV | tee .local/macos-evidence/rustc.txt
+        rustup target list --installed | tee .local/macos-evidence/installed-targets.txt
+
+    - name: Rust checks
+      if: inputs.rust
+      run: |
+        python3 tools/test-rust-build-evidence.py
+        cargo fmt --all -- --check
+        cargo check --workspace --all-targets --locked --target aarch64-apple-darwin
+        cargo clippy --workspace --all-targets --locked --target aarch64-apple-darwin -- -D warnings
+        cargo test --workspace --locked --target aarch64-apple-darwin
 
     - name: Setup vcpkg
       id: vcpkg
@@ -62,10 +86,15 @@ jobs:
         cd build
 
         echo "::group::CMake"
+        rust_parameters=()
+        if [ "${{ inputs.rust }}" = true ]; then
+          rust_parameters=(-DOPTION_RUST=ON -DCMAKE_OSX_SYSROOT="$SDKROOT" -DCMAKE_OSX_DEPLOYMENT_TARGET="$MACOSX_DEPLOYMENT_TARGET")
+        fi
         cmake .. \
           -DCMAKE_OSX_ARCHITECTURES=${{ inputs.full_arch }} \
           -DVCPKG_TARGET_TRIPLET=${{ inputs.arch }}-osx \
           -DCMAKE_TOOLCHAIN_FILE=${{ steps.vcpkg.outputs.vcpkg-cmake }} \
+          "${rust_parameters[@]}" \
           ${{ inputs.extra-cmake-parameters }} \
           # EOF
         echo "::endgroup::"
@@ -78,4 +107,86 @@ jobs:
     - name: Test
       run: |
         cd build
-        ctest -j $(sysctl -n hw.logicalcpu) --timeout 120
+        ctest --show-only=json-v1 > ctest-inventory.json
+        python3 -c 'import json; tests=json.load(open("ctest-inventory.json"))["tests"]; assert tests, "Empty test inventory"; print(f"Discovered {len(tests)} tests")'
+        ctest -j $(sysctl -n hw.logicalcpu) --timeout 120 --output-junit ctest.xml
+
+    - name: Reject unsupported Rust configurations
+      if: inputs.rust
+      run: |
+        if cmake -S . -B .local/reject-universal -DOPTION_TOOLS_ONLY=ON -DOPTION_RUST=ON \
+          '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64' -DCMAKE_OSX_SYSROOT="$SDKROOT" \
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 > .local/macos-evidence/reject-universal.log 2>&1; then
+          echo "Universal Rust configuration unexpectedly succeeded"
+          exit 1
+        fi
+        grep -q 'universal and Intel targets are unsupported' .local/macos-evidence/reject-universal.log
+        if cmake -S . -B .local/reject-old-minimum -DOPTION_TOOLS_ONLY=ON -DOPTION_RUST=ON \
+          -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_SYSROOT="$SDKROOT" \
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=10.15 > .local/macos-evidence/reject-old-minimum.log 2>&1; then
+          echo "Unsupported deployment minimum unexpectedly succeeded"
+          exit 1
+        fi
+        grep -q 'deployment target of at least 11.0' .local/macos-evidence/reject-old-minimum.log
+
+    - name: Fresh Rust native generators
+      if: inputs.rust
+      run: |
+        cmake -S . -B .local/build-tools-macos \
+          -DOPTION_TOOLS_ONLY=ON -DOPTION_RUST=ON \
+          -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_SYSROOT="$SDKROOT" \
+          -DCMAKE_OSX_DEPLOYMENT_TARGET="$MACOSX_DEPLOYMENT_TARGET" \
+          -DVCPKG_TARGET_TRIPLET=${{ inputs.arch }}-osx \
+          -DCMAKE_TOOLCHAIN_FILE=${{ steps.vcpkg.outputs.vcpkg-cmake }} \
+          ${{ inputs.extra-cmake-parameters }}
+        cmake --build .local/build-tools-macos -j $(sysctl -n hw.logicalcpu)
+
+    - name: Verify native archive configuration freshness
+      if: inputs.rust
+      run: |
+        python3 - <<'PYCODE'
+        import json
+        from pathlib import Path
+        import subprocess
+        import sys
+        sys.path.insert(0, 'tools')
+        import migration
+        build = Path('.local/build-tools-macos').resolve()
+        archive = migration.rust_archive(build)
+        stamp = build / 'rust-build-configuration.txt'
+        records = []
+        for label, minimum in [('unchanged', '11.0'), ('changed', '12.0'), ('restored', '11.0'), ('restored-unchanged', '11.0')]:
+            before = (stamp.stat().st_mtime_ns, archive.stat().st_mtime_ns)
+            with Path(f'.local/macos-evidence/freshness-{label}.log').open('w') as output:
+                subprocess.run(['cmake', '-S', '.', '-B', str(build), f'-DCMAKE_OSX_DEPLOYMENT_TARGET={minimum}'], stdout=output, stderr=subprocess.STDOUT, check=True)
+                subprocess.run(['cmake', '--build', str(build), '--target', 'openttd_rust_build', '--parallel', '1'], stdout=output, stderr=subprocess.STDOUT, check=True)
+            after = (stamp.stat().st_mtime_ns, archive.stat().st_mtime_ns)
+            if label in ('unchanged', 'restored-unchanged'):
+                assert before == after, (label, before, after)
+            else:
+                assert after[0] > before[0] and after[1] > before[1], (label, before, after)
+            records.append({'label': label, 'minimum': minimum, 'before': before, 'after': after})
+        Path('.local/macos-evidence/freshness.json').write_text(json.dumps({'passed': True, 'records': records}, indent=2) + '\n')
+        PYCODE
+        cmake --build .local/build-tools-macos -j $(sysctl -n hw.logicalcpu)
+        python3 tools/rust-build-evidence.py --build build --tools .local/build-tools-macos --output .local/macos-evidence
+
+    - name: Retain native Rust evidence
+      if: always() && inputs.rust
+      uses: actions/upload-artifact@v4
+      with:
+        include-hidden-files: true
+        name: macos-rust-${{ inputs.arch }}-${{ contains(inputs.extra-cmake-parameters, 'RelWithDebInfo') && 'release' || 'debug' }}
+        path: |
+          .local/macos-evidence
+          build/ctest-inventory.json
+          build/ctest.xml
+          build/Testing/Temporary
+          build/rust-*.log
+          build/rust-toolchain.txt
+          build/rust-build-configuration.txt
+          build/CMakeCache.txt
+          build/compile_commands.json
+          .local/build-tools-macos/CMakeCache.txt
+          .local/build-tools-macos/compile_commands.json
+          .local/build-tools-macos/rust-*.log

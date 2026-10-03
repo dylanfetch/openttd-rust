@@ -141,7 +141,7 @@ def main():
     MIGRATION["ensure_reference"]()
     OUT.mkdir(parents=True, exist_ok=True)
     env = MIGRATION["environment"]()
-    archive = ROOT / "build-rust/cargo/release/libopenttd_kernels.a"
+    archive = MIGRATION["rust_archive"](ROOT / "build-rust")
     if not archive.exists():
         raise RuntimeError("Run full native verification first")
     records = list(dict.fromkeys(corpus()))
