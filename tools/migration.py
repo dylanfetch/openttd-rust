@@ -50,18 +50,28 @@ def rust_configuration(build: Path):
             key, value = line.split("=", 1)
             cache[key.split(":", 1)[0]] = value
     target = cache.get("RUST_TARGET")
-    supported = {"x86_64-unknown-linux-gnu": "Linux", "aarch64-unknown-linux-gnu": "Linux",
-                 "aarch64-apple-darwin": "Darwin"}
+    supported = {"x86_64-unknown-linux-gnu": ("Linux", 8), "aarch64-unknown-linux-gnu": ("Linux", 8),
+                 "aarch64-apple-darwin": ("Darwin", 8), "i686-pc-windows-msvc": ("Windows", 4),
+                 "x86_64-pc-windows-msvc": ("Windows", 8)}
     if cache.get("OPTION_RUST") != "ON" or target not in supported:
         raise RuntimeError(f"{build}: Rust must be enabled with a supported validated target")
-    if cache.get("RUST_PLATFORM") != supported[target] or cache.get("RUST_POINTER_WIDTH") != "8":
+    platform, width = supported[target]
+    if cache.get("RUST_PLATFORM") != platform or cache.get("RUST_POINTER_WIDTH") != str(width):
         raise RuntimeError(f"{build}: Rust/C++ target metadata is inconsistent")
+    archive_name = "openttd_kernels.lib" if platform == "Windows" else "libopenttd_kernels.a"
+    if platform == "Windows" and (cache.get("RUST_CRT") != "static-release" or
+                                  cache.get("CMAKE_MSVC_RUNTIME_LIBRARY") != "MultiThreaded" or
+                                  cache.get("CMAKE_BUILD_TYPE") != "RelWithDebInfo" or
+                                  cache.get("OPTION_USE_ASSERTS") != "ON" or
+                                  cache.get("RUST_EFFECTIVE_FLAGS") != "-C;target-feature=+crt-static"):
+        raise RuntimeError(f"{build}: Windows target/CRT policy is inconsistent")
     directory = build / "cargo"
-    archive = directory / target / "release/libopenttd_kernels.a"
-    if cache.get("RUST_TARGET_DIR") != str(directory) or cache.get("RUST_ARCHIVE") != str(archive):
+    archive = directory / target / "release" / archive_name
+    if Path(cache.get("RUST_TARGET_DIR", "")).resolve() != directory or Path(cache.get("RUST_ARCHIVE", "")).resolve() != archive:
         raise RuntimeError(f"{build}: unexpected Rust archive layout; reconfigure this build")
-    return {"target": target, "platform": supported[target], "pointer_bytes": 8,
-            "target_dir": str(directory), "archive": str(archive),
+    return {"target": target, "host": cache.get("RUST_HOST", ""), "platform": platform, "pointer_bytes": width,
+            "target_dir": str(directory), "archive": str(archive), "archive_name": archive_name,
+            "crt": cache.get("RUST_CRT", ""), "effective_flags": cache.get("RUST_EFFECTIVE_FLAGS", "").split(";") if cache.get("RUST_EFFECTIVE_FLAGS") else [],
             "deployment_target": cache.get("CMAKE_OSX_DEPLOYMENT_TARGET", ""),
             "sdk": cache.get("CMAKE_OSX_SYSROOT", ""),
             "native_libraries": cache.get("RUST_NATIVE_LIBS", "").split(";"),
@@ -73,7 +83,7 @@ def rust_archive(build: Path, *, target_dir: Path | None = None) -> Path:
     """Locate an existing release archive using CMake's validated native target."""
     configuration = rust_configuration(build)
     directory = Path(configuration["target_dir"]) if target_dir is None else target_dir.resolve()
-    archive = directory / configuration["target"] / "release/libopenttd_kernels.a"
+    archive = directory / configuration["target"] / "release" / configuration["archive_name"]
     if not archive.is_file():
         raise RuntimeError(f"Rust archive missing: {archive}; build this validated target first")
     return archive

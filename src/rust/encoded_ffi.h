@@ -50,7 +50,7 @@ typedef struct {
 /**
  * Every nonempty input/span is readable initialized bytes in one live allocation,
  * immutable during the call, length <=PTRDIFF_MAX. Empty spans allow NULL.
- * Read-only spans may overlap. Parameter arrays are initialized/aligned and their
+ * Read-only spans may overlap. Parameter fields are initialized; arrays may be under-aligned (MSVC i686). Their
  * total byte size <=PTRDIFF_MAX; zero count permits NULL. Tags are 0/1/2.
  * Rust retains no C++ pointer. It owns intermediate/output storage and checks
  * output length before append. Allocation failure/panic abort; ABI never unwinds.

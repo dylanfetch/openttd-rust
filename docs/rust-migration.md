@@ -42,6 +42,7 @@ games; commercial game assets are unnecessary. The verification driver requires
 the pinned Rust toolchain and always configures the candidate with `OPTION_RUST=ON`.
 Ordinary CMake builds default to `OPTION_RUST=OFF`, preserving the original portable
 C++ path. Rust linkage supports native GNU/Linux (64-bit x86 or ARM) and native macOS arm64.
+The scoped native Windows MSVC mode is described below.
 Other platforms, cross compilation, and macOS universal/Intel configurations reject
 an enabled Rust option; their portable fallback remains migration work.
 
@@ -747,7 +748,7 @@ On macOS it requires exactly `CMAKE_OSX_ARCHITECTURES=arm64` and a deployment
 minimum of 11.0 or newer, with the same resolved SDK and minimum supplied to Rust
 through `SDKROOT` and `MACOSX_DEPLOYMENT_TARGET`. Rust's [Darwin target documentation](https://doc.rust-lang.org/rustc/platform-support/apple-darwin.html)
 specifies the supported minimum and these environment inputs. Intel packaging,
-Windows CRT policy and Emscripten host/target builds remain separate tasks.
+Additional Windows CRT modes and Emscripten host/target builds remain separate tasks.
 
 Archives live at `<build>/cargo/<validated-target>/release/libopenttd_kernels.a`.
 `tools/migration.py` exposes `rust_configuration(build)` and `rust_archive(build)`;
@@ -862,3 +863,64 @@ original binaries, build IDs, and section/date/producer/LTO analysis. The ignore
 comparison commands are `tools/compare-integers.py`, `tools/utf8-comparison.py`,
 `tools/encoded-comparison.py`, and `tools/byte-strings-comparison.py`. No expected
 results or binaries from a prior run supplied validation inputs.
+
+## Native Windows MSVC Rust linkage
+
+Issue #33 adds one native Windows mode: VS 2022 MSVC, x86 or x64, single-config
+Ninja, `RelWithDebInfo`, `OPTION_USE_ASSERTS=ON`, and the static release CRT.
+The C++ compiler's architecture macros and pointer width select
+`i686-pc-windows-msvc` or `x86_64-pc-windows-msvc`; the pinned Rust host is recorded
+separately. An x64 Rust host therefore does not choose the game architecture.
+The protected architecture jobs install the exact target standard library and run
+the four Cargo gates with an explicit target for target-dependent commands.
+
+`WindowsRust.cmake` sets `CMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded` before creating
+any game, test or generator target, including the tools-only path. CMP0091 is NEW
+before the first `project()` call, as required by the
+[CMake runtime property](https://cmake.org/cmake/help/latest/prop_tgt/MSVC_RUNTIME_LIBRARY.html).
+Both the direct rustc native-library query and Cargo use
+`-C target-feature=+crt-static`. The resulting archive is
+`<build>/cargo/<validated-target>/release/openttd_kernels.lib`. The shared cache
+locator validates target, pointer width, CRT, flags and the target-specific path.
+The configuration stamp includes these effective settings and captured profile
+inputs; a code-generation setting change and restoration must rebuild the actual
+archive. Native library ordering and quoted arguments are retained. Rust's
+[CRT documentation](https://doc.rust-lang.org/reference/linkage.html#static-and-dynamic-c-runtimes)
+explains why the feature must apply to the selected target and its native query.
+
+Debug/debug CRT, dynamic CRT, other build types, assertions disabled, non-MSVC,
+multi-config/non-Ninja, ARM/UWP/MinGW, cross-OS and external `HOST_BINARY_DIR`
+configurations remain unsupported for Windows Rust. Conflicting C++ runtime flags,
+Rust target overrides or mismatch suppression fail configuration. Missing target
+std also fails; C++ fallback is never selected implicitly. Future modes remain
+tracked under issue #3. `OPTION_RUST=OFF` retains its existing configuration.
+
+The unchanged CMake ordering gives Windows RelWithDebInfo game/tests both
+`NDEBUG` and `WITH_ASSERT`, while generators have `NDEBUG` alone. Evidence checks
+actual role-specific compile commands rather than adding generator definitions.
+The ABI fixture compares all current C++ struct sizes, alignments and field offsets
+against Rust, and executes high-bit scalars, by-value returns, pointer-sized
+sentinels, null/empty inputs and Rust allocation/view/destroy paths. Its deliberately
+unaligned descriptor array closes the documented
+[MSVC i686 alignment gap](https://doc.rust-lang.org/rustc/platform-support.html):
+Rust copies foreign encoded descriptors with raw `read_unaligned` before taking
+any references, without changing their declared layout. All exports retain
+`extern "C"`; the [MSVC target ABI](https://doc.rust-lang.org/rustc/platform-support/windows-msvc.html)
+uses cdecl on i686. Borrowed byte spans retain `isize::MAX` limits and release
+panics abort. Rust owns and frees its allocations.
+
+The accepted history engine is included in this audit: descriptor/step layout and
+by-value calls round-trip live C++ HistoryRange identities, high-bit masks and all
+staged operation modes. Only opaque Rust-allocated engine handles enter Rust by
+pointer; typed C++ storage and exception execution remain outside Rust.
+
+`windows-rust-evidence.py` checks PE machine headers, retained Ninja response files,
+exact archive linkage, MSVC maps and static CRT imports. It executes a shared
+per-thread non-C locale check through native C++ and Rust lowercase calls; signed
+negative compare arguments remain outside the defined C library domain (issue #26).
+Fresh tools-only builds execute current-source string and settings generators after
+deleting previous outputs. Windows artifacts retain compiler/host/target metadata,
+CRT and assertion commands, maps, ABI execution, refusal/freshness reports, nonempty
+test inventories, JUnit and fresh generated files. Parser unit checks and Linux
+ABI/Cargo checks are preliminary evidence; actual x86/x64 Windows artifacts and
+existing macOS checks are required before claiming platform support or integration.
