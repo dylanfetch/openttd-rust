@@ -1283,3 +1283,50 @@ checks descriptor ID 22 and executes all six public functions with actual native
 contexts, including Windows x86 size/alignment, high counter and wipe behavior.
 Optimized-call and fresh vendor-free generator linkage evidence is retained in
 the component PR; final supported-platform CI remains an integration gate.
+
+### Normal X25519 and Montgomery ladder
+
+Rust-enabled `crypto_x25519`, `crypto_x25519_public_key` and
+`crypto_eddsa_trim_scalar` retain their original public interfaces. A single
+coarse `scalarmult` adapter serves the unchanged dirty-small/inverse callers.
+Rust owns the complete 255/256-bit ladder and its private ten-limb field decode,
+encode, add/subtract, masked swap/copy, multiplication, squaring, carry,
+inverse-square-root and inversion. Original normal-X25519/ladder bodies remain
+under the explicit portable fallback. C++ shared-field helpers remain for
+untouched Edwards, conversions, Elligator and other families: that temporary
+internal duplicate is unfinished migration work, not shared-field closure.
+
+The original carry schedule gives even limbs below `1.1 * 2^25` and odd limbs
+below `1.1 * 2^24`; ladder add/subtract remain within original multiply bounds
+`1.65 * 2^26/25`. Unrolled products/sums stay below `0.67 * 2^61`, small products
+below `2^58`, and serialization's signed intermediates below `2^29`. Signed
+helpers use unchecked arithmetic only under these closed source-derived bounds,
+so valid fixed-byte inputs do not acquire overflow branches or signed wrapping.
+Rust arithmetic shifts preserve the supported C++ sign-extension behavior;
+unsigned serialization preserves the original bit packing and narrowing.
+
+A separate synchronous immutable cdecl table contains only the original
+nonthrowing wipe and constant-time verify32 leaves. No field object, callback
+registration, application operation, vendor import or heap crosses the ABI.
+Private arrays are initialized in their final stack storage and accessed raw to
+permit original internal aliasing without whole-array moves or overlapping Rust
+references. Original explicit wipe points/order remain; compiler spills/copies
+are not a complete-erasure claim. ABI ID 25 records the leaf-table layout;
+IDs 23/24 are reserved for the independently reviewed Packet component.
+
+The fixed 32-byte output may overlap secret/scalar/point, including partial
+overlap: inputs are consumed before serialization. Scalar trim independently
+retains literal forward byte-copy behavior, including overlapping propagation.
+The public-key top bit is ignored, noncanonical field encodings remain accepted,
+and raw zero outputs remain primitive outputs; authentication rejection policy
+and RNG/protocol behavior are unchanged. Coarse callers retain both bit counts,
+including inverse/dirty-small's original 256-bit path. Pointers never survive a
+call, native width/calling conventions are explicit and Rust panic aborts.
+
+The existing five network tests, mixed authentication corpus and accepted
+primitive/hash comparisons run unchanged first. Only demonstrated curve,
+alias/trim-copy, direct-ladder and retained-caller gaps extend their existing
+fixture. Functional coverage, optimized-code inspection and C++ boundary
+sanitizers do not certify cryptographic security, instrument Rust accesses or
+prove complete vendor/game equivalence. Supported-platform final CI and separate
+exact-head review remain required before root integration.
