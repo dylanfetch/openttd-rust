@@ -20,7 +20,8 @@ extern "C" {
  * 13 encoded diagnostic, 14 spiral state, 15 byte trim,
  * 16 history descriptor, 17 history step, 18 station cargo,
  * 19 cipher leaves, 20 Poly1305 layout, 21 AEAD layout, 22 BLAKE2b layout,
- * 23 Packet state, 24 Packet framing offsets, 25 X25519 leaves.
+ * 23 Packet state, 24 Packet framing offsets, 25 X25519 leaves,
+ * 26 string-validation step, 27 in-place write result.
  * Item 0 size, 1 alignment, then every field offset in declaration order.
  * Unknown type/item returns SIZE_MAX. No memory borrow, ownership or callback.
  * Native extern-C convention (cdecl on i686 MSVC); Rust panic never unwinds.

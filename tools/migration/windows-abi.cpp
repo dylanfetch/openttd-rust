@@ -19,6 +19,7 @@
 #include "rust/math_ffi.h"
 #include "rust/station_cargo_ffi.h"
 #include "rust/packet_ffi.h"
+#include "rust/string_validation_ffi.h"
 #include "rust/crypto_primitives_ffi.h"
 #include "rust/blake2b_ffi.h"
 #include "rust/x25519_ffi.h"
@@ -80,6 +81,8 @@ static void Layouts()
 	Layout(23, "OpenTTDPacketState", {sizeof(OpenTTDPacketState), alignof(OpenTTDPacketState), offsetof(OpenTTDPacketState, limit), offsetof(OpenTTDPacketState, position)});
 	Layout(24, "OpenTTDPacketFrame", {sizeof(OpenTTDPacketFrame), alignof(OpenTTDPacketFrame), offsetof(OpenTTDPacketFrame, message), offsetof(OpenTTDPacketFrame, payload)});
 	Layout(25, "OpenTTDX25519Leaves", {sizeof(OpenTTDX25519Leaves), alignof(OpenTTDX25519Leaves), offsetof(OpenTTDX25519Leaves, wipe), offsetof(OpenTTDX25519Leaves, verify32)});
+	Layout(26, "OpenTTDValidationStep", {sizeof(OpenTTDValidationStep), alignof(OpenTTDValidationStep), offsetof(OpenTTDValidationStep, consumed), offsetof(OpenTTDValidationStep, output), offsetof(OpenTTDValidationStep, stopped)});
+	Layout(27, "OpenTTDInplaceWrite", {sizeof(OpenTTDInplaceWrite), alignof(OpenTTDInplaceWrite), offsetof(OpenTTDInplaceWrite, position), offsetof(OpenTTDInplaceWrite, accepted)});
 	CHECK(openttd_rust_abi_layout(255, 0) == SIZE_MAX);
 	CHECK(static_cast<size_t>(PTRDIFF_MAX) == (SIZE_MAX >> 1));
 	std::printf("pointer_bytes %zu sentinel %zu borrow_limit %zu\n", sizeof(void *), SIZE_MAX, static_cast<size_t>(PTRDIFF_MAX));
@@ -483,6 +486,31 @@ static void PacketState()
 	std::printf("packet scalar framing, binary reads and native cursor transitions passed\n");
 }
 
+static void StringValidation()
+{
+	static_assert(sizeof(char32_t) == sizeof(uint32_t));
+	std::array<uint8_t, 4> input{13,10,0,0xFF};
+	auto step = openttd_rust_validation_step(input.data(), input.size(), 15);
+	CHECK(step.consumed == 1 && step.output.length == 0 && step.stopped == 0);
+	step = openttd_rust_validation_step(input.data() + 1, input.size() - 1, 15);
+	CHECK(step.consumed == 1 && step.output.length == 1 && step.output.bytes[0] == 10);
+	step = openttd_rust_validation_step(input.data() + 2, 2, 15);
+	CHECK(step.consumed == 1 && step.stopped == 1 && step.output.length == 0);
+	step = openttd_rust_validation_step(input.data() + 3, 1, 255);
+	CHECK(step.consumed == 1 && step.stopped == 0 && step.output.length == 0);
+	std::array<uint8_t, 4> surrogate{0xED,0xA0,0x80,0};
+	CHECK(openttd_rust_validation_valid(surrogate.data(), surrogate.size()) == 1);
+	CHECK(openttd_rust_validation_valid(surrogate.data(), surrogate.size() - 1) == 0);
+	std::array<uint8_t, 8> bytes{'a','b','c','d','e','f','g','h'};
+	auto write = openttd_rust_inplace_write(bytes.data(), 0, 6, bytes.data() + 2, 4);
+	CHECK(write.accepted == 1 && write.position == 4 && bytes[0] == 'c' && bytes[3] == 'f' && bytes[4] == 'e');
+	write = openttd_rust_inplace_write(bytes.data(), 4, 4, input.data(), 1);
+	CHECK(write.accepted == 0 && write.position == 4 && bytes[4] == 'e');
+	write = openttd_rust_inplace_write(bytes.data(), 4, 1, input.data(), 1);
+	CHECK(write.accepted == 1 && write.position == 5 && bytes[4] == 13);
+	std::printf("string_validation historical policy, NUL, surrogate and live in-place copy passed\n");
+}
+
 int main()
 {
 	Layouts();
@@ -495,6 +523,7 @@ int main()
 	X25519();
 	StationCargo();
 	PacketState();
+	StringValidation();
 	Locale();
 	std::printf("ABI audit passed\n");
 }

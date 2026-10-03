@@ -58,6 +58,8 @@ pub fn layout(type_id: u8, item: u8) -> usize {
         23 => layout!(crate::packet::State, item; limit, position),
         24 => layout!(crate::packet::Frame, item; message, payload),
         25 => crate::x25519::abi_layout(item),
+        26 => layout!(crate::string_validation::Step, item; consumed, output, stopped),
+        27 => layout!(crate::string_validation::Write, item; position, accepted),
         _ => usize::MAX,
     }
 }
