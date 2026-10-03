@@ -50,6 +50,9 @@
 #include "../settings_internal.h"
 #include "saveload_internal.h"
 #include "saveload_filter.h"
+#ifdef WITH_RUST
+#include "../rust/encoded_adapter.hpp"
+#endif
 
 #include <atomic>
 #ifdef __EMSCRIPTEN__
@@ -932,6 +935,11 @@ static inline size_t SlCalcStdStringLen(const void *ptr)
  */
 void FixSCCEncoded(std::string &str, bool fix_code)
 {
+#ifdef WITH_RUST
+	auto result = OwnRustEncoded(openttd_rust_encoded_legacy(reinterpret_cast<const uint8_t *>(str.data()), str.size(), fix_code));
+	if (openttd_rust_encoded_view(result.get()).apply == 0) return;
+	str = CopyRustEncoded(result, str);
+#else
 	if (str.empty()) return;
 
 	/* We need to convert from old escape-style encoding to record separator encoding.
@@ -991,6 +999,7 @@ void FixSCCEncoded(std::string &str, bool fix_code)
 	}
 
 	str = std::move(result);
+#endif
 }
 
 /**
@@ -999,6 +1008,11 @@ void FixSCCEncoded(std::string &str, bool fix_code)
  */
 void FixSCCEncodedNegative(std::string &str)
 {
+#ifdef WITH_RUST
+	auto result = OwnRustEncoded(openttd_rust_encoded_negatives(reinterpret_cast<const uint8_t *>(str.data()), str.size()));
+	if (openttd_rust_encoded_view(result.get()).apply == 0) return;
+	str = CopyRustEncoded(result, str);
+#else
 	if (str.empty()) return;
 
 	StringConsumer consumer(str);
@@ -1028,6 +1042,7 @@ void FixSCCEncodedNegative(std::string &str)
 	}
 
 	str = std::move(result);
+#endif
 }
 
 /**

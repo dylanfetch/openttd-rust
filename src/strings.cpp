@@ -46,6 +46,9 @@
 #include "3rdparty/fmt/std.h"
 
 #include "strings_internal.h"
+#ifdef WITH_RUST
+#include "rust/encoded_adapter.hpp"
+#endif
 
 #include "safeguards.h"
 
@@ -101,6 +104,13 @@ EncodedString GetEncodedString(StringID str)
  */
 EncodedString GetEncodedStringWithArgs(StringID str, std::span<const StringParameter> params)
 {
+#ifdef WITH_RUST
+	std::vector<OpenTTDRustEncodedParameter> descriptors;
+	descriptors.reserve(params.size());
+	for (const auto &parameter : params) descriptors.push_back(RustEncodedParameter(parameter));
+	auto result = OwnRustEncoded(openttd_rust_encoded_serialize(str, descriptors.data(), descriptors.size(), RUST_ENCODED_STRING_ASSERTIONS));
+	return EncodedString{CopyRustEncoded(result)};
+#else
 	std::string result;
 	StringBuilder builder(result);
 	builder.PutUtf8(SCC_ENCODED_INTERNAL);
@@ -138,6 +148,7 @@ EncodedString GetEncodedStringWithArgs(StringID str, std::span<const StringParam
 	}
 
 	return EncodedString{std::move(result)};
+#endif
 }
 
 /**
@@ -149,6 +160,11 @@ EncodedString GetEncodedStringWithArgs(StringID str, std::span<const StringParam
  */
 EncodedString EncodedString::ReplaceParam(size_t param, StringParameter &&data) const
 {
+#ifdef WITH_RUST
+	auto result = OwnRustEncoded(openttd_rust_encoded_replace(reinterpret_cast<const uint8_t *>(this->string.data()), this->string.size(),
+		param, RustEncodedParameter(data), RUST_ENCODED_NUMERIC_ASSERTIONS, RUST_ENCODED_STRING_ASSERTIONS));
+	return EncodedString{CopyRustEncoded(result, this->string)};
+#else
 	if (this->empty()) return {};
 
 	std::vector<StringParameter> params;
@@ -198,6 +214,7 @@ EncodedString EncodedString::ReplaceParam(size_t param, StringParameter &&data) 
 	if (param >= std::size(params)) return {};
 	params[param] = data;
 	return GetEncodedStringWithArgs(str, params);
+#endif
 }
 
 /**
