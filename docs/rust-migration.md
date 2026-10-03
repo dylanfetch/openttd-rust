@@ -1144,3 +1144,44 @@ full game instance and extracts unchanged TileList persistence bodies without
 simulating world population. This evidence does not establish arbitrary VM,
 savegame or allocation-failure equivalence. CI retains these comparisons along
 with the existing checks.
+
+The bundled Monocypher 4.0.2 ChaCha20/Poly1305/AEAD family (#48) keeps its public
+C interfaces and caller-owned context types. Rust owns cipher rounds, MAC
+arithmetic, incremental buffering, authentication padding and composition. C++
+starts actual trivial context lifetimes for one-shot calls and passes compiler
+size/alignment/field-offset descriptors. Raw field access reads only initialized
+Poly1305 fields/chunk bytes, preserves unwritten chunk/padding bytes at init, and
+wipes the actual complete caller context at finalization. Counter access is raw
+and unaligned-capable, avoiding an i686 Rust/C++ uint64 alignment assumption.
+
+The original nonthrowing wipe and constant-time verify16 leaves are borrowed
+through a two-function explicit-cdecl table; Rust has no direct vendor imports or
+global callback registration. Every callback returns synchronously. Cipher input
+and output are disjoint or exactly in-place; key/nonce loads precede output,
+including unchanged Elligator key generation's overlapping key. Unsigned
+arithmetic wraps as before, failed reads preserve output/context, successful
+stream operations rekey without incrementing the context counter. Fixed-size
+secret temporaries use stable local storage and the original wipe points; this
+does not promise erasure of every compiler copy/spill or cryptographic
+certification. Other Monocypher algorithms and the exact portable family remain
+in C++. The clean core passes the four Cargo gates and full native reference/candidate
+verification, including the five unchanged network cases and both unchanged
+scripted regressions. The unchanged authentication corpus first passes all 1,800
+transcript records, including both mixed endpoint directions. Its existing
+`python3 tools/auth-comparison.py` tool now also invokes the bounded `--primitives`
+mode against actual pinned vendor functions, matching 484 direct records through
+Rust and portable C++: variant outputs/carries, null keystream, disjoint/in-place
+text, key/nonce and Elligator overlap, split Poly1305 updates with prefilled
+untouched bytes and final wipe, unaligned associated-data padding, three
+initializers, multi-chunk rekey, and failed output/context preservation with retry.
+The existing C++ ASan/UBSan runs exercise both modes; Rust accesses are not
+instrumented. Passing does not certify cryptography or arbitrary overlap/inputs.
+
+The native ABI executable adds all 15 actual facade/FFI calls and caller-context
+checks while retaining every existing layout/math check. Metadata IDs 19..21
+cover the two-leaf table and two field-layout descriptors; 18 is reserved for the
+separate station cargo owner. The crypto-only audit has 21 entries, and the final
+combined audit will have all 22 IDs from 0 through 21. Only the ABI executable adds
+a vendor object for its primitive calls; fresh strgen/settingsgen continue linking
+the shared Rust archive with no vendor object/import dependency. Actual final
+Linux/macOS/Windows x86/x64 CI and independent final-head review remain mandatory.

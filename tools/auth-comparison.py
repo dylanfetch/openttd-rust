@@ -182,6 +182,26 @@ def main():
                 raise RuntimeError(f"Mixed authentication discrepancy: {name}; see retained transcript")
             comparisons += len(actual)
             hashes[name] = hashlib.sha256(json.dumps(actual).encode()).hexdigest()
+    # Only uncovered primitive variants/alias/buffer/padding/state cases. Expected
+    # bytes always come from the actual pinned vendor binary, never from Rust.
+    primitive_outputs = {}
+    for label in ("reference", "candidate", "candidate-cpp"):
+        result = subprocess.run([str(binaries[label]), "--primitives"], env=env,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        (OUT / f"{label}-primitives.out").write_bytes(result.stdout)
+        (OUT / f"{label}-primitives.err").write_bytes(result.stderr)
+        if result.returncode or result.stderr:
+            raise RuntimeError(f"{label} direct primitives failed; see retained output")
+        primitive_outputs[label] = result.stdout
+        if label != "reference" and result.stdout != primitive_outputs["reference"]:
+            expected, actual = primitive_outputs["reference"].splitlines(), result.stdout.splitlines()
+            failures = [{"line": i + 1,
+                         "expected": expected[i].decode() if i < len(expected) else "<missing>",
+                         "actual": actual[i].decode() if i < len(actual) else "<missing>"}
+                        for i in range(max(len(expected), len(actual)))
+                        if (expected[i] if i < len(expected) else None) != (actual[i] if i < len(actual) else None)]
+            (OUT / "primitive-failures.json").write_text(json.dumps(failures, indent=2) + "\n")
+            raise RuntimeError(f"{label} primitive discrepancies: {len(failures)}")
     # Instrument the complete C++ fixture, Packet, vendor and facade boundary;
     # stable Rust allocations are leak-observable, Rust accesses are not ASan-instrumented.
     sanitizer = next(list(command) for command in commands if "-DWITH_RUST" in command)
@@ -200,20 +220,30 @@ def main():
         expected = scenario(binaries["reference"], binaries["reference"], env, b"a\x00b\xff", b"a\x00b\xff", "failures")
         if actual != expected:
             raise RuntimeError("Sanitizer output changed")
+    result = subprocess.run([str(OUT / "candidate-sanitized"), "--primitives"], env=sanitized_env,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    (OUT / "candidate-sanitized-primitives.out").write_bytes(result.stdout)
+    (OUT / "candidate-sanitized-primitives.err").write_bytes(result.stderr)
+    if result.returncode or result.stderr or result.stdout != primitive_outputs["reference"]:
+        raise RuntimeError("Direct primitive C++ boundary sanitizer failed; see retained output")
+    primitives = {"records": len(primitive_outputs["reference"].splitlines()),
+                  "record_counts": dict(Counter(row.split()[0].decode() for row in primitive_outputs["reference"].splitlines())),
+                  "output_sha256": {label: hashlib.sha256(output).hexdigest() for label, output in primitive_outputs.items()},
+                  "all_context_bytes_prefilled": True, "cpp_boundary_sanitizers_passed": True, "passed": True}
     MIGRATION["ensure_reference"]()
     report = {"baseline": MIGRATION["BASELINE"], "candidate_commit": MIGRATION["git"]("rev-parse", "HEAD"),
               "candidate_status": MIGRATION["git"]("status", "--porcelain"), "rust_archive": str(archive),
-              "commands": commands, "scenario_count": len(scenarios), "compared_endpoint_records": comparisons,
+              "commands": commands, "scenario_count": len(scenarios), "compared_endpoint_records": comparisons, "primitives": primitives,
               "original_record_counts": dict(counts), "transcript_sha256": hashes,
               "reference_source_sha256": {name: hashlib.sha256((REFERENCE / name).read_bytes()).hexdigest() for name in sources},
               "fixture_sha256": hashlib.sha256(fixture.read_bytes()).hexdigest(),
               "sanitizer_scope": {"cpp_vendor_packet_fixture_and_facade": True, "rust_accesses_instrumented": False, "rust_allocation_leaks_checked": True, "passed": True},
               "limits": ["Prescribed entropy verifies call order/bytes, not operating-system RNG quality",
                          "Nonempty-short enable nonce is undefined in pinned Packet and excluded (#41)",
-                         "Observed wipes cover outer session/shared/context boundaries and hash-final bytes; vendor internals remain unchanged",
+                         "Observed outer session/shared/hash wipes are supplemented by prefilled Poly1305 final context checks; compiler spills are not fully observable",
                          "Protocol primitives are real bundled Monocypher, not mock crypto"], "passed": True}
     (OUT / "report.json").write_text(json.dumps(report, indent=2) + "\n")
-    print(f"Authentication comparisons passed: {comparisons} mixed endpoint records; {OUT / 'report.json'}")
+    print(f"Authentication comparisons passed: {comparisons} mixed endpoint records + {primitives['records']} bounded primitive records; {OUT / 'report.json'}")
 
 
 if __name__ == "__main__":
