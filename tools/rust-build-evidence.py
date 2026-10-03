@@ -5,9 +5,18 @@ import argparse
 import json
 from pathlib import Path
 import re
+import shlex
 import subprocess
 
 import migration
+
+
+def archive_is_linked(link_script: Path, archive: Path) -> bool:
+    """Resolve CMake Makefiles link tokens from the target's build directory."""
+    # <target-directory>/CMakeFiles/<target>.dir/link.txt runs in target-directory.
+    working_directory = link_script.parents[2]
+    return any((working_directory / token).resolve() == archive.resolve()
+               for token in shlex.split(link_script.read_text()))
 
 
 def main():
@@ -60,7 +69,7 @@ def main():
                 if expected_assertions == "OFF" and "-DNDEBUG" not in flags:
                     raise RuntimeError(f"{label}/{name} does not disable original C++ assertions")
         links = list(build.rglob("link.txt"))
-        rust_links = [str(path.relative_to(build)) for path in links if str(archive) in path.read_text()]
+        rust_links = [str(path.relative_to(build)) for path in links if archive_is_linked(path, archive)]
         for target in (["openttd", "openttd_test", "strgen", "settingsgen"] if label == "game" else ["strgen", "settingsgen"]):
             if not any(f"/{target}.dir/" in "/" + path for path in rust_links):
                 raise RuntimeError(f"{label}/{target} lacks target-specific Rust archive linkage")
