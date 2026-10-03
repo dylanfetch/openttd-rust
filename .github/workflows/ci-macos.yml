@@ -145,6 +145,7 @@ jobs:
       if: always() && inputs.rust
       uses: actions/upload-artifact@v4
       with:
+        include-hidden-files: true
         name: macos-rust-${{ inputs.arch }}-${{ contains(inputs.extra-cmake-parameters, 'RelWithDebInfo') && 'release' || 'debug' }}
         path: |
           .local/macos-evidence
