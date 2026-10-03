@@ -2,10 +2,10 @@
 model = "gpt-6-astra"
 model_reasoning_effort = "xhigh"
 
-# Eight workers plus the orchestrator: nine agents total.
+# Five workers plus the orchestrator: six agents total.
 # Existing sessions may retain limits supplied by their host.
 [agents]
 enabled = true
-max_concurrent_threads_per_session = 8
+max_concurrent_threads_per_session = 5
 default_subagent_model = "gpt-6.1-sol"
 default_subagent_reasoning_effort = "high"

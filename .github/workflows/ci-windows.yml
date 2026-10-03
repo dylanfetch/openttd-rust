@@ -90,17 +90,66 @@ jobs:
         cargo clippy --workspace --all-targets --locked --target "$RUST_TARGET" -- -D warnings
         cargo test --workspace --locked --target "$RUST_TARGET"
 
+    - name: Identify runner image
+      id: runner-image
+      shell: bash
+      run: echo "version=${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
+
+    # vcpkg names each cached binary by its ABI hash (port version, triplet,
+    # compiler), so a stale entry is never reused; it simply misses. A new
+    # runner image (new compiler) gets a new key so its rebuilt binaries persist.
+    - name: Restore vcpkg binary cache
+      id: vcpkg-binary-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ runner.temp }}/vcpkg-binary-cache
+        key: vcpkg-bin-${{ inputs.arch }}-${{ hashFiles('vcpkg.json') }}-${{ steps.runner-image.outputs.version }}
+        restore-keys: |
+          vcpkg-bin-${{ inputs.arch }}-${{ hashFiles('vcpkg.json') }}-
+
+    # MSVC caching needs embedded /Z7 debug info and no PCH; ccache hashes the
+    # compiler binary, arguments, INCLUDE environment and every included header.
+    - name: Install ccache
+      if: inputs.rust
+      shell: bash
+      run: |
+        v=4.14.1
+        curl -fsSL -o ccache.zip "https://github.com/ccache/ccache/releases/download/v$v/ccache-$v-windows-x86_64.zip"
+        echo "6219f3865ca59aec41ee4b678df171d5d35855ecb2b6dbbbd20690b3a68af7b4  ccache.zip" | sha256sum -c -
+        unzip -q -j ccache.zip "ccache-$v-windows-x86_64/ccache.exe" -d "$RUNNER_TEMP/ccache-bin"
+        rm ccache.zip
+        echo "CCACHE_EXE=$(cygpath -m "$RUNNER_TEMP/ccache-bin/ccache.exe")" >> "$GITHUB_ENV"
+
+    - name: Restore compiler cache
+      if: inputs.rust
+      id: compiler-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ runner.temp }}/ccache
+        # compiler_check=content hashes cl.exe but not its backend DLLs, so the
+        # runner image (and with it the MSVC toolset) is part of the key.
+        key: ccache-msvc-v1-${{ inputs.arch }}-${{ steps.runner-image.outputs.version }}-${{ hashFiles('migration/ccache.conf') }}-${{ github.sha }}
+        restore-keys: ccache-msvc-v1-${{ inputs.arch }}-${{ steps.runner-image.outputs.version }}-${{ hashFiles('migration/ccache.conf') }}-
+
     - name: Build
       shell: bash
       env:
         NINJA_STATUS: "[%f/%t -- %e] " # [finished_edges/total_edges -- elapsed_time], default value is "[%f/%t] "
-        # Upstream setup configures a Packages feed this fork does not maintain.
-        VCPKG_BINARY_SOURCES: clear
+        # Upstream setup configures a Packages feed this fork does not maintain;
+        # use a local files cache persisted by actions/cache instead.
+        VCPKG_BINARY_SOURCES: clear;files,${{ runner.temp }}/vcpkg-binary-cache,readwrite
+        CCACHE_CONFIGPATH: ${{ github.workspace }}/migration/ccache.conf
+        CCACHE_DIR: ${{ runner.temp }}/ccache
+        CCACHE_MAXSIZE: 1G
       run: |
         export PATH="$(dirname "$(command -v cl.exe)"):$PATH"
         rust_parameters=()
         if [ "${{ inputs.rust }}" = true ]; then
-          rust_parameters=(-DOPTION_RUST=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo -DOPTION_USE_ASSERTS=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded)
+          rust_parameters=(-DOPTION_RUST=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo -DOPTION_USE_ASSERTS=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
+            -DCMAKE_C_COMPILER_LAUNCHER="$CCACHE_EXE" -DCMAKE_CXX_COMPILER_LAUNCHER="$CCACHE_EXE"
+            -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON
+            -DCMAKE_POLICY_DEFAULT_CMP0141=NEW -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded)
+          "$CCACHE_EXE" -z
         fi
         echo "::group::CMake"
         cmake -S . -B build \
@@ -113,10 +162,26 @@ jobs:
         echo "::group::Build"
         if [ "${{ inputs.rust }}" = true ]; then
           cmake --build build --parallel 4 -- -d keeprsp
+          mkdir -p .local/windows-evidence
+          { "$CCACHE_EXE" --show-config; "$CCACHE_EXE" -sv; } | tee .local/windows-evidence/ccache-stats.txt
         else
           cmake --build build
         fi
         echo "::endgroup::"
+
+    - name: Save vcpkg binary cache
+      if: github.event_name == 'push' && steps.vcpkg-binary-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ runner.temp }}/vcpkg-binary-cache
+        key: ${{ steps.vcpkg-binary-cache.outputs.cache-primary-key }}
+
+    - name: Save compiler cache
+      if: inputs.rust && github.event_name == 'push' && github.ref == 'refs/heads/rust-migration' && steps.compiler-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ runner.temp }}/ccache
+        key: ${{ steps.compiler-cache.outputs.cache-primary-key }}
 
     - name: Test
       shell: bash

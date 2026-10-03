@@ -62,6 +62,46 @@ jobs:
       id: vcpkg
       uses: OpenTTD/actions/setup-vcpkg@v6
 
+    - name: Identify runner image and build flavour
+      id: runner-image
+      env:
+        EXTRA_CMAKE_PARAMETERS: ${{ inputs.extra-cmake-parameters }}
+      run: |
+        echo "version=${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
+        echo "flavour=$(printf '%s' "$EXTRA_CMAKE_PARAMETERS" | shasum -a 256 | cut -c1-12)" >> "$GITHUB_OUTPUT"
+
+    # Upstream's vcpkg setup points at a Packages feed this fork cannot use;
+    # keep binaries in a files cache instead (ABI-hashed, so stale entries miss).
+    - name: Restore vcpkg binary cache
+      id: vcpkg-binary-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ runner.temp }}/vcpkg-binary-cache
+        key: vcpkg-bin-${{ inputs.arch }}-osx-${{ hashFiles('vcpkg.json') }}-${{ steps.runner-image.outputs.version }}
+        restore-keys: |
+          vcpkg-bin-${{ inputs.arch }}-osx-${{ hashFiles('vcpkg.json') }}-
+
+    - name: Install ccache
+      if: inputs.rust
+      run: |
+        v=4.14.1
+        curl -fsSL -o ccache.tar.gz "https://github.com/ccache/ccache/releases/download/v$v/ccache-$v-darwin.tar.gz"
+        echo "c279fa81e2e806b4d9e64d4a06cb569a84ef54151feef796e5d4f4e95a464563  ccache.tar.gz" | shasum -a 256 -c -
+        mkdir -p "$RUNNER_TEMP/ccache-bin"
+        tar -xzf ccache.tar.gz -C "$RUNNER_TEMP/ccache-bin" --strip-components=1 "ccache-$v-darwin/ccache"
+        rm ccache.tar.gz
+        echo "CCACHE_EXE=$RUNNER_TEMP/ccache-bin/ccache" >> "$GITHUB_ENV"
+
+    - name: Restore compiler cache
+      if: inputs.rust
+      id: compiler-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ runner.temp }}/ccache
+        # The runner image pins the Xcode toolchain, so it is part of the key.
+        key: ccache-macos-v1-${{ inputs.arch }}-${{ steps.runner-image.outputs.version }}-${{ steps.runner-image.outputs.flavour }}-${{ hashFiles('migration/ccache.conf') }}-${{ github.sha }}
+        restore-keys: ccache-macos-v1-${{ inputs.arch }}-${{ steps.runner-image.outputs.version }}-${{ steps.runner-image.outputs.flavour }}-${{ hashFiles('migration/ccache.conf') }}-
+
     - name: Install OpenGFX
       run: |
         mkdir -p ~/Documents/OpenTTD/baseset
@@ -81,6 +121,11 @@ jobs:
       uses: ammaraskar/gcc-problem-matcher@master
 
     - name: Build
+      env:
+        VCPKG_BINARY_SOURCES: clear;files,${{ runner.temp }}/vcpkg-binary-cache,readwrite
+        CCACHE_CONFIGPATH: ${{ github.workspace }}/migration/ccache.conf
+        CCACHE_DIR: ${{ runner.temp }}/ccache
+        CCACHE_MAXSIZE: 1G
       run: |
         mkdir build
         cd build
@@ -88,7 +133,10 @@ jobs:
         echo "::group::CMake"
         rust_parameters=()
         if [ "${{ inputs.rust }}" = true ]; then
-          rust_parameters=(-DOPTION_RUST=ON -DCMAKE_OSX_SYSROOT="$SDKROOT" -DCMAKE_OSX_DEPLOYMENT_TARGET="$MACOSX_DEPLOYMENT_TARGET")
+          rust_parameters=(-DOPTION_RUST=ON -DCMAKE_OSX_SYSROOT="$SDKROOT" -DCMAKE_OSX_DEPLOYMENT_TARGET="$MACOSX_DEPLOYMENT_TARGET"
+            -DCMAKE_C_COMPILER_LAUNCHER="$CCACHE_EXE" -DCMAKE_CXX_COMPILER_LAUNCHER="$CCACHE_EXE"
+            -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON)
+          "$CCACHE_EXE" -z
         fi
         cmake .. \
           -DCMAKE_OSX_ARCHITECTURES=${{ inputs.full_arch }} \
@@ -103,6 +151,24 @@ jobs:
         echo "Running on $(sysctl -n hw.logicalcpu) cores"
         cmake --build . -j $(sysctl -n hw.logicalcpu)
         echo "::endgroup::"
+        if [ "${{ inputs.rust }}" = true ]; then
+          mkdir -p ../.local/macos-evidence
+          { "$CCACHE_EXE" --show-config; "$CCACHE_EXE" -sv; } | tee ../.local/macos-evidence/ccache-stats.txt
+        fi
+
+    - name: Save vcpkg binary cache
+      if: github.event_name == 'push' && steps.vcpkg-binary-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ runner.temp }}/vcpkg-binary-cache
+        key: ${{ steps.vcpkg-binary-cache.outputs.cache-primary-key }}
+
+    - name: Save compiler cache
+      if: inputs.rust && github.event_name == 'push' && github.ref == 'refs/heads/rust-migration' && steps.compiler-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ runner.temp }}/ccache
+        key: ${{ steps.compiler-cache.outputs.cache-primary-key }}
 
     - name: Test
       run: |
