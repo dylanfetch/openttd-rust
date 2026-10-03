@@ -92,7 +92,7 @@ static void Scalars()
 {
 	const HistoryRange wide{40};
 	const HistoryRange small{2}, middle{small, 2, 4}, upper{middle, 2, 5}, fourth{upper, 1, 5};
-	const HistoryRange one{1}, two{one, 1, 1}, three{two, 1, 1}, four{three, 1, 1}, five{four, 1, 1};
+	const HistoryRange one{4}, two{one, 1, 4}, three{two, 1, 4}, four{three, 1, 4}, five{four, 1, 4};
 	const std::array<const HistoryRange *, 9> ranges{&HISTORY_MONTH, &HISTORY_QUARTER, &HISTORY_YEAR, &wide, &small, &middle, &fourth, &five, &upper};
 	const std::array<ValidHistoryMask, 10> masks{0, 1, 2, 4, 8, 0xAAAAAAULL, (1ULL << 24), (1ULL << 41), (1ULL << 35) | (1ULL << 63), UINT64_MAX};
 	for (size_t range = 0; range < ranges.size(); ++range) {
