@@ -1330,3 +1330,14 @@ fixture. Functional coverage, optimized-code inspection and C++ boundary
 sanitizers do not certify cryptographic security, instrument Rust accesses or
 prove complete vendor/game equivalence. Supported-platform final CI and separate
 exact-head review remain required before root integration.
+
+The direct authentication fixture exposes the unchanged vendor's private ladder
+by including its actual source in a small generated companion and adding one
+coarse wrapper. Expected math remains entirely the pinned implementation.
+New records cover scalar clamp-bit variants, zero/one/base/noncanonical/top-bit
+points, output/input overlap, distinct forward trim behavior, both raw ladder
+bit counts with bit 255 set, and deterministic dirty-small/fast/inverse callers.
+Existing authentication, cipher/MAC/hash and retained caller records remain an
+unchanged prefix. Native ABI calls execute all four exports and the actual
+cdecl wipe/verify32 table, checking four verifies and original physical wipe
+counts/sizes per ladder; these observations do not prove all spills were erased.
