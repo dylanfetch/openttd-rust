@@ -10,6 +10,9 @@
 #include "core/math_func.hpp"
 #include <cstdio>
 
+/* The standalone command must match the validated native build width. */
+static_assert(sizeof(void *) == OPENTTD_MATH_POINTER_BYTES);
+
 /* numeric_limits permits a destination with observable constructor selection. */
 struct IntegerDestination {
 	uint32_t value;
