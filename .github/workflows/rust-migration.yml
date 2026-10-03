@@ -72,6 +72,14 @@ jobs:
       - name: Build native Rust generators without the game
         run: |
           python3 tools/migration.py tools --jobs 4 --ccache
+      - name: Report port metrics
+        if: github.event_name == 'pull_request'
+        run: |
+          {
+            echo "### Port metrics (tools/port-metrics.py)"
+            python3 tools/port-metrics.py --target "origin/${{ github.base_ref }}"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Check Rust and compare original and migration builds
         run: |
           python3 tools/migration.py verify --jobs 4 --ccache

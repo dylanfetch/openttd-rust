@@ -5,7 +5,7 @@ Root owns this file and updates it when a phase completes or priorities change.
 to work on next. If an issue conflicts with this roadmap, follow the roadmap;
 a subagent stops and reports the conflict in its hand-off to root.
 
-## Where the fork stands (2026-10-03, `rust-migration` at `2ebebd5b85`)
+## Where the fork stands (2026-10-03, `rust-migration` at `f40b0a73f8`)
 
 - Ported: one landscape kernel, StringConsumer/StringBuilder/UTF-8/byte-string
   utilities, history and spiral/alternating iterators, Script Admin JSON
@@ -16,6 +16,9 @@ a subagent stops and reports the conflict in its hand-off to root.
   Almost all of the ported code is utility or vendored-library code.
 - Quality: the original behavior has been preserved carefully, every platform
   build is green, and reviews are thorough.
+- Workflow (#80): worktrees share one reference build and a compiler cache, a
+  fresh-worktree `verify` takes about a minute, comparisons run in parallel,
+  and merges no longer force other PRs to be up to date.
 
 ## Course correction
 
@@ -38,13 +41,13 @@ Three habits held back progress. The rules in `AGENTS.md` now prevent them.
 
 | Item | Disposition |
 | --- | --- |
-| PR #62 (BLAKE2b, Packet, X25519, string validation) | Reviewed and green. Integrate. |
-| PR #70 / issue #65 (ScriptList VM control) | Integrate once its review passes. Then close the ScriptList line. |
-| PR #66 / issue #64 (curve family) | Integrate only if review passes without another implementation round. Otherwise label it `paused`, leave the draft open, and stop work. |
+| PR #62 (BLAKE2b, Packet, X25519, string validation) | Reviewed. Base-updated after #80; integrate when its CI is green. Then close the superseded component drafts #57, #60, #61, #63. |
+| PR #70 / issue #65 (ScriptList VM control) | Stacked on #62. After #62 lands, update it from base (take the base workflow file), finish its review, integrate, and close #65. |
+| PR #66 / issue #64 (curve family) | Paused: its macOS Release check fails, which needs another implementation round. Leave the draft open; no further work. |
 | Issue #68 (SHA-512/HMAC/HKDF/Ed25519) | Paused. No new `src/3rdparty` work beyond finishing #62/#66 as stated. |
 | Issue #69 (tile areas, bitmap, tile lists) | Paused. Revisit as an ownership port when station/industry work needs it. |
 | Issue #75 (GetPartialPixelZ full-domain fidelity) | Do it. Small. |
-| Issue #76 (worktree/branch cleanup) | Do it. Luna low. |
+| Issue #76 (worktree/branch cleanup) | Local worktrees done 2026-10-03. Remaining: delete remote branches of merged or closed PRs, then close. Luna low. |
 
 ## Phase 1: simulation comparison harness (#72), the critical path
 
@@ -54,12 +57,23 @@ the save chunks, and compare them field by field. The scenarios are the
 regression saves, generated maps across seeds, and one committed
 transport-network save with cargodist enabled. It must pass reference vs
 reference and reference vs candidate, detect a deliberate rule change, and run
-in CI. Phase 2 waits for #72. Phase 0 items may continue in parallel.
+in CI. The tool is `tools/simulate.py` behind `python3 tools/migration.py
+simulate`; it must not match the `tools/*-comparison.py` glob, which would run
+it a second time inside the comparisons step.
+
+Reference vs reference must be clean before #72 lands. A reference-vs-candidate
+divergence caused by an existing port does not block #72: file it as a bug,
+list that scenario as a known failure naming the issue, and land. The CI job
+fails on any divergence not on that list, and the list is emptied by fixing
+the ports, never by masking fields.
 
 ## Phase 2: first game-logic ports with Rust-owned state
 
-These two can run in parallel once #72 lands. Both are self-contained, game-visible
-and deterministic, with a clean ownership boundary.
+Implementation of both starts now, in parallel with #72: the Rust code, its
+unit tests, and the C++ facade, on their own branches. Integration waits for
+#72 and a clean harness run that includes scenarios exercising the component
+(add them to the harness's scenario list). Both are self-contained,
+game-visible and deterministic, with a clean ownership boundary.
 
 - **#73 TGP terrain generator** (`src/tgp.cpp`). Rust owns the height map and
   every generation stage. C++ keeps a facade plus callbacks for `Random` and
@@ -88,8 +102,22 @@ are roughly in order of increasing coupling:
 - After those: town growth, road/rail vehicle controllers, YAPF rail/road.
 
 Map/tile storage and pool ownership will need a design note before any of
-these crosses into shared world state. Root writes that note (or delegates it
-to Astra high) during phase 2.
+these crosses into shared world state. Astra high writes it now, as
+`docs/design/world-state.md` (about 80 lines: options, the chosen boundary,
+callback costs, and how saves and the harness stay unchanged), and root
+accepts it by merging it like any other PR.
+
+## Choosing the next task
+
+Take the first unblocked item from the earliest phase that has one. Work
+already in CI or review is not blocking: start the next item while it runs.
+Phases 1 and 2 and the design note run concurrently. Paused, deferred and
+out-of-scope issues are not fallbacks; when every listed item is in progress,
+root picks the next phase 3 candidate and adds its issue here.
+
+Updating a reviewed PR from its base needs no new review when the update has
+no conflicts in `src/` or `rust/` and CI passes. Otherwise the reviewer checks
+only the conflict resolution.
 
 ## Out of scope for the near term
 
@@ -99,7 +127,10 @@ layout. Platform or toolchain expansion. Deferred behavior improvements stay in
 
 ## Progress metric
 
-Every port PR reports four line counts: Rust added, C++ retired from the
-candidate build (moved under `#ifndef WITH_RUST` or deleted), new C++ glue, and
-new tooling. A healthy port retires more C++ than it adds as glue plus tooling.
-Ports that fail this need a stated reason in the PR.
+Every port PR pastes the output of `python3 tools/port-metrics.py`: Rust added,
+tooling added, C++ glue added (new `src/` lines compiled with `WITH_RUST`), and
+C++ retired (net new `src/` lines compiled only without `WITH_RUST`, under
+either guard form, plus deleted files). A healthy port retires more C++ than it
+adds as glue plus tooling; ports that fail this state a reason in the PR. For
+scale, the history port (#32) measured Rust 433, tooling 379, glue 203,
+retired 64: the kernel-extraction pattern phase 2 must avoid.
