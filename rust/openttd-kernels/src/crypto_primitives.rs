@@ -67,7 +67,7 @@ use std::ptr;
 
 #[repr(C)]
 pub(crate) struct Leaves {
-    wipe: unsafe extern "C" fn(*mut c_void, usize),
+    pub(crate) wipe: unsafe extern "C" fn(*mut c_void, usize),
     verify16: unsafe extern "C" fn(*const u8, *const u8) -> i32,
 }
 #[repr(C)]
@@ -176,6 +176,17 @@ fn h(ops: &Leaves, out: *mut u8, key: *const u8, nonce: *const u8) {
 }
 fn djb(
     ops: &Leaves,
+    out: *mut u8,
+    input: *const u8,
+    size: usize,
+    key: *const u8,
+    nonce: *const u8,
+    counter: u64,
+) -> u64 {
+    djb_with_wipe(ops.wipe, out, input, size, key, nonce, counter)
+}
+pub(crate) fn djb_with_wipe(
+    wipe_fn: unsafe extern "C" fn(*mut c_void, usize),
     mut out: *mut u8,
     mut input: *const u8,
     size: usize,
@@ -229,12 +240,18 @@ fn djb(
                 out.add(i).write(*byte ^ *input.add(i));
             }
         }
-        wipe(ops, tmp.as_mut_ptr(), tmp.len());
+        unsafe {
+            wipe_fn(tmp.as_mut_ptr().cast(), tmp.len());
+        }
     }
     let next =
         (u64::from(state[12]) | (u64::from(state[13]) << 32)).wrapping_add(u64::from(tail > 0));
-    wipe(ops, pool.as_mut_ptr(), size_of_val(&pool));
-    wipe(ops, state.as_mut_ptr(), size_of_val(&state));
+    unsafe {
+        wipe_fn(pool.as_mut_ptr().cast(), size_of_val(&pool));
+    }
+    unsafe {
+        wipe_fn(state.as_mut_ptr().cast(), size_of_val(&state));
+    }
     next
 }
 fn ietf(

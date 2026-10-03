@@ -18,8 +18,13 @@
 #include "rust/history_ffi.h"
 #include "rust/math_ffi.h"
 #include "rust/station_cargo_ffi.h"
+#include "rust/packet_ffi.h"
 #include "rust/crypto_primitives_ffi.h"
+#include "rust/blake2b_ffi.h"
+#include "rust/x25519_ffi.h"
+#include "rust/curve25519_ffi.h"
 #include "3rdparty/monocypher/monocypher.h"
+#include "3rdparty/monocypher/monocypher-ed25519.h"
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -73,6 +78,10 @@ static void Layouts()
 	Layout(19, "OpenTTDCryptoLeaves", {sizeof(OpenTTDCryptoLeaves), alignof(OpenTTDCryptoLeaves), offsetof(OpenTTDCryptoLeaves, wipe), offsetof(OpenTTDCryptoLeaves, verify16)});
 	Layout(20, "OpenTTDPolyLayout", {sizeof(OpenTTDPolyLayout), alignof(OpenTTDPolyLayout), offsetof(OpenTTDPolyLayout, size), offsetof(OpenTTDPolyLayout, alignment), offsetof(OpenTTDPolyLayout, c), offsetof(OpenTTDPolyLayout, c_idx), offsetof(OpenTTDPolyLayout, r), offsetof(OpenTTDPolyLayout, pad), offsetof(OpenTTDPolyLayout, h)});
 	Layout(21, "OpenTTDAeadLayout", {sizeof(OpenTTDAeadLayout), alignof(OpenTTDAeadLayout), offsetof(OpenTTDAeadLayout, size), offsetof(OpenTTDAeadLayout, alignment), offsetof(OpenTTDAeadLayout, counter), offsetof(OpenTTDAeadLayout, key), offsetof(OpenTTDAeadLayout, nonce)});
+	Layout(22, "OpenTTDBlake2bLayout", {sizeof(OpenTTDBlake2bLayout), alignof(OpenTTDBlake2bLayout), offsetof(OpenTTDBlake2bLayout, size), offsetof(OpenTTDBlake2bLayout, alignment), offsetof(OpenTTDBlake2bLayout, hash), offsetof(OpenTTDBlake2bLayout, input_offset), offsetof(OpenTTDBlake2bLayout, input), offsetof(OpenTTDBlake2bLayout, input_idx), offsetof(OpenTTDBlake2bLayout, hash_size)});
+	Layout(23, "OpenTTDPacketState", {sizeof(OpenTTDPacketState), alignof(OpenTTDPacketState), offsetof(OpenTTDPacketState, limit), offsetof(OpenTTDPacketState, position)});
+	Layout(24, "OpenTTDPacketFrame", {sizeof(OpenTTDPacketFrame), alignof(OpenTTDPacketFrame), offsetof(OpenTTDPacketFrame, message), offsetof(OpenTTDPacketFrame, payload)});
+	Layout(25, "OpenTTDX25519Leaves", {sizeof(OpenTTDX25519Leaves), alignof(OpenTTDX25519Leaves), offsetof(OpenTTDX25519Leaves, wipe), offsetof(OpenTTDX25519Leaves, verify32)});
 	CHECK(openttd_rust_abi_layout(255, 0) == SIZE_MAX);
 	CHECK(static_cast<size_t>(PTRDIFF_MAX) == (SIZE_MAX >> 1));
 	std::printf("pointer_bytes %zu sentinel %zu borrow_limit %zu\n", sizeof(void *), SIZE_MAX, static_cast<size_t>(PTRDIFF_MAX));
@@ -328,6 +337,149 @@ static void CryptoPrimitives()
 	std::printf("crypto 15 Rust algorithms, cdecl leaves, caller layouts, counter high bits, partial init, padding and failed retry passed; poly_size=%zu poly_align=%zu aead_size=%zu aead_align=%zu\n", sizeof(poly), alignof(crypto_poly1305_ctx), sizeof(crypto_aead_ctx), alignof(crypto_aead_ctx));
 }
 
+static void Blake2b()
+{
+	std::array<uint8_t, 129> message;
+	std::array<uint8_t, 128> key;
+	for (size_t i = 0; i < message.size(); ++i) message[i] = static_cast<uint8_t>(i * 37 + 11);
+	for (size_t i = 0; i < key.size(); ++i) key[i] = static_cast<uint8_t>(i * 13 + 7);
+	std::array<uint8_t, 64> expected, actual;
+	crypto_blake2b_keyed(expected.data(), 32, key.data(), 65, message.data(), message.size());
+	crypto_blake2b_ctx ctx;
+	std::fill_n(reinterpret_cast<uint8_t *>(&ctx), sizeof(ctx), 0xA5);
+	crypto_blake2b_keyed_init(&ctx, 32, key.data(), 65);
+	CHECK(ctx.input_idx == 128 && ctx.hash_size == 32 && ctx.input_offset[0] == 0 && ctx.input_offset[1] == 0);
+	crypto_blake2b_update(&ctx, nullptr, 0);
+	crypto_blake2b_update(&ctx, message.data(), 127);
+	auto copy = ctx;
+	crypto_blake2b_update(&ctx, message.data() + 127, 2);
+	crypto_blake2b_final(&ctx, actual.data());
+	CHECK(std::equal(actual.begin(), actual.begin() + 32, expected.begin()));
+	CHECK(std::all_of(reinterpret_cast<const uint8_t *>(&ctx), reinterpret_cast<const uint8_t *>(&ctx) + sizeof(ctx), [](uint8_t x) { return x == 0; }));
+	crypto_blake2b_update(&copy, message.data() + 127, 1);
+	crypto_blake2b_final(&copy, actual.data());
+	crypto_blake2b_keyed(expected.data(), 32, key.data(), 65, message.data(), 128);
+	CHECK(std::equal(actual.begin(), actual.begin() + 32, expected.begin()));
+	crypto_blake2b(expected.data(), 64, message.data(), message.size());
+	crypto_blake2b_init(&ctx, 64);
+	crypto_blake2b_update(&ctx, message.data(), 128);
+	CHECK(ctx.input_idx == 128 && ctx.input_offset[0] == 0);
+	crypto_blake2b_update(&ctx, message.data() + 128, 1);
+	crypto_blake2b_final(&ctx, actual.data()); CHECK(actual == expected);
+	crypto_blake2b_init(&ctx, 64); crypto_blake2b_update(&ctx, message.data(), 128);
+	ctx.input_offset[0] = UINT64_MAX - 127; ctx.input_offset[1] = UINT64_C(0x1122334455667788);
+	crypto_blake2b_update(&ctx, message.data() + 128, 1);
+	CHECK(ctx.input_offset[0] == 0 && ctx.input_offset[1] == UINT64_C(0x1122334455667789) && ctx.input_idx == 1);
+	crypto_blake2b_final(&ctx, actual.data());
+	crypto_blake2b_init(&ctx, 0); crypto_blake2b_final(&ctx, nullptr);
+	CHECK(std::all_of(reinterpret_cast<const uint8_t *>(&ctx), reinterpret_cast<const uint8_t *>(&ctx) + sizeof(ctx), [](uint8_t x) { return x == 0; }));
+	std::array<uint8_t, 72> sentinel; sentinel.fill(0xA5);
+	crypto_blake2b_keyed(sentinel.data(), 65, key.data(), 128, message.data(), message.size());
+	CHECK(std::all_of(sentinel.begin() + 64, sentinel.end(), [](uint8_t x) { return x == 0xA5; }));
+	std::printf("blake2b six facades, context size %zu align %zu offsets %zu %zu %zu %zu %zu; copy, carry, pending block, wipe and source sizes passed\n", sizeof(ctx), alignof(crypto_blake2b_ctx), offsetof(crypto_blake2b_ctx, hash), offsetof(crypto_blake2b_ctx, input_offset), offsetof(crypto_blake2b_ctx, input), offsetof(crypto_blake2b_ctx, input_idx), offsetof(crypto_blake2b_ctx, hash_size));
+}
+
+static size_t x25519_wipes, x25519_last_wipe;
+static unsigned x25519_verifies;
+static bool x25519_wipes_zero;
+static void OPENTTD_CRYPTO_CALL X25519Wipe(void *data, size_t size) noexcept
+{
+	crypto_wipe(data, size);
+	x25519_wipes++; x25519_last_wipe = size;
+	const auto *bytes = static_cast<const uint8_t *>(data);
+	x25519_wipes_zero &= std::all_of(bytes, bytes + size, [](uint8_t x) { return x == 0; });
+}
+static int32_t OPENTTD_CRYPTO_CALL X25519Verify32(const uint8_t *a, const uint8_t *b) noexcept
+{
+	x25519_verifies++;
+	return crypto_verify32(a, b);
+}
+static void X25519()
+{
+	const OpenTTDX25519Leaves leaves{X25519Wipe, X25519Verify32};
+	std::array<uint8_t, 32> secret, point{}, expected, actual;
+	for (size_t i = 0; i < secret.size(); ++i) secret[i] = static_cast<uint8_t>(i * 37 + 13);
+	point[0] = 9;
+	crypto_x25519_public_key(expected.data(), secret.data());
+	x25519_wipes = x25519_verifies = 0; x25519_wipes_zero = true;
+	openttd_rust_x25519_public_key(&leaves, actual.data(), secret.data());
+	CHECK(actual == expected && x25519_verifies == 4 && x25519_wipes == 29 && x25519_last_wipe == 32 && x25519_wipes_zero);
+	x25519_wipes = x25519_verifies = 0;
+	openttd_rust_x25519(&leaves, actual.data(), secret.data(), point.data());
+	CHECK(actual == expected && x25519_verifies == 4 && x25519_wipes == 29 && x25519_last_wipe == 32 && x25519_wipes_zero);
+	std::array<uint8_t, 64> storage;
+	storage.fill(13); storage[33] = 0xA5;
+	openttd_rust_x25519_trim(storage.data() + 1, storage.data());
+	CHECK(storage[1] == 8 && storage[32] == 0x4D && storage[33] == 0xA5);
+	CHECK(std::all_of(storage.begin() + 2, storage.begin() + 32, [](uint8_t x) { return x == 13; }));
+	secret.fill(0); secret[31] = 0x80;
+	std::array<uint8_t, 32> short_result, full_result;
+	x25519_wipes = x25519_verifies = 0;
+	openttd_rust_x25519_ladder(&leaves, short_result.data(), secret.data(), point.data(), 255);
+	CHECK(x25519_verifies == 4 && x25519_wipes == 28 && x25519_last_wipe == 40 && x25519_wipes_zero);
+	openttd_rust_x25519_ladder(&leaves, full_result.data(), secret.data(), point.data(), 256);
+	CHECK(short_result != full_result && x25519_verifies == 8 && x25519_wipes == 56 && x25519_last_wipe == 40 && x25519_wipes_zero);
+	std::printf("x25519 four exports, cdecl wipe/verify32, physical wipe counts/final sizes, forward trim and 255/256 high-bit distinction passed\n");
+}
+
+static const uint8_t *curve_seed_watch, *curve_secret_watch, *curve_public_watch;
+static size_t curve_secret_size;
+static bool curve_seed_seen, curve_seed_order, curve_context_size_seen;
+static void OPENTTD_CRYPTO_CALL CurveWipe(void *data, size_t size) noexcept
+{
+	if (data == curve_seed_watch) {
+		curve_seed_seen = true;
+		curve_seed_order = std::all_of(curve_secret_watch, curve_secret_watch + curve_secret_size, [](uint8_t x) { return x == 0xA5; }) &&
+			std::all_of(curve_public_watch, curve_public_watch + 32, [](uint8_t x) { return x == 0xA5; });
+	}
+	curve_context_size_seen |= size == sizeof(crypto_blake2b_ctx);
+	X25519Wipe(data, size);
+}
+static void CurveFamily()
+{
+	const OpenTTDX25519Leaves leaves{CurveWipe, X25519Verify32};
+	std::array<uint8_t, 64> expanded, secret, signature;
+	std::array<uint8_t, 32> seed, public_key, scalar, expected, actual, point{};
+	for (size_t i = 0; i < expanded.size(); ++i) expanded[i] = static_cast<uint8_t>(i * 37 + 17);
+	std::copy_n(expanded.begin(), 32, seed.begin()); scalar.fill(0); scalar[31] = 0x80; point[0] = 9;
+	x25519_wipes_zero = true; curve_context_size_seen = false;
+	crypto_eddsa_reduce(expected.data(), expanded.data()); openttd_rust_eddsa_reduce(&leaves, actual.data(), expanded.data()); CHECK(actual == expected);
+	crypto_eddsa_mul_add(expected.data(), scalar.data(), seed.data(), point.data()); openttd_rust_eddsa_mul_add(&leaves, actual.data(), scalar.data(), seed.data(), point.data()); CHECK(actual == expected);
+	crypto_eddsa_scalarbase(expected.data(), scalar.data()); openttd_rust_eddsa_scalarbase(&leaves, actual.data(), scalar.data()); CHECK(actual == expected);
+	secret.fill(0xA5); public_key.fill(0xA5); curve_seed_watch = seed.data(); curve_secret_watch = secret.data(); curve_public_watch = public_key.data(); curve_secret_size = 64;
+	curve_seed_seen = curve_seed_order = false;
+	openttd_rust_eddsa_key_pair(&leaves, secret.data(), public_key.data(), seed.data());
+	CHECK(curve_seed_seen && curve_seed_order && std::all_of(seed.begin(), seed.end(), [](uint8_t x) { return x == 0; }) && curve_context_size_seen);
+	curve_seed_watch = nullptr;
+	openttd_rust_eddsa_sign(&leaves, signature.data(), secret.data(), expanded.data(), expanded.size());
+	CHECK(openttd_rust_eddsa_check(&leaves, signature.data(), public_key.data(), expanded.data(), expanded.size()) == 0);
+	signature[3] ^= 0x40; CHECK(openttd_rust_eddsa_check(&leaves, signature.data(), public_key.data(), expanded.data(), expanded.size()) == -1);
+	std::array<uint8_t, 64> equation{}; std::array<uint8_t, 32> identity{}, h{}; equation[0] = identity[0] = 1;
+	CHECK(openttd_rust_eddsa_check_equation(&leaves, equation.data(), identity.data(), h.data()) == 0);
+	equation[63] = 0x80; CHECK(openttd_rust_eddsa_check_equation(&leaves, equation.data(), identity.data(), h.data()) == -1);
+	crypto_eddsa_to_x25519(expected.data(), public_key.data()); openttd_rust_eddsa_to_x25519(&leaves, actual.data(), public_key.data()); CHECK(actual == expected);
+	crypto_x25519_to_eddsa(expected.data(), point.data()); openttd_rust_x25519_to_eddsa(&leaves, actual.data(), point.data()); CHECK(actual == expected);
+	crypto_x25519_dirty_small(expected.data(), scalar.data()); openttd_rust_x25519_dirty_small(&leaves, actual.data(), scalar.data()); CHECK(actual == expected);
+	crypto_x25519_dirty_fast(expected.data(), scalar.data()); openttd_rust_x25519_dirty_fast(&leaves, actual.data(), scalar.data()); CHECK(actual == expected);
+	crypto_elligator_map(expected.data(), scalar.data()); openttd_rust_elligator_map(&leaves, actual.data(), scalar.data()); CHECK(actual == expected);
+	point = actual; expected.fill(0xA5); actual.fill(0xA5);
+	int reverse = crypto_elligator_rev(expected.data(), point.data(), 0xC1);
+	CHECK(openttd_rust_elligator_rev(&leaves, actual.data(), point.data(), 0xC1) == reverse && actual == expected && reverse == 0);
+	std::array<uint8_t, 32> hidden, dirty_secret; hidden.fill(0xA5); dirty_secret.fill(0xA5); std::copy_n(expanded.begin(), 32, seed.begin());
+	curve_seed_watch = seed.data(); curve_secret_watch = dirty_secret.data(); curve_public_watch = hidden.data(); curve_secret_size = 32; curve_seed_seen = curve_seed_order = false;
+	openttd_rust_elligator_key_pair(&leaves, hidden.data(), dirty_secret.data(), seed.data());
+	CHECK(curve_seed_seen && curve_seed_order && std::all_of(seed.begin(), seed.end(), [](uint8_t x) { return x == 0; })); curve_seed_watch = nullptr;
+	crypto_x25519_inverse(expected.data(), scalar.data(), point.data()); openttd_rust_x25519_inverse(&leaves, actual.data(), scalar.data(), point.data()); CHECK(actual == expected);
+	CHECK(x25519_wipes_zero);
+	/* Actual retained SHA-512 callers reach the same Rust curve facades. */
+	std::copy_n(expanded.begin(), 32, seed.begin()); crypto_ed25519_key_pair(secret.data(), public_key.data(), seed.data());
+	crypto_ed25519_sign(signature.data(), secret.data(), expanded.data(), expanded.size()); CHECK(crypto_ed25519_check(signature.data(), public_key.data(), expanded.data(), expanded.size()) == 0);
+	signature[3] ^= 0x40; CHECK(crypto_ed25519_check(signature.data(), public_key.data(), expanded.data(), expanded.size()) == -1);
+	crypto_ed25519_ph_sign(signature.data(), secret.data(), expanded.data()); CHECK(crypto_ed25519_ph_check(signature.data(), public_key.data(), expanded.data()) == 0);
+	signature[3] ^= 0x40; CHECK(crypto_ed25519_ph_check(signature.data(), public_key.data(), expanded.data()) == -1);
+	std::printf("curve 15 exports reuse ABI 25, full-width scalar/equation, seed write order, zeroed wipes, native hash-context size, EdDSA and retained SHA-512/prehash callers passed\n");
+}
+
 static void StationCargo()
 {
 	auto list = std::unique_ptr<OpenTTDScriptList, decltype(&openttd_rust_list_destroy)>(openttd_rust_list_new(), openttd_rust_list_destroy);
@@ -355,6 +507,42 @@ static void StationCargo()
 	std::printf("station_cargo scalar layout, uint32 wrapping, origin reset and finalization passed\n");
 }
 
+static void PacketState()
+{
+	static_assert(sizeof(intptr_t) == sizeof(size_t));
+	OpenTTDPacketState state;
+	openttd_rust_packet_init(&state, SIZE_MAX);
+	CHECK(state.limit == SIZE_MAX && state.position == 0);
+	CHECK(openttd_rust_packet_can_write(&state, SIZE_MAX, 1) == 1);
+	CHECK(openttd_rust_packet_boolean(128) == 1 && openttd_rust_packet_boolean(0) == 0);
+	CHECK(openttd_rust_packet_buffer_size(SIZE_MAX) == 1 && openttd_rust_packet_prefix(65537) == 1);
+	std::array<uint8_t, 8> bytes{8, 0, 1, 2, 3, 4, 5, 6};
+	CHECK(openttd_rust_packet_parse_size(&state, bytes.data(), bytes.size()) == 8);
+	openttd_rust_packet_read_start(&state);
+	CHECK(openttd_rust_packet_has_size(&state) == 1 && openttd_rust_packet_can_read(&state, 8, 6) == 1);
+	CHECK(openttd_rust_packet_recv(&state, bytes.data(), bytes.size(), 2) == 0x0201 && state.position == 4);
+	uint16_t count = 1;
+	uint8_t byte = 0;
+	CHECK(openttd_rust_packet_buffer_next(&state, bytes.data(), bytes.size(), &count, &byte) == 1 && byte == 3 && state.position == 5);
+	CHECK(openttd_rust_packet_buffer_next(&state, bytes.data(), bytes.size(), &count, &byte) == 0 && count == UINT16_MAX);
+	CHECK(openttd_rust_packet_remaining(&state, 8) == 3 && openttd_rust_packet_transfer_amount(&state, 8, 2) == 2);
+	openttd_rust_packet_transfer_commit(&state, -1);
+	CHECK(state.position == 5);
+	openttd_rust_packet_transfer_commit(&state, 65537);
+	CHECK(state.position == 6);
+	openttd_rust_packet_skip_mac(&state, 65537);
+	CHECK(state.position == 7);
+	OpenTTDPacketFrame frame;
+	CHECK(openttd_rust_packet_frame(2, 8, 2, &frame) == 1 && frame.message == 4 && frame.payload == 4);
+	CHECK(openttd_rust_packet_frame(2, 4, 2, &frame) == 0);
+	CHECK(openttd_rust_packet_send_amount(&state, SIZE_MAX - 2, 4) == 2);
+	openttd_rust_packet_write_header(bytes.data(), bytes.size());
+	CHECK(bytes[0] == 8 && bytes[1] == 0);
+	openttd_rust_packet_send_reset(&state);
+	CHECK(state.position == 0);
+	std::printf("packet scalar framing, binary reads and native cursor transitions passed\n");
+}
+
 int main()
 {
 	Layouts();
@@ -363,7 +551,11 @@ int main()
 	History();
 	Math();
 	CryptoPrimitives();
+	Blake2b();
+	X25519();
+	CurveFamily();
 	StationCargo();
+	PacketState();
 	Locale();
 	std::printf("ABI audit passed\n");
 }
