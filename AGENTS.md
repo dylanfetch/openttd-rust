@@ -79,6 +79,11 @@ supported prefixes such as `Add:`, `Change:`, `Fix:`, `Doc:`, or `Update:`.
 `python3 tools/migration.py verify` builds and tests the pinned original and fork,
 checks that the candidate retains reference test names, and records evidence under
 `.local/`. `python3 tools/migration.py build` builds both without running tests.
+`python3 tools/migration.py tools` builds the native Rust generators. The optional
+`--ccache` mode uses separate strict preprocessor caches and disables PCH; ordinary
+builds remain the default. `--ccache-bypass` retains the same no-PCH build flags
+while disabling cache reuse for measurement. Never cache test results or build
+directories, and never clear another task's reference build for a cache trial.
 The reference uses C++; the candidate explicitly enables `OPTION_RUST` and links
 the migrated kernels into both the game and test executable.
 

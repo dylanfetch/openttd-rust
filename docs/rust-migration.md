@@ -625,3 +625,37 @@ libraries, Mach-O archive/symbol checks and fresh generated files. These checks
 validate native linkage and covered behavior; Linux results alone do not establish
 Darwin support. Actual macOS CI evidence and independent review are required before
 integration.
+
+## Conservative compiler-cache trial
+
+Compiler caching is opt-in. `python3 tools/migration.py tools --ccache` builds
+native Rust generators; `python3 tools/migration.py verify --ccache` retains all
+Cargo checks, original/candidate builds, test inventories, and tests. Ordinary
+commands clear stale compiler launchers and restore the normal PCH policy.
+`--ccache-bypass` requires `--ccache` and keeps identical no-PCH flags while
+disabling artifact reuse. Both modes record effective settings, per-role counter
+deltas, build settings, and total duration in the verification report.
+
+The policy in `migration/ccache.conf` requires compiler-content validation,
+preprocessor mode, empty sloppiness, unchanged paths, and local storage. Ambient
+`CCACHE_*` policy overrides are removed. Original and candidate artifacts occupy
+separate directories; PCH is disabled rather than enabling timestamp or PCH
+sloppiness. Existing build dates remain observable and can change the revision
+object and executable bytes across otherwise equivalent builds.
+
+The Linux migration workflow can run the trial with the manual `use_ccache`
+input. Automatic use requires the repository variable `MIGRATION_CCACHE=true`
+after measured benefit and a successful protected-branch seed. Cache compatibility
+includes OS, architecture, pinned original revision, policy/workflow/driver hashes,
+compiler/tool versions, and installed dependency versions. Ccache validates source
+and header contents for reuse. Pull requests restore only; successful protected
+`rust-migration` push/manual runs save only compilation artifacts after every
+existing comparison succeeds. Reports, expected results, build directories, and
+executables are never restored.
+
+Measure fresh ordinary-PCH, cold cache, warm cache, and cache-bypassed no-PCH runs
+with the same source, compiler, jobs, and private build paths. Delete only the
+trial's own build outputs between runs while retaining the warm cache. Record
+actual hits and total elapsed time, retain all verification evidence, and explain
+object or executable differences before adoption. A warm Ninja no-op is not a
+cache benefit measurement.

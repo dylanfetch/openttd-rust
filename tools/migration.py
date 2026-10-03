@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import os
+import platform
 from pathlib import Path
 import shutil
 import subprocess
@@ -78,6 +79,87 @@ def rust_archive(build: Path, *, target_dir: Path | None = None) -> Path:
     return archive
 
 
+CCACHE_POLICY = {
+    "compiler_check": "content", "direct_mode": "false", "depend_mode": "false",
+    "sloppiness": "", "hash_dir": "true", "base_dir": "", "remote_storage": "",
+}
+
+
+def compiler_cache_environment(env, role, *, bypass=False):
+    """Isolate role provenance and ignore ambient cache-policy overrides."""
+    if role not in ("reference", "candidate"):
+        raise ValueError("Compiler cache role must be reference or candidate")
+    result = {key: value for key, value in env.items() if not key.startswith("CCACHE_")}
+    result["CCACHE_CONFIGPATH"] = str(ROOT / "migration/ccache.conf")
+    result["CCACHE_DIR"] = str(LOCAL / "compiler-cache" / role)
+    if bypass:
+        result["CCACHE_DISABLE"] = "1"
+    return result
+
+
+def compiler_cache_settings(executable, env):
+    """Retain and verify effective settings rather than trusting a config file."""
+    output = subprocess.check_output([executable, "--show-config"], env=env, text=True)
+    settings = {}
+    for line in output.splitlines():
+        if ") " in line and " = " in line:
+            key, value = line.split(") ", 1)[1].split(" = ", 1)
+            settings[key] = value
+    for key, expected in CCACHE_POLICY.items():
+        if settings.get(key) != expected:
+            raise RuntimeError(f"Unsafe ccache setting {key}: {settings.get(key)!r}, expected {expected!r}")
+    expected_disable = "true" if env.get("CCACHE_DISABLE") else "false"
+    if settings.get("disable") != expected_disable:
+        raise RuntimeError("Unexpected ccache bypass setting")
+    return settings, output
+
+
+def compiler_cache_statistics(executable, env):
+    output = subprocess.check_output([executable, "--print-stats"], env=env, text=True)
+    return {key: int(value) for key, value in (line.split() for line in output.splitlines())}
+
+
+def compiler_cache_options(executable):
+    """Clear stale launchers/PCH overrides when returning to ordinary builds."""
+    return [f"-DCMAKE_C_COMPILER_LAUNCHER={executable or ''}",
+            f"-DCMAKE_CXX_COMPILER_LAUNCHER={executable or ''}",
+            f"-DCMAKE_DISABLE_PRECOMPILE_HEADERS={'ON' if executable else 'OFF'}"]
+
+
+def verify_compiler_cache_options(build, executable):
+    cache = {}
+    for line in (build / "CMakeCache.txt").read_text().splitlines():
+        if line and not line.startswith(("#", "//")) and "=" in line:
+            key, value = line.split("=", 1)
+            cache[key.split(":", 1)[0]] = value
+    expected = {"CMAKE_C_COMPILER_LAUNCHER": executable or "",
+                "CMAKE_CXX_COMPILER_LAUNCHER": executable or "",
+                "CMAKE_DISABLE_PRECOMPILE_HEADERS": "ON" if executable else "OFF"}
+    if any(cache.get(key) != value for key, value in expected.items()):
+        raise RuntimeError(f"{build}: compiler-cache/PCH mode does not match the requested mode")
+    expected.update({key: cache.get(key) for key in ("CMAKE_C_COMPILER", "CMAKE_CXX_COMPILER")})
+    return expected
+
+
+def compiler_cache_compatibility(env=None):
+    """Fingerprint the runtime/policy, leaving source contents to the compiler cache."""
+    env = environment() if env is None else env
+    tools = {}
+    for name in (env.get("CC", "cc"), env.get("CXX", "c++"), "ccache", "cmake", "ninja", "ld", "ar", "rustc", "cargo"):
+        tools[name] = subprocess.check_output([name, "--version"], env=env, text=True)
+    dependencies = subprocess.check_output([
+        "dpkg-query", "-W", "-f=${binary:Package}=${Version}\n",
+    ], env=env, text=True)
+    files = ("migration/ccache.conf", "tools/migration.py", ".github/workflows/rust-migration.yml")
+    policy = {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in files}
+    identity = {"os": platform.system(), "architecture": platform.machine(),
+                "baseline": BASELINE["commit"], "policy": policy,
+                "tools": tools, "installed_dependencies": dependencies}
+    digest = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
+    identity["prefix"] = f"compiler-v1-{identity['os']}-{identity['architecture']}-{BASELINE['commit']}-{digest}"
+    return identity
+
+
 def git(*args, cwd=ROOT):
     return subprocess.check_output(["git", *args], cwd=cwd, text=True).strip()
 
@@ -111,13 +193,21 @@ def supply_graphics(build):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("build", "verify"), nargs="?", default="verify")
+    parser.add_argument("action", choices=("build", "verify", "tools"), nargs="?", default="verify")
     parser.add_argument("--jobs", type=int, default=min(6, os.cpu_count() or 1))
+    parser.add_argument("--ccache", action="store_true", help="Use conservative separate compiler caches with PCH disabled")
+    parser.add_argument("--ccache-bypass", action="store_true", help="Measure the same no-PCH configuration without cache reuse (requires --ccache)")
     args = parser.parse_args()
+    if args.ccache_bypass and not args.ccache:
+        parser.error("--ccache-bypass requires --ccache")
     if args.jobs < 1:
         parser.error("--jobs must be positive")
+    started = time.monotonic()
     ensure_reference()
     env = environment()
+    cache_executable = shutil.which("ccache", path=env["PATH"]) if args.ccache else None
+    if args.ccache and cache_executable is None:
+        parser.error("--ccache requires ccache on PATH")
     env["CARGO_TARGET_DIR"] = str(ROOT / "build-rust/cargo")
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
     evidence = LOCAL / "verification" / stamp
@@ -130,6 +220,12 @@ def main():
         "candidate_rust_enabled": True,
         "started_at": stamp,
         "commands": [],
+        "compiler_cache": {
+            "enabled": args.ccache, "bypassed": args.ccache_bypass,
+            "executable": cache_executable,
+            "version": subprocess.check_output([cache_executable, "--version"], env=env, text=True).splitlines()[0] if cache_executable else None,
+            "roles": {},
+        },
         "passed": False,
     }
     patch = subprocess.check_output(["git", "diff", "HEAD", "--binary"], cwd=ROOT)
@@ -160,6 +256,18 @@ def main():
         return log
 
     builds = {"reference": (ROOT / "build-reference").resolve(), "candidate": ROOT / "build-rust"}
+    original_environment = env.copy()
+    cache_before = {}
+
+    def select_role(role):
+        nonlocal env
+        env = compiler_cache_environment(original_environment, role, bypass=args.ccache_bypass) if args.ccache else original_environment.copy()
+        if cache_executable:
+            settings, text = compiler_cache_settings(cache_executable, env)
+            (evidence / f"{role}-ccache-config.log").write_text(text)
+            cache_before[role] = compiler_cache_statistics(cache_executable, env)
+            report["compiler_cache"]["roles"][role] = {"settings": settings, "before": cache_before[role]}
+
     try:
         if args.action == "verify":
             for name, command in (
@@ -174,19 +282,35 @@ def main():
             "-DOPTION_USE_ASSERTS=ON", "-DOPTION_DEDICATED=OFF",
             "-DCMAKE_DISABLE_FIND_PACKAGE_Grfcodec=ON", "-DBUILD_TESTING=ON",
         ]
+        if args.action == "tools":
+            builds = {"candidate": LOCAL / "build-tools-rust"}
+            common = ["-G", "Ninja", "-DCMAKE_BUILD_TYPE=RelWithDebInfo", "-DOPTION_USE_ASSERTS=OFF"]
+        common.extend(compiler_cache_options(cache_executable))
         for name, build in builds.items():
+            select_role(name)
             source = REFERENCE.resolve() if name == "reference" else ROOT
             extra = [] if name == "reference" else [
                 "-DBINARY_NAME=openttd-rust",
                 "-DOPTION_RUST=ON",
             ]
+            if args.action == "tools":
+                extra.append("-DOPTION_TOOLS_ONLY=ON")
             run(f"{name}-configure", ["cmake", "-S", str(source), "-B", str(build), *common, *extra])
+            report[f"{name}_compiler_settings"] = verify_compiler_cache_options(build, cache_executable)
             if name == "candidate":
                 report["rust_configuration"] = rust_configuration(build)
-            supply_graphics(build)
+            if args.action != "tools":
+                supply_graphics(build)
             run(f"{name}-build", ["cmake", "--build", str(build), "--parallel", str(args.jobs)])
-            binary = build / ("openttd" if name == "reference" else "openttd-rust")
-            report[f"{name}_binary_sha256"] = hashlib.sha256(binary.read_bytes()).hexdigest()
+            if args.action == "tools":
+                binaries = [build / "src/strgen/strgen", build / "src/settingsgen/settingsgen"]
+                report[f"{name}_binary_sha256"] = {
+                    str(binary.relative_to(build)): hashlib.sha256(binary.read_bytes()).hexdigest()
+                    for binary in binaries
+                }
+            else:
+                binary = build / ("openttd" if name == "reference" else "openttd-rust")
+                report[f"{name}_binary_sha256"] = hashlib.sha256(binary.read_bytes()).hexdigest()
 
         if args.action == "verify":
             inventories = {}
@@ -206,6 +330,11 @@ def main():
         ensure_reference()
         report["passed"] = True
     finally:
+        if cache_executable:
+            for role, before in cache_before.items():
+                after = compiler_cache_statistics(cache_executable, compiler_cache_environment(original_environment, role, bypass=args.ccache_bypass))
+                report["compiler_cache"]["roles"][role].update({"after": after, "delta": {key: after.get(key, 0) - value for key, value in before.items()}})
+        report["total_seconds"] = round(time.monotonic() - started, 3)
         (evidence / "report.json").write_text(json.dumps(report, indent=2) + "\n")
         print(f"Evidence: {evidence / 'report.json'}", flush=True)
     print(f"{args.action}: passed", flush=True)
