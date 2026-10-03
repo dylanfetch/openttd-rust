@@ -5,37 +5,68 @@ preserving the original game's observable behavior. The original game supplies
 the specification, including historical quirks. Record possible improvements in
 fork GitHub issues for consideration after near-full Rust reproduction.
 
-Read `docs/rust-migration.md` for setup, validation, and project process.
+Read `docs/rust-migration.md` for setup, validation, and project process, and
+`docs/roadmap.md` for current priorities. The roadmap decides what to work on
+next; do not start work outside it without root re-selecting and updating it.
 `migration/baseline.json` pins the original revision. `README.md` identifies the
 fork; the remaining upstream documentation explains behavior and architecture.
 
 ## Migration method
 
-- Choose bounded components or coupled groups from actual dependencies and test
-  coverage. Prioritize heavily tested modules whose unchanged upstream tests can
-  exercise Rust through the existing interface. Investigate before choosing the
-  first implementation; no subsystem or transport mode has a special priority.
+- The goal is a game whose simulation runs in Rust. Prioritize game code: map
+  generation, landscape and tile loops, towns, industries, vehicles, cargo,
+  economy, link graph, pathfinding, and the commands that change them. Support
+  code is ported only when a selected game component needs it. Vendored
+  libraries (`src/3rdparty`), GUI rendering, and platform code come last.
+  Upstream unit-test coverage alone is not a reason to select a component.
+- Prefer ownership ports: Rust owns the component's state and control flow, and
+  C++ keeps only a thin facade plus callbacks for shared services (`Random`,
+  pools, map access, progress). In the candidate build the original C++ body is
+  compiled only in the portable path (`#ifndef WITH_RUST`). Do not extract an
+  algorithmic fragment while C++ keeps the surrounding state and loop, unless
+  the roadmap names it as a stepping stone.
 - Keep the full game running throughout migration. Preserve networking, saves,
-  mods, interface, and shared random-number behavior.
-- Reuse existing tests first. Identify concrete behavior gaps before adding narrow
-  comparisons against unchanged reference functions or the reference executable.
-  There is no mandatory up-front simulation harness or blanket requirement to
-  build a new differential test for every port.
+  mods, interface, and shared random-number behavior, including the exact
+  sequence of random draws.
+- Reproduce the original over its whole reachable input domain. Do not add
+  guards, assertions, rejections, or fatal paths that the original lacks.
+- Evidence for game-logic ports is the semantic simulation harness
+  (`python3 tools/migration.py simulate`, roadmap phase 1) plus the existing
+  tests. Extend the harness's scenarios rather than writing a new per-component
+  comparison tool. Add a narrow comparison against unchanged reference bodies
+  only for a concrete gap the harness cannot reach.
 - Keep the pinned reference worktree unchanged. Never change candidate behavior
   and expected results together merely to make checks pass. Existing test success
   establishes covered behavior, not complete game equivalence.
-- When simulation comparisons become necessary, compare semantic state; screenshots
-  alone and compressed-save byte equality cannot establish equivalent simulation.
-  Retain small failures and explain discrepancies before accepting changes.
+- Compare semantic state. Screenshots alone and compressed-save byte equality
+  cannot establish equivalent simulation. Retain small failures and explain
+  discrepancies before accepting changes.
 - Record changes, reproducible checks, and remaining limits in PRs and migration
   documentation. Scaffolding does not complete a subsystem.
+
+## Evidence budget
+
+Evidence must be checkable, not exhaustive prose. Spend effort on code and on
+checks that run; do not restate them in paragraphs.
+
+- Issue: scope, interfaces, evidence plan, and acceptance criteria. About 60
+  lines at most; leave design detail to the implementation.
+- PR description: what moved, what stays in C++, exact commands, known limits,
+  and the four line counts from the roadmap progress metric. About 60 lines at
+  most. Integration PRs link the component PRs instead of re-describing them.
+- Component entry in `docs/rust-migration.md`: about 25 lines at most.
+- Review report: reviewed commit, findings, and dispositions. Do not narrate
+  what was verified when there are no findings.
+- One PR per component, targeting `rust-migration` directly. Use an integration
+  branch only when CI capacity forces batching. Do not make merge-only
+  "preserve ancestry" commits.
 
 ## Agent team and review
 
 The root agent orchestrates and delegates heavily, owns component selection and
-integration, and verifies delegated diffs and evidence. Target concurrency is nine
-agents total: the root plus eight subagents. Respect the running host's actual
-limit; this document cannot raise a session limit.
+integration, and verifies delegated diffs and evidence. Target concurrency is six
+agents total: the root plus five subagents, matching `.codex/config.toml`. Respect
+the running host's actual limit; this document cannot raise a session limit.
 
 Every spawn must specify a model and reasoning effort rather than inherit them:
 

@@ -5,12 +5,11 @@ progressively replacing C++ components with Rust while preserving game behavior.
 The migration starts from OpenTTD 15.3 and keeps the complete original game as a
 working host and comparison baseline. This is not an official OpenTTD release.
 
-The native Linux migration build replaces the partial-pixel landscape height
-kernel, alternating and spiral iterator traversal, UTF-8 codec/iteration, StringConsumer
-integer and byte algorithms, and StringBuilder numeric encoders with Rust through
-their existing C++ interfaces. Native string/settings generators share the crate.
-The rest of the game remains C++; other platforms retain the original algorithms
-until their Rust linkage is validated. See the migration guide for options and limits.
+Built with `OPTION_RUST=ON` (native Linux, macOS arm64 and Windows MSVC), the
+fork runs a growing set of components in Rust behind their original C++
+interfaces. The rest of the game remains C++, and portable builds keep the
+original code. The [roadmap](docs/roadmap.md) lists current priorities, starting
+with a semantic simulation harness and then the first game-logic ports.
 
 See [the migration guide](docs/rust-migration.md) for setup, verification, scope,
 and team process. The original game documentation follows below.

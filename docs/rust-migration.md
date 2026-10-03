@@ -3,8 +3,9 @@
 OpenTTD-Rust is an independent experiment in incremental C++ to Rust migration.
 The original game's observable behavior is the specification, including quirks
 retained for historical fidelity. Record possible improvements in fork GitHub
-issues, deferred until near-full Rust reproduction. Component priorities come
-from dependencies and existing test coverage.
+issues, deferred until near-full Rust reproduction. Game-simulation code takes
+priority, with Rust owning component state; `docs/roadmap.md` sets current work
+and `AGENTS.md` states the selection rules.
 
 ## Repository and reference
 
@@ -225,7 +226,21 @@ LD_LIBRARY_PATH="$PWD/.local/deps/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$L
 
 `-X` avoids global game folders. Use separate development configuration and saves.
 
-## Selecting and validating components
+## Selecting components
+
+Selection follows `AGENTS.md` and `docs/roadmap.md`: game code first, ownership
+ports over fragment extraction, and the semantic simulation harness (#72) as the
+default evidence for game logic. Before choosing, inventory dependencies, the
+state the component owns, shared services it calls (`Random`, pools, map
+access), and floating-point or overflow behavior. Retain the pinned original as
+the independent oracle. When the harness finds a divergence, keep the first
+differing snapshot and its inputs. Improvements to original behavior remain
+deferred issues.
+
+The sections below record the components ported so far. The earlier ones were
+selected under the previous coverage-first rule and are mostly utility kernels.
+
+## Early utility ports
 
 `GetPartialPixelZ` is tested through its unchanged C++ entry point by 32 upstream
 cases, including fixed expected grids at all 256 tile positions, addition
@@ -242,8 +257,9 @@ base-slope validation, clears all upper slope bits, and retains asymmetric round
 The reserved `UINT32_MAX` result invokes the existing C++ `NOT_REACHED` fatal handler
 for an unsupported base slope or an out-of-contract coordinate. The coordinate
 guard is new: the original may compute a height for some out-of-range inputs,
-whereas Rust rejects them. Equivalence is limited to the original documented
-coordinate range; callers inspected for this port use 0 through 15. Both Rust build profiles
+whereas Rust rejects them. This divergence is a defect tracked by #75.
+Equivalence is limited to the original documented coordinate range; callers
+inspected for this port use 0 through 15. Both Rust build profiles
 abort on panic; the non-unwinding C ABI prevents unwinding into C++. Unsafe code is
 denied except for the scoped export-symbol attribute; the implementation is safe Rust.
 
@@ -395,22 +411,6 @@ The huge inherited perimeter after a wrapped extent is not traversed by the
 constructor test; no runtime limit is introduced. These checks do not establish
 full world-generation or map-subsystem equivalence. Native generators do not use
 spiral traversal and are not claimed as its runtime coverage.
-
-Start with dependency and test inventories. Prefer bounded, heavily tested modules
-whose unchanged upstream tests can exercise replacements through their existing
-interfaces. Assess ownership, data representation, conversion/overflow behavior,
-and linkage before choosing a component or coupled group.
-
-Reuse existing checks and identify specific uncovered behavior. Add narrow reference
-comparisons only where those gaps justify them, retaining the pinned original as the
-independent oracle. There is no required initial rail harness or universal new
-comparison test for each port. When simulation migration eventually needs state
-comparisons, compare semantic state and retain the first divergence and its inputs;
-screenshots and compressed-save byte equality are insufficient.
-
-Integrate verified replacements incrementally while retaining the playable game and
-reference checks. Report validation limits explicitly. Improvements to original game
-behavior remain deferred issues rather than migration changes.
 
 ## StringBuilder numeric byte encoders
 
@@ -806,15 +806,15 @@ issue/PR; this bounded corpus is not complete game/economy equivalence.
 ## Team process and engineering standards
 
 `AGENTS.md` defines durable agent instructions. Root orchestrates, delegates heavily,
-selects boundaries, checks returned evidence, and integrates changes. Target nine
-agents total (root plus eight); respect any lower running-session limit. Explicitly
+selects boundaries, checks returned evidence, and integrates changes. Target six
+agents total (root plus five); respect any lower running-session limit. Explicitly
 select model and effort for every spawn: `gpt-6.1-sol` high by default for most
 implementation/analysis, `gpt-6-luna` low/medium for bounded mechanical tasks,
 `gpt-6-astra` high for all delegated planning, and `gpt-6-astra` medium for all
 independent review. Root uses xhigh effort; every Astra subagent must use strictly
 lower effort than root. Lower Sol effort requires a clearly bounded task.
 `.codex/config.toml` sets root to Astra xhigh and spawned agents to Sol high by
-default, with a limit of eight spawned threads. Explicit spawn settings choose the
+default, with a limit of five spawned threads. Explicit spawn settings choose the
 required role; a running host may impose a lower limit.
 
 For substantive work, create a fork issue specifying scope, existing test evidence,
