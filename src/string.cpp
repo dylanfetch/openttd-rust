@@ -15,6 +15,10 @@
 #include "core/utf8.hpp"
 #include "core/string_inplace.hpp"
 
+#ifdef WITH_RUST
+#	include "rust/byte_strings_ffi.h"
+#endif
+
 #include "table/control_codes.h"
 
 #ifdef _WIN32
@@ -41,6 +45,25 @@
 
 #include "safeguards.h"
 
+
+#ifdef WITH_RUST
+static_assert(CHAR_BIT == 8 && sizeof(int) == sizeof(int32_t));
+
+/** C++ retains its native string_view length policy; Rust scans and maps bytes. */
+static int RustByteCase(std::string_view left, std::string_view right, uint8_t mode)
+{
+	int length_order = 0;
+	if (mode == 0) {
+		/* Real suffix views keep every nonempty range valid even though comparing
+		 * against an empty view does not read its bytes. */
+		length_order = left.size() >= right.size()
+			? left.substr(right.size()).compare(std::string_view{})
+			: std::string_view{}.compare(right.substr(left.size()));
+	}
+	return openttd_rust_bytes_case(reinterpret_cast<const uint8_t *>(left.data()), left.size(),
+		reinterpret_cast<const uint8_t *>(right.data()), right.size(), mode, CHAR_MIN < 0, length_order);
+}
+#endif
 
 /**
  * Copies characters from one buffer to another.
@@ -76,6 +99,13 @@ void strecpy(std::span<char> dst, std::string_view src)
  */
 std::string FormatArrayAsHex(std::span<const uint8_t> data)
 {
+#ifdef WITH_RUST
+	std::string str;
+	str.reserve(data.size() * 2 + 1);
+	str.resize(data.size() * 2);
+	openttd_rust_bytes_hex_encode(data.data(), data.size(), reinterpret_cast<uint8_t *>(str.data()));
+	return str;
+#else
 	std::string str;
 	str.reserve(data.size() * 2 + 1);
 
@@ -84,6 +114,7 @@ std::string FormatArrayAsHex(std::span<const uint8_t> data)
 	}
 
 	return str;
+#endif
 }
 
 /**
@@ -227,6 +258,17 @@ bool StrValid(std::span<const char> str)
  */
 void StrTrimInPlace(std::string &str)
 {
+#ifdef WITH_RUST
+	auto set = StringConsumer::WHITESPACE_NO_NEWLINE;
+	auto result = openttd_rust_bytes_trim(reinterpret_cast<const uint8_t *>(str.data()), str.size(),
+		reinterpret_cast<const uint8_t *>(set.data()), set.size());
+	if (result.length == 0) {
+		str.clear();
+		return;
+	}
+	str.erase(0, result.offset);
+	str.erase(result.length);
+#else
 	size_t first_pos = str.find_first_not_of(StringConsumer::WHITESPACE_NO_NEWLINE);
 	if (first_pos == std::string::npos) {
 		str.clear();
@@ -236,16 +278,23 @@ void StrTrimInPlace(std::string &str)
 
 	size_t last_pos = str.find_last_not_of(StringConsumer::WHITESPACE_NO_NEWLINE);
 	str.erase(last_pos + 1);
+#endif
 }
 
 std::string_view StrTrimView(std::string_view str, std::string_view characters_to_trim)
 {
+#ifdef WITH_RUST
+	auto result = openttd_rust_bytes_trim(reinterpret_cast<const uint8_t *>(str.data()), str.size(),
+		reinterpret_cast<const uint8_t *>(characters_to_trim.data()), characters_to_trim.size());
+	return result.length == 0 ? std::string_view{} : str.substr(result.offset, result.length);
+#else
 	size_t first_pos = str.find_first_not_of(characters_to_trim);
 	if (first_pos == std::string::npos) {
 		return std::string_view{};
 	}
 	size_t last_pos = str.find_last_not_of(characters_to_trim);
 	return str.substr(first_pos, last_pos - first_pos + 1);
+#endif
 }
 
 /**
@@ -256,8 +305,12 @@ std::string_view StrTrimView(std::string_view str, std::string_view characters_t
  */
 bool StrStartsWithIgnoreCase(std::string_view str, std::string_view prefix)
 {
+#ifdef WITH_RUST
+	return RustByteCase(str, prefix, 2) != 0;
+#else
 	if (str.size() < prefix.size()) return false;
 	return StrEqualsIgnoreCase(str.substr(0, prefix.size()), prefix);
+#endif
 }
 
 /** Case insensitive implementation of the standard character type traits. */
@@ -296,8 +349,12 @@ typedef std::basic_string_view<char, CaseInsensitiveCharTraits> CaseInsensitiveS
  */
 bool StrEndsWithIgnoreCase(std::string_view str, std::string_view suffix)
 {
+#ifdef WITH_RUST
+	return RustByteCase(str, suffix, 3) != 0;
+#else
 	if (str.size() < suffix.size()) return false;
 	return StrEqualsIgnoreCase(str.substr(str.size() - suffix.size()), suffix);
+#endif
 }
 
 /**
@@ -309,9 +366,13 @@ bool StrEndsWithIgnoreCase(std::string_view str, std::string_view suffix)
  */
 int StrCompareIgnoreCase(std::string_view str1, std::string_view str2)
 {
+#ifdef WITH_RUST
+	return RustByteCase(str1, str2, 0);
+#else
 	CaseInsensitiveStringView ci_str1{ str1.data(), str1.size() };
 	CaseInsensitiveStringView ci_str2{ str2.data(), str2.size() };
 	return ci_str1.compare(ci_str2);
+#endif
 }
 
 /**
@@ -322,8 +383,12 @@ int StrCompareIgnoreCase(std::string_view str1, std::string_view str2)
  */
 bool StrEqualsIgnoreCase(std::string_view str1, std::string_view str2)
 {
+#ifdef WITH_RUST
+	return RustByteCase(str1, str2, 1) != 0;
+#else
 	if (str1.size() != str2.size()) return false;
 	return StrCompareIgnoreCase(str1, str2) == 0;
+#endif
 }
 
 /**
@@ -335,9 +400,13 @@ bool StrEqualsIgnoreCase(std::string_view str1, std::string_view str2)
  */
 bool StrContainsIgnoreCase(std::string_view str, std::string_view value)
 {
+#ifdef WITH_RUST
+	return RustByteCase(str, value, 4) != 0;
+#else
 	CaseInsensitiveStringView ci_str{ str.data(), str.size() };
 	CaseInsensitiveStringView ci_value{ value.data(), value.size() };
 	return ci_str.find(ci_value) != ci_str.npos;
+#endif
 }
 
 /**
@@ -354,6 +423,9 @@ size_t Utf8StringLength(std::string_view str)
 
 bool strtolower(std::string &str, std::string::size_type offs)
 {
+#ifdef WITH_RUST
+	return openttd_rust_bytes_lower(reinterpret_cast<uint8_t *>(str.data()), str.size(), offs) != 0;
+#else
 	bool changed = false;
 	for (auto ch = str.begin() + offs; ch != str.end(); ++ch) {
 		auto new_ch = static_cast<char>(tolower(static_cast<unsigned char>(*ch)));
@@ -361,6 +433,7 @@ bool strtolower(std::string &str, std::string::size_type offs)
 		*ch = new_ch;
 	}
 	return changed;
+#endif
 }
 
 /**
@@ -537,11 +610,16 @@ static int ICUStringContains(std::string_view str, std::string_view value, bool 
 	if (res >= 0) return res > 0;
 #endif
 
+#ifdef WITH_RUST
+	return StrContainsIgnoreCase(str, value);
+#else
 	CaseInsensitiveStringView ci_str{ str.data(), str.size() };
 	CaseInsensitiveStringView ci_value{ value.data(), value.size() };
 	return ci_str.find(ci_value) != CaseInsensitiveStringView::npos;
+#endif
 }
 
+#ifndef WITH_RUST
 /**
  * Convert a single hex-nibble to a byte.
  *
@@ -556,6 +634,8 @@ static int ConvertHexNibbleToByte(char c)
 	return -1;
 }
 
+#endif
+
 /**
  * Convert a hex-string to a byte-array, while validating it was actually hex.
  *
@@ -569,6 +649,9 @@ static int ConvertHexNibbleToByte(char c)
  */
 bool ConvertHexToBytes(std::string_view hex, std::span<uint8_t> bytes)
 {
+#ifdef WITH_RUST
+	return openttd_rust_bytes_hex_decode(reinterpret_cast<const uint8_t *>(hex.data()), hex.size(), bytes.data(), bytes.size()) != 0;
+#else
 	if (bytes.size() != hex.size() / 2) {
 		return false;
 	}
@@ -590,6 +673,7 @@ bool ConvertHexToBytes(std::string_view hex, std::span<uint8_t> bytes)
 	}
 
 	return true;
+#endif
 }
 
 #ifdef WITH_UNISCRIBE

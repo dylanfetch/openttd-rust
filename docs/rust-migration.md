@@ -418,6 +418,70 @@ sanitizer-instrumented. Evidence resides in `.local/encoded-comparison/` and is
 retained by CI. No generator runtime coverage is claimed for these algorithms.
 Portable bodies and ownership facades remain transitional under #3.
 
+## Byte-string utility boundary
+
+The issue #21 byte-string port moves case-insensitive compare/equal/prefix/suffix/
+contains, lowercase conversion, uppercase hex encoding, sequential hex decoding,
+and byte-set trim scanning into `byte_strings.rs`. C++ retains std::string owners,
+public views, erases, and the installed standard library's exact equal-prefix
+length comparison policy. The length adapter compares a valid suffix of the
+longer original view against a default empty view; Rust scans/maps bytes and
+returns that supplied scalar only when the shared prefix is equal. All operations
+remain length-delimited, including embedded NUL.
+
+Rust calls native C `toupper` with the original C++ char promotion (signedness is
+an explicit scalar supplied by C++) and native `tolower` with unsigned-byte
+promotion. This retains process-locale behavior and does not replace it with ASCII
+or Unicode rules. Negative-char uppercase inputs other than EOF remain outside
+portable C's specified domain; compatibility is only the observed native behavior
+and call shape, not a claim of defined behavior. Locale must not change concurrently.
+Issue #26 records the deferred signed-byte ctype improvement.
+
+The ABI borrows initialized bytes in live allocations, lengths <= PTRDIFF_MAX;
+empty spans allow null, read-only spans may overlap, no pointer is retained, and
+ownership never transfers. Lowercase holds an exclusive mutable span and requires
+an offset at most size. Hex encode uses disjoint input and caller-owned initialized
+output. Hex decode deliberately forms no Rust slices or references: sequential raw
+reads of both nibbles precede each raw write, allowing legal input/output overlap
+and preserving earlier writes on later invalid pairs. Decode destinations may be
+uninitialized except where their bytes also belong to initialized readable input.
+Rejected lengths write
+nothing. Rust trim returns offsets; C++ returns a default null-data string_view for
+all-trimmed/empty inputs and otherwise takes the original substring. In-place trim
+keeps the original newline-preserving whitespace set and erase order. Panic aborts
+and the C ABI never unwinds. Equivalent resource-exhaustion timing is not claimed.
+
+Only the portable fallback of natural contains routes through this helper. ICU,
+Windows/macOS search/collation, sanitation/character validation, in-place replacement,
+and StringIterator backends remain separate work; these utilities do not complete
+string.cpp or the string subsystem. The twelve original utility tests are unchanged.
+
+The bounded `python3 tools/byte-strings-comparison.py` probe compiles full unchanged
+pinned string.cpp/core string-consumer sources against the public interfaces, and
+compares Rust and portable C++ outputs. It uses the shared validated CMake archive
+locator and native static-library flags. Its 3,699 records cover all single-byte
+case/lowercase mappings and nibble positions, bounded/overlapping/NUL contains,
+changed flags and lowercase offsets, uppercase hex, sentinel destinations, invalid
+lengths and late invalid pairs, legal same/forward/backward decode overlap with
+full backing-byte checks, custom trim sets and null/offset results. Real readable
+zero-filled mmap storage above INT_MAX tests exact native length-result saturation
+in both directions without fabricating invalid views. On this libstdc++ host the
+results are INT_MAX and INT_MIN respectively. Both native char promotion and
+-funsigned-char builds match the pristine reference.
+
+Available host locales are C, C.utf8, and POSIX; their mappings are identical for
+this corpus, so alternate locale mapping behavior remains untested. The report
+records available locales and whether their results differ from C rather than
+claiming non-C coverage from a locale name alone. ASan/UBSan instrument the C++
+fixture/facades (including complete original dependencies needed by UBSan RTTI);
+the release Rust archive's accesses remain uninstrumented. The bounded sanitizer
+run checks output equality and intercepted allocator leaks, not Rust memory access
+instrumentation or defined behavior of historical negative-char ctype calls.
+Evidence and source hashes are retained under `.local/byte-strings-comparison/`;
+CI runs the probe after native verification. Existing upstream tests remain the
+primary covered behavior evidence, with this probe limited to the listed gaps.
+
+
 ## UTF-8 codec and byte positions
 
 With `OPTION_RUST=ON`, `EncodeUtf8`, `DecodeUtf8`, `IsUtf8Part`, forward/backward
