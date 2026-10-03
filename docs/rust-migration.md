@@ -1145,6 +1145,77 @@ simulating world population. This evidence does not establish arbitrary VM,
 savegame or allocation-failure equivalence. CI retains these comparisons along
 with the existing checks.
 
+## ScriptList VM control closure
+
+Issue #65 moves `Valuate`, VM-filtered `FillList`, `SaveObject`, `LoadObject`,
+`_get`, `_set` and `_nexti` operation control into the accepted Rust list owner.
+An independent, scalar-only controller chooses each original phase, ascending
+item read, result/type/error branch, stack operation, mutation and operation charge.
+C++ dispatches its concrete actions only after Rust returns, retaining the real
+bundled Squirrel VM, script identity, typed live pool range and validity predicates.
+The ordinary typed non-VM FillList overloads and List/TileList allocation/clone
+wrappers remain C++. Portable builds retain the complete original algorithms.
+This closes these list VM algorithms, not Squirrel or generic world queries.
+
+C++ owns stack-resident optional `DisableDoCommandScope` and `SQOpsLimiter`
+objects and constructs them only at the scheduled original phases. Their reverse
+destruction order, including nested restoration, stays native. Rust never invokes
+an application callback, imports Squirrel symbols, or retains a list borrow over
+a VM/typed operation. Each invocation has its own opaque controller, returned to
+Rust on normal completion or C++ unwinding without scheduling any pending cleanup.
+Controller allocations/panics abort; extra control allocations do not establish
+identical resource-exhaustion timing. Inputs/actions carry signed 64-bit values,
+full unsigned 64-bit SQBool results and checked/raw 32-bit VM type encodings; no
+VM object, borrowed string, C++ layout or world pointer crosses the ABI. Metadata
+29/30 checks the input/action records; vendor curve metadata 28 is reserved for
+the separate owner and is not defined by this component.
+
+Valuation touches the modification token before parameter validation. The Rust
+controller enumerates ascending keys without changing public iteration, checks
+return type before modification, commits SetValue before popping the result and
+charging five operations, and retains the original success/error pop counts and
+call-failure return convention. Filter setup validates/pushes the function before
+disabling commands; the no-function path still disables commands. Typed validity
+runs first. Rust requests the live item index for callback arguments and requests
+it again for a selected AddItem after callback/result-pop, preserving a defined
+index change without caching it across reentry. Filter accepts bool only, throws
+its original SQInteger failure, and adds no valuation operation charge.
+
+Save keeps the original tag/array/sort/table format and ascending-key order without
+consuming the cursor; TileList keeps its original wrapper. Load merges, commits
+entries incrementally, preserves partial stack/list state on every failure, checks
+surplus array entries after table traversal, and sorts only after complete parsing.
+Its type predicate remains `key != INTEGER && value != INTEGER`. The real C++
+`GetPair` action executes both original ignored-result getters; finite representable
+mixed numeric values convert in the bundled VM. Nonnumeric/integer pairs can read
+an uninitialized local upstream and remain excluded, tracked for later correction
+in [issue #67](https://github.com/dylanfetch/openttd-rust/issues/67). Unrepresentable
+float conversions, signed-overflow and invalidated/evaded original iterators remain
+outside the defined-input reproduction claim. Metamethod control retains missing
+entry/noninteger rejection, null deletion, bool normalization, AddItem versus
+SetValue mutation counts, ignored `_nexti` input conversions, cursor and diagnostic
+behavior.
+
+Before this port the unchanged real-VM owner comparison passed 888 records at
+O0/O2 on clean assembled source. Both unchanged saved-world regressions passed
+through a frozen binary whose list VM algorithms were still C++. The same existing
+comparison tool retains every original record and adds only the identified direct
+VM/control gaps: missing/nonfunction valuation/filter arguments, native/closure
+filters and extra arguments/root identity, bool-only rejection and later callback
+or typed-predicate failure, malformed load shape/type/length with preexisting
+content and early/late partial commits, defined mixed numeric conversions and
+final cursor/sort effects, direct metamethod mutation/stack/diagnostic cases, and
+nested valuation/filter scope restoration. One stable four-item typed range
+reaches protected filtering; it does not simulate a game world. The unchanged
+scripted suites remain real production pool-iteration and excessive-CPU evidence.
+Actual pinned methods, bundled VM and allocator supply the comparison oracle;
+O0/O2 comparisons are exact within each mode. Commands/source hashes/traces are
+retained by `python3 tools/script-list-comparison.py` under the existing report
+path. Final full verification, all inherited comparisons, fresh generators,
+actual-call/linkage evidence and supported-platform CI are recorded at exact source
+revisions in the issue/PR. Passing establishes these covered paths, not arbitrary
+VM/allocator/savegame behavior or whole-game equivalence.
+
 ## ChaCha20, Poly1305 and AEAD primitives
 
 The bundled Monocypher 4.0.2 ChaCha20/Poly1305/AEAD family (#48) keeps its public

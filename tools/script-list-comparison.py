@@ -155,6 +155,8 @@ def main():
                          "Command-disabling scope uses a host bool sentinel; actual VM/allocator/operation limit remain unchanged",
                          "Save/clone TileList bodies are extracted unchanged; world population is not simulated",
                          "Undefined signed-overflow/evaded invalid-iterator valuation cases excluded",
+                         "Load nonnumeric/integer failed-getter and unrepresentable float cases excluded (deferred issue #67)",
+                         "VM filter uses four stable typed items, including two live index reads across a real callback; no simulated world",
                          "Cargo fixture directly initializes scalar collector without world validation; unchanged stationlist saved-game regression is world/query adapter evidence",
                          "Failed station/cargo/company policy and missing HasData supplemental probes are unexecuted; typed validation and goods-guard bodies/order are checked unchanged"], "passed": True}
     (OUT / "report.json").write_text(json.dumps(report, indent=2) + "\n")

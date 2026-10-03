@@ -54,6 +54,25 @@ protected:
 	/** Borrow storage for a synchronous derived-class reducer; never retain in Rust. */
 	OpenTTDScriptList *GetRustListOwner() const { return this->owner.get(); }
 #endif
+#ifdef WITH_RUST
+	/** Own actual host scopes; Rust supplies every VM/control decision. */
+	class VMControl {
+		HSQUIRRELVM vm;
+		ScriptList *list;
+		std::unique_ptr<OpenTTDListControl, decltype(&openttd_rust_list_control_destroy)> control;
+		std::optional<ScriptObject::DisableDoCommandScope> disabler;
+		std::optional<SQOpsLimiter> limiter;
+		OpenTTDListControlInput input{};
+		bool needs_index = false;
+	public:
+		VMControl(HSQUIRRELVM vm, ScriptList *list, uint8_t operation);
+		SQInteger Drive();
+		void Item(bool valid);
+		bool NeedsIndex() const { return this->needs_index; }
+		void Index(SQInteger index);
+		void Finish();
+	};
+#endif
 	/* Temporary helper functions to get the raw index from either strongly and non-strongly typed pool items. */
 	template <typename T>
 	static auto GetRawIndex(const T &index) { return index; }
@@ -85,6 +104,18 @@ protected:
 	template <typename T, class ItemValid>
 	static void FillList(HSQUIRRELVM vm, ScriptList *list, ItemValid item_valid)
 	{
+#ifdef WITH_RUST
+		VMControl control(vm, list, 1);
+		control.Drive();
+		/* Live typed iteration and validation remain host operations. No snapshot
+		 * or iterator crosses Rust, and invalid items do not extract their index. */
+		for (const T *item : T::Iterate()) {
+			bool valid = item_valid(item);
+			control.Item(valid);
+			while (control.NeedsIndex()) control.Index(static_cast<SQInteger>(GetRawIndex(item->index)));
+		}
+		control.Finish();
+#else
 		int nparam = sq_gettop(vm) - 1;
 		if (nparam >= 1) {
 			/* Make sure the filter function is really a function, and not any
@@ -146,6 +177,7 @@ protected:
 			/* Pop the filter function */
 			sq_poptop(vm);
 		}
+#endif
 	}
 
 	template <typename T>
