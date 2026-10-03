@@ -67,7 +67,7 @@ use std::ptr;
 
 #[repr(C)]
 pub(crate) struct Leaves {
-    wipe: unsafe extern "C" fn(*mut c_void, usize),
+    pub(crate) wipe: unsafe extern "C" fn(*mut c_void, usize),
     verify16: unsafe extern "C" fn(*const u8, *const u8) -> i32,
 }
 #[repr(C)]
