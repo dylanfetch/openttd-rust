@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Describe a bounded migration candidate. The original game is the behavioral specification; preserve observed behavior, including quirks.
+        Describe a migration task taken from docs/roadmap.md. The original game is the behavioral specification; preserve observed behavior, including quirks. Keep the whole issue to about 60 lines.
   - type: input
     id: attribution
     attributes:
@@ -22,6 +22,13 @@ body:
     validations:
       required: true
   - type: input
+    id: roadmap
+    attributes:
+      label: Roadmap item
+      description: The docs/roadmap.md phase and item this implements. Work outside the roadmap needs root to update the roadmap first.
+    validations:
+      required: true
+  - type: input
     id: component
     attributes:
       label: Component or coupled group
@@ -31,15 +38,15 @@ body:
   - type: textarea
     id: boundary
     attributes:
-      label: Proposed dependency boundary
-      description: Describe callers, callees, shared state, and the intended Rust/C++ interface. Include dependencies that may need to move together.
+      label: Ownership boundary
+      description: The state and control flow Rust will own, the C++ facade and callbacks that remain, and a budget for new C++ glue lines.
     validations:
       required: true
   - type: textarea
     id: evidence
     attributes:
-      label: Existing test and comparison evidence
-      description: List relevant existing tests, reference comparisons, and the behavior they cover. Note gaps in current evidence.
+      label: Evidence plan
+      description: The simulation-harness scenarios that exercise this component (existing or to add) and the relevant existing tests. Name any concrete gap that needs a narrow comparison instead.
     validations:
       required: true
   - type: textarea
