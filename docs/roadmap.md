@@ -2,8 +2,7 @@
 
 Root owns this file and updates it when a phase completes or priorities change.
 `AGENTS.md` and `docs/rust-migration.md` define the rules; this file decides what
-to work on next. If an issue conflicts with this roadmap, follow the roadmap;
-a subagent stops and reports the conflict in its hand-off to root.
+to work on next. If an issue conflicts with this roadmap, follow the roadmap.
 
 ## Where the fork stands (2026-10-03, `rust-migration` at `2ebebd5b85`)
 
@@ -40,7 +39,7 @@ Three habits held back progress. The rules in `AGENTS.md` now prevent them.
 | --- | --- |
 | PR #62 (BLAKE2b, Packet, X25519, string validation) | Reviewed and green. Integrate. |
 | PR #70 / issue #65 (ScriptList VM control) | Integrate once its review passes. Then close the ScriptList line. |
-| PR #66 / issue #64 (curve family) | Integrate only if review passes without another implementation round. Otherwise label it `paused`, leave the draft open, and stop work. |
+| PR #66 / issue #64 (curve family) | Integrate only if review passes without another implementation round. Otherwise label it `paused` and leave the draft open. |
 | Issue #68 (SHA-512/HMAC/HKDF/Ed25519) | Paused. No new `src/3rdparty` work beyond finishing #62/#66 as stated. |
 | Issue #69 (tile areas, bitmap, tile lists) | Paused. Revisit as an ownership port when station/industry work needs it. |
 | Issue #75 (GetPartialPixelZ full-domain fidelity) | Do it. Small. |
