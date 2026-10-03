@@ -82,6 +82,8 @@ jobs:
       if: inputs.rust
       shell: bash
       run: |
+        # Git Bash prepends its unrelated link.exe; use the configured MSVC tools.
+        export PATH="$(dirname "$(command -v cl.exe)"):$PATH"
         python tools/test-windows-rust-evidence.py
         cargo fmt --all -- --check
         cargo check --workspace --all-targets --locked --target "$RUST_TARGET"
@@ -95,6 +97,7 @@ jobs:
         # Upstream setup configures a Packages feed this fork does not maintain.
         VCPKG_BINARY_SOURCES: clear
       run: |
+        export PATH="$(dirname "$(command -v cl.exe)"):$PATH"
         rust_parameters=()
         if [ "${{ inputs.rust }}" = true ]; then
           rust_parameters=(-DOPTION_RUST=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo -DOPTION_USE_ASSERTS=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded)
@@ -129,6 +132,7 @@ jobs:
       env:
         VCPKG_BINARY_SOURCES: clear
       run: |
+        export PATH="$(dirname "$(command -v cl.exe)"):$PATH"
         cmake -S . -B .local/build-tools-windows -GNinja \
           -DOPTION_TOOLS_ONLY=ON -DOPTION_RUST=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo \
           -DOPTION_USE_ASSERTS=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded \
@@ -142,12 +146,16 @@ jobs:
       shell: bash
       env:
         VCPKG_BINARY_SOURCES: clear
-      run: python tools/check-windows-rust-configurations.py --tools .local/build-tools-windows --output .local/windows-evidence
+      run: |
+        export PATH="$(dirname "$(command -v cl.exe)"):$PATH"
+        python tools/check-windows-rust-configurations.py --tools .local/build-tools-windows --output .local/windows-evidence
 
     - name: Record native CRT ABI linkage and fresh outputs
       if: inputs.rust
       shell: bash
-      run: python tools/windows-rust-evidence.py --target "$RUST_TARGET" --build build --tools .local/build-tools-windows --output .local/windows-evidence
+      run: |
+        export PATH="$(dirname "$(command -v cl.exe)"):$PATH"
+        python tools/windows-rust-evidence.py --target "$RUST_TARGET" --build build --tools .local/build-tools-windows --output .local/windows-evidence
 
     - name: Retain native Windows Rust and test evidence
       if: always() && inputs.rust
