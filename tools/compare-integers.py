@@ -70,7 +70,7 @@ def compare_builders(env, binaries):
         (OUT / f"{name}-builder.txt").write_bytes(result.stdout)
         streams[name] = result.stdout.splitlines()
     expected = streams["reference"]
-    assert len(expected) == len(corpus) + 10, "Builder probe inventory changed"
+    assert len(expected) == len(corpus) + 13, "Builder probe inventory changed"
     for name in ("candidate", "candidate-cpp"):
         failures = [(index, records[index].decode().strip() if index < len(records) else "fixed sink/alias case",
                      want.decode(), got.decode())
@@ -78,7 +78,7 @@ def compare_builders(env, binaries):
         (OUT / f"{name}-builder-failures.json").write_text(json.dumps(failures, indent=2) + "\n")
         if len(streams[name]) != len(expected) or failures:
             raise RuntimeError(f"Builder comparison failed: {name}; {OUT / f'{name}-builder-failures.json'}")
-    return {"cases": len(corpus), "fixed_alias_sink_cases": 10, "commands": commands,
+    return {"cases": len(corpus), "fixed_alias_sink_cases": 13, "commands": commands,
             "output_sha256": hashlib.sha256(b"\n".join(expected) + b"\n").hexdigest()}
 
 def compare_generators(env):

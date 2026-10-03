@@ -140,7 +140,7 @@ static int BuilderMain()
 	enum SignedEnum : int64_t { NegativeEnum = INT64_MIN };
 	enum UnsignedEnum : uint64_t { MaximumEnum = UINT64_MAX };
 	enum BoolEnum : bool { TrueEnum = true };
-	auto enum_probe = [](std::string_view label, auto value) {
+	auto converted_probe = [](std::string_view label, auto value) {
 		RecordingBuilder builder;
 		builder.active = true;
 		builder.PutIntegerBase(value, 36);
@@ -148,9 +148,18 @@ static int BuilderMain()
 		std::cout << label << ' ';
 		DumpBuilder(builder);
 	};
-	enum_probe("signed-enum", NegativeEnum);
-	enum_probe("unsigned-enum", MaximumEnum);
-	enum_probe("bool-enum", TrueEnum);
+	converted_probe("signed-enum", NegativeEnum);
+	converted_probe("unsigned-enum", MaximumEnum);
+	converted_probe("bool-enum", TrueEnum);
+	struct ImplicitSigned { operator int() const { return -42; } };
+	struct ImplicitUnsigned { operator uint64_t() const { return UINT64_MAX; } };
+	struct OverloadedPlus {
+		operator int() const { return 42; }
+		int operator+() const { return 999; }
+	};
+	converted_probe("implicit-signed", ImplicitSigned{});
+	converted_probe("implicit-unsigned", ImplicitUnsigned{});
+	converted_probe("overloaded-plus", OverloadedPlus{});
 
 	RecordingBuilder sequence;
 	auto call = [&](auto operation) {

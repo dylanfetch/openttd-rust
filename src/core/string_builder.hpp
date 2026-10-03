@@ -17,6 +17,35 @@
 #include "../rust/builder_ffi.h"
 #endif
 
+#ifdef WITH_RUST
+/** Match std::to_chars integer overload resolution, including implicit conversions. */
+class StringBuilderIntegerAdapter {
+	template <class T>
+	static OpenTTDRustFormattedInteger FormatValue(T value, int base)
+	{
+		static_assert(sizeof(T) <= sizeof(uint64_t));
+		static_assert(sizeof(int) == sizeof(int32_t));
+		bool negative = false;
+		if constexpr (std::is_signed_v<T>) negative = value < 0;
+		return openttd_rust_format_integer(static_cast<uint64_t>(value), negative, base);
+	}
+
+public:
+	static OpenTTDRustFormattedInteger Format(char value, int base) { return FormatValue(value, base); }
+	static OpenTTDRustFormattedInteger Format(signed char value, int base) { return FormatValue(value, base); }
+	static OpenTTDRustFormattedInteger Format(unsigned char value, int base) { return FormatValue(value, base); }
+	static OpenTTDRustFormattedInteger Format(short value, int base) { return FormatValue(value, base); }
+	static OpenTTDRustFormattedInteger Format(unsigned short value, int base) { return FormatValue(value, base); }
+	static OpenTTDRustFormattedInteger Format(int value, int base) { return FormatValue(value, base); }
+	static OpenTTDRustFormattedInteger Format(unsigned int value, int base) { return FormatValue(value, base); }
+	static OpenTTDRustFormattedInteger Format(long value, int base) { return FormatValue(value, base); }
+	static OpenTTDRustFormattedInteger Format(unsigned long value, int base) { return FormatValue(value, base); }
+	static OpenTTDRustFormattedInteger Format(long long value, int base) { return FormatValue(value, base); }
+	static OpenTTDRustFormattedInteger Format(unsigned long long value, int base) { return FormatValue(value, base); }
+	static OpenTTDRustFormattedInteger Format(bool, int) = delete;
+};
+#endif
+
 /**
  * Compose data into a string / buffer.
  */
@@ -55,19 +84,9 @@ public:
 	void PutIntegerBase(T value, int base)
 	{
 #ifdef WITH_RUST
-		if constexpr (std::is_enum_v<T>) {
-			// std::to_chars accepts unscoped enums through integral promotion too.
-			this->PutIntegerBase(+value, base);
-		} else {
-			static_assert(std::is_integral_v<T> && !std::is_same_v<T, bool>);
-			static_assert(sizeof(T) <= sizeof(uint64_t));
-			static_assert(sizeof(int) == sizeof(int32_t));
-			bool negative = false;
-			if constexpr (std::is_signed_v<T>) negative = value < 0;
-			auto result = openttd_rust_format_integer(static_cast<uint64_t>(value), negative, base);
-			if (result.length == 0) return;
-			this->PutBuffer({reinterpret_cast<const char *>(result.bytes), result.length});
-		}
+		auto result = StringBuilderIntegerAdapter::Format(value, base);
+		if (result.length == 0) return;
+		this->PutBuffer({reinterpret_cast<const char *>(result.bytes), result.length});
 #else
 		std::array<char, 32> buf;
 		auto result = std::to_chars(buf.data(), buf.data() + buf.size(), value, base);
