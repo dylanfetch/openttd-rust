@@ -19,6 +19,21 @@ def archive_is_linked(link_script: Path, archive: Path) -> bool:
                for token in shlex.split(link_script.read_text()))
 
 
+def consumer_assertion_policy(command: str, consumer: str, build_type: str) -> str:
+    """Verify the original role-specific assertion flags in recorded CMake commands."""
+    definitions = {token[2:].split("=", 1)[0] for token in shlex.split(command) if token.startswith("-D")}
+    if consumer not in ("game", "tests", "strgen", "settingsgen"):
+        raise ValueError("Unknown native archive consumer")
+    if build_type == "Debug":
+        expected_custom = consumer in ("game", "tests")
+        if "NDEBUG" in definitions or ("WITH_ASSERT" in definitions) != expected_custom:
+            raise RuntimeError(f"{consumer} does not preserve original Debug assertions")
+        return "WITH_ASSERT" if expected_custom else "standard assertions"
+    if build_type != "RelWithDebInfo" or "NDEBUG" not in definitions or "WITH_ASSERT" in definitions:
+        raise RuntimeError(f"{consumer} does not preserve original Release assertion policy")
+    return "NDEBUG"
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--build", type=Path, required=True)
@@ -50,7 +65,10 @@ def main():
             raise RuntimeError("Actual archive native libraries differ from the configure-time query")
         if run(["lipo", "-archs", archive], f"{label}-archive-architecture").strip() != b"arm64":
             raise RuntimeError("Rust archive is not exclusively arm64")
-        run(["nm", "-g", archive], f"{label}-archive-symbols")
+        # Apple nm's LLVM reader can lag the pinned Rust compiler and reject
+        # archive bitcode (Apple LLVM21 versus Rust LLVM23). Check the archive
+        # architecture above; exact link paths and final Mach-O symbols below
+        # remain mandatory, and their nm failures are never suppressed.
         commands = json.loads((build / "compile_commands.json").read_text())
         consumers = {"strgen": "/strgen/strgen.cpp", "settingsgen": "/settingsgen/settingsgen.cpp"}
         if label == "game":
@@ -63,11 +81,7 @@ def main():
             if not matching or any("WITH_RUST" not in entry["command"] for entry in matching):
                 raise RuntimeError(f"{label}/{name} lacks WITH_RUST compile propagation")
             for entry in matching:
-                flags = entry["command"]
-                if expected_assertions == "ON" and ("-DWITH_ASSERT" not in flags or "-DNDEBUG" in flags):
-                    raise RuntimeError(f"{label}/{name} does not enable original C++ assertions")
-                if expected_assertions == "OFF" and "-DNDEBUG" not in flags:
-                    raise RuntimeError(f"{label}/{name} does not disable original C++ assertions")
+                consumer_assertion_policy(entry["command"], name, configuration["build_type"])
         links = list(build.rglob("link.txt"))
         rust_links = [str(path.relative_to(build)) for path in links if archive_is_linked(path, archive)]
         for target in (["openttd", "openttd_test", "strgen", "settingsgen"] if label == "game" else ["strgen", "settingsgen"]):
