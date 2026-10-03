@@ -456,6 +456,31 @@ Windows/macOS search/collation, sanitation/character validation, in-place replac
 and StringIterator backends remain separate work; these utilities do not complete
 string.cpp or the string subsystem. The twelve original utility tests are unchanged.
 
+The bounded `python3 tools/byte-strings-comparison.py` probe compiles full unchanged
+pinned string.cpp/core string-consumer sources against the public interfaces, and
+compares Rust and portable C++ outputs. It uses the shared validated CMake archive
+locator and native static-library flags. Its 3,699 records cover all single-byte
+case/lowercase mappings and nibble positions, bounded/overlapping/NUL contains,
+changed flags and lowercase offsets, uppercase hex, sentinel destinations, invalid
+lengths and late invalid pairs, legal same/forward/backward decode overlap with
+full backing-byte checks, custom trim sets and null/offset results. Real readable
+zero-filled mmap storage above INT_MAX tests exact native length-result saturation
+in both directions without fabricating invalid views. On this libstdc++ host the
+results are INT_MAX and INT_MIN respectively. Both native char promotion and
+-funsigned-char builds match the pristine reference.
+
+Available host locales are C, C.utf8, and POSIX; their mappings are identical for
+this corpus, so alternate locale mapping behavior remains untested. The report
+records available locales and whether their results differ from C rather than
+claiming non-C coverage from a locale name alone. ASan/UBSan instrument the C++
+fixture/facades (including complete original dependencies needed by UBSan RTTI);
+the release Rust archive's accesses remain uninstrumented. The bounded sanitizer
+run checks output equality and intercepted allocator leaks, not Rust memory access
+instrumentation or defined behavior of historical negative-char ctype calls.
+Evidence and source hashes are retained under `.local/byte-strings-comparison/`;
+CI runs the probe after native verification. Existing upstream tests remain the
+primary covered behavior evidence, with this probe limited to the listed gaps.
+
 
 ## UTF-8 codec and byte positions
 

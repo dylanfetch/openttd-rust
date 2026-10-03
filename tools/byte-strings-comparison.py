@@ -97,7 +97,7 @@ def main():
                            str(source / "src/string.cpp"), str(source / "src/core/string_consumer.cpp"),
                            "-Wl,--gc-sections", "-o", str(binary), *flags]
                 if label == "candidate":
-                    command.extend(["-DWITH_RUST", str(archive), "-ldl", "-lpthread", "-lm"])
+                    command.extend(["-DWITH_RUST", str(archive), *MIGRATION["rust_configuration"](ROOT / "build-rust")["native_libraries"]])
                 run(command, f"compile-{binary.name}")
                 for index, locale in enumerate(locales):
                     name = f"{binary.name}-locale-{index}"
@@ -117,8 +117,10 @@ def main():
         sanitizer = OUT / "candidate-sanitized"
         command = ["c++", "-std=c++20", "-O1", "-DFMT_HEADER_ONLY", "-ffunction-sections", "-fdata-sections",
                    "-I", str(ROOT / "src"), str(ROOT / "tools/migration/byte-strings-comparison.cpp"),
-                   str(ROOT / "src/string.cpp"), str(ROOT / "src/core/string_consumer.cpp"), "-Wl,--gc-sections",
-                   "-DWITH_RUST", str(archive), "-ldl", "-lpthread", "-lm", "-fsanitize=address,undefined",
+                   str(ROOT / "src/string.cpp"), str(ROOT / "src/core/string_consumer.cpp"),
+                   str(ROOT / "src/core/string_builder.cpp"), str(ROOT / "src/core/string_inplace.cpp"),
+                   str(ROOT / "src/core/utf8.cpp"), "-Wl,--gc-sections",
+                   "-DWITH_RUST", str(archive), *MIGRATION["rust_configuration"](ROOT / "build-rust")["native_libraries"], "-fsanitize=address,undefined",
                    "-fno-omit-frame-pointer", "-no-pie", "-o", str(sanitizer)]
         run(command, "compile-sanitized")
         sanitizer_env = env | {"ASAN_OPTIONS": "detect_leaks=1:halt_on_error=1", "UBSAN_OPTIONS": "halt_on_error=1"}
