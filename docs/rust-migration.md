@@ -1099,4 +1099,24 @@ stream operations rekey without incrementing the context counter. Fixed-size
 secret temporaries use stable local storage and the original wipe points; this
 does not promise erasure of every compiler copy/spill or cryptographic
 certification. Other Monocypher algorithms and the exact portable family remain
-in C++; initial Cargo/source checks pass and full existing evidence is pending.
+in C++. The clean core passes the four Cargo gates and full native reference/candidate
+verification, including the five unchanged network cases and both unchanged
+scripted regressions. The unchanged authentication corpus first passes all 1,800
+transcript records, including both mixed endpoint directions. Its existing
+`python3 tools/auth-comparison.py` tool now also invokes the bounded `--primitives`
+mode against actual pinned vendor functions, matching 484 direct records through
+Rust and portable C++: variant outputs/carries, null keystream, disjoint/in-place
+text, key/nonce and Elligator overlap, split Poly1305 updates with prefilled
+untouched bytes and final wipe, unaligned associated-data padding, three
+initializers, multi-chunk rekey, and failed output/context preservation with retry.
+The existing C++ ASan/UBSan runs exercise both modes; Rust accesses are not
+instrumented. Passing does not certify cryptography or arbitrary overlap/inputs.
+
+The native ABI executable adds all 15 actual facade/FFI calls and caller-context
+checks while retaining every existing layout/math check. Metadata IDs 19..21
+cover the two-leaf table and two field-layout descriptors; 18 is reserved for the
+separate station cargo owner. The crypto-only audit has 21 entries, and the final
+combined audit will have all 22 IDs from 0 through 21. Only the ABI executable adds
+a vendor object for its primitive calls; fresh strgen/settingsgen continue linking
+the shared Rust archive with no vendor object/import dependency. Actual final
+Linux/macOS/Windows x86/x64 CI and independent final-head review remain mandatory.
