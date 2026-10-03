@@ -40,8 +40,9 @@ uint8_t openttd_rust_bytes_lower(uint8_t *data, size_t length, size_t offset);
 void openttd_rust_bytes_hex_encode(const uint8_t *data, size_t length, uint8_t *output);
 
 /**
- * Initialized readable/writable spans may overlap, without other accesses during
- * the call. Both nibbles are read before each write; earlier writes affect later
+ * Initialized readable input and live writable output may overlap, without other
+ * accesses during the call. Output may be uninitialized except bytes also read
+ * through input. Both nibbles are read before each write; earlier writes affect later
  * reads. Bad lengths write nothing; invalid pairs preserve prior writes. No Rust
  * references alias these spans. Empty spans allow NULL, length <= PTRDIFF_MAX.
  */
