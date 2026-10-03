@@ -7,9 +7,11 @@
 
 //! Migrated game and text kernels exposed through the documented `src/rust` ABIs.
 
+mod alternating;
 mod integer;
 mod landscape;
 
+pub use alternating::{AlternatingState, AlternatingStep};
 pub use integer::IntegerResult;
 
 /// Height at a coordinate within a tile, preserving `OpenTTD`'s slope rounding.
@@ -80,6 +82,56 @@ pub unsafe extern "C" fn openttd_rust_skip_integer(
         unsafe { std::slice::from_raw_parts(src, length) }
     };
     integer::skip(bytes, base)
+}
+
+/// Initialize traversal position and side from the original live boundary fact.
+/// All arguments are scalar, no pointer ownership or borrowing crosses the ABI.
+/// End position is zero for begin, otherwise the nonnegative range distance.
+/// Both side flags are 0/1; no C++ iterator is retained and panic aborts.
+#[allow(unsafe_code)] // Exported symbol attribute only; traversal is safe Rust.
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_alternating_initialize(
+    end_position: usize,
+    before_at_first: u8,
+) -> AlternatingState {
+    alternating::initialize(end_position, before_at_first != 0)
+}
+
+/// Choose a logical advance and typed movement using the current range size.
+/// Position must be less than `live_size`; state must originate from initialize
+/// and completed advances. No range length is cached and panic aborts.
+#[allow(unsafe_code)] // Exported symbol attribute only; traversal is safe Rust.
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_alternating_advance(
+    state: AlternatingState,
+    live_size: usize,
+) -> AlternatingStep {
+    alternating::advance(state, live_size)
+}
+
+/// Complete a nonterminal advance using its requested live boundary fact.
+/// After ++after, boundary is before == first; after --before, boundary is
+/// next(after) != last. It must be 0/1. C++ retains all typed iterators; no
+/// pointer or allocation crosses the non-unwinding ABI and panic aborts.
+#[allow(unsafe_code)] // Exported symbol attribute only; traversal is safe Rust.
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_alternating_complete(
+    state: AlternatingState,
+    boundary: u8,
+) -> AlternatingState {
+    alternating::complete(state, boundary != 0)
+}
+
+/// Compare positions in states whose range/middle identity C++ has checked.
+/// Other state fields deliberately do not participate. No pointers or ownership
+/// cross this non-unwinding ABI; panic aborts.
+#[allow(unsafe_code)] // Exported symbol attribute only; traversal is safe Rust.
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_alternating_compare(
+    left: AlternatingState,
+    right: AlternatingState,
+) -> i8 {
+    alternating::compare(left, right)
 }
 
 mod utf8;
