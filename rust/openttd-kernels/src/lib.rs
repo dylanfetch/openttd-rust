@@ -5,7 +5,7 @@
  * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
  */
 
-//! Scalar game kernels exposed through the ABI documented in `src/rust/ffi.h`.
+//! Migrated game and text kernels exposed through the documented `src/rust` ABIs.
 
 mod integer;
 mod landscape;
@@ -80,4 +80,83 @@ pub unsafe extern "C" fn openttd_rust_skip_integer(
         unsafe { std::slice::from_raw_parts(src, length) }
     };
     integer::skip(bytes, base)
+}
+
+mod utf8;
+pub use utf8::{Decoded as Utf8Decoded, Encoded as Utf8Encoded};
+
+/// Encode a 32-bit codepoint by value without allocation or ownership transfer.
+/// Surrogates are accepted; invalid values return zero length and zero bytes.
+#[allow(unsafe_code)] // Export attribute only.
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_encode_utf8(codepoint: u32) -> Utf8Encoded {
+    utf8::encode(codepoint)
+}
+
+/// Classify an original byte, returning one for continuation bytes and zero otherwise.
+#[allow(unsafe_code)] // Export attribute only.
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_is_utf8_part(byte: u8) -> u8 {
+    u8::from(utf8::is_part(byte))
+}
+
+/// Decode the first sequence, without examining trailing bytes or rejecting surrogates.
+///
+/// # Safety
+/// `data` must address `length` readable initialized bytes in one allocation, valid
+/// and unmodified for this call, with length at most `isize::MAX`. Zero length permits
+/// null. No pointer is retained; read-only overlapping spans are allowed. Panics abort.
+#[allow(unsafe_code)] // Export attribute and the single borrowed-slice construction.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_decode_utf8(data: *const u8, length: usize) -> Utf8Decoded {
+    // SAFETY: The caller supplies the immutable span described above.
+    utf8::decode(unsafe { utf8::borrow(data, length) })
+}
+
+/// Advance one byte and skip its following continuation run, without decoding.
+///
+/// # Safety
+/// The same input-span requirements as `openttd_rust_decode_utf8` apply, and
+/// `position < length`. The original C++ assertion remains in the facade.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_utf8_next(
+    data: *const u8,
+    length: usize,
+    position: usize,
+) -> usize {
+    // SAFETY: The caller supplies the immutable span described above.
+    utf8::next(unsafe { utf8::borrow(data, length) }, position)
+}
+
+/// Retreat to the preceding non-continuation byte or offset zero, without decoding.
+///
+/// # Safety
+/// The same input-span requirements as `openttd_rust_decode_utf8` apply, and
+/// `0 < position <= length`. The original C++ assertion remains in the facade.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_utf8_previous(
+    data: *const u8,
+    length: usize,
+    position: usize,
+) -> usize {
+    // SAFETY: The caller supplies the immutable span described above.
+    utf8::previous(unsafe { utf8::borrow(data, length) }, position)
+}
+
+/// Normalize a byte offset by backward scanning; offsets at or beyond length yield end.
+///
+/// # Safety
+/// The same input-span requirements as `openttd_rust_decode_utf8` apply.
+/// The facade preserves its assertion of `offset <= length` before this call.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_utf8_at_byte(
+    data: *const u8,
+    length: usize,
+    offset: usize,
+) -> usize {
+    // SAFETY: The caller supplies the immutable span described above.
+    utf8::at_byte(unsafe { utf8::borrow(data, length) }, offset)
 }
