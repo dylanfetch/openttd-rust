@@ -1043,3 +1043,39 @@ required. Original source hashes, commands and transcripts are retained under
 `.local/auth-comparison/`; `.local/auth-linkage.json` records actual Rust calls in
 both game/test binaries. The migration workflow runs the authentication
 comparison unconditionally and retains its evidence.
+
+## ScriptList storage and iteration
+
+The ScriptList owner migration (#44) moves both deterministic item/value indexes,
+all four sort modes, live pending-cursor/end state, mutation accounting, filters
+and list algebra into Rust. C++ retains script identity/bindings, pool enumeration,
+VM/error/operation charging and save/load adapters. Valuation and serialization
+read copied ascending-item scalars; every Rust borrow ends before a VM operation
+can reenter the list. The mutation token is validated after the original callback
+return-type check; SetValue occurs before the original pop and five-operation
+charge. Earlier commits and callback side effects remain on failure.
+
+The scalar/pointer ABI avoids aggregate-return layout differences on 32-bit
+hosts; items/values are explicitly signed 64-bit and modification tokens signed
+32-bit. Two-list operations recognize self-aliasing before creating references.
+Rust allocation/panics abort. Defined-input reproduction excludes original signed
+modification-counter overflow, nonempty rank decrement overflow and overflowing
+Count()-count, and callbacks that leave original iterators invalid while evading
+its modification check. Resource-exhaustion exception behavior is not promised
+identical. Clone content uses the original target sort/initialization flow;
+saving traverses item order without resetting public iteration. The original
+mixed-type load validation remains unchanged. The unchanged full-game regressions
+`regression_regression` and `regression_stationlist` pass alongside all reference
+tests. `python3 tools/script-list-comparison.py` compares only the identified gaps
+against the actual pinned C++ implementation, with separate original, Rust-enabled
+and portable binaries at O0/O2. It covers active/ended cursor swaps and insertions,
+self operations, pending removals/value changes, no-op mutations, empty-list
+union, strict/reversed/equal filters and zero/negative ranks. The actual bundled
+Squirrel VM and allocator exercise callback failure/error precedence, partial
+commits, operation charges and command-scope restoration. Valid List and TileList
+save/load representations and independent clones are compared without resetting
+the source cursor. The fixture substitutes only a command-permission bool for the
+full game instance and extracts unchanged TileList persistence bodies without
+simulating world population. This evidence does not establish arbitrary VM,
+savegame or allocation-failure equivalence. CI retains these comparisons along
+with the existing checks.

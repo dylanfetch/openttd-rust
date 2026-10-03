@@ -12,6 +12,9 @@
 #define SCRIPT_LIST_HPP
 
 #include "script_object.hpp"
+#ifdef WITH_RUST
+#include "../../rust/script_list_ffi.h"
+#endif
 
 /** Maximum number of operations allowed for valuating a list. */
 static const int MAX_VALUATE_OPS = 1000000;
@@ -36,11 +39,15 @@ public:
 	static const bool SORT_DESCENDING = false;
 
 private:
+#ifdef WITH_RUST
+	std::unique_ptr<OpenTTDScriptList, decltype(&openttd_rust_list_destroy)> owner; ///< Rust storage/order/live cursor.
+#else
 	std::unique_ptr<ScriptListSorter> sorter; ///< Sorting algorithm
 	SorterType sorter_type;       ///< Sorting type
 	bool sort_ascending;          ///< Whether to sort ascending or descending
 	bool initialized;             ///< Whether an iteration has been started
 	int modifications;            ///< Number of modification that has been done. To prevent changing data while valuating.
+#endif
 
 protected:
 	/* Temporary helper functions to get the raw index from either strongly and non-strongly typed pool items. */
@@ -154,11 +161,13 @@ protected:
 	void CopyList(const ScriptList *list);
 
 public:
+#ifndef WITH_RUST
 	using ScriptListSet = std::set<std::pair<SQInteger, SQInteger>>; ///< List per value
 	using ScriptListMap = std::map<SQInteger, SQInteger>; ///< List per item
 
 	ScriptListMap items;           ///< The items in the list
 	ScriptListSet values; ///< The items in the list, sorted by value
+#endif
 
 	ScriptList();
 	~ScriptList();

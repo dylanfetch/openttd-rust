@@ -16,6 +16,7 @@ mod history;
 mod integer;
 mod landscape;
 mod math;
+mod script_list;
 
 pub use admin_conversion::Action as AdminAction;
 pub use alternating::{AlternatingState, AlternatingStep};
