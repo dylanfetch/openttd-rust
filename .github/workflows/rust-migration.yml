@@ -17,6 +17,8 @@ concurrency:
 jobs:
   compare:
     runs-on: ubuntu-24.04
+    # Raised from 45 when #62 added the packet comparison (run 37102176363 hit 45 min
+    # before #80 cached builds and parallelised comparisons).
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
