@@ -1278,3 +1278,11 @@ the pinned original and is excluded per issue #41; zero-source and sufficiently
 large-source cases retain original behavior. These checks do not establish real
 socket delivery, all allocator failure modes, full protocol equivalence or full
 Packet ownership migration. No upstream test or expected output changes.
+
+The native migration CI job timeout is 60 minutes with this additional companion.
+The protected cold-cache run 37102176363 began at 06:10:29 UTC; its full native
+verification ran from 06:12:21 to 06:37:40, and at 06:48 it was still comparing
+ScriptList after Admin conversion. This measured sequence left little margin in
+the prior 45-minute limit before adding Packet. Protected job names and saving
+compiler artifacts only after all comparisons succeed remain unchanged; the
+larger limit is scheduling allowance, not a performance claim.
