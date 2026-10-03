@@ -280,6 +280,9 @@ static void CryptoPrimitives()
 	std::array<uint8_t, 32> key{}, h{};
 	std::array<uint8_t, 24> nonce{};
 	std::array<uint8_t, 65> cipher{}, plain{}, decoded{};
+	for (size_t i = 0; i < key.size(); ++i) key[i] = static_cast<uint8_t>(i * 13 + 9);
+	for (size_t i = 0; i < nonce.size(); ++i) nonce[i] = static_cast<uint8_t>(i * 7 + 101);
+	nonce[0] = 0x12; nonce[1] = 0x34; nonce[2] = 0x56; nonce[3] = 0xF8;
 	crypto_chacha20_h(h.data(), key.data(), nonce.data());
 	CHECK(crypto_chacha20_djb(cipher.data(), nullptr, 65, key.data(), nonce.data(), UINT64_MAX) == 1);
 	CHECK(crypto_chacha20_ietf(cipher.data(), nullptr, 65, key.data(), nonce.data(), UINT32_MAX) == 1);
@@ -306,6 +309,7 @@ static void CryptoPrimitives()
 		if (variant == 1) { crypto_aead_init_djb(&send, key.data(), nonce.data()); crypto_aead_init_djb(&receive, key.data(), nonce.data()); }
 		if (variant == 2) { crypto_aead_init_ietf(&send, key.data(), nonce.data()); crypto_aead_init_ietf(&receive, key.data(), nonce.data()); }
 		auto counter = send.counter;
+		CHECK(counter == (variant == 2 ? UINT64_C(0xF856341200000000) : uint64_t{0}));
 		for (unsigned chunk = 0; chunk != 2; ++chunk) {
 			crypto_aead_write(&send, cipher.data(), mac.data(), nonce.data(), 17, plain.data(), plain.size());
 			CHECK(send.counter == counter);
