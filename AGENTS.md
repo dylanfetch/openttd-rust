@@ -124,13 +124,22 @@ merge titles also need a supported prefix; `Merge:` is rejected by inherited CI.
 `python3 tools/migration.py verify` builds and tests the pinned original and fork,
 checks that the candidate retains reference test names, and records evidence under
 `.local/`. `python3 tools/migration.py build` builds both without running tests.
-`python3 tools/migration.py tools` builds the native Rust generators. The optional
-`--ccache` mode uses separate strict preprocessor caches and disables PCH; ordinary
-builds remain the default. `--ccache-bypass` retains the same no-PCH build flags
-while disabling cache reuse for measurement. Never cache test results or build
-directories, and never clear another task's reference build for a cache trial.
-The reference uses C++; the candidate explicitly enables `OPTION_RUST` and links
-the migrated kernels into both the game and test executable.
+`python3 tools/migration.py tools` builds the native Rust generators.
+`python3 tools/run-comparisons.py [name...]` runs the reference comparison tools
+in parallel; any `tools/*-comparison.py` is picked up automatically, so adding
+one needs no workflow edit. The reference uses C++; the candidate explicitly
+enables `OPTION_RUST` and links the migrated kernels into both the game and test
+executable.
+
+Every worktree of a clone shares one pinned reference checkout and build (in the
+main checkout, serialized by a lock), the bootstrapped toolchain and dependencies,
+and per-role ccache stores. ccache is used whenever it is installed (PCH off);
+`--no-ccache` gives an ordinary PCH build. Cache build outputs freely when the
+key covers what determines them; never cache test results.
+
+Iterate locally: incremental builds take seconds to minutes, while every push
+starts roughly 15 minutes of CI. Push when a change is ready for CI or review,
+with its commits batched, and keep working while CI runs.
 
 Rust changes require reproducible `cargo fmt --all -- --check`,
 `cargo check --workspace --all-targets --locked`,

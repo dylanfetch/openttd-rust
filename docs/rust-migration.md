@@ -18,10 +18,12 @@ from OpenTTD 15.3, commit `14ec60f248547d4d062a1160f0fc26d742319888`, pinned in
 from it and target it with fork PRs; the pinned original revision remains the
 behavioral reference throughout migration.
 
-The verification driver creates `.local/reference/openttd` as a detached Git
-worktree at that revision. It rejects a changed reference revision or dirty
-reference source. Builds go into `build-reference` and `build-rust`; neither
-changes reference source. Updating the baseline is a separate deliberate task.
+The verification driver creates `.local/reference/openttd` in the main checkout
+as a detached Git worktree at that revision, shared by every worktree of the
+clone. It rejects a changed reference revision or dirty reference source. The
+shared reference builds into the main checkout's `.local/build-reference`; each
+worktree builds its candidate into its own `build-rust`. Neither changes
+reference source. Updating the baseline is a separate deliberate task.
 Never change candidate behavior and expected results together to make checks pass.
 
 The premature Rust integer-square-root implementation was removed before component
@@ -215,9 +217,9 @@ game equivalence. PRs record exact checks and limits for each reviewed commit.
 The fork executable is `build-rust/openttd-rust`; Cargo artifacts reside in the
 ignored `build-rust/cargo` directory. CMake tracks the Rust sources, manifests,
 lockfile, and toolchain file to rebuild the archive and affected executables.
-The reference executable is
-`build-reference/openttd`. Most in-game branding remains original. When using this
-host's extracted dependencies, launch with their library path:
+The reference executable is `.local/build-reference/openttd` in the main
+checkout. Most in-game branding remains original. When using this host's
+extracted dependencies, launch with their library path:
 
 ```sh
 LD_LIBRARY_PATH="$PWD/.local/deps/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
@@ -903,84 +905,37 @@ validate native linkage and covered behavior; Linux results alone do not establi
 Darwin support. Actual macOS CI evidence and independent review are required before
 integration.
 
-## Conservative compiler-cache trial
+## Compiler cache, shared reference and CI time
 
-Compiler caching is opt-in. `python3 tools/migration.py tools --ccache` builds
-native Rust generators; `python3 tools/migration.py verify --ccache` retains all
-Cargo checks, original/candidate builds, test inventories, and tests. Ordinary
-commands clear stale compiler launchers and restore the normal PCH policy.
-`--ccache-bypass` requires `--ccache` and keeps identical no-PCH flags while
-disabling artifact reuse. Both modes record effective settings, per-role counter
-deltas, build settings, and total duration in the verification report.
+Every worktree of a clone shares the main checkout's pinned reference checkout
+(`.local/reference/openttd`), reference build (`.local/build-reference`), bootstrapped
+toolchain/dependencies, and per-role ccache stores (`.local/compiler-cache/`).
+A lock serializes reference configure/build/test across concurrent runs, so the
+original is compiled once per clone rather than once per worktree. New worktrees
+need no symlinks. The driver skips an explicit CMake configure when the existing
+cache already holds every requested `-D` value; Ninja still reconfigures on any
+CMake input change. Configure-time environment changes (for example a new
+dependency prefix) need a fresh build directory or one manual configure.
 
-The policy in `migration/ccache.conf` requires compiler-content validation,
-preprocessor mode, empty sloppiness, unchanged paths, and local storage. Ambient
-`CCACHE_*` policy overrides are removed. Original and candidate artifacts occupy
-separate directories; PCH is disabled rather than enabling timestamp or PCH
-sloppiness. Existing build dates remain observable and can change the revision
-object and executable bytes across otherwise equivalent builds.
+The driver uses ccache whenever it is installed (`tools/bootstrap-local.py`
+installs it locally). `migration/ccache.conf` keeps compiler-content checks and
+empty sloppiness, and enables direct mode. The driver sets `base_dir` to each
+role's root, so paths are relative and worktrees share entries. PCH is disabled
+under ccache; `--no-ccache` gives an ordinary PCH build, and `--ccache-bypass`
+keeps the no-PCH flags without reuse for measurement. The first local trial
+(`07c7134451`) found warm-cache validation 58% shorter than ordinary PCH builds,
+with no code or data differences in the objects.
 
-The Linux migration workflow can run the trial with the manual `use_ccache`
-input. Automatic use requires the repository variable `MIGRATION_CCACHE=true`
-after measured benefit and a successful protected-branch seed. Cache compatibility
-includes OS, architecture, pinned original revision, policy/workflow/driver hashes,
-compiler/tool versions, and installed dependency versions. Ccache validates source
-and header contents for reuse. Pull requests restore only; successful protected
-`rust-migration` push/manual runs save only compilation artifacts after every
-existing comparison succeeds. Reports, expected results, build directories, and
-executables are never restored.
-
-Measure fresh ordinary-PCH, cold cache, warm cache, and cache-bypassed no-PCH runs
-with the same source, compiler, jobs, and private build paths. Delete only the
-trial's own build outputs between runs while retaining the warm cache. Record
-actual hits and total elapsed time, retain all verification evidence, and explain
-object or executable differences before adoption. A warm Ninja no-op is not a
-cache benefit measurement.
-
-The first Linux trial at `07c713445146ea38ad9ce82f2cdd8208aeeab1a0` used
-five jobs, GCC 15.2.0, ccache 4.12.3, CMake 4.3.4, Ninja 1.13.2, and pinned Rust
-1.99.0. Each row recreated the same private game/reference/tools build paths, ran
-`tools`, `verify`, and all four focused comparison scripts. Only the warm cache
-retained compilation entries. All rows passed four Cargo gates, 97 original and
-110 candidate tests, all focused suites, and fresh generator comparisons.
-
-| Mode | Native verification (seconds) | Complete validation (seconds) | Original PP hits/misses | Candidate PP hits/misses |
-| --- | ---: | ---: | ---: | ---: |
-| Ordinary PCH | 494.141 | 646.790 | disabled | disabled |
-| Cold strict cache | 582.175 | 735.064 | 8 / 538 | 8 / 541 |
-| Warm recreated outputs | 120.275 | 270.413 | 545 / 1 | 548 / 1 |
-| Bypassed, same no-PCH flags | 566.154 | 720.521 | 0 / 0 | 0 / 0 |
-
-Native hit/miss deltas exclude the separately recorded tools step; direct hits
-were zero. Bypass effective configuration reported `disable=true`. Complete
-duration includes tools, Cargo/native/tests, every focused suite, and snapshots.
-Warm validation was 58.2% shorter than ordinary PCH and 62.5% shorter than the
-equivalent bypass control; cold validation was 13.6% slower than ordinary PCH.
-These are single local runs, without GitHub cache upload/download time. Keep
-automatic adoption disabled until a protected-branch manual seed passes all gates.
-
-Object differences were retained and investigated, without rewriting flags or
-build dates. Cold/warm production C++ objects matched except two revision
-objects whose differing bytes were solely their original build-date strings.
-Against bypass, all 1,113 non-revision production objects had identical allocated
-code/data and runtime relocations. GCC DWARF producer text records ccache's
-reordered `-finput-charset=utf-8`; two Unix entry objects additionally contain
-different internal LTO identifiers. An identical configure-only IPO command
-compiled twice reproduced different GCC LTO identifiers. Configure-only probes
-and fresh Cargo debug incremental paths are separate from cached game objects.
-All four original/candidate game/test binaries have 27 file-backed allocated sections; only
-the original date bytes in `.rodata` and the resulting build IDs changed between
-cold and bypass. Code and mutable data agree. The trial therefore establishes
-covered behavior and material local reuse benefit, not byte-identical binaries
-or a guaranteed CI speedup.
-
-Evidence remains in the implementation worktree's `.local/cache-trial/`: each
-mode retains driver reports, all comparison logs, object SHA/size inventories,
-original binaries, build IDs, and section/date/producer/LTO analysis. The ignored
-`.local/cache-trial.py` reproduces the guarded private-path run sequence; the
-comparison commands are `tools/compare-integers.py`, `tools/utf8-comparison.py`,
-`tools/encoded-comparison.py`, and `tools/byte-strings-comparison.py`. No expected
-results or binaries from a prior run supplied validation inputs.
+CI restores both cache roles keyed only by OS, architecture, baseline, compiler
+versions and `ccache.conf`. ccache itself hashes compiler content, arguments and
+every included file. Workflow and driver edits no longer change the key; before
+#79 they did, so PRs never hit. Successful `rust-migration` pushes save the cache,
+and PRs restore it. Windows and macOS keep vcpkg binaries in an actions/cache
+files store keyed by runner image; vcpkg's ABI hashes make stale entries miss.
+Their Rust jobs also compile through ccache 4.14.1 (checksummed download) with
+PCH off; MSVC uses embedded `/Z7` debug info (CMP0141), which ccache requires.
+`tools/run-comparisons.py` runs every comparison tool in parallel. Platform CI
+also runs on `rust-migration` pushes, which checks each merge.
 
 ## Native Windows MSVC Rust linkage
 

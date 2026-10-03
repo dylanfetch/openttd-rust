@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Check conservative cache provenance and explicit return to ordinary CMake mode."""
+"""Check shared cache provenance and explicit return to ordinary CMake mode."""
 
 from pathlib import Path
+import shutil
 import tempfile
 import unittest
 
@@ -16,7 +17,11 @@ class CompilerCacheTests(unittest.TestCase):
         self.assertNotEqual(reference["CCACHE_DIR"], candidate["CCACHE_DIR"])
         self.assertEqual(reference["PATH"], "/bin")
         self.assertNotIn("CCACHE_SLOPPINESS", reference)
-        self.assertNotIn("CCACHE_BASEDIR", reference)
+        # Ambient base_dir is replaced by the role root that holds source and build.
+        self.assertEqual(reference["CCACHE_BASEDIR"], str(migration.COMMON_ROOT.resolve()))
+        self.assertEqual(candidate["CCACHE_BASEDIR"], str(migration.ROOT.resolve()))
+        # Every worktree of a clone shares one cache per role.
+        self.assertEqual(Path(candidate["CCACHE_DIR"]).parent, migration.COMMON_LOCAL / "compiler-cache")
         self.assertEqual(original["CCACHE_SLOPPINESS"], "time_macros")
         self.assertEqual(migration.compiler_cache_environment(original, "candidate", bypass=True)["CCACHE_DISABLE"], "1")
         with self.assertRaises(ValueError):
@@ -33,6 +38,12 @@ class CompilerCacheTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 migration.verify_compiler_cache_options(build, None)
             migration.verify_compiler_cache_options(build, "/usr/bin/ccache")
+
+    @unittest.skipUnless(shutil.which("ccache", path=migration.environment()["PATH"]), "ccache not installed")
+    def test_cache_key_ignores_workflow_and_driver_edits(self):
+        identity = migration.compiler_cache_compatibility()
+        self.assertEqual(set(identity["policy"]), {"migration/ccache.conf"})
+        self.assertTrue(identity["prefix"].startswith("compiler-v1-"))
 
 
 if __name__ == "__main__":
