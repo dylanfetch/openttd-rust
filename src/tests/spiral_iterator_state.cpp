@@ -7,12 +7,12 @@
 
 /** @file spiral_iterator_state.cpp Audited rectangular-map and value-state gaps. */
 
-#include "stdafx.h"
-#include "3rdparty/catch2/catch.hpp"
-#include "tilearea_type.h"
-#include "map_func.h"
+#include "../stdafx.h"
+#include "../3rdparty/catch2/catch.hpp"
+#include "../tilearea_type.h"
+#include "../map_func.h"
 
-#include "safeguards.h"
+#include "../safeguards.h"
 
 struct SpiralCoord {
 	uint x, y;
