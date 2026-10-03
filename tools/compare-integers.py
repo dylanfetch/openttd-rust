@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare concrete integer-parser gaps against the pinned, unchanged C++ source."""
+"""Compare bounded integer parser/builder gaps against pinned unchanged C++ sources."""
 
 import hashlib
 import json
@@ -30,6 +30,56 @@ def cases():
                     for src in dict.fromkeys(samples):
                         yield width, signed, base, clamp, src
 
+
+
+def builder_cases():
+    for width in (8, 16, 32, 64):
+        mask = (1 << width) - 1
+        for signed in (0, 1):
+            low = -(1 << (width - 1)) if signed else 0
+            high = (1 << (width - 1)) - 1 if signed else mask
+            values = {low, low + 1, 0, 1, high - 1, high}
+            if signed:
+                values.add(-1)
+            for base in range(2, 37):
+                samples = values.copy()
+                # Exactly 32 versus 33 bytes, including the minus sign. Only
+                # representable inputs are included; reference to_chars is the oracle.
+                for exponent in (30, 31, 32):
+                    boundary = base ** exponent
+                    for value in (boundary - 1, boundary, boundary + 1):
+                        if low <= value <= high:
+                            samples.add(value)
+                        if signed and low <= -value <= high:
+                            samples.add(-value)
+                for value in sorted(samples):
+                    yield width, signed, base, value & mask
+
+
+def compare_builders(env, binaries):
+    corpus = list(builder_cases())
+    records = [f"{width} {signed} {base} {bits:x}\n".encode() for width, signed, base, bits in corpus]
+    (OUT / "builder-corpus.txt").write_bytes(b"".join(records))
+    commands = []
+    streams = {}
+    for name in ("reference", "candidate", "candidate-cpp"):
+        command = [str(binaries[name, False]), "--builder"]
+        commands.append(command)
+        result = subprocess.run(command, input=b"".join(records), env=env,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        (OUT / f"{name}-builder.txt").write_bytes(result.stdout)
+        streams[name] = result.stdout.splitlines()
+    expected = streams["reference"]
+    assert len(expected) == len(corpus) + 13, "Builder probe inventory changed"
+    for name in ("candidate", "candidate-cpp"):
+        failures = [(index, records[index].decode().strip() if index < len(records) else "fixed sink/alias case",
+                     want.decode(), got.decode())
+                    for index, (want, got) in enumerate(zip(expected, streams[name])) if want != got]
+        (OUT / f"{name}-builder-failures.json").write_text(json.dumps(failures, indent=2) + "\n")
+        if len(streams[name]) != len(expected) or failures:
+            raise RuntimeError(f"Builder comparison failed: {name}; {OUT / f'{name}-builder-failures.json'}")
+    return {"cases": len(corpus), "fixed_alias_sink_cases": 13, "commands": commands,
+            "output_sha256": hashlib.sha256(b"\n".join(expected) + b"\n").hexdigest()}
 
 def compare_generators(env):
     outputs = {}
@@ -82,10 +132,10 @@ def main():
     if not archive.exists():
         raise RuntimeError("Build the native Rust tools first; see migration guide")
     binaries = {}
-    for name, source in (("reference", REFERENCE), ("candidate", ROOT)):
-        for fatal in (False, True):
+    for name, source in (("reference", REFERENCE), ("candidate", ROOT), ("candidate-cpp", ROOT)):
+        for fatal in ((False,) if name == "candidate-cpp" else (False, True)):
             binary = OUT / (name + ("-fatal" if fatal else ""))
-            command = ["g++", "-std=c++20", "-O0", "-ffunction-sections", "-fdata-sections", "-DFMT_HEADER_ONLY", "-I", str(source / "src"), str(ROOT / "tools/integer_probe.cpp"), str(source / "src/core/string_consumer.cpp"), "-Wl,--gc-sections", "-o", str(binary)]
+            command = ["g++", "-std=c++20", "-O0", "-ffunction-sections", "-fdata-sections", "-DFMT_HEADER_ONLY", "-I", str(source / "src"), str(ROOT / "tools/integer_probe.cpp"), str(source / "src/core/string_consumer.cpp"), str(source / "src/core/string_builder.cpp"), str(source / "src/core/utf8.cpp"), "-Wl,--gc-sections", "-o", str(binary)]
             if fatal:
                 command.append("-DSTRGEN")
             if name == "candidate":
@@ -116,11 +166,12 @@ def main():
         assert outputs[0].returncode == outputs[1].returncode == 2
         assert outputs[0].stdout == outputs[1].stdout and outputs[0].stderr == outputs[1].stderr
         fatal_cases.append({"input": record.decode().strip(), "exit_code": 2, "stdout": outputs[0].stdout.decode()})
+    builders = compare_builders(env, binaries)
     generators = compare_generators(env)
     MIGRATION["ensure_reference"]()
-    report = {"baseline": MIGRATION["BASELINE"], "candidate_commit": MIGRATION["git"]("rev-parse", "HEAD"), "cases": len(corpus), "fatal_cases": fatal_cases, "generators": generators, "reference_sources_sha256": {name: hashlib.sha256((REFERENCE / name).read_bytes()).hexdigest() for name in ("src/core/string_consumer.hpp", "src/core/string_consumer.cpp")}, "passed": True}
+    report = {"baseline": MIGRATION["BASELINE"], "candidate_commit": MIGRATION["git"]("rev-parse", "HEAD"), "candidate_status": MIGRATION["git"]("status", "--porcelain"), "cases": len(corpus), "fatal_cases": fatal_cases, "generators": generators, "builders": builders, "reference_sources_sha256": {name: hashlib.sha256((REFERENCE / name).read_bytes()).hexdigest() for name in ("src/core/string_consumer.hpp", "src/core/string_consumer.cpp", "src/core/string_builder.hpp", "src/core/string_builder.cpp", "src/core/utf8.hpp", "src/core/utf8.cpp")}, "passed": True}
     (OUT / "report.json").write_text(json.dumps(report, indent=2) + "\n")
-    print(f"Integer comparisons passed: {len(corpus)} API cases, {len(fatal_cases)} fatal diagnostic cases; {OUT / 'report.json'}")
+    print(f"Integer comparisons passed: {len(corpus)} API cases, {len(fatal_cases)} fatal diagnostic cases, {builders['cases']} builder formats + {builders['fixed_alias_sink_cases']} fixed sink/alias cases; {OUT / 'report.json'}")
 
 
 if __name__ == "__main__":

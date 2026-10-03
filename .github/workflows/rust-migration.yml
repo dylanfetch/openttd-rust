@@ -44,7 +44,7 @@ jobs:
           cmake --build .local/build-tools-rust --target tools --parallel 4
       - name: Check Rust and compare original and migration builds
         run: python3 tools/migration.py verify --jobs 4
-      - name: Compare integer parser behavior with pinned original
+      - name: Compare integer parser and builder behavior with pinned original
         run: python3 tools/compare-integers.py
       - name: Compare UTF-8 byte behavior with pinned original
         run: python3 tools/utf8-comparison.py

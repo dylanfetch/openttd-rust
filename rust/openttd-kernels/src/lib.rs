@@ -212,3 +212,32 @@ pub unsafe extern "C" fn openttd_rust_utf8_at_byte(
     // SAFETY: The caller supplies the immutable span described above.
     utf8::at_byte(unsafe { utf8::borrow(data, length) }, offset)
 }
+
+mod builder;
+pub use builder::{FormattedInteger, LittleEndian};
+
+/// Encode a scalar as eight little-endian bytes; the C++ facade selects its width.
+/// Returns owned by-value storage without pointers, allocation, or ownership transfer.
+#[allow(unsafe_code)] // Export attribute only; the implementation is safe Rust.
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_encode_uint_le(value: u64) -> LittleEndian {
+    builder::little_endian(value)
+}
+
+/// Format integer bits into the original fixed 32-byte scratch capacity.
+/// Base must be 2..36; negative is one only for a signed negative input converted
+/// directly to `uint64_t` modulo 2^64. Zero length suppresses the C++ sink call.
+/// No pointer, allocation, ownership transfer, callback, or state crosses this ABI.
+/// Panics abort, and this C ABI never unwinds into C++.
+///
+/// # Panics
+/// Invalid bases violate the original `std::to_chars` precondition and abort.
+#[allow(unsafe_code)] // Export attribute only; the implementation is safe Rust.
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_format_integer(
+    bits: u64,
+    negative: u8,
+    base: i32,
+) -> FormattedInteger {
+    builder::integer(bits, negative != 0, base)
+}

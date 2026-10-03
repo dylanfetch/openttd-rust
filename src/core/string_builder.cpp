@@ -17,10 +17,15 @@
  */
 void BaseStringBuilder::PutUint8(uint8_t value)
 {
+#ifdef WITH_RUST
+	auto buf = openttd_rust_encode_uint_le(value);
+	this->PutBuffer({reinterpret_cast<const char *>(buf.bytes), 1});
+#else
 	std::array<char, 1> buf{
 		static_cast<char>(value)
 	};
 	this->PutBuffer(buf);
+#endif
 }
 
 /**
@@ -36,11 +41,16 @@ void BaseStringBuilder::PutSint8(int8_t value)
  */
 void BaseStringBuilder::PutUint16LE(uint16_t value)
 {
+#ifdef WITH_RUST
+	auto buf = openttd_rust_encode_uint_le(value);
+	this->PutBuffer({reinterpret_cast<const char *>(buf.bytes), 2});
+#else
 	std::array<char, 2> buf{
 		static_cast<char>(static_cast<uint8_t>(value)),
 		static_cast<char>(static_cast<uint8_t>(value >> 8))
 	};
 	this->PutBuffer(buf);
+#endif
 }
 
 /**
@@ -56,6 +66,10 @@ void BaseStringBuilder::PutSint16LE(int16_t value)
  */
 void BaseStringBuilder::PutUint32LE(uint32_t value)
 {
+#ifdef WITH_RUST
+	auto buf = openttd_rust_encode_uint_le(value);
+	this->PutBuffer({reinterpret_cast<const char *>(buf.bytes), 4});
+#else
 	std::array<char, 4> buf{
 		static_cast<char>(static_cast<uint8_t>(value)),
 		static_cast<char>(static_cast<uint8_t>(value >> 8)),
@@ -63,6 +77,7 @@ void BaseStringBuilder::PutUint32LE(uint32_t value)
 		static_cast<char>(static_cast<uint8_t>(value >> 24))
 	};
 	this->PutBuffer(buf);
+#endif
 }
 
 /**
@@ -78,6 +93,10 @@ void BaseStringBuilder::PutSint32LE(int32_t value)
  */
 void BaseStringBuilder::PutUint64LE(uint64_t value)
 {
+#ifdef WITH_RUST
+	auto buf = openttd_rust_encode_uint_le(value);
+	this->PutBuffer({reinterpret_cast<const char *>(buf.bytes), 8});
+#else
 	std::array<char, 8> buf{
 		static_cast<char>(static_cast<uint8_t>(value)),
 		static_cast<char>(static_cast<uint8_t>(value >> 8)),
@@ -89,6 +108,7 @@ void BaseStringBuilder::PutUint64LE(uint64_t value)
 		static_cast<char>(static_cast<uint8_t>(value >> 56))
 	};
 	this->PutBuffer(buf);
+#endif
 }
 
 /**
