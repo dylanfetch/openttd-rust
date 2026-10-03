@@ -1209,7 +1209,9 @@ nested valuation/filter scope restoration. One stable four-item typed range
 reaches protected filtering; it does not simulate a game world. The unchanged
 scripted suites remain real production pool-iteration and excessive-CPU evidence.
 Actual pinned methods, bundled VM and allocator supply the comparison oracle;
-O0/O2 comparisons are exact within each mode. Commands/source hashes/traces are
+The same tool also compares AI, GameScript and template generated List bindings
+byte-for-byte with the pinned originals, preserving protected helper visibility
+through the upstream parser. O0/O2 comparisons are exact within each mode. Commands/source hashes/traces are
 retained by `python3 tools/script-list-comparison.py` under the existing report
 path. Final full verification, all inherited comparisons, fresh generators,
 actual-call/linkage evidence and supported-platform CI are recorded at exact source

@@ -72,6 +72,9 @@ protected:
 		void Index(SQInteger index);
 		void Finish();
 	};
+	/* Restore outer visibility for the upstream binding generator, which tracks
+	 * public markers without recognizing an un-inherited nested helper class. */
+protected:
 #endif
 	/* Temporary helper functions to get the raw index from either strongly and non-strongly typed pool items. */
 	template <typename T>
