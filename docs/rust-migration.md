@@ -783,3 +783,207 @@ FlowStat origins, wrapping, sentinel keys, repeats, reentry, a C++ exception bet
 feeds). The direct fixture bypasses world lookup, so failed station/cargo/company
 policy and missing-data probes are not executed; this is not cargo routing or
 station-storage equivalence.
+
+
+### BLAKE2b family
+
+Rust-enabled bundled Monocypher BLAKE2b implements all six public functions through
+unchanged C interfaces. Rust owns twelve compression rounds, keyed/unkeyed
+initialization, word/block buffering, pending-final-block decisions, digest
+serialization and final context wiping. The portable bodies remain unchanged.
+C++ owns actual context lifetime and supplies size/alignment/field offsets; the
+shared archive borrows the existing nonthrowing primitive wipe leaf and imports
+no vendor symbols. No context padding is read and no heap allocation is added.
+
+The supplied hash size remains part of the initial parameter; final output writes
+`min(hash_size, 64)`, including defined source behavior at sizes zero/over 64.
+Keys 65–128 bytes fit the original padded block and retain its source behavior,
+while the documented cryptographic interface limits keys to 64 bytes. Keys over
+128 overrun original storage and have no reproduction guarantee. A pending key
+block and a full final message block remain uncompressed until the original
+transition. Zero-length updates return before context or pointer access.
+
+One-shot output can overlap message/key, including partial overlap: all inputs
+are consumed before output writes. Original incremental context/input/output
+preconditions still apply. Raw field/buffer access creates no overlapping Rust
+references; actual caller extents must fit `isize::MAX`. Counter carry wraps as
+original unsigned arithmetic. Finalization wipes the complete actual context.
+Original keyed-init and compression temporaries lack explicit wipes and retain
+that behavior; no stronger compiler-copy/spill erasure is claimed.
+
+Authentication KDF, UID RNG/time sampling, file read/signature policy, Argon2,
+EdDSA and other vendor algorithms remain their unchanged callers. Existing five
+network tests, 1,800 authentication records and 484 cipher/MAC primitive records are primary evidence; bounded hash
+coverage, inherited checks and supported-platform evidence are recorded in the
+component PR. This replacement does not certify cryptographic security or
+complete Monocypher/network/game equivalence.
+
+`python3 tools/auth-comparison.py` extends the existing direct primitive mode
+with bounded hash cases. Its unchanged pinned vendor binary remains the oracle,
+including digest sizes 0/65, keys 65/128, word/block/file-sized partitions,
+initialized context state, independent copies, low-counter carry, final wiping,
+null zero-length output, equal/partial overlap and unchanged deterministic
+Argon2/EdDSA callers. Earlier cipher/MAC records remain an unchanged prefix.
+C++ boundary sanitizers do not instrument Rust accesses. The native ABI audit
+checks descriptor ID 22 and executes all six public functions with actual native
+contexts, including Windows x86 size/alignment, high counter and wipe behavior.
+Optimized-call and fresh vendor-free generator linkage evidence is retained in
+the component PR; final supported-platform CI remains an integration gate.
+
+### Packet framing, binary serialization and transfer state
+
+The Rust Packet kernel owns the native-width limit, persistently narrowed uint16
+cursor, binary encoding/decoding, length-prefix sequencing, framing offsets and
+transfer planning/commit decisions. C++ retains vector/string storage, each
+original allocation operation, direct spans, socket policy, assertions and
+external encryption/transfer callbacks. Packet copies/assignments copy scalar
+state and the existing C++ vector. No Rust borrow survives a C++ allocation or
+callback, and no C++ exception crosses Rust; kernel panics abort.
+
+The facade preserves the original per-byte append order and advances each
+received result byte before its potentially throwing C++ push. Parsing commits
+position two only after resize succeeds. Encryption header writes occur before
+handler queries; send reset occurs after normal encryption return and before
+shrink. Normal false decryption still skips its MAC; throwing decryption does
+not. Transfers commit positive results to the live post-callback cursor, using
+uint16 narrowing; native unsigned arithmetic wraps as in the original. The
+historical GetPacketType send-handler offset remains intact. C++ fallback bodies
+remain available when Rust is disabled.
+
+The unchanged five network/authentication unit cases and existing mixed-endpoint
+1,800-record authentication comparison remain primary evidence, together with
+both scripted regressions and the full test inventory. Run
+`python3 tools/packet-comparison.py` for the independent bounded companion at O0
+and O2: actual pinned, portable candidate and Rust candidate Packet sources are
+compared for binary/buffer bytes, suffix identity, copy independence, TCP/UDP
+framing, partial/zero/negative/throwing transfers, reentrant live cursor changes,
+close policy, controlled encryption callbacks and selected C++ allocation
+failures. It also checks the original uint16 per-byte wrap with larger native
+buffers and prefix narrowing. Commands, source hashes and full observations are
+retained in `.local/packet-comparison/`. ABI IDs 23 and 24 describe scalar Packet
+state/framing outputs; native ABI smoke calls exercise their actual exports.
+
+Send_string and Recv_string collection/sanitation remain C++, as does the exact
+Recv_bytes callback. The nonempty-short Recv_bytes domain remains undefined in
+the pinned original and is excluded per issue #41; zero-source and sufficiently
+large-source cases retain original behavior. These checks do not establish real
+socket delivery, all allocator failure modes, full protocol equivalence or full
+Packet ownership migration. No upstream test or expected output changes.
+
+The native migration CI job timeout is 60 minutes with this additional companion.
+The protected cold-cache run 37102176363 began at 06:10:29 UTC; its full native
+verification ran from 06:12:21 to 06:37:40, and at 06:48 it was still comparing
+ScriptList after Admin conversion. This measured sequence left little margin in
+the prior 45-minute limit before adding Packet. Protected job names and saving
+compiler artifacts only after all comparisons succeed remain unchanged; the
+larger limit is scheduling allowance, not a performance claim.
+
+### Normal X25519 and Montgomery ladder
+
+Rust-enabled `crypto_x25519`, `crypto_x25519_public_key` and
+`crypto_eddsa_trim_scalar` retain their original public interfaces. A single
+coarse `scalarmult` adapter serves the unchanged dirty-small/inverse callers.
+Rust owns the complete 255/256-bit ladder and its private ten-limb field decode,
+encode, add/subtract, masked swap/copy, multiplication, squaring, carry,
+inverse-square-root and inversion. Original normal-X25519/ladder bodies remain
+under the explicit portable fallback. C++ shared-field helpers remain for
+untouched Edwards, conversions, Elligator and other families: that temporary
+internal duplicate is unfinished migration work, not shared-field closure.
+
+The original carry schedule gives even limbs below `1.1 * 2^25` and odd limbs
+below `1.1 * 2^24`; ladder add/subtract remain within original multiply bounds
+`1.65 * 2^26/25`. Unrolled products/sums stay below `0.67 * 2^61`, small products
+below `2^58`, and serialization's signed intermediates below `2^29`. Signed
+helpers use unchecked arithmetic only under these closed source-derived bounds,
+so valid fixed-byte inputs do not acquire overflow branches or signed wrapping.
+Rust arithmetic shifts preserve the supported C++ sign-extension behavior;
+unsigned serialization preserves the original bit packing and narrowing.
+
+A separate synchronous immutable cdecl table contains only the original
+nonthrowing wipe and constant-time verify32 leaves. No field object, callback
+registration, application operation, vendor import or heap crosses the ABI.
+Private arrays are initialized in their final stack storage and accessed raw to
+permit original internal aliasing without whole-array moves or overlapping Rust
+references. Original explicit wipe points/order remain; compiler spills/copies
+are not a complete-erasure claim. ABI ID 25 records the leaf-table layout;
+IDs 23/24 describe the independently reviewed Packet component.
+
+The fixed 32-byte output may overlap secret/scalar/point, including partial
+overlap: inputs are consumed before serialization. Scalar trim independently
+retains literal forward byte-copy behavior, including overlapping propagation.
+The public-key top bit is ignored, noncanonical field encodings remain accepted,
+and raw zero outputs remain primitive outputs; authentication rejection policy
+and RNG/protocol behavior are unchanged. Coarse callers retain both bit counts,
+including inverse/dirty-small's original 256-bit path. Pointers never survive a
+call, native width/calling conventions are explicit and Rust panic aborts.
+
+The existing five network tests, mixed authentication corpus and accepted
+primitive/hash comparisons run unchanged first. Only demonstrated curve,
+alias/trim-copy, direct-ladder and retained-caller gaps extend their existing
+fixture. Functional coverage, optimized-code inspection and C++ boundary
+sanitizers do not certify cryptographic security, instrument Rust accesses or
+prove complete vendor/game equivalence. Supported-platform final CI and separate
+exact-head review remain required before root integration.
+
+The direct authentication fixture exposes the unchanged vendor's private ladder
+by including its actual source in a small generated companion and adding one
+coarse wrapper. Expected math remains entirely the pinned implementation.
+New records cover scalar clamp-bit variants, zero/one/base/noncanonical/top-bit
+points, output/input overlap, distinct forward trim behavior, both raw ladder
+bit counts with bit 255 set, and deterministic dirty-small/fast/inverse callers.
+Existing authentication, cipher/MAC/hash and retained caller records remain an
+unchanged prefix. Native ABI calls execute all four exports and the actual
+cdecl wipe/verify32 table, checking four verifies and original physical wipe
+counts/sizes per ladder; these observations do not prove all spills were erased.
+
+### Coupled string validation and borrowed in-place replacement
+
+Rust owns the shared StrMakeValid scan/policy decisions, StrValid fixed-span scan
+and InPlaceBuilder write progression/copy. Each sanitation decision contains a
+consumed count and at most one existing UTF-8 encoded character. C++ advances the
+actual StringConsumer before its original output operation; string append, erase,
+C-string strlen/tail termination, spans, reference rebinding and fatal dispatch
+remain C++. There is no Rust heap owner or whole-result preallocation. Trivial
+facade getters stay local; the write operation receives the live consumer count
+rather than a cached cursor. InPlaceReplacement copies share borrowed storage but
+retain independent progress and builders bound to their own copied consumers.
+
+The historical codec remains authoritative, including accepted surrogate values.
+Malformed decoding skips one byte without replacement, decoded NUL consumes its
+byte then stops, and unknown settings bits are ignored. Rust retains the exact
+printable/private-use/sprite rules, five allowed SCC codes, all four flags and
+CRLF/newline/space/question-mark precedence. C++ checks flag positions and SCC
+constants at compile time. Native unsigned capacity subtraction retains wrapping
+when the public consumer is reassigned; overtake failure changes neither bytes
+nor position before C++ NOT_REACHED. Valid copying reads then writes forward using
+raw pointers without simultaneous overlapping Rust slices or retained borrows.
+The original ranges::copy precondition excludes a destination inside nonempty
+input, including exact/right overlap; defined disjoint/left overlap remains the
+compatibility domain (https://eel.is/c++draft/alg.copy).
+
+Existing direct coverage is limited: one unchanged InPlaceReplacement case has
+26 assertions; unchanged UTF-8, consumer and builder tests exercise dependencies.
+The pre-port frozen Packet binary passed the selected 22 cases/641 assertions
+with unchanged C++ validation/in-place bodies. Final candidate checks rerun those
+same tests through Rust, together with full native tests and both unchanged
+scripted regressions. Startup/language-header/settings users add integration
+coverage rather than exhaustive malformed sanitation/settings evidence.
+
+`python3 tools/utf8-comparison.py` extends the accepted O2 assertions/NDEBUG modes
+with actual unchanged pinned string.cpp bodies, portable candidate and Rust
+candidate. The bounded corpus includes all 16 flags with ignored unknown bits,
+malformed/truncated/overlong byte sequences, accepted surrogates, printable/SCC
+boundaries, NUL and C-string suffix bytes, missing terminators, empty/unchanged
+inputs, copy/assignment/self-assignment/rvalue copies, live consumer rewinding,
+defined left overlap and overtake fatal state. A fixed observation builder uses
+the actual local shared loop to check consumption before ordinary C++ append
+allocation failure and reentrant validation. Commands, source hashes, exact
+outputs and small failures remain under `.local/utf8-comparison/`; prior codec
+cases and upstream tests are retained. ABI IDs 26/27 describe scan/write results,
+with real native calls checking byte flags, surrogate/NUL policy and copy state.
+
+These checks do not prove every allocator failure, out-of-domain overlap, full
+text rendering or whole-game equivalence. C++ owns containers and borrowed
+lifetimes; other string algorithms and Packet text collection/Recv_bytes remain
+unchanged. No C++ exception crosses Rust and kernel panics abort. Final combined
+platform CI remains required for supported macOS and Windows x86/x64 ABIs.

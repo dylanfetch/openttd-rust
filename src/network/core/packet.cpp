@@ -28,8 +28,16 @@
  *                          loose some the data of the packet, so there you pass the maximum
  *                          size for the packet you expect from the network.
  */
-Packet::Packet(NetworkSocketHandler *cs, size_t limit, size_t initial_read_size) : pos(0), limit(limit)
+Packet::Packet(NetworkSocketHandler *cs, size_t limit, size_t initial_read_size)
+#ifdef WITH_RUST
+	: state{}
+#else
+	: pos(0), limit(limit)
+#endif
 {
+#ifdef WITH_RUST
+	openttd_rust_packet_init(&this->state, limit);
+#endif
 	assert(cs != nullptr);
 
 	this->cs = cs;
@@ -45,13 +53,28 @@ Packet::Packet(NetworkSocketHandler *cs, size_t limit, size_t initial_read_size)
  *              the limit as it might break things if the other side is not expecting
  *              much larger packets than what they support.
  */
-Packet::Packet(NetworkSocketHandler *cs, PacketType type, size_t limit) : pos(0), limit(limit), cs(cs)
+Packet::Packet(NetworkSocketHandler *cs, PacketType type, size_t limit)
+#ifdef WITH_RUST
+	: state{}, cs(cs)
+#else
+	: pos(0), limit(limit), cs(cs)
+#endif
 {
+#ifdef WITH_RUST
+	openttd_rust_packet_init(&this->state, limit);
+#endif
 	/* Allocate space for the the size so we can write that in just before sending the packet. */
 	size_t size = EncodedLengthOfPacketSize();
 	if (cs != nullptr && cs->send_encryption_handler != nullptr) {
 		/* Allocate some space for the message authentication code of the encryption. */
+#ifdef WITH_RUST
+		size_t mac_size = cs->send_encryption_handler->MACSize();
+		OpenTTDPacketFrame frame;
+		openttd_rust_packet_frame(static_cast<PacketSize>(size), this->Size(), mac_size, &frame);
+		size = frame.message;
+#else
 		size += cs->send_encryption_handler->MACSize();
+#endif
 	}
 	assert(this->CanWriteToPacket(size));
 	this->buffer.resize(size, 0);
@@ -65,6 +88,19 @@ Packet::Packet(NetworkSocketHandler *cs, PacketType type, size_t limit) : pos(0)
  */
 void Packet::PrepareToSend()
 {
+#ifdef WITH_RUST
+	/* Header writes precede handler queries and encryption, even when those throw. */
+	assert(this->buffer[0] == 0 && this->buffer[1] == 0);
+	openttd_rust_packet_write_header(this->buffer.data(), this->Size());
+	if (cs != nullptr && cs->send_encryption_handler != nullptr) {
+		size_t mac_size = cs->send_encryption_handler->MACSize();
+		OpenTTDPacketFrame frame;
+		openttd_rust_packet_frame(static_cast<PacketSize>(EncodedLengthOfPacketSize()), this->Size(), mac_size, &frame);
+		cs->send_encryption_handler->Encrypt(std::span(&this->buffer[EncodedLengthOfPacketSize()], mac_size), std::span(&this->buffer[frame.message], frame.payload));
+	}
+	openttd_rust_packet_send_reset(&this->state);
+	this->buffer.shrink_to_fit();
+#else
 	/* Prevent this to be called twice and for packets that have been received. */
 	assert(this->buffer[0] == 0 && this->buffer[1] == 0);
 
@@ -80,6 +116,7 @@ void Packet::PrepareToSend()
 
 	this->pos  = 0; // We start reading from here
 	this->buffer.shrink_to_fit();
+#endif
 }
 
 /**
@@ -89,7 +126,11 @@ void Packet::PrepareToSend()
  */
 bool Packet::CanWriteToPacket(size_t bytes_to_write)
 {
+#ifdef WITH_RUST
+	return openttd_rust_packet_can_write(&this->state, this->Size(), bytes_to_write) != 0;
+#else
 	return this->Size() + bytes_to_write <= this->limit;
+#endif
 }
 
 /*
@@ -110,7 +151,11 @@ bool Packet::CanWriteToPacket(size_t bytes_to_write)
  */
 void Packet::Send_bool(bool data)
 {
+#ifdef WITH_RUST
+	this->Send_uint8(openttd_rust_packet_boolean(static_cast<uint8_t>(data)));
+#else
 	this->Send_uint8(data ? 1 : 0);
+#endif
 }
 
 /**
@@ -119,8 +164,15 @@ void Packet::Send_bool(bool data)
  */
 void Packet::Send_uint8(uint8_t data)
 {
+#ifdef WITH_RUST
+	assert(this->CanWriteToPacket(sizeof(data)));
+	OpenTTDRustLittleEndian encoded = openttd_rust_encode_uint_le(data);
+	/* Keep each original append and its allocation/partial-write order. */
+	for (size_t byte = 0; byte < sizeof(data); ++byte) this->buffer.emplace_back(encoded.bytes[byte]);
+#else
 	assert(this->CanWriteToPacket(sizeof(data)));
 	this->buffer.emplace_back(data);
+#endif
 }
 
 /**
@@ -129,9 +181,16 @@ void Packet::Send_uint8(uint8_t data)
  */
 void Packet::Send_uint16(uint16_t data)
 {
+#ifdef WITH_RUST
+	assert(this->CanWriteToPacket(sizeof(data)));
+	OpenTTDRustLittleEndian encoded = openttd_rust_encode_uint_le(data);
+	/* Keep each original append and its allocation/partial-write order. */
+	for (size_t byte = 0; byte < sizeof(data); ++byte) this->buffer.emplace_back(encoded.bytes[byte]);
+#else
 	assert(this->CanWriteToPacket(sizeof(data)));
 	this->buffer.emplace_back(GB(data, 0, 8));
 	this->buffer.emplace_back(GB(data, 8, 8));
+#endif
 }
 
 /**
@@ -140,11 +199,18 @@ void Packet::Send_uint16(uint16_t data)
  */
 void Packet::Send_uint32(uint32_t data)
 {
+#ifdef WITH_RUST
+	assert(this->CanWriteToPacket(sizeof(data)));
+	OpenTTDRustLittleEndian encoded = openttd_rust_encode_uint_le(data);
+	/* Keep each original append and its allocation/partial-write order. */
+	for (size_t byte = 0; byte < sizeof(data); ++byte) this->buffer.emplace_back(encoded.bytes[byte]);
+#else
 	assert(this->CanWriteToPacket(sizeof(data)));
 	this->buffer.emplace_back(GB(data,  0, 8));
 	this->buffer.emplace_back(GB(data,  8, 8));
 	this->buffer.emplace_back(GB(data, 16, 8));
 	this->buffer.emplace_back(GB(data, 24, 8));
+#endif
 }
 
 /**
@@ -153,6 +219,12 @@ void Packet::Send_uint32(uint32_t data)
  */
 void Packet::Send_uint64(uint64_t data)
 {
+#ifdef WITH_RUST
+	assert(this->CanWriteToPacket(sizeof(data)));
+	OpenTTDRustLittleEndian encoded = openttd_rust_encode_uint_le(data);
+	/* Keep each original append and its allocation/partial-write order. */
+	for (size_t byte = 0; byte < sizeof(data); ++byte) this->buffer.emplace_back(encoded.bytes[byte]);
+#else
 	assert(this->CanWriteToPacket(sizeof(data)));
 	this->buffer.emplace_back(GB(data,  0, 8));
 	this->buffer.emplace_back(GB(data,  8, 8));
@@ -162,6 +234,7 @@ void Packet::Send_uint64(uint64_t data)
 	this->buffer.emplace_back(GB(data, 40, 8));
 	this->buffer.emplace_back(GB(data, 48, 8));
 	this->buffer.emplace_back(GB(data, 56, 8));
+#endif
 }
 
 /**
@@ -182,9 +255,15 @@ void Packet::Send_string(std::string_view data)
  */
 void Packet::Send_buffer(const std::vector<uint8_t> &data)
 {
+#ifdef WITH_RUST
+	assert(this->CanWriteToPacket(openttd_rust_packet_buffer_size(data.size())));
+	this->Send_uint16(openttd_rust_packet_prefix(data.size()));
+	this->buffer.insert(this->buffer.end(), data.begin(), data.end());
+#else
 	assert(this->CanWriteToPacket(sizeof(uint16_t) + data.size()));
 	this->Send_uint16((uint16_t)data.size());
 	this->buffer.insert(this->buffer.end(), data.begin(), data.end());
+#endif
 }
 
 /**
@@ -196,9 +275,15 @@ void Packet::Send_buffer(const std::vector<uint8_t> &data)
  */
 std::span<const uint8_t> Packet::Send_bytes(const std::span<const uint8_t> span)
 {
+#ifdef WITH_RUST
+	size_t amount = openttd_rust_packet_send_amount(&this->state, this->Size(), span.size());
+	this->buffer.insert(this->buffer.end(), span.data(), span.data() + amount);
+	return span.subspan(amount);
+#else
 	size_t amount = std::min<size_t>(span.size(), this->limit - this->Size());
 	this->buffer.insert(this->buffer.end(), span.data(), span.data() + amount);
 	return span.subspan(amount);
+#endif
 }
 
 /*
@@ -222,7 +307,11 @@ bool Packet::CanReadFromPacket(size_t bytes_to_read, bool close_connection)
 	if (this->cs->HasClientQuit()) return false;
 
 	/* Check if variable is within packet-size */
+#ifdef WITH_RUST
+	if (openttd_rust_packet_can_read(&this->state, this->Size(), bytes_to_read) == 0) {
+#else
 	if (this->pos + bytes_to_read > this->Size()) {
+#endif
 		if (close_connection) this->cs->NetworkSocketHandler::MarkClosed();
 		return false;
 	}
@@ -237,7 +326,11 @@ bool Packet::CanReadFromPacket(size_t bytes_to_read, bool close_connection)
  */
 bool Packet::HasPacketSizeData() const
 {
+#ifdef WITH_RUST
+	return openttd_rust_packet_has_size(&this->state) != 0;
+#else
 	return this->pos >= EncodedLengthOfPacketSize();
+#endif
 }
 
 /**
@@ -258,6 +351,14 @@ size_t Packet::Size() const
  */
 bool Packet::ParsePacketSize()
 {
+#ifdef WITH_RUST
+	PacketSize size = openttd_rust_packet_parse_size(&this->state, this->buffer.data(), this->Size());
+	if (size == 0) return false;
+	/* Resize may throw; the cursor commits only after it succeeds. */
+	this->buffer.resize(size);
+	openttd_rust_packet_read_start(&this->state);
+	return true;
+#else
 	size_t size = static_cast<size_t>(this->buffer[0]);
 	size       += static_cast<size_t>(this->buffer[1]) << 8;
 
@@ -269,6 +370,7 @@ bool Packet::ParsePacketSize()
 	this->buffer.resize(size);
 	this->pos = static_cast<PacketSize>(EncodedLengthOfPacketSize());
 	return true;
+#endif
 }
 
 /**
@@ -277,6 +379,18 @@ bool Packet::ParsePacketSize()
  */
 bool Packet::PrepareToRead()
 {
+#ifdef WITH_RUST
+	openttd_rust_packet_read_start(&this->state);
+	if (cs == nullptr || cs->receive_encryption_handler == nullptr) return true;
+
+	size_t mac_size = cs->receive_encryption_handler->MACSize();
+	OpenTTDPacketFrame frame;
+	if (openttd_rust_packet_frame(this->Position(), this->Size(), mac_size, &frame) == 0) return false;
+	bool valid = cs->receive_encryption_handler->Decrypt(std::span(&this->buffer[this->Position()], mac_size), std::span(&this->buffer[frame.message], frame.payload));
+	/* False consumes the MAC; a thrown callback does not. Use its live cursor. */
+	openttd_rust_packet_skip_mac(&this->state, mac_size);
+	return valid;
+#else
 	/* Put the position on the right place */
 	this->pos = static_cast<PacketSize>(EncodedLengthOfPacketSize());
 
@@ -288,6 +402,7 @@ bool Packet::PrepareToRead()
 	bool valid = cs->receive_encryption_handler->Decrypt(std::span(&this->buffer[pos], mac_size), std::span(&this->buffer[pos + mac_size], this->buffer.size() - pos - mac_size));
 	this->pos += static_cast<PacketSize>(mac_size);
 	return valid;
+#endif
 }
 
 /**
@@ -296,10 +411,20 @@ bool Packet::PrepareToRead()
  */
 PacketType Packet::GetPacketType() const
 {
+#ifdef WITH_RUST
+	assert(this->Size() >= EncodedLengthOfPacketSize() + EncodedLengthOfPacketType());
+	/* The original deliberately queries the send handler here. */
+	size_t mac_size = 0;
+	if (cs != nullptr && cs->send_encryption_handler != nullptr) mac_size = cs->send_encryption_handler->MACSize();
+	OpenTTDPacketFrame frame;
+	openttd_rust_packet_frame(static_cast<PacketSize>(EncodedLengthOfPacketSize()), this->Size(), mac_size, &frame);
+	return static_cast<PacketType>(buffer[frame.message]);
+#else
 	assert(this->Size() >= EncodedLengthOfPacketSize() + EncodedLengthOfPacketType());
 	size_t offset = EncodedLengthOfPacketSize();
 	if (cs != nullptr && cs->send_encryption_handler != nullptr) offset += cs->send_encryption_handler->MACSize();
 	return static_cast<PacketType>(buffer[offset]);
+#endif
 }
 
 /**
@@ -308,7 +433,11 @@ PacketType Packet::GetPacketType() const
  */
 bool Packet::Recv_bool()
 {
+#ifdef WITH_RUST
+	return openttd_rust_packet_boolean(this->Recv_uint8()) != 0;
+#else
 	return this->Recv_uint8() != 0;
+#endif
 }
 
 /**
@@ -317,12 +446,17 @@ bool Packet::Recv_bool()
  */
 uint8_t Packet::Recv_uint8()
 {
+#ifdef WITH_RUST
+	if (!this->CanReadFromPacket(sizeof(uint8_t), true)) return 0;
+	return static_cast<uint8_t>(openttd_rust_packet_recv(&this->state, this->buffer.data(), this->Size(), sizeof(uint8_t)));
+#else
 	uint8_t n;
 
 	if (!this->CanReadFromPacket(sizeof(n), true)) return 0;
 
 	n = this->buffer[this->pos++];
 	return n;
+#endif
 }
 
 /**
@@ -331,6 +465,10 @@ uint8_t Packet::Recv_uint8()
  */
 uint16_t Packet::Recv_uint16()
 {
+#ifdef WITH_RUST
+	if (!this->CanReadFromPacket(sizeof(uint16_t), true)) return 0;
+	return static_cast<uint16_t>(openttd_rust_packet_recv(&this->state, this->buffer.data(), this->Size(), sizeof(uint16_t)));
+#else
 	uint16_t n;
 
 	if (!this->CanReadFromPacket(sizeof(n), true)) return 0;
@@ -338,6 +476,7 @@ uint16_t Packet::Recv_uint16()
 	n  = (uint16_t)this->buffer[this->pos++];
 	n += (uint16_t)this->buffer[this->pos++] << 8;
 	return n;
+#endif
 }
 
 /**
@@ -346,6 +485,10 @@ uint16_t Packet::Recv_uint16()
  */
 uint32_t Packet::Recv_uint32()
 {
+#ifdef WITH_RUST
+	if (!this->CanReadFromPacket(sizeof(uint32_t), true)) return 0;
+	return static_cast<uint32_t>(openttd_rust_packet_recv(&this->state, this->buffer.data(), this->Size(), sizeof(uint32_t)));
+#else
 	uint32_t n;
 
 	if (!this->CanReadFromPacket(sizeof(n), true)) return 0;
@@ -355,6 +498,7 @@ uint32_t Packet::Recv_uint32()
 	n += (uint32_t)this->buffer[this->pos++] << 16;
 	n += (uint32_t)this->buffer[this->pos++] << 24;
 	return n;
+#endif
 }
 
 /**
@@ -363,6 +507,10 @@ uint32_t Packet::Recv_uint32()
  */
 uint64_t Packet::Recv_uint64()
 {
+#ifdef WITH_RUST
+	if (!this->CanReadFromPacket(sizeof(uint64_t), true)) return 0;
+	return static_cast<uint64_t>(openttd_rust_packet_recv(&this->state, this->buffer.data(), this->Size(), sizeof(uint64_t)));
+#else
 	uint64_t n;
 
 	if (!this->CanReadFromPacket(sizeof(n), true)) return 0;
@@ -376,6 +524,7 @@ uint64_t Packet::Recv_uint64()
 	n += (uint64_t)this->buffer[this->pos++] << 48;
 	n += (uint64_t)this->buffer[this->pos++] << 56;
 	return n;
+#endif
 }
 
 /**
@@ -384,6 +533,16 @@ uint64_t Packet::Recv_uint64()
  */
 std::vector<uint8_t> Packet::Recv_buffer()
 {
+#ifdef WITH_RUST
+	uint16_t size = this->Recv_uint16();
+	if (size == 0 || !this->CanReadFromPacket(size, true)) return {};
+
+	std::vector<uint8_t> data;
+	uint8_t byte;
+	/* Consume each byte before its potentially throwing result allocation. */
+	while (openttd_rust_packet_buffer_next(&this->state, this->buffer.data(), this->Size(), &size, &byte) != 0) data.push_back(byte);
+	return data;
+#else
 	uint16_t size = this->Recv_uint16();
 	if (size == 0 || !this->CanReadFromPacket(size, true)) return {};
 
@@ -393,6 +552,7 @@ std::vector<uint8_t> Packet::Recv_buffer()
 	}
 
 	return data;
+#endif
 }
 
 /**
@@ -446,5 +606,9 @@ std::string Packet::Recv_string(size_t length, StringValidationSettings settings
  */
 size_t Packet::RemainingBytesToTransfer() const
 {
+#ifdef WITH_RUST
+	return openttd_rust_packet_remaining(&this->state, this->Size());
+#else
 	return this->Size() - this->pos;
+#endif
 }
