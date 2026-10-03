@@ -88,6 +88,9 @@ jobs:
           python3 tools/migration.py verify --jobs 4 --ccache
       - name: Compare migrated components with the pinned original
         run: python3 tools/run-comparisons.py --jobs 4
+      - name: Compare simulation state with the pinned original
+        # Reuses the builds from verify; see tools/simulate.py for scenarios and masks.
+        run: python3 tools/simulate.py --jobs 4
       - name: Save validated protected-branch compilation artifacts
         if: success() && github.ref == 'refs/heads/rust-migration' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && steps.compiler-cache-restore.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
@@ -103,6 +106,7 @@ jobs:
           name: migration-evidence
           path: |
             .local/compiler-cache-identity.json
+            .local/simulation/
             .local/verification/
             .local/comparison-logs/
             .local/*-comparison/

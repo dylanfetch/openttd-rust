@@ -219,8 +219,11 @@ def git(*args, cwd=ROOT):
 
 
 @contextmanager
-def reference_lock():
-    """Serialize reference checkout/build/test across concurrent worktree runs."""
+def reference_lock(shared=False):
+    """Serialize reference checkout/build/test across concurrent worktree runs.
+
+    Shared holders (tools/simulate.py copying the built reference's runtime) may
+    overlap each other but never a build."""
     try:
         import fcntl
     except ImportError:  # Windows CI imports this module but never builds the reference.
@@ -228,7 +231,7 @@ def reference_lock():
         return
     COMMON_LOCAL.mkdir(parents=True, exist_ok=True)
     with (COMMON_LOCAL / "reference.lock").open("w") as handle:
-        fcntl.flock(handle, fcntl.LOCK_EX)
+        fcntl.flock(handle, fcntl.LOCK_SH if shared else fcntl.LOCK_EX)
         try:
             yield
         finally:
@@ -265,12 +268,15 @@ def supply_graphics(build):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("build", "verify", "tools"), nargs="?", default="verify")
+    parser.add_argument("action", choices=("build", "verify", "tools", "simulate"), nargs="?", default="verify")
     parser.add_argument("--jobs", type=int, default=min(6, os.cpu_count() or 1))
     parser.add_argument("--ccache", action="store_true", help="Require the shared compiler cache (default: use it when ccache is available)")
     parser.add_argument("--no-ccache", action="store_true", help="Ordinary builds without the compiler cache (PCH enabled)")
     parser.add_argument("--ccache-bypass", action="store_true", help="Measure the same no-PCH configuration without cache reuse")
-    args = parser.parse_args()
+    # simulate forwards any further arguments to tools/simulate.py.
+    args, simulate_args = parser.parse_known_args()
+    if simulate_args and args.action != "simulate":
+        parser.error(f"unrecognized arguments: {' '.join(simulate_args)}")
     if args.no_ccache and (args.ccache or args.ccache_bypass):
         parser.error("--no-ccache conflicts with --ccache/--ccache-bypass")
     if args.jobs < 1:
@@ -410,6 +416,11 @@ def main():
             missing = inventories["reference"] - inventories["candidate"]
             if missing:
                 raise RuntimeError(f"Candidate removed reference tests: {sorted(missing)}")
+        if args.action == "simulate":
+            # --jobs is the driver's; each simulation job runs two game processes.
+            log = run("simulate", [sys.executable, str(ROOT / "tools/simulate.py"),
+                                   "--jobs", str(max(1, args.jobs // 2)), *simulate_args])
+            print(log.read_text(errors="replace"), end="", flush=True)
         ensure_reference()
         report["passed"] = True
     finally:

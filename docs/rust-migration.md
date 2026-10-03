@@ -142,6 +142,36 @@ ccache 4.14.1 (checksummed download) with PCH off; MSVC uses embedded `/Z7` debu
 info (CMP0141), which ccache requires. Platform CI also runs on `rust-migration`
 pushes, which checks each merge.
 
+## Simulation comparison
+
+`python3 tools/migration.py simulate` builds both games, then runs
+`tools/simulate.py`; CI runs its default set after the comparisons. It is the
+evidence for game-logic ports. Each scenario runs the reference and the
+candidate headlessly in isolated directories under `.local/simulation/`, twice:
+with `-d desync=3`, which writes an uncompressed snapshot every 32 economy days,
+and plainly, because desync mode also rebuilds caches every tick and takes
+YAPF's uncached rail path. Both write an exit save. Every chunk is decoded
+(tables field by field from the stored header, other chunks byte by byte) and
+the first differences are reported as `chunk/element/field: ref -> cand`.
+Any `[desync:` warning (a cache mismatch) and any log or stdout difference fail
+(cut to the shorter run when end moments differ; the plain run is always full).
+
+- Scenarios: both regression saves with their AIs, and generated maps (TGP and
+  original, sizes, seeds, disasters on). `--soak` adds more; `--self` compares
+  the reference with itself; names filter. Extend `scenario_list()` for ports.
+  The cargodist transport scenario is #84 (needed by #74).
+- Masks (`MASKS`, with reasons and hit counts in the report): the random save
+  id, build revision/NewGRF version, and `round_trip_time`, which the original
+  saves uninitialized (#83); ports touching it need their own check.
+- Port divergences go in `KNOWN_FAILURES` by first divergence and issue.
+- `-vnull:ticks` counts loop iterations and a late threaded link graph job
+  pauses the game, so run length varies with load. Snapshots compare by date;
+  exit saves only when both runs stopped at the same tick (a clean plain pair
+  is retried; a consistently slower link graph job fails on timing, not state).
+  GameScripts run while paused, so scenarios must not use an active one.
+- The reference runtime is copied under a shared lock, so simulations never
+  block other worktrees. Evidence: `.local/simulation/<time>/report.json`.
+
 ## Native macOS arm64 Rust linkage
 
 CMake verifies the pinned `rustc -vV` host against the actual C++ platform,
