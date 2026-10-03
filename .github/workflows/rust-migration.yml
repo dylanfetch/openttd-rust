@@ -6,11 +6,6 @@ on:
   pull_request:
     branches: [rust-migration]
   workflow_dispatch:
-    inputs:
-      use_ccache:
-        description: Run the measured conservative compiler-cache trial
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -18,10 +13,6 @@ permissions:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/rust-migration' }}
-
-env:
-  # Adoption follows measured benefit and a successful protected-branch seed.
-  MIGRATION_CCACHE: ${{ (github.event_name == 'workflow_dispatch' && inputs.use_ccache) || vars.MIGRATION_CCACHE == 'true' }}
 
 jobs:
   compare:
@@ -53,7 +44,6 @@ jobs:
       - name: Verify compiler-cache controls
         run: python3 tools/test-compiler-cache.py
       - name: Identify compatible compilation artifacts
-        if: env.MIGRATION_CCACHE == 'true'
         id: compiler-cache-identity
         run: |
           python3 - <<'PY'
@@ -70,7 +60,6 @@ jobs:
               output.write(f"prefix={identity['prefix']}\n")
           PY
       - name: Restore compatible compilation artifacts
-        if: env.MIGRATION_CCACHE == 'true'
         id: compiler-cache-restore
         uses: actions/cache/restore@v4
         with:
@@ -82,40 +71,14 @@ jobs:
       # The driver requires cargo fmt/check/clippy/test before native builds.
       - name: Build native Rust generators without the game
         run: |
-          cache_flags=()
-          if [ "$MIGRATION_CCACHE" = true ]; then cache_flags=(--ccache); fi
-          python3 tools/migration.py tools --jobs 4 "${cache_flags[@]}"
+          python3 tools/migration.py tools --jobs 4 --ccache
       - name: Check Rust and compare original and migration builds
         run: |
-          cache_flags=()
-          if [ "$MIGRATION_CCACHE" = true ]; then cache_flags=(--ccache); fi
-          python3 tools/migration.py verify --jobs 4 "${cache_flags[@]}"
-      - name: Compare integer, builder and consumer bytes with pinned original
-        run: python3 tools/compare-integers.py
-      - name: Compare UTF-8 byte behavior with pinned original
-        run: python3 tools/utf8-comparison.py
-      - name: Compare encoded-string behavior with pinned original
-        run: python3 tools/encoded-comparison.py
-      - name: Compare byte-string behavior with pinned original
-        run: python3 tools/byte-strings-comparison.py
-      - name: Compare rounded roots and saturation with pinned original
-        run: |
-          python3 tools/math-comparison.py
-          python3 tools/math-extension-comparison.py
-      - name: Compare generic history behavior with pinned original
-        run: python3 tools/history-comparison.py
-      - name: Compare X25519 authentication and streaming with mixed original endpoints
-        run: python3 tools/auth-comparison.py
-      - name: Compare Packet framing and transfer states
-        run: python3 tools/packet-comparison.py
-      - name: Compare paired Admin conversion behavior with pinned original
-        run: python3 tools/admin-conversion-comparison.py
-      - name: Compare ScriptList owner and real-VM gaps with pinned original
-        run: python3 tools/script-list-comparison.py
-      - name: Compare widget parser shape and ownership with pinned original
-        run: python3 tools/widget-parser-comparison.py
+          python3 tools/migration.py verify --jobs 4 --ccache
+      - name: Compare migrated components with the pinned original
+        run: python3 tools/run-comparisons.py --jobs 4
       - name: Save validated protected-branch compilation artifacts
-        if: success() && env.MIGRATION_CCACHE == 'true' && github.ref == 'refs/heads/rust-migration' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && steps.compiler-cache-restore.outputs.cache-hit != 'true'
+        if: success() && github.ref == 'refs/heads/rust-migration' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && steps.compiler-cache-restore.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: |
@@ -130,16 +93,6 @@ jobs:
           path: |
             .local/compiler-cache-identity.json
             .local/verification/
-            .local/integer-comparison/
-            .local/utf8-comparison/
-            .local/encoded-comparison/
-            .local/byte-strings-comparison/
-            .local/math-comparison/
-            .local/math-extension-comparison/
-            .local/history-comparison/
-            .local/auth-comparison/
-            .local/packet-comparison/
-            .local/admin-conversion-comparison/
-            .local/script-list-comparison/
-            .local/widget-parser-comparison/
+            .local/comparison-logs/
+            .local/*-comparison/
           include-hidden-files: true

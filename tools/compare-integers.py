@@ -121,7 +121,7 @@ def compare_generators(env):
     settings_dir = REFERENCE / "src/table/settings"
     settings_inputs = [str(settings_dir / name) for name in re.findall(r"\$\{CMAKE_CURRENT_SOURCE_DIR\}/(\w+\.ini)", (settings_dir / "CMakeLists.txt").read_text())]
     lang = REFERENCE / "src/lang"
-    tools = {"reference": (ROOT / "build-reference/src").resolve(), "candidate": ROOT / ".local/build-tools-rust/src"}
+    tools = {"reference": (MIGRATION["REFERENCE_BUILD"] / "src").resolve(), "candidate": ROOT / ".local/build-tools-rust/src"}
     for name, tool_dir in tools.items():
         out = OUT / (name + "-generated")
         out.mkdir(exist_ok=True)
