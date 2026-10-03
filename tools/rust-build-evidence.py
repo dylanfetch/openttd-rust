@@ -50,7 +50,10 @@ def main():
             raise RuntimeError("Actual archive native libraries differ from the configure-time query")
         if run(["lipo", "-archs", archive], f"{label}-archive-architecture").strip() != b"arm64":
             raise RuntimeError("Rust archive is not exclusively arm64")
-        run(["nm", "-g", archive], f"{label}-archive-symbols")
+        # Apple nm's LLVM reader can lag the pinned Rust compiler and reject
+        # archive bitcode (Apple LLVM21 versus Rust LLVM23). Check the archive
+        # architecture above; exact link paths and final Mach-O symbols below
+        # remain mandatory, and their nm failures are never suppressed.
         commands = json.loads((build / "compile_commands.json").read_text())
         consumers = {"strgen": "/strgen/strgen.cpp", "settingsgen": "/settingsgen/settingsgen.cpp"}
         if label == "game":
