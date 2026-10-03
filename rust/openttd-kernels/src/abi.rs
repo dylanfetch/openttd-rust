@@ -55,6 +55,8 @@ pub fn layout(type_id: u8, item: u8) -> usize {
         }
         19..=21 => crate::crypto_primitives::abi_layout(type_id, item),
         22 => crate::blake2b::abi_layout(item),
+        23 => layout!(crate::packet::State, item; limit, position),
+        24 => layout!(crate::packet::Frame, item; message, payload),
         _ => usize::MAX,
     }
 }
