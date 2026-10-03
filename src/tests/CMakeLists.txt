@@ -11,6 +11,7 @@ add_test_files(
     mock_fontcache.h
     mock_spritecache.cpp
     mock_spritecache.h
+    spiral_iterator_state.cpp
     string_builder.cpp
     string_consumer.cpp
     string_consumer_bytes.cpp

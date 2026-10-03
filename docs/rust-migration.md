@@ -245,6 +245,37 @@ SQFile erases/resizes its owning buffer and explicitly reconstructs the consumer
 no Rust borrow survives that boundary. No allocator, in-place memory copy/rebinding,
 escape-parser caller, or encoded-string transformation moved with this group.
 
+Spiral tile traversal also uses the shared archive. Rust owns both square/hole
+initializations, position initialization, per-direction movement, shell jumps,
+outside-map skipping, end detection, and coordinate-only equality. C++ keeps the
+public typed iterator/sequence facade, TileXY dereference conversion, copies and
+postfix wrappers, and map storage/allocation. Map dimensions are supplied afresh
+at each constructor and prefix increment; no map size is cached in Rust state.
+Orthogonal and diagonal tile-area algorithms remain C++.
+
+`src/rust/spiral_ffi.h` exposes five pointer-free by-value operations and a copyable
+40-byte state (nine uint32_t fields counting the four extents, then a uint8_t
+direction at byte 36; alignment 4). C++ and Rust assert that layout; C++ also
+asserts original uint width and direction encodings. Directions are NE(-1,0),
+SE(0,1), SW(1,0), NW(0,-1), with west shell jumps(+1,-1). Coordinate, extent,
+position and radius calculations explicitly wrap at 32 bits, including temporary
+outside-map coordinates. There is no new clamp or extent/diameter cap. Positive
+diameter/radius and increment-before-end remain original preconditions. End is
+exactly radius equality with a non-invalid direction; iterator equality uses x,y
+only, including terminal coordinates. No pointer, tile storage, allocator,
+callback, borrow or random state crosses this ABI; panic aborts without unwinding.
+
+The five original ordered spiral tests remain unchanged (217 assertions). Four
+focused public cases cover three complete clipped sequences on 128x64/64x128
+maps, live map dimensions, copies/postfix/coordinate-only equality and sentinel
+state, and UINT32_MAX hole-initialization wrapping. Fixtures were captured from
+pinned unchanged C++ functions. The same original and new cases are compiled
+against pinned reference algorithms, Rust facades and portable C++ fallbacks.
+The huge inherited perimeter after a wrapped extent is not traversed by the
+constructor test; no runtime limit is introduced. These checks do not establish
+full world-generation or map-subsystem equivalence. Native generators do not use
+spiral traversal and are not claimed as its runtime coverage.
+
 Start with dependency and test inventories. Prefer bounded, heavily tested modules
 whose unchanged upstream tests can exercise replacements through their existing
 interfaces. Assess ownership, data representation, conversion/overflow behavior,

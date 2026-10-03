@@ -299,6 +299,19 @@ TileIterator &DiagonalTileIterator::operator++()
 /**
  * See SpiralTileSequence constructor for description.
  */
+#ifdef WITH_RUST
+SpiralTileIterator::SpiralTileIterator(TileIndex center, uint diameter)
+{
+	assert(diameter > 0);
+	this->state = openttd_rust_spiral_square(TileX(center), TileY(center), diameter, Map::SizeX(), Map::SizeY());
+}
+
+SpiralTileIterator::SpiralTileIterator(TileIndex start_north, uint radius, uint w, uint h)
+{
+	assert(radius > 0);
+	this->state = openttd_rust_spiral_hole(TileX(start_north), TileY(start_north), radius, w, h, Map::SizeX(), Map::SizeY());
+}
+#else
 SpiralTileIterator::SpiralTileIterator(TileIndex center, uint diameter) :
 	max_radius(diameter / 2),
 	cur_radius(0),
@@ -397,3 +410,4 @@ void SpiralTileIterator::Increment()
 
 	this->InitPosition();
 }
+#endif /* WITH_RUST */
