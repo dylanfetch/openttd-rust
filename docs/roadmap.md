@@ -2,8 +2,8 @@
 
 Root owns this file and updates it when a phase completes or priorities change.
 `AGENTS.md` and `docs/rust-migration.md` define the rules; this file decides what
-to work on next. If an issue conflicts with this roadmap, follow the roadmap and
-ask root to re-select.
+to work on next. If an issue conflicts with this roadmap, follow the roadmap;
+a subagent stops and reports the conflict in its hand-off to root.
 
 ## Where the fork stands (2026-10-03, `rust-migration` at `2ebebd5b85`)
 
@@ -40,8 +40,8 @@ Three habits held back progress. The rules in `AGENTS.md` now prevent them.
 | --- | --- |
 | PR #62 (BLAKE2b, Packet, X25519, string validation) | Reviewed and green. Integrate. |
 | PR #70 / issue #65 (ScriptList VM control) | Integrate once its review passes. Then close the ScriptList line. |
-| PR #66 / issue #64 (curve family) | Integrate only if review passes without another implementation round. Otherwise park it. |
-| Issue #68 (SHA-512/HMAC/HKDF/Ed25519) | Paused. No more `src/3rdparty` work. |
+| PR #66 / issue #64 (curve family) | Integrate only if review passes without another implementation round. Otherwise label it `paused`, leave the draft open, and stop work. |
+| Issue #68 (SHA-512/HMAC/HKDF/Ed25519) | Paused. No new `src/3rdparty` work beyond finishing #62/#66 as stated. |
 | Issue #69 (tile areas, bitmap, tile lists) | Paused. Revisit as an ownership port when station/industry work needs it. |
 | Issue #75 (GetPartialPixelZ full-domain fidelity) | Do it. Small. |
 | Issue #76 (worktree/branch cleanup) | Do it. Luna low. |
@@ -54,8 +54,7 @@ the save chunks, and compare them field by field. The scenarios are the
 regression saves, generated maps across seeds, and one committed
 transport-network save with cargodist enabled. It must pass reference vs
 reference and reference vs candidate, detect a deliberate rule change, and run
-in CI. Until it lands, start no new non-roadmap ports. Phase 0 items may
-continue in parallel.
+in CI. Phase 2 waits for #72. Phase 0 items may continue in parallel.
 
 ## Phase 2: first game-logic ports with Rust-owned state
 

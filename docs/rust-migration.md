@@ -817,8 +817,8 @@ lower effort than root. Lower Sol effort requires a clearly bounded task.
 default, with a limit of five spawned threads. Explicit spawn settings choose the
 required role; a running host may impose a lower limit.
 
-For substantive work, create a fork issue specifying scope, existing test evidence,
-behavior gaps, and acceptance criteria. Assign an owner and an isolated branch/worktree.
+For substantive work, create a fork issue specifying scope, affected interfaces,
+evidence plan, and acceptance criteria. Assign an owner and an isolated branch/worktree.
 The implementation agent opens a draft PR targeting `rust-migration` and linking
 the issue, with reproducible checks and limits. A separate reviewer examines the
 final commit and validation evidence;

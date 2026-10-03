@@ -21,18 +21,23 @@ fork; the remaining upstream documentation explains behavior and architecture.
   Upstream unit-test coverage alone is not a reason to select a component.
 - Prefer ownership ports: Rust owns the component's state and control flow, and
   C++ keeps only a thin facade plus callbacks for shared services (`Random`,
-  pools, map access, progress). In the candidate build the original C++ body is
-  compiled only in the portable path (`#ifndef WITH_RUST`). Do not extract an
+  pools, map access, progress). With `WITH_RUST` defined the original C++ body
+  is not compiled; it remains under `#ifndef WITH_RUST` for portable builds.
+  Do not extract an
   algorithmic fragment while C++ keeps the surrounding state and loop, unless
   the roadmap names it as a stepping stone.
 - Keep the full game running throughout migration. Preserve networking, saves,
   mods, interface, and shared random-number behavior, including the exact
   sequence of random draws.
 - Reproduce the original over its whole reachable input domain. Do not add
-  guards, assertions, rejections, or fatal paths that the original lacks.
+  guards, assertions, rejections, or fatal paths that the original lacks. Where
+  the C++ wraps or truncates, use explicit `wrapping_*` operations or `as`
+  casts; Rust overflow checks (enabled in release, with `panic = "abort"`) may
+  only back up operations that cannot overflow in the original. This applies to
+  new work; known divergences in existing ports are tracked as issues (#75).
 - Evidence for game-logic ports is the semantic simulation harness
-  (`python3 tools/migration.py simulate`, roadmap phase 1) plus the existing
-  tests. Extend the harness's scenarios rather than writing a new per-component
+  (`python3 tools/migration.py simulate`, added by #72; until then, existing
+  tests plus narrow comparisons) plus the existing tests. Extend the harness's scenarios rather than writing a new per-component
   comparison tool. Add a narrow comparison against unchanged reference bodies
   only for a concrete gap the harness cannot reach.
 - Keep the pinned reference worktree unchanged. Never change candidate behavior
@@ -49,17 +54,22 @@ fork; the remaining upstream documentation explains behavior and architecture.
 Evidence must be checkable, not exhaustive prose. Spend effort on code and on
 checks that run; do not restate them in paragraphs.
 
-- Issue: scope, interfaces, evidence plan, and acceptance criteria. About 60
-  lines at most; leave design detail to the implementation.
+- Issue: scope, affected interfaces, evidence plan, and acceptance criteria.
+  About 60 lines at most; leave design detail to the implementation.
 - PR description: what moved, what stays in C++, exact commands, known limits,
   and the four line counts from the roadmap progress metric. About 60 lines at
   most. Integration PRs link the component PRs instead of re-describing them.
+  Count lines with `git diff --numstat origin/rust-migration...HEAD`: Rust
+  added is `rust/`; tooling is `tools/`; glue is lines added under `src/`
+  outside `#ifndef WITH_RUST` blocks; C++ retired is the original lines newly
+  enclosed by `#ifndef WITH_RUST` (or deleted). Comments and blanks count.
 - Component entry in `docs/rust-migration.md`: about 25 lines at most.
 - Review report: reviewed commit, findings, and dispositions. Do not narrate
   what was verified when there are no findings.
 - One PR per component, targeting `rust-migration` directly. Use an integration
-  branch only when CI capacity forces batching. Do not make merge-only
-  "preserve ancestry" commits.
+  branch only when CI capacity forces batching. Updating a PR branch from its
+  base (merge or rebase) is fine; do not add merges whose only purpose is to
+  keep reviewed commit ancestry.
 
 ## Agent team and review
 
@@ -80,11 +90,13 @@ Every spawn must specify a model and reasoning effort rather than inherit them:
 Every agent-authored GitHub issue, PR, comment, and review report must identify
 the agent, exact model, and reasoning effort, including artifacts authored by root.
 For example: `Agent: /root/implementation | Model: gpt-6.1-sol | Reasoning effort: high`.
+A user-directed session outside Codex (for example Claude Code) names its exact
+model and states its effort as reported by its host.
 
 For substantive changes:
 
-1. Create a fork issue with scope, affected interfaces, existing test evidence,
-   behavior gaps, and acceptance criteria. Give each task a clear owner.
+1. Create a fork issue with scope, affected interfaces, evidence plan, and
+   acceptance criteria. Give each task a clear owner.
 2. Use an isolated branch/worktree based on `rust-migration`. The implementation
    agent opens a draft PR targeting `rust-migration`, linking the issue and
    recording exact validation commands and limitations.
