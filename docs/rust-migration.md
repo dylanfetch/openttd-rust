@@ -1238,3 +1238,43 @@ failed station/cargo/company policy and missing-data supplemental probes are not
 executed. Existing saved-world regressions cover their exercised real query paths,
 not every invalid world state. This evidence does not establish cargo routing,
 station-storage ownership, arbitrary allocation failures or full game equivalence.
+
+### Packet framing, binary serialization and transfer state
+
+The Rust Packet kernel owns the native-width limit, persistently narrowed uint16
+cursor, binary encoding/decoding, length-prefix sequencing, framing offsets and
+transfer planning/commit decisions. C++ retains vector/string storage, each
+original allocation operation, direct spans, socket policy, assertions and
+external encryption/transfer callbacks. Packet copies/assignments copy scalar
+state and the existing C++ vector. No Rust borrow survives a C++ allocation or
+callback, and no C++ exception crosses Rust; kernel panics abort.
+
+The facade preserves the original per-byte append order and advances each
+received result byte before its potentially throwing C++ push. Parsing commits
+position two only after resize succeeds. Encryption header writes occur before
+handler queries; send reset occurs after normal encryption return and before
+shrink. Normal false decryption still skips its MAC; throwing decryption does
+not. Transfers commit positive results to the live post-callback cursor, using
+uint16 narrowing; native unsigned arithmetic wraps as in the original. The
+historical GetPacketType send-handler offset remains intact. C++ fallback bodies
+remain available when Rust is disabled.
+
+The unchanged five network/authentication unit cases and existing mixed-endpoint
+1,800-record authentication comparison remain primary evidence, together with
+both scripted regressions and the full test inventory. Run
+`python3 tools/packet-comparison.py` for the independent bounded companion at O0
+and O2: actual pinned, portable candidate and Rust candidate Packet sources are
+compared for binary/buffer bytes, suffix identity, copy independence, TCP/UDP
+framing, partial/zero/negative/throwing transfers, reentrant live cursor changes,
+close policy, controlled encryption callbacks and selected C++ allocation
+failures. It also checks the original uint16 per-byte wrap with larger native
+buffers and prefix narrowing. Commands, source hashes and full observations are
+retained in `.local/packet-comparison/`. ABI IDs 23 and 24 describe scalar Packet
+state/framing outputs; native ABI smoke calls exercise their actual exports.
+
+Send_string and Recv_string collection/sanitation remain C++, as does the exact
+Recv_bytes callback. The nonempty-short Recv_bytes domain remains undefined in
+the pinned original and is excluded per issue #41; zero-source and sufficiently
+large-source cases retain original behavior. These checks do not establish real
+socket delivery, all allocator failure modes, full protocol equivalence or full
+Packet ownership migration. No upstream test or expected output changes.
