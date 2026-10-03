@@ -52,6 +52,7 @@ jobs:
     - name: Rust checks
       if: inputs.rust
       run: |
+        python3 tools/test-rust-build-evidence.py
         cargo fmt --all -- --check
         cargo check --workspace --all-targets --locked --target aarch64-apple-darwin
         cargo clippy --workspace --all-targets --locked --target aarch64-apple-darwin -- -D warnings
