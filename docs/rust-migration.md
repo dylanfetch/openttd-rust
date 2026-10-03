@@ -572,8 +572,27 @@ rather than validity's false return. Result/history aliasing and partial typed
 writes follow the original operation order.
 
 The unchanged 288-month upstream test remains primary evidence. Its standalone
-reference/Rust/fallback runs each pass 86 assertions; focused gap evidence and
-full linked-game verification are recorded in the issue/PR as they complete.
+reference/Rust/fallback runs each pass 86 assertions. `python3 tools/history-comparison.py` compiles the pristine
+history source and a common public-interface fixture independently for the
+reference, Rust facade, and portable C++ facade at O0 and O2. Its 11,133 records
+cover all twelve phases, prerequisite/unrelated/saturated masks, wide GB windows,
+arbitrary valid descriptor chains, wrapped/out-of-range ages, and the independent
+explicit rotation versus global query phases. It records typed constructor,
+copy/move/assignment, reduction and destruction order, exception partial state,
+result aliases, live phase mutations, and both ordered graph fillers with present
+and absent histories. The three actual production reducers are extracted verbatim
+from the pristine source and checked unchanged in the candidate: a nested-year
+rounding fixture produces 0 while an intentionally flattened comparison produces
+1, and Town fields retain the historical int accumulator conversions.
+
+The fixture records IsValidHistory/GetHistory disagreement rather than treating
+it as a bug. Fatal stubs compare original dispatch and C++ unwinding; they do not
+compare game fatal text or source locations. ASan/UBSan instruments the C++ fixture
+and adapters; the release Rust archive is uninstrumented, while allocator leak
+checking covers opaque engine destruction, including typed exceptions. The shared
+migration archive locator validates the configured native target and archive.
+Full native checks and linked Industry/Town call-site evidence are recorded in the
+issue/PR; this bounded corpus is not complete game/economy equivalence.
 
 ## Team process and engineering standards
 
