@@ -11,11 +11,11 @@
 #[repr(C)]
 #[derive(Default)]
 pub struct IntegerResult {
-    value_bits: u64,
-    length: usize,
-    error_offset: usize,
-    error_length: usize,
-    error_kind: u8,
+    pub(super) value_bits: u64,
+    pub(super) length: usize,
+    pub(super) error_offset: usize,
+    pub(super) error_length: usize,
+    pub(super) error_kind: u8,
 }
 
 fn digit(byte: u8, base: u8) -> Option<u64> {

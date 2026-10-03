@@ -245,6 +245,37 @@ SQFile erases/resizes its owning buffer and explicitly reconstructs the consumer
 no Rust borrow survives that boundary. No allocator, in-place memory copy/rebinding,
 escape-parser caller, or encoded-string transformation moved with this group.
 
+Spiral tile traversal also uses the shared archive. Rust owns both square/hole
+initializations, position initialization, per-direction movement, shell jumps,
+outside-map skipping, end detection, and coordinate-only equality. C++ keeps the
+public typed iterator/sequence facade, TileXY dereference conversion, copies and
+postfix wrappers, and map storage/allocation. Map dimensions are supplied afresh
+at each constructor and prefix increment; no map size is cached in Rust state.
+Orthogonal and diagonal tile-area algorithms remain C++.
+
+`src/rust/spiral_ffi.h` exposes five pointer-free by-value operations and a copyable
+40-byte state (nine uint32_t fields counting the four extents, then a uint8_t
+direction at byte 36; alignment 4). C++ and Rust assert that layout; C++ also
+asserts original uint width and direction encodings. Directions are NE(-1,0),
+SE(0,1), SW(1,0), NW(0,-1), with west shell jumps(+1,-1). Coordinate, extent,
+position and radius calculations explicitly wrap at 32 bits, including temporary
+outside-map coordinates. There is no new clamp or extent/diameter cap. Positive
+diameter/radius and increment-before-end remain original preconditions. End is
+exactly radius equality with a non-invalid direction; iterator equality uses x,y
+only, including terminal coordinates. No pointer, tile storage, allocator,
+callback, borrow or random state crosses this ABI; panic aborts without unwinding.
+
+The five original ordered spiral tests remain unchanged (217 assertions). Four
+focused public cases cover three complete clipped sequences on 128x64/64x128
+maps, live map dimensions, copies/postfix/coordinate-only equality and sentinel
+state, and UINT32_MAX hole-initialization wrapping. Fixtures were captured from
+pinned unchanged C++ functions. The same original and new cases are compiled
+against pinned reference algorithms, Rust facades and portable C++ fallbacks.
+The huge inherited perimeter after a wrapped extent is not traversed by the
+constructor test; no runtime limit is introduced. These checks do not establish
+full world-generation or map-subsystem equivalence. Native generators do not use
+spiral traversal and are not claimed as its runtime coverage.
+
 Start with dependency and test inventories. Prefer bounded, heavily tested modules
 whose unchanged upstream tests can exercise replacements through their existing
 interfaces. Assess ownership, data representation, conversion/overflow behavior,
@@ -308,6 +339,84 @@ zero-length UTF-8 calls, and absent formatting calls. Parser and fatal diagnosti
 comparisons remain intact, as do freshly generated string/settings headers,
 English/French output, and malformed strgen diagnostics. These bounded checks do
 not establish complete text formatting or whole-game equivalence.
+
+## Encoded-string compatibility and parameter rewriting
+
+With `OPTION_RUST=ON`, Rust owns `FixSCCEncoded`, `FixSCCEncodedNegative`,
+`EncodedString::ReplaceParam`, and the shared `GetEncodedStringWithArgs`
+serialization algorithm. The save-version dispatch and its ordering remain C++:
+legacy encoding before version 350 (old markers before 169), negative repair before
+353, then sanitation under the original control-code policy. General decoding,
+rendering, ScriptText encoding, and sanitation remain separate migration work.
+
+Legacy conversion remains permissive: old E028/E02A normalize only with fix_code;
+markers are recognized even inside quotes; quotes toggle/disappear; quoted colons
+remain bytes; numeric text is not validated. A valid nonmarker first character
+leaves the original string untouched. Invalid first UTF-8 produces empty output,
+and invalid UTF-8 after a recognized prefix truncates output. Negative repair only
+accepts SCC_ENCODED, tries unsigned hex before signed hex, retains signed modulo
+bits, and canonicalizes successful positive values as well. Failed signed reads
+log the original diagnostic, default to zero, and perform the original lexical
+skip, preserving suffix bytes for copying.
+
+Replacement requires the internal marker and uint32 hexadecimal ID. Empty interior
+records and unknown types become monostate. A final separator does not create a
+final empty record. Out-of-range replacement returns empty after the original
+parsing/diagnostic/assertion work. String parameters remain arbitrary bytes,
+including NUL and interior record separators. Public StringParameter construction
+still converts negative integers to uint64 before the descriptor boundary.
+
+`src/rust/encoded_ffi.h` passes explicit tags (0 monostate, 1 uint64, 2 byte span),
+never C++ string/vector/variant layouts. Static checks pin StringID width and the
+RS/E000/E001/E002/E003 token contract. Nonempty spans are initialized readable bytes
+in one live allocation, length <=PTRDIFF_MAX; descriptor arrays are aligned and
+have total byte size <=PTRDIFF_MAX. Empty spans/counts allow null, and read-only
+spans may overlap. All input borrows end before Rust returns; no C++ pointer is
+stored in the result.
+
+Rust returns an opaque Box owning output and diagnostic vectors. Getters provide
+immutable views and by-value metadata without mutating/reallocating storage. C++
+keeps a unique_ptr with the Rust destroy function as deleter, copies output into
+its own std::string, and returns all intermediate allocations only to Rust, even
+if C++ copying or logging throws. No view survives destruction. Each output append
+checks addition and pointer-sized length; Vec checks capacity. Rust allocation
+failure/panic abort, overflow checks stay enabled, and the ABI never unwinds. This
+boundary does not claim equivalent resource-exhaustion timing.
+
+Diagnostic offsets always identify the complete operation input. A record's
+integer error span and following preview (at most four bytes) are bounded within
+that original record before translating to full input offsets; negative repair's
+preview uses the whole remaining input. C++ retains that input while formatting
+and replaying ordered messages. A single Rust scan avoids duplicate diagnostics
+from a sizing pass. It stops at the first enabled assertion, then C++ replays
+preceding logs and uses the original assertion expressions before any output
+commit. Numeric remainder assertions follow !NDEBUG || WITH_ASSERT, matching
+stdafx's release assertion handler. The serializer's forbidden string-prefix
+check follows the separate WITH_ASSERT guard. These distinct policies are retained.
+
+The four original FixSCCEncoded/Negative and ReplaceParam positive/negative tests
+remain unchanged and run through the production adapters. Bounded gaps use:
+
+```sh
+python3 tools/encoded-comparison.py
+```
+
+The script extracts the four complete reference functions verbatim from pristine
+pinned files into ignored compilation fixtures, preserving source/function hashes.
+It compiles the same public-API fixture against reference and candidate headers
+and both Rust/portable candidate bodies. Malformed EncodedString cases use the
+existing EndianBufferReader; output uses EndianBufferWriter. No raw-string public
+constructor is added. Four NDEBUG/WITH_ASSERT combinations compare output bytes,
+ordered diagnostic bytes, assertion expressions and status; only libc assertion
+file/function locations are normalized. The corpus includes both old markers,
+malformed UTF-8, permissive quotes, extrema and invalid numerics, suffixes,
+interior/trailing empty records, NUL/RS string payloads, default/cleared strings,
+and replacement bounds. Address/undefined/leak sanitizer runs cover the C++
+fixture/adapters and intercepted allocations, including logger and output-copy
+exceptions that must destroy the Rust owner. The Rust archive itself is not
+sanitizer-instrumented. Evidence resides in `.local/encoded-comparison/` and is
+retained by CI. No generator runtime coverage is claimed for these algorithms.
+Portable bodies and ownership facades remain transitional under #3.
 
 ## UTF-8 codec and byte positions
 
