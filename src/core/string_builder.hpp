@@ -55,14 +55,19 @@ public:
 	void PutIntegerBase(T value, int base)
 	{
 #ifdef WITH_RUST
-		static_assert(std::is_integral_v<T> && !std::is_same_v<T, bool>);
-		static_assert(sizeof(T) <= sizeof(uint64_t));
-		static_assert(sizeof(int) == sizeof(int32_t));
-		bool negative = false;
-		if constexpr (std::is_signed_v<T>) negative = value < 0;
-		auto result = openttd_rust_format_integer(static_cast<uint64_t>(value), negative, base);
-		if (result.length == 0) return;
-		this->PutBuffer({reinterpret_cast<const char *>(result.bytes), result.length});
+		if constexpr (std::is_enum_v<T>) {
+			// std::to_chars accepts unscoped enums through integral promotion too.
+			this->PutIntegerBase(+value, base);
+		} else {
+			static_assert(std::is_integral_v<T> && !std::is_same_v<T, bool>);
+			static_assert(sizeof(T) <= sizeof(uint64_t));
+			static_assert(sizeof(int) == sizeof(int32_t));
+			bool negative = false;
+			if constexpr (std::is_signed_v<T>) negative = value < 0;
+			auto result = openttd_rust_format_integer(static_cast<uint64_t>(value), negative, base);
+			if (result.length == 0) return;
+			this->PutBuffer({reinterpret_cast<const char *>(result.bytes), result.length});
+		}
 #else
 		std::array<char, 32> buf;
 		auto result = std::to_chars(buf.data(), buf.data() + buf.size(), value, base);

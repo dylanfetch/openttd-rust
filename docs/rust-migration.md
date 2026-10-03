@@ -223,7 +223,8 @@ Overflow checks and abort-on-panic remain enabled. Invalid bases are outside the
 same 2..36 precondition as the original `std::to_chars` API.
 
 The adapter covers standard integral types other than bool, up to 64 bits, and
-checks widths at compile time. Real text-format call sites use 32/64-bit values in
+checks widths at compile time. Unscoped enums retain their original integral
+promotion before formatting. Real text-format call sites use 32/64-bit values in
 `strings.cpp`, save repair, and script text encoding. No wider compiler integer
 extension is used there. Strgen uses binary byte/16-bit encoders and UTF-8, but has
 no `PutIntegerBase` call. Settingsgen has no numeric builder call; compiling the
@@ -236,7 +237,7 @@ and full verification exercise the existing interfaces. `tools/compare-integers.
 also compares the existing narrow probe's `--builder` mode against unchanged pinned
 C++ source and both Rust and portable candidate bodies. Its 1,624 formats cover all
 bases, signed/unsigned widths, extrema, zero, and the 32/33-byte boundary. Six alias
-cases and an ordered counting sink preserve byte lengths, order, synchronous calls,
+cases, three unscoped-enum cases, and an ordered counting sink preserve byte lengths, order, synchronous calls,
 zero-length UTF-8 calls, and absent formatting calls. Parser and fatal diagnostic
 comparisons remain intact, as do freshly generated string/settings headers,
 English/French output, and malformed strgen diagnostics. These bounded checks do

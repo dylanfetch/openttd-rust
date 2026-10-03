@@ -136,6 +136,22 @@ static int BuilderMain()
 	std::cout << "char16 "; FormatProbe<char16_t>(UINT16_MAX, 16);
 	std::cout << "char32 "; FormatProbe<char32_t>(UINT32_MAX, 16);
 
+	// Unscoped enums were accepted by std::to_chars through integral promotion.
+	enum SignedEnum : int64_t { NegativeEnum = INT64_MIN };
+	enum UnsignedEnum : uint64_t { MaximumEnum = UINT64_MAX };
+	enum BoolEnum : bool { TrueEnum = true };
+	auto enum_probe = [](std::string_view label, auto value) {
+		RecordingBuilder builder;
+		builder.active = true;
+		builder.PutIntegerBase(value, 36);
+		builder.active = false;
+		std::cout << label << ' ';
+		DumpBuilder(builder);
+	};
+	enum_probe("signed-enum", NegativeEnum);
+	enum_probe("unsigned-enum", MaximumEnum);
+	enum_probe("bool-enum", TrueEnum);
+
 	RecordingBuilder sequence;
 	auto call = [&](auto operation) {
 		++sequence.phase;
