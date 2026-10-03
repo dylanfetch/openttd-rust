@@ -2,12 +2,15 @@
 """Check archive evidence parsing for CMake's actual Makefiles path conventions."""
 
 from pathlib import Path
+import json
 import runpy
 import shlex
 import tempfile
 import unittest
 
-archive_is_linked = runpy.run_path(str(Path(__file__).with_name("rust-build-evidence.py")))["archive_is_linked"]
+evidence = runpy.run_path(str(Path(__file__).with_name("rust-build-evidence.py")))
+archive_is_linked = evidence["archive_is_linked"]
+consumer_assertion_policy = evidence["consumer_assertion_policy"]
 
 
 class LinkEvidenceTests(unittest.TestCase):
@@ -38,6 +41,27 @@ class LinkEvidenceTests(unittest.TestCase):
             self.assertTrue(archive_is_linked(script, archive))
             script.write_text(f"c++ {shlex.quote(str(archive) + '.unrelated')} -o openttd\n")
             self.assertFalse(archive_is_linked(script, archive))
+
+
+class AssertionEvidenceTests(unittest.TestCase):
+    def test_recorded_native_debug_release_roles(self):
+        fixtures = json.loads((Path(__file__).parent / "migration/macos-assertion-flags.json").read_text())
+        for record in fixtures["records"]:
+            with self.subTest(build_type=record["build_type"], consumer=record["consumer"]):
+                consumer_assertion_policy(record["command"], record["consumer"], record["build_type"])
+                bad_flag = " -DNDEBUG" if record["build_type"] == "Debug" else " -DWITH_ASSERT"
+                with self.assertRaises(RuntimeError):
+                    consumer_assertion_policy(record["command"] + bad_flag, record["consumer"], record["build_type"])
+
+    def test_incorrect_role_macros_are_rejected(self):
+        for consumer in ("strgen", "settingsgen"):
+            with self.assertRaises(RuntimeError):
+                consumer_assertion_policy("c++ -DWITH_ASSERT -g", consumer, "Debug")
+        for consumer in ("game", "tests"):
+            with self.assertRaises(RuntimeError):
+                consumer_assertion_policy("c++ -g", consumer, "Debug")
+        with self.assertRaises(RuntimeError):
+            consumer_assertion_policy("c++ -O2", "strgen", "RelWithDebInfo")
 
 
 if __name__ == "__main__":
