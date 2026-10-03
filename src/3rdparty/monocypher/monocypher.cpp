@@ -54,6 +54,8 @@
 #include "monocypher.h"
 #ifdef WITH_RUST
 #include "../../rust/crypto_primitives_ffi.h"
+#include "../../rust/blake2b_ffi.h"
+#include "../../rust/x25519_ffi.h"
 #include <type_traits>
 #endif
 
@@ -83,6 +85,7 @@ typedef uint64_t u64;
 
 static const u8 zero[128] = {0};
 
+#ifndef WITH_RUST
 // returns the smallest positive integer y such that
 // (x + y) % pow_2  == 0
 // Basically, y is the "gap" missing to align x.
@@ -92,6 +95,7 @@ static size_t gap(size_t x, size_t pow_2)
 {
 	return (~x + 1) & (pow_2 - 1);
 }
+#endif
 
 static u32 load24_le(const u8 s[3])
 {
@@ -177,6 +181,10 @@ void crypto_wipe(void *secret, size_t size)
 static void OPENTTD_CRYPTO_CALL RustCryptoWipe(void *p, size_t size) noexcept { crypto_wipe(p, size); }
 static int32_t OPENTTD_CRYPTO_CALL RustCryptoVerify16(const uint8_t *a, const uint8_t *b) noexcept { return crypto_verify16(a, b); }
 static const OpenTTDCryptoLeaves rust_crypto_leaves = {RustCryptoWipe, RustCryptoVerify16};
+static int32_t OPENTTD_CRYPTO_CALL RustX25519Verify32(const uint8_t *a, const uint8_t *b) noexcept { return crypto_verify32(a, b); }
+static const OpenTTDX25519Leaves rust_x25519_leaves = {RustCryptoWipe, RustX25519Verify32};
+static_assert(sizeof(OpenTTDX25519Leaves) == 2 * sizeof(void *) && sizeof(i32) == 4 && sizeof(int) == 4);
+static_assert((-1 >> 1) == -1);
 static_assert(std::is_standard_layout_v<crypto_poly1305_ctx> && std::is_trivially_copyable_v<crypto_poly1305_ctx>);
 static_assert(std::is_standard_layout_v<crypto_aead_ctx> && std::is_trivially_copyable_v<crypto_aead_ctx>);
 static_assert(sizeof(size_t) == sizeof(void *) && sizeof(u32) == 4 && sizeof(u64) == 8);
@@ -530,6 +538,45 @@ void crypto_poly1305(u8     mac[16],  const u8 *message,
 ////////////////
 /// BLAKE2 b ///
 ////////////////
+#ifdef WITH_RUST
+static_assert(std::is_standard_layout_v<crypto_blake2b_ctx> && std::is_trivially_copyable_v<crypto_blake2b_ctx>);
+static_assert(sizeof(OpenTTDBlake2bLayout) == 7 * sizeof(size_t));
+static const OpenTTDBlake2bLayout rust_blake2b_layout = {
+	sizeof(crypto_blake2b_ctx), alignof(crypto_blake2b_ctx), offsetof(crypto_blake2b_ctx, hash),
+	offsetof(crypto_blake2b_ctx, input_offset), offsetof(crypto_blake2b_ctx, input),
+	offsetof(crypto_blake2b_ctx, input_idx), offsetof(crypto_blake2b_ctx, hash_size),
+};
+void crypto_blake2b_keyed_init(crypto_blake2b_ctx *ctx, size_t hash_size,
+                               const u8 *key, size_t key_size)
+{
+	openttd_rust_blake2b_keyed_init(&rust_blake2b_layout, ctx, hash_size, key, key_size);
+}
+void crypto_blake2b_init(crypto_blake2b_ctx *ctx, size_t hash_size)
+{
+	openttd_rust_blake2b_init(&rust_blake2b_layout, ctx, hash_size);
+}
+void crypto_blake2b_update(crypto_blake2b_ctx *ctx,
+                           const u8 *message, size_t message_size)
+{
+	openttd_rust_blake2b_update(&rust_blake2b_layout, ctx, message, message_size);
+}
+void crypto_blake2b_final(crypto_blake2b_ctx *ctx, u8 *hash)
+{
+	openttd_rust_blake2b_final(&rust_crypto_leaves, &rust_blake2b_layout, ctx, hash);
+}
+void crypto_blake2b_keyed(u8 *hash,          size_t hash_size,
+                          const u8 *key,     size_t key_size,
+                          const u8 *message, size_t message_size)
+{
+	crypto_blake2b_ctx ctx; // Start actual caller-layout trivial lifetime.
+	openttd_rust_blake2b_keyed(&rust_crypto_leaves, &rust_blake2b_layout, &ctx, hash, hash_size, key, key_size, message, message_size);
+}
+void crypto_blake2b(u8 *hash, size_t hash_size, const u8 *msg, size_t msg_size)
+{
+	crypto_blake2b_ctx ctx;
+	openttd_rust_blake2b(&rust_crypto_leaves, &rust_blake2b_layout, &ctx, hash, hash_size, msg, msg_size);
+}
+#else
 static const u64 iv[8] = {
 	0x6a09e667f3bcc908, 0xbb67ae8584caa73b,
 	0x3c6ef372fe94f82b, 0xa54ff53a5f1d36f1,
@@ -728,6 +775,8 @@ void crypto_blake2b(u8 *hash, size_t hash_size, const u8 *msg, size_t msg_size)
 {
 	crypto_blake2b_keyed(hash, hash_size, 0, 0, msg, msg_size);
 }
+
+#endif // WITH_RUST
 
 //////////////
 /// Argon2 ///
@@ -1545,6 +1594,12 @@ static void fe_invert(fe out, const fe x)
 }
 
 // trim a scalar for scalar multiplication
+#ifdef WITH_RUST
+void crypto_eddsa_trim_scalar(u8 out[32], const u8 in[32])
+{
+	openttd_rust_x25519_trim(out, in);
+}
+#else
 void crypto_eddsa_trim_scalar(u8 out[32], const u8 in[32])
 {
 	COPY(out, in, 32);
@@ -1552,6 +1607,8 @@ void crypto_eddsa_trim_scalar(u8 out[32], const u8 in[32])
 	out[31] &= 127;
 	out[31] |= 64;
 }
+
+#endif // WITH_RUST
 
 // get bit from scalar at position i
 static int scalar_bit(const u8 s[32], int i)
@@ -1563,6 +1620,22 @@ static int scalar_bit(const u8 s[32], int i)
 ///////////////
 /// X-25519 /// Taken from SUPERCOP's ref10 implementation.
 ///////////////
+#ifdef WITH_RUST
+// Coarse adapter only. Rust owns the complete ladder and required field math;
+// the retained C++ field helpers above still serve Edwards/Elligator families.
+static void scalarmult(u8 q[32], const u8 scalar[32], const u8 p[32], int nb_bits)
+{
+	openttd_rust_x25519_ladder(&rust_x25519_leaves, q, scalar, p, nb_bits);
+}
+void crypto_x25519(u8 raw_shared_secret[32], const u8 your_secret_key[32], const u8 their_public_key[32])
+{
+	openttd_rust_x25519(&rust_x25519_leaves, raw_shared_secret, your_secret_key, their_public_key);
+}
+void crypto_x25519_public_key(u8 public_key[32], const u8 secret_key[32])
+{
+	openttd_rust_x25519_public_key(&rust_x25519_leaves, public_key, secret_key);
+}
+#else
 static void scalarmult(u8 q[32], const u8 scalar[32], const u8 p[32],
                        int nb_bits)
 {
@@ -1639,6 +1712,8 @@ void crypto_x25519_public_key(u8       public_key[32],
 	static const u8 base_point[32] = {9};
 	crypto_x25519(public_key, secret_key, base_point);
 }
+
+#endif // WITH_RUST
 
 ///////////////////////////
 /// Arithmetic modulo L ///

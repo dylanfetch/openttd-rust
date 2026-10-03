@@ -150,15 +150,22 @@ def main():
     env = MIGRATION["environment"]()
     archive = MIGRATION["rust_archive"](ROOT / "build-rust")
     fixture = ROOT / "tools/migration/auth-comparison.cpp"
-    commands, binaries = [], {}
+    commands, binaries, ladder_shims = [], {}, {}
     sources = ("src/network/network_crypto.cpp", "src/network/network_crypto_internal.h",
                "src/network/core/packet.cpp", "src/3rdparty/monocypher/monocypher.cpp",
                "src/3rdparty/monocypher/monocypher.h", "src/string.cpp", "src/core/string_builder.cpp", "src/core/string_inplace.cpp", "src/core/utf8.cpp")
     for label, source in (("reference", REFERENCE), ("candidate", ROOT), ("candidate-cpp", ROOT)):
         binary = OUT / label
+        # Include unchanged actual vendor source and expose only its private
+        # coarse helper. No copied field/ladder oracle or altered vendor body.
+        shim = OUT / f"{label}-ladder.cpp"
+        shim.write_text(f'#include "{source / "src/3rdparty/monocypher/monocypher.cpp"}"\n'
+                        'extern "C" void FixtureLadder(uint8_t *out, const uint8_t *scalar, const uint8_t *point, int32_t bits) { scalarmult(out, scalar, point, bits); }\n')
+        ladder_shims[label] = {"path": str(shim), "sha256": hashlib.sha256(shim.read_bytes()).hexdigest()}
         command = ["g++", "-std=c++20", "-O2", "-DUNIX", "-DFMT_HEADER_ONLY", "-ffunction-sections", "-fdata-sections",
                    "-I", str(source / "src"), str(fixture),
-                   *[str(source / name) for name in sources if name.endswith(".cpp") and name != "src/network/network_crypto.cpp"],
+                   *[str(shim if name == "src/3rdparty/monocypher/monocypher.cpp" else source / name)
+                     for name in sources if name.endswith(".cpp") and name != "src/network/network_crypto.cpp"],
                    "-Wl,--gc-sections", "-o", str(binary)]
         if label == "candidate":
             command.extend(["-DWITH_RUST", str(archive), "-ldl", "-lpthread", "-lm"])
@@ -230,17 +237,20 @@ def main():
                   "record_counts": dict(Counter(row.split()[0].decode() for row in primitive_outputs["reference"].splitlines())),
                   "output_sha256": {label: hashlib.sha256(output).hexdigest() for label, output in primitive_outputs.items()},
                   "all_context_bytes_prefilled": True, "cpp_boundary_sanitizers_passed": True, "passed": True}
+    primitives["blake2b_records"] = sum(count for kind, count in primitives["record_counts"].items() if kind.startswith("blake-"))
+    primitives["x25519_records"] = sum(count for kind, count in primitives["record_counts"].items() if kind.startswith("x25519-"))
+    primitives["prior_cipher_mac_records"] = primitives["records"] - primitives["blake2b_records"] - primitives["x25519_records"]
     MIGRATION["ensure_reference"]()
     report = {"baseline": MIGRATION["BASELINE"], "candidate_commit": MIGRATION["git"]("rev-parse", "HEAD"),
               "candidate_status": MIGRATION["git"]("status", "--porcelain"), "rust_archive": str(archive),
-              "commands": commands, "scenario_count": len(scenarios), "compared_endpoint_records": comparisons, "primitives": primitives,
+              "commands": commands, "ladder_shims": ladder_shims, "scenario_count": len(scenarios), "compared_endpoint_records": comparisons, "primitives": primitives,
               "original_record_counts": dict(counts), "transcript_sha256": hashes,
               "reference_source_sha256": {name: hashlib.sha256((REFERENCE / name).read_bytes()).hexdigest() for name in sources},
               "fixture_sha256": hashlib.sha256(fixture.read_bytes()).hexdigest(),
               "sanitizer_scope": {"cpp_vendor_packet_fixture_and_facade": True, "rust_accesses_instrumented": False, "rust_allocation_leaks_checked": True, "passed": True},
               "limits": ["Prescribed entropy verifies call order/bytes, not operating-system RNG quality",
                          "Nonempty-short enable nonce is undefined in pinned Packet and excluded (#41)",
-                         "Observed outer session/shared/hash wipes are supplemented by prefilled Poly1305 final context checks; compiler spills are not fully observable",
+                         "Observed outer session/shared/hash wipes are supplemented by prefilled Poly1305/BLAKE2b final context checks; compiler spills are not fully observable",
                          "Protocol primitives are real bundled Monocypher, not mock crypto"], "passed": True}
     (OUT / "report.json").write_text(json.dumps(report, indent=2) + "\n")
     print(f"Authentication comparisons passed: {comparisons} mixed endpoint records + {primitives['records']} bounded primitive records; {OUT / 'report.json'}")
