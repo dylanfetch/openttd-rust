@@ -86,6 +86,71 @@ failure, arbitrary recursion depths, network simulation, and complete script/gam
 equivalence remain outside this evidence. Native platform builds exercise the
 unchanged game tests through their actual Rust/C++ ABI.
 
+### Nested widget descriptor parser
+
+With Rust enabled, `MakeNWidgets` and `MakeWindowNWidgetTree` use a widget-specific
+pull parser. Rust owns the descriptor cursor, contiguous attribute traversal,
+declared/produced container decisions, recursive tree control, end-marker handling,
+complete-consumption policy, and first/root/body/shade composition. C++ retains
+the unchanged single-part factory, attribute operations, real widget classes,
+RTTI observations, `unique_ptr` owners, Add/GetWidgetOfType operations and generator
+callbacks. Each typed operation executes after the Rust call returns; generators
+may safely invoke an independent nested parser. Portable builds retain the original
+recursive control bodies. The constexpr descriptor builders and public signatures
+remain C++.
+
+The scalar ABI carries unsigned 64-bit descriptor offsets and stable owner slots,
+raw uint8 widget tags and capability observations. No C++ union, virtual object,
+RTTI layout, function pointer or owner enters Rust. Native valid span/iterator
+domains apply; no descriptor pointer survives completion. Enum widths, attribute
+range markers, exact container tags and action field offsets are asserted in C++.
+Push-button bits are not masked when classifying containers. A function-produced
+subtree is complete and never acquires following descriptor nodes as children.
+
+EOF inside a declared container remains accepted. Null function results retain
+their original unconsumed cursor and end-marker assertion; release behavior is
+preserved only for originally defined cases. Ordinary assertions remain separate
+from the `WITH_ASSERT`-only trailing-parts exception. Window construction clears
+the shade output on entry, recognizes actual horizontal subclasses, queries
+caption then shade only when there is a remaining body, and writes the new shade
+pointer before constructing that body. The inserted stacked wrapper retains
+INVALID_WIDGET and its original vertical body container.
+
+The initial `unique_ptr&&` remains a C++ reference until successful return.
+Constructor, attribute, generator and Add exceptions retain already-committed
+children in a caller-supplied container. Stable C++ slots hold unattached objects
+and typed temporaries; RAII destroys them in reverse construction order without
+executing pending parser actions. The shade output is not reset on an exception
+and may be unusable after failure, as originally. Rust owns only control allocations
+and its matching destroy function; exceptions never unwind through a Rust frame.
+Panic and Rust allocation exhaustion abort. Additional control/slot allocations
+change resource-exhaustion timing; identical failure timing for arbitrary allocation
+positions is not claimed.
+
+All four unchanged `test_window_desc.cpp` bodies remain primary evidence, including
+constructing/destroying every registered WindowDesc through the production parser.
+The source inventory has 156 static WindowDesc declarations and 34 NWidgetFunction
+callsites; these counts do not establish platform registration or identical shape.
+`python3 tools/widget-parser-comparison.py` records the actual native registered
+count (163 in the recorded native build) and compares a small semantic/ownership
+fixture against unchanged pinned
+parser bodies with the same real construction primitives and MockEnvironment.
+It inspects type/order/index, selected explicit attributes, shade membership,
+partial caller ownership, callback/cleanup order and exception messages. Cases
+cover nested background attributes, shade body/no-body, function-produced and
+reentrant subtrees, permissive EOF, trailing end markers, throwing attributes and
+generators, and shade output timing. Null-generator failures run separately under
+custom assertions, standard assertions and release policy.
+
+This production-object fixture currently runs on native Linux. It varies assertion
+policy in widget.cpp/oracle/fixture; the other real production objects retain their
+native build flags. Fatal probes compare termination category and callback entry,
+not changed assertion expression/source-location text. Its background shapes use
+the unchanged default vertical child. Rendering, layout, events, complete widget
+ownership migration, arbitrary malformed descriptors, all allocation failures and
+full GUI equivalence remain outside this evidence. Existing generator/comparison
+checks remain required; the shared Rust archive imports no widget-library callbacks.
+
 ## Build and verification
 
 The current verification setup targets native Linux and needs a C++20 compiler,

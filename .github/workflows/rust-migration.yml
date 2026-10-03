@@ -110,6 +110,8 @@ jobs:
         run: python3 tools/admin-conversion-comparison.py
       - name: Compare ScriptList owner and real-VM gaps with pinned original
         run: python3 tools/script-list-comparison.py
+      - name: Compare widget parser shape and ownership with pinned original
+        run: python3 tools/widget-parser-comparison.py
       - name: Save validated protected-branch compilation artifacts
         if: success() && env.MIGRATION_CCACHE == 'true' && github.ref == 'refs/heads/rust-migration' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && steps.compiler-cache-restore.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
@@ -136,4 +138,5 @@ jobs:
             .local/auth-comparison/
             .local/admin-conversion-comparison/
             .local/script-list-comparison/
+            .local/widget-parser-comparison/
           include-hidden-files: true
