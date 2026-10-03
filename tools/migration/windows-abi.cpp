@@ -414,7 +414,7 @@ static void X25519()
 	CHECK(x25519_verifies == 4 && x25519_wipes == 28 && x25519_last_wipe == 40 && x25519_wipes_zero);
 	openttd_rust_x25519_ladder(&leaves, full_result.data(), secret.data(), point.data(), 256);
 	CHECK(short_result != full_result && x25519_verifies == 8 && x25519_wipes == 56 && x25519_last_wipe == 40 && x25519_wipes_zero);
-	std::printf("x25519 four exports, cdecl wipe/verify32, physical wipe sizes/order counts, forward trim and 255/256 high-bit distinction passed\n");
+	std::printf("x25519 four exports, cdecl wipe/verify32, physical wipe counts/final sizes, forward trim and 255/256 high-bit distinction passed\n");
 }
 
 static void StationCargo()
