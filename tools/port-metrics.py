@@ -7,8 +7,8 @@ blank lines included):
   rust     lines added under rust/
   tooling  lines added under tools/
   glue     lines added under src/ that are compiled when WITH_RUST is defined
-  retired  net increase in src/ lines compiled only without WITH_RUST (the
-           original C++ kept as the portable fallback), plus deleted src/ files
+  retired  src/ lines the candidate compiled at the base and no longer
+           compiles: removed, or now only in the portable (no WITH_RUST) build
 
 Both guard forms are understood: `#ifdef WITH_RUST ... #else <original>
 #endif` and `#ifndef WITH_RUST <original> #endif` (and the `defined()` forms).
@@ -73,15 +73,29 @@ def show(rev, path):
     return result.stdout if result.returncode == 0 else ""
 
 
-def added_lines(base, head, old, new):
-    """Return 1-based line numbers of `new` at head not present in `old` at base."""
-    numbers = []
+def hunks(base, head, old, new):
+    """Yield (old start, old count, new start, new count) of a zero-context diff."""
     for line in git("diff", "-U0", "-M", base, head, "--", *dict.fromkeys((old, new))).splitlines():
-        hunk = re.match(r"^@@ -\S+ \+(\d+)(?:,(\d+))? @@", line)
+        hunk = re.match(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", line)
         if hunk:
-            start, count = int(hunk.group(1)), int(hunk.group(2) or "1")
-            numbers.extend(range(start, start + count))
-    return numbers
+            yield tuple(int(value) if value is not None else 1 for value in hunk.groups())
+
+
+def added_lines(changes):
+    """Return 1-based new-side line numbers added by the hunks."""
+    return [n for _, _, start, count in changes for n in range(start, start + count)]
+
+
+def surviving(changes, length):
+    """Map each unchanged old-side line number to its new-side line number."""
+    removed, shift, mapping = set(), [], {}
+    for old_start, old_count, new_start, new_count in changes:
+        removed.update(range(old_start, old_start + old_count))
+        shift.append((old_start + old_count - 1 if old_count else old_start, new_count - old_count))
+    for n in range(1, length + 1):
+        if n not in removed:
+            mapping[n] = n + sum(delta for end, delta in shift if end < n)
+    return mapping
 
 
 def changes(base, head):
@@ -101,27 +115,24 @@ def changes(base, head):
 def metrics(base, head="HEAD"):
     result = {"rust": 0, "tooling": 0, "glue": 0, "retired": 0}
     sources = (".cpp", ".h", ".hpp", ".c", ".cc", ".mm")
-    retired_delta = 0
     for status, old, new in changes(base, head):
         before, after = ("" if status == "A" else show(base, old)), ("" if status == "D" else show(head, new))
+        diff = [] if status == "D" else list(hunks(base, head, old, new))
         # Lines of `new` that do not come from `old` (all of them for an added file).
-        numbers = [] if status == "D" else added_lines(base, head, old, new)
-        if new.startswith(("rust/", "tools/")):
+        numbers = added_lines(diff)
+        if new.startswith(("rust/", "tools/")) and status != "D":
             result["rust" if new.startswith("rust/") else "tooling"] += len(numbers)
         if not (old.startswith("src/") or new.startswith("src/")) or not new.endswith(sources):
             continue
-        if status == "D":
-            # Deleting original C++ retires it; deleting earlier glue does not.
-            retired_delta += sum(1 for tag in classify(before) if tag != "rust")
-            continue
         head_tags, base_tags = classify(after), classify(before)
-        retired_delta += head_tags.count("cpp") - base_tags.count("cpp")
+        kept = {} if status == "D" else surviving(diff, len(base_tags))
+        # Original lines compiled with WITH_RUST that are now removed or C++-only.
+        result["retired"] += sum(1 for n, tag in enumerate(base_tags, 1)
+                                 if tag == "common" and (n not in kept or head_tags[kept[n] - 1] == "cpp"))
+        if status == "D":
+            continue
         result["glue"] += sum(1 for n in numbers if n <= len(head_tags) and head_tags[n - 1] != "cpp")
-    result["retired"] = max(0, retired_delta)
     return result
-
-
-
 
 
 def main():

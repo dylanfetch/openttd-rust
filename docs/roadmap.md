@@ -130,8 +130,8 @@ layout. Platform or toolchain expansion. Deferred behavior improvements stay in
 
 Every port PR pastes the output of `python3 tools/port-metrics.py`: Rust added,
 tooling added, C++ glue added (new `src/` lines compiled with `WITH_RUST`), and
-C++ retired (net new `src/` lines compiled only without `WITH_RUST`, under
-either guard form, plus deleted files). A healthy port retires more C++ than it
+C++ retired (original `src/` lines the candidate no longer compiles: deleted,
+or moved under either `WITH_RUST` guard form into the portable fallback). A healthy port retires more C++ than it
 adds as glue plus tooling; ports that fail this state a reason in the PR. For
 scale, the history port (#32) measured Rust 433, tooling 379, glue 203,
 retired 64: the kernel-extraction pattern phase 2 must avoid.

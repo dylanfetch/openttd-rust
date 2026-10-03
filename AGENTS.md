@@ -35,14 +35,14 @@ fork; the remaining upstream documentation explains behavior and architecture.
   casts; Rust overflow checks (enabled in release, with `panic = "abort"`) may
   only back up operations that cannot overflow in the original. This applies to
   new work; known divergences in existing ports are tracked as issues (#75).
-- Evidence for game-logic ports is the semantic simulation harness
-  (`python3 tools/migration.py simulate`, #72) plus the existing tests; a new
-  game-logic port integrates only after the harness exists and its scenarios
-  exercise the component. Fidelity fixes to existing ports (such as #75) are
-  not new ports and do not wait for it. Extend the harness's scenarios rather than writing a
+- Evidence for game-logic ports is the semantic simulation harness (`python3
+  tools/migration.py simulate`, #72) plus the existing tests; a new game-logic
+  port integrates only after the harness exists and its scenarios exercise the
+  component. Fidelity fixes to existing ports (such as #75) are not new ports
+  and do not wait for it. Extend the harness's scenarios rather than writing a
   new per-component comparison tool. Add a narrow comparison against unchanged
-  reference bodies only for a concrete gap the harness cannot reach, and say
-  in the PR which gap.
+  reference bodies only for a concrete gap the harness cannot reach, and say in
+  the PR which gap.
 - Keep the pinned reference worktree unchanged. Never change candidate behavior
   and expected results together merely to make checks pass. Existing test success
   establishes covered behavior, not complete game equivalence.
