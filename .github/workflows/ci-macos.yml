@@ -111,6 +111,10 @@ jobs:
         python3 -c 'import json; tests=json.load(open("ctest-inventory.json"))["tests"]; assert tests, "Empty test inventory"; print(f"Discovered {len(tests)} tests")'
         ctest -j $(sysctl -n hw.logicalcpu) --timeout 120 --output-junit ctest.xml
 
+    - name: Compare accepted wide math templates with pinned C++
+      if: inputs.rust
+      run: python3 tools/math-extension-comparison.py --build build --output .local/macos-evidence/math-extensions
+
     - name: Reject unsupported Rust configurations
       if: inputs.rust
       run: |

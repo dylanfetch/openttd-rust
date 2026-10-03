@@ -13,6 +13,7 @@ mod consumer;
 mod history;
 mod integer;
 mod landscape;
+mod math;
 
 pub use alternating::{AlternatingState, AlternatingStep};
 pub use consumer::{
@@ -588,6 +589,47 @@ pub unsafe extern "C" fn openttd_rust_encoded_destroy(owner: *mut std::ffi::c_vo
         // SAFETY: Ownership is returned exactly once to the allocating Rust Box.
         drop(unsafe { Box::from_raw(owner.cast::<encoded::Output>()) });
     }
+}
+
+/// Rounded square root; scalar-only ABI, no ownership or pointers. Panic aborts.
+#[allow(unsafe_code)] // Only the export symbol attribute.
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_int_sqrt(value: u32) -> u32 {
+    math::int_sqrt(value)
+}
+
+/// Saturate integer bits using audited widths/signs from `math_ffi.h`.
+/// No allocations, pointers, state, or ownership; panic aborts, never unwinds.
+#[allow(unsafe_code)] // Only the export symbol attribute.
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_clamp_to(
+    value: u64,
+    from_width: u8,
+    from_signed: u8,
+    to_width: u8,
+    to_signed: u8,
+) -> u64 {
+    math::clamp_to(
+        value,
+        from_width,
+        from_signed != 0,
+        to_width,
+        to_signed != 0,
+    )
+}
+
+/// Soft clamp integer bits, preserving narrow promotions and unsigned wrapping.
+/// No allocations, pointers, state, or ownership; panic aborts, never unwinds.
+#[allow(unsafe_code)] // Only the export symbol attribute.
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_soft_clamp(
+    value: u64,
+    min: u64,
+    max: u64,
+    width: u8,
+    is_signed: u8,
+) -> u64 {
+    math::soft_clamp(value, min, max, width, is_signed != 0)
 }
 
 pub use history::{Descriptor as HistoryDescriptor, Step as HistoryStep};
