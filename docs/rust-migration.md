@@ -27,7 +27,7 @@ The premature Rust integer-square-root implementation was removed before compone
 selection. The first selected replacement is `GetPartialPixelZ`, the scalar
 landscape height kernel, implemented in `rust/openttd-kernels` behind its original
 C++ interface. The shared crate also implements StringConsumer's integer parsing
-and lexical skipping and alternating-iterator traversal. Native string/settings
+and lexical skipping, UTF-8 codec/iteration, and alternating-iterator traversal. Native string/settings
 generators link the shared archive. These replacements do not complete their
 containing subsystems. Preserve the complete game,
 including networking, saves, NewGRF mods, graphics, and shared random-number behavior.
@@ -217,6 +217,56 @@ screenshots and compressed-save byte equality are insufficient.
 Integrate verified replacements incrementally while retaining the playable game and
 reference checks. Report validation limits explicitly. Improvements to original game
 behavior remain deferred issues rather than migration changes.
+
+## UTF-8 codec and byte positions
+
+With `OPTION_RUST=ON`, `EncodeUtf8`, `DecodeUtf8`, `IsUtf8Part`, forward/backward
+iterator stepping, and `GetIterAtByte` normalization call the Rust byte algorithms.
+The C++ view owns only its borrowed `std::string_view` and iterator facade; pair
+adapters, comparison assertions, postfix copying, and invalid-data `?` dereference
+remain there. Native generators use the same archive and codec through issue #5's
+shared target. `OPTION_RUST=OFF` retains the original portable algorithms.
+
+This codec deliberately accepts surrogate values, rejects overlong and out-of-range
+first sequences, ignores malformed trailing data after a valid first sequence, and
+zeros all unused encoding bytes. View movement scans continuation runs rather than
+advancing by decoded lengths. The unchanged `StringConsumer` read/skip methods still
+advance one byte on decode failure; `TryReadUtf8` still leaves its position unchanged.
+
+`src/rust/utf8_ffi.h` uses 32-bit codepoints, byte pointers and `size_t` lengths/offsets,
+and returns `repr(C)` data by value. There are no allocations, output-pointer aliases,
+ownership transfers or retained pointers. Nonempty spans must be readable initialized
+bytes in one allocation, immutable for the call, and representable by `ptrdiff_t`;
+empty/null views bypass raw-slice construction. Read-only overlapping spans are valid.
+The C++ facade retains the original position assertions. Valid positions bound each
+increment/decrement; codepoint-to-byte conversions are explicitly masked or bounded.
+Both Rust profiles check overflow and abort on panic; the C ABI never unwinds into C++.
+
+The three unchanged upstream UTF-8 view tests and existing consumer/builder tests
+exercise the production adapters. A bounded comparison compiles the unchanged pinned
+reference codec and consumer alongside the same fixture used for the candidate:
+
+```sh
+python3 tools/utf8-comparison.py
+```
+
+It records commands, reference source hashes and exact outputs under
+`.local/utf8-comparison/`, comparing assertion-enabled and `NDEBUG` builds. The corpus
+covers encoding boundaries, surrogates, all four buffer bytes, invalid and truncated
+prefixes, invalid continuation positions, valid prefixes with invalid trailing bytes,
+all byte classifications, every position in selected malformed runs, embedded NUL,
+empty/null views, and consumer-versus-view movement. Under `NDEBUG` it also compares
+the original `offset >= size` end branch, including `SIZE_MAX`. The standalone adapter
+aborts if its bounded consumer corpus reaches error logging; game logging behavior is
+outside this comparison. These checks establish this bounded byte behavior, not full
+Unicode/text rendering or whole-game equivalence.
+
+The C++ algorithm fallback remains transitional until Rust linkage and the existing
+checks pass on maintained target platforms. Removing it and making Rust the normal
+production path is a distinct remaining obligation under #3. As consumer groups move
+to Rust, they should use the internal byte algorithms directly; after the last consumer
+moves, remove the C++ view/pair facade and files. Neither this slice nor its reference
+comparison completes the entire string subsystem.
 
 ## Team process and engineering standards
 
