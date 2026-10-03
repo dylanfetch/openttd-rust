@@ -10,6 +10,7 @@
 mod alternating;
 mod byte_strings;
 mod consumer;
+mod history;
 mod integer;
 mod landscape;
 
@@ -587,4 +588,105 @@ pub unsafe extern "C" fn openttd_rust_encoded_destroy(owner: *mut std::ffi::c_vo
         // SAFETY: Ownership is returned exactly once to the allocating Rust Box.
         drop(unsafe { Box::from_raw(owner.cast::<encoded::Output>()) });
     }
+}
+
+pub use history::{Descriptor as HistoryDescriptor, Step as HistoryStep};
+
+/// Allocate a scalar history engine; no typed history pointer enters Rust.
+///
+/// Mode is 0 update, 1 first-child validity, 2 rotation, 3 query. Descriptor
+/// identities are C++ uintptr values, interpreted only by C++. All identified
+/// descriptors must remain live and immutable until destroy, forming an acyclic
+/// chain with the original valid-index/divisor/bit-shift preconditions. Age uses
+/// native 32-bit unsigned arithmetic; month is explicit for update/rotation and
+/// current global phase for validity. Query phase is supplied after C++ constructs
+/// each scratch array. Rust owns its scalar frame allocations; OOM/panic aborts.
+/// The handle is uniquely owned and returned to Rust exactly once for destruction.
+#[allow(unsafe_code)] // Export attribute only; the descriptor token is never dereferenced.
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_history_create(
+    mode: u8,
+    token: usize,
+    mask: u64,
+    age: u32,
+    month: u32,
+) -> *mut std::ffi::c_void {
+    Box::into_raw(Box::new(history::Engine::new(
+        mode, token, mask, age, month,
+    )))
+    .cast()
+}
+
+#[allow(unsafe_code)] // One exclusive handle borrow, never kept across an extern call.
+unsafe fn history_engine<'a>(handle: *mut std::ffi::c_void) -> &'a mut history::Engine {
+    // SAFETY: Each caller requires a live uniquely accessible Rust engine handle.
+    unsafe { &mut *handle.cast::<history::Engine>() }
+}
+
+/// Return the next structural instruction; execute all typed work after returning.
+///
+/// # Safety
+/// Handle is live, nonnull, created by `openttd_rust_history_create`, and exclusively accessible
+/// during the call. Follow the Describe/phase/completion protocol; no C++ callback
+/// occurs in Rust, and no history or scratch allocation is borrowed. No concurrent
+/// handle use or descriptor mutation; panic aborts and the C ABI never unwinds.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_history_next(handle: *mut std::ffi::c_void) -> HistoryStep {
+    // SAFETY: Caller grants this engine's exclusive borrow until return.
+    unsafe { history_engine(handle) }.next()
+}
+
+/// Supply immutable scalar fields for the most recent Describe instruction.
+///
+/// # Safety
+/// The handle contract is the same as `openttd_rust_history_next`. Descriptor identity/fields
+/// come from the requested live C++ object, child token from its actual pointer;
+/// no C++ layout is reinterpreted by Rust. Both descriptor objects remain live.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_history_describe(
+    handle: *mut std::ffi::c_void,
+    descriptor: HistoryDescriptor,
+) {
+    // SAFETY: The caller gives unique access to the waiting engine.
+    unsafe { history_engine(handle) }.describe(descriptor);
+}
+
+/// Supply the live global query phase after constructing every typed scratch element.
+///
+/// # Safety
+/// The handle contract is the same as `openttd_rust_history_next`. Call only immediately after
+/// a `PrepareScratch` instruction and before requesting its children.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_history_phase(handle: *mut std::ffi::c_void, month: u32) {
+    // SAFETY: The caller gives unique access to the waiting query engine.
+    unsafe { history_engine(handle) }.phase(month);
+}
+
+/// Finish one typed leaf/reduction assignment and return its OR validity.
+///
+/// # Safety
+/// The handle contract is the same as `openttd_rust_history_next`. Call only after successfully
+/// executing Leaf or `QueryReduce`; C++ destroys its scratch scope before any later
+/// typed operation or phase read. On a typed exception destroy the owner instead.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_history_complete(handle: *mut std::ffi::c_void) -> u8 {
+    // SAFETY: The caller gives unique access after the typed assignment completes.
+    u8::from(unsafe { history_engine(handle) }.complete_query())
+}
+
+/// Destroy scalar Rust storage, including on C++ typed-operation exceptions.
+///
+/// # Safety
+/// Handle is live/non-null, created by `openttd_rust_history_create`, and destroyed exactly once
+/// with no active access. C++ never deletes this allocation; no typed storage or
+/// descriptor object is freed. Panic aborts and this function never unwinds.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_history_destroy(handle: *mut std::ffi::c_void) {
+    // SAFETY: The uniquely owned handle returns its allocation to Rust exactly once.
+    drop(unsafe { Box::from_raw(handle.cast::<history::Engine>()) });
 }

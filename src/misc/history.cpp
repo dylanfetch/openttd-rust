@@ -24,6 +24,9 @@
  */
 void UpdateValidHistory(ValidHistoryMask &valid_history, const HistoryRange &hr, uint cur_month)
 {
+#ifdef WITH_RUST
+	valid_history = RustHistory::Scalar(0, hr, valid_history, 0, cur_month);
+#else
 	/* Update for subdivisions first. */
 	if (hr.hr != nullptr) UpdateValidHistory(valid_history, *hr.hr, cur_month);
 
@@ -35,6 +38,7 @@ void UpdateValidHistory(ValidHistoryMask &valid_history, const HistoryRange &hr,
 	if (hr.division != 1 && !HasBit(valid_history, hr.first - hr.division)) return;
 
 	SB(valid_history, hr.first, hr.records, GB(valid_history, hr.first, hr.records) << 1ULL | 1ULL);
+#endif
 }
 
 /**
@@ -46,6 +50,9 @@ void UpdateValidHistory(ValidHistoryMask &valid_history, const HistoryRange &hr,
  */
 bool IsValidHistory(ValidHistoryMask valid_history, const HistoryRange &hr, uint age)
 {
+#ifdef WITH_RUST
+	return RustHistory::Scalar(1, hr, valid_history, age, TimerGameEconomy::month) != 0;
+#else
 	if (hr.hr == nullptr) {
 		if (age < hr.periods) {
 			uint slot = hr.first + age;
@@ -62,4 +69,5 @@ bool IsValidHistory(ValidHistoryMask valid_history, const HistoryRange &hr, uint
 		}
 	}
 	return false;
+#endif
 }
