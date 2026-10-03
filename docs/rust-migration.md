@@ -1267,7 +1267,19 @@ that behavior; no stronger compiler-copy/spill erasure is claimed.
 
 Authentication KDF, UID RNG/time sampling, file read/signature policy, Argon2,
 EdDSA and other vendor algorithms remain their unchanged callers. Existing five
-network tests and auth1800/primitive484 corpus are primary evidence; bounded hash
+network tests, 1,800 authentication records and 484 cipher/MAC primitive records are primary evidence; bounded hash
 coverage, inherited checks and supported-platform evidence are recorded in the
 component PR. This replacement does not certify cryptographic security or
 complete Monocypher/network/game equivalence.
+
+`python3 tools/auth-comparison.py` extends the existing direct primitive mode
+with bounded hash cases. Its unchanged pinned vendor binary remains the oracle,
+including digest sizes 0/65, keys 65/128, word/block/file-sized partitions,
+initialized context state, independent copies, low-counter carry, final wiping,
+null zero-length output, equal/partial overlap and unchanged deterministic
+Argon2/EdDSA callers. Earlier cipher/MAC records remain an unchanged prefix.
+C++ boundary sanitizers do not instrument Rust accesses. The native ABI audit
+checks descriptor ID 22 and executes all six public functions with actual native
+contexts, including Windows x86 size/alignment, high counter and wipe behavior.
+Optimized-call and fresh vendor-free generator linkage evidence is retained in
+the component PR; final supported-platform CI remains an integration gate.

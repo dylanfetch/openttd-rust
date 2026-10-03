@@ -164,6 +164,147 @@ static void PrimitiveInit(crypto_aead_ctx &ctx, unsigned variant, const uint8_t 
 	if (variant == 1) crypto_aead_init_djb(&ctx, key, nonce);
 	if (variant == 2) crypto_aead_init_ietf(&ctx, key, nonce);
 }
+/* Bounded BLAKE2b gaps. Source-defined sizes 0/65 and keys 65/128 are
+ * reproduction probes, not recommended cryptographic parameters. */
+static void BlakePrimitives()
+{
+	std::cout << "blake-layout " << sizeof(crypto_blake2b_ctx) << ' ' << alignof(crypto_blake2b_ctx)
+			<< ' ' << offsetof(crypto_blake2b_ctx, hash) << ' ' << offsetof(crypto_blake2b_ctx, input_offset)
+			<< ' ' << offsetof(crypto_blake2b_ctx, input) << ' ' << offsetof(crypto_blake2b_ctx, input_idx)
+			<< ' ' << offsetof(crypto_blake2b_ctx, hash_size) << '\n';
+	struct HashCase { size_t digest, key, message; };
+	std::vector<HashCase> cases;
+	const std::array<size_t, 10> sizes{0, 1, 7, 8, 9, 16, 32, 63, 64, 65};
+	const std::array<size_t, 6> keys{0, 1, 32, 64, 65, 128};
+	const std::array<size_t, 13> messages{0, 1, 7, 8, 9, 127, 128, 129, 255, 256, 257, 1024, 1041};
+	for (size_t i = 0; i < messages.size(); ++i) cases.push_back({sizes[i % sizes.size()], keys[i % keys.size()], messages[i]});
+	for (size_t size : sizes) cases.push_back({size, 32, 129});
+	for (size_t size : keys) cases.push_back({64, size, 128});
+	for (size_t case_id = 0; case_id < cases.size(); ++case_id) {
+		const auto [digest, key_size, length] = cases[case_id];
+		auto key = PrimitiveBytes(key_size, 17), message = PrimitiveBytes(length, 53);
+		std::array<uint8_t, 80> expected;
+		expected.fill(0xA5);
+		crypto_blake2b_keyed(expected.data() + 8, digest, key_size ? key.data() : nullptr, key_size, length ? message.data() : nullptr, length);
+		PrimitiveRequire(std::all_of(expected.begin(), expected.begin() + 8, [](uint8_t x) { return x == 0xA5; }));
+		PrimitiveRequire(std::all_of(expected.begin() + 8 + std::min(digest, size_t{64}), expected.end(), [](uint8_t x) { return x == 0xA5; }));
+		std::cout << "blake-oneshot " << case_id << ' ' << digest << ' ' << key_size << ' ' << length << ' ' << Hex(expected) << '\n';
+		if (!key_size) {
+			std::array<uint8_t, 80> direct; direct.fill(0xA5);
+			crypto_blake2b(direct.data() + 8, digest, length ? message.data() : nullptr, length);
+			PrimitiveRequire(direct == expected);
+			std::cout << "blake-unkeyed " << case_id << ' ' << Hex(direct) << '\n';
+		}
+		// Word and block partitions, plus real 1024-byte file chunk shapes.
+		for (size_t boundary : {size_t{7}, size_t{8}, size_t{9}, size_t{127}, size_t{128}, size_t{1024}}) {
+			crypto_blake2b_ctx ctx;
+			std::fill_n(reinterpret_cast<uint8_t *>(&ctx), sizeof(ctx), 0xA5);
+			if (key_size) crypto_blake2b_keyed_init(&ctx, digest, key.data(), key_size);
+			else crypto_blake2b_init(&ctx, digest);
+			std::cout << "blake-init " << case_id << ' ' << boundary << ' ' << ContextBytes(ctx) << '\n';
+			crypto_blake2b_update(&ctx, nullptr, 0);
+			const auto split = std::min(boundary, length);
+			crypto_blake2b_update(&ctx, length ? message.data() : nullptr, split);
+			std::cout << "blake-update " << case_id << ' ' << boundary << ' ' << ContextBytes(ctx) << '\n';
+			crypto_blake2b_update(&ctx, nullptr, 0);
+			crypto_blake2b_update(&ctx, length ? message.data() + split : nullptr, length - split);
+			crypto_blake2b_update(&ctx, nullptr, 0);
+			std::array<uint8_t, 80> result; result.fill(0xA5);
+			crypto_blake2b_final(&ctx, result.data() + 8);
+			PrimitiveRequire(result == expected && std::ranges::all_of(ContextBytes(ctx), [](char c) { return c == '0'; }));
+			std::cout << "blake-final " << case_id << ' ' << boundary << ' ' << Hex(result) << ' ' << ContextBytes(ctx) << '\n';
+		}
+	}
+	// Defined zero-output finalization: a null output is never dereferenced.
+	{
+		auto message = PrimitiveBytes(129, 19), key = PrimitiveBytes(32, 23);
+		crypto_blake2b_ctx ctx;
+		std::fill_n(reinterpret_cast<uint8_t *>(&ctx), sizeof(ctx), 0xA5);
+		crypto_blake2b_init(&ctx, 0); crypto_blake2b_update(&ctx, message.data(), message.size());
+		crypto_blake2b_final(&ctx, nullptr);
+		PrimitiveRequire(std::ranges::all_of(ContextBytes(ctx), [](char c) { return c == '0'; }));
+		crypto_blake2b(nullptr, 0, message.data(), message.size());
+		crypto_blake2b_keyed(nullptr, 0, key.data(), key.size(), message.data(), message.size());
+		std::cout << "blake-null-final " << ContextBytes(ctx) << '\n';
+	}
+	// Snapshot fields before divergent continuations; no incidental uninitialized padding.
+	{
+		auto message = PrimitiveBytes(129, 67), key = PrimitiveBytes(32, 13);
+		crypto_blake2b_ctx left;
+		std::fill_n(reinterpret_cast<uint8_t *>(&left), sizeof(left), 0xA5);
+		crypto_blake2b_keyed_init(&left, 32, key.data(), key.size());
+		crypto_blake2b_update(&left, message.data(), 127);
+		auto right = left;
+		crypto_blake2b_update(&left, message.data() + 127, 1);
+		crypto_blake2b_update(&right, message.data() + 127, 2);
+		std::cout << "blake-copy-state " << ContextBytes(left) << ' ' << ContextBytes(right) << '\n';
+		std::array<uint8_t, 32> a, b, expected;
+		crypto_blake2b_final(&left, a.data()); crypto_blake2b_final(&right, b.data());
+		crypto_blake2b_keyed(expected.data(), 32, key.data(), key.size(), message.data(), 128); PrimitiveRequire(a == expected);
+		crypto_blake2b_keyed(expected.data(), 32, key.data(), key.size(), message.data(), 129); PrimitiveRequire(b == expected && a != b);
+		std::cout << "blake-copy-final " << Hex(a) << ' ' << Hex(b) << ' ' << ContextBytes(left) << ' ' << ContextBytes(right) << '\n';
+	}
+	{
+		auto message = PrimitiveBytes(129, 89);
+		crypto_blake2b_ctx ctx;
+		std::fill_n(reinterpret_cast<uint8_t *>(&ctx), sizeof(ctx), 0xA5);
+		crypto_blake2b_init(&ctx, 64); crypto_blake2b_update(&ctx, message.data(), 128);
+		ctx.input_offset[0] = UINT64_MAX - 127; ctx.input_offset[1] = UINT64_C(0x1122334455667788);
+		crypto_blake2b_update(&ctx, message.data() + 128, 1);
+		PrimitiveRequire(ctx.input_offset[0] == 0 && ctx.input_offset[1] == UINT64_C(0x1122334455667789) && ctx.input_idx == 1);
+		std::cout << "blake-counter " << ContextBytes(ctx) << '\n';
+		std::array<uint8_t, 64> digest; crypto_blake2b_final(&ctx, digest.data());
+		std::cout << "blake-counter-final " << Hex(digest) << ' ' << ContextBytes(ctx) << '\n';
+	}
+	// Equal and partial overlap in both directions, and key/message/output sharing.
+	for (unsigned style = 0; style != 6; ++style) {
+		auto storage = PrimitiveBytes(320, 73), original = storage;
+		const size_t message_at = 80, output_at = style == 0 ? 80 : style == 1 ? 96 : style == 2 ? 64 : style == 3 ? 8 : style == 4 ? 32 : 112;
+		const size_t key_at = style == 5 ? 96 : 8, key_size = style == 5 ? 64 : 32;
+		std::array<uint8_t, 64> expected;
+		crypto_blake2b_keyed(expected.data(), 64, original.data() + key_at, key_size, original.data() + message_at, 129);
+		crypto_blake2b_keyed(storage.data() + output_at, 64, storage.data() + key_at, key_size, storage.data() + message_at, 129);
+		PrimitiveRequire(std::equal(expected.begin(), expected.end(), storage.begin() + output_at));
+		PrimitiveRequire(std::equal(storage.begin(), storage.begin() + output_at, original.begin()));
+		PrimitiveRequire(std::equal(storage.begin() + output_at + 64, storage.end(), original.begin() + output_at + 64));
+		std::cout << "blake-overlap " << style << ' ' << Hex(storage) << '\n';
+	}
+	// Exact unchanged extended_hash and EdDSA buffer shapes.
+	{
+		auto storage = PrimitiveBytes(96, 41), original = storage;
+		std::array<uint8_t, 64> expected;
+		crypto_blake2b(expected.data(), 64, original.data(), 64);
+		crypto_blake2b(storage.data() + 32, 64, storage.data(), 64);
+		PrimitiveRequire(std::equal(expected.begin(), expected.end(), storage.begin() + 32));
+		std::cout << "blake-extended-overlap " << Hex(storage) << '\n';
+		auto seed = PrimitiveBytes(64, 23); original = seed;
+		crypto_blake2b(expected.data(), 64, original.data(), 32); crypto_blake2b(seed.data(), 64, seed.data(), 32);
+		PrimitiveRequire(std::equal(expected.begin(), expected.end(), seed.begin()));
+		std::cout << "blake-eddsa-overlap " << Hex(seed) << '\n';
+	}
+	{
+		auto password = PrimitiveBytes(19, 43), salt = PrimitiveBytes(16, 29);
+		std::vector<uint64_t> work(8 * 128);
+		std::array<uint8_t, 32> hash;
+		crypto_argon2_config config{CRYPTO_ARGON2_ID, 8, 1, 1};
+		crypto_argon2_inputs inputs{password.data(), salt.data(), static_cast<uint32_t>(password.size()), static_cast<uint32_t>(salt.size())};
+		crypto_argon2(hash.data(), hash.size(), work.data(), config, inputs, crypto_argon2_no_extras);
+		std::cout << "blake-argon2-caller " << Hex(hash) << ' ' << Hex({reinterpret_cast<const uint8_t *>(work.data()), work.size() * sizeof(uint64_t)}) << '\n';
+	}
+	{
+		auto seed = PrimitiveBytes(32, 37), message = PrimitiveBytes(129, 49);
+		std::array<uint8_t, 64> secret, signature;
+		std::array<uint8_t, 32> public_key;
+		crypto_eddsa_key_pair(secret.data(), public_key.data(), seed.data());
+		crypto_eddsa_sign(signature.data(), secret.data(), message.data(), message.size());
+		PrimitiveRequire(crypto_eddsa_check(signature.data(), public_key.data(), message.data(), message.size()) == 0);
+		auto bad = signature; bad[31] ^= 1;
+		const auto failure = crypto_eddsa_check(bad.data(), public_key.data(), message.data(), message.size()); PrimitiveRequire(failure == -1);
+		PrimitiveRequire(std::ranges::all_of(seed, [](uint8_t x) { return x == 0; }));
+		std::cout << "blake-eddsa-caller " << Hex(secret) << ' ' << Hex(public_key) << ' ' << Hex(signature) << ' ' << failure << ' ' << Hex(seed) << '\n';
+	}
+}
+
 static int PrimitiveMain()
 {
 	auto key = PrimitiveBytes(32, 9), nonce = PrimitiveBytes(24, 101);
@@ -275,6 +416,7 @@ static int PrimitiveMain()
 		PrimitiveRequire(std::equal(plain.begin(), plain.end(), output.begin()));
 		std::cout << "aead-oneshot " << ad_size << ' ' << length << ' ' << Hex(cipher) << ' ' << Hex(mac) << ' ' << Hex(output) << '\n';
 	}
+	BlakePrimitives();
 	return 0;
 }
 
