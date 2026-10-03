@@ -139,6 +139,35 @@ jobs:
           -DCMAKE_TOOLCHAIN_FILE=${{ steps.vcpkg.outputs.vcpkg-cmake }} \
           ${{ inputs.extra-cmake-parameters }}
         cmake --build .local/build-tools-macos -j $(sysctl -n hw.logicalcpu)
+
+    - name: Verify native archive configuration freshness
+      if: inputs.rust
+      run: |
+        python3 - <<'PYCODE'
+        import json
+        from pathlib import Path
+        import subprocess
+        import sys
+        sys.path.insert(0, 'tools')
+        import migration
+        build = Path('.local/build-tools-macos').resolve()
+        archive = migration.rust_archive(build)
+        stamp = build / 'rust-build-configuration.txt'
+        records = []
+        for label, minimum in [('unchanged', '11.0'), ('changed', '12.0'), ('restored', '11.0'), ('restored-unchanged', '11.0')]:
+            before = (stamp.stat().st_mtime_ns, archive.stat().st_mtime_ns)
+            with Path(f'.local/macos-evidence/freshness-{label}.log').open('w') as output:
+                subprocess.run(['cmake', '-S', '.', '-B', str(build), f'-DCMAKE_OSX_DEPLOYMENT_TARGET={minimum}'], stdout=output, stderr=subprocess.STDOUT, check=True)
+                subprocess.run(['cmake', '--build', str(build), '--target', 'openttd_rust_build', '--parallel', '1'], stdout=output, stderr=subprocess.STDOUT, check=True)
+            after = (stamp.stat().st_mtime_ns, archive.stat().st_mtime_ns)
+            if label in ('unchanged', 'restored-unchanged'):
+                assert before == after, (label, before, after)
+            else:
+                assert after[0] > before[0] and after[1] > before[1], (label, before, after)
+            records.append({'label': label, 'minimum': minimum, 'before': before, 'after': after})
+        Path('.local/macos-evidence/freshness.json').write_text(json.dumps({'passed': True, 'records': records}, indent=2) + '\n')
+        PYCODE
+        cmake --build .local/build-tools-macos -j $(sysctl -n hw.logicalcpu)
         python3 tools/rust-build-evidence.py --build build --tools .local/build-tools-macos --output .local/macos-evidence
 
     - name: Retain native Rust evidence
@@ -154,6 +183,7 @@ jobs:
           build/Testing/Temporary
           build/rust-*.log
           build/rust-toolchain.txt
+          build/rust-build-configuration.txt
           build/CMakeCache.txt
           build/compile_commands.json
           .local/build-tools-macos/CMakeCache.txt

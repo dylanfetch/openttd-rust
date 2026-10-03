@@ -99,15 +99,41 @@ if(NOT RUST_RESULT EQUAL 0 OR NOT CMAKE_MATCH_1)
 endif()
 separate_arguments(RUST_NATIVE_LIBS UNIX_COMMAND "${CMAKE_MATCH_1}")
 set(RUST_NATIVE_LIBS "${RUST_NATIVE_LIBS}" CACHE INTERNAL "Pinned Rust native link flags" FORCE)
+# Makefiles do not track command-line/environment changes as output dependencies.
+# Generate a content-stable configuration file and invalidate the release crate
+# only when its effective configuration changes, including SDK-only changes.
+set(RUST_CONFIGURATION "compiler=${RUSTC_EXECUTABLE}\ncargo=${CARGO_EXECUTABLE}\n${RUST_VERSION}target=${RUST_TARGET}\nsdk=${RUST_SDKROOT}\ndeployment=${CMAKE_OSX_DEPLOYMENT_TARGET}\n")
+string(TOUPPER "${RUST_TARGET}" RUST_TARGET_ENV)
+string(REPLACE "-" "_" RUST_TARGET_ENV "${RUST_TARGET_ENV}")
+set(RUST_CONFIGURATION_ENV RUSTFLAGS CARGO_ENCODED_RUSTFLAGS RUSTC_WRAPPER
+    RUSTC_WORKSPACE_WRAPPER CARGO_BUILD_RUSTFLAGS
+    "CARGO_TARGET_${RUST_TARGET_ENV}_RUSTFLAGS" "CARGO_TARGET_${RUST_TARGET_ENV}_LINKER"
+    CARGO_PROFILE_RELEASE_OPT_LEVEL CARGO_PROFILE_RELEASE_DEBUG
+    CARGO_PROFILE_RELEASE_STRIP CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS
+    CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS CARGO_PROFILE_RELEASE_LTO
+    CARGO_PROFILE_RELEASE_PANIC CARGO_PROFILE_RELEASE_INCREMENTAL
+    CARGO_PROFILE_RELEASE_CODEGEN_UNITS)
+foreach(RUST_ENV IN LISTS RUST_CONFIGURATION_ENV)
+    if(DEFINED ENV{${RUST_ENV}})
+        string(APPEND RUST_CONFIGURATION "${RUST_ENV}=$ENV{${RUST_ENV}}\n")
+        list(APPEND RUST_BUILD_ENV "${RUST_ENV}=$ENV{${RUST_ENV}}")
+    else()
+        string(APPEND RUST_CONFIGURATION "${RUST_ENV}=<unset>\n")
+        list(APPEND RUST_BUILD_ENV "--unset=${RUST_ENV}")
+    endif()
+endforeach()
+file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/rust-build-configuration.txt" CONTENT "${RUST_CONFIGURATION}")
 file(GLOB_RECURSE RUST_INPUTS CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/rust/*.rs" "${CMAKE_SOURCE_DIR}/rust/*/Cargo.toml")
 add_custom_command(OUTPUT "${RUST_ARCHIVE}"
     COMMAND ${CMAKE_COMMAND} -E env ${RUST_BUILD_ENV} "${CMAKE_COMMAND}"
         "-DCARGO=${CARGO_EXECUTABLE}" "-DSOURCE=${CMAKE_SOURCE_DIR}" "-DTARGET=${RUST_TARGET}"
-        "-DLOG=${CMAKE_BINARY_DIR}/rust-build.log" -P "${CMAKE_SOURCE_DIR}/cmake/BuildRust.cmake"
+        "-DLOG=${CMAKE_BINARY_DIR}/rust-build.log"
+        "-DCONFIGURATION=${CMAKE_BINARY_DIR}/rust-build-configuration.txt" -P "${CMAKE_SOURCE_DIR}/cmake/BuildRust.cmake"
     WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
     DEPENDS ${RUST_INPUTS} "${CMAKE_SOURCE_DIR}/Cargo.toml" "${CMAKE_SOURCE_DIR}/Cargo.lock"
         "${CMAKE_SOURCE_DIR}/rust-toolchain.toml" "${CMAKE_SOURCE_DIR}/cmake/BuildRust.cmake"
         "${CMAKE_SOURCE_DIR}/cmake/Rust.cmake"
+        "${CMAKE_BINARY_DIR}/rust-build-configuration.txt"
     COMMENT "Building shared Rust algorithms for ${RUST_TARGET}" VERBATIM)
 add_custom_target(openttd_rust_build DEPENDS "${RUST_ARCHIVE}")
 add_library(openttd_rust STATIC IMPORTED)

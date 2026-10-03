@@ -34,7 +34,7 @@ def main():
         if configuration["target"] != "aarch64-apple-darwin":
             raise RuntimeError("This evidence command requires native macOS arm64")
         (output / f"{label}-configuration.json").write_text(json.dumps(configuration, indent=2) + "\n")
-        for name in ("CMakeCache.txt", "rust-toolchain.txt", "rust-native-libs.log", "rust-build.log", "compile_commands.json"):
+        for name in ("CMakeCache.txt", "rust-toolchain.txt", "rust-native-libs.log", "rust-build.log", "rust-build-configuration.txt", "compile_commands.json"):
             (output / f"{label}-{name}").write_bytes((build / name).read_bytes())
         actual = re.findall(r"native-static-libs: ([^\r\n]+)", (build / "rust-build.log").read_text())
         if not actual or actual[-1].split() != configuration["native_libraries"]:

@@ -543,7 +543,11 @@ remain previously built executables and do not consume the target archive.
 The pinned compiler's `--print=native-static-libs` output supplies final link
 flags instead of applying Linux libraries to Darwin. Configuration retains
 `rust-toolchain.txt` and `rust-native-libs.log`; archive builds retain
-`rust-build.log`, including the actual crate's native-library output. Rust's
+`rust-build.log`, including the actual crate's native-library output. A
+content-stable `rust-build-configuration.txt` dependency records the compiler,
+target, SDK, minimum and relevant build flags. A changed configuration invalidates
+only that target's release crate before Cargo rebuilds; unchanged reconfiguration
+preserves the archive. Native CI checks minimum changes and restoration explicitly. Rust's
 [static-library linkage documentation](https://doc.rust-lang.org/reference/linkage.html#linkstaticlib)
 explains why final C++ links require these system dependencies. The crate retains
 its release abort-on-panic profile and explicit overflow checks in both C++ modes.
