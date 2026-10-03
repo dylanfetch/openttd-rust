@@ -26,9 +26,11 @@ Never change candidate behavior and expected results together to make checks pas
 The premature Rust integer-square-root implementation was removed before component
 selection. The first selected replacement is `GetPartialPixelZ`, the scalar
 landscape height kernel, implemented in `rust/openttd-kernels` behind its original
-C++ interface. The shared crate also implements StringConsumer's integer parsing
-and lexical skipping, including native string/settings generator uses. Neither
-replacement completes its containing subsystem. Preserve the complete game,
+C++ interface. The shared crate also implements StringConsumer's integer and
+remaining byte algorithms, UTF-8 codec/iteration, alternating-iterator traversal,
+and StringBuilder's numeric byte encoders. Native generators share the Rust
+archive; actual call-site coverage is described below. These replacements do not
+complete their containing subsystems. Preserve the complete game,
 including networking, saves, NewGRF mods, graphics, and shared random-number behavior.
 
 ## Build and verification
@@ -175,8 +177,73 @@ compares fatal logging adapters, real malformed strgen diagnostics, and fresh
 settings/string headers plus English/French language output on unchanged reference
 inputs. Evidence and source hashes live under `.local/integer-comparison/`; CI runs
 the fresh Rust tools build and comparisons. The eleven unchanged upstream
-StringConsumer cases remain the primary existing tests. Other consumer/builder/UTF8
-algorithms, C++ adapters, and non-Linux Rust integration remain migration work.
+StringConsumer cases remain the primary existing parser tests. In-place ownership,
+other builder algorithms, C++ adapters, and non-Linux Rust integration remain migration work.
+
+Alternating-iterator traversal also uses the shared Rust archive. Rust owns initial
+position/selectors, logical advancement, side selection, end transitions, and
+position comparison. C++ retains the typed iterators, range identity assertions,
+dereferencing, and container lifetimes. Each increment recomputes the live range
+distance, Rust requests a typed move, C++ applies that move and queries only the
+requested live boundary, then Rust completes the next-side state. This preserves
+the original operation order without caching size or requiring random access;
+stable noncontiguous iterators remain supported after insertion.
+
+The scalar ABI in `src/rust/alternating_ffi.h` maps size_t to Rust usize and explicit
+uint8 selectors (0 before, 1 after). Nonnegative distances retain the original
+size_t conversion; there is no additional range cap. State copies are independent;
+no pointer, allocation, container element, or ownership crosses the ABI. Valid
+range/iterator preconditions remain; panic aborts and never unwinds into C++.
+Logical end skips movement/completion, preserving the last selected Base iterator,
+while separately constructed end retains middle. They compare equal by position.
+
+The fifteen original fixed sequences remain unchanged. Small additional public
+interface tests cover empty/singleton, independent copies/postfix/prefix identity,
+position ordering, distinct end Base values, stable-list insertion, and typed
+operation counts. The original C++ algorithm remains under the explicit fallback;
+other generic iterator/container and text-file owner code remains C++.
+
+The remaining StringConsumer byte algorithms live in `consumer.rs`: exact unsigned
+little-endian assembly; bounded read/skip lengths and shortfall/cursor decisions;
+byte-prefix matching and conditional consumption; substring/character-set search
+and membership; and complete separator result/consumption decisions. C++ retains
+typed optional/default conversions, borrowed std::string_view construction,
+diagnostic formatting/dispatch, cursor commit, and trivial accessors. It preserves
+empty view pointers through the original source substring at the current offset.
+No separate Rust call was added for trivial getters.
+
+`src/rust/consumer_ffi.h` returns scalar repr(C) metadata by value. Read-only spans
+may overlap and include NUL/non-UTF8 bytes; each nonempty span addresses initialized
+bytes in one live allocation, length <=PTRDIFF_MAX, immutable for the call. Empty
+spans allow null. Rust retains no pointer/slice, allocates no C++ storage, and calls
+no C++ logger while borrowing. C++ logs a shortfall before applying the returned
+position; fatal generator logging therefore leaves the cursor unchanged. Normal
+game diagnostics keep the original text and consume the remaining bytes.
+
+Nonempty search/set/separator assertions remain valid-input preconditions; release
+behavior outside those contracts is not claimed equivalent (including original
+empty-separator loops). Prefix matching still accepts empty patterns at end. npos
+maps to SIZE_MAX/usize::MAX and means all remaining or not-found as appropriate.
+Bounds use remaining-length subtraction before clamping, avoiding overflowing
+position+requested arithmetic. Separator policies return and consume different
+lengths for SKIP modes, repeat whole separators without overlapping matches, and
+retain default KEEP for unknown values. Panic aborts; the ABI never unwinds.
+
+The eleven original consumer cases remain unchanged. Four additional public cases
+cover audited gaps: empty-prefix/zero-length borrowed offsets; partial-width TryRead
+cursor preservation; all policies for multi-byte separators with nonzero offsets,
+overlap and unknown-value default; and byte sets/read-only overlapping patterns.
+The existing `tools/compare-integers.py` script invokes the probe's additive
+`--consumer` mode:
+60 bounded byte/offset/shortfall cases and six fatal timing checks compare against
+unchanged pinned C++ source, retaining diagnostic bytes and cursor-before-log.
+The inherited integer/generator comparisons and separate UTF8 checks remain in CI.
+The integer comparison report records `consumer_bytes` separately.
+
+The in-place pair and owning string/container code remain C++. In particular,
+SQFile erases/resizes its owning buffer and explicitly reconstructs the consumer;
+no Rust borrow survives that boundary. No allocator, in-place memory copy/rebinding,
+escape-parser caller, or encoded-string transformation moved with this group.
 
 Start with dependency and test inventories. Prefer bounded, heavily tested modules
 whose unchanged upstream tests can exercise replacements through their existing
@@ -193,6 +260,54 @@ screenshots and compressed-save byte equality are insufficient.
 Integrate verified replacements incrementally while retaining the playable game and
 reference checks. Report validation limits explicitly. Improvements to original game
 behavior remain deferred issues rather than migration changes.
+
+## StringBuilder numeric byte encoders
+
+With `OPTION_RUST=ON`, Rust extracts the bytes for `PutUint8`, `PutUint16LE`,
+`PutUint32LE`, and `PutUint64LE`, and formats integral `PutIntegerBase` values in
+bases 2 through 36. The signed binary wrappers keep their original modulo-width
+unsigned casts. Text uses lowercase digits, a leading minus for signed negatives,
+no base prefix, and one digit for zero. The signed magnitude uses unsigned
+negation, including `INT64_MIN`, without signed overflow.
+
+The original formatting scratch buffer holds exactly 32 bytes, including the minus
+sign. Values that need more bytes produce no `PutBuffer` call; exactly 32 bytes
+produce one call. For example, `UINT32_MAX` in base 2 succeeds, whereas `INT32_MIN`
+in base 2 produces no call. This behavior is retained; #12 records a possible later
+capacity improvement. `PutUtf8` reuses the migrated codec and still makes one
+zero-length sink call for an invalid codepoint, distinct from formatting failure.
+
+The two functions in `src/rust/builder_ffi.h` accept scalars and return `repr(C)`
+byte arrays by value. Rust neither borrows caller storage nor invokes a C++ sink.
+The C++ adapter synchronously passes a span of the returned local array to its
+original virtual `PutBuffer`. That span is valid during the call; sinks must not
+retain it. Allocation, sink exceptions, string ownership, raw `Put`, InPlaceBuilder
+copy/overlap handling, and cursor updates remain in C++. There are no Rust
+allocations, ownership transfers, retained pointers, or additional unsafe blocks.
+Overflow checks and abort-on-panic remain enabled. Invalid bases are outside the
+same 2..36 precondition as the original `std::to_chars` API.
+
+The adapter covers standard integral types other than bool, up to 64 bits, and
+checks widths at compile time. A C++ overload adapter preserves
+the original integer overload selection, including unscoped-enum promotions and
+implicit user-defined conversions; bool remains rejected. Real text-format call sites use 32/64-bit values in
+`strings.cpp`, save repair, and script text encoding. No wider compiler integer
+extension is used there. Strgen uses binary byte/16-bit encoders and UTF-8, but has
+no `PutIntegerBase` call. Settingsgen has no numeric builder call; compiling the
+shared source and linking the archive does not establish runtime use there.
+`OPTION_RUST=OFF` retains the original portable bodies, tracked under #3 until
+platform support and the eventual facade removal are resolved.
+
+The three unchanged StringBuilder cases, InPlaceReplacement, encoded-string tests,
+and full verification exercise the existing interfaces. `tools/compare-integers.py`
+also compares the existing narrow probe's `--builder` mode against unchanged pinned
+C++ source and both Rust and portable candidate bodies. Its 1,624 formats cover all
+bases, signed/unsigned widths, extrema, zero, and the 32/33-byte boundary. Six alias
+cases, three unscoped-enum and three implicit-conversion cases, and an ordered counting sink preserve byte lengths, order, synchronous calls,
+zero-length UTF-8 calls, and absent formatting calls. Parser and fatal diagnostic
+comparisons remain intact, as do freshly generated string/settings headers,
+English/French output, and malformed strgen diagnostics. These bounded checks do
+not establish complete text formatting or whole-game equivalence.
 
 ## UTF-8 codec and byte positions
 

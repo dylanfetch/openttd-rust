@@ -1,5 +1,6 @@
 add_test_files(
     alternating_iterator.cpp
+    alternating_iterator_state.cpp
     bitmath_func.cpp
     enum_over_optimisation.cpp
     flatset_type.cpp
@@ -12,6 +13,7 @@ add_test_files(
     mock_spritecache.h
     string_builder.cpp
     string_consumer.cpp
+    string_consumer_bytes.cpp
     string_inplace.cpp
     string_func.cpp
     test_main.cpp
