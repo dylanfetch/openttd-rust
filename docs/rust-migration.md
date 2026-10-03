@@ -1182,11 +1182,10 @@ instrumented. Passing does not certify cryptography or arbitrary overlap/inputs.
 The native ABI executable adds all 15 actual facade/FFI calls and caller-context
 checks while retaining every existing layout/math check. Metadata IDs 19..21
 cover the two-leaf table and two field-layout descriptors; 18 covers the
-station cargo owner. The combined audit has all 22 IDs from 0 through 21. Only the ABI executable adds
-a vendor object for its primitive calls; fresh strgen/settingsgen continue linking
+station cargo owner. The combined audit has all 22 IDs from 0 through 21. Only the
+ABI executable adds a vendor object for its primitive calls; fresh strgen/settingsgen continue linking
 the shared Rust archive with no vendor object/import dependency. Actual final
 Linux/macOS/Windows x86/x64 CI and independent final-head review remain mandatory.
-
 
 ## Station cargo-list queries
 
@@ -1202,7 +1201,7 @@ other station APIs remain C++. Portable builds retain the original cargo bodies.
 
 A caller-owned 16-byte scalar collector uses unsigned 32-bit amount/previous,
 unsigned 16-bit station IDs (including 0xFFFF), and byte selector/finalized fields.
-Explicit width/offset/alignment assertions and ABI layout entry18 check the C/Rust
+Explicit width/offset/alignment assertions and ABI layout entry 18 check the C/Rust
 boundary. Windows x86 uses the established explicit cdecl convention. No collector
 allocation is added; Rust borrows the existing opaque destination and disjoint
 scalar state only during feed/finalize calls. No world pointer, STL/VM layout,

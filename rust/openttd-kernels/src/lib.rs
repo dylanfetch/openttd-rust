@@ -747,7 +747,7 @@ mod abi;
 
 /// Return size, alignment or field offsets for the bounded public ABI audit.
 ///
-/// Type IDs 0..17 and 19..21 follow `abi_ffi.h`; 18 is reserved for station cargo.
+/// Type IDs 0..21 follow `abi_ffi.h`, including station cargo and crypto layouts.
 /// Item 0 is size, 1 alignment, then fields in
 /// declaration order. Unknown IDs/items return `usize::MAX` (C++ `SIZE_MAX`).
 /// Scalar metadata only: no allocation, pointers, ownership or callbacks.
