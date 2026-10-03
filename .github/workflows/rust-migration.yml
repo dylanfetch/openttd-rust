@@ -56,6 +56,8 @@ jobs:
         run: python3 tools/encoded-comparison.py
       - name: Compare byte-string behavior with pinned original
         run: python3 tools/byte-strings-comparison.py
+      - name: Compare rounded roots and saturation with pinned original
+        run: python3 tools/math-comparison.py
       - name: Retain comparison evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -67,4 +69,5 @@ jobs:
             .local/utf8-comparison/
             .local/encoded-comparison/
             .local/byte-strings-comparison/
+            .local/math-comparison/
           include-hidden-files: true

@@ -533,6 +533,70 @@ to Rust, they should use the internal byte algorithms directly; after the last c
 moves, remove the C++ view/pair facade and files. Neither this slice nor its reference
 comparison completes the entire string subsystem.
 
+## Rounded square root and runtime integer saturation
+
+With `OPTION_RUST=ON`, `IntSqrt(uint32_t)` and runtime `ClampTo` / `SoftClamp`
+call the shared Rust archive through `src/rust/math_ffi.h`. `IntSqrt` retains
+nearest-integer rounding, including 65536 for UINT32_MAX. `DivideApprox` remains
+C++: its potentially overflowing signed intermediates require separate work.
+
+The public saturation templates retain their original C++ bodies for constant
+evaluation, dispatched with `std::is_constant_evaluated()`. The StrongType and
+OverflowSafeInt overloads retain their original unwrap-and-forward behavior.
+Portable builds retain the original complete bodies. These are explicit remaining
+C++ implementations; this slice does not complete all math migration.
+
+Source inventory finds ClampTo destinations uint8/uint16/uint32/int32, the int32
+widget size_type and TimerGameTick::Ticks aliases, and history element types.
+Sources include promoted 8/16-bit expressions, native int/uint, 32/64-bit integers,
+size_t/ptrdiff_t, date/year StrongTypes, and OverflowSafeInt money results. All
+four production SoftClamp calls in misc_gui.cpp use native int. No production
+bool saturation, explicit narrow SoftClamp instantiation, or wider compiler
+integer extension appears in these call sites. The standard integral public
+contracts also include signed/unsigned char, wchar_t and char8/16/32_t aliases.
+The Rust adapter explicitly checks eight-bit bytes, a 32-bit int promotion model
+for SoftClamp, and widths no larger than uint64_t. Unsupported wider extension
+instantiations produce a compile-time failure rather than silently bypass Rust.
+
+The ABI is pointer-free and scalar-only: modulo-2^64 value bits, explicit widths
+and signedness, and result bits reconstructed by C++20 integral conversion.
+ClampTo accepts 1-bit bool descriptors alongside 8/16/32/64-bit integer widths.
+Unsigned uint64 values never pass through signed int64; Rust uses a bounded i128
+comparison domain and explicitly reconstructs modulo bits. The original template
+still determines which bool-source instantiations are well-formed: for example,
+its make_unsigned<bool> means bool-to-int8 remains ill-formed. Existing valid
+bool conversions and destination truth values are preserved.
+
+SoftClamp accepts the original non-bool standard integral types. Reversed signed
+8/16-bit intervals first convert min to the matching unsigned type, then promote
+both subtraction operands to int. Rust preserves this unusual behavior: e.g.
+SoftClamp<int8_t>(0, -1, -3) returns 126. Reversed 32/64-bit signed intervals use
+unsigned subtraction/division and modular result conversion; unsigned intervals
+retain the original rounding toward min. Ordinary/equal intervals preserve the
+<= and >= decisions. No allocation, ownership, random state, callback, pointer,
+or exception crosses the ABI. Safe Rust uses explicitly bounded or wrapping
+operations; both profiles abort on panic and the C ABI cannot unwind into C++.
+
+The unchanged IntSqrtTest - Zero/FindSqRt, ClampTo, and SoftClamp cases remain
+primary. Bounded coverage gaps are compared with:
+
+```sh
+python3 tools/math-comparison.py
+```
+
+The script verifies the pristine pinned oracle and compiles one public-API fixture
+against its unchanged math source/header and both Rust and portable candidate
+bodies, in assertion-enabled and NDEBUG modes. It compares exact ordered results
+for every uint32 integer-root square and adjacent rounding transition, UINT32_MAX,
+8/16/32/64-bit signedness/width extrema, bool and standard character/size aliases,
+StrongType/OverflowSafeInt adapters, normal/equal/reversed SoftClamp intervals,
+and all reversed signed 8-bit pairs. Static assertions retain constexpr evidence.
+GNU linker wrappers count actual calls to each Rust symbol, including initial
+literal calls at -O2; retained nm output supplies symbol evidence. Source hashes,
+commands, outputs, and routing counts reside in `.local/math-comparison/` and CI
+retains them. The probe is a native GNU/Linux comparison, not a new simulation
+framework or a proof over all math inputs, platform ABIs, or whole-game behavior.
+
 ## Team process and engineering standards
 
 `AGENTS.md` defines durable agent instructions. Root orchestrates, delegates heavily,
