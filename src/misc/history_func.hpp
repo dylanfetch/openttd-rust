@@ -28,6 +28,10 @@ bool IsValidHistory(ValidHistoryMask valid_history, const HistoryRange &hr, uint
 template <typename T>
 T SumHistory(typename std::span<const T> history);
 
+#ifdef WITH_RUST
+#	include "../rust/history_adapter.hpp"
+#endif
+
 /**
  * Rotate historical data.
  * @note Call only for the largest history range sub-division.
@@ -40,6 +44,9 @@ T SumHistory(typename std::span<const T> history);
 template <typename T>
 void RotateHistory(HistoryData<T> &history, ValidHistoryMask valid_history, const HistoryRange &hr, uint cur_month)
 {
+#ifdef WITH_RUST
+	RustHistory::Rotate(history, valid_history, hr, cur_month);
+#else
 	if (hr.hr != nullptr) RotateHistory(history, valid_history, *hr.hr, cur_month);
 	if (cur_month % hr.total_division != 0) return;
 
@@ -53,6 +60,7 @@ void RotateHistory(HistoryData<T> &history, ValidHistoryMask valid_history, cons
 		auto last = std::next(first, hr.division);
 		history[hr.first] = SumHistory<T>(std::span{first, last});
 	}
+#endif
 }
 
 /**
@@ -82,6 +90,9 @@ T GetAndResetAccumulatedAverage(Taccrued &total)
 template <typename T>
 bool GetHistory(const HistoryData<T> &history, ValidHistoryMask valid_history, const HistoryRange &hr, uint age, T &result)
 {
+#ifdef WITH_RUST
+	return RustHistory::Get(history, valid_history, hr, age, result);
+#else
 	if (hr.hr == nullptr) {
 		if (age < hr.periods) {
 			uint slot = hr.first + age;
@@ -106,6 +117,7 @@ bool GetHistory(const HistoryData<T> &history, ValidHistoryMask valid_history, c
 		}
 	}
 	NOT_REACHED();
+#endif
 }
 
 /**
