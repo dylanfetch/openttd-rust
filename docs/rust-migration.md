@@ -611,7 +611,10 @@ framework or a proof over all math inputs, platform ABIs, or whole-game behavior
 
 `python3 tools/math-extension-comparison.py` additionally compiles the same small
 wide-template fixture against pinned, portable and Rust candidate headers on the
-native compiler/library. It covers the GCC accepted unsigned128 widening path;
+native compiler/library. The probe uses the configured C++ compiler and pointer
+width, preserving the original macOS pointer guard; native macOS commands also
+carry that build's arm64 architecture, SDK and deployment minimum for compilation
+and linkage. It covers the GCC accepted unsigned128 widening path;
 on libc++ it also checks accepted signed/unsigned128 sources, signed destinations,
 saturation beyond uint64 limits, negative values and wide SoftClamp intervals.
 Both result words and constexpr assertions are checked. A tiny integer-like
