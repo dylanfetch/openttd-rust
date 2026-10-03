@@ -747,7 +747,7 @@ mod abi;
 
 /// Return size, alignment or field offsets for the bounded public ABI audit.
 ///
-/// Type IDs 0..21 follow `abi_ffi.h`, including station cargo and crypto layouts.
+/// Type IDs 0..22 and 25 follow `abi_ffi.h`, including station cargo and crypto layouts.
 /// Item 0 is size, 1 alignment, then fields in
 /// declaration order. Unknown IDs/items return `usize::MAX` (C++ `SIZE_MAX`).
 /// Scalar metadata only: no allocation, pointers, ownership or callbacks.
@@ -951,3 +951,9 @@ pub unsafe extern "C" fn openttd_rust_cargo_finish(
         (&mut *state).finish(&mut *list.cast::<script_list::List>());
     }
 }
+
+#[allow(unsafe_code)]
+mod blake2b;
+
+#[allow(unsafe_code)]
+mod x25519;
