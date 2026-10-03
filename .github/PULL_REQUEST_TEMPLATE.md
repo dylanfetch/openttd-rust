@@ -1,39 +1,33 @@
-## Issue and scope
+<!-- Target rust-migration. About 60 lines; see the evidence budget in AGENTS.md. -->
 
-<!-- Target rust-migration. Link the issue and state the bounded change this PR makes. -->
+Closes #<issue>. Roadmap item: <phase / issue>.
 
-## Agent attribution
+Agent: <agent path> | Model: <exact model> | Reasoning effort: <effort>
 
-<!-- Every agent-authored PR and follow-up comment needs its author's attribution. -->
-- Agent identifier:
-- Exact model:
-- Reasoning effort:
+## Moved to Rust
 
-## Original behavior and fidelity
+<!-- The state and control flow Rust now owns. One short paragraph or list. -->
 
-<!-- Describe the original behavior this change preserves or reproduces. Call out any quirks retained for compatibility. -->
+## Stays in C++
 
-## Implementation
+<!-- The facade and callbacks that remain, and why each one is needed. -->
 
-<!-- Summarize the Rust/C++ boundary and any relevant state or ownership changes. -->
+## Checks
 
-## Validation
+<!-- Exact commands run, and their results. Harness scenarios that exercise this component. -->
 
-<!-- List the exact commands and comparison evidence. Include the reference revision or verification report when relevant. -->
+## Metrics
 
-## Limits and known discrepancies
+<!-- Paste the output of: python3 tools/port-metrics.py. If C++ retired is less than glue plus tooling, give the reason. -->
 
-<!-- State what this validation does not cover and any remaining differences. -->
+## Known limits
 
-## Independent review
+<!-- Divergences, uncovered input domains, and follow-up issues. "None" is a valid answer. -->
 
-<!-- Reviewer: complete this separately after reviewing the PR. Tie the report to the commit reviewed. -->
-- Reviewer agent identifier:
-- Exact model:
-- Reasoning effort:
-- Reviewed commit SHA:
-- Disposition: ready to integrate / changes required
-- Checks and behavioral evidence reviewed:
-- Findings or follow-up:
-
-<!-- Shared credentials require an attributed report, not a GitHub platform approval. -->
+<!--
+Review report (reviewer posts it as a separate comment, about 20 lines):
+Agent: <path> | Model: <exact model> | Reasoning effort: <effort>
+Reviewed commit: <sha>
+Findings and dispositions: <list, or "none">
+Shared credentials require an attributed report, not a GitHub platform approval.
+-->

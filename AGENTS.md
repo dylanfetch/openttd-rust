@@ -22,10 +22,10 @@ fork; the remaining upstream documentation explains behavior and architecture.
 - Prefer ownership ports: Rust owns the component's state and control flow, and
   C++ keeps only a thin facade plus callbacks for shared services (`Random`,
   pools, map access, progress). With `WITH_RUST` defined the original C++ body
-  is not compiled; it remains under `#ifndef WITH_RUST` for portable builds.
-  Do not extract an
-  algorithmic fragment while C++ keeps the surrounding state and loop, unless
-  the roadmap names it as a stepping stone.
+  is not compiled; it remains in the `#else` of `#ifdef WITH_RUST` (or under
+  `#ifndef WITH_RUST`) for portable builds. Do not extract an algorithmic
+  fragment while C++ keeps the surrounding state and loop, unless the roadmap
+  names it as a stepping stone.
 - Keep the full game running throughout migration. Preserve networking, saves,
   mods, interface, and shared random-number behavior, including the exact
   sequence of random draws.
@@ -36,10 +36,12 @@ fork; the remaining upstream documentation explains behavior and architecture.
   only back up operations that cannot overflow in the original. This applies to
   new work; known divergences in existing ports are tracked as issues (#75).
 - Evidence for game-logic ports is the semantic simulation harness
-  (`python3 tools/migration.py simulate`, added by #72; until then, existing
-  tests plus narrow comparisons) plus the existing tests. Extend the harness's scenarios rather than writing a new per-component
-  comparison tool. Add a narrow comparison against unchanged reference bodies
-  only for a concrete gap the harness cannot reach.
+  (`python3 tools/migration.py simulate`, #72) plus the existing tests; a
+  game-logic port integrates only after the harness exists and its scenarios
+  exercise the component. Extend the harness's scenarios rather than writing a
+  new per-component comparison tool. Add a narrow comparison against unchanged
+  reference bodies only for a concrete gap the harness cannot reach, and say
+  in the PR which gap.
 - Keep the pinned reference worktree unchanged. Never change candidate behavior
   and expected results together merely to make checks pass. Existing test success
   establishes covered behavior, not complete game equivalence.
@@ -57,12 +59,10 @@ checks that run; do not restate them in paragraphs.
 - Issue: scope, affected interfaces, evidence plan, and acceptance criteria.
   About 60 lines at most; leave design detail to the implementation.
 - PR description: what moved, what stays in C++, exact commands, known limits,
-  and the four line counts from the roadmap progress metric. About 60 lines at
-  most. Integration PRs link the component PRs instead of re-describing them.
-  Count lines with `git diff --numstat origin/rust-migration...HEAD`: Rust
-  added is `rust/`; tooling is `tools/`; glue is lines added under `src/`
-  outside `#ifndef WITH_RUST` blocks; C++ retired is the original lines newly
-  enclosed by `#ifndef WITH_RUST` (or deleted). Comments and blanks count.
+  and the output of `python3 tools/port-metrics.py` (the roadmap progress
+  metric). About 60 lines at most. Integration PRs link the component PRs
+  instead of re-describing them. `.github/PULL_REQUEST_TEMPLATE.md` and the
+  migration issue form follow this budget.
 - Component entry in `docs/rust-migration.md`: about 25 lines at most.
 - Review report: reviewed commit, findings, and dispositions. Do not narrate
   what was verified when there are no findings.
@@ -126,8 +126,8 @@ checks that the candidate retains reference test names, and records evidence und
 `.local/`. `python3 tools/migration.py build` builds both without running tests.
 `python3 tools/migration.py tools` builds the native Rust generators.
 `python3 tools/run-comparisons.py [name...]` runs the reference comparison tools
-in parallel; any `tools/*-comparison.py` is picked up automatically, so adding
-one needs no workflow edit. The reference uses C++; the candidate explicitly
+in parallel and picks up any `tools/*-comparison.py` automatically. The
+reference uses C++; the candidate explicitly
 enables `OPTION_RUST` and links the migrated kernels into both the game and test
 executable.
 
