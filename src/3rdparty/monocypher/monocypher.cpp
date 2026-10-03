@@ -84,6 +84,7 @@ typedef uint64_t u64;
 
 static const u8 zero[128] = {0};
 
+#ifndef WITH_RUST
 // returns the smallest positive integer y such that
 // (x + y) % pow_2  == 0
 // Basically, y is the "gap" missing to align x.
@@ -93,6 +94,7 @@ static size_t gap(size_t x, size_t pow_2)
 {
 	return (~x + 1) & (pow_2 - 1);
 }
+#endif
 
 static u32 load24_le(const u8 s[3])
 {
