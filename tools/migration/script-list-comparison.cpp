@@ -150,7 +150,7 @@ static void CargoGaps()
 			CargoRecord("empty-pending", list);
 			collector.Packet(StationID{7}, StationID{7}, UINT32_MAX);
 			collector.Packet(StationID{7}, StationID{7}, 2);
-			collector.Packet(StationID{7}, StationID{8}, 3); // Filtered before run-key change for via filter.
+			collector.Packet(StationID{8}, StationID{8}, 3); // Both filters reject a different run key.
 			collector.Packet(StationID{7}, StationID{7}, 2);
 			collector.Packet(StationID{1}, StationID{7}, 0);
 			CargoRecord("key-change-wrap-zero", list);
