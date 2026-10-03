@@ -17,6 +17,8 @@ concurrency:
 jobs:
   compare:
     runs-on: ubuntu-24.04
+    # Raised from 45 when #62 added the packet comparison (run 37102176363 hit 45 min
+    # before #80 cached builds and parallelised comparisons).
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -72,6 +74,15 @@ jobs:
       - name: Build native Rust generators without the game
         run: |
           python3 tools/migration.py tools --jobs 4 --ccache
+      - name: Report port metrics
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        run: |
+          {
+            echo "### Port metrics (tools/port-metrics.py)"
+            python3 tools/port-metrics.py --target "origin/${{ github.base_ref }}"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Check Rust and compare original and migration builds
         run: |
           python3 tools/migration.py verify --jobs 4 --ccache
