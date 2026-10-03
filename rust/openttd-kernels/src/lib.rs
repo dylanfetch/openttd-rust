@@ -795,3 +795,6 @@ pub unsafe extern "C" fn openttd_rust_admin_conversion_destroy(handle: *mut std:
     // SAFETY: Return unique ownership to the allocating Rust Box exactly once.
     drop(unsafe { Box::from_raw(handle.cast::<admin_conversion::Engine>()) });
 }
+
+#[allow(unsafe_code)]
+mod crypto_primitives;

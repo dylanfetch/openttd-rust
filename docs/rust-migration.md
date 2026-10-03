@@ -1079,3 +1079,24 @@ full game instance and extracts unchanged TileList persistence bodies without
 simulating world population. This evidence does not establish arbitrary VM,
 savegame or allocation-failure equivalence. CI retains these comparisons along
 with the existing checks.
+
+The bundled Monocypher 4.0.2 ChaCha20/Poly1305/AEAD family (#48) keeps its public
+C interfaces and caller-owned context types. Rust owns cipher rounds, MAC
+arithmetic, incremental buffering, authentication padding and composition. C++
+starts actual trivial context lifetimes for one-shot calls and passes compiler
+size/alignment/field-offset descriptors. Raw field access reads only initialized
+Poly1305 fields/chunk bytes, preserves unwritten chunk/padding bytes at init, and
+wipes the actual complete caller context at finalization. Counter access is raw
+and unaligned-capable, avoiding an i686 Rust/C++ uint64 alignment assumption.
+
+The original nonthrowing wipe and constant-time verify16 leaves are borrowed
+through a two-function explicit-cdecl table; Rust has no direct vendor imports or
+global callback registration. Every callback returns synchronously. Cipher input
+and output are disjoint or exactly in-place; key/nonce loads precede output,
+including unchanged Elligator key generation's overlapping key. Unsigned
+arithmetic wraps as before, failed reads preserve output/context, successful
+stream operations rekey without incrementing the context counter. Fixed-size
+secret temporaries use stable local storage and the original wipe points; this
+does not promise erasure of every compiler copy/spill or cryptographic
+certification. Other Monocypher algorithms and the exact portable family remain
+in C++; initial Cargo/source checks pass and full existing evidence is pending.
