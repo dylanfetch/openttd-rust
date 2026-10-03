@@ -14,7 +14,8 @@ evidence = runpy.run_path(str(Path(__file__).with_name("windows-rust-evidence.py
 class WindowsEvidenceTests(unittest.TestCase):
     def test_both_target_archive_metadata_and_refusals(self):
         with tempfile.TemporaryDirectory() as directory:
-            build = Path(directory)
+            # Windows TEMP can use an 8.3 alias; the locator returns canonical paths.
+            build = Path(directory).resolve()
             for target, width in (("i686-pc-windows-msvc", 4), ("x86_64-pc-windows-msvc", 8)):
                 with self.subTest(target=target):
                     archive = build / "cargo" / target / "release/openttd_kernels.lib"
