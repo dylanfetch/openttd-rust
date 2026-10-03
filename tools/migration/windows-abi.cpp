@@ -16,6 +16,7 @@
 #include "rust/spiral_ffi.h"
 #include "rust/byte_strings_ffi.h"
 #include "rust/history_ffi.h"
+#include "rust/math_ffi.h"
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -229,12 +230,48 @@ static void History()
 	std::printf("history descriptor identities, high-bit mask and staged by-value calls passed\n");
 }
 
+static void Math()
+{
+	/* Full uint32 input/output, including the rounded result beyond uint16. */
+	CHECK(openttd_rust_int_sqrt(0) == 0);
+	CHECK(openttd_rust_int_sqrt(6) == 2);
+	CHECK(openttd_rust_int_sqrt(7) == 3);
+	CHECK(openttd_rust_int_sqrt(UINT32_C(0x80000000)) == 46341);
+	CHECK(openttd_rust_int_sqrt(UINT32_C(4294836225)) == 65535);
+	CHECK(openttd_rust_int_sqrt(UINT32_MAX) == 65536);
+	constexpr uint64_t bits = UINT64_C(0xFEDCBA9876543210);
+	constexpr uint64_t high = UINT64_C(0x8000000000000000);
+	CHECK(openttd_rust_clamp_to(bits, 64, 0, 64, 0) == bits);
+	CHECK(openttd_rust_clamp_to(UINT64_MAX, 64, 0, 64, 1) == INT64_MAX);
+	CHECK(openttd_rust_clamp_to(high, 64, 1, 64, 0) == 0);
+	CHECK(openttd_rust_clamp_to(high, 64, 1, 64, 1) == high);
+	CHECK(openttd_rust_clamp_to(UINT64_MAX, 64, 0, 32, 0) == UINT32_MAX);
+	CHECK(openttd_rust_clamp_to(UINT32_MAX, 32, 0, 32, 1) == INT32_MAX);
+	CHECK(openttd_rust_clamp_to(UINT16_MAX, 16, 0, 16, 1) == INT16_MAX);
+	CHECK(openttd_rust_clamp_to(256, 16, 0, 8, 0) == UINT8_MAX);
+	CHECK(openttd_rust_clamp_to(0x80, 8, 1, 64, 1) == static_cast<uint64_t>(INT8_MIN));
+	CHECK(openttd_rust_clamp_to(UINT64_MAX, 64, 1, 8, 1) == UINT64_MAX);
+	CHECK(openttd_rust_clamp_to(2, 8, 0, 1, 0) == 1);
+	CHECK(openttd_rust_clamp_to(1, 1, 0, 64, 1) == 1);
+	/* The narrow signed reversed intervals intentionally retain C++ promotions. */
+	CHECK(openttd_rust_soft_clamp(bits, high, UINT64_MAX, 64, 0) == bits);
+	CHECK(openttd_rust_soft_clamp(0, high, UINT64_MAX, 64, 0) == high);
+	CHECK(openttd_rust_soft_clamp(UINT64_MAX, 0, bits, 64, 0) == bits);
+	CHECK(openttd_rust_soft_clamp(0, UINT64_MAX, 0, 64, 0) == high);
+	CHECK(openttd_rust_soft_clamp(0, UINT64_MAX, UINT64_MAX - 2, 8, 1) == 126);
+	CHECK(openttd_rust_soft_clamp(0, UINT64_MAX, UINT64_MAX - 2, 16, 1) == 32766);
+	CHECK(openttd_rust_soft_clamp(0, 1500000000, static_cast<uint64_t>(-1500000000), 32, 1) == 0);
+	CHECK(openttd_rust_soft_clamp(high, high, INT64_MAX, 64, 1) == high);
+	std::printf("math int_sqrt, clamp_to and soft_clamp scalar high-bit, width and boundary calls passed\n");
+}
+
 int main()
 {
 	Layouts();
 	Calls();
 	Encoded();
 	History();
+	Math();
 	Locale();
 	std::printf("ABI audit passed\n");
 }
