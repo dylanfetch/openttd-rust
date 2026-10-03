@@ -22,7 +22,9 @@
 #include "rust/crypto_primitives_ffi.h"
 #include "rust/blake2b_ffi.h"
 #include "rust/x25519_ffi.h"
+#include "rust/curve25519_ffi.h"
 #include "3rdparty/monocypher/monocypher.h"
+#include "3rdparty/monocypher/monocypher-ed25519.h"
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -420,6 +422,64 @@ static void X25519()
 	std::printf("x25519 four exports, cdecl wipe/verify32, physical wipe counts/final sizes, forward trim and 255/256 high-bit distinction passed\n");
 }
 
+static const uint8_t *curve_seed_watch, *curve_secret_watch, *curve_public_watch;
+static size_t curve_secret_size;
+static bool curve_seed_seen, curve_seed_order, curve_context_size_seen;
+static void OPENTTD_CRYPTO_CALL CurveWipe(void *data, size_t size) noexcept
+{
+	if (data == curve_seed_watch) {
+		curve_seed_seen = true;
+		curve_seed_order = std::all_of(curve_secret_watch, curve_secret_watch + curve_secret_size, [](uint8_t x) { return x == 0xA5; }) &&
+			std::all_of(curve_public_watch, curve_public_watch + 32, [](uint8_t x) { return x == 0xA5; });
+	}
+	curve_context_size_seen |= size == sizeof(crypto_blake2b_ctx);
+	X25519Wipe(data, size);
+}
+static void CurveFamily()
+{
+	const OpenTTDX25519Leaves leaves{CurveWipe, X25519Verify32};
+	std::array<uint8_t, 64> expanded, secret, signature;
+	std::array<uint8_t, 32> seed, public_key, scalar, expected, actual, point{};
+	for (size_t i = 0; i < expanded.size(); ++i) expanded[i] = static_cast<uint8_t>(i * 37 + 17);
+	std::copy_n(expanded.begin(), 32, seed.begin()); scalar.fill(0); scalar[31] = 0x80; point[0] = 9;
+	x25519_wipes_zero = true; curve_context_size_seen = false;
+	crypto_eddsa_reduce(expected.data(), expanded.data()); openttd_rust_eddsa_reduce(&leaves, actual.data(), expanded.data()); CHECK(actual == expected);
+	crypto_eddsa_mul_add(expected.data(), scalar.data(), seed.data(), point.data()); openttd_rust_eddsa_mul_add(&leaves, actual.data(), scalar.data(), seed.data(), point.data()); CHECK(actual == expected);
+	crypto_eddsa_scalarbase(expected.data(), scalar.data()); openttd_rust_eddsa_scalarbase(&leaves, actual.data(), scalar.data()); CHECK(actual == expected);
+	secret.fill(0xA5); public_key.fill(0xA5); curve_seed_watch = seed.data(); curve_secret_watch = secret.data(); curve_public_watch = public_key.data(); curve_secret_size = 64;
+	curve_seed_seen = curve_seed_order = false;
+	openttd_rust_eddsa_key_pair(&leaves, secret.data(), public_key.data(), seed.data());
+	CHECK(curve_seed_seen && curve_seed_order && std::all_of(seed.begin(), seed.end(), [](uint8_t x) { return x == 0; }) && curve_context_size_seen);
+	curve_seed_watch = nullptr;
+	openttd_rust_eddsa_sign(&leaves, signature.data(), secret.data(), expanded.data(), expanded.size());
+	CHECK(openttd_rust_eddsa_check(&leaves, signature.data(), public_key.data(), expanded.data(), expanded.size()) == 0);
+	signature[3] ^= 0x40; CHECK(openttd_rust_eddsa_check(&leaves, signature.data(), public_key.data(), expanded.data(), expanded.size()) == -1);
+	std::array<uint8_t, 64> equation{}; std::array<uint8_t, 32> identity{}, h{}; equation[0] = identity[0] = 1;
+	CHECK(openttd_rust_eddsa_check_equation(&leaves, equation.data(), identity.data(), h.data()) == 0);
+	equation[63] = 0x80; CHECK(openttd_rust_eddsa_check_equation(&leaves, equation.data(), identity.data(), h.data()) == -1);
+	crypto_eddsa_to_x25519(expected.data(), public_key.data()); openttd_rust_eddsa_to_x25519(&leaves, actual.data(), public_key.data()); CHECK(actual == expected);
+	crypto_x25519_to_eddsa(expected.data(), point.data()); openttd_rust_x25519_to_eddsa(&leaves, actual.data(), point.data()); CHECK(actual == expected);
+	crypto_x25519_dirty_small(expected.data(), scalar.data()); openttd_rust_x25519_dirty_small(&leaves, actual.data(), scalar.data()); CHECK(actual == expected);
+	crypto_x25519_dirty_fast(expected.data(), scalar.data()); openttd_rust_x25519_dirty_fast(&leaves, actual.data(), scalar.data()); CHECK(actual == expected);
+	crypto_elligator_map(expected.data(), scalar.data()); openttd_rust_elligator_map(&leaves, actual.data(), scalar.data()); CHECK(actual == expected);
+	point = actual; expected.fill(0xA5); actual.fill(0xA5);
+	int reverse = crypto_elligator_rev(expected.data(), point.data(), 0xC1);
+	CHECK(openttd_rust_elligator_rev(&leaves, actual.data(), point.data(), 0xC1) == reverse && actual == expected && reverse == 0);
+	std::array<uint8_t, 32> hidden, dirty_secret; hidden.fill(0xA5); dirty_secret.fill(0xA5); std::copy_n(expanded.begin(), 32, seed.begin());
+	curve_seed_watch = seed.data(); curve_secret_watch = dirty_secret.data(); curve_public_watch = hidden.data(); curve_secret_size = 32; curve_seed_seen = curve_seed_order = false;
+	openttd_rust_elligator_key_pair(&leaves, hidden.data(), dirty_secret.data(), seed.data());
+	CHECK(curve_seed_seen && curve_seed_order && std::all_of(seed.begin(), seed.end(), [](uint8_t x) { return x == 0; })); curve_seed_watch = nullptr;
+	crypto_x25519_inverse(expected.data(), scalar.data(), point.data()); openttd_rust_x25519_inverse(&leaves, actual.data(), scalar.data(), point.data()); CHECK(actual == expected);
+	CHECK(x25519_wipes_zero);
+	/* Actual retained SHA-512 callers reach the same Rust curve facades. */
+	std::copy_n(expanded.begin(), 32, seed.begin()); crypto_ed25519_key_pair(secret.data(), public_key.data(), seed.data());
+	crypto_ed25519_sign(signature.data(), secret.data(), expanded.data(), expanded.size()); CHECK(crypto_ed25519_check(signature.data(), public_key.data(), expanded.data(), expanded.size()) == 0);
+	signature[3] ^= 0x40; CHECK(crypto_ed25519_check(signature.data(), public_key.data(), expanded.data(), expanded.size()) == -1);
+	crypto_ed25519_ph_sign(signature.data(), secret.data(), expanded.data()); CHECK(crypto_ed25519_ph_check(signature.data(), public_key.data(), expanded.data()) == 0);
+	signature[3] ^= 0x40; CHECK(crypto_ed25519_ph_check(signature.data(), public_key.data(), expanded.data()) == -1);
+	std::printf("curve 15 exports reuse ABI 25, full-width scalar/equation, seed write order, zeroed wipes, native hash-context size, EdDSA and retained SHA-512/prehash callers passed\n");
+}
+
 static void StationCargo()
 {
 	auto list = std::unique_ptr<OpenTTDScriptList, decltype(&openttd_rust_list_destroy)>(openttd_rust_list_new(), openttd_rust_list_destroy);
@@ -493,6 +553,7 @@ int main()
 	CryptoPrimitives();
 	Blake2b();
 	X25519();
+	CurveFamily();
 	StationCargo();
 	PacketState();
 	Locale();

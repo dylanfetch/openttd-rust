@@ -8,6 +8,7 @@
 /** @file auth-comparison.cpp Stateful endpoint using actual Packet and authentication implementations. */
 #include "stdafx.h"
 #include "3rdparty/monocypher/monocypher.h"
+#include "3rdparty/monocypher/monocypher-ed25519.h"
 #include "debug.h"
 #include "core/random_func.hpp"
 #include <iostream>
@@ -391,6 +392,133 @@ static void X25519Primitives()
 	}
 }
 
+static void CurveKeyPair(unsigned variant, uint8_t *secret, uint8_t *public_key, uint8_t *seed)
+{
+	if (variant == 0) crypto_eddsa_key_pair(secret, public_key, seed);
+	else crypto_ed25519_key_pair(secret, public_key, seed);
+}
+static void CurveSign(unsigned variant, uint8_t *signature, const uint8_t *secret, const uint8_t *message, size_t size)
+{
+	if (variant == 0) crypto_eddsa_sign(signature, secret, message, size);
+	else if (variant == 1) crypto_ed25519_sign(signature, secret, message, size);
+	else { std::array<uint8_t, 64> hash; crypto_sha512(hash.data(), message, size); crypto_ed25519_ph_sign(signature, secret, hash.data()); }
+}
+static int CurveCheck(unsigned variant, const uint8_t *signature, const uint8_t *public_key, const uint8_t *message, size_t size)
+{
+	if (variant == 0) return crypto_eddsa_check(signature, public_key, message, size);
+	if (variant == 1) return crypto_ed25519_check(signature, public_key, message, size);
+	std::array<uint8_t, 64> hash; crypto_sha512(hash.data(), message, size); return crypto_ed25519_ph_check(signature, public_key, hash.data());
+}
+static void CurvePrimitives()
+{
+	const std::array<uint8_t, 32> l{0xed,0xd3,0xf5,0x5c,0x1a,0x63,0x12,0x58,0xd6,0x9c,0xf7,0xa2,0xde,0xf9,0xde,0x14,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0x10};
+	std::array<std::array<uint8_t, 32>, 8> scalars{};
+	scalars[1].fill(0xff); scalars[2] = l; --scalars[2][0]; scalars[3] = l; scalars[4] = l; ++scalars[4][0];
+	scalars[5][31] = 0x80; scalars[6][31] = 0x10; auto pattern = PrimitiveBytes(32, 41); std::copy(pattern.begin(), pattern.end(), scalars[7].begin());
+	for (size_t i = 0; i < scalars.size(); ++i) {
+		std::array<uint8_t, 64> expanded; for (size_t j = 0; j < expanded.size(); ++j) expanded[j] = scalars[i][j & 31];
+		std::array<uint8_t, 32> reduced, point, product;
+		crypto_eddsa_reduce(reduced.data(), expanded.data()); crypto_eddsa_scalarbase(point.data(), scalars[i].data());
+		crypto_eddsa_mul_add(product.data(), scalars[i].data(), scalars[(i+1)%8].data(), scalars[(i+2)%8].data());
+		std::cout << "curve-scalars " << i << ' ' << Hex(reduced) << ' ' << Hex(point) << ' ' << Hex(product) << '\n';
+	}
+	for (int delta : {-7, 0, 9, 39}) {
+		std::array<uint8_t, 144> storage; storage.fill(0xa5); auto input = PrimitiveBytes(64, 83); std::copy(input.begin(), input.end(), storage.begin() + 32);
+		crypto_eddsa_reduce(storage.data() + 32 + delta, storage.data() + 32);
+		std::cout << "curve-reduce-overlap " << delta << ' ' << Hex(storage) << '\n';
+	}
+	for (size_t output : {size_t{25}, size_t{32}, size_t{45}, size_t{71}}) {
+		std::array<uint8_t, 160> storage; storage.fill(0xa5); auto input = PrimitiveBytes(96, 57); std::copy(input.begin(), input.end(), storage.begin() + 32);
+		crypto_eddsa_mul_add(storage.data() + output, storage.data() + 32, storage.data() + 64, storage.data() + 96);
+		std::cout << "curve-mul-add-overlap " << output << ' ' << Hex(storage) << '\n';
+	}
+	for (int delta : {-5, 0, 7}) {
+		std::array<uint8_t, 104> storage; storage.fill(0xa5); std::copy(scalars[1].begin(), scalars[1].end(), storage.begin() + 32);
+		crypto_eddsa_scalarbase(storage.data() + 32 + delta, storage.data() + 32);
+		std::cout << "curve-scalarbase-overlap " << delta << ' ' << Hex(storage) << '\n';
+	}
+	/* The equation API admits noncanonical/low-order points; record its actual
+	 * decode/S-check/cofactor behavior, including bit 252 of reduced scalars. */
+	std::array<uint8_t, 32> identity{}; identity[0] = 1;
+	for (unsigned kind = 0; kind < 11; ++kind) {
+		std::array<uint8_t, 64> signature{}; std::array<uint8_t, 32> public_key = identity, h{};
+		signature[0] = 1;
+		if (kind == 1) { public_key.fill(0xff); public_key[0] = 0xee; public_key[31] = 0x7f; } // p+1 encodes y=1
+		if (kind == 2) { std::fill_n(signature.begin(), 32, 0xff); signature[0] = 0xee; signature[31] = 0x7f; }
+		if (kind == 3) public_key[31] = 0x80; // negative encoding of x=0
+		if (kind == 4) public_key[0] = 2;
+		if (kind == 5) signature[0] = 2;
+		if (kind == 6) std::copy(l.begin(), l.end(), signature.begin()+32);
+		if (kind == 7) signature[63] = 0x80;
+		if (kind == 8) { crypto_eddsa_scalarbase(signature.data(), scalars[2].data()); std::copy(scalars[2].begin(), scalars[2].end(), signature.begin()+32); }
+		if (kind == 9) { crypto_eddsa_scalarbase(public_key.data(), identity.data()); std::copy(scalars[2].begin(), scalars[2].end(), signature.begin()+32); h = scalars[2]; }
+		if (kind == 10) { public_key.fill(0); signature[0] = 0; h[0] = 3; }
+		const auto result = crypto_eddsa_check_equation(signature.data(), public_key.data(), h.data());
+		std::cout << "curve-equation " << kind << ' ' << result << '\n';
+	}
+	for (unsigned variant = 0; variant < 3; ++variant) {
+		auto seed = PrimitiveBytes(32, 23); std::array<uint8_t, 64> secret; std::array<uint8_t, 32> public_key;
+		CurveKeyPair(variant, secret.data(), public_key.data(), seed.data());
+		PrimitiveRequire(std::ranges::all_of(seed, [](uint8_t byte) { return byte == 0; }));
+		std::cout << "curve-keypair " << variant << ' ' << Hex(secret) << ' ' << Hex(public_key) << ' ' << Hex(seed) << '\n';
+		for (size_t size : {size_t{0},size_t{1},size_t{127},size_t{128},size_t{129},size_t{255},size_t{256}}) {
+			auto message = PrimitiveBytes(size, 91); std::array<uint8_t, 64> signature;
+			CurveSign(variant, signature.data(), secret.data(), message.data(), size);
+			const auto valid = CurveCheck(variant, signature.data(), public_key.data(), message.data(), size);
+			auto damaged = signature; damaged[3] ^= 0x40;
+			const auto bad = CurveCheck(variant, damaged.data(), public_key.data(), message.data(), size);
+			PrimitiveRequire(valid == 0 && bad == -1);
+			std::cout << "curve-signature " << variant << ' ' << size << ' ' << Hex(signature) << ' ' << valid << ' ' << bad << '\n';
+		}
+	}
+	const std::array<std::array<size_t, 3>, 8> key_aliases{{{48,112,16},{32,96,32},{48,16,16},{32,64,128},{32,32,128},{32,55,128},{32,96,37},{48,61,16}}};
+	for (unsigned variant : {0U,1U}) for (const auto &offsets : key_aliases) {
+		std::array<uint8_t, 192> storage; storage.fill(0xa5); auto seed = PrimitiveBytes(32, 17); std::copy(seed.begin(), seed.end(), storage.begin()+offsets[2]);
+		CurveKeyPair(variant, storage.data()+offsets[0], storage.data()+offsets[1], storage.data()+offsets[2]);
+		std::cout << "curve-keypair-overlap " << variant << ' ' << offsets[0] << ' ' << offsets[1] << ' ' << offsets[2] << ' ' << Hex(storage) << '\n';
+	}
+	const std::array<std::array<size_t, 3>, 6> sign_aliases{{{48,128,48},{32,128,128},{48,128,55},{32,128,135},{32,128,121},{32,80,48}}};
+	for (unsigned variant = 0; variant < 3; ++variant) for (const auto &offsets : sign_aliases) {
+		std::array<uint8_t, 224> storage; storage.fill(0xa5); auto message = PrimitiveBytes(65, 103); std::copy(message.begin(),message.end(),storage.begin()+offsets[1]);
+		auto seed = PrimitiveBytes(32, 17); std::array<uint8_t, 32> public_key;
+		CurveKeyPair(variant,storage.data()+offsets[0],public_key.data(),seed.data());
+		auto message_before = std::span(storage.data()+offsets[1],65); std::vector<uint8_t> snapshot(message_before.begin(),message_before.end());
+		CurveSign(variant,storage.data()+offsets[2],storage.data()+offsets[0],storage.data()+offsets[1],65);
+		const auto valid = CurveCheck(variant,storage.data()+offsets[2],public_key.data(),snapshot.data(),snapshot.size()); PrimitiveRequire(valid==0);
+		std::cout << "curve-sign-overlap " << variant << ' ' << offsets[0] << ' ' << offsets[1] << ' ' << offsets[2] << ' ' << Hex(storage) << ' ' << valid << '\n';
+	}
+	std::array<std::array<uint8_t, 32>, 9> points{}; points[1][0] = 1; points[2][0] = 9;
+	points[3].fill(0xff); points[3][0]=0xec; points[3][31]=0x7f; points[4]=points[3]; ++points[4][0]; points[5]=points[4]; ++points[5][0]; points[6].fill(0xff); points[6][31]=0x7f; points[7]=points[2]; points[7][31]=0x80; points[8].fill(0xff); points[8][0]=0xe7; points[8][1]=0x92; points[8][2]=0xf8; points[8][31]=0x7f; // -A
+	for (size_t i=0;i<points.size();++i) {
+		std::array<uint8_t, 32> montgomery,edwards; crypto_eddsa_to_x25519(montgomery.data(),points[i].data()); crypto_x25519_to_eddsa(edwards.data(),points[i].data());
+		std::cout << "curve-conversion " << i << ' ' << Hex(montgomery) << ' ' << Hex(edwards) << '\n';
+		for (uint8_t tweak : {uint8_t{0},uint8_t{1},uint8_t{2},uint8_t{3},uint8_t{0x3c},uint8_t{0xc0},uint8_t{0xc1},uint8_t{0xff}}) {
+			std::array<uint8_t, 32> hidden; hidden.fill(0xa5); const auto result=crypto_elligator_rev(hidden.data(),points[i].data(),tweak);
+			if (result != 0) PrimitiveRequire(std::ranges::all_of(hidden,[](uint8_t byte){return byte==0xa5;}));
+			std::array<uint8_t, 32> mapped{}; if (result==0) crypto_elligator_map(mapped.data(),hidden.data());
+			std::cout << "curve-reverse " << i << ' ' << static_cast<unsigned>(tweak) << ' ' << result << ' ' << Hex(hidden) << ' ' << Hex(mapped) << '\n';
+		}
+	}
+	for (unsigned high=0;high<4;++high) {
+		auto hidden=PrimitiveBytes(32,31); hidden[31]=static_cast<uint8_t>((hidden[31]&0x3f)|(high<<6)); std::array<uint8_t, 32> mapped; crypto_elligator_map(mapped.data(),hidden.data());
+		std::cout << "curve-map-padding " << high << ' ' << Hex(mapped) << '\n';
+	}
+	for (unsigned operation=0;operation<5;++operation) for (int delta : {-7,0,5}) {
+		std::array<uint8_t, 160> storage; storage.fill(0xa5); auto input=PrimitiveBytes(32,17); std::copy(input.begin(),input.end(),storage.begin()+32); storage[96]=9;
+		if (operation==0) crypto_eddsa_to_x25519(storage.data()+32+delta,storage.data()+32);
+		if (operation==1) crypto_x25519_to_eddsa(storage.data()+32+delta,storage.data()+32);
+		if (operation==2) crypto_x25519_dirty_small(storage.data()+32+delta,storage.data()+32);
+		if (operation==3) crypto_x25519_dirty_fast(storage.data()+32+delta,storage.data()+32);
+		if (operation==4) crypto_x25519_inverse(storage.data()+96+delta,storage.data()+32,storage.data()+96);
+		std::cout << "curve-caller-overlap " << operation << ' ' << delta << ' ' << Hex(storage) << '\n';
+	}
+	for (const auto &offsets : std::array<std::array<size_t,3>,4>{{{16,64,112},{16,64,16},{16,64,64},{16,21,112}}}) {
+		std::array<uint8_t, 160> storage; storage.fill(0xa5); auto seed=PrimitiveBytes(32,73); std::copy(seed.begin(),seed.end(),storage.begin()+offsets[2]);
+		crypto_elligator_key_pair(storage.data()+offsets[0],storage.data()+offsets[1],storage.data()+offsets[2]);
+		std::cout << "curve-elligator-keypair-overlap " << offsets[0] << ' ' << offsets[1] << ' ' << offsets[2] << ' ' << Hex(storage) << '\n';
+	}
+}
+
 static int PrimitiveMain()
 {
 	auto key = PrimitiveBytes(32, 9), nonce = PrimitiveBytes(24, 101);
@@ -504,6 +632,7 @@ static int PrimitiveMain()
 	}
 	BlakePrimitives();
 	X25519Primitives();
+	CurvePrimitives();
 	return 0;
 }
 
@@ -627,6 +756,15 @@ int main(int argc, char **argv)
 				try { FixtureSession thrown(secret); } catch (const std::runtime_error &) {}
 				random_throw_after = SIZE_MAX;
 				std::cout << wipe_ok << ' ' << (wipes != 0);
+			} else if (command == "curve-sign") {
+				std::string message_hex; input >> message_hex; auto seed = Unhex(b), message = Unhex(message_hex); PrimitiveRequire(seed.size() == 32);
+				std::array<uint8_t, 64> secret, signature; std::array<uint8_t, 32> public_key; auto variant = Number(a, 10); PrimitiveRequire(variant < 3);
+				CurveKeyPair(variant, secret.data(), public_key.data(), seed.data()); CurveSign(variant, signature.data(), secret.data(), message.data(), message.size());
+				std::cout << Hex(public_key) << ' ' << Hex(signature) << ' ' << Hex(seed);
+			} else if (command == "curve-check") {
+				std::string public_hex, message_hex; input >> public_hex >> message_hex; auto signature = Unhex(b), public_key = Unhex(public_hex), message = Unhex(message_hex);
+				auto variant = Number(a, 10); PrimitiveRequire(variant < 3 && signature.size() == 64 && public_key.size() == 32);
+				std::cout << CurveCheck(variant, signature.data(), public_key.data(), message.data(), message.size());
 			} else throw std::runtime_error("unknown command");
 			std::cout << '\n' << std::flush;
 		} catch (const std::exception &error) { std::cout << "error " << error.what() << '\n' << std::flush; }

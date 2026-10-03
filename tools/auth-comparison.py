@@ -143,6 +143,37 @@ def scenario(server_binary, client_binary, env, extra_server, extra_client, mode
     return transcript
 
 
+def curve_interoperability(binaries, env, name):
+    transcript = []
+    endpoints = {label: Endpoint(binary, label, transcript, env) for label, binary in binaries.items()}
+    cases = 0
+    try:
+        seed = bytes((i * 37 + 17) & 255 for i in range(32)).hex()
+        for variant in (0, 1, 2):
+            for size in (0, 1, 127, 128, 129):
+                message = bytes((i * 37 + 91) & 255 for i in range(size))
+                signed = {label: endpoint.call(f"curve-sign {variant} {seed} {hex_bytes(message)}").split()
+                          for label, endpoint in endpoints.items()}
+                expected = signed["reference"]
+                if any(value != expected for value in signed.values()) or expected[2] != "00" * 32:
+                    raise RuntimeError(f"Curve signing/seed wipe discrepancy: {name}, {variant}, {size}")
+                for signer, checker in (("reference", "candidate"), ("candidate", "reference"),
+                                        ("reference", "candidate-cpp"), ("candidate-cpp", "reference")):
+                    public_key, signature, _ = signed[signer]
+                    result = endpoints[checker].call(f"curve-check {variant} {signature} {public_key} {hex_bytes(message)}")
+                    bad = bytearray.fromhex(signature); bad[3] ^= 0x40
+                    failed = endpoints[checker].call(f"curve-check {variant} {bad.hex()} {public_key} {hex_bytes(message)}")
+                    if result != "0" or failed != "-1":
+                        raise RuntimeError(f"Mixed curve signature discrepancy: {name}, {signer}, {checker}, {variant}, {size}")
+                cases += 1
+    finally:
+        for endpoint in endpoints.values():
+            endpoint.close()
+    path = OUT / f"curve-interop-{name}.json"
+    path.write_text(json.dumps(transcript, indent=2) + "\n")
+    return {"cases": cases, "endpoint_records": len(transcript), "sha256": hashlib.sha256(path.read_bytes()).hexdigest(), "passed": True}
+
+
 def main():
     MIGRATION["ensure_reference"]()
     OUT.mkdir(parents=True, exist_ok=True)
@@ -153,14 +184,21 @@ def main():
     commands, binaries, ladder_shims = [], {}, {}
     sources = ("src/network/network_crypto.cpp", "src/network/network_crypto_internal.h",
                "src/network/core/packet.cpp", "src/3rdparty/monocypher/monocypher.cpp",
-               "src/3rdparty/monocypher/monocypher.h", "src/string.cpp", "src/core/string_builder.cpp", "src/core/string_inplace.cpp", "src/core/utf8.cpp")
+               "src/3rdparty/monocypher/monocypher.h", "src/3rdparty/monocypher/monocypher-ed25519.cpp", "src/3rdparty/monocypher/monocypher-ed25519.h", "src/string.cpp", "src/core/string_builder.cpp", "src/core/string_inplace.cpp", "src/core/utf8.cpp")
     for label, source in (("reference", REFERENCE), ("candidate", ROOT), ("candidate-cpp", ROOT)):
         binary = OUT / label
         # Include unchanged actual vendor source and expose only its private
         # coarse helper. No copied field/ladder oracle or altered vendor body.
         shim = OUT / f"{label}-ladder.cpp"
         shim.write_text(f'#include "{source / "src/3rdparty/monocypher/monocypher.cpp"}"\n'
-                        'extern "C" void FixtureLadder(uint8_t *out, const uint8_t *scalar, const uint8_t *point, int32_t bits) { scalarmult(out, scalar, point, bits); }\n')
+                        '''extern "C" void FixtureLadder(uint8_t *out, const uint8_t *scalar, const uint8_t *point, int32_t bits) {
+#ifdef WITH_RUST
+    openttd_rust_x25519_ladder(&rust_x25519_leaves, out, scalar, point, bits);
+#else
+    scalarmult(out, scalar, point, bits);
+#endif
+}
+''')
         ladder_shims[label] = {"path": str(shim), "sha256": hashlib.sha256(shim.read_bytes()).hexdigest()}
         command = ["g++", "-std=c++20", "-O2", "-DUNIX", "-DFMT_HEADER_ONLY", "-ffunction-sections", "-fdata-sections",
                    "-I", str(source / "src"), str(fixture),
@@ -209,6 +247,7 @@ def main():
                         if (expected[i] if i < len(expected) else None) != (actual[i] if i < len(actual) else None)]
             (OUT / "primitive-failures.json").write_text(json.dumps(failures, indent=2) + "\n")
             raise RuntimeError(f"{label} primitive discrepancies: {len(failures)}")
+    curve_interop = curve_interoperability(binaries, env, "native")
     # Instrument the complete C++ fixture, Packet, vendor and facade boundary;
     # stable Rust allocations are leak-observable, Rust accesses are not ASan-instrumented.
     sanitizer = next(list(command) for command in commands if "-DWITH_RUST" in command)
@@ -233,17 +272,20 @@ def main():
     (OUT / "candidate-sanitized-primitives.err").write_bytes(result.stderr)
     if result.returncode or result.stderr or result.stdout != primitive_outputs["reference"]:
         raise RuntimeError("Direct primitive C++ boundary sanitizer failed; see retained output")
+    sanitized_binaries = dict(binaries); sanitized_binaries["candidate"] = OUT / "candidate-sanitized"
+    curve_interop["cpp_boundary_sanitizers"] = curve_interoperability(sanitized_binaries, sanitized_env, "sanitized")
     primitives = {"records": len(primitive_outputs["reference"].splitlines()),
                   "record_counts": dict(Counter(row.split()[0].decode() for row in primitive_outputs["reference"].splitlines())),
                   "output_sha256": {label: hashlib.sha256(output).hexdigest() for label, output in primitive_outputs.items()},
                   "all_context_bytes_prefilled": True, "cpp_boundary_sanitizers_passed": True, "passed": True}
     primitives["blake2b_records"] = sum(count for kind, count in primitives["record_counts"].items() if kind.startswith("blake-"))
     primitives["x25519_records"] = sum(count for kind, count in primitives["record_counts"].items() if kind.startswith("x25519-"))
-    primitives["prior_cipher_mac_records"] = primitives["records"] - primitives["blake2b_records"] - primitives["x25519_records"]
+    primitives["curve_records"] = sum(count for kind, count in primitives["record_counts"].items() if kind.startswith("curve-"))
+    primitives["prior_cipher_mac_records"] = primitives["records"] - primitives["blake2b_records"] - primitives["x25519_records"] - primitives["curve_records"]
     MIGRATION["ensure_reference"]()
     report = {"baseline": MIGRATION["BASELINE"], "candidate_commit": MIGRATION["git"]("rev-parse", "HEAD"),
               "candidate_status": MIGRATION["git"]("status", "--porcelain"), "rust_archive": str(archive),
-              "commands": commands, "ladder_shims": ladder_shims, "scenario_count": len(scenarios), "compared_endpoint_records": comparisons, "primitives": primitives,
+              "commands": commands, "ladder_shims": ladder_shims, "curve_interop": curve_interop, "scenario_count": len(scenarios), "compared_endpoint_records": comparisons, "primitives": primitives,
               "original_record_counts": dict(counts), "transcript_sha256": hashes,
               "reference_source_sha256": {name: hashlib.sha256((REFERENCE / name).read_bytes()).hexdigest() for name in sources},
               "fixture_sha256": hashlib.sha256(fixture.read_bytes()).hexdigest(),

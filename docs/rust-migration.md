@@ -1440,3 +1440,20 @@ vendor fixture. Native supported-platform ABI/call evidence and separate exact-h
 review remain required. Functional comparisons and C++ boundary sanitizers do not
 instrument Rust accesses, certify cryptographic timing/security, prove complete
 copy/spill erasure or establish complete vendor/game equivalence.
+
+The curve closure removes the now-unused C++ ladder bridge from the Rust-enabled
+vendor translation unit. The existing fixture companion directly calls the actual
+Rust coarse ladder with the original leaf table in that mode; the portable/original
+companion still exposes the actual unchanged private C++ helper. No function body
+is rewritten for its oracle. The retained SHA-512 translation unit is linked into
+the ABI audit and actual-vendor fixture to exercise its original Ed25519/prehash
+calls on every supported native ABI.
+
+The bounded curve extension covers full-width L/scalar cases and output aliases,
+public equation decode/S/cofactor and bit-252 witnesses, empty/hash-block-boundary
+messages, key-pair/signature overlaps, conversion exceptions, reverse-map selector,
+padding/failure/sentinel behavior and deterministic key/inverse aliases. Mixed
+original-sign/Rust-check and Rust-sign/original-check calls retain exact bytes and
+return codes. Nonthrowing ABI observers additionally verify outputs remain untouched
+at the external seed wipe and observe the native hash-context wipe size. These
+observations complement source-reviewed complete wipe ordering, not total erasure.

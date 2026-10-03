@@ -1054,10 +1054,6 @@ void crypto_argon2(u8 *hash, u32 hash_size, void *work_area,
 #ifdef WITH_RUST
 // Coarse public adapters. All field/L/point/curve decisions stay inside Rust.
 void crypto_eddsa_trim_scalar(u8 out[32], const u8 in[32]) { openttd_rust_x25519_trim(out, in); }
-[[maybe_unused]] static void scalarmult(u8 out[32], const u8 scalar[32], const u8 point[32], int bits)
-{
-	openttd_rust_x25519_ladder(&rust_x25519_leaves, out, scalar, point, bits);
-}
 void crypto_x25519(u8 out[32], const u8 secret[32], const u8 point[32])
 {
 	openttd_rust_x25519(&rust_x25519_leaves, out, secret, point);
