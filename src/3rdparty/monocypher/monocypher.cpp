@@ -84,9 +84,9 @@ typedef int32_t  i32;
 typedef int64_t  i64;
 typedef uint64_t u64;
 
+#ifndef WITH_RUST
 static const u8 zero[128] = {0};
 
-#ifndef WITH_RUST
 // returns the smallest positive integer y such that
 // (x + y) % pow_2  == 0
 // Basically, y is the "gap" missing to align x.
@@ -137,15 +137,19 @@ static void store64_le(u8 out[8], u64 in)
 	store32_le(out + 4, in >> 32);
 }
 
+#ifndef WITH_RUST
 static void load32_le_buf (u32 *dst, const u8 *src, size_t size) {
 	FOR(i, 0, size) { dst[i] = load32_le(src + i*4); }
 }
+#endif
 static void load64_le_buf (u64 *dst, const u8 *src, size_t size) {
 	FOR(i, 0, size) { dst[i] = load64_le(src + i*8); }
 }
+#ifndef WITH_RUST
 static void store32_le_buf(u8 *dst, const u32 *src, size_t size) {
 	FOR(i, 0, size) { store32_le(dst + i*4, src[i]); }
 }
+#endif
 static void store64_le_buf(u8 *dst, const u64 *src, size_t size) {
 	FOR(i, 0, size) { store64_le(dst + i*8, src[i]); }
 }
