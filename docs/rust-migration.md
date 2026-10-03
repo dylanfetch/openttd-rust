@@ -698,7 +698,7 @@ reordered `-finput-charset=utf-8`; two Unix entry objects additionally contain
 different internal LTO identifiers. An identical configure-only IPO command
 compiled twice reproduced different GCC LTO identifiers. Configure-only probes
 and fresh Cargo debug incremental paths are separate from cached game objects.
-All four original/candidate game/test binaries have 27 allocated sections; only
+All four original/candidate game/test binaries have 27 file-backed allocated sections; only
 the original date bytes in `.rodata` and the resulting build IDs changed between
 cold and bypass. Code and mutable data agree. The trial therefore establishes
 covered behavior and material local reuse benefit, not byte-identical binaries
