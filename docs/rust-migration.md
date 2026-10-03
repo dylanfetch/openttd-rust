@@ -33,6 +33,59 @@ archive; actual call-site coverage is described below. These replacements do not
 complete their containing subsystems. Preserve the complete game,
 including networking, saves, NewGRF mods, graphics, and shared random-number behavior.
 
+### Paired Script Admin conversion
+
+`ScriptAdminMakeJSON` and `ScriptEventAdminPort::GetObject` keep their public C++
+interfaces. With Rust enabled, an Admin-specific owner selects types, walks both
+conversion directions, propagates results, and schedules the original VM and JSON
+operations. An opaque per-invocation handle returns scalar actions; C++ executes
+each action after the Rust call returns. The adapter retains the bundled Squirrel
+VM, nlohmann parser and JSON objects, script logger, and network send/framing.
+Portable builds retain the original recursive bodies.
+
+Outgoing traversal checks `depth == 25` before reading the VM type or changing
+JSON, including calls with an explicit initial depth. It preserves live Squirrel
+iteration, key stringification and byte copying before child conversion, duplicate
+stringified-key overwrite order, `index - 1`, and `depth + 1` for the original
+defined arithmetic domain. A failed child leaves completed root children intact:
+the original two VM pops and iterator pop occur before failed temporary cleanup.
+Arrays copy their completed temporary; tables move the copied key and value.
+Incoming traversal accepts only an object root, rejects floats, and has no depth
+25 limit. Ordinary failure restores the saved stack top before logging and pushing
+null. Parsing malformed input still supplies the original root diagnostic.
+
+No JSON tree or byte string crosses the ABI. Stable C++ heap frames retain actual
+JSON temporaries, iterators, and copied keys; Rust retains only traversal state and
+scalar frame slots. Raw Squirrel and nlohmann type encodings are pinned with C++
+assertions. `SQInteger` and `SQRESULT` remain signed 64-bit, `SQBool` unsigned
+64-bit, and outgoing depth signed 32-bit, including the original VM widths on
+i686. The incoming unsigned JSON conversion still calls `get<int64_t>()`.
+Arbitrary NUL and non-UTF-8 bytes retain the original byte-string operations.
+
+Typed allocation errors, `Script_FatalError`, nlohmann exceptions, and reentrant
+key metamethods occur entirely between Rust calls. RAII destroys control owners and
+typed temporaries on C++ unwinding, without executing pending VM pops, rollback,
+logging, or null pushes. Nested conversions own independent engines. The matching
+Rust destroy function owns deallocation; no C++ exception crosses a live Rust
+frame. Rust panic and allocation exhaustion abort. Additional control/frame
+allocations change resource-exhaustion timing; this port does not claim identical
+failure timing for all memory limits or arbitrary allocation positions.
+
+The two unchanged `test_script_admin.cpp` cases retain their 15 outgoing and 27
+incoming checks. `python3 tools/admin-conversion-comparison.py` adds only the
+demonstrated coverage gaps, extracting unchanged pinned conversion bodies and
+`ScriptAllocator`, and using the actual bundled VM and candidate entry points.
+It compares both mixed original/candidate directions and directly inspects VM
+values, stack state, partial JSON, diagnostic entry text/order, and owner cleanup
+at O0 and O2. The scoped fixture includes depth 25/26, incoming depth 40, integer
+extrema and unsigned overflow, byte strings/keys, completed siblings before
+failure, colliding key stringification, a reentrant `_tostring`, typed string/key
+copy allocation failures, and a real script allocation limit. The GNU link-wrap
+cleanup checks currently run on native Linux; game-log storage, every allocation
+failure, arbitrary recursion depths, network simulation, and complete script/game
+equivalence remain outside this evidence. Native platform builds exercise the
+unchanged game tests through their actual Rust/C++ ABI.
+
 ## Build and verification
 
 The current verification setup targets native Linux and needs a C++20 compiler,

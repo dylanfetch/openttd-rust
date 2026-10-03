@@ -22,6 +22,10 @@
 
 #include "table/strings.h"
 
+#ifdef WITH_RUST
+#include "../admin_conversion.hpp"
+#endif
+
 #include "../../safeguards.h"
 
 bool ScriptEventEnginePreview::IsEngineValid() const
@@ -121,6 +125,8 @@ ScriptEventAdminPort::ScriptEventAdminPort(const std::string &json) :
 		json(json)
 {
 }
+
+#ifndef WITH_RUST
 /**
  * Convert a JSON part for Squirrel.
  * @param vm The VM used.
@@ -182,11 +188,15 @@ static bool ScriptEventAdminPortReadValue(HSQUIRRELVM vm, nlohmann::json &json)
 
 	return true;
 }
+#endif /* !WITH_RUST */
 
 SQInteger ScriptEventAdminPort::GetObject(HSQUIRRELVM vm)
 {
 	auto json = nlohmann::json::parse(this->json, nullptr, false);
 
+#ifdef WITH_RUST
+	ScriptAdminConvertFromJSON(json, vm);
+#else
 	if (!json.is_object()) {
 		ScriptLog::Error("The root element in the JSON data from AdminPort has to be an object.");
 
@@ -204,6 +214,6 @@ SQInteger ScriptEventAdminPort::GetObject(HSQUIRRELVM vm)
 		sq_pushnull(vm);
 		return 1;
 	}
-
+#endif /* WITH_RUST */
 	return 1;
 }
