@@ -18,6 +18,7 @@
 #include "rust/history_ffi.h"
 #include "rust/math_ffi.h"
 #include "rust/station_cargo_ffi.h"
+#include "rust/packet_ffi.h"
 #include "rust/crypto_primitives_ffi.h"
 #include "3rdparty/monocypher/monocypher.h"
 #include <algorithm>
@@ -73,6 +74,8 @@ static void Layouts()
 	Layout(19, "OpenTTDCryptoLeaves", {sizeof(OpenTTDCryptoLeaves), alignof(OpenTTDCryptoLeaves), offsetof(OpenTTDCryptoLeaves, wipe), offsetof(OpenTTDCryptoLeaves, verify16)});
 	Layout(20, "OpenTTDPolyLayout", {sizeof(OpenTTDPolyLayout), alignof(OpenTTDPolyLayout), offsetof(OpenTTDPolyLayout, size), offsetof(OpenTTDPolyLayout, alignment), offsetof(OpenTTDPolyLayout, c), offsetof(OpenTTDPolyLayout, c_idx), offsetof(OpenTTDPolyLayout, r), offsetof(OpenTTDPolyLayout, pad), offsetof(OpenTTDPolyLayout, h)});
 	Layout(21, "OpenTTDAeadLayout", {sizeof(OpenTTDAeadLayout), alignof(OpenTTDAeadLayout), offsetof(OpenTTDAeadLayout, size), offsetof(OpenTTDAeadLayout, alignment), offsetof(OpenTTDAeadLayout, counter), offsetof(OpenTTDAeadLayout, key), offsetof(OpenTTDAeadLayout, nonce)});
+	Layout(23, "OpenTTDPacketState", {sizeof(OpenTTDPacketState), alignof(OpenTTDPacketState), offsetof(OpenTTDPacketState, limit), offsetof(OpenTTDPacketState, position)});
+	Layout(24, "OpenTTDPacketFrame", {sizeof(OpenTTDPacketFrame), alignof(OpenTTDPacketFrame), offsetof(OpenTTDPacketFrame, message), offsetof(OpenTTDPacketFrame, payload)});
 	CHECK(openttd_rust_abi_layout(255, 0) == SIZE_MAX);
 	CHECK(static_cast<size_t>(PTRDIFF_MAX) == (SIZE_MAX >> 1));
 	std::printf("pointer_bytes %zu sentinel %zu borrow_limit %zu\n", sizeof(void *), SIZE_MAX, static_cast<size_t>(PTRDIFF_MAX));
@@ -355,6 +358,42 @@ static void StationCargo()
 	std::printf("station_cargo scalar layout, uint32 wrapping, origin reset and finalization passed\n");
 }
 
+static void PacketState()
+{
+	static_assert(sizeof(intptr_t) == sizeof(size_t));
+	OpenTTDPacketState state;
+	openttd_rust_packet_init(&state, SIZE_MAX);
+	CHECK(state.limit == SIZE_MAX && state.position == 0);
+	CHECK(openttd_rust_packet_can_write(&state, SIZE_MAX, 1) == 1);
+	CHECK(openttd_rust_packet_boolean(128) == 1 && openttd_rust_packet_boolean(0) == 0);
+	CHECK(openttd_rust_packet_buffer_size(SIZE_MAX) == 1 && openttd_rust_packet_prefix(65537) == 1);
+	std::array<uint8_t, 8> bytes{8, 0, 1, 2, 3, 4, 5, 6};
+	CHECK(openttd_rust_packet_parse_size(&state, bytes.data(), bytes.size()) == 8);
+	openttd_rust_packet_read_start(&state);
+	CHECK(openttd_rust_packet_has_size(&state) == 1 && openttd_rust_packet_can_read(&state, 8, 6) == 1);
+	CHECK(openttd_rust_packet_recv(&state, bytes.data(), bytes.size(), 2) == 0x0201 && state.position == 4);
+	uint16_t count = 1;
+	uint8_t byte = 0;
+	CHECK(openttd_rust_packet_buffer_next(&state, bytes.data(), bytes.size(), &count, &byte) == 1 && byte == 3 && state.position == 5);
+	CHECK(openttd_rust_packet_buffer_next(&state, bytes.data(), bytes.size(), &count, &byte) == 0 && count == UINT16_MAX);
+	CHECK(openttd_rust_packet_remaining(&state, 8) == 3 && openttd_rust_packet_transfer_amount(&state, 8, 2) == 2);
+	openttd_rust_packet_transfer_commit(&state, -1);
+	CHECK(state.position == 5);
+	openttd_rust_packet_transfer_commit(&state, 65537);
+	CHECK(state.position == 6);
+	openttd_rust_packet_skip_mac(&state, 65537);
+	CHECK(state.position == 7);
+	OpenTTDPacketFrame frame;
+	CHECK(openttd_rust_packet_frame(2, 8, 2, &frame) == 1 && frame.message == 4 && frame.payload == 4);
+	CHECK(openttd_rust_packet_frame(2, 4, 2, &frame) == 0);
+	CHECK(openttd_rust_packet_send_amount(&state, SIZE_MAX - 2, 4) == 2);
+	openttd_rust_packet_write_header(bytes.data(), bytes.size());
+	CHECK(bytes[0] == 8 && bytes[1] == 0);
+	openttd_rust_packet_send_reset(&state);
+	CHECK(state.position == 0);
+	std::printf("packet scalar framing, binary reads and native cursor transitions passed\n");
+}
+
 int main()
 {
 	Layouts();
@@ -364,6 +403,7 @@ int main()
 	Math();
 	CryptoPrimitives();
 	StationCargo();
+	PacketState();
 	Locale();
 	std::printf("ABI audit passed\n");
 }
