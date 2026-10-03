@@ -55,6 +55,18 @@ RUNTIME_DIRECTORIES = ("lang", "baseset", "ai", "game", "regression")
 TICKS_PER_DAY = 74
 SNAPSHOT_TICKS = 32 * TICKS_PER_DAY
 
+# Road networks built by LLM players in OpenTTD 15.1 (migration/saves/README.md),
+# loaded with their scripts dropped. The first two run by default.
+PLAY_SAVES = ("opus-55-167-002", "grok-159-001", "astra-156-003", "opus-55-165-002", "opus-5-133-009", "fable-152-004")
+# Console commands run from scripts/game_start.scr after loading; the saves were
+# written paused. cargodist uses short link graph intervals so jobs recur often.
+DISTRIBUTIONS = {
+    "manual": ["unpause"],
+    "cargodist": ["setting linkgraph.distribution_pax 2", "setting linkgraph.distribution_mail 2",
+                  "setting linkgraph.distribution_default 1", "setting linkgraph.recalc_interval 4",
+                  "setting linkgraph.recalc_time 16", "unpause"],
+}
+
 
 def scenario_list(soak):
     """Data-driven scenario set; extend this for new ports rather than adding tools."""
@@ -73,6 +85,13 @@ def scenario_list(soak):
                     "map_log2": size, "land_generator": generator,
                     "ticks": years * 365 * TICKS_PER_DAY + SNAPSHOT_TICKS,
                 })
+    for save in PLAY_SAVES if soak else PLAY_SAVES[:2]:
+        for distribution, commands in DISTRIBUTIONS.items():
+            scenarios.append({
+                "name": f"play-{save}-{distribution}", "kind": "save", "console": commands,
+                "save": str(ROOT / "migration/saves" / f"{save}.sav"),
+                "ticks": years * 365 * TICKS_PER_DAY + SNAPSHOT_TICKS,
+            })
     return scenarios
 
 
@@ -294,9 +313,10 @@ def write_config(scenario, build, run_dir):
             "[gui]\nautosave = off\n"
             "[difficulty]\nmax_no_competitors = 0\ndisasters = true\n"
             "[game_creation]\ntown_name = english\n"
-            f"map_x = {scenario['map_log2']}\nmap_y = {scenario['map_log2']}\n"
-            f"land_generator = {scenario['land_generator']}\n"
         )
+        if scenario["kind"] == "generate":
+            text += (f"map_x = {scenario['map_log2']}\nmap_y = {scenario['map_log2']}\n"
+                     f"land_generator = {scenario['land_generator']}\n")
     text = set_option(text, "misc", "savegame_format = none")
     # The null video driver writes save/autosave/exit.sav when it stops.
     text = set_option(text, "gui", "autosave_on_exit = true")
@@ -312,7 +332,14 @@ def run_game(scenario, binary, build, run_dir, timeout, base_env=None, desync=Tr
     shutil.rmtree(run_dir, ignore_errors=True)
     run_dir.mkdir(parents=True)
     write_config(scenario, build, run_dir)
-    if scenario["kind"] == "regression":
+    if "console" in scenario:
+        (run_dir / "scripts").mkdir()
+        (run_dir / "scripts/game_start.scr").write_text("".join(f"{line}\n" for line in scenario["console"]))
+    if scenario["kind"] == "save":
+        # A saved AI or GameScript missing from the runtime is replaced by the
+        # idle dummy AI or dropped; the logs show it in both runs.
+        game = ["-g", scenario["save"], "-d", "script=2"]
+    elif scenario["kind"] == "regression":
         game = ["-g", f"ai/{scenario['test']}/test.sav", "-d", "script=2", "-Q"]
     else:
         game = ["-g", "-G", str(scenario["seed"])]

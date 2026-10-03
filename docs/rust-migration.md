@@ -156,10 +156,13 @@ the first differences are reported as `chunk/element/field: ref -> cand`.
 Any `[desync:` warning (a cache mismatch) and any log or stdout difference fail
 (cut to the shorter run when end moments differ; the plain run is always full).
 
-- Scenarios: both regression saves with their AIs, and generated maps (TGP and
-  original, sizes, seeds, disasters on). `--soak` adds more; `--self` compares
-  the reference with itself; names filter. Extend `scenario_list()` for ports.
-  The cargodist transport scenario is #84 (needed by #74).
+- Scenarios: both regression saves with their AIs; generated maps (TGP and
+  original, sizes, seeds, disasters on); and `play-*`, road networks built by
+  LLM players (`migration/saves/README.md`), each loaded with manual
+  distribution and with cargodist (short link graph intervals). The saves'
+  `console` lines go to `scripts/game_start.scr`. `--soak` adds more; `--self`
+  compares the reference with itself; names filter. Extend `scenario_list()`
+  for ports. Rail, ship and aircraft scenarios are #86.
 - Masks (`MASKS`, with reasons and hit counts in the report): the random save
   id, build revision/NewGRF version, and `round_trip_time`, which the original
   saves uninitialized (#83); ports touching it need their own check.
