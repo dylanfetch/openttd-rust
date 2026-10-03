@@ -693,3 +693,35 @@ binary `nm` inspection are not suppressed. These checks
 validate native linkage and covered behavior; Linux results alone do not establish
 Darwin support. Actual macOS CI evidence and independent review are required before
 integration.
+
+The X25519 session and encryption-owner migration (#35) uses a versioned,
+primitive-only host function table. The bundled Monocypher algorithms remain
+unchanged. Rust owns stable key/session allocations and vendor-context storage;
+C++ supplies each vendor context's actual size/alignment and starts its trivial
+object lifetime before initialization or copying. This avoids a Rust mirror of
+platform-dependent vendor structs and adds no vendor-symbol dependency to other
+Rust archive consumers. Packet, RNG, policy and logging calls happen after each
+Rust call returns, so application exceptions cannot unwind through Rust.
+
+Secret fields are initialized directly in their final allocation. Deep copies
+copy heap to heap; assignment overwrites existing fixed storage as the original
+C++ member assignment did. Rvalue facade copies preserve the original source
+state. Destruction invokes bundled volatile wiping before Rust deallocation,
+including the original reverse session-field order. Hash finalization performs
+its original context wipe. Temporary shared secrets have independently wiped
+stable storage. Opaque streaming contexts retain the bundled successful-rekey
+behavior; their counter does not advance, and failed authentication leaves the
+context and output unchanged. Allocation failure/panics abort as for the other
+Rust kernels.
+
+Borrowed fixed-width views end before any owner mutation/destruction. Callers
+serialize access, provide initialized readable/writable buffers and byte lengths
+no greater than `PTRDIFF_MAX`, and keep MAC/message regions disjoint. Encryption
+is in place through raw primitive pointers; Rust never creates overlapping
+shared and mutable message slices. Empty variable spans may use null pointers.
+The existing short nonempty `Packet::Recv_bytes` path is undefined because its
+callback takes an unchecked subspan; deferred fork issue #41 records this
+separately. Zero-length, full-length and trailing-data paths are defined and
+remain within #35's reproduction contract. Initial validation passes all Cargo
+gates and both Rust-enabled and portable C++ source compilation; the unchanged
+five network cases and mixed original/Rust deterministic evidence remain pending.
