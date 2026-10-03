@@ -33,7 +33,11 @@ def git(*args):
 def classify(text):
     """Tag every line 'cpp' (only without WITH_RUST), 'rust' or 'common'."""
     stack, tags = [], []
-    for line in text.splitlines():
+    # Split only on "\n", as git numbers lines, so tags line up with diff hunks.
+    lines = text.split("\n")
+    if lines[-1] == "":
+        lines.pop()
+    for line in lines:
         match = DIRECTIVE.match(line)
         kind, rest = (match.group(1), re.sub(r"/\*.*?\*/", " ", match.group(2)).split("//")[0].strip()) if match else (None, "")
         if kind in ("if", "ifdef", "ifndef"):
