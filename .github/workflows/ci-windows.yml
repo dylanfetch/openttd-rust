@@ -6,6 +6,10 @@ on:
       arch:
         required: true
         type: string
+      rust:
+        required: false
+        type: boolean
+        default: false
 
 env:
   CTEST_OUTPUT_ON_FAILURE: 1
@@ -51,6 +55,39 @@ jobs:
         arch: ${{ inputs.arch }}
         vsversion: '2022'
 
+    - name: Setup Python for Rust evidence
+      if: inputs.rust
+      uses: actions/setup-python@v6
+      with:
+        python-version: '3.13'
+
+    - name: Install pinned Rust and selected target
+      if: inputs.rust
+      shell: bash
+      run: |
+        case "${{ inputs.arch }}" in
+          x86) rust_target=i686-pc-windows-msvc ;;
+          x64) rust_target=x86_64-pc-windows-msvc ;;
+          *) echo "Unsupported protected architecture"; exit 1 ;;
+        esac
+        channel=$(python -c 'import tomllib; print(tomllib.load(open("rust-toolchain.toml", "rb"))["toolchain"]["channel"])')
+        rustup toolchain install "$channel" --profile minimal --component rustfmt,clippy --target "$rust_target"
+        echo "RUST_TARGET=$rust_target" >> "$GITHUB_ENV"
+        echo "RUSTFLAGS=-C target-feature=+crt-static" >> "$GITHUB_ENV"
+        mkdir -p .local/windows-evidence
+        rustc -vV | tee .local/windows-evidence/rustc.txt
+        rustup target list --installed --toolchain "$channel" | tee .local/windows-evidence/installed-targets.txt
+
+    - name: Rust checks for actual selected target
+      if: inputs.rust
+      shell: bash
+      run: |
+        python tools/test-windows-rust-evidence.py
+        cargo fmt --all -- --check
+        cargo check --workspace --all-targets --locked --target "$RUST_TARGET"
+        cargo clippy --workspace --all-targets --locked --target "$RUST_TARGET" -- -D warnings
+        cargo test --workspace --locked --target "$RUST_TARGET"
+
     - name: Build
       shell: bash
       env:
@@ -58,26 +95,83 @@ jobs:
         # Upstream setup configures a Packages feed this fork does not maintain.
         VCPKG_BINARY_SOURCES: clear
       run: |
-        mkdir build
-        cd build
-
+        rust_parameters=()
+        if [ "${{ inputs.rust }}" = true ]; then
+          rust_parameters=(-DOPTION_RUST=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo -DOPTION_USE_ASSERTS=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded)
+        fi
         echo "::group::CMake"
-        cmake .. \
+        cmake -S . -B build \
           -GNinja \
           -DVCPKG_TARGET_TRIPLET=${{ inputs.arch }}-windows-static \
           -DCMAKE_TOOLCHAIN_FILE="${{ steps.vcpkg.outputs.vcpkg-cmake }}" \
-          # EOF
+          "${rust_parameters[@]}"
         echo "::endgroup::"
 
         echo "::group::Build"
-        cmake --build .
+        if [ "${{ inputs.rust }}" = true ]; then
+          cmake --build build --parallel 4 -- -d keeprsp
+        else
+          cmake --build build
+        fi
         echo "::endgroup::"
 
     - name: Test
       shell: bash
       run: |
         cd build
-        ctest --timeout 120
+        ctest --show-only=json-v1 > ctest-inventory.json
+        python -c 'import json; tests=json.load(open("ctest-inventory.json"))["tests"]; assert tests, "Empty test inventory"; print(f"Discovered {len(tests)} tests")'
+        ctest --timeout 120 --output-junit ctest.xml
+
+    - name: Fresh Rust native generators
+      if: inputs.rust
+      shell: bash
+      env:
+        VCPKG_BINARY_SOURCES: clear
+      run: |
+        cmake -S . -B .local/build-tools-windows -GNinja \
+          -DOPTION_TOOLS_ONLY=ON -DOPTION_RUST=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DOPTION_USE_ASSERTS=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded \
+          -DVCPKG_TARGET_TRIPLET=${{ inputs.arch }}-windows-static \
+          -DVCPKG_INSTALLED_DIR="$GITHUB_WORKSPACE/build/vcpkg_installed" \
+          -DCMAKE_TOOLCHAIN_FILE="${{ steps.vcpkg.outputs.vcpkg-cmake }}"
+        cmake --build .local/build-tools-windows --target tools --parallel 4 -- -d keeprsp
+
+    - name: Validate refusals and actual archive freshness
+      if: inputs.rust
+      shell: bash
+      env:
+        VCPKG_BINARY_SOURCES: clear
+      run: python tools/check-windows-rust-configurations.py --tools .local/build-tools-windows --output .local/windows-evidence
+
+    - name: Record native CRT ABI linkage and fresh outputs
+      if: inputs.rust
+      shell: bash
+      run: python tools/windows-rust-evidence.py --target "$RUST_TARGET" --build build --tools .local/build-tools-windows --output .local/windows-evidence
+
+    - name: Retain native Windows Rust and test evidence
+      if: always() && inputs.rust
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-rust-${{ inputs.arch }}-evidence
+        include-hidden-files: true
+        path: |
+          .local/windows-evidence/
+          build/ctest-inventory.json
+          build/ctest.xml
+          build/Testing/Temporary/LastTest.log
+          build/CMakeCache.txt
+          build/CMakeFiles/CMakeConfigureLog.yaml
+          build/compile_commands.json
+          build/rust-*.log
+          build/rust-*.txt
+          build/*.map
+          .local/build-tools-windows/CMakeCache.txt
+          .local/build-tools-windows/CMakeFiles/CMakeConfigureLog.yaml
+          .local/build-tools-windows/compile_commands.json
+          .local/build-tools-windows/rust-*.log
+          .local/build-tools-windows/rust-*.txt
+          .local/build-tools-windows/*.map
 
     - name: Retain dependency and configure failure logs
       if: failure()

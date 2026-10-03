@@ -442,8 +442,11 @@ unsafe fn encoded_parameter<'a>(descriptor: &EncodedDescriptor) -> encoded::Para
 
 /// Encode a string ID and tagged parameters into an independently owned Rust result.
 ///
+/// # Panics
+/// Aborts if the descriptor count exceeds the documented byte-extent limit.
+///
 /// # Safety
-/// Nonzero count addresses count initialized/aligned descriptors in one immutable
+/// Nonzero count addresses count initialized descriptors in one immutable
 /// allocation with byte size <= `isize::MAX`. All tag-2 spans meet the descriptor
 /// contract above, remain live for this call, and may overlap read-only input.
 /// Zero count permits null. No C++ pointer is retained in the returned owner.
@@ -459,17 +462,17 @@ pub unsafe extern "C" fn openttd_rust_encoded_serialize(
     count: usize,
     string_assertions: u8,
 ) -> *mut std::ffi::c_void {
-    let descriptors = if count == 0 {
-        &[]
-    } else {
-        // SAFETY: The caller guarantees aligned initialized descriptors for this call.
-        unsafe { std::slice::from_raw_parts(descriptors, count) }
-    };
-    let parameters: Vec<_> = descriptors
-        .iter()
-        .map(|descriptor| {
+    assert!(
+        count <= usize::try_from(isize::MAX).unwrap() / std::mem::size_of::<EncodedDescriptor>()
+    );
+    let parameters: Vec<_> = (0..count)
+        .map(|index| {
+            // SAFETY: Initialized descriptor fields and the total extent are valid.
+            // MSVC i686 can under-align stack arrays; never form a C++-storage
+            // reference/slice. Copy unaligned fields into a Rust-owned local first.
+            let descriptor = unsafe { descriptors.add(index).read_unaligned() };
             // SAFETY: Nested byte spans share the enclosing operation's lifetime.
-            unsafe { encoded_parameter(descriptor) }
+            unsafe { encoded_parameter(&descriptor) }
         })
         .collect();
     Box::into_raw(Box::new(encoded::serialize(
@@ -587,4 +590,17 @@ pub unsafe extern "C" fn openttd_rust_encoded_destroy(owner: *mut std::ffi::c_vo
         // SAFETY: Ownership is returned exactly once to the allocating Rust Box.
         drop(unsafe { Box::from_raw(owner.cast::<encoded::Output>()) });
     }
+}
+
+mod abi;
+
+/// Return size, alignment or field offsets for the bounded public ABI audit.
+///
+/// Type IDs 0..15 follow `abi_ffi.h`; item 0 is size, 1 alignment, then fields in
+/// declaration order. Unknown IDs/items return `usize::MAX` (C++ `SIZE_MAX`).
+/// Scalar metadata only: no allocation, pointers, ownership or callbacks.
+#[allow(unsafe_code)] // Exported scalar C symbol, like the existing kernel entry points.
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_abi_layout(type_id: u8, item: u8) -> usize {
+    abi::layout(type_id, item)
 }

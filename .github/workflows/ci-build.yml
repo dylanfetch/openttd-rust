@@ -90,6 +90,7 @@ jobs:
     secrets: inherit
 
     with:
+      rust: true
       arch: ${{ matrix.arch }}
 
   check_annotations:
