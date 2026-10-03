@@ -86,13 +86,20 @@ const BASE: [u8; 32] = [
     9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 ];
 // CLOSED arithmetic bounds: carry outputs even |limb|<1.1*2^25 and odd
-// |limb|<1.1*2^24. Ladder add/sub remain <1.65*2^26/25; doubled odd
+// |limb|<1.1*2^24. Ladder and Edwards add/sub remain <1.65*2^26/25; doubled odd
 // terms and *19/*38 factors fit i32. Original unrolled mul/sq sums are
 // <0.67*2^61 (others smaller), mul_small products <2^58; carry additions
 // therefore stay well inside i64, including rounding. Serialization has
 // |19*t9+2^24|<2^29; its signed i32 operations fit. Frombytes intermediates
 // are <=2^32. These helpers use unchecked SIGNED arithmetic under those
 // established internal bounds, not signed wrapping or silently hidden errors.
+// Edwards: every ge output is carried by its final multiplication. Add/cache
+// combine two carried limbs; double/madd can combine three, at most 3.3*2^25/24
+// == 1.65*2^26/25. Literal precomputed/low-order fields are within 2^25/24.
+// All *19/*38 i32 coefficient products are therefore below 2.104*10^9 <2^31.
+// Elligator sums are at most two carried fields plus the small constant A;
+// conversions and negations do not widen these bounds. Secret comb selection
+// scans all eight entries; equation verification remains public variable-time.
 // It preserves source arithmetic and avoids overflow branches on secret limbs.
 #[inline]
 fn add32(a: i32, b: i32) -> i32 {
@@ -245,6 +252,9 @@ macro_rules! carry {
     }};
 }
 fn fe_frombytes(h: *mut i32, s: *const u8) {
+    fe_frombytes_mask(h, s, 1);
+}
+fn fe_frombytes_mask(h: *mut i32, s: *const u8, mask_bits: u32) {
     let mut t0 = i64::from(load(s, 4));
     let mut t1 = i64::from(load(unsafe { s.add(4) }, 3) << 6);
     let mut t2 = i64::from(load(unsafe { s.add(7) }, 3) << 5);
@@ -254,7 +264,7 @@ fn fe_frombytes(h: *mut i32, s: *const u8) {
     let mut t6 = i64::from(load(unsafe { s.add(20) }, 3) << 7);
     let mut t7 = i64::from(load(unsafe { s.add(23) }, 3) << 5);
     let mut t8 = i64::from(load(unsafe { s.add(26) }, 3) << 4);
-    let mut t9 = i64::from((load(unsafe { s.add(29) }, 3) & 0x007f_ffff) << 2);
+    let mut t9 = i64::from((load(unsafe { s.add(29) }, 3) & (0x00ff_ffff >> mask_bits)) << 2);
     carry!(h, t0, t1, t2, t3, t4, t5, t6, t7, t8, t9);
 }
 fn fe_tobytes(leaves: &Leaves, s: *mut u8, h: *const i32) {
@@ -1038,3 +1048,6 @@ pub(crate) fn abi_layout(item: u8) -> usize {
     .copied()
     .unwrap_or(usize::MAX)
 }
+
+#[path = "curve25519.rs"]
+mod curve;

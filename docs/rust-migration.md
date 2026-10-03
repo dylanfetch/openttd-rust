@@ -1389,3 +1389,54 @@ Existing authentication, cipher/MAC/hash and retained caller records remain an
 unchanged prefix. Native ABI calls execute all four exports and the actual
 cdecl wipe/verify32 table, checking four verifies and original physical wipe
 counts/sizes per ladder; these observations do not prove all spills were erased.
+
+### Coupled remaining Curve25519 family
+
+Rust-enabled builds route modulo-L reduction/mul-add, full-width Edwards base
+multiplication/equation checking, EdDSA key-pair/sign/check, both conversions,
+dirty-small/fast, Elligator map/reverse/key-pair and X25519 inverse through coarse
+public facades. They share the existing Rust X25519 field/ladder core; there is
+no active C++ field/L/point/curve algorithm duplicate. The complete pinned C++
+curve block remains byte-identical inside the explicit portable fallback. Argon2
+and the SHA-512 Ed25519/prehash wrappers remain C++; those wrappers call the same
+public Rust-backed curve functions. This does not complete Monocypher migration.
+
+Every group multiplication carries its output. Edwards addition/cache combine
+at most two carried limbs; double/madd combine at most three before the next
+multiplication: less than `3.3 * 2^25/24 == 1.65 * 2^26/25`. Literal precomputed
+and low-order fields are within `2^25/24`. Shared coefficient products by 19/38
+remain below `2.104 * 10^9 < 2^31`, and unrolled signed sums retain the established
+`0.67 * 2^61` bound. Elligator combines carried fields with small constant A;
+serialization/inversion keep the original carry/shift schedule. Unsigned scalar
+carry, Barrett/Montgomery reduction and narrowing retain modulo arithmetic.
+Secret comb lookup scans all eight rows with masks; equation verification remains
+variable-time on public inputs, including original decode order, `S < L`, allowed
+noncanonical points and final multiplication by the cofactor. Full-width scalars
+and inverse/dirty-small's 256-bit ladder are retained.
+
+The existing two-entry primitive-only wipe/verify32 table (ABI ID 25) suffices;
+no point/field/context representation or additional callback crosses the boundary.
+BLAKE2b transcripts and deterministic ChaCha retries use the existing Rust
+implementations internally through wipe-only calls, without direct vendor imports
+or duplicated algorithms. Internal BLAKE2b context metadata belongs only to Rust;
+external caller context descriptors remain unchanged. No heap, global registration,
+application operation or C++ exception crosses a live Rust frame. Panic aborts.
+
+Private scalar/field/point/hash buffers are initialized in final stack storage
+and accessed raw without overlapping slices or whole secret aggregate moves.
+Original explicit wipe points and sizes remain; originally unwiped public
+verification/hash temporaries are not assigned a stronger erasure claim. Key-pair
+writes preserve seed wipe, secret output, public output order; Elligator preserves
+seed wipe, hidden output, secret output order. Signing finishes input hashing
+before signature writes. Raw sequential byte copies retain defined partial aliases
+and forward propagation where present. Reverse-map failure leaves output intact;
+selector bit zero, ignored bits and padding retain actual source behavior. There
+is no blanket new alias guarantee or support for originally undefined pointers.
+
+Existing network tests and the unchanged authentication/1,142-record primitive
+fixture run first. Only concrete scalar/equation, signature transcript/alias,
+conversion/reverse branch and retained SHA-512 caller gaps extend the same pinned
+vendor fixture. Native supported-platform ABI/call evidence and separate exact-head
+review remain required. Functional comparisons and C++ boundary sanitizers do not
+instrument Rust accesses, certify cryptographic timing/security, prove complete
+copy/spill erasure or establish complete vendor/game equivalence.

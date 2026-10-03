@@ -57,7 +57,7 @@
 // Narrowing matches little-endian serialization; arity preserves the vendor ABI.
 use crate::crypto_primitives::Leaves;
 use std::ffi::c_void;
-use std::mem::{align_of, offset_of, size_of};
+use std::mem::{MaybeUninit, align_of, offset_of, size_of};
 use std::ptr;
 
 #[repr(C)]
@@ -298,7 +298,12 @@ fn update(layout: &Layout, ctx: *mut u8, mut message: *const u8, mut size: usize
         }
     }
 }
-fn finish(leaves: &Leaves, layout: &Layout, ctx: *mut u8, hash: *mut u8) {
+fn finish_with_wipe(
+    wipe_fn: unsafe extern "C" fn(*mut c_void, usize),
+    layout: &Layout,
+    ctx: *mut u8,
+    hash: *mut u8,
+) {
     compress(layout, ctx, true);
     let size = read_size(ctx, layout.hash_size).min(64);
     for i in 0..size {
@@ -308,7 +313,7 @@ fn finish(leaves: &Leaves, layout: &Layout, ctx: *mut u8, hash: *mut u8) {
         }
     }
     unsafe {
-        (leaves.wipe)(ctx.cast(), layout.size);
+        wipe_fn(ctx.cast(), layout.size);
     }
 }
 // SAFETY for exports: actual caller context lifetime is live, layout/leaf tables
@@ -354,7 +359,12 @@ pub(crate) unsafe extern "C" fn openttd_rust_blake2b_final(
     ctx: *mut c_void,
     hash: *mut u8,
 ) {
-    finish(unsafe { &*leaves }, unsafe { &*layout }, ctx.cast(), hash);
+    finish_with_wipe(
+        unsafe { (*leaves).wipe },
+        unsafe { &*layout },
+        ctx.cast(),
+        hash,
+    );
 }
 #[unsafe(no_mangle)]
 pub(crate) unsafe extern "C" fn openttd_rust_blake2b_keyed(
@@ -371,7 +381,7 @@ pub(crate) unsafe extern "C" fn openttd_rust_blake2b_keyed(
     let layout = unsafe { &*layout };
     init(layout, ctx.cast(), size, key, key_size);
     update(layout, ctx.cast(), message, message_size);
-    finish(unsafe { &*leaves }, layout, ctx.cast(), hash);
+    finish_with_wipe(unsafe { (*leaves).wipe }, layout, ctx.cast(), hash);
 }
 #[unsafe(no_mangle)]
 pub(crate) unsafe extern "C" fn openttd_rust_blake2b(
@@ -412,4 +422,37 @@ pub(crate) fn abi_layout(item: u8) -> usize {
     .get(usize::from(item))
     .copied()
     .unwrap_or(usize::MAX)
+}
+
+// Rust-internal context only: no mirror is passed across FFI. The original
+// context byte count, per-word initialization and final wipe remain explicit.
+#[repr(C)]
+struct NativeContext {
+    hash: [u64; 8],
+    offset: [u64; 2],
+    input: [u64; 16],
+    index: usize,
+    size: usize,
+}
+const NATIVE: Layout = Layout {
+    size: size_of::<NativeContext>(),
+    alignment: align_of::<NativeContext>(),
+    hash: offset_of!(NativeContext, hash),
+    input_offset: offset_of!(NativeContext, offset),
+    input: offset_of!(NativeContext, input),
+    input_idx: offset_of!(NativeContext, index),
+    hash_size: offset_of!(NativeContext, size),
+};
+pub(crate) fn native_hash(
+    wipe_fn: unsafe extern "C" fn(*mut c_void, usize),
+    out: *mut u8,
+    chunks: &[(*const u8, usize)],
+) {
+    let mut storage = MaybeUninit::<NativeContext>::uninit();
+    let ctx = storage.as_mut_ptr().cast::<u8>();
+    init(&NATIVE, ctx, 64, ptr::null(), 0);
+    for &(input, size) in chunks {
+        update(&NATIVE, ctx, input, size);
+    }
+    finish_with_wipe(wipe_fn, &NATIVE, ctx, out);
 }

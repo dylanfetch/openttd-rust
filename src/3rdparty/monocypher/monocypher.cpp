@@ -56,6 +56,7 @@
 #include "../../rust/crypto_primitives_ffi.h"
 #include "../../rust/blake2b_ffi.h"
 #include "../../rust/x25519_ffi.h"
+#include "../../rust/curve25519_ffi.h"
 #include <type_traits>
 #endif
 
@@ -97,6 +98,7 @@ static size_t gap(size_t x, size_t pow_2)
 }
 #endif
 
+#ifndef WITH_RUST
 static u32 load24_le(const u8 s[3])
 {
 	return
@@ -104,6 +106,8 @@ static u32 load24_le(const u8 s[3])
 		((u32)s[1] <<  8) |
 		((u32)s[2] << 16);
 }
+
+#endif
 
 static u32 load32_le(const u8 s[4])
 {
@@ -1047,6 +1051,82 @@ void crypto_argon2(u8 *hash, u32 hash_size, void *work_area,
 	WIPE_BUFFER(final_block);
 }
 
+#ifdef WITH_RUST
+// Coarse public adapters. All field/L/point/curve decisions stay inside Rust.
+void crypto_eddsa_trim_scalar(u8 out[32], const u8 in[32]) { openttd_rust_x25519_trim(out, in); }
+[[maybe_unused]] static void scalarmult(u8 out[32], const u8 scalar[32], const u8 point[32], int bits)
+{
+	openttd_rust_x25519_ladder(&rust_x25519_leaves, out, scalar, point, bits);
+}
+void crypto_x25519(u8 out[32], const u8 secret[32], const u8 point[32])
+{
+	openttd_rust_x25519(&rust_x25519_leaves, out, secret, point);
+}
+void crypto_x25519_public_key(u8 out[32], const u8 secret[32])
+{
+	openttd_rust_x25519_public_key(&rust_x25519_leaves, out, secret);
+}
+void crypto_eddsa_reduce(u8 reduced[32], const u8 expanded[64])
+{
+	openttd_rust_eddsa_reduce(&rust_x25519_leaves, reduced, expanded);
+}
+void crypto_eddsa_mul_add(u8 r[32], const u8 a[32], const u8 b[32], const u8 c[32])
+{
+	openttd_rust_eddsa_mul_add(&rust_x25519_leaves, r, a, b, c);
+}
+void crypto_eddsa_scalarbase(u8 point[32], const u8 scalar[32])
+{
+	openttd_rust_eddsa_scalarbase(&rust_x25519_leaves, point, scalar);
+}
+int crypto_eddsa_check_equation(const u8 signature[64], const u8 public_key[32], const u8 h[32])
+{
+	return openttd_rust_eddsa_check_equation(&rust_x25519_leaves, signature, public_key, h);
+}
+void crypto_eddsa_key_pair(u8 secret_key[64], u8 public_key[32], u8 seed[32])
+{
+	openttd_rust_eddsa_key_pair(&rust_x25519_leaves, secret_key, public_key, seed);
+}
+void crypto_eddsa_sign(u8 signature [64], const u8 secret_key[64], const u8 *message, size_t message_size)
+{
+	openttd_rust_eddsa_sign(&rust_x25519_leaves, signature, secret_key, message, message_size);
+}
+int crypto_eddsa_check(const u8 signature[64], const u8 public_key[32], const u8 *message, size_t message_size)
+{
+	return openttd_rust_eddsa_check(&rust_x25519_leaves, signature, public_key, message, message_size);
+}
+void crypto_eddsa_to_x25519(u8 x25519[32], const u8 eddsa[32])
+{
+	openttd_rust_eddsa_to_x25519(&rust_x25519_leaves, x25519, eddsa);
+}
+void crypto_x25519_to_eddsa(u8 eddsa[32], const u8 x25519[32])
+{
+	openttd_rust_x25519_to_eddsa(&rust_x25519_leaves, eddsa, x25519);
+}
+void crypto_x25519_dirty_small(u8 public_key[32], const u8 secret_key[32])
+{
+	openttd_rust_x25519_dirty_small(&rust_x25519_leaves, public_key, secret_key);
+}
+void crypto_x25519_dirty_fast(u8 public_key[32], const u8 secret_key[32])
+{
+	openttd_rust_x25519_dirty_fast(&rust_x25519_leaves, public_key, secret_key);
+}
+void crypto_elligator_map(u8 curve[32], const u8 hidden[32])
+{
+	openttd_rust_elligator_map(&rust_x25519_leaves, curve, hidden);
+}
+int crypto_elligator_rev(u8 hidden[32], const u8 public_key[32], u8 tweak)
+{
+	return openttd_rust_elligator_rev(&rust_x25519_leaves, hidden, public_key, tweak);
+}
+void crypto_elligator_key_pair(u8 hidden[32], u8 secret_key[32], u8 seed[32])
+{
+	openttd_rust_elligator_key_pair(&rust_x25519_leaves, hidden, secret_key, seed);
+}
+void crypto_x25519_inverse(u8 blind_salt [32], const u8 private_key[32], const u8 curve_point[32])
+{
+	openttd_rust_x25519_inverse(&rust_x25519_leaves, blind_salt, private_key, curve_point);
+}
+#else // WITH_RUST: complete original portable curve/field family
 ////////////////////////////////////
 /// Arithmetic modulo 2^255 - 19 ///
 ////////////////////////////////////
@@ -1594,12 +1674,6 @@ static void fe_invert(fe out, const fe x)
 }
 
 // trim a scalar for scalar multiplication
-#ifdef WITH_RUST
-void crypto_eddsa_trim_scalar(u8 out[32], const u8 in[32])
-{
-	openttd_rust_x25519_trim(out, in);
-}
-#else
 void crypto_eddsa_trim_scalar(u8 out[32], const u8 in[32])
 {
 	COPY(out, in, 32);
@@ -1607,8 +1681,6 @@ void crypto_eddsa_trim_scalar(u8 out[32], const u8 in[32])
 	out[31] &= 127;
 	out[31] |= 64;
 }
-
-#endif // WITH_RUST
 
 // get bit from scalar at position i
 static int scalar_bit(const u8 s[32], int i)
@@ -1620,22 +1692,6 @@ static int scalar_bit(const u8 s[32], int i)
 ///////////////
 /// X-25519 /// Taken from SUPERCOP's ref10 implementation.
 ///////////////
-#ifdef WITH_RUST
-// Coarse adapter only. Rust owns the complete ladder and required field math;
-// the retained C++ field helpers above still serve Edwards/Elligator families.
-static void scalarmult(u8 q[32], const u8 scalar[32], const u8 p[32], int nb_bits)
-{
-	openttd_rust_x25519_ladder(&rust_x25519_leaves, q, scalar, p, nb_bits);
-}
-void crypto_x25519(u8 raw_shared_secret[32], const u8 your_secret_key[32], const u8 their_public_key[32])
-{
-	openttd_rust_x25519(&rust_x25519_leaves, raw_shared_secret, your_secret_key, their_public_key);
-}
-void crypto_x25519_public_key(u8 public_key[32], const u8 secret_key[32])
-{
-	openttd_rust_x25519_public_key(&rust_x25519_leaves, public_key, secret_key);
-}
-#else
 static void scalarmult(u8 q[32], const u8 scalar[32], const u8 p[32],
                        int nb_bits)
 {
@@ -1712,8 +1768,6 @@ void crypto_x25519_public_key(u8       public_key[32],
 	static const u8 base_point[32] = {9};
 	crypto_x25519(public_key, secret_key, base_point);
 }
-
-#endif // WITH_RUST
 
 ///////////////////////////
 /// Arithmetic modulo L ///
@@ -3005,6 +3059,8 @@ void crypto_x25519_inverse(u8 blind_salt [32], const u8 private_key[32],
 	WIPE_BUFFER(scalar);   WIPE_BUFFER(m_scl);
 	WIPE_BUFFER(product);  WIPE_BUFFER(m_inv);
 }
+
+#endif // WITH_RUST: complete curve family
 
 #ifdef WITH_RUST
 void crypto_aead_init_x(crypto_aead_ctx *ctx,
