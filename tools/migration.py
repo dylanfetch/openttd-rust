@@ -63,7 +63,9 @@ def rust_configuration(build: Path):
             "target_dir": str(directory), "archive": str(archive),
             "deployment_target": cache.get("CMAKE_OSX_DEPLOYMENT_TARGET", ""),
             "sdk": cache.get("CMAKE_OSX_SYSROOT", ""),
-            "native_libraries": cache.get("RUST_NATIVE_LIBS", "").split(";")}
+            "native_libraries": cache.get("RUST_NATIVE_LIBS", "").split(";"),
+            "build_type": cache.get("CMAKE_BUILD_TYPE", ""),
+            "assertions": cache.get("OPTION_USE_ASSERTS", "")}
 
 
 def rust_archive(build: Path, *, target_dir: Path | None = None) -> Path:
