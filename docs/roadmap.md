@@ -51,10 +51,15 @@ Three habits held back progress. The rules in `AGENTS.md` now prevent them.
 
 ## Phase 1: simulation comparison harness (#72), the critical path
 
-Run the reference and the candidate headlessly on identical scenarios, take
-periodic uncompressed snapshots using the existing `-d desync=3` hook, decode
-the save chunks, and compare them field by field. The scenarios are the
-regression saves, generated maps across seeds, and one committed
+Status: the harness is `python3 tools/migration.py simulate` (see
+`docs/rust-migration.md`, "Simulation comparison"); its default set runs in CI.
+Remaining phase 1 work: the transport-network scenario with cargodist (#84),
+which #74 needs before it integrates, and any bugs the harness finds.
+
+Original scope: run the reference and the candidate headlessly on identical
+scenarios, take periodic uncompressed snapshots using the existing `-d desync=3`
+hook, decode the save chunks, and compare them field by field. The scenarios are
+the regression saves, generated maps across seeds, and one committed
 transport-network save with cargodist enabled. It must pass reference vs
 reference and reference vs candidate, detect a deliberate rule change, and run
 in CI. The tool is `tools/simulate.py` behind `python3 tools/migration.py

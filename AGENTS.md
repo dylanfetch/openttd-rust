@@ -129,6 +129,8 @@ merge titles also need a supported prefix; `Merge:` is rejected by inherited CI.
 checks that the candidate retains reference test names, and records evidence under
 `.local/`. `python3 tools/migration.py build` builds both without running tests.
 `python3 tools/migration.py tools` builds the native Rust generators.
+`python3 tools/migration.py simulate [name...] [--soak] [--self]` builds both
+games and compares their simulation state (`tools/simulate.py`).
 `python3 tools/run-comparisons.py [name...]` runs the reference comparison tools
 in parallel and picks up any `tools/*-comparison.py` automatically. The
 reference uses C++; the candidate explicitly

@@ -142,6 +142,33 @@ ccache 4.14.1 (checksummed download) with PCH off; MSVC uses embedded `/Z7` debu
 info (CMP0141), which ccache requires. Platform CI also runs on `rust-migration`
 pushes, which checks each merge.
 
+## Simulation comparison
+
+`python3 tools/migration.py simulate` builds both games, then runs
+`tools/simulate.py`. It is the evidence for game-logic ports; CI runs its
+default set after the comparisons. Each scenario runs the reference and the
+candidate headlessly (`-snull -mnull -vnull:ticks=N -d desync=3`) in isolated
+personal directories under `.local/simulation/`, with `savegame_format = none`,
+so both write an uncompressed snapshot every 32 economy days. Every chunk of
+every snapshot is decoded: table chunks field by field from the header stored
+in the save, map and other chunks byte by byte. The first differences are
+reported as `snapshot chunk/element/field: reference -> candidate`.
+
+- Scenarios: both regression saves with their AIs (script logs compared too),
+  and generated maps for TGP and the original generator across sizes and
+  seeds. `--soak` adds seeds, sizes and years; `--self` compares the reference
+  with itself; names filter scenarios. Extend `scenario_list()` for new ports.
+  The transport-network scenario with cargodist is #84 (needed by #74).
+- Masks (`MASKS`, each with its reason): the random savegame id, the build's
+  revision text/modified flag/NewGRF version, and `round_trip_time`, which the
+  original saves uninitialized (#83). Ports touching round-trip measurement
+  need their own check of that field.
+- Known port divergences go in `KNOWN_FAILURES` by first divergence and issue.
+- The reference's runtime files are copied from the shared build under a
+  shared lock, so simulations never block other worktrees' builds. There is no
+  exit save under the null video driver; the last 32-day snapshot is final.
+- Evidence: `.local/simulation/<time>/report.json`; failing runs keep saves.
+
 ## Native macOS arm64 Rust linkage
 
 CMake verifies the pinned `rustc -vV` host against the actual C++ platform,
