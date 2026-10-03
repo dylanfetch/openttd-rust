@@ -340,6 +340,84 @@ comparisons remain intact, as do freshly generated string/settings headers,
 English/French output, and malformed strgen diagnostics. These bounded checks do
 not establish complete text formatting or whole-game equivalence.
 
+## Encoded-string compatibility and parameter rewriting
+
+With `OPTION_RUST=ON`, Rust owns `FixSCCEncoded`, `FixSCCEncodedNegative`,
+`EncodedString::ReplaceParam`, and the shared `GetEncodedStringWithArgs`
+serialization algorithm. The save-version dispatch and its ordering remain C++:
+legacy encoding before version 350 (old markers before 169), negative repair before
+353, then sanitation under the original control-code policy. General decoding,
+rendering, ScriptText encoding, and sanitation remain separate migration work.
+
+Legacy conversion remains permissive: old E028/E02A normalize only with fix_code;
+markers are recognized even inside quotes; quotes toggle/disappear; quoted colons
+remain bytes; numeric text is not validated. A valid nonmarker first character
+leaves the original string untouched. Invalid first UTF-8 produces empty output,
+and invalid UTF-8 after a recognized prefix truncates output. Negative repair only
+accepts SCC_ENCODED, tries unsigned hex before signed hex, retains signed modulo
+bits, and canonicalizes successful positive values as well. Failed signed reads
+log the original diagnostic, default to zero, and perform the original lexical
+skip, preserving suffix bytes for copying.
+
+Replacement requires the internal marker and uint32 hexadecimal ID. Empty interior
+records and unknown types become monostate. A final separator does not create a
+final empty record. Out-of-range replacement returns empty after the original
+parsing/diagnostic/assertion work. String parameters remain arbitrary bytes,
+including NUL and interior record separators. Public StringParameter construction
+still converts negative integers to uint64 before the descriptor boundary.
+
+`src/rust/encoded_ffi.h` passes explicit tags (0 monostate, 1 uint64, 2 byte span),
+never C++ string/vector/variant layouts. Static checks pin StringID width and the
+RS/E000/E001/E002/E003 token contract. Nonempty spans are initialized readable bytes
+in one live allocation, length <=PTRDIFF_MAX; descriptor arrays are aligned and
+have total byte size <=PTRDIFF_MAX. Empty spans/counts allow null, and read-only
+spans may overlap. All input borrows end before Rust returns; no C++ pointer is
+stored in the result.
+
+Rust returns an opaque Box owning output and diagnostic vectors. Getters provide
+immutable views and by-value metadata without mutating/reallocating storage. C++
+keeps a unique_ptr with the Rust destroy function as deleter, copies output into
+its own std::string, and returns all intermediate allocations only to Rust, even
+if C++ copying or logging throws. No view survives destruction. Each output append
+checks addition and pointer-sized length; Vec checks capacity. Rust allocation
+failure/panic abort, overflow checks stay enabled, and the ABI never unwinds. This
+boundary does not claim equivalent resource-exhaustion timing.
+
+Diagnostic offsets always identify the complete operation input. A record's
+integer error span and following preview (at most four bytes) are bounded within
+that original record before translating to full input offsets; negative repair's
+preview uses the whole remaining input. C++ retains that input while formatting
+and replaying ordered messages. A single Rust scan avoids duplicate diagnostics
+from a sizing pass. It stops at the first enabled assertion, then C++ replays
+preceding logs and uses the original assertion expressions before any output
+commit. Numeric remainder assertions follow !NDEBUG || WITH_ASSERT, matching
+stdafx's release assertion handler. The serializer's forbidden string-prefix
+check follows the separate WITH_ASSERT guard. These distinct policies are retained.
+
+The four original FixSCCEncoded/Negative and ReplaceParam positive/negative tests
+remain unchanged and run through the production adapters. Bounded gaps use:
+
+```sh
+python3 tools/encoded-comparison.py
+```
+
+The script extracts the four complete reference functions verbatim from pristine
+pinned files into ignored compilation fixtures, preserving source/function hashes.
+It compiles the same public-API fixture against reference and candidate headers
+and both Rust/portable candidate bodies. Malformed EncodedString cases use the
+existing EndianBufferReader; output uses EndianBufferWriter. No raw-string public
+constructor is added. Four NDEBUG/WITH_ASSERT combinations compare output bytes,
+ordered diagnostic bytes, assertion expressions and status; only libc assertion
+file/function locations are normalized. The corpus includes both old markers,
+malformed UTF-8, permissive quotes, extrema and invalid numerics, suffixes,
+interior/trailing empty records, NUL/RS string payloads, default/cleared strings,
+and replacement bounds. Address/undefined/leak sanitizer runs cover the C++
+fixture/adapters and intercepted allocations, including logger and output-copy
+exceptions that must destroy the Rust owner. The Rust archive itself is not
+sanitizer-instrumented. Evidence resides in `.local/encoded-comparison/` and is
+retained by CI. No generator runtime coverage is claimed for these algorithms.
+Portable bodies and ownership facades remain transitional under #3.
+
 ## UTF-8 codec and byte positions
 
 With `OPTION_RUST=ON`, `EncodeUtf8`, `DecodeUtf8`, `IsUtf8Part`, forward/backward

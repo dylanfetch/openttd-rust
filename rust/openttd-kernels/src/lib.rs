@@ -416,3 +416,174 @@ pub extern "C" fn openttd_rust_spiral_end(state: SpiralState) -> u8 {
 pub extern "C" fn openttd_rust_spiral_equal(left: SpiralState, right: SpiralState) -> u8 {
     u8::from(spiral::equal(left, right))
 }
+
+mod encoded;
+pub use encoded::{
+    Descriptor as EncodedDescriptor, Diagnostic as EncodedDiagnostic, View as EncodedView,
+};
+
+/// Borrow a tagged string descriptor only for the enclosing FFI operation.
+///
+/// # Safety
+/// Tag is 0/1/2. A tag-2 nonempty byte span meets `utf8::borrow`'s contract.
+/// The returned borrow never escapes the enclosing operation.
+#[allow(unsafe_code)]
+unsafe fn encoded_parameter<'a>(descriptor: &EncodedDescriptor) -> encoded::Parameter<'a> {
+    match descriptor.kind {
+        0 => encoded::Parameter::Empty,
+        1 => encoded::Parameter::Integer(descriptor.value),
+        2 => {
+            encoded::Parameter::String(unsafe { utf8::borrow(descriptor.bytes, descriptor.length) })
+        }
+        _ => unreachable!("unknown encoded descriptor tag"),
+    }
+}
+
+/// Encode a string ID and tagged parameters into an independently owned Rust result.
+///
+/// # Safety
+/// Nonzero count addresses count initialized/aligned descriptors in one immutable
+/// allocation with byte size <= `isize::MAX`. All tag-2 spans meet the descriptor
+/// contract above, remain live for this call, and may overlap read-only input.
+/// Zero count permits null. No C++ pointer is retained in the returned owner.
+/// `string_assertions` matches the original `WITH_ASSERT` guard (0/1).
+/// The caller destroys the result exactly once using `encoded_destroy`, including
+/// when later C++ allocation/logging throws. Rust allocation failure and panic
+/// abort; this ABI never unwinds. Output sizing is checked before each append.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_encoded_serialize(
+    id: u32,
+    descriptors: *const EncodedDescriptor,
+    count: usize,
+    string_assertions: u8,
+) -> *mut std::ffi::c_void {
+    let descriptors = if count == 0 {
+        &[]
+    } else {
+        // SAFETY: The caller guarantees aligned initialized descriptors for this call.
+        unsafe { std::slice::from_raw_parts(descriptors, count) }
+    };
+    let parameters: Vec<_> = descriptors
+        .iter()
+        .map(|descriptor| {
+            // SAFETY: Nested byte spans share the enclosing operation's lifetime.
+            unsafe { encoded_parameter(descriptor) }
+        })
+        .collect();
+    Box::into_raw(Box::new(encoded::serialize(
+        id,
+        &parameters,
+        string_assertions != 0,
+    )))
+    .cast()
+}
+
+/// Convert permissive legacy quote/colon encoding without validating numeric text.
+///
+/// # Safety
+/// Input is immutable readable bytes in one live allocation, length <= `isize::MAX`;
+/// empty permits null. `fix_code` is 0/1. No pointer is retained. The returned owner
+/// has the same destroy/allocator/panic contract as `encoded_serialize`.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_encoded_legacy(
+    data: *const u8,
+    length: usize,
+    fix_code: u8,
+) -> *mut std::ffi::c_void {
+    // SAFETY: Input is readable and remains immutable for this call.
+    let bytes = unsafe { utf8::borrow(data, length) };
+    Box::into_raw(Box::new(encoded::legacy(bytes, fix_code != 0))).cast()
+}
+
+/// Canonicalize numeric records, trying unsigned hex before signed/default-zero.
+///
+/// # Safety
+/// Same input/destroy contract as `encoded_legacy`. Diagnostics contain offsets only
+/// in this complete input, not pointers; keep it alive until C++ replay finishes.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_encoded_negatives(
+    data: *const u8,
+    length: usize,
+) -> *mut std::ffi::c_void {
+    // SAFETY: Input is readable and remains immutable for this call.
+    let bytes = unsafe { utf8::borrow(data, length) };
+    Box::into_raw(Box::new(encoded::negatives(bytes))).cast()
+}
+
+/// Parse, replace, and serialize an internal encoded string in a single operation.
+///
+/// # Safety
+/// Input and replacement spans satisfy the same immutable-borrow contract above.
+/// Input/replacement may overlap read-only. No C++ pointer is retained. Numeric
+/// assertions are active when !`NDEBUG` or `WITH_ASSERT`; string assertions follow
+/// the separate `WITH_ASSERT` guard. Each flag is 0/1. Before an enabled assertion,
+/// replay all preceding diagnostics, then assert without copying/committing output.
+/// The owner and all returned views have `encoded_serialize`'s destroy contract.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_encoded_replace(
+    data: *const u8,
+    length: usize,
+    index: usize,
+    replacement: EncodedDescriptor,
+    numeric_assertions: u8,
+    string_assertions: u8,
+) -> *mut std::ffi::c_void {
+    // SAFETY: Both input and nested replacement bytes are immutable for this call.
+    let bytes = unsafe { utf8::borrow(data, length) };
+    // SAFETY: The tag and nested replacement span obey the descriptor contract.
+    let replacement = unsafe { encoded_parameter(&replacement) };
+    Box::into_raw(Box::new(encoded::replace(
+        bytes,
+        index,
+        replacement,
+        numeric_assertions != 0,
+        string_assertions != 0,
+    )))
+    .cast()
+}
+
+/// Obtain a by-value immutable view without mutating/reallocating result storage.
+///
+/// # Safety
+/// owner is a live result from exactly one encoded operation; no concurrent destroy.
+/// Output bytes are borrowed from Rust until destroy, never freed by C++. Empty
+/// output returns null. Diagnostics' offsets refer to the original encoded input.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_encoded_view(owner: *const std::ffi::c_void) -> EncodedView {
+    // SAFETY: The pointer identifies the live Rust owner described above.
+    unsafe { &*owner.cast::<encoded::Output>() }.view()
+}
+
+/// Get one ordered by-value diagnostic; getters never change owner storage.
+///
+/// # Safety
+/// owner has `encoded_view`'s live-owner contract; index < `diagnostic_count`.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_encoded_diagnostic(
+    owner: *const std::ffi::c_void,
+    index: usize,
+) -> EncodedDiagnostic {
+    // SAFETY: The owner is live and the index is bounded by its immutable view.
+    unsafe { &*owner.cast::<encoded::Output>() }.diagnostic(index)
+}
+
+/// Destroy the opaque result with Rust's allocator; null is a no-op.
+///
+/// # Safety
+/// A nonnull pointer is a unique live result returned by one encoded operation,
+/// destroyed exactly once after all output/diagnostic views cease use. Never use
+/// C++ delete/free for this pointer. No concurrent getters; panic cannot unwind.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_encoded_destroy(owner: *mut std::ffi::c_void) {
+    if !owner.is_null() {
+        // SAFETY: Ownership is returned exactly once to the allocating Rust Box.
+        drop(unsafe { Box::from_raw(owner.cast::<encoded::Output>()) });
+    }
+}
