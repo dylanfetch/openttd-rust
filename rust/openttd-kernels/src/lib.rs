@@ -19,6 +19,7 @@ mod math;
 mod packet;
 mod script_list;
 mod station_cargo;
+mod string_validation;
 mod widget_parser;
 
 pub use admin_conversion::Action as AdminAction;
@@ -1218,4 +1219,69 @@ pub unsafe extern "C" fn openttd_rust_packet_skip_mac(state: *mut packet::State,
 pub unsafe extern "C" fn openttd_rust_packet_write_header(bytes: *mut u8, length: usize) {
     // SAFETY: The exclusive allocation is valid for this short mutable borrow only.
     packet::header(unsafe { std::slice::from_raw_parts_mut(bytes, length) });
+}
+
+/// Scan one historical sanitation step without retaining bytes or doing output.
+///
+/// # Safety
+/// Input is one readable initialized allocation of length <= `ISIZE_MAX`, valid
+/// and immutable only for this call; a null pointer is allowed for zero length.
+/// The returned encoded bytes own their storage. No pointer escapes this call.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_validation_step(
+    bytes: *const u8,
+    length: usize,
+    settings: u8,
+) -> string_validation::Step {
+    // SAFETY: The caller grants the short-lived readable byte allocation.
+    string_validation::step(unsafe { utf8::borrow(bytes, length) }, settings)
+}
+
+/// Validate a fixed span, requiring its first valid NUL before its end.
+///
+/// # Safety
+/// Same readable allocation/lifetime contract as `validation_step`; no borrow
+/// escapes, no output/allocation/callback occurs, and panics abort.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_validation_valid(bytes: *const u8, length: usize) -> u8 {
+    // SAFETY: The caller supplies immutable bytes for only this call.
+    u8::from(string_validation::valid(unsafe {
+        utf8::borrow(bytes, length)
+    }))
+}
+
+/// Check live consumer capacity, copy in original forward order, then commit.
+///
+/// # Safety
+/// On accepted capacity, source contains `length` initialized readable bytes and
+/// destination has writable bytes at `position..position+length`, with original
+/// valid pointer/range preconditions. Each is within one live allocation of size
+/// <= `ISIZE_MAX`. The output start is outside the nonempty source range: disjoint
+/// or defined left overlap is allowed, destination inside source is excluded.
+/// No Rust references to these bytes are created. C++ views may remain alive,
+/// without concurrent access during writing. Zero-length copying accesses neither pointer. Raw reads happen
+/// before each raw write, without simultaneous overlapping Rust slices/references.
+/// On overtake neither bytes nor position change; C++ dispatches its fatal path
+/// after return. No allocation/callback occurs here, and panic aborts.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_inplace_write(
+    destination: *mut u8,
+    position: usize,
+    consumed: usize,
+    source: *const u8,
+    length: usize,
+) -> string_validation::Write {
+    let result = string_validation::write_plan(position, consumed, length);
+    if result.accepted != 0 {
+        for index in 0..length {
+            // SAFETY: Caller supplies live valid raw ranges and permitted overlap.
+            // No shared/mutable slices are constructed; this value read ends before write.
+            let byte = unsafe { source.add(index).read() };
+            unsafe { destination.add(position + index).write(byte) };
+        }
+    }
+    result
 }

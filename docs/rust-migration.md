@@ -1331,3 +1331,55 @@ ScriptList after Admin conversion. This measured sequence left little margin in
 the prior 45-minute limit before adding Packet. Protected job names and saving
 compiler artifacts only after all comparisons succeed remain unchanged; the
 larger limit is scheduling allowance, not a performance claim.
+
+### Coupled string validation and borrowed in-place replacement
+
+Rust owns the shared StrMakeValid scan/policy decisions, StrValid fixed-span scan
+and InPlaceBuilder write progression/copy. Each sanitation decision contains a
+consumed count and at most one existing UTF-8 encoded character. C++ advances the
+actual StringConsumer before its original output operation; string append, erase,
+C-string strlen/tail termination, spans, reference rebinding and fatal dispatch
+remain C++. There is no Rust heap owner or whole-result preallocation. Trivial
+facade getters stay local; the write operation receives the live consumer count
+rather than a cached cursor. InPlaceReplacement copies share borrowed storage but
+retain independent progress and builders bound to their own copied consumers.
+
+The historical codec remains authoritative, including accepted surrogate values.
+Malformed decoding skips one byte without replacement, decoded NUL consumes its
+byte then stops, and unknown settings bits are ignored. Rust retains the exact
+printable/private-use/sprite rules, five allowed SCC codes, all four flags and
+CRLF/newline/space/question-mark precedence. C++ checks flag positions and SCC
+constants at compile time. Native unsigned capacity subtraction retains wrapping
+when the public consumer is reassigned; overtake failure changes neither bytes
+nor position before C++ NOT_REACHED. Valid copying reads then writes forward using
+raw pointers without simultaneous overlapping Rust slices or retained borrows.
+The original ranges::copy precondition excludes a destination inside nonempty
+input, including exact/right overlap; defined disjoint/left overlap remains the
+compatibility domain (https://eel.is/c++draft/alg.copy).
+
+Existing direct coverage is limited: one unchanged InPlaceReplacement case has
+26 assertions; unchanged UTF-8, consumer and builder tests exercise dependencies.
+The pre-port frozen Packet binary passed the selected 22 cases/641 assertions
+with unchanged C++ validation/in-place bodies. Final candidate checks rerun those
+same tests through Rust, together with full native tests and both unchanged
+scripted regressions. Startup/language-header/settings users add integration
+coverage rather than exhaustive malformed sanitation/settings evidence.
+
+`python3 tools/utf8-comparison.py` extends the accepted O2 assertions/NDEBUG modes
+with actual unchanged pinned string.cpp bodies, portable candidate and Rust
+candidate. The bounded corpus includes all 16 flags with ignored unknown bits,
+malformed/truncated/overlong byte sequences, accepted surrogates, printable/SCC
+boundaries, NUL and C-string suffix bytes, missing terminators, empty/unchanged
+inputs, copy/assignment/self-assignment/rvalue copies, live consumer rewinding,
+defined left overlap and overtake fatal state. A fixed observation builder uses
+the actual local shared loop to check consumption before ordinary C++ append
+allocation failure and reentrant validation. Commands, source hashes, exact
+outputs and small failures remain under `.local/utf8-comparison/`; prior codec
+cases and upstream tests are retained. ABI IDs 26/27 describe scan/write results,
+with real native calls checking byte flags, surrogate/NUL policy and copy state.
+
+These checks do not prove every allocator failure, out-of-domain overlap, full
+text rendering or whole-game equivalence. C++ owns containers and borrowed
+lifetimes; other string algorithms and Packet text collection/Recv_bytes remain
+unchanged. No C++ exception crosses Rust and kernel panics abort. Final combined
+platform CI remains required for supported macOS and Windows x86/x64 ABIs.
