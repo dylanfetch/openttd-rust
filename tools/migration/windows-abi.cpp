@@ -17,6 +17,9 @@
 #include "rust/byte_strings_ffi.h"
 #include "rust/history_ffi.h"
 #include "rust/math_ffi.h"
+#include "rust/station_cargo_ffi.h"
+#include "rust/crypto_primitives_ffi.h"
+#include "3rdparty/monocypher/monocypher.h"
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -66,6 +69,10 @@ static void Layouts()
 	Layout(15, "OpenTTDRustByteTrim", {sizeof(OpenTTDRustByteTrim), alignof(OpenTTDRustByteTrim), offsetof(OpenTTDRustByteTrim, offset), offsetof(OpenTTDRustByteTrim, length)});
 	Layout(16, "OpenTTDRustHistoryDescriptor", {sizeof(OpenTTDRustHistoryDescriptor), alignof(OpenTTDRustHistoryDescriptor), offsetof(OpenTTDRustHistoryDescriptor, child), offsetof(OpenTTDRustHistoryDescriptor, periods), offsetof(OpenTTDRustHistoryDescriptor, records), offsetof(OpenTTDRustHistoryDescriptor, first), offsetof(OpenTTDRustHistoryDescriptor, last), offsetof(OpenTTDRustHistoryDescriptor, division), offsetof(OpenTTDRustHistoryDescriptor, total_division), offsetof(OpenTTDRustHistoryDescriptor, child_periods), offsetof(OpenTTDRustHistoryDescriptor, child_division)});
 	Layout(17, "OpenTTDRustHistoryStep", {sizeof(OpenTTDRustHistoryStep), alignof(OpenTTDRustHistoryStep), offsetof(OpenTTDRustHistoryStep, kind), offsetof(OpenTTDRustHistoryStep, count), offsetof(OpenTTDRustHistoryStep, first), offsetof(OpenTTDRustHistoryStep, last), offsetof(OpenTTDRustHistoryStep, target), offsetof(OpenTTDRustHistoryStep, token), offsetof(OpenTTDRustHistoryStep, value)});
+	Layout(18, "OpenTTDCargoCollector", {sizeof(OpenTTDCargoCollector), alignof(OpenTTDCargoCollector), offsetof(OpenTTDCargoCollector, amount), offsetof(OpenTTDCargoCollector, previous), offsetof(OpenTTDCargoCollector, last_key), offsetof(OpenTTDCargoCollector, other), offsetof(OpenTTDCargoCollector, origin), offsetof(OpenTTDCargoCollector, selector), offsetof(OpenTTDCargoCollector, finalized)});
+	Layout(19, "OpenTTDCryptoLeaves", {sizeof(OpenTTDCryptoLeaves), alignof(OpenTTDCryptoLeaves), offsetof(OpenTTDCryptoLeaves, wipe), offsetof(OpenTTDCryptoLeaves, verify16)});
+	Layout(20, "OpenTTDPolyLayout", {sizeof(OpenTTDPolyLayout), alignof(OpenTTDPolyLayout), offsetof(OpenTTDPolyLayout, size), offsetof(OpenTTDPolyLayout, alignment), offsetof(OpenTTDPolyLayout, c), offsetof(OpenTTDPolyLayout, c_idx), offsetof(OpenTTDPolyLayout, r), offsetof(OpenTTDPolyLayout, pad), offsetof(OpenTTDPolyLayout, h)});
+	Layout(21, "OpenTTDAeadLayout", {sizeof(OpenTTDAeadLayout), alignof(OpenTTDAeadLayout), offsetof(OpenTTDAeadLayout, size), offsetof(OpenTTDAeadLayout, alignment), offsetof(OpenTTDAeadLayout, counter), offsetof(OpenTTDAeadLayout, key), offsetof(OpenTTDAeadLayout, nonce)});
 	CHECK(openttd_rust_abi_layout(255, 0) == SIZE_MAX);
 	CHECK(static_cast<size_t>(PTRDIFF_MAX) == (SIZE_MAX >> 1));
 	std::printf("pointer_bytes %zu sentinel %zu borrow_limit %zu\n", sizeof(void *), SIZE_MAX, static_cast<size_t>(PTRDIFF_MAX));
@@ -265,6 +272,89 @@ static void Math()
 	std::printf("math int_sqrt, clamp_to and soft_clamp scalar high-bit, width and boundary calls passed\n");
 }
 
+static void CryptoPrimitives()
+{
+	/* Actual public facades invoke all 15 Rust functions with native descriptors.
+	 * Counter high bits, initialized-only Poly1305 storage, callback convention,
+	 * in-place failure/retry and rekey are observed on the current native target. */
+	std::array<uint8_t, 32> key{}, h{};
+	std::array<uint8_t, 24> nonce{};
+	std::array<uint8_t, 65> cipher{}, plain{}, decoded{};
+	for (size_t i = 0; i < key.size(); ++i) key[i] = static_cast<uint8_t>(i * 13 + 9);
+	for (size_t i = 0; i < nonce.size(); ++i) nonce[i] = static_cast<uint8_t>(i * 7 + 101);
+	nonce[0] = 0x12; nonce[1] = 0x34; nonce[2] = 0x56; nonce[3] = 0xF8;
+	crypto_chacha20_h(h.data(), key.data(), nonce.data());
+	CHECK(crypto_chacha20_djb(cipher.data(), nullptr, 65, key.data(), nonce.data(), UINT64_MAX) == 1);
+	CHECK(crypto_chacha20_ietf(cipher.data(), nullptr, 65, key.data(), nonce.data(), UINT32_MAX) == 1);
+	CHECK(crypto_chacha20_x(cipher.data(), nullptr, 65, key.data(), nonce.data(), UINT64_MAX) == 1);
+	plain.fill(0x42);
+	CHECK(crypto_chacha20_djb(cipher.data(), plain.data(), plain.size(), key.data(), nonce.data(), UINT64_C(0xFEDCBA9876543210)) == UINT64_C(0xFEDCBA9876543212));
+	crypto_chacha20_djb(decoded.data(), cipher.data(), cipher.size(), key.data(), nonce.data(), UINT64_C(0xFEDCBA9876543210));
+	CHECK(decoded == plain);
+	crypto_poly1305_ctx poly;
+	std::fill_n(reinterpret_cast<uint8_t *>(&poly), sizeof(poly), 0xA5);
+	crypto_poly1305_init(&poly, key.data());
+	CHECK(std::all_of(std::begin(poly.c), std::end(poly.c), [](uint8_t c) { return c == 0xA5; }));
+	crypto_poly1305_update(&poly, nullptr, 0);
+	crypto_poly1305_update(&poly, plain.data(), 15);
+	crypto_poly1305_update(&poly, plain.data() + 15, plain.size() - 15);
+	std::array<uint8_t, 16> mac{}, split{};
+	crypto_poly1305_final(&poly, split.data());
+	CHECK(std::all_of(reinterpret_cast<const uint8_t *>(&poly), reinterpret_cast<const uint8_t *>(&poly) + sizeof(poly), [](uint8_t c) { return c == 0; }));
+	crypto_poly1305(mac.data(), plain.data(), plain.size(), key.data());
+	CHECK(mac == split);
+	for (unsigned variant = 0; variant != 3; ++variant) {
+		crypto_aead_ctx send, receive;
+		if (variant == 0) { crypto_aead_init_x(&send, key.data(), nonce.data()); crypto_aead_init_x(&receive, key.data(), nonce.data()); }
+		if (variant == 1) { crypto_aead_init_djb(&send, key.data(), nonce.data()); crypto_aead_init_djb(&receive, key.data(), nonce.data()); }
+		if (variant == 2) { crypto_aead_init_ietf(&send, key.data(), nonce.data()); crypto_aead_init_ietf(&receive, key.data(), nonce.data()); }
+		auto counter = send.counter;
+		CHECK(counter == (variant == 2 ? UINT64_C(0xF856341200000000) : uint64_t{0}));
+		for (unsigned chunk = 0; chunk != 2; ++chunk) {
+			crypto_aead_write(&send, cipher.data(), mac.data(), nonce.data(), 17, plain.data(), plain.size());
+			CHECK(send.counter == counter);
+			auto bad = mac; bad[0] ^= 1;
+			decoded.fill(0xA5);
+			auto before = receive;
+			CHECK(crypto_aead_read(&receive, decoded.data(), bad.data(), nonce.data(), 17, cipher.data(), cipher.size()) == -1);
+			CHECK(std::all_of(decoded.begin(), decoded.end(), [](uint8_t c) { return c == 0xA5; }));
+			CHECK(receive.counter == before.counter && std::equal(std::begin(receive.key), std::end(receive.key), std::begin(before.key)));
+			CHECK(crypto_aead_read(&receive, cipher.data(), mac.data(), nonce.data(), 17, cipher.data(), cipher.size()) == 0);
+			CHECK(cipher == plain && receive.counter == counter && std::equal(std::begin(send.key), std::end(send.key), std::begin(receive.key)));
+		}
+	}
+	crypto_aead_lock(cipher.data(), mac.data(), key.data(), nonce.data(), nonce.data(), 17, plain.data(), plain.size());
+	CHECK(crypto_aead_unlock(decoded.data(), mac.data(), key.data(), nonce.data(), nonce.data(), 17, cipher.data(), cipher.size()) == 0 && decoded == plain);
+	std::printf("crypto 15 Rust algorithms, cdecl leaves, caller layouts, counter high bits, partial init, padding and failed retry passed; poly_size=%zu poly_align=%zu aead_size=%zu aead_align=%zu\n", sizeof(poly), alignof(crypto_poly1305_ctx), sizeof(crypto_aead_ctx), alignof(crypto_aead_ctx));
+}
+
+static void StationCargo()
+{
+	auto list = std::unique_ptr<OpenTTDScriptList, decltype(&openttd_rust_list_destroy)>(openttd_rust_list_new(), openttd_rust_list_destroy);
+	OpenTTDCargoCollector state;
+	CHECK(openttd_rust_cargo_plan(0, 1) == 1 && openttd_rust_cargo_plan(1, 3) == 3);
+	CHECK(openttd_rust_cargo_plan(9, 0) == UINT8_MAX);
+	openttd_rust_cargo_init(&state, 0, UINT16_MAX);
+	openttd_rust_cargo_packet(&state, list.get(), UINT16_MAX, 2, UINT32_MAX);
+	openttd_rust_cargo_packet(&state, list.get(), UINT16_MAX, 2, 2);
+	openttd_rust_cargo_packet(&state, list.get(), 3, 2, 7);
+	int64_t value = 0;
+	CHECK(openttd_rust_list_get(list.get(), UINT16_MAX, &value) == 1 && value == 1);
+	openttd_rust_cargo_finish(&state, list.get());
+	CHECK(openttd_rust_list_get(list.get(), 3, &value) == 1 && value == 7);
+	auto token = openttd_rust_list_token(list.get());
+	openttd_rust_cargo_finish(&state, list.get());
+	CHECK(openttd_rust_list_token(list.get()) == token);
+	openttd_rust_cargo_init(&state, 2, 0);
+	openttd_rust_cargo_origin(&state, 10);
+	openttd_rust_cargo_share(&state, list.get(), 4, UINT32_MAX);
+	openttd_rust_cargo_origin(&state, 11);
+	openttd_rust_cargo_share(&state, list.get(), 4, 1);
+	openttd_rust_cargo_finish(&state, list.get());
+	CHECK(openttd_rust_list_get(list.get(), 4, &value) == 0);
+	std::printf("station_cargo scalar layout, uint32 wrapping, origin reset and finalization passed\n");
+}
+
 int main()
 {
 	Layouts();
@@ -272,6 +362,8 @@ int main()
 	Encoded();
 	History();
 	Math();
+	CryptoPrimitives();
+	StationCargo();
 	Locale();
 	std::printf("ABI audit passed\n");
 }

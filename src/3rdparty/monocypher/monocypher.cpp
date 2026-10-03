@@ -52,6 +52,10 @@
 // <https://creativecommons.org/publicdomain/zero/1.0/>
 
 #include "monocypher.h"
+#ifdef WITH_RUST
+#include "../../rust/crypto_primitives_ffi.h"
+#include <type_traits>
+#endif
 
 #ifdef MONOCYPHER_CPP_NAMESPACE
 namespace MONOCYPHER_CPP_NAMESPACE {
@@ -139,7 +143,9 @@ static void store64_le_buf(u8 *dst, const u64 *src, size_t size) {
 }
 
 static u64 rotr64(u64 x, u64 n) { return (x >> n) ^ (x << (64 - n)); }
+#ifndef WITH_RUST
 static u32 rotl32(u32 x, u32 n) { return (x << n) ^ (x >> (32 - n)); }
+#endif
 
 static int neq0(u64 diff)
 {
@@ -166,6 +172,77 @@ void crypto_wipe(void *secret, size_t size)
 	ZERO(v_secret, size);
 }
 
+#ifdef WITH_RUST
+// Only original leaf primitives cross back to C++; never application callbacks.
+static void OPENTTD_CRYPTO_CALL RustCryptoWipe(void *p, size_t size) noexcept { crypto_wipe(p, size); }
+static int32_t OPENTTD_CRYPTO_CALL RustCryptoVerify16(const uint8_t *a, const uint8_t *b) noexcept { return crypto_verify16(a, b); }
+static const OpenTTDCryptoLeaves rust_crypto_leaves = {RustCryptoWipe, RustCryptoVerify16};
+static_assert(std::is_standard_layout_v<crypto_poly1305_ctx> && std::is_trivially_copyable_v<crypto_poly1305_ctx>);
+static_assert(std::is_standard_layout_v<crypto_aead_ctx> && std::is_trivially_copyable_v<crypto_aead_ctx>);
+static_assert(sizeof(size_t) == sizeof(void *) && sizeof(u32) == 4 && sizeof(u64) == 8);
+static_assert(sizeof(OpenTTDCryptoLeaves) == 2 * sizeof(void *));
+static_assert(sizeof(OpenTTDPolyLayout) == 7 * sizeof(size_t));
+static_assert(sizeof(OpenTTDAeadLayout) == 5 * sizeof(size_t));
+// Actual compiler layouts, including i686 MSVC size_t and uint64 alignment.
+static const OpenTTDPolyLayout rust_poly_layout = {
+	sizeof(crypto_poly1305_ctx), alignof(crypto_poly1305_ctx), offsetof(crypto_poly1305_ctx, c),
+	offsetof(crypto_poly1305_ctx, c_idx), offsetof(crypto_poly1305_ctx, r),
+	offsetof(crypto_poly1305_ctx, pad), offsetof(crypto_poly1305_ctx, h),
+};
+static const OpenTTDAeadLayout rust_aead_layout = {
+	sizeof(crypto_aead_ctx), alignof(crypto_aead_ctx), offsetof(crypto_aead_ctx, counter),
+	offsetof(crypto_aead_ctx, key), offsetof(crypto_aead_ctx, nonce),
+};
+void crypto_chacha20_h(u8 out[32], const u8 key[32], const u8 in [16])
+{
+	openttd_rust_chacha_h(&rust_crypto_leaves, out, key, in);
+}
+
+u64 crypto_chacha20_djb(u8 *cipher_text, const u8 *plain_text,
+                        size_t text_size, const u8 key[32], const u8 nonce[8],
+                        u64 ctr)
+{
+	return openttd_rust_chacha_djb(&rust_crypto_leaves, cipher_text, plain_text, text_size, key, nonce, ctr);
+}
+
+u32 crypto_chacha20_ietf(u8 *cipher_text, const u8 *plain_text,
+                         size_t text_size,
+                         const u8 key[32], const u8 nonce[12], u32 ctr)
+{
+	return openttd_rust_chacha_ietf(&rust_crypto_leaves, cipher_text, plain_text, text_size, key, nonce, ctr);
+}
+
+u64 crypto_chacha20_x(u8 *cipher_text, const u8 *plain_text,
+                      size_t text_size,
+                      const u8 key[32], const u8 nonce[24], u64 ctr)
+{
+	return openttd_rust_chacha_x(&rust_crypto_leaves, cipher_text, plain_text, text_size, key, nonce, ctr);
+}
+
+void crypto_poly1305_init(crypto_poly1305_ctx *ctx, const u8 key[32])
+{
+	openttd_rust_poly_init(&rust_poly_layout, ctx, key);
+}
+
+void crypto_poly1305_update(crypto_poly1305_ctx *ctx,
+                            const u8 *message, size_t message_size)
+{
+	openttd_rust_poly_update(&rust_poly_layout, ctx, message, message_size);
+}
+
+void crypto_poly1305_final(crypto_poly1305_ctx *ctx, u8 mac[16])
+{
+	openttd_rust_poly_final(&rust_crypto_leaves, &rust_poly_layout, ctx, mac);
+}
+
+void crypto_poly1305(u8     mac[16],  const u8 *message,
+                     size_t message_size, const u8  key[32])
+{
+	crypto_poly1305_ctx ctx; // Start actual trivial C++ lifetime; chunk remains unwritten.
+	openttd_rust_poly(&rust_crypto_leaves, &rust_poly_layout, &ctx, mac, message, message_size, key);
+}
+
+#else
 /////////////////
 /// Chacha 20 ///
 /////////////////
@@ -447,6 +524,8 @@ void crypto_poly1305(u8     mac[16],  const u8 *message,
 	crypto_poly1305_update(&ctx, message, message_size);
 	crypto_poly1305_final (&ctx, mac);
 }
+
+#endif // WITH_RUST
 
 ////////////////
 /// BLAKE2 b ///
@@ -878,7 +957,7 @@ void crypto_argon2(u8 *hash, u32 hash_size, void *work_area,
 					u64  y         = (window_size * x) >> 32;
 					u64  z         = (window_size - 1) - y;
 					u64  ref       = (window_start + z) % lane_size;
-					u32  index     = lane * lane_size + (u32)ref;
+					u32  index     = (u32)(lane * lane_size + (u32)ref);
 					blk *reference = blocks + index;
 
 					// Shuffle the previous & reference block
@@ -2852,6 +2931,56 @@ void crypto_x25519_inverse(u8 blind_salt [32], const u8 private_key[32],
 	WIPE_BUFFER(product);  WIPE_BUFFER(m_inv);
 }
 
+#ifdef WITH_RUST
+void crypto_aead_init_x(crypto_aead_ctx *ctx,
+                        u8 const key[32], const u8 nonce[24])
+{
+	openttd_rust_aead_init_x(&rust_crypto_leaves, &rust_aead_layout, ctx, key, nonce);
+}
+
+void crypto_aead_init_djb(crypto_aead_ctx *ctx,
+                          const u8 key[32], const u8 nonce[8])
+{
+	openttd_rust_aead_init_djb(&rust_aead_layout, ctx, key, nonce);
+}
+
+void crypto_aead_init_ietf(crypto_aead_ctx *ctx,
+                           const u8 key[32], const u8 nonce[12])
+{
+	openttd_rust_aead_init_ietf(&rust_aead_layout, ctx, key, nonce);
+}
+
+void crypto_aead_write(crypto_aead_ctx *ctx, u8 *cipher_text, u8 mac[16],
+                       const u8 *ad,         size_t ad_size,
+                       const u8 *plain_text, size_t text_size)
+{
+	openttd_rust_aead_write(&rust_crypto_leaves, &rust_aead_layout, ctx, cipher_text, mac, ad, ad_size, plain_text, text_size);
+}
+
+int crypto_aead_read(crypto_aead_ctx *ctx, u8 *plain_text, const u8 mac[16],
+                     const u8 *ad,          size_t ad_size,
+                     const u8 *cipher_text, size_t text_size)
+{
+	return openttd_rust_aead_read(&rust_crypto_leaves, &rust_aead_layout, ctx, plain_text, mac, ad, ad_size, cipher_text, text_size);
+}
+
+void crypto_aead_lock(u8 *cipher_text, u8 mac[16], const u8 key[32],
+                      const u8  nonce[24], const u8 *ad, size_t ad_size,
+                      const u8 *plain_text, size_t text_size)
+{
+	crypto_aead_ctx ctx; // Start actual trivial lifetime before Rust initializes fields.
+	openttd_rust_aead_lock(&rust_crypto_leaves, &rust_aead_layout, &ctx, cipher_text, mac, key, nonce, ad, ad_size, plain_text, text_size);
+}
+
+int crypto_aead_unlock(u8 *plain_text, const u8  mac[16], const u8 key[32],
+                       const u8 nonce[24], const u8 *ad, size_t ad_size,
+                       const u8 *cipher_text, size_t text_size)
+{
+	crypto_aead_ctx ctx; // Rust wipes this actual context on both success and failure.
+	return openttd_rust_aead_unlock(&rust_crypto_leaves, &rust_aead_layout, &ctx, plain_text, mac, key, nonce, ad, ad_size, cipher_text, text_size);
+}
+
+#else
 ////////////////////////////////
 /// Authenticated encryption ///
 ////////////////////////////////
@@ -2950,6 +3079,8 @@ int crypto_aead_unlock(u8 *plain_text, const u8  mac[16], const u8 key[32],
 	crypto_wipe(&ctx, sizeof(ctx));
 	return mismatch;
 }
+
+#endif // WITH_RUST
 
 #ifdef MONOCYPHER_CPP_NAMESPACE
 }

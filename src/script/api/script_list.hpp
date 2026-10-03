@@ -50,6 +50,10 @@ private:
 #endif
 
 protected:
+#ifdef WITH_RUST
+	/** Borrow storage for a synchronous derived-class reducer; never retain in Rust. */
+	OpenTTDScriptList *GetRustListOwner() const { return this->owner.get(); }
+#endif
 	/* Temporary helper functions to get the raw index from either strongly and non-strongly typed pool items. */
 	template <typename T>
 	static auto GetRawIndex(const T &index) { return index; }

@@ -1144,3 +1144,97 @@ full game instance and extracts unchanged TileList persistence bodies without
 simulating world population. This evidence does not establish arbitrary VM,
 savegame or allocation-failure equivalence. CI retains these comparisons along
 with the existing checks.
+
+## ChaCha20, Poly1305 and AEAD primitives
+
+The bundled Monocypher 4.0.2 ChaCha20/Poly1305/AEAD family (#48) keeps its public
+C interfaces and caller-owned context types. Rust owns cipher rounds, MAC
+arithmetic, incremental buffering, authentication padding and composition. C++
+starts actual trivial context lifetimes for one-shot calls and passes compiler
+size/alignment/field-offset descriptors. Raw field access reads only initialized
+Poly1305 fields/chunk bytes, preserves unwritten chunk/padding bytes at init, and
+wipes the actual complete caller context at finalization. Counter access is raw
+and unaligned-capable, avoiding an i686 Rust/C++ uint64 alignment assumption.
+
+The original nonthrowing wipe and constant-time verify16 leaves are borrowed
+through a two-function explicit-cdecl table; Rust has no direct vendor imports or
+global callback registration. Every callback returns synchronously. Cipher input
+and output are disjoint or exactly in-place; key/nonce loads precede output,
+including unchanged Elligator key generation's overlapping key. Unsigned
+arithmetic wraps as before, failed reads preserve output/context, successful
+stream operations rekey without incrementing the context counter. Fixed-size
+secret temporaries use stable local storage and the original wipe points; this
+does not promise erasure of every compiler copy/spill or cryptographic
+certification. Other Monocypher algorithms and the exact portable family remain
+in C++. The clean core passes the four Cargo gates and full native reference/candidate
+verification, including the five unchanged network cases and both unchanged
+scripted regressions. The unchanged authentication corpus first passes all 1,800
+transcript records, including both mixed endpoint directions. Its existing
+`python3 tools/auth-comparison.py` tool now also invokes the bounded `--primitives`
+mode against actual pinned vendor functions, matching 484 direct records through
+Rust and portable C++: variant outputs/carries, null keystream, disjoint/in-place
+text, key/nonce and Elligator overlap, split Poly1305 updates with prefilled
+untouched bytes and final wipe, unaligned associated-data padding, three
+initializers, multi-chunk rekey, and failed output/context preservation with retry.
+The existing C++ ASan/UBSan runs exercise both modes; Rust accesses are not
+instrumented. Passing does not certify cryptography or arbitrary overlap/inputs.
+
+The native ABI executable adds all 15 actual facade/FFI calls and caller-context
+checks while retaining every existing layout/math check. Metadata IDs 19..21
+cover the two-leaf table and two field-layout descriptors; 18 covers the
+station cargo owner. The combined audit has all 22 IDs from 0 through 21. Only the
+ABI executable adds a vendor object for its primitive calls; fresh strgen/settingsgen continue linking
+the shared Rust archive with no vendor object/import dependency. Actual final
+Linux/macOS/Windows x86/x64 CI and independent final-head review remain mandatory.
+
+## Station cargo-list queries
+
+The station cargo-list port (#51) reuses the Rust ScriptList owner. Rust owns all
+four selector/filter rules, pending run keys and unsigned 32-bit totals, positive
+flush decisions, existing-item add-versus-set merges, per-origin cumulative-share
+decoding, and selection of waiting/all versus equal_range and planned/all versus
+find query plans. C++ retains actual station/cargo validation, pool/GoodsEntry
+access, HasData checks, packet/flow iterators and scalar extraction. All eight
+specialized constructors and the generic mode/selector temporary/SwapList facades
+use the same reducer. Non-cargo station lists, routing, packet/flow ownership and
+other station APIs remain C++. Portable builds retain the original cargo bodies.
+
+A caller-owned 16-byte scalar collector uses unsigned 32-bit amount/previous,
+unsigned 16-bit station IDs (including 0xFFFF), and byte selector/finalized fields.
+Explicit width/offset/alignment assertions and ABI layout entry 18 check the C/Rust
+boundary. Windows x86 uses the established explicit cdecl convention. No collector
+allocation is added; Rust borrows the existing opaque destination and disjoint
+scalar state only during feed/finalize calls. No world pointer, STL/VM layout,
+iterator, callback or C++ exception enters or survives a Rust call. A C++ RAII
+finalizer flushes the last positive run on normal exit, early return or unwinding;
+the destination outlives the collector. Finalization is idempotent, with no
+transactional rollback or extra list insertion on empty/zero runs.
+
+Filtering precedes pending-key changes. Selected equal-key totals and cumulative
+share differences wrap modulo 2^32. Each origin resets previous to zero; every
+visited share advances it, including filtered and restricted entries from GetShares.
+Repeated noncontiguous keys merge using the accepted list add/set methods, retaining
+modification tokens, live pending cursors and final value/tie ordering. Original
+signed result/modification-counter overflow remains outside the defined domain.
+List allocation/panic limits are unchanged: Rust aborts on panic/allocation failure;
+recoverable resource-exhaustion equivalence is not claimed.
+
+The unchanged stationlist script already exercises 24 cargo-list constructions
+and checks 41 cargo item/value output rows. Both unchanged scripted suites and the
+full upstream unit inventory remain primary evidence. The existing
+`python3 tools/script-list-comparison.py` machinery adds only bounded cargo gaps
+at O0/O2, comparing exact pinned original Update/SetValue/destructor and planned
+all/find loop bodies, portable candidate and Rust feeds. Actual FlowStat maps
+exercise origin reset, filtered intermediate and restricted shares. Traces include
+ordered items, mutation tokens and live cursor/end behavior, unsigned wrapping,
+zero/invalid-sentinel keys, noncontiguous repeats, empty/absent origins, reentry and
+a C++ exception between completed feeds. The original private mutation count is
+read through a narrowly scoped explicit-instantiation member pointer without
+changing production headers or behavior.
+
+The direct reducer fixture bypasses world lookup. It checks exact preservation of
+the typed station-before-cargo validation and null-goods/HasData guard bodies/order;
+failed station/cargo/company policy and missing-data supplemental probes are not
+executed. Existing saved-world regressions cover their exercised real query paths,
+not every invalid world state. This evidence does not establish cargo routing,
+station-storage ownership, arbitrary allocation failures or full game equivalence.

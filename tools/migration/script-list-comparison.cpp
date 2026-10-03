@@ -9,6 +9,11 @@
 #include "stdafx.h"
 #include "script/api/script_list.hpp"
 #include "script/api/script_tilelist.hpp"
+#include "script/api/script_stationlist.hpp"
+#include "station_base.h"
+#ifdef WITH_RUST
+#include "rust/station_cargo_ffi.h"
+#endif
 #include "script/squirrel.hpp"
 #include <iostream>
 #include <sstream>
@@ -39,6 +44,146 @@ public:
 	using ScriptList::LoadObject;
 	using ScriptTileList::CloneObject;
 };
+/* Exact pinned control bodies with fixture-only direct scalar initialization. */
+#include "cargo-reducer.hpp"
+class CargoProbeList : public ScriptStationList_Cargo {
+public:
+	CargoProbeList() = default;
+#ifdef WITH_RUST
+	OpenTTDScriptList *Owner() { return this->GetRustListOwner(); }
+#endif
+};
+#ifndef WITH_RUST
+/* Explicit-instantiation access obtains a read-only pointer to the actual private
+ * mutation counter. It does not change the production header or list behavior. */
+struct CargoModificationTag {
+	using type = int ScriptList::*;
+	friend type CargoModificationMember(CargoModificationTag);
+};
+template <CargoModificationTag::type Pointer> struct CargoModificationAccess {
+	friend CargoModificationTag::type CargoModificationMember(CargoModificationTag) { return Pointer; }
+};
+template struct CargoModificationAccess<&ScriptList::modifications>;
+#endif
+static int CargoToken(CargoProbeList &list)
+{
+#ifdef WITH_RUST
+	return openttd_rust_list_token(list.Owner());
+#else
+	return list.*CargoModificationMember(CargoModificationTag{});
+#endif
+}
+class GapCargoCollector {
+public:
+	GapCargoCollector(CargoProbeList &list, uint8_t selector, StationID other) : list(list), selector(selector)
+#ifndef WITH_RUST
+		, original(&list, StationID::Invalid(), 0, other)
+#endif
+	{
+#ifdef WITH_RUST
+		openttd_rust_cargo_init(&this->state, selector, other.base());
+#endif
+	}
+	~GapCargoCollector()
+	{
+#ifdef WITH_RUST
+		openttd_rust_cargo_finish(&this->state, this->list.Owner());
+#endif
+	}
+	void Packet(StationID from, StationID via, uint32_t amount)
+	{
+#ifdef WITH_RUST
+		openttd_rust_cargo_packet(&this->state, this->list.Owner(), from.base(), via.base(), amount);
+#else
+		switch (this->selector) {
+			case 0: this->original.Update<ScriptStationList_Cargo::CS_BY_FROM>(from, via, amount); break;
+			case 1: this->original.Update<ScriptStationList_Cargo::CS_VIA_BY_FROM>(from, via, amount); break;
+			case 2: this->original.Update<ScriptStationList_Cargo::CS_BY_VIA>(from, via, amount); break;
+			case 3: this->original.Update<ScriptStationList_Cargo::CS_FROM_BY_VIA>(from, via, amount); break;
+		}
+#endif
+	}
+	void Planned(const FlowStatMap &flows, StationID other)
+	{
+#ifdef WITH_RUST
+		auto feed = [this](FlowStatMap::const_iterator iter) {
+			openttd_rust_cargo_origin(&this->state, iter->first.base());
+			for (const auto &[cumulative, via] : *iter->second.GetShares()) openttd_rust_cargo_share(&this->state, this->list.Owner(), via.base(), cumulative);
+		};
+		if (openttd_rust_cargo_plan(1, this->selector) == 3) {
+			auto iter = flows.find(other);
+			if (iter != flows.end()) feed(iter);
+		} else {
+			for (auto iter = flows.begin(); iter != flows.end(); ++iter) feed(iter);
+		}
+#else
+		switch (this->selector) {
+			case 0: OriginalCargoPlanned<ScriptStationList_Cargo::CS_BY_FROM>(this->original, flows); break;
+			case 1: OriginalCargoPlanned<ScriptStationList_Cargo::CS_VIA_BY_FROM>(this->original, flows); break;
+			case 2: OriginalCargoPlanned<ScriptStationList_Cargo::CS_BY_VIA>(this->original, flows); break;
+			case 3: OriginalCargoFind(this->original, flows, other); break;
+		}
+#endif
+	}
+private:
+	CargoProbeList &list;
+	uint8_t selector;
+#ifdef WITH_RUST
+	OpenTTDCargoCollector state;
+#else
+	ReferenceCargoCollector original;
+#endif
+};
+static void CargoRecord(std::string_view label, CargoProbeList &list)
+{
+	std::cout << "cargo " << label << " token=" << CargoToken(list) << " end=" << list.IsEnd() << " count=" << list.Count() << " items=";
+	for (int64_t key : {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 20, 30, 40, 65535}) if (list.HasItem(key)) std::cout << key << '=' << list.GetValue(key) << ',';
+	std::cout << '\n';
+}
+static void CargoGaps()
+{
+	for (uint8_t selector = 0; selector != 4; ++selector) for (auto mode : {ScriptList::SORT_BY_VALUE, ScriptList::SORT_BY_ITEM}) for (bool ascending : {false, true}) {
+		std::cout << "cargo_mode " << unsigned(selector) << ' ' << mode << ' ' << ascending << '\n';
+		CargoProbeList list; list.AddItem(1, 8); list.AddItem(2, 9); list.AddItem(7, 2); list.Sort(mode, ascending); list.Begin();
+		{
+			GapCargoCollector collector(list, selector, StationID{7});
+			CargoRecord("empty-pending", list);
+			collector.Packet(StationID{7}, StationID{7}, UINT32_MAX);
+			collector.Packet(StationID{7}, StationID{7}, 2);
+			collector.Packet(StationID{8}, StationID{8}, 3); // Both filters reject a different run key.
+			collector.Packet(StationID{7}, StationID{7}, 2);
+			collector.Packet(StationID{1}, StationID{7}, 0);
+			CargoRecord("key-change-wrap-zero", list);
+			collector.Packet(StationID::Invalid(), StationID::Invalid(), 10);
+			collector.Packet(StationID{7}, StationID{7}, 11);
+			CargoRecord("noncontiguous-before-final", list);
+		}
+		CargoRecord("final", list);
+		std::cout << "cargo_cursor";
+		for (unsigned n = 0; !list.IsEnd() && n < 32; ++n) std::cout << ' ' << list.Next();
+		Require(list.IsEnd()); std::cout << '\n';
+		CargoProbeList partial;
+		try {
+			GapCargoCollector collector(partial, selector, StationID{7});
+			collector.Packet(StationID{7}, StationID{7}, 5);
+			collector.Packet(StationID{1}, StationID{7}, 7);
+			CargoRecord("before-injected-throw", partial);
+			{ GapCargoCollector nested(partial, selector, StationID{7}); nested.Packet(StationID{7}, StationID{7}, 3); }
+			throw std::runtime_error("fixture interruption between Rust calls");
+		} catch (const std::runtime_error &) { CargoRecord("unwind-last-run", partial); }
+		FlowStatMap flows;
+		FlowStat first(StationID{7}, 5); first.AppendShare(StationID{8}, 9); first.AppendShare(StationID{7}, 4, true);
+		flows.emplace(StationID{7}, std::move(first));
+		FlowStat second(StationID{7}, 3, true); second.AppendShare(StationID::Invalid(), 2, true);
+		flows.emplace(StationID{8}, std::move(second));
+		CargoProbeList planned;
+		{ GapCargoCollector collector(planned, selector, StationID{7}); collector.Planned(flows, StationID{7}); CargoRecord("planned-before-final", planned); }
+		CargoRecord("planned-origin-reset-filter-restricted", planned);
+		CargoProbeList absent;
+		{ GapCargoCollector collector(absent, selector, StationID{40}); collector.Planned({}, StationID{40}); collector.Planned(flows, StationID{40}); }
+		CargoRecord("empty-absent-origin", absent);
+	}
+}
 static constexpr SQInteger keys[] = {INT64_MIN, -5, -1, 0, 1, 2, 3, 4, 5, 6, 8, 10, 20, 30, 40, 99, INT64_MAX};
 static std::string Hex(std::string_view input)
 {
@@ -235,5 +380,5 @@ static void Persistence(std::string_view tag)
 }
 int main()
 {
-	OwnerGaps(); ValuationGaps(); Persistence<TestList>("List"); Persistence<TestTileList>("TileList");
+	OwnerGaps(); CargoGaps(); ValuationGaps(); Persistence<TestList>("List"); Persistence<TestTileList>("TileList");
 }

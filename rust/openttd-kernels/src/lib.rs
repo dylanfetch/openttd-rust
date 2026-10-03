@@ -17,6 +17,7 @@ mod integer;
 mod landscape;
 mod math;
 mod script_list;
+mod station_cargo;
 mod widget_parser;
 
 pub use admin_conversion::Action as AdminAction;
@@ -746,7 +747,8 @@ mod abi;
 
 /// Return size, alignment or field offsets for the bounded public ABI audit.
 ///
-/// Type IDs 0..17 follow `abi_ffi.h`; item 0 is size, 1 alignment, then fields in
+/// Type IDs 0..21 follow `abi_ffi.h`, including station cargo and crypto layouts.
+/// Item 0 is size, 1 alignment, then fields in
 /// declaration order. Unknown IDs/items return `usize::MAX` (C++ `SIZE_MAX`).
 /// Scalar metadata only: no allocation, pointers, ownership or callbacks.
 #[allow(unsafe_code)] // Exported scalar C symbol, like the existing kernel entry points.
@@ -850,4 +852,102 @@ pub unsafe extern "C" fn openttd_rust_widget_parser_advance(
 pub unsafe extern "C" fn openttd_rust_widget_parser_destroy(handle: *mut std::ffi::c_void) {
     // SAFETY: Return unique ownership to the allocating Rust Box exactly once.
     drop(unsafe { Box::from_raw(handle.cast::<widget_parser::Engine>()) });
+}
+
+#[allow(unsafe_code)]
+mod crypto_primitives;
+
+/// Select cargo traversal without borrowing world state; invalid tags return 255.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_cargo_plan(mode: u8, selector: u8) -> u8 {
+    station_cargo::plan(mode, selector)
+}
+
+/// Initialize caller-owned scalar collector; no allocation or retained pointer.
+///
+/// # Safety
+/// State is writable, aligned storage of the documented C layout. Selector < 4.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_cargo_init(
+    state: *mut station_cargo::Collector,
+    selector: u8,
+    other: u16,
+) {
+    // SAFETY: Caller supplies writable aligned state with no active access.
+    unsafe {
+        state.write(station_cargo::Collector::new(selector, other));
+    }
+}
+
+/// Feed a packet after typed iteration returns to C++.
+///
+/// # Safety
+/// State and list are live, aligned, exclusive and disjoint for this call only.
+/// Neither is finalized; no callback/world/VM operation enters this Rust frame.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_cargo_packet(
+    state: *mut station_cargo::Collector,
+    list: *mut std::ffi::c_void,
+    from: u16,
+    via: u16,
+    amount: u32,
+) {
+    // SAFETY: Exclusive disjoint state/list borrows expire at return.
+    unsafe {
+        (&mut *state).packet(&mut *list.cast::<script_list::List>(), from, via, amount);
+    }
+}
+
+/// Begin an origin, resetting only the cumulative-share decoder.
+///
+/// # Safety
+/// State is initialized, live, aligned, exclusive and not finalized.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_cargo_origin(
+    state: *mut station_cargo::Collector,
+    origin: u16,
+) {
+    // SAFETY: The caller exclusively borrows the scalar state for this call.
+    unsafe {
+        (&mut *state).origin(origin);
+    }
+}
+
+/// Decode a visited cumulative share and feed the selected run.
+///
+/// # Safety
+/// Same disjoint, exclusive state/list contract as `cargo_packet`; origin began.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_cargo_share(
+    state: *mut station_cargo::Collector,
+    list: *mut std::ffi::c_void,
+    via: u16,
+    cumulative: u32,
+) {
+    // SAFETY: The disjoint borrows end before another typed iterator operation.
+    unsafe {
+        (&mut *state).share(&mut *list.cast::<script_list::List>(), via, cumulative);
+    }
+}
+
+/// Flush the last positive run once; RAII calls this even on C++ unwinding.
+///
+/// # Safety
+/// State/list are live, aligned, exclusive, disjoint; destination outlives state.
+/// No destructor callback crosses Rust; panic/allocation exhaustion aborts.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_cargo_finish(
+    state: *mut station_cargo::Collector,
+    list: *mut std::ffi::c_void,
+) {
+    // SAFETY: C++ keeps the destination alive through this synchronous finalizer.
+    unsafe {
+        (&mut *state).finish(&mut *list.cast::<script_list::List>());
+    }
 }
