@@ -357,3 +357,62 @@ pub unsafe extern "C" fn openttd_rust_consumer_separator(
         policy,
     )
 }
+
+mod spiral;
+pub use spiral::SpiralState;
+
+/// Initialize a square spiral with the live map dimensions; diameter is positive.
+/// All scalar arithmetic wraps at 32 bits. No pointer/ownership crosses the ABI.
+#[allow(unsafe_code)] // Export attribute only; implementation is safe Rust.
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_spiral_square(
+    x: u32,
+    y: u32,
+    diameter: u32,
+    size_x: u32,
+    size_y: u32,
+) -> SpiralState {
+    spiral::square(x, y, diameter, size_x, size_y)
+}
+
+/// Initialize a rectangular-hole spiral; radius is positive, extents are unsigned.
+/// Live map dimensions are supplied by the facade; no map/storage borrow occurs.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_spiral_hole(
+    x: u32,
+    y: u32,
+    radius: u32,
+    width: u32,
+    height: u32,
+    size_x: u32,
+    size_y: u32,
+) -> SpiralState {
+    spiral::hole(x, y, radius, width, height, size_x, size_y)
+}
+
+/// Advance a non-ended initialized state and skip coordinates outside the live map.
+/// State/results are independent copies; panic aborts without unwinding into C++.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_spiral_advance(
+    state: SpiralState,
+    size_x: u32,
+    size_y: u32,
+) -> SpiralState {
+    state.advance(size_x, size_y)
+}
+
+/// End means current radius equals its limit with a non-invalid direction.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_spiral_end(state: SpiralState) -> u8 {
+    u8::from(state.is_end())
+}
+
+/// Iterator equality compares coordinates only, independent of other state.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_spiral_equal(left: SpiralState, right: SpiralState) -> u8 {
+    u8::from(spiral::equal(left, right))
+}
