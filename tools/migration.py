@@ -40,6 +40,44 @@ def environment():
     return env
 
 
+def rust_configuration(build: Path):
+    """Read the target validated by CMake, refusing portable or stale archive layouts."""
+    build = build.resolve()
+    cache = {}
+    for line in (build / "CMakeCache.txt").read_text().splitlines():
+        if line and not line.startswith(("#", "//")) and "=" in line:
+            key, value = line.split("=", 1)
+            cache[key.split(":", 1)[0]] = value
+    target = cache.get("RUST_TARGET")
+    supported = {"x86_64-unknown-linux-gnu": "Linux", "aarch64-unknown-linux-gnu": "Linux",
+                 "aarch64-apple-darwin": "Darwin"}
+    if cache.get("OPTION_RUST") != "ON" or target not in supported:
+        raise RuntimeError(f"{build}: Rust must be enabled with a supported validated target")
+    if cache.get("RUST_PLATFORM") != supported[target] or cache.get("RUST_POINTER_WIDTH") != "8":
+        raise RuntimeError(f"{build}: Rust/C++ target metadata is inconsistent")
+    directory = build / "cargo"
+    archive = directory / target / "release/libopenttd_kernels.a"
+    if cache.get("RUST_TARGET_DIR") != str(directory) or cache.get("RUST_ARCHIVE") != str(archive):
+        raise RuntimeError(f"{build}: unexpected Rust archive layout; reconfigure this build")
+    return {"target": target, "platform": supported[target], "pointer_bytes": 8,
+            "target_dir": str(directory), "archive": str(archive),
+            "deployment_target": cache.get("CMAKE_OSX_DEPLOYMENT_TARGET", ""),
+            "sdk": cache.get("CMAKE_OSX_SYSROOT", ""),
+            "native_libraries": cache.get("RUST_NATIVE_LIBS", "").split(";"),
+            "build_type": cache.get("CMAKE_BUILD_TYPE", ""),
+            "assertions": cache.get("OPTION_USE_ASSERTS", "")}
+
+
+def rust_archive(build: Path, *, target_dir: Path | None = None) -> Path:
+    """Locate an existing release archive using CMake's validated native target."""
+    configuration = rust_configuration(build)
+    directory = Path(configuration["target_dir"]) if target_dir is None else target_dir.resolve()
+    archive = directory / configuration["target"] / "release/libopenttd_kernels.a"
+    if not archive.is_file():
+        raise RuntimeError(f"Rust archive missing: {archive}; build this validated target first")
+    return archive
+
+
 def git(*args, cwd=ROOT):
     return subprocess.check_output(["git", *args], cwd=cwd, text=True).strip()
 
@@ -143,8 +181,8 @@ def main():
                 "-DOPTION_RUST=ON",
             ]
             run(f"{name}-configure", ["cmake", "-S", str(source), "-B", str(build), *common, *extra])
-            if name == "candidate" and "OPTION_RUST:BOOL=ON" not in (build / "CMakeCache.txt").read_text():
-                raise RuntimeError("Candidate Rust option was not enabled; refusing fallback verification")
+            if name == "candidate":
+                report["rust_configuration"] = rust_configuration(build)
             supply_graphics(build)
             run(f"{name}-build", ["cmake", "--build", str(build), "--parallel", str(args.jobs)])
             binary = build / ("openttd" if name == "reference" else "openttd-rust")

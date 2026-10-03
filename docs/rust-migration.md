@@ -41,8 +41,9 @@ libraries described in `COMPILING.md`. OpenGFX supplies free graphics for regres
 games; commercial game assets are unnecessary. The verification driver requires
 the pinned Rust toolchain and always configures the candidate with `OPTION_RUST=ON`.
 Ordinary CMake builds default to `OPTION_RUST=OFF`, preserving the original portable
-C++ path. Rust linkage currently supports native Linux; other platforms and cross
-compilation remain outstanding migration work and reject an enabled Rust option.
+C++ path. Rust linkage supports native GNU/Linux (64-bit x86 or ARM) and native macOS arm64.
+Other platforms, cross compilation, and macOS universal/Intel configurations reject
+an enabled Rust option; their portable fallback remains migration work.
 
 On Ubuntu with administrator access:
 
@@ -178,7 +179,7 @@ settings/string headers plus English/French language output on unchanged referen
 inputs. Evidence and source hashes live under `.local/integer-comparison/`; CI runs
 the fresh Rust tools build and comparisons. The eleven unchanged upstream
 StringConsumer cases remain the primary existing parser tests. In-place ownership,
-other builder algorithms, C++ adapters, and non-Linux Rust integration remain migration work.
+other builder algorithms and C++ adapters remain migration work.
 
 Alternating-iterator traversal also uses the shared Rust archive. Rust owns initial
 position/selectors, logical advancement, side selection, end transitions, and
@@ -418,6 +419,70 @@ sanitizer-instrumented. Evidence resides in `.local/encoded-comparison/` and is
 retained by CI. No generator runtime coverage is claimed for these algorithms.
 Portable bodies and ownership facades remain transitional under #3.
 
+## Byte-string utility boundary
+
+The issue #21 byte-string port moves case-insensitive compare/equal/prefix/suffix/
+contains, lowercase conversion, uppercase hex encoding, sequential hex decoding,
+and byte-set trim scanning into `byte_strings.rs`. C++ retains std::string owners,
+public views, erases, and the installed standard library's exact equal-prefix
+length comparison policy. The length adapter compares a valid suffix of the
+longer original view against a default empty view; Rust scans/maps bytes and
+returns that supplied scalar only when the shared prefix is equal. All operations
+remain length-delimited, including embedded NUL.
+
+Rust calls native C `toupper` with the original C++ char promotion (signedness is
+an explicit scalar supplied by C++) and native `tolower` with unsigned-byte
+promotion. This retains process-locale behavior and does not replace it with ASCII
+or Unicode rules. Negative-char uppercase inputs other than EOF remain outside
+portable C's specified domain; compatibility is only the observed native behavior
+and call shape, not a claim of defined behavior. Locale must not change concurrently.
+Issue #26 records the deferred signed-byte ctype improvement.
+
+The ABI borrows initialized bytes in live allocations, lengths <= PTRDIFF_MAX;
+empty spans allow null, read-only spans may overlap, no pointer is retained, and
+ownership never transfers. Lowercase holds an exclusive mutable span and requires
+an offset at most size. Hex encode uses disjoint input and caller-owned initialized
+output. Hex decode deliberately forms no Rust slices or references: sequential raw
+reads of both nibbles precede each raw write, allowing legal input/output overlap
+and preserving earlier writes on later invalid pairs. Decode destinations may be
+uninitialized except where their bytes also belong to initialized readable input.
+Rejected lengths write
+nothing. Rust trim returns offsets; C++ returns a default null-data string_view for
+all-trimmed/empty inputs and otherwise takes the original substring. In-place trim
+keeps the original newline-preserving whitespace set and erase order. Panic aborts
+and the C ABI never unwinds. Equivalent resource-exhaustion timing is not claimed.
+
+Only the portable fallback of natural contains routes through this helper. ICU,
+Windows/macOS search/collation, sanitation/character validation, in-place replacement,
+and StringIterator backends remain separate work; these utilities do not complete
+string.cpp or the string subsystem. The twelve original utility tests are unchanged.
+
+The bounded `python3 tools/byte-strings-comparison.py` probe compiles full unchanged
+pinned string.cpp/core string-consumer sources against the public interfaces, and
+compares Rust and portable C++ outputs. It uses the shared validated CMake archive
+locator and native static-library flags. Its 3,699 records cover all single-byte
+case/lowercase mappings and nibble positions, bounded/overlapping/NUL contains,
+changed flags and lowercase offsets, uppercase hex, sentinel destinations, invalid
+lengths and late invalid pairs, legal same/forward/backward decode overlap with
+full backing-byte checks, custom trim sets and null/offset results. Real readable
+zero-filled mmap storage above INT_MAX tests exact native length-result saturation
+in both directions without fabricating invalid views. On this libstdc++ host the
+results are INT_MAX and INT_MIN respectively. Both native char promotion and
+-funsigned-char builds match the pristine reference.
+
+Available host locales are C, C.utf8, and POSIX; their mappings are identical for
+this corpus, so alternate locale mapping behavior remains untested. The report
+records available locales and whether their results differ from C rather than
+claiming non-C coverage from a locale name alone. ASan/UBSan instrument the C++
+fixture/facades (including complete original dependencies needed by UBSan RTTI);
+the release Rust archive's accesses remain uninstrumented. The bounded sanitizer
+run checks output equality and intercepted allocator leaks, not Rust memory access
+instrumentation or defined behavior of historical negative-char ctype calls.
+Evidence and source hashes are retained under `.local/byte-strings-comparison/`;
+CI runs the probe after native verification. Existing upstream tests remain the
+primary covered behavior evidence, with this probe limited to the listed gaps.
+
+
 ## UTF-8 codec and byte positions
 
 With `OPTION_RUST=ON`, `EncodeUtf8`, `DecodeUtf8`, `IsUtf8Part`, forward/backward
@@ -564,3 +629,45 @@ are enforced separately from these documents.
 
 Preserve OpenTTD copyright notices, credits, and GPLv2. Agent-generated work is welcome
 in this fork; upstream submission policies govern contributions to OpenTTD itself.
+
+## Native macOS arm64 Rust linkage
+
+CMake verifies the pinned `rustc -vV` host against the actual C++ platform,
+architecture and 64-bit pointer width, then passes an explicit Cargo `--target`.
+On macOS it requires exactly `CMAKE_OSX_ARCHITECTURES=arm64` and a deployment
+minimum of 11.0 or newer, with the same resolved SDK and minimum supplied to Rust
+through `SDKROOT` and `MACOSX_DEPLOYMENT_TARGET`. Rust's [Darwin target documentation](https://doc.rust-lang.org/rustc/platform-support/apple-darwin.html)
+specifies the supported minimum and these environment inputs. Intel packaging,
+Windows CRT policy and Emscripten host/target builds remain separate tasks.
+
+Archives live at `<build>/cargo/<validated-target>/release/libopenttd_kernels.a`.
+`tools/migration.py` exposes `rust_configuration(build)` and `rust_archive(build)`;
+all comparison consumers use this cache-validated lookup. Reconfigure existing
+build directories when adopting this layout. Imported `HOST_BINARY_DIR` tools
+remain previously built executables and do not consume the target archive.
+
+The pinned compiler's `--print=native-static-libs` output supplies final link
+flags instead of applying Linux libraries to Darwin. Configuration retains
+`rust-toolchain.txt` and `rust-native-libs.log`; archive builds retain
+`rust-build.log`, including the actual crate's native-library output. A
+content-stable `rust-build-configuration.txt` dependency records the compiler,
+target, SDK, minimum and relevant build flags. A changed configuration invalidates
+only that target's release crate before Cargo rebuilds; unchanged reconfiguration
+preserves the archive. Native CI checks minimum changes and restoration explicitly. Rust's
+[static-library linkage documentation](https://doc.rust-lang.org/reference/linkage.html#linkstaticlib)
+explains why final C++ links require these system dependencies. The crate retains
+its release abort-on-panic profile and explicit overflow checks in both C++ modes.
+
+The existing required macOS ARM jobs activate Rust through the reusable workflow's
+explicit `rust` input. Debug enables `OPTION_USE_ASSERTS`; release disables it.
+Both run the four targeted Cargo checks, nonempty CTest inventories and scripted
+regressions, then build and execute fresh native tools. The evidence artifact
+retains JUnit, compiler/SDK/target metadata, compile commands, link scripts, native
+libraries, archive architecture, final Mach-O symbols and fresh generated files.
+Whole-archive Apple `nm` inspection is excluded: its LLVM21 reader cannot parse
+LLVM23 bitcode embedded by the pinned Rust compiler. Architecture, exact archive
+linkage and final executable symbol checks remain mandatory; failures of final
+binary `nm` inspection are not suppressed. These checks
+validate native linkage and covered behavior; Linux results alone do not establish
+Darwin support. Actual macOS CI evidence and independent review are required before
+integration.
