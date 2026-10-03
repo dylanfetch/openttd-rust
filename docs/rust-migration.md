@@ -1238,3 +1238,36 @@ failed station/cargo/company policy and missing-data supplemental probes are not
 executed. Existing saved-world regressions cover their exercised real query paths,
 not every invalid world state. This evidence does not establish cargo routing,
 station-storage ownership, arbitrary allocation failures or full game equivalence.
+
+### BLAKE2b family
+
+Rust-enabled bundled Monocypher BLAKE2b implements all six public functions through
+unchanged C interfaces. Rust owns twelve compression rounds, keyed/unkeyed
+initialization, word/block buffering, pending-final-block decisions, digest
+serialization and final context wiping. The portable bodies remain unchanged.
+C++ owns actual context lifetime and supplies size/alignment/field offsets; the
+shared archive borrows the existing nonthrowing primitive wipe leaf and imports
+no vendor symbols. No context padding is read and no heap allocation is added.
+
+The supplied hash size remains part of the initial parameter; final output writes
+`min(hash_size, 64)`, including defined source behavior at sizes zero/over 64.
+Keys 65–128 bytes fit the original padded block and retain its source behavior,
+while the documented cryptographic interface limits keys to 64 bytes. Keys over
+128 overrun original storage and have no reproduction guarantee. A pending key
+block and a full final message block remain uncompressed until the original
+transition. Zero-length updates return before context or pointer access.
+
+One-shot output can overlap message/key, including partial overlap: all inputs
+are consumed before output writes. Original incremental context/input/output
+preconditions still apply. Raw field/buffer access creates no overlapping Rust
+references; actual caller extents must fit `isize::MAX`. Counter carry wraps as
+original unsigned arithmetic. Finalization wipes the complete actual context.
+Original keyed-init and compression temporaries lack explicit wipes and retain
+that behavior; no stronger compiler-copy/spill erasure is claimed.
+
+Authentication KDF, UID RNG/time sampling, file read/signature policy, Argon2,
+EdDSA and other vendor algorithms remain their unchanged callers. Existing five
+network tests and auth1800/primitive484 corpus are primary evidence; bounded hash
+coverage, inherited checks and supported-platform evidence are recorded in the
+component PR. This replacement does not certify cryptographic security or
+complete Monocypher/network/game equivalence.
