@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [rust-migration]
   workflow_dispatch:
+    inputs:
+      use_ccache:
+        description: Run the measured conservative compiler-cache trial
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -13,6 +18,10 @@ permissions:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/rust-migration' }}
+
+env:
+  # Adoption follows measured benefit and a successful protected-branch seed.
+  MIGRATION_CCACHE: ${{ (github.event_name == 'workflow_dispatch' && inputs.use_ccache) || vars.MIGRATION_CCACHE == 'true' }}
 
 jobs:
   compare:
@@ -25,7 +34,7 @@ jobs:
       - name: Install native dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build libsdl2-dev liblzma-dev libpng-dev \
+          sudo apt-get install -y ccache ninja-build libsdl2-dev liblzma-dev libpng-dev \
             libcurl4-openssl-dev libfreetype-dev libfontconfig-dev libharfbuzz-dev \
             libicu-dev liblzo2-dev openttd-opengfx
       - name: Install pinned Rust compiler and checks
@@ -41,13 +50,46 @@ jobs:
               "--component", ",".join(toolchain["components"]),
           ], check=True)
           PY
+      - name: Verify compiler-cache controls
+        run: python3 tools/test-compiler-cache.py
+      - name: Identify compatible compilation artifacts
+        if: env.MIGRATION_CCACHE == 'true'
+        id: compiler-cache-identity
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import sys
+          sys.path.insert(0, "tools")
+          import migration
+          identity = migration.compiler_cache_compatibility()
+          Path(".local").mkdir(exist_ok=True)
+          Path(".local/compiler-cache-identity.json").write_text(json.dumps(identity, indent=2) + "\n")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"prefix={identity['prefix']}\n")
+          PY
+      - name: Restore compatible compilation artifacts
+        if: env.MIGRATION_CCACHE == 'true'
+        id: compiler-cache-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            .local/compiler-cache/reference
+            .local/compiler-cache/candidate
+          key: ${{ steps.compiler-cache-identity.outputs.prefix }}-${{ github.sha }}
+          restore-keys: ${{ steps.compiler-cache-identity.outputs.prefix }}-
       # The driver requires cargo fmt/check/clippy/test before native builds.
       - name: Build native Rust generators without the game
         run: |
-          cmake -S . -B .local/build-tools-rust -G Ninja -DOPTION_TOOLS_ONLY=ON -DOPTION_RUST=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo
-          cmake --build .local/build-tools-rust --target tools --parallel 4
+          cache_flags=()
+          if [ "$MIGRATION_CCACHE" = true ]; then cache_flags=(--ccache); fi
+          python3 tools/migration.py tools --jobs 4 "${cache_flags[@]}"
       - name: Check Rust and compare original and migration builds
-        run: python3 tools/migration.py verify --jobs 4
+        run: |
+          cache_flags=()
+          if [ "$MIGRATION_CCACHE" = true ]; then cache_flags=(--ccache); fi
+          python3 tools/migration.py verify --jobs 4 "${cache_flags[@]}"
       - name: Compare integer, builder and consumer bytes with pinned original
         run: python3 tools/compare-integers.py
       - name: Compare UTF-8 byte behavior with pinned original
@@ -58,12 +100,21 @@ jobs:
         run: python3 tools/byte-strings-comparison.py
       - name: Compare generic history behavior with pinned original
         run: python3 tools/history-comparison.py
+      - name: Save validated protected-branch compilation artifacts
+        if: success() && env.MIGRATION_CCACHE == 'true' && github.ref == 'refs/heads/rust-migration' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && steps.compiler-cache-restore.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            .local/compiler-cache/reference
+            .local/compiler-cache/candidate
+          key: ${{ steps.compiler-cache-identity.outputs.prefix }}-${{ github.sha }}
       - name: Retain comparison evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: migration-evidence
           path: |
+            .local/compiler-cache-identity.json
             .local/verification/
             .local/integer-comparison/
             .local/utf8-comparison/
