@@ -27,8 +27,9 @@ The premature Rust integer-square-root implementation was removed before compone
 selection. The first selected replacement is `GetPartialPixelZ`, the scalar
 landscape height kernel, implemented in `rust/openttd-kernels` behind its original
 C++ interface. The shared crate also implements StringConsumer's integer parsing
-and lexical skipping, including native string/settings generator uses. Neither
-replacement completes its containing subsystem. Preserve the complete game,
+and lexical skipping, the UTF-8 codec/view positions, and StringBuilder's numeric
+byte encoders. Native generators share the Rust archive; actual call-site coverage
+is described below. These replacements do not complete their containing subsystems. Preserve the complete game,
 including networking, saves, NewGRF mods, graphics, and shared random-number behavior.
 
 ## Build and verification
@@ -175,8 +176,9 @@ compares fatal logging adapters, real malformed strgen diagnostics, and fresh
 settings/string headers plus English/French language output on unchanged reference
 inputs. Evidence and source hashes live under `.local/integer-comparison/`; CI runs
 the fresh Rust tools build and comparisons. The eleven unchanged upstream
-StringConsumer cases remain the primary existing tests. Other consumer/builder/UTF8
-algorithms, C++ adapters, and non-Linux Rust integration remain migration work.
+StringConsumer cases remain the primary existing parser tests. Other consumer
+algorithms, C++ sink/ownership adapters, and non-Linux Rust integration remain
+migration work.
 
 Start with dependency and test inventories. Prefer bounded, heavily tested modules
 whose unchanged upstream tests can exercise replacements through their existing
@@ -193,6 +195,52 @@ screenshots and compressed-save byte equality are insufficient.
 Integrate verified replacements incrementally while retaining the playable game and
 reference checks. Report validation limits explicitly. Improvements to original game
 behavior remain deferred issues rather than migration changes.
+
+## StringBuilder numeric byte encoders
+
+With `OPTION_RUST=ON`, Rust extracts the bytes for `PutUint8`, `PutUint16LE`,
+`PutUint32LE`, and `PutUint64LE`, and formats integral `PutIntegerBase` values in
+bases 2 through 36. The signed binary wrappers keep their original modulo-width
+unsigned casts. Text uses lowercase digits, a leading minus for signed negatives,
+no base prefix, and one digit for zero. The signed magnitude uses unsigned
+negation, including `INT64_MIN`, without signed overflow.
+
+The original formatting scratch buffer holds exactly 32 bytes, including the minus
+sign. Values that need more bytes produce no `PutBuffer` call; exactly 32 bytes
+produce one call. For example, `UINT32_MAX` in base 2 succeeds, whereas `INT32_MIN`
+in base 2 produces no call. This behavior is retained; #12 records a possible later
+capacity improvement. `PutUtf8` reuses the migrated codec and still makes one
+zero-length sink call for an invalid codepoint, distinct from formatting failure.
+
+The two functions in `src/rust/builder_ffi.h` accept scalars and return `repr(C)`
+byte arrays by value. Rust neither borrows caller storage nor invokes a C++ sink.
+The C++ adapter synchronously passes a span of the returned local array to its
+original virtual `PutBuffer`. That span is valid during the call; sinks must not
+retain it. Allocation, sink exceptions, string ownership, raw `Put`, InPlaceBuilder
+copy/overlap handling, and cursor updates remain in C++. There are no Rust
+allocations, ownership transfers, retained pointers, or additional unsafe blocks.
+Overflow checks and abort-on-panic remain enabled. Invalid bases are outside the
+same 2..36 precondition as the original `std::to_chars` API.
+
+The adapter covers standard integral types other than bool, up to 64 bits, and
+checks widths at compile time. Real text-format call sites use 32/64-bit values in
+`strings.cpp`, save repair, and script text encoding. No wider compiler integer
+extension is used there. Strgen uses binary byte/16-bit encoders and UTF-8, but has
+no `PutIntegerBase` call. Settingsgen has no numeric builder call; compiling the
+shared source and linking the archive does not establish runtime use there.
+`OPTION_RUST=OFF` retains the original portable bodies, tracked under #3 until
+platform support and the eventual facade removal are resolved.
+
+The three unchanged StringBuilder cases, InPlaceReplacement, encoded-string tests,
+and full verification exercise the existing interfaces. `tools/compare-integers.py`
+also compares the existing narrow probe's `--builder` mode against unchanged pinned
+C++ source and both Rust and portable candidate bodies. Its 1,624 formats cover all
+bases, signed/unsigned widths, extrema, zero, and the 32/33-byte boundary. Six alias
+cases and an ordered counting sink preserve byte lengths, order, synchronous calls,
+zero-length UTF-8 calls, and absent formatting calls. Parser and fatal diagnostic
+comparisons remain intact, as do freshly generated string/settings headers,
+English/French output, and malformed strgen diagnostics. These bounded checks do
+not establish complete text formatting or whole-game equivalence.
 
 ## UTF-8 codec and byte positions
 
