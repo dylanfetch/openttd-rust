@@ -16,8 +16,10 @@ mod history;
 mod integer;
 mod landscape;
 mod math;
+mod packet;
 mod script_list;
 mod station_cargo;
+mod string_validation;
 mod widget_parser;
 
 pub use admin_conversion::Action as AdminAction;
@@ -747,7 +749,7 @@ mod abi;
 
 /// Return size, alignment or field offsets for the bounded public ABI audit.
 ///
-/// Type IDs 0..21 follow `abi_ffi.h`, including station cargo and crypto layouts.
+/// Type IDs 0..24 follow `abi_ffi.h`, including cargo, crypto and Packet layouts.
 /// Item 0 is size, 1 alignment, then fields in
 /// declaration order. Unknown IDs/items return `usize::MAX` (C++ `SIZE_MAX`).
 /// Scalar metadata only: no allocation, pointers, ownership or callbacks.
@@ -950,4 +952,336 @@ pub unsafe extern "C" fn openttd_rust_cargo_finish(
     unsafe {
         (&mut *state).finish(&mut *list.cast::<script_list::List>());
     }
+}
+
+#[allow(unsafe_code)]
+mod blake2b;
+
+/// Initialize caller-owned copyable Packet state; no allocation/pointer retention.
+///
+/// # Safety
+/// State is aligned writable storage of the documented C layout, exclusive here.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_packet_init(state: *mut packet::State, limit: usize) {
+    // SAFETY: Caller provides valid writable scalar state storage.
+    unsafe {
+        state.write(packet::State::new(limit));
+    }
+}
+
+/// Normalize both sent bools and arbitrary received bool bytes.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_packet_boolean(value: u8) -> u8 {
+    u8::from(value != 0)
+}
+
+/// Native unsigned capacity decision; no socket effect is performed here.
+///
+/// # Safety
+/// State is initialized, aligned and borrowed shared only during this call.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_packet_can_write(
+    state: *const packet::State,
+    size: usize,
+    amount: usize,
+) -> u8 {
+    // SAFETY: Shared scalar borrow ends at return.
+    u8::from(unsafe { &*state }.can_write(size, amount))
+}
+
+/// Bounds decision after C++ has checked client-quit state first.
+///
+/// # Safety
+/// Same shared state contract as `packet_can_write`; C++ retains close policy.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_packet_can_read(
+    state: *const packet::State,
+    size: usize,
+    amount: usize,
+) -> u8 {
+    // SAFETY: Shared scalar borrow ends at return.
+    u8::from(unsafe { &*state }.can_read(size, amount))
+}
+
+/// Test completion of the two-byte size header.
+///
+/// # Safety
+/// State is initialized, live, aligned and shared for this call only.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_packet_has_size(state: *const packet::State) -> u8 {
+    // SAFETY: Shared scalar borrow ends at return.
+    u8::from(unsafe { &*state }.position >= 2)
+}
+
+/// Native unsigned size-minus-cursor; no new clamping policy.
+///
+/// # Safety
+/// State follows the live aligned shared scalar contract.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_packet_remaining(
+    state: *const packet::State,
+    size: usize,
+) -> usize {
+    // SAFETY: Shared scalar borrow ends at return.
+    unsafe { &*state }.remaining(size)
+}
+
+/// Plan transfer amount before the C++ callback; no byte/span borrow is retained.
+///
+/// # Safety
+/// State is live, aligned and shared only here; original transfer-domain applies.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_packet_transfer_amount(
+    state: *const packet::State,
+    size: usize,
+    limit: usize,
+) -> usize {
+    // SAFETY: This borrow ends before C++ invokes the transfer callback.
+    unsafe { &*state }.transfer_amount(size, limit)
+}
+
+/// Commit a positive result against the live post-callback cursor; narrow to u16.
+///
+/// # Safety
+/// State is live/aligned/exclusive only here. Callback has returned normally;
+/// no span/reference is retained. Original returned-count obligations remain.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_packet_transfer_commit(
+    state: *mut packet::State,
+    amount: isize,
+) {
+    // SAFETY: The exclusive borrow starts only after the C++ callback returns.
+    unsafe { &mut *state }.transfer_commit(amount);
+}
+
+/// Plan limited raw-byte insertion, preserving native unsigned subtraction.
+///
+/// # Safety
+/// State is live/aligned/shared only here. No input bytes are borrowed.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_packet_send_amount(
+    state: *const packet::State,
+    size: usize,
+    input: usize,
+) -> usize {
+    // SAFETY: Shared scalar borrow ends before C++ vector insertion.
+    unsafe { &*state }.send_amount(size, input)
+}
+
+/// Length-prefixed buffer capacity request uses the original native addition.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_packet_buffer_size(length: usize) -> usize {
+    length.wrapping_add(2)
+}
+
+/// Narrow a length-prefix or MAC skip to the original unsigned16 width.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_packet_prefix(length: usize) -> u16 {
+    packet::prefix(length)
+}
+
+/// Decode width1/2/4/8 with persistent cursor narrowing after every byte.
+///
+/// # Safety
+/// State is initialized/aligned/exclusive. Bytes are one readable allocation of
+/// length <= `ISIZE_MAX`; state/bytes are disjoint and no concurrent mutation occurs.
+/// Original scalar-read bounds check succeeded; width is1/2/4/8. Borrows end here.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_packet_recv(
+    state: *mut packet::State,
+    bytes: *const u8,
+    length: usize,
+    width: u8,
+) -> u64 {
+    // SAFETY: The caller provides disjoint valid state and short-lived byte storage.
+    unsafe { &mut *state }.recv(unsafe { utf8::borrow(bytes, length) }, width)
+}
+
+/// Decrement remaining and consume one byte BEFORE C++ result `push_back`.
+///
+/// # Safety
+/// Scalar state/count/output are aligned, writable, exclusive and disjoint from
+/// each other/bytes. Read storage follows `packet_recv`. Prefix/body bounds succeeded;
+/// caller stops on false. No allocation or callback occurs here.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_packet_buffer_next(
+    state: *mut packet::State,
+    bytes: *const u8,
+    length: usize,
+    remaining: *mut u16,
+    output: *mut u8,
+) -> u8 {
+    // SAFETY: Exclusive count borrow is valid and disjoint from all other arguments.
+    let count = unsafe { &mut *remaining };
+    let previous = *count;
+    *count = count.wrapping_sub(1);
+    if previous == 0 {
+        return 0;
+    }
+    // SAFETY: Exclusive state and valid bytes share only this call; output is disjoint.
+    let byte = unsafe { &mut *state }.recv(unsafe { utf8::borrow(bytes, length) }, 1);
+    unsafe {
+        output.write(byte.to_le_bytes()[0]);
+    }
+    1
+}
+
+/// Decode/validate declared size without committing cursor before C++ resize.
+///
+/// # Safety
+/// Live/aligned/shared state; readable disjoint storage >=2 and <= `ISIZE_MAX`.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_packet_parse_size(
+    state: *const packet::State,
+    bytes: *const u8,
+    length: usize,
+) -> u16 {
+    // SAFETY: The two original required header bytes exist for this short borrow.
+    unsafe { &*state }.parse_size(unsafe { utf8::borrow(bytes, length) })
+}
+
+/// Commit read cursor2, before external receive-handler operations or after resize.
+///
+/// # Safety
+/// State is live, aligned and exclusive for this call only.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_packet_read_start(state: *mut packet::State) {
+    // SAFETY: Exclusive scalar borrow ends at return.
+    unsafe { &mut *state }.read_start();
+}
+
+/// Commit send cursor0 only after Encrypt returns normally, before `shrink_to_fit`.
+///
+/// # Safety
+/// State is live, aligned and exclusive; all C++ callbacks have returned normally.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_packet_send_reset(state: *mut packet::State) {
+    // SAFETY: This exclusive borrow begins after external encryption returns.
+    unsafe { &mut *state }.send_reset();
+}
+
+/// Compute packet framing offsets with native unsigned wrap; no byte borrow.
+///
+/// # Safety
+/// Output is live/aligned/exclusive writable Frame storage. Original span domains
+/// remain caller obligations. Return value is the original strict receive-size check.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_packet_frame(
+    position: u16,
+    size: usize,
+    mac: usize,
+    output: *mut packet::Frame,
+) -> u8 {
+    let frame = packet::frame(position, size, mac);
+    let accepted = u8::from(size > frame.message);
+    // SAFETY: Caller supplies writable output storage; no pointer survives return.
+    unsafe {
+        output.write(frame);
+    }
+    accepted
+}
+
+/// Skip narrowed MAC bytes against the live cursor only after Decrypt returns.
+///
+/// # Safety
+/// State is initialized/live/aligned/exclusive; no external callback is active.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_packet_skip_mac(state: *mut packet::State, mac: usize) {
+    // SAFETY: Exclusive borrow begins after the normal C++ Decrypt return.
+    unsafe { &mut *state }.skip_mac(mac);
+}
+
+/// Write low16 size header bytes before external send-handler calls.
+///
+/// # Safety
+/// Bytes are one exclusive writable allocation >=2 and <= `ISIZE_MAX`; caller has
+/// performed the original zero-header assertion. No borrow survives this call.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_packet_write_header(bytes: *mut u8, length: usize) {
+    // SAFETY: The exclusive allocation is valid for this short mutable borrow only.
+    packet::header(unsafe { std::slice::from_raw_parts_mut(bytes, length) });
+}
+
+/// Scan one historical sanitation step without retaining bytes or doing output.
+///
+/// # Safety
+/// Input is one readable initialized allocation of length <= `ISIZE_MAX`, valid
+/// and immutable only for this call; a null pointer is allowed for zero length.
+/// The returned encoded bytes own their storage. No pointer escapes this call.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_validation_step(
+    bytes: *const u8,
+    length: usize,
+    settings: u8,
+) -> string_validation::Step {
+    // SAFETY: The caller grants the short-lived readable byte allocation.
+    string_validation::step(unsafe { utf8::borrow(bytes, length) }, settings)
+}
+
+/// Validate a fixed span, requiring its first valid NUL before its end.
+///
+/// # Safety
+/// Same readable allocation/lifetime contract as `validation_step`; no borrow
+/// escapes, no output/allocation/callback occurs, and panics abort.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_validation_valid(bytes: *const u8, length: usize) -> u8 {
+    // SAFETY: The caller supplies immutable bytes for only this call.
+    u8::from(string_validation::valid(unsafe {
+        utf8::borrow(bytes, length)
+    }))
+}
+
+/// Check live consumer capacity, copy in original forward order, then commit.
+///
+/// # Safety
+/// On accepted capacity, source contains `length` initialized readable bytes and
+/// destination has writable bytes at `position..position+length`, with original
+/// valid pointer/range preconditions. Each is within one live allocation of size
+/// <= `ISIZE_MAX`. The output start is outside the nonempty source range: disjoint
+/// or defined left overlap is allowed, destination inside source is excluded.
+/// No Rust references to these bytes are created. C++ views may remain alive,
+/// without concurrent access during writing. Zero-length copying accesses neither pointer. Raw reads happen
+/// before each raw write, without simultaneous overlapping Rust slices/references.
+/// On overtake neither bytes nor position change; C++ dispatches its fatal path
+/// after return. No allocation/callback occurs here, and panic aborts.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_inplace_write(
+    destination: *mut u8,
+    position: usize,
+    consumed: usize,
+    source: *const u8,
+    length: usize,
+) -> string_validation::Write {
+    let result = string_validation::write_plan(position, consumed, length);
+    if result.accepted != 0 {
+        for index in 0..length {
+            // SAFETY: Caller supplies live valid raw ranges and permitted overlap.
+            // No shared/mutable slices are constructed; this value read ends before write.
+            let byte = unsafe { source.add(index).read() };
+            unsafe { destination.add(position + index).write(byte) };
+        }
+    }
+    result
 }

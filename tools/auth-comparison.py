@@ -230,6 +230,8 @@ def main():
                   "record_counts": dict(Counter(row.split()[0].decode() for row in primitive_outputs["reference"].splitlines())),
                   "output_sha256": {label: hashlib.sha256(output).hexdigest() for label, output in primitive_outputs.items()},
                   "all_context_bytes_prefilled": True, "cpp_boundary_sanitizers_passed": True, "passed": True}
+    primitives["blake2b_records"] = sum(count for kind, count in primitives["record_counts"].items() if kind.startswith("blake-"))
+    primitives["prior_cipher_mac_records"] = primitives["records"] - primitives["blake2b_records"]
     MIGRATION["ensure_reference"]()
     report = {"baseline": MIGRATION["BASELINE"], "candidate_commit": MIGRATION["git"]("rev-parse", "HEAD"),
               "candidate_status": MIGRATION["git"]("status", "--porcelain"), "rust_archive": str(archive),
@@ -240,7 +242,7 @@ def main():
               "sanitizer_scope": {"cpp_vendor_packet_fixture_and_facade": True, "rust_accesses_instrumented": False, "rust_allocation_leaks_checked": True, "passed": True},
               "limits": ["Prescribed entropy verifies call order/bytes, not operating-system RNG quality",
                          "Nonempty-short enable nonce is undefined in pinned Packet and excluded (#41)",
-                         "Observed outer session/shared/hash wipes are supplemented by prefilled Poly1305 final context checks; compiler spills are not fully observable",
+                         "Observed outer session/shared/hash wipes are supplemented by prefilled Poly1305/BLAKE2b final context checks; compiler spills are not fully observable",
                          "Protocol primitives are real bundled Monocypher, not mock crypto"], "passed": True}
     (OUT / "report.json").write_text(json.dumps(report, indent=2) + "\n")
     print(f"Authentication comparisons passed: {comparisons} mixed endpoint records + {primitives['records']} bounded primitive records; {OUT / 'report.json'}")

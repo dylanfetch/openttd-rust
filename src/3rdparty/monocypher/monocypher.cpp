@@ -54,6 +54,7 @@
 #include "monocypher.h"
 #ifdef WITH_RUST
 #include "../../rust/crypto_primitives_ffi.h"
+#include "../../rust/blake2b_ffi.h"
 #include <type_traits>
 #endif
 
@@ -530,6 +531,45 @@ void crypto_poly1305(u8     mac[16],  const u8 *message,
 ////////////////
 /// BLAKE2 b ///
 ////////////////
+#ifdef WITH_RUST
+static_assert(std::is_standard_layout_v<crypto_blake2b_ctx> && std::is_trivially_copyable_v<crypto_blake2b_ctx>);
+static_assert(sizeof(OpenTTDBlake2bLayout) == 7 * sizeof(size_t));
+static const OpenTTDBlake2bLayout rust_blake2b_layout = {
+	sizeof(crypto_blake2b_ctx), alignof(crypto_blake2b_ctx), offsetof(crypto_blake2b_ctx, hash),
+	offsetof(crypto_blake2b_ctx, input_offset), offsetof(crypto_blake2b_ctx, input),
+	offsetof(crypto_blake2b_ctx, input_idx), offsetof(crypto_blake2b_ctx, hash_size),
+};
+void crypto_blake2b_keyed_init(crypto_blake2b_ctx *ctx, size_t hash_size,
+                               const u8 *key, size_t key_size)
+{
+	openttd_rust_blake2b_keyed_init(&rust_blake2b_layout, ctx, hash_size, key, key_size);
+}
+void crypto_blake2b_init(crypto_blake2b_ctx *ctx, size_t hash_size)
+{
+	openttd_rust_blake2b_init(&rust_blake2b_layout, ctx, hash_size);
+}
+void crypto_blake2b_update(crypto_blake2b_ctx *ctx,
+                           const u8 *message, size_t message_size)
+{
+	openttd_rust_blake2b_update(&rust_blake2b_layout, ctx, message, message_size);
+}
+void crypto_blake2b_final(crypto_blake2b_ctx *ctx, u8 *hash)
+{
+	openttd_rust_blake2b_final(&rust_crypto_leaves, &rust_blake2b_layout, ctx, hash);
+}
+void crypto_blake2b_keyed(u8 *hash,          size_t hash_size,
+                          const u8 *key,     size_t key_size,
+                          const u8 *message, size_t message_size)
+{
+	crypto_blake2b_ctx ctx; // Start actual caller-layout trivial lifetime.
+	openttd_rust_blake2b_keyed(&rust_crypto_leaves, &rust_blake2b_layout, &ctx, hash, hash_size, key, key_size, message, message_size);
+}
+void crypto_blake2b(u8 *hash, size_t hash_size, const u8 *msg, size_t msg_size)
+{
+	crypto_blake2b_ctx ctx;
+	openttd_rust_blake2b(&rust_crypto_leaves, &rust_blake2b_layout, &ctx, hash, hash_size, msg, msg_size);
+}
+#else
 static const u64 iv[8] = {
 	0x6a09e667f3bcc908, 0xbb67ae8584caa73b,
 	0x3c6ef372fe94f82b, 0xa54ff53a5f1d36f1,
@@ -728,6 +768,8 @@ void crypto_blake2b(u8 *hash, size_t hash_size, const u8 *msg, size_t msg_size)
 {
 	crypto_blake2b_keyed(hash, hash_size, 0, 0, msg, msg_size);
 }
+
+#endif // WITH_RUST
 
 //////////////
 /// Argon2 ///

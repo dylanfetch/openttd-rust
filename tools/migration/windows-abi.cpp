@@ -18,7 +18,10 @@
 #include "rust/history_ffi.h"
 #include "rust/math_ffi.h"
 #include "rust/station_cargo_ffi.h"
+#include "rust/packet_ffi.h"
+#include "rust/string_validation_ffi.h"
 #include "rust/crypto_primitives_ffi.h"
+#include "rust/blake2b_ffi.h"
 #include "3rdparty/monocypher/monocypher.h"
 #include <algorithm>
 #include <array>
@@ -73,6 +76,11 @@ static void Layouts()
 	Layout(19, "OpenTTDCryptoLeaves", {sizeof(OpenTTDCryptoLeaves), alignof(OpenTTDCryptoLeaves), offsetof(OpenTTDCryptoLeaves, wipe), offsetof(OpenTTDCryptoLeaves, verify16)});
 	Layout(20, "OpenTTDPolyLayout", {sizeof(OpenTTDPolyLayout), alignof(OpenTTDPolyLayout), offsetof(OpenTTDPolyLayout, size), offsetof(OpenTTDPolyLayout, alignment), offsetof(OpenTTDPolyLayout, c), offsetof(OpenTTDPolyLayout, c_idx), offsetof(OpenTTDPolyLayout, r), offsetof(OpenTTDPolyLayout, pad), offsetof(OpenTTDPolyLayout, h)});
 	Layout(21, "OpenTTDAeadLayout", {sizeof(OpenTTDAeadLayout), alignof(OpenTTDAeadLayout), offsetof(OpenTTDAeadLayout, size), offsetof(OpenTTDAeadLayout, alignment), offsetof(OpenTTDAeadLayout, counter), offsetof(OpenTTDAeadLayout, key), offsetof(OpenTTDAeadLayout, nonce)});
+	Layout(22, "OpenTTDBlake2bLayout", {sizeof(OpenTTDBlake2bLayout), alignof(OpenTTDBlake2bLayout), offsetof(OpenTTDBlake2bLayout, size), offsetof(OpenTTDBlake2bLayout, alignment), offsetof(OpenTTDBlake2bLayout, hash), offsetof(OpenTTDBlake2bLayout, input_offset), offsetof(OpenTTDBlake2bLayout, input), offsetof(OpenTTDBlake2bLayout, input_idx), offsetof(OpenTTDBlake2bLayout, hash_size)});
+	Layout(23, "OpenTTDPacketState", {sizeof(OpenTTDPacketState), alignof(OpenTTDPacketState), offsetof(OpenTTDPacketState, limit), offsetof(OpenTTDPacketState, position)});
+	Layout(24, "OpenTTDPacketFrame", {sizeof(OpenTTDPacketFrame), alignof(OpenTTDPacketFrame), offsetof(OpenTTDPacketFrame, message), offsetof(OpenTTDPacketFrame, payload)});
+	Layout(26, "OpenTTDValidationStep", {sizeof(OpenTTDValidationStep), alignof(OpenTTDValidationStep), offsetof(OpenTTDValidationStep, consumed), offsetof(OpenTTDValidationStep, output), offsetof(OpenTTDValidationStep, stopped)});
+	Layout(27, "OpenTTDInplaceWrite", {sizeof(OpenTTDInplaceWrite), alignof(OpenTTDInplaceWrite), offsetof(OpenTTDInplaceWrite, position), offsetof(OpenTTDInplaceWrite, accepted)});
 	CHECK(openttd_rust_abi_layout(255, 0) == SIZE_MAX);
 	CHECK(static_cast<size_t>(PTRDIFF_MAX) == (SIZE_MAX >> 1));
 	std::printf("pointer_bytes %zu sentinel %zu borrow_limit %zu\n", sizeof(void *), SIZE_MAX, static_cast<size_t>(PTRDIFF_MAX));
@@ -328,6 +336,48 @@ static void CryptoPrimitives()
 	std::printf("crypto 15 Rust algorithms, cdecl leaves, caller layouts, counter high bits, partial init, padding and failed retry passed; poly_size=%zu poly_align=%zu aead_size=%zu aead_align=%zu\n", sizeof(poly), alignof(crypto_poly1305_ctx), sizeof(crypto_aead_ctx), alignof(crypto_aead_ctx));
 }
 
+static void Blake2b()
+{
+	std::array<uint8_t, 129> message;
+	std::array<uint8_t, 128> key;
+	for (size_t i = 0; i < message.size(); ++i) message[i] = static_cast<uint8_t>(i * 37 + 11);
+	for (size_t i = 0; i < key.size(); ++i) key[i] = static_cast<uint8_t>(i * 13 + 7);
+	std::array<uint8_t, 64> expected, actual;
+	crypto_blake2b_keyed(expected.data(), 32, key.data(), 65, message.data(), message.size());
+	crypto_blake2b_ctx ctx;
+	std::fill_n(reinterpret_cast<uint8_t *>(&ctx), sizeof(ctx), 0xA5);
+	crypto_blake2b_keyed_init(&ctx, 32, key.data(), 65);
+	CHECK(ctx.input_idx == 128 && ctx.hash_size == 32 && ctx.input_offset[0] == 0 && ctx.input_offset[1] == 0);
+	crypto_blake2b_update(&ctx, nullptr, 0);
+	crypto_blake2b_update(&ctx, message.data(), 127);
+	auto copy = ctx;
+	crypto_blake2b_update(&ctx, message.data() + 127, 2);
+	crypto_blake2b_final(&ctx, actual.data());
+	CHECK(std::equal(actual.begin(), actual.begin() + 32, expected.begin()));
+	CHECK(std::all_of(reinterpret_cast<const uint8_t *>(&ctx), reinterpret_cast<const uint8_t *>(&ctx) + sizeof(ctx), [](uint8_t x) { return x == 0; }));
+	crypto_blake2b_update(&copy, message.data() + 127, 1);
+	crypto_blake2b_final(&copy, actual.data());
+	crypto_blake2b_keyed(expected.data(), 32, key.data(), 65, message.data(), 128);
+	CHECK(std::equal(actual.begin(), actual.begin() + 32, expected.begin()));
+	crypto_blake2b(expected.data(), 64, message.data(), message.size());
+	crypto_blake2b_init(&ctx, 64);
+	crypto_blake2b_update(&ctx, message.data(), 128);
+	CHECK(ctx.input_idx == 128 && ctx.input_offset[0] == 0);
+	crypto_blake2b_update(&ctx, message.data() + 128, 1);
+	crypto_blake2b_final(&ctx, actual.data()); CHECK(actual == expected);
+	crypto_blake2b_init(&ctx, 64); crypto_blake2b_update(&ctx, message.data(), 128);
+	ctx.input_offset[0] = UINT64_MAX - 127; ctx.input_offset[1] = UINT64_C(0x1122334455667788);
+	crypto_blake2b_update(&ctx, message.data() + 128, 1);
+	CHECK(ctx.input_offset[0] == 0 && ctx.input_offset[1] == UINT64_C(0x1122334455667789) && ctx.input_idx == 1);
+	crypto_blake2b_final(&ctx, actual.data());
+	crypto_blake2b_init(&ctx, 0); crypto_blake2b_final(&ctx, nullptr);
+	CHECK(std::all_of(reinterpret_cast<const uint8_t *>(&ctx), reinterpret_cast<const uint8_t *>(&ctx) + sizeof(ctx), [](uint8_t x) { return x == 0; }));
+	std::array<uint8_t, 72> sentinel; sentinel.fill(0xA5);
+	crypto_blake2b_keyed(sentinel.data(), 65, key.data(), 128, message.data(), message.size());
+	CHECK(std::all_of(sentinel.begin() + 64, sentinel.end(), [](uint8_t x) { return x == 0xA5; }));
+	std::printf("blake2b six facades, context size %zu align %zu offsets %zu %zu %zu %zu %zu; copy, carry, pending block, wipe and source sizes passed\n", sizeof(ctx), alignof(crypto_blake2b_ctx), offsetof(crypto_blake2b_ctx, hash), offsetof(crypto_blake2b_ctx, input_offset), offsetof(crypto_blake2b_ctx, input), offsetof(crypto_blake2b_ctx, input_idx), offsetof(crypto_blake2b_ctx, hash_size));
+}
+
 static void StationCargo()
 {
 	auto list = std::unique_ptr<OpenTTDScriptList, decltype(&openttd_rust_list_destroy)>(openttd_rust_list_new(), openttd_rust_list_destroy);
@@ -355,6 +405,67 @@ static void StationCargo()
 	std::printf("station_cargo scalar layout, uint32 wrapping, origin reset and finalization passed\n");
 }
 
+static void PacketState()
+{
+	static_assert(sizeof(intptr_t) == sizeof(size_t));
+	OpenTTDPacketState state;
+	openttd_rust_packet_init(&state, SIZE_MAX);
+	CHECK(state.limit == SIZE_MAX && state.position == 0);
+	CHECK(openttd_rust_packet_can_write(&state, SIZE_MAX, 1) == 1);
+	CHECK(openttd_rust_packet_boolean(128) == 1 && openttd_rust_packet_boolean(0) == 0);
+	CHECK(openttd_rust_packet_buffer_size(SIZE_MAX) == 1 && openttd_rust_packet_prefix(65537) == 1);
+	std::array<uint8_t, 8> bytes{8, 0, 1, 2, 3, 4, 5, 6};
+	CHECK(openttd_rust_packet_parse_size(&state, bytes.data(), bytes.size()) == 8);
+	openttd_rust_packet_read_start(&state);
+	CHECK(openttd_rust_packet_has_size(&state) == 1 && openttd_rust_packet_can_read(&state, 8, 6) == 1);
+	CHECK(openttd_rust_packet_recv(&state, bytes.data(), bytes.size(), 2) == 0x0201 && state.position == 4);
+	uint16_t count = 1;
+	uint8_t byte = 0;
+	CHECK(openttd_rust_packet_buffer_next(&state, bytes.data(), bytes.size(), &count, &byte) == 1 && byte == 3 && state.position == 5);
+	CHECK(openttd_rust_packet_buffer_next(&state, bytes.data(), bytes.size(), &count, &byte) == 0 && count == UINT16_MAX);
+	CHECK(openttd_rust_packet_remaining(&state, 8) == 3 && openttd_rust_packet_transfer_amount(&state, 8, 2) == 2);
+	openttd_rust_packet_transfer_commit(&state, -1);
+	CHECK(state.position == 5);
+	openttd_rust_packet_transfer_commit(&state, 65537);
+	CHECK(state.position == 6);
+	openttd_rust_packet_skip_mac(&state, 65537);
+	CHECK(state.position == 7);
+	OpenTTDPacketFrame frame;
+	CHECK(openttd_rust_packet_frame(2, 8, 2, &frame) == 1 && frame.message == 4 && frame.payload == 4);
+	CHECK(openttd_rust_packet_frame(2, 4, 2, &frame) == 0);
+	CHECK(openttd_rust_packet_send_amount(&state, SIZE_MAX - 2, 4) == 2);
+	openttd_rust_packet_write_header(bytes.data(), bytes.size());
+	CHECK(bytes[0] == 8 && bytes[1] == 0);
+	openttd_rust_packet_send_reset(&state);
+	CHECK(state.position == 0);
+	std::printf("packet scalar framing, binary reads and native cursor transitions passed\n");
+}
+
+static void StringValidation()
+{
+	static_assert(sizeof(char32_t) == sizeof(uint32_t));
+	std::array<uint8_t, 4> input{13,10,0,0xFF};
+	auto step = openttd_rust_validation_step(input.data(), input.size(), 15);
+	CHECK(step.consumed == 1 && step.output.length == 0 && step.stopped == 0);
+	step = openttd_rust_validation_step(input.data() + 1, input.size() - 1, 15);
+	CHECK(step.consumed == 1 && step.output.length == 1 && step.output.bytes[0] == 10);
+	step = openttd_rust_validation_step(input.data() + 2, 2, 15);
+	CHECK(step.consumed == 1 && step.stopped == 1 && step.output.length == 0);
+	step = openttd_rust_validation_step(input.data() + 3, 1, 255);
+	CHECK(step.consumed == 1 && step.stopped == 0 && step.output.length == 0);
+	std::array<uint8_t, 4> surrogate{0xED,0xA0,0x80,0};
+	CHECK(openttd_rust_validation_valid(surrogate.data(), surrogate.size()) == 1);
+	CHECK(openttd_rust_validation_valid(surrogate.data(), surrogate.size() - 1) == 0);
+	std::array<uint8_t, 8> bytes{'a','b','c','d','e','f','g','h'};
+	auto write = openttd_rust_inplace_write(bytes.data(), 0, 6, bytes.data() + 2, 4);
+	CHECK(write.accepted == 1 && write.position == 4 && bytes[0] == 'c' && bytes[3] == 'f' && bytes[4] == 'e');
+	write = openttd_rust_inplace_write(bytes.data(), 4, 4, input.data(), 1);
+	CHECK(write.accepted == 0 && write.position == 4 && bytes[4] == 'e');
+	write = openttd_rust_inplace_write(bytes.data(), 4, 1, input.data(), 1);
+	CHECK(write.accepted == 1 && write.position == 5 && bytes[4] == 13);
+	std::printf("string_validation historical policy, NUL, surrogate and live in-place copy passed\n");
+}
+
 int main()
 {
 	Layouts();
@@ -363,7 +474,10 @@ int main()
 	History();
 	Math();
 	CryptoPrimitives();
+	Blake2b();
 	StationCargo();
+	PacketState();
+	StringValidation();
 	Locale();
 	std::printf("ABI audit passed\n");
 }
