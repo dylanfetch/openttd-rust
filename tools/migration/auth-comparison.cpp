@@ -305,6 +305,92 @@ static void BlakePrimitives()
 	}
 }
 
+/* Only direct curve/overlap/count gaps; the shim includes actual vendor source
+ * unchanged, exposing its private coarse helper without a rewritten oracle. */
+extern "C" void FixtureLadder(uint8_t *, const uint8_t *, const uint8_t *, int32_t);
+static void X25519Primitives()
+{
+	std::vector<std::array<uint8_t, 32>> scalars(6);
+	scalars[0].fill(0); scalars[1].fill(0xff);
+	for (size_t i = 0; i < 32; ++i) scalars[2][i] = static_cast<uint8_t>(i * 37 + 13);
+	scalars[3] = scalars[2]; scalars[3][0] ^= 7; scalars[3][31] ^= 0xc0;
+	scalars[4] = scalars[2]; scalars[4][0] &= 0xf8; scalars[4][31] &= 0x3f;
+	scalars[5] = scalars[2]; scalars[5][0] |= 7; scalars[5][31] |= 0xc0;
+	std::vector<std::array<uint8_t, 32>> points(9);
+	points[1][0] = 1; points[2][0] = 9; points[3] = points[2]; points[3][31] = 0x80;
+	for (size_t i : {4, 5, 6, 7}) { points[i].fill(0xff); points[i][31] = 0x7f; }
+	points[4][0] = 0xec; points[5][0] = 0xed; points[6][0] = 0xee;
+	points[8] = points[7]; points[8][31] = 0xff;
+	std::array<uint8_t, 32> clamped_public{};
+	for (size_t i = 0; i < scalars.size(); ++i) {
+		std::array<uint8_t, 32> public_key, trimmed;
+		crypto_x25519_public_key(public_key.data(), scalars[i].data());
+		crypto_eddsa_trim_scalar(trimmed.data(), scalars[i].data());
+		if (i == 2) clamped_public = public_key;
+		if (i > 2) PrimitiveRequire(public_key == clamped_public);
+		std::cout << "x25519-public " << i << ' ' << Hex(public_key) << ' ' << Hex(trimmed) << '\n';
+		std::array<uint8_t, 32> low_base, low_max;
+		for (size_t j = 0; j < points.size(); ++j) {
+			std::array<uint8_t, 32> shared;
+			crypto_x25519(shared.data(), scalars[i].data(), points[j].data());
+			if (j == 2) low_base = shared;
+			if (j == 3) PrimitiveRequire(shared == low_base);
+			if (j == 7) low_max = shared;
+			if (j == 8) PrimitiveRequire(shared == low_max);
+			std::cout << "x25519-shared " << i << ' ' << j << ' ' << Hex(shared) << '\n';
+		}
+	}
+	for (unsigned style = 0; style != 7; ++style) {
+		auto storage = PrimitiveBytes(160, 31), original = storage;
+		const size_t output_at = style == 0 ? 32 : style == 1 ? 37 : style == 2 ? 27 : style == 3 ? 80 : style == 4 ? 87 : style == 5 ? 73 : 56;
+		std::array<uint8_t, 32> expected;
+		crypto_x25519(expected.data(), original.data() + 32, original.data() + 80);
+		crypto_x25519(storage.data() + output_at, storage.data() + 32, storage.data() + 80);
+		PrimitiveRequire(std::equal(expected.begin(), expected.end(), storage.begin() + output_at));
+		PrimitiveRequire(std::equal(storage.begin(), storage.begin() + output_at, original.begin()));
+		PrimitiveRequire(std::equal(storage.begin() + output_at + 32, storage.end(), original.begin() + output_at + 32));
+		std::cout << "x25519-overlap " << style << ' ' << Hex(storage) << '\n';
+	}
+	for (int delta : {-7, -1, 0, 1, 7}) {
+		auto storage = PrimitiveBytes(96, 19), original = storage;
+		const auto output_at = static_cast<size_t>(32 + delta);
+		crypto_eddsa_trim_scalar(storage.data() + output_at, storage.data() + 32);
+		PrimitiveRequire(std::equal(storage.begin(), storage.begin() + output_at, original.begin()));
+		PrimitiveRequire(std::equal(storage.begin() + output_at + 32, storage.end(), original.begin() + output_at + 32));
+		std::cout << "x25519-trim-forward " << delta << ' ' << Hex(storage) << '\n';
+		storage = original;
+		std::array<uint8_t, 32> expected;
+		crypto_x25519_public_key(expected.data(), original.data() + 32);
+		crypto_x25519_public_key(storage.data() + output_at, storage.data() + 32);
+		PrimitiveRequire(std::equal(expected.begin(), expected.end(), storage.begin() + output_at));
+		std::cout << "x25519-public-overlap " << delta << ' ' << Hex(storage) << '\n';
+	}
+	for (unsigned style = 0; style != 2; ++style) {
+		std::array<uint8_t, 32> scalar{}, point{}, short_result, full_result;
+		scalar[31] = 0x80; scalar[0] = style == 0 ? 0 : 19; point[0] = 9;
+		FixtureLadder(short_result.data(), scalar.data(), point.data(), 255);
+		FixtureLadder(full_result.data(), scalar.data(), point.data(), 256);
+		PrimitiveRequire(short_result != full_result);
+		std::cout << "x25519-ladder-bits " << style << ' ' << Hex(short_result) << ' ' << Hex(full_result) << '\n';
+		// Coarse helper itself must consume all scalar/point bytes before output.
+		std::array<uint8_t, 64> storage{};
+		std::copy(scalar.begin(), scalar.end(), storage.begin()); std::copy(point.begin(), point.end(), storage.begin() + 32);
+		FixtureLadder(storage.data() + 17, storage.data(), storage.data() + 32, 256);
+		PrimitiveRequire(std::equal(full_result.begin(), full_result.end(), storage.begin() + 17));
+		std::cout << "x25519-ladder-overlap " << style << ' ' << Hex(storage) << '\n';
+	}
+	for (unsigned seed : {0, 1, 7}) {
+		auto secret = PrimitiveBytes(32, seed), other = PrimitiveBytes(32, seed + 53);
+		std::array<uint8_t, 32> small, fast, base, point, inverse;
+		crypto_x25519_dirty_small(small.data(), secret.data()); crypto_x25519_dirty_fast(fast.data(), secret.data());
+		PrimitiveRequire(small == fast);
+		std::cout << "x25519-dirty-caller " << seed << ' ' << Hex(small) << ' ' << Hex(fast) << '\n';
+		crypto_x25519_public_key(base.data(), other.data()); crypto_x25519(point.data(), secret.data(), base.data());
+		crypto_x25519_inverse(inverse.data(), secret.data(), point.data()); PrimitiveRequire(inverse == base);
+		std::cout << "x25519-inverse-caller " << seed << ' ' << Hex(base) << ' ' << Hex(point) << ' ' << Hex(inverse) << '\n';
+	}
+}
+
 static int PrimitiveMain()
 {
 	auto key = PrimitiveBytes(32, 9), nonce = PrimitiveBytes(24, 101);
@@ -417,6 +503,7 @@ static int PrimitiveMain()
 		std::cout << "aead-oneshot " << ad_size << ' ' << length << ' ' << Hex(cipher) << ' ' << Hex(mac) << ' ' << Hex(output) << '\n';
 	}
 	BlakePrimitives();
+	X25519Primitives();
 	return 0;
 }
 

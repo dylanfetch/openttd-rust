@@ -748,7 +748,7 @@ mod abi;
 
 /// Return size, alignment or field offsets for the bounded public ABI audit.
 ///
-/// Type IDs 0..24 follow `abi_ffi.h`, including cargo, crypto and Packet layouts.
+/// Type IDs 0..25 follow `abi_ffi.h`, including cargo, crypto and Packet layouts.
 /// Item 0 is size, 1 alignment, then fields in
 /// declaration order. Unknown IDs/items return `usize::MAX` (C++ `SIZE_MAX`).
 /// Scalar metadata only: no allocation, pointers, ownership or callbacks.
@@ -1219,3 +1219,6 @@ pub unsafe extern "C" fn openttd_rust_packet_write_header(bytes: *mut u8, length
     // SAFETY: The exclusive allocation is valid for this short mutable borrow only.
     packet::header(unsafe { std::slice::from_raw_parts_mut(bytes, length) });
 }
+
+#[allow(unsafe_code)]
+mod x25519;

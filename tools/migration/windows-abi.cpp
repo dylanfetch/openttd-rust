@@ -21,6 +21,7 @@
 #include "rust/packet_ffi.h"
 #include "rust/crypto_primitives_ffi.h"
 #include "rust/blake2b_ffi.h"
+#include "rust/x25519_ffi.h"
 #include "3rdparty/monocypher/monocypher.h"
 #include <algorithm>
 #include <array>
@@ -78,6 +79,7 @@ static void Layouts()
 	Layout(22, "OpenTTDBlake2bLayout", {sizeof(OpenTTDBlake2bLayout), alignof(OpenTTDBlake2bLayout), offsetof(OpenTTDBlake2bLayout, size), offsetof(OpenTTDBlake2bLayout, alignment), offsetof(OpenTTDBlake2bLayout, hash), offsetof(OpenTTDBlake2bLayout, input_offset), offsetof(OpenTTDBlake2bLayout, input), offsetof(OpenTTDBlake2bLayout, input_idx), offsetof(OpenTTDBlake2bLayout, hash_size)});
 	Layout(23, "OpenTTDPacketState", {sizeof(OpenTTDPacketState), alignof(OpenTTDPacketState), offsetof(OpenTTDPacketState, limit), offsetof(OpenTTDPacketState, position)});
 	Layout(24, "OpenTTDPacketFrame", {sizeof(OpenTTDPacketFrame), alignof(OpenTTDPacketFrame), offsetof(OpenTTDPacketFrame, message), offsetof(OpenTTDPacketFrame, payload)});
+	Layout(25, "OpenTTDX25519Leaves", {sizeof(OpenTTDX25519Leaves), alignof(OpenTTDX25519Leaves), offsetof(OpenTTDX25519Leaves, wipe), offsetof(OpenTTDX25519Leaves, verify32)});
 	CHECK(openttd_rust_abi_layout(255, 0) == SIZE_MAX);
 	CHECK(static_cast<size_t>(PTRDIFF_MAX) == (SIZE_MAX >> 1));
 	std::printf("pointer_bytes %zu sentinel %zu borrow_limit %zu\n", sizeof(void *), SIZE_MAX, static_cast<size_t>(PTRDIFF_MAX));
@@ -375,6 +377,49 @@ static void Blake2b()
 	std::printf("blake2b six facades, context size %zu align %zu offsets %zu %zu %zu %zu %zu; copy, carry, pending block, wipe and source sizes passed\n", sizeof(ctx), alignof(crypto_blake2b_ctx), offsetof(crypto_blake2b_ctx, hash), offsetof(crypto_blake2b_ctx, input_offset), offsetof(crypto_blake2b_ctx, input), offsetof(crypto_blake2b_ctx, input_idx), offsetof(crypto_blake2b_ctx, hash_size));
 }
 
+static size_t x25519_wipes, x25519_last_wipe;
+static unsigned x25519_verifies;
+static bool x25519_wipes_zero;
+static void OPENTTD_CRYPTO_CALL X25519Wipe(void *data, size_t size) noexcept
+{
+	crypto_wipe(data, size);
+	x25519_wipes++; x25519_last_wipe = size;
+	const auto *bytes = static_cast<const uint8_t *>(data);
+	x25519_wipes_zero &= std::all_of(bytes, bytes + size, [](uint8_t x) { return x == 0; });
+}
+static int32_t OPENTTD_CRYPTO_CALL X25519Verify32(const uint8_t *a, const uint8_t *b) noexcept
+{
+	x25519_verifies++;
+	return crypto_verify32(a, b);
+}
+static void X25519()
+{
+	const OpenTTDX25519Leaves leaves{X25519Wipe, X25519Verify32};
+	std::array<uint8_t, 32> secret, point{}, expected, actual;
+	for (size_t i = 0; i < secret.size(); ++i) secret[i] = static_cast<uint8_t>(i * 37 + 13);
+	point[0] = 9;
+	crypto_x25519_public_key(expected.data(), secret.data());
+	x25519_wipes = x25519_verifies = 0; x25519_wipes_zero = true;
+	openttd_rust_x25519_public_key(&leaves, actual.data(), secret.data());
+	CHECK(actual == expected && x25519_verifies == 4 && x25519_wipes == 29 && x25519_last_wipe == 32 && x25519_wipes_zero);
+	x25519_wipes = x25519_verifies = 0;
+	openttd_rust_x25519(&leaves, actual.data(), secret.data(), point.data());
+	CHECK(actual == expected && x25519_verifies == 4 && x25519_wipes == 29 && x25519_last_wipe == 32 && x25519_wipes_zero);
+	std::array<uint8_t, 64> storage;
+	storage.fill(13); storage[33] = 0xA5;
+	openttd_rust_x25519_trim(storage.data() + 1, storage.data());
+	CHECK(storage[1] == 8 && storage[32] == 0x4D && storage[33] == 0xA5);
+	CHECK(std::all_of(storage.begin() + 2, storage.begin() + 32, [](uint8_t x) { return x == 13; }));
+	secret.fill(0); secret[31] = 0x80;
+	std::array<uint8_t, 32> short_result, full_result;
+	x25519_wipes = x25519_verifies = 0;
+	openttd_rust_x25519_ladder(&leaves, short_result.data(), secret.data(), point.data(), 255);
+	CHECK(x25519_verifies == 4 && x25519_wipes == 28 && x25519_last_wipe == 40 && x25519_wipes_zero);
+	openttd_rust_x25519_ladder(&leaves, full_result.data(), secret.data(), point.data(), 256);
+	CHECK(short_result != full_result && x25519_verifies == 8 && x25519_wipes == 56 && x25519_last_wipe == 40 && x25519_wipes_zero);
+	std::printf("x25519 four exports, cdecl wipe/verify32, physical wipe counts/final sizes, forward trim and 255/256 high-bit distinction passed\n");
+}
+
 static void StationCargo()
 {
 	auto list = std::unique_ptr<OpenTTDScriptList, decltype(&openttd_rust_list_destroy)>(openttd_rust_list_new(), openttd_rust_list_destroy);
@@ -447,6 +492,7 @@ int main()
 	Math();
 	CryptoPrimitives();
 	Blake2b();
+	X25519();
 	StationCargo();
 	PacketState();
 	Locale();
