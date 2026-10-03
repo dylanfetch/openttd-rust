@@ -44,7 +44,11 @@ def main():
         ("conflicting-crt-flag", ["-DCMAKE_CXX_FLAGS=/MD"], {}, "conflicting CRT flags"),
         ("quoted-crt-flag", ['-DCMAKE_CXX_FLAGS="/MD"'], {}, "conflicting CRT flags"),
         ("crt-mismatch-suppression", ["-DCMAKE_EXE_LINKER_FLAGS=/force:multiple"], {}, "CRT mismatch suppression"),
-        ("quoted-crt-suppression", ['-DCMAKE_EXE_LINKER_FLAGS="/NODEFAULTLIB"'], {}, "CRT mismatch suppression"),
+        # /NODEFAULTLIB breaks project()'s compiler smoke link before the policy
+        # runs. An archive-only smoke test lets this refusal reach the unchanged
+        # CRT guard; configuration must still fail before creating any targets.
+        ("quoted-crt-suppression", ['-DCMAKE_EXE_LINKER_FLAGS="/NODEFAULTLIB"',
+                                    "-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY"], {}, "CRT mismatch suppression"),
         ("external-host-tools", ["-DHOST_BINARY_DIR=" + str(output / "external")], {}, "external HOST_BINARY_DIR"),
         ("cross-configuration", ["-DCMAKE_SYSTEM_NAME=Windows"], {}, "cross-OS builds are unsupported"),
         ("contradictory-rust-crt", [], {"RUSTFLAGS": "-C target-feature=-crt-static"}, "contradictory or unvalidated flags"),
