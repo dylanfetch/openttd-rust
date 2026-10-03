@@ -26,8 +26,8 @@ Never change candidate behavior and expected results together to make checks pas
 The premature Rust integer-square-root implementation was removed before component
 selection. The first selected replacement is `GetPartialPixelZ`, the scalar
 landscape height kernel, implemented in `rust/openttd-kernels` behind its original
-C++ interface. The shared crate also implements StringConsumer's integer parsing
-and lexical skipping, UTF-8 codec/iteration, alternating-iterator traversal,
+C++ interface. The shared crate also implements StringConsumer's integer and
+remaining byte algorithms, UTF-8 codec/iteration, alternating-iterator traversal,
 and StringBuilder's numeric byte encoders. Native generators share the Rust
 archive; actual call-site coverage is described below. These replacements do not
 complete their containing subsystems. Preserve the complete game,
@@ -177,9 +177,8 @@ compares fatal logging adapters, real malformed strgen diagnostics, and fresh
 settings/string headers plus English/French language output on unchanged reference
 inputs. Evidence and source hashes live under `.local/integer-comparison/`; CI runs
 the fresh Rust tools build and comparisons. The eleven unchanged upstream
-StringConsumer cases remain the primary existing parser tests. Other consumer
-algorithms, C++ sink/ownership adapters, and non-Linux Rust integration remain
-migration work.
+StringConsumer cases remain the primary existing parser tests. In-place ownership,
+other builder algorithms, C++ adapters, and non-Linux Rust integration remain migration work.
 
 Alternating-iterator traversal also uses the shared Rust archive. Rust owns initial
 position/selectors, logical advancement, side selection, end transitions, and
@@ -203,6 +202,48 @@ interface tests cover empty/singleton, independent copies/postfix/prefix identit
 position ordering, distinct end Base values, stable-list insertion, and typed
 operation counts. The original C++ algorithm remains under the explicit fallback;
 other generic iterator/container and text-file owner code remains C++.
+
+The remaining StringConsumer byte algorithms live in `consumer.rs`: exact unsigned
+little-endian assembly; bounded read/skip lengths and shortfall/cursor decisions;
+byte-prefix matching and conditional consumption; substring/character-set search
+and membership; and complete separator result/consumption decisions. C++ retains
+typed optional/default conversions, borrowed std::string_view construction,
+diagnostic formatting/dispatch, cursor commit, and trivial accessors. It preserves
+empty view pointers through the original source substring at the current offset.
+No separate Rust call was added for trivial getters.
+
+`src/rust/consumer_ffi.h` returns scalar repr(C) metadata by value. Read-only spans
+may overlap and include NUL/non-UTF8 bytes; each nonempty span addresses initialized
+bytes in one live allocation, length <=PTRDIFF_MAX, immutable for the call. Empty
+spans allow null. Rust retains no pointer/slice, allocates no C++ storage, and calls
+no C++ logger while borrowing. C++ logs a shortfall before applying the returned
+position; fatal generator logging therefore leaves the cursor unchanged. Normal
+game diagnostics keep the original text and consume the remaining bytes.
+
+Nonempty search/set/separator assertions remain valid-input preconditions; release
+behavior outside those contracts is not claimed equivalent (including original
+empty-separator loops). Prefix matching still accepts empty patterns at end. npos
+maps to SIZE_MAX/usize::MAX and means all remaining or not-found as appropriate.
+Bounds use remaining-length subtraction before clamping, avoiding overflowing
+position+requested arithmetic. Separator policies return and consume different
+lengths for SKIP modes, repeat whole separators without overlapping matches, and
+retain default KEEP for unknown values. Panic aborts; the ABI never unwinds.
+
+The eleven original consumer cases remain unchanged. Four additional public cases
+cover audited gaps: empty-prefix/zero-length borrowed offsets; partial-width TryRead
+cursor preservation; all policies for multi-byte separators with nonzero offsets,
+overlap and unknown-value default; and byte sets/read-only overlapping patterns.
+The existing `tools/compare-integers.py` script invokes the probe's additive
+`--consumer` mode:
+60 bounded byte/offset/shortfall cases and six fatal timing checks compare against
+unchanged pinned C++ source, retaining diagnostic bytes and cursor-before-log.
+The inherited integer/generator comparisons and separate UTF8 checks remain in CI.
+The integer comparison report records `consumer_bytes` separately.
+
+The in-place pair and owning string/container code remain C++. In particular,
+SQFile erases/resizes its owning buffer and explicitly reconstructs the consumer;
+no Rust borrow survives that boundary. No allocator, in-place memory copy/rebinding,
+escape-parser caller, or encoded-string transformation moved with this group.
 
 Start with dependency and test inventories. Prefer bounded, heavily tested modules
 whose unchanged upstream tests can exercise replacements through their existing

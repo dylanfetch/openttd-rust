@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import runpy
 import subprocess
+import struct
 
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATION = runpy.run_path(str(ROOT / "tools/migration.py"))
@@ -80,6 +81,39 @@ def compare_builders(env, binaries):
             raise RuntimeError(f"Builder comparison failed: {name}; {OUT / f'{name}-builder-failures.json'}")
     return {"cases": len(corpus), "fixed_alias_sink_cases": 13, "commands": commands,
             "output_sha256": hashlib.sha256(b"\n".join(expected) + b"\n").hexdigest()}
+
+def compare_consumers(env, binaries):
+    # Bounded audited gaps, not a second general consumer fuzz corpus.
+    maximum = (1 << (8 * struct.calcsize("P"))) - 1  # Native size_t; cross compilation is unsupported.
+    corpus = []
+    for operation in (0, 1, 2):
+        for offset, requested, src in ((0, 0, b""), (0, maximum, b""), (1, 0, b"A\x00\xff"),
+                                       (1, 8, b"A\x00\xff"), (1, maximum - 1, b"A\x00\xff"),
+                                       (3, 0, b"A\x00\xff"), (3, maximum, b"A\x00\xff"), (1, 1, b"A\x00\xff")):
+            corpus.append((operation, offset, requested, src))
+    for operation in range(3, 12):
+        for offset, src in ((0, b""), (1, b"ABC"), (3, b"ABC"), (1, b"X\x01\x02\x03\x04\x05\x06\x07\x80")):
+            corpus.append((operation, offset, 0, src))
+    records = [f"{operation} {offset} {requested} {src.hex() or '-'}\n".encode() for operation, offset, requested, src in corpus]
+    (OUT / "consumer-corpus.txt").write_bytes(b"".join(records))
+    streams = []
+    for name in ("reference", "candidate"):
+        result = subprocess.run([str(binaries[name, False]), "--consumer"], input=b"".join(records), env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        (OUT / f"{name}-consumer.txt").write_bytes(result.stdout)
+        assert len(result.stdout.splitlines()) == len(records)
+        streams.append(result.stdout)
+    assert streams[0] == streams[1], "Consumer byte/cursor/diagnostic mismatch; retained streams in evidence"
+    fatal_cases = []
+    for operation, offset, requested, src in ((1, 1, 8, b"A\x00\xff"), (2, 1, 8, b"A\x00\xff"),
+                                             (3, 3, 0, b"ABC"), (4, 2, 0, b"ABC"),
+                                             (5, 1, 0, b"ABC"), (6, 1, 0, b"ABC")):
+        record = f"{operation} {offset} {requested} {src.hex()}\n".encode()
+        results = [subprocess.run([str(binaries[name, True]), "--consumer"], input=record, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE) for name in ("reference", "candidate")]
+        assert results[0].returncode == results[1].returncode == 2
+        assert results[0].stdout == results[1].stdout and results[0].stderr == results[1].stderr
+        fatal_cases.append({"input": record.decode().strip(), "exit_code": 2, "stdout": results[0].stdout.decode()})
+    return {"cases": len(corpus), "fatal_cases": fatal_cases}
+
 
 def compare_generators(env):
     outputs = {}
@@ -167,11 +201,12 @@ def main():
         assert outputs[0].stdout == outputs[1].stdout and outputs[0].stderr == outputs[1].stderr
         fatal_cases.append({"input": record.decode().strip(), "exit_code": 2, "stdout": outputs[0].stdout.decode()})
     builders = compare_builders(env, binaries)
+    consumer_bytes = compare_consumers(env, binaries)
     generators = compare_generators(env)
     MIGRATION["ensure_reference"]()
-    report = {"baseline": MIGRATION["BASELINE"], "candidate_commit": MIGRATION["git"]("rev-parse", "HEAD"), "candidate_status": MIGRATION["git"]("status", "--porcelain"), "cases": len(corpus), "fatal_cases": fatal_cases, "generators": generators, "builders": builders, "reference_sources_sha256": {name: hashlib.sha256((REFERENCE / name).read_bytes()).hexdigest() for name in ("src/core/string_consumer.hpp", "src/core/string_consumer.cpp", "src/core/string_builder.hpp", "src/core/string_builder.cpp", "src/core/utf8.hpp", "src/core/utf8.cpp")}, "passed": True}
+    report = {"baseline": MIGRATION["BASELINE"], "candidate_commit": MIGRATION["git"]("rev-parse", "HEAD"), "candidate_status": MIGRATION["git"]("status", "--porcelain"), "cases": len(corpus), "fatal_cases": fatal_cases, "generators": generators, "builders": builders, "consumer_bytes": consumer_bytes, "reference_sources_sha256": {name: hashlib.sha256((REFERENCE / name).read_bytes()).hexdigest() for name in ("src/core/string_consumer.hpp", "src/core/string_consumer.cpp", "src/core/string_builder.hpp", "src/core/string_builder.cpp", "src/core/utf8.hpp", "src/core/utf8.cpp")}, "passed": True}
     (OUT / "report.json").write_text(json.dumps(report, indent=2) + "\n")
-    print(f"Integer comparisons passed: {len(corpus)} API cases, {len(fatal_cases)} fatal diagnostic cases, {builders['cases']} builder formats + {builders['fixed_alias_sink_cases']} fixed sink/alias cases; {OUT / 'report.json'}")
+    print(f"Integer comparisons passed: {len(corpus)} API cases, {len(fatal_cases)} fatal diagnostic cases, {builders['cases']} builder formats + {builders['fixed_alias_sink_cases']} fixed sink/alias cases, {consumer_bytes['cases']} consumer byte gaps + {len(consumer_bytes['fatal_cases'])} fatal timing gaps; {OUT / 'report.json'}")
 
 
 if __name__ == "__main__":

@@ -16,6 +16,7 @@
 #ifdef WITH_RUST
 #include <bit>
 #include "../rust/ffi.h"
+#include "../rust/consumer_ffi.h"
 #endif
 #include "format.hpp"
 
@@ -53,6 +54,40 @@ private:
 	size_type position = 0;
 
 	static void LogError(std::string &&msg);
+
+#ifdef WITH_RUST
+	static_assert(npos == SIZE_MAX);
+
+	OpenTTDRustConsumerByte PeekBinary(uint8_t width) const
+	{
+		auto input = this->GetLeftData();
+		return openttd_rust_consumer_little_endian(reinterpret_cast<const uint8_t *>(input.data()), input.size(), width);
+	}
+
+	OpenTTDRustConsumerMatch MatchPrefix(std::string_view pattern) const
+	{
+		auto input = this->GetLeftData();
+		return openttd_rust_consumer_prefix(reinterpret_cast<const uint8_t *>(input.data()), input.size(), reinterpret_cast<const uint8_t *>(pattern.data()), pattern.size());
+	}
+
+	OpenTTDRustConsumerByte MatchCharacter(std::string_view chars, bool member) const
+	{
+		auto input = this->GetLeftData();
+		return openttd_rust_consumer_character(reinterpret_cast<const uint8_t *>(input.data()), input.size(), reinterpret_cast<const uint8_t *>(chars.data()), chars.size(), member);
+	}
+
+	size_type FindBytes(std::string_view pattern, uint8_t mode) const
+	{
+		auto input = this->GetLeftData();
+		return openttd_rust_consumer_find(reinterpret_cast<const uint8_t *>(input.data()), input.size(), reinterpret_cast<const uint8_t *>(pattern.data()), pattern.size(), mode);
+	}
+
+	OpenTTDRustConsumerSeparator SeparatorResult(std::string_view pattern, int32_t policy) const
+	{
+		auto input = this->GetLeftData();
+		return openttd_rust_consumer_separator(reinterpret_cast<const uint8_t *>(input.data()), input.size(), reinterpret_cast<const uint8_t *>(pattern.data()), pattern.size(), policy);
+	}
+#endif
 
 public:
 	/**
@@ -450,23 +485,37 @@ public:
 	 */
 	[[nodiscard]] bool PeekIf(std::string_view str) const
 	{
+#ifdef WITH_RUST
+		return this->MatchPrefix(str).matched != 0;
+#else
 		return this->src.compare(this->position, str.size(), str) == 0;
+#endif
 	}
 	/**
 	 * Check whether the next data matches 'str', and skip it.
 	 */
 	[[nodiscard]] bool ReadIf(std::string_view str)
 	{
+#ifdef WITH_RUST
+		auto result = this->MatchPrefix(str);
+		this->position += result.length;
+		return result.matched != 0;
+#else
 		bool result = this->PeekIf(str);
 		if (result) this->Skip(str.size());
 		return result;
+#endif
 	}
 	/**
 	 * If the next data matches 'str', then skip it.
 	 */
 	void SkipIf(std::string_view str)
 	{
+#ifdef WITH_RUST
+		this->position += this->MatchPrefix(str).length;
+#else
 		if (this->PeekIf(str)) this->Skip(str.size());
+#endif
 	}
 
 	/**
@@ -533,12 +582,20 @@ public:
 	 */
 	[[nodiscard]] std::string_view Read(size_type len)
 	{
+#ifdef WITH_RUST
+		auto bounds = openttd_rust_consumer_bound(this->src.size(), this->position, len);
+		auto result = this->src.substr(this->position, bounds.length);
+		if (bounds.shortfall) LogError(fmt::format("Source buffer too short: {} > {}", len, bounds.length));
+		this->position = bounds.position; // Commit only after the original logger returns.
+		return result;
+#else
 		auto result = this->Peek(len);
 		if (len != npos && len != result.size()) {
 			LogError(fmt::format("Source buffer too short: {} > {}", len, result.size()));
 		}
 		this->Skip(result.size());
 		return result;
+#endif
 	}
 	/**
 	 * Discard some bytes.
@@ -582,10 +639,17 @@ public:
 	 */
 	[[nodiscard]] std::optional<char> PeekCharIfIn(std::string_view chars) const
 	{
+#ifdef WITH_RUST
+		assert(!chars.empty());
+		auto result = this->MatchCharacter(chars, true);
+		if (result.length == 0) return std::nullopt;
+		return static_cast<char>(result.value_bits);
+#else
 		assert(!chars.empty());
 		std::optional<char> c = this->PeekChar();
 		if (c.has_value() && chars.find(*c) != std::string_view::npos) return c;
 		return std::nullopt;
+#endif
 	}
 	/**
 	 * Read next 8-bit char, check whether it is in 'chars', and advance reader.
@@ -612,10 +676,17 @@ public:
 	 */
 	[[nodiscard]] std::optional<char> PeekCharIfNotIn(std::string_view chars) const
 	{
+#ifdef WITH_RUST
+		assert(!chars.empty());
+		auto result = this->MatchCharacter(chars, false);
+		if (result.length == 0) return std::nullopt;
+		return static_cast<char>(result.value_bits);
+#else
 		assert(!chars.empty());
 		std::optional<char> c = this->PeekChar();
 		if (c.has_value() && chars.find(*c) == std::string_view::npos) return c;
 		return std::nullopt;
+#endif
 	}
 	/**
 	 * Read next 8-bit char, check whether it is not in 'chars', and advance reader.
@@ -700,6 +771,9 @@ public:
 		SKIP_ONE_SEPARATOR,  ///< Read and discard one separator, do not include it in the result.
 		SKIP_ALL_SEPARATORS, ///< Read and discard all consecutive separators, do not include any in the result.
 	};
+#ifdef WITH_RUST
+	static_assert(READ_ALL_SEPARATORS == 0 && READ_ONE_SEPARATOR == 1 && KEEP_SEPARATOR == 2 && SKIP_ONE_SEPARATOR == 3 && SKIP_ALL_SEPARATORS == 4);
+#endif
 
 	/**
 	 * Peek data until the first occurrence of 'str'.
@@ -714,6 +788,13 @@ public:
 	 */
 	[[nodiscard]] std::string_view ReadUntil(std::string_view str, SeparatorUsage sep)
 	{
+#ifdef WITH_RUST
+		assert(!str.empty());
+		auto lengths = this->SeparatorResult(str, sep);
+		auto result = this->src.substr(this->position, lengths.result_length);
+		this->position += lengths.consumed_length;
+		return result;
+#else
 		assert(!str.empty());
 		auto result = this->PeekUntil(str, sep);
 		this->Skip(result.size());
@@ -728,6 +809,7 @@ public:
 				break;
 		}
 		return result;
+#endif
 	}
 	/**
 	 * Skip data until the first occurrence of 'str'.
@@ -736,6 +818,10 @@ public:
 	 */
 	void SkipUntil(std::string_view str, SeparatorUsage sep)
 	{
+#ifdef WITH_RUST
+		assert(!str.empty());
+		this->position += this->SeparatorResult(str, sep).consumed_length;
+#else
 		assert(!str.empty());
 		this->Skip(this->Find(str));
 		switch (sep) {
@@ -750,6 +836,7 @@ public:
 				while (this->ReadIf(str)) {}
 				break;
 		}
+#endif
 	}
 
 	/**
