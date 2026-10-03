@@ -522,3 +522,40 @@ are enforced separately from these documents.
 
 Preserve OpenTTD copyright notices, credits, and GPLv2. Agent-generated work is welcome
 in this fork; upstream submission policies govern contributions to OpenTTD itself.
+
+## Byte-string utility boundary
+
+The issue #21 byte-string port moves case-insensitive compare/equal/prefix/suffix/
+contains, lowercase conversion, uppercase hex encoding, sequential hex decoding,
+and byte-set trim scanning into `byte_strings.rs`. C++ retains std::string owners,
+public views, erases, and the installed standard library's exact equal-prefix
+length comparison policy. The length adapter compares a valid suffix of the
+longer original view against a default empty view; Rust scans/maps bytes and
+returns that supplied scalar only when the shared prefix is equal. All operations
+remain length-delimited, including embedded NUL.
+
+Rust calls native C `toupper` with the original C++ char promotion (signedness is
+an explicit scalar supplied by C++) and native `tolower` with unsigned-byte
+promotion. This retains process-locale behavior and does not replace it with ASCII
+or Unicode rules. Negative-char uppercase inputs other than EOF remain outside
+portable C's specified domain; compatibility is only the observed native behavior
+and call shape, not a claim of defined behavior. Locale must not change concurrently.
+Issue #26 records the deferred signed-byte ctype improvement.
+
+The ABI borrows initialized bytes in live allocations, lengths <= PTRDIFF_MAX;
+empty spans allow null, read-only spans may overlap, no pointer is retained, and
+ownership never transfers. Lowercase holds an exclusive mutable span and requires
+an offset at most size. Hex encode uses disjoint input and caller-owned initialized
+output. Hex decode deliberately forms no Rust slices or references: sequential raw
+reads of both nibbles precede each raw write, allowing legal input/output overlap
+and preserving earlier writes on later invalid pairs. Rejected lengths write
+nothing. Rust trim returns offsets; C++ returns a default null-data string_view for
+all-trimmed/empty inputs and otherwise takes the original substring. In-place trim
+keeps the original newline-preserving whitespace set and erase order. Panic aborts
+and the C ABI never unwinds. Equivalent resource-exhaustion timing is not claimed.
+
+Only the portable fallback of natural contains routes through this helper. ICU,
+Windows/macOS search/collation, sanitation/character validation, in-place replacement,
+and StringIterator backends remain separate work; these utilities do not complete
+string.cpp or the string subsystem. The twelve original utility tests are unchanged.
+
