@@ -42,6 +42,7 @@ games; commercial game assets are unnecessary. The verification driver requires
 the pinned Rust toolchain and always configures the candidate with `OPTION_RUST=ON`.
 Ordinary CMake builds default to `OPTION_RUST=OFF`, preserving the original portable
 C++ path. Rust linkage supports native GNU/Linux (64-bit x86 or ARM) and native macOS arm64.
+The scoped native Windows MSVC mode is described below.
 Other platforms, cross compilation, and macOS universal/Intel configurations reject
 an enabled Rust option; their portable fallback remains migration work.
 
@@ -533,6 +534,96 @@ to Rust, they should use the internal byte algorithms directly; after the last c
 moves, remove the C++ view/pair facade and files. Neither this slice nor its reference
 comparison completes the entire string subsystem.
 
+## Rounded square root and runtime integer saturation
+
+With `OPTION_RUST=ON`, `IntSqrt(uint32_t)` and runtime `ClampTo` / `SoftClamp`
+call the shared Rust archive through `src/rust/math_ffi.h`. `IntSqrt` retains
+nearest-integer rounding, including 65536 for UINT32_MAX. `DivideApprox` remains
+C++: its potentially overflowing signed intermediates require separate work.
+
+The public saturation templates retain their original C++ bodies for constant
+evaluation, dispatched with `std::is_constant_evaluated()`. The StrongType and
+OverflowSafeInt overloads retain their original unwrap-and-forward behavior.
+Portable builds retain the original complete bodies. Accepted wider extension
+sources/signed destinations and SoftClamp also retain the original runtime bodies.
+These are explicit remaining
+C++ implementations; this slice does not complete all math migration.
+
+Source inventory finds ClampTo destinations uint8/uint16/uint32/int32, the int32
+widget size_type and TimerGameTick::Ticks aliases, and history element types.
+Sources include promoted 8/16-bit expressions, native int/uint, 32/64-bit integers,
+size_t/ptrdiff_t, date/year StrongTypes, and OverflowSafeInt money results. All
+four production SoftClamp calls in misc_gui.cpp use native int. No production
+bool saturation, explicit narrow SoftClamp instantiation, or wider compiler
+integer extension appears in these call sites. The standard integral public
+contracts also include signed/unsigned char, wchar_t and char8/16/32_t aliases.
+The Rust adapter explicitly checks eight-bit bytes, a 32-bit int promotion model
+for SoftClamp, and routes standard widths through uint64_t to Rust. An accepted wider unsigned
+destination uses Rust's unsigned64 saturation followed by C++ widening. Wider
+ClampTo sources/signed destinations and wider SoftClamp types retain the original
+C++ runtime body when accepted by the compiler/library. No new source/destination
+width precondition is imposed. Non-builtin integer-like destinations accepted by
+`numeric_limits` retain the original body and constructor/conversion selection.
+Strict GCC/libstdc++ originally rejects signed
+sources for unsigned128 destinations, signed128 destinations and 128-bit sources
+through its traits; libc++ supports a broader extension domain. The bounded
+extension comparison below checks each library's actual accepted domain rather
+than assuming GCC defines every supported platform's public API.
+
+The ABI is pointer-free and scalar-only: modulo-2^64 value bits, explicit widths
+and signedness, and result bits reconstructed by C++20 integral conversion.
+ClampTo accepts 1-bit bool descriptors alongside 8/16/32/64-bit integer widths.
+Unsigned uint64 values never pass through signed int64; Rust uses a bounded i128
+comparison domain and explicitly reconstructs modulo bits. The original template
+still determines which bool-source instantiations are well-formed: for example,
+its make_unsigned<bool> means bool-to-int8 remains ill-formed. Existing valid
+bool conversions and destination truth values are preserved.
+
+SoftClamp accepts the original non-bool standard integral types. Reversed signed
+8/16-bit intervals first convert min to the matching unsigned type, then promote
+both subtraction operands to int. Rust preserves this unusual behavior: e.g.
+SoftClamp<int8_t>(0, -1, -3) returns 126. Reversed 32/64-bit signed intervals use
+unsigned subtraction/division and modular result conversion; unsigned intervals
+retain the original rounding toward min. Ordinary/equal intervals preserve the
+<= and >= decisions. No allocation, ownership, random state, callback, pointer,
+or exception crosses the ABI. Safe Rust uses explicitly bounded or wrapping
+operations; both profiles abort on panic and the C ABI cannot unwind into C++.
+
+The unchanged IntSqrtTest - Zero/FindSqRt, ClampTo, and SoftClamp cases remain
+primary. Bounded coverage gaps are compared with:
+
+```sh
+python3 tools/math-comparison.py
+```
+
+The script verifies the pristine pinned oracle and compiles one public-API fixture
+against its unchanged math source/header and both Rust and portable candidate
+bodies, in assertion-enabled and NDEBUG modes. It compares exact ordered results
+for every uint32 integer-root square and adjacent rounding transition, UINT32_MAX,
+8/16/32/64-bit signedness/width extrema, bool and standard character/size aliases,
+StrongType/OverflowSafeInt adapters, accepted unsigned 128-bit destinations
+(including both result words and runtime routing), normal/equal/reversed SoftClamp intervals,
+and all reversed signed 8-bit pairs. Static assertions retain constexpr evidence.
+GNU linker wrappers count actual calls to each Rust symbol, including initial
+literal calls at -O2; retained nm output supplies symbol evidence. Source hashes,
+commands, outputs, and routing counts reside in `.local/math-comparison/` and CI
+retains them. The probe is a native GNU/Linux comparison, not a new simulation
+framework or a proof over all math inputs, platform ABIs, or whole-game behavior.
+
+`python3 tools/math-extension-comparison.py` additionally compiles the same small
+wide-template fixture against pinned, portable and Rust candidate headers on the
+native compiler/library. The probe uses the configured C++ compiler and pointer
+width, preserving the original macOS pointer guard; native macOS commands also
+carry that build's arm64 architecture, SDK and deployment minimum for compilation
+and linkage. It covers the GCC accepted unsigned128 widening path;
+on libc++ it also checks accepted signed/unsigned128 sources, signed destinations,
+saturation beyond uint64 limits, negative values and wide SoftClamp intervals.
+Both result words and constexpr assertions are checked. A tiny integer-like
+numeric_limits destination also checks the original constructor selection. Native macOS Rust CI runs
+this comparison with `--build build` and retains it in the macOS evidence bundle.
+Library-dependent extension coverage is reported by each fixture output; wider
+C++ fallback behavior is explicitly remaining migration work.
+
 ## Generic history structural engine
 
 The issue #29 history port moves descriptor-driven validity, rotation scheduling,
@@ -657,7 +748,7 @@ On macOS it requires exactly `CMAKE_OSX_ARCHITECTURES=arm64` and a deployment
 minimum of 11.0 or newer, with the same resolved SDK and minimum supplied to Rust
 through `SDKROOT` and `MACOSX_DEPLOYMENT_TARGET`. Rust's [Darwin target documentation](https://doc.rust-lang.org/rustc/platform-support/apple-darwin.html)
 specifies the supported minimum and these environment inputs. Intel packaging,
-Windows CRT policy and Emscripten host/target builds remain separate tasks.
+Additional Windows CRT modes and Emscripten host/target builds remain separate tasks.
 
 Archives live at `<build>/cargo/<validated-target>/release/libopenttd_kernels.a`.
 `tools/migration.py` exposes `rust_configuration(build)` and `rust_archive(build)`;
@@ -693,3 +784,147 @@ binary `nm` inspection are not suppressed. These checks
 validate native linkage and covered behavior; Linux results alone do not establish
 Darwin support. Actual macOS CI evidence and independent review are required before
 integration.
+
+## Conservative compiler-cache trial
+
+Compiler caching is opt-in. `python3 tools/migration.py tools --ccache` builds
+native Rust generators; `python3 tools/migration.py verify --ccache` retains all
+Cargo checks, original/candidate builds, test inventories, and tests. Ordinary
+commands clear stale compiler launchers and restore the normal PCH policy.
+`--ccache-bypass` requires `--ccache` and keeps identical no-PCH flags while
+disabling artifact reuse. Both modes record effective settings, per-role counter
+deltas, build settings, and total duration in the verification report.
+
+The policy in `migration/ccache.conf` requires compiler-content validation,
+preprocessor mode, empty sloppiness, unchanged paths, and local storage. Ambient
+`CCACHE_*` policy overrides are removed. Original and candidate artifacts occupy
+separate directories; PCH is disabled rather than enabling timestamp or PCH
+sloppiness. Existing build dates remain observable and can change the revision
+object and executable bytes across otherwise equivalent builds.
+
+The Linux migration workflow can run the trial with the manual `use_ccache`
+input. Automatic use requires the repository variable `MIGRATION_CCACHE=true`
+after measured benefit and a successful protected-branch seed. Cache compatibility
+includes OS, architecture, pinned original revision, policy/workflow/driver hashes,
+compiler/tool versions, and installed dependency versions. Ccache validates source
+and header contents for reuse. Pull requests restore only; successful protected
+`rust-migration` push/manual runs save only compilation artifacts after every
+existing comparison succeeds. Reports, expected results, build directories, and
+executables are never restored.
+
+Measure fresh ordinary-PCH, cold cache, warm cache, and cache-bypassed no-PCH runs
+with the same source, compiler, jobs, and private build paths. Delete only the
+trial's own build outputs between runs while retaining the warm cache. Record
+actual hits and total elapsed time, retain all verification evidence, and explain
+object or executable differences before adoption. A warm Ninja no-op is not a
+cache benefit measurement.
+
+The first Linux trial at `07c713445146ea38ad9ce82f2cdd8208aeeab1a0` used
+five jobs, GCC 15.2.0, ccache 4.12.3, CMake 4.3.4, Ninja 1.13.2, and pinned Rust
+1.99.0. Each row recreated the same private game/reference/tools build paths, ran
+`tools`, `verify`, and all four focused comparison scripts. Only the warm cache
+retained compilation entries. All rows passed four Cargo gates, 97 original and
+110 candidate tests, all focused suites, and fresh generator comparisons.
+
+| Mode | Native verification (seconds) | Complete validation (seconds) | Original PP hits/misses | Candidate PP hits/misses |
+| --- | ---: | ---: | ---: | ---: |
+| Ordinary PCH | 494.141 | 646.790 | disabled | disabled |
+| Cold strict cache | 582.175 | 735.064 | 8 / 538 | 8 / 541 |
+| Warm recreated outputs | 120.275 | 270.413 | 545 / 1 | 548 / 1 |
+| Bypassed, same no-PCH flags | 566.154 | 720.521 | 0 / 0 | 0 / 0 |
+
+Native hit/miss deltas exclude the separately recorded tools step; direct hits
+were zero. Bypass effective configuration reported `disable=true`. Complete
+duration includes tools, Cargo/native/tests, every focused suite, and snapshots.
+Warm validation was 58.2% shorter than ordinary PCH and 62.5% shorter than the
+equivalent bypass control; cold validation was 13.6% slower than ordinary PCH.
+These are single local runs, without GitHub cache upload/download time. Keep
+automatic adoption disabled until a protected-branch manual seed passes all gates.
+
+Object differences were retained and investigated, without rewriting flags or
+build dates. Cold/warm production C++ objects matched except two revision
+objects whose differing bytes were solely their original build-date strings.
+Against bypass, all 1,113 non-revision production objects had identical allocated
+code/data and runtime relocations. GCC DWARF producer text records ccache's
+reordered `-finput-charset=utf-8`; two Unix entry objects additionally contain
+different internal LTO identifiers. An identical configure-only IPO command
+compiled twice reproduced different GCC LTO identifiers. Configure-only probes
+and fresh Cargo debug incremental paths are separate from cached game objects.
+All four original/candidate game/test binaries have 27 file-backed allocated sections; only
+the original date bytes in `.rodata` and the resulting build IDs changed between
+cold and bypass. Code and mutable data agree. The trial therefore establishes
+covered behavior and material local reuse benefit, not byte-identical binaries
+or a guaranteed CI speedup.
+
+Evidence remains in the implementation worktree's `.local/cache-trial/`: each
+mode retains driver reports, all comparison logs, object SHA/size inventories,
+original binaries, build IDs, and section/date/producer/LTO analysis. The ignored
+`.local/cache-trial.py` reproduces the guarded private-path run sequence; the
+comparison commands are `tools/compare-integers.py`, `tools/utf8-comparison.py`,
+`tools/encoded-comparison.py`, and `tools/byte-strings-comparison.py`. No expected
+results or binaries from a prior run supplied validation inputs.
+
+## Native Windows MSVC Rust linkage
+
+Issue #33 adds one native Windows mode: VS 2022 MSVC, x86 or x64, single-config
+Ninja, `RelWithDebInfo`, `OPTION_USE_ASSERTS=ON`, and the static release CRT.
+The C++ compiler's architecture macros and pointer width select
+`i686-pc-windows-msvc` or `x86_64-pc-windows-msvc`; the pinned Rust host is recorded
+separately. An x64 Rust host therefore does not choose the game architecture.
+The protected architecture jobs install the exact target standard library and run
+the four Cargo gates with an explicit target for target-dependent commands.
+
+`WindowsRust.cmake` sets `CMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded` before creating
+any game, test or generator target, including the tools-only path. CMP0091 is NEW
+before the first `project()` call, as required by the
+[CMake runtime property](https://cmake.org/cmake/help/latest/prop_tgt/MSVC_RUNTIME_LIBRARY.html).
+Both the direct rustc native-library query and Cargo use
+`-C target-feature=+crt-static`. The resulting archive is
+`<build>/cargo/<validated-target>/release/openttd_kernels.lib`. The shared cache
+locator validates target, pointer width, CRT, flags and the target-specific path.
+The configuration stamp includes these effective settings and captured profile
+inputs; a code-generation setting change and restoration must rebuild the actual
+archive. Native library ordering and quoted arguments are retained. Rust's
+[CRT documentation](https://doc.rust-lang.org/reference/linkage.html#static-and-dynamic-c-runtimes)
+explains why the feature must apply to the selected target and its native query.
+
+Debug/debug CRT, dynamic CRT, other build types, assertions disabled, non-MSVC,
+multi-config/non-Ninja, ARM/UWP/MinGW, cross-OS and external `HOST_BINARY_DIR`
+configurations remain unsupported for Windows Rust. Conflicting C++ runtime flags,
+Rust target overrides or mismatch suppression fail configuration. Missing target
+std also fails; C++ fallback is never selected implicitly. Future modes remain
+tracked under issue #3. `OPTION_RUST=OFF` retains its existing configuration.
+
+The unchanged CMake ordering gives Windows RelWithDebInfo game/tests both
+`NDEBUG` and `WITH_ASSERT`, while generators have `NDEBUG` alone. Evidence checks
+actual role-specific compile commands rather than adding generator definitions.
+The x86 RelWithDebInfo build exposed six existing narrowing assignments in station
+expansion, snow-line calculation, map-height selection and old-save station loading.
+Explicit casts to their existing unsigned destinations retain the original modulo
+conversion after the complete expression, without changing arithmetic or ordering.
+The ABI fixture compares all current C++ struct sizes, alignments and field offsets
+against Rust, and executes high-bit scalars, by-value returns, pointer-sized
+sentinels, null/empty inputs and Rust allocation/view/destroy paths. Its deliberately
+unaligned descriptor array closes the documented
+[MSVC i686 alignment gap](https://doc.rust-lang.org/rustc/platform-support.html):
+Rust copies foreign encoded descriptors with raw `read_unaligned` before taking
+any references, without changing their declared layout. All exports retain
+`extern "C"`; the [MSVC target ABI](https://doc.rust-lang.org/rustc/platform-support/windows-msvc.html)
+uses cdecl on i686. Borrowed byte spans retain `isize::MAX` limits and release
+panics abort. Rust owns and frees its allocations.
+
+The accepted history engine is included in this audit: descriptor/step layout and
+by-value calls round-trip live C++ HistoryRange identities, high-bit masks and all
+staged operation modes. Only opaque Rust-allocated engine handles enter Rust by
+pointer; typed C++ storage and exception execution remain outside Rust.
+
+`windows-rust-evidence.py` checks PE machine headers, retained Ninja response files,
+exact archive linkage, MSVC maps and static CRT imports. It executes a shared
+per-thread non-C locale check through native C++ and Rust lowercase calls; signed
+negative compare arguments remain outside the defined C library domain (issue #26).
+Fresh tools-only builds execute current-source string and settings generators after
+deleting previous outputs. Windows artifacts retain compiler/host/target metadata,
+CRT and assertion commands, maps, ABI execution, refusal/freshness reports, nonempty
+test inventories, JUnit and fresh generated files. Parser unit checks and Linux
+ABI/Cargo checks are preliminary evidence; actual x86/x64 Windows artifacts and
+existing macOS checks are required before claiming platform support or integration.

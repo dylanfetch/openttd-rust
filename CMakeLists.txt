@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.17)
+cmake_policy(SET CMP0091 NEW)
 
 if(NOT BINARY_NAME)
     set(BINARY_NAME openttd)
@@ -53,6 +54,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED YES)
 set(CMAKE_CXX_EXTENSIONS NO)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS YES)
+
+if(OPTION_RUST AND CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    include(WindowsRust)
+endif()
 
 # An empty target for the tools
 add_custom_target(tools)
@@ -261,7 +266,7 @@ if(MSVC)
 
     # If target -static is used, switch our project to static (/MT) too.
     # If the target ends on -static-md, it will remain dynamic (/MD).
-    if(VCPKG_TARGET_TRIPLET MATCHES "-static" AND NOT VCPKG_TARGET_TRIPLET MATCHES "-md")
+    if(NOT OPTION_RUST AND VCPKG_TARGET_TRIPLET MATCHES "-static" AND NOT VCPKG_TARGET_TRIPLET MATCHES "-md")
         set_property(TARGET openttd_lib PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
         set_property(TARGET openttd PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
         set_property(TARGET openttd_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -445,6 +450,13 @@ endif()
 link_package(SSE)
 
 add_definitions_based_on_options()
+
+if(OPTION_RUST AND BUILD_TESTING)
+    add_executable(openttd_rust_abi tools/migration/windows-abi.cpp)
+    target_include_directories(openttd_rust_abi PRIVATE "${CMAKE_SOURCE_DIR}/src")
+    target_link_libraries(openttd_rust_abi PRIVATE openttd_rust)
+    add_test(NAME rust-abi-layout-and-calls COMMAND openttd_rust_abi)
+endif()
 
 if(WIN32)
     add_definitions(

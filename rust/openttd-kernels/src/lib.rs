@@ -13,6 +13,7 @@ mod consumer;
 mod history;
 mod integer;
 mod landscape;
+mod math;
 
 pub use alternating::{AlternatingState, AlternatingStep};
 pub use consumer::{
@@ -443,8 +444,11 @@ unsafe fn encoded_parameter<'a>(descriptor: &EncodedDescriptor) -> encoded::Para
 
 /// Encode a string ID and tagged parameters into an independently owned Rust result.
 ///
+/// # Panics
+/// Aborts if the descriptor count exceeds the documented byte-extent limit.
+///
 /// # Safety
-/// Nonzero count addresses count initialized/aligned descriptors in one immutable
+/// Nonzero count addresses count initialized descriptors in one immutable
 /// allocation with byte size <= `isize::MAX`. All tag-2 spans meet the descriptor
 /// contract above, remain live for this call, and may overlap read-only input.
 /// Zero count permits null. No C++ pointer is retained in the returned owner.
@@ -460,17 +464,17 @@ pub unsafe extern "C" fn openttd_rust_encoded_serialize(
     count: usize,
     string_assertions: u8,
 ) -> *mut std::ffi::c_void {
-    let descriptors = if count == 0 {
-        &[]
-    } else {
-        // SAFETY: The caller guarantees aligned initialized descriptors for this call.
-        unsafe { std::slice::from_raw_parts(descriptors, count) }
-    };
-    let parameters: Vec<_> = descriptors
-        .iter()
-        .map(|descriptor| {
+    assert!(
+        count <= usize::try_from(isize::MAX).unwrap() / std::mem::size_of::<EncodedDescriptor>()
+    );
+    let parameters: Vec<_> = (0..count)
+        .map(|index| {
+            // SAFETY: Initialized descriptor fields and the total extent are valid.
+            // MSVC i686 can under-align stack arrays; never form a C++-storage
+            // reference/slice. Copy unaligned fields into a Rust-owned local first.
+            let descriptor = unsafe { descriptors.add(index).read_unaligned() };
             // SAFETY: Nested byte spans share the enclosing operation's lifetime.
-            unsafe { encoded_parameter(descriptor) }
+            unsafe { encoded_parameter(&descriptor) }
         })
         .collect();
     Box::into_raw(Box::new(encoded::serialize(
@@ -590,6 +594,47 @@ pub unsafe extern "C" fn openttd_rust_encoded_destroy(owner: *mut std::ffi::c_vo
     }
 }
 
+/// Rounded square root; scalar-only ABI, no ownership or pointers. Panic aborts.
+#[allow(unsafe_code)] // Only the export symbol attribute.
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_int_sqrt(value: u32) -> u32 {
+    math::int_sqrt(value)
+}
+
+/// Saturate integer bits using audited widths/signs from `math_ffi.h`.
+/// No allocations, pointers, state, or ownership; panic aborts, never unwinds.
+#[allow(unsafe_code)] // Only the export symbol attribute.
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_clamp_to(
+    value: u64,
+    from_width: u8,
+    from_signed: u8,
+    to_width: u8,
+    to_signed: u8,
+) -> u64 {
+    math::clamp_to(
+        value,
+        from_width,
+        from_signed != 0,
+        to_width,
+        to_signed != 0,
+    )
+}
+
+/// Soft clamp integer bits, preserving narrow promotions and unsigned wrapping.
+/// No allocations, pointers, state, or ownership; panic aborts, never unwinds.
+#[allow(unsafe_code)] // Only the export symbol attribute.
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_soft_clamp(
+    value: u64,
+    min: u64,
+    max: u64,
+    width: u8,
+    is_signed: u8,
+) -> u64 {
+    math::soft_clamp(value, min, max, width, is_signed != 0)
+}
+
 pub use history::{Descriptor as HistoryDescriptor, Step as HistoryStep};
 
 /// Allocate a scalar history engine; no typed history pointer enters Rust.
@@ -689,4 +734,17 @@ pub unsafe extern "C" fn openttd_rust_history_complete(handle: *mut std::ffi::c_
 pub unsafe extern "C" fn openttd_rust_history_destroy(handle: *mut std::ffi::c_void) {
     // SAFETY: The uniquely owned handle returns its allocation to Rust exactly once.
     drop(unsafe { Box::from_raw(handle.cast::<history::Engine>()) });
+}
+
+mod abi;
+
+/// Return size, alignment or field offsets for the bounded public ABI audit.
+///
+/// Type IDs 0..17 follow `abi_ffi.h`; item 0 is size, 1 alignment, then fields in
+/// declaration order. Unknown IDs/items return `usize::MAX` (C++ `SIZE_MAX`).
+/// Scalar metadata only: no allocation, pointers, ownership or callbacks.
+#[allow(unsafe_code)] // Exported scalar C symbol, like the existing kernel entry points.
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_abi_layout(type_id: u8, item: u8) -> usize {
+    abi::layout(type_id, item)
 }
