@@ -205,7 +205,10 @@ def main():
     MIGRATION["ensure_reference"]()
     report = {"baseline": MIGRATION["BASELINE"], "candidate_commit": MIGRATION["git"]("rev-parse", "HEAD"),
               "candidate_status": MIGRATION["git"]("status", "--porcelain"), "cases": len(records), "modes": modes,
-              "commands": commands, "sanitizers": sanitized_runs, "extracted_functions_sha256": hashes,
+              "commands": commands, "sanitizers": sanitized_runs,
+              "sanitizer_scope": {"cpp_fixture_and_adapters_instrumented": True, "rust_memory_accesses_instrumented": False,
+                                  "rust_allocator_leaks_checked": True},
+              "extracted_functions_sha256": hashes,
               "reference_source_sha256": {name: hashlib.sha256((REFERENCE / name).read_bytes()).hexdigest() for name in FUNCTIONS},
               "assertion_policy_counts": {mode: sum(item["exit_code"] != 0 for item in outputs["reference", mode]) for mode in modes}, "passed": True}
     (OUT / "report.json").write_text(json.dumps(report, indent=2) + "\n")
