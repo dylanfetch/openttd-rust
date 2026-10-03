@@ -15,6 +15,10 @@
 #include "../../string_func.h"
 #include "../../3rdparty/nlohmann/json.hpp"
 
+#ifdef WITH_RUST
+#include "../admin_conversion.hpp"
+#endif
+
 #include "../../safeguards.h"
 
 /**
@@ -30,6 +34,9 @@
  */
 bool ScriptAdminMakeJSON(nlohmann::json &json, HSQUIRRELVM vm, SQInteger index, int depth = 0)
 {
+#ifdef WITH_RUST
+	return ScriptAdminConvertToJSON(json, vm, index, depth);
+#else
 	if (depth == SQUIRREL_MAX_DEPTH) {
 		ScriptLog::Error("Send parameters can only be nested to 25 deep. No data sent."); // SQUIRREL_MAX_DEPTH = 25
 		return false;
@@ -114,6 +121,7 @@ bool ScriptAdminMakeJSON(nlohmann::json &json, HSQUIRRELVM vm, SQInteger index, 
 			ScriptLog::Error("You tried to send an unsupported type. No data sent.");
 			return false;
 	}
+#endif
 }
 
 /* static */ SQInteger ScriptAdmin::Send(HSQUIRRELVM vm)
