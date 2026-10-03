@@ -145,29 +145,30 @@ pushes, which checks each merge.
 ## Simulation comparison
 
 `python3 tools/migration.py simulate` builds both games, then runs
-`tools/simulate.py`. It is the evidence for game-logic ports; CI runs its
-default set after the comparisons. Each scenario runs the reference and the
-candidate headlessly (`-snull -mnull -vnull:ticks=N -d desync=3`) in isolated
-personal directories under `.local/simulation/`, with `savegame_format = none`,
-so both write an uncompressed snapshot every 32 economy days. Every chunk of
-every snapshot is decoded: table chunks field by field from the header stored
-in the save, map and other chunks byte by byte. The first differences are
-reported as `snapshot chunk/element/field: reference -> candidate`.
+`tools/simulate.py`; CI runs its default set after the comparisons. It is the
+evidence for game-logic ports. Each scenario runs the reference and the
+candidate headlessly in isolated directories under `.local/simulation/`, twice:
+with `-d desync=3`, which writes an uncompressed snapshot every 32 economy days,
+and plainly, because desync mode also rebuilds caches every tick and takes
+YAPF's uncached rail path. Both write an exit save. Every chunk is decoded
+(tables field by field from the stored header, other chunks byte by byte) and
+the first differences are reported as `chunk/element/field: ref -> cand`.
+Any `[desync:` warning (a cache mismatch) and any log or stdout difference fail.
 
-- Scenarios: both regression saves with their AIs (script logs compared too),
-  and generated maps for TGP and the original generator across sizes and
-  seeds. `--soak` adds seeds, sizes and years; `--self` compares the reference
-  with itself; names filter scenarios. Extend `scenario_list()` for new ports.
-  The transport-network scenario with cargodist is #84 (needed by #74).
-- Masks (`MASKS`, each with its reason): the random savegame id, the build's
-  revision text/modified flag/NewGRF version, and `round_trip_time`, which the
-  original saves uninitialized (#83). Ports touching round-trip measurement
-  need their own check of that field.
-- Known port divergences go in `KNOWN_FAILURES` by first divergence and issue.
-- The reference's runtime files are copied from the shared build under a
-  shared lock, so simulations never block other worktrees' builds. There is no
-  exit save under the null video driver; the last 32-day snapshot is final.
-- Evidence: `.local/simulation/<time>/report.json`; failing runs keep saves.
+- Scenarios: both regression saves with their AIs, and generated maps (TGP and
+  original, sizes, seeds, disasters on). `--soak` adds more; `--self` compares
+  the reference with itself; names filter. Extend `scenario_list()` for ports.
+  The cargodist transport scenario is #84 (needed by #74).
+- Masks (`MASKS`, with reasons and hit counts in the report): the random save
+  id, build revision/NewGRF version, and `round_trip_time`, which the original
+  saves uninitialized (#83); ports touching it need their own check.
+- Port divergences go in `KNOWN_FAILURES` by first divergence and issue.
+- `-vnull:ticks` counts loop iterations and a late threaded link graph job
+  pauses the game, so run length varies with load. Snapshots compare by date;
+  exit saves only when both runs stopped at the same tick. GameScripts also run
+  while paused, so scenarios must not depend on an active GameScript.
+- The reference runtime is copied under a shared lock, so simulations never
+  block other worktrees. Evidence: `.local/simulation/<time>/report.json`.
 
 ## Native macOS arm64 Rust linkage
 

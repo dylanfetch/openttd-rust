@@ -15,6 +15,7 @@ check) and `--soak` for the larger scenario set.
 import argparse
 import concurrent.futures
 import fnmatch
+import hashlib
 import json
 import os
 import re
@@ -122,7 +123,7 @@ def read_header(reader):
         kind = reader.byte()
         if kind == 0:
             break
-        fields.append({"type": kind, "key": reader.take(reader.gamma()).decode("utf-8", "replace")})
+        fields.append({"type": kind, "key": reader.take(reader.gamma()).decode("utf-8", "surrogateescape")})
     for field in fields:
         if field["type"] & 0x0F == FILE_STRUCT:
             field["fields"] = read_header(reader)
@@ -132,7 +133,8 @@ def read_header(reader):
 def read_value(reader, kind):
     base = kind & 0x0F
     if base == FILE_STRING:
-        return reader.take(reader.gamma()).decode("utf-8", "replace")
+        # surrogateescape keeps distinct invalid byte sequences distinct.
+        return reader.take(reader.gamma()).decode("utf-8", "surrogateescape")
     fmt, size = FILE_TYPES[base]
     return struct.unpack(fmt, reader.take(size))[0]
 
@@ -179,7 +181,9 @@ def read_save(path):
                 element = Reader(reader.take(length - 1))
                 if kind in (2, 4):  # sparse: index precedes the element body
                     index = element.gamma()
-                if element.pos < len(element.data):  # SlIterateArray skips empty slots
+                # SlIterateArray skips empty non-sparse slots; a sparse element
+                # always counts because its length includes the index.
+                if kind in (2, 4) or element.pos < len(element.data):
                     chunk["elements"].append((index, element.data[element.pos:]))
                 index += 1
         chunks[cid.decode("latin-1")] = chunk
@@ -191,40 +195,39 @@ def decode_element(chunk, body):
     reader, out = Reader(body), {}
     try:
         read_object(reader, chunk["header"], "", out)
-    except (Corrupt, struct.error):
+    except (Corrupt, struct.error, KeyError):
         return None
     # Chunks whose handlers append data beyond the described fields fall back to bytes.
     return out if reader.pos == len(body) else None
 
 
-def masked(cid, path):
+def mask_for(cid, path):
+    """Return the MASKS pattern covering this field, if any."""
     generic = re.sub(r"\[\d+\]", "", path)
-    return any(cid == chunk and fnmatch.fnmatchcase(generic, pattern) for chunk, pattern in MASKS)
+    return next((pattern for chunk, pattern in MASKS if cid == chunk and fnmatch.fnmatchcase(generic, pattern)), None)
 
 
-def compare_chunk(cid, ref, cand, limit):
+def compare_chunk(cid, ref, cand, stats):
     """Yield (element, field, reference, candidate) differences in one chunk."""
     if ref["kind"] != cand["kind"]:
         yield ("", "chunk type", ref["kind"], cand["kind"])
         return
     if ref["kind"] == 0:
         a, b = ref["raw"], cand["raw"]
+        stats["elements"] += 1
         if a != b:
             if len(a) != len(b):
                 yield ("", "length", len(a), len(b))
-            shown = 0
             for offset in range(min(len(a), len(b))):
                 if a[offset] != b[offset]:
                     yield (f"byte {offset}", "", a[offset], b[offset])
-                    shown += 1
-                    if shown >= limit:
-                        return
         return
     if ref["header"] != cand["header"]:
         yield ("", "table header", "differs", "differs")
         return
     left, right = dict(ref["elements"]), dict(cand["elements"])
     for index in sorted(set(left) | set(right)):
+        stats["elements"] += 1
         a, b = left.get(index), right.get(index)
         if a == b:
             continue
@@ -238,45 +241,74 @@ def compare_chunk(cid, ref, cand, limit):
             continue
         for path in sorted(set(fields_a) | set(fields_b)):
             va, vb = fields_a.get(path), fields_b.get(path)
-            if va != vb and not masked(cid, path):
+            if va == vb:
+                continue
+            pattern = mask_for(cid, path)
+            if pattern is None:
                 yield (str(index), path, va, vb)
+            else:
+                stats["masked"][f"{cid}:{pattern}"] = stats["masked"].get(f"{cid}:{pattern}", 0) + 1
 
 
-def compare_saves(ref_path, cand_path, limit):
+def failure_key(scenario, cid, element, field):
+    """KNOWN_FAILURES key: the field path without indices, or the element for byte-level differences."""
+    return (scenario, cid, re.sub(r"\[\d+\]", "", field) if field not in ("", "bytes") else element)
+
+
+def compare_saves(ref_path, cand_path, scenario, limit, stats):
+    """Return difference records; stops after `limit` differences not in KNOWN_FAILURES."""
     ref, cand = read_save(ref_path), read_save(cand_path)
-    diffs = []
+    records, unknown = [], 0
     for cid in sorted(set(ref) | set(cand)):
+        stats["chunks"] += 1
         if cid not in ref or cid not in cand:
-            diffs.append((cid, "", "chunk", cid in ref, cid in cand))
-            continue
-        for diff in compare_chunk(cid, ref[cid], cand[cid], limit):
-            diffs.append((cid, *diff))
-            if len(diffs) >= limit:
-                return diffs, len(ref)
-    return diffs, len(ref)
+            diffs = [("", "chunk", cid in ref, cid in cand)]
+        else:
+            diffs = compare_chunk(cid, ref[cid], cand[cid], stats)
+        for element, field, ref_value, cand_value in diffs:
+            record = {"snapshot": ref_path.name, "chunk": cid, "element": element, "field": field,
+                      "reference": repr(ref_value), "candidate": repr(cand_value)}
+            issue = KNOWN_FAILURES.get(failure_key(scenario, cid, element, field))
+            if issue:
+                record["issue"] = issue
+            else:
+                unknown += 1
+            records.append(record)
+            if unknown >= limit:
+                return records
+    return records
+
+
+def set_option(text, section, line):
+    """Add a line to an existing cfg section (a repeated section would be ignored)."""
+    text, count = re.subn(rf"^\[{section}\]\s*$", f"[{section}]\n{line}", text, count=1, flags=re.M)
+    return text if count else f"{text.rstrip()}\n[{section}]\n{line}\n"
 
 
 def write_config(scenario, build, run_dir):
     if scenario["kind"] == "regression":
         text = (build / "regression/regression.cfg").read_text()
-        # A second [misc] section would be ignored; extend the existing one.
-        text, count = re.subn(r"^\[misc\]\s*$", "[misc]\nsavegame_format = none", text, count=1, flags=re.M)
-        if count != 1:
-            raise RuntimeError("regression.cfg has no [misc] section")
     else:
         text = (
-            "[misc]\nsavegame_format = none\nlanguage = english.lng\n"
+            "[misc]\nlanguage = english.lng\n"
             "[gui]\nautosave = off\n"
-            "[difficulty]\nmax_no_competitors = 0\n"
+            "[difficulty]\nmax_no_competitors = 0\ndisasters = true\n"
             "[game_creation]\ntown_name = english\n"
             f"map_x = {scenario['map_log2']}\nmap_y = {scenario['map_log2']}\n"
             f"land_generator = {scenario['land_generator']}\n"
         )
+    text = set_option(text, "misc", "savegame_format = none")
+    # The null video driver writes save/autosave/exit.sav when it stops.
+    text = set_option(text, "gui", "autosave_on_exit = true")
     (run_dir / "openttd.cfg").write_text(text)
 
 
-def run_game(scenario, binary, build, run_dir, timeout, base_env=None):
-    """Run one binary on one scenario in an isolated personal directory."""
+def run_game(scenario, binary, build, run_dir, timeout, base_env=None, desync=True):
+    """Run one binary on one scenario in an isolated personal directory.
+
+    desync=3 writes the 32-day snapshots but also checks and rebuilds caches
+    every tick and switches YAPF rail to its uncached path, so every scenario
+    also has a plain run without it whose exit save is compared."""
     shutil.rmtree(run_dir, ignore_errors=True)
     run_dir.mkdir(parents=True)
     write_config(scenario, build, run_dir)
@@ -285,73 +317,115 @@ def run_game(scenario, binary, build, run_dir, timeout, base_env=None):
     else:
         game = ["-g", "-G", str(scenario["seed"])]
     command = [str(binary), "-x", "-c", str(run_dir / "openttd.cfg"), *game,
-               "-snull", "-mnull", f"-vnull:ticks={scenario['ticks']}", "-d", "desync=3"]
+               "-snull", "-mnull", f"-vnull:ticks={scenario['ticks']}", *(["-d", "desync=3"] if desync else [])]
     env = dict(base_env or os.environ, HOME=str(run_dir), XDG_DATA_HOME=str(run_dir / "xdg-data"),
                XDG_CONFIG_HOME=str(run_dir / "xdg-config"), XDG_CACHE_HOME=str(run_dir / "xdg-cache"))
     started = time.monotonic()
     with open(run_dir / "stdout.log", "wb") as out, open(run_dir / "stderr.log", "wb") as err:
-        result = subprocess.run(command, cwd=build, env=env, stdout=out, stderr=err, timeout=timeout)
-    snapshots = sorted(path for path in (run_dir / "save/autosave").glob("dmp_cmds_*.sav")
+        try:
+            code = subprocess.run(command, cwd=build, env=env, stdout=out, stderr=err, timeout=timeout).returncode
+        except subprocess.TimeoutExpired:
+            code = "timeout"
+    autosave = run_dir / "save/autosave"
+    snapshots = sorted(path for path in autosave.glob("dmp_cmds_*.sav")
                        if not path.name.endswith("_00000000_00000000.sav"))  # title screen
-    return {"exit": result.returncode, "seconds": round(time.monotonic() - started, 1),
-            "snapshots": snapshots, "command": command}
+    if (autosave / "exit.sav").is_file():
+        snapshots.append(autosave / "exit.sav")
+    return {"exit": code, "seconds": round(time.monotonic() - started, 1), "snapshots": snapshots,
+            "log": log_lines(run_dir), "stdout": (run_dir / "stdout.log").read_bytes()}
 
 
-def script_log(run_dir):
-    """Script (AI) output with timestamps and save/desync chatter removed."""
-    lines = []
-    for line in (run_dir / "stderr.log").read_text(errors="replace").splitlines():
-        line = re.sub(r"^\[[^\]]*\] ", "", line)
-        if re.match(r"^\[?(desync|save|load|net)", line):
-            continue
-        lines.append(line)
-    return lines
+def log_lines(run_dir):
+    """Debug output (script logs, warnings) without its timestamps."""
+    return [re.sub(r"^\[[^\]]*\] ", "", line)
+            for line in (run_dir / "stderr.log").read_text(errors="surrogateescape").splitlines()]
+
+
+def save_moment(path):
+    """(date, date_fract, tick_counter) at which a save was written."""
+    chunk = read_save(path)["DATE"]
+    fields = decode_element(chunk, chunk["elements"][0][1])
+    return fields["date"], fields["date_fract"], fields["tick_counter"]
+
+
+def first_difference(a, b):
+    index = next(i for i, (x, y) in enumerate(zip(a + [None], b + [None])) if x != y)
+    return index, (a[index] if index < len(a) else None), (b[index] if index < len(b) else None)
 
 
 def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
-    result = {"scenario": scenario["name"], "differences": [], "known_failures": [], "problems": []}
-    runs = {}
-    for role in ("reference", "candidate"):
-        runs[role] = run_game(scenario, binaries[role], builds[role], out / scenario["name"] / role, timeout, env)
-        result[f"{role}_seconds"] = runs[role]["seconds"]
-        if runs[role]["exit"] != 0:
-            result["problems"].append(f"{role} exited with {runs[role]['exit']}")
-    ref_names = [path.name for path in runs["reference"]["snapshots"]]
-    cand_names = [path.name for path in runs["candidate"]["snapshots"]]
-    if ref_names != cand_names:
-        result["problems"].append(f"snapshot sets differ: {len(ref_names)} reference, {len(cand_names)} candidate; "
-                                  f"first mismatch {next((a, b) for a, b in zip(ref_names + [''], cand_names + ['']) if a != b)}")
-    if not ref_names:
-        result["problems"].append("no snapshots were written")
-    result["snapshots"] = len(ref_names)
-    chunks = 0
-    for name in sorted(set(ref_names) & set(cand_names)):
-        diffs, count = compare_saves(out / scenario["name"] / "reference/save/autosave" / name,
-                                     out / scenario["name"] / "candidate/save/autosave" / name, limit)
-        chunks += count
-        for cid, element, field, ref_value, cand_value in diffs:
-            key = (scenario["name"], cid, re.sub(r"\[\d+\]", "", field))
-            record = {"snapshot": name, "chunk": cid, "element": element, "field": field,
-                      "reference": repr(ref_value), "candidate": repr(cand_value)}
-            if key in KNOWN_FAILURES:
-                record["issue"] = KNOWN_FAILURES[key]
-                result["known_failures"].append(record)
-            else:
-                result["differences"].append(record)
-        if result["differences"]:
-            break  # Later snapshots only repeat the first divergence.
-    result["chunks_compared"] = chunks
-    if scenario["kind"] == "regression":
-        ref_log = script_log(out / scenario["name"] / "reference")
-        cand_log = script_log(out / scenario["name"] / "candidate")
-        if ref_log != cand_log:
-            first = next(i for i, (a, b) in enumerate(zip(ref_log + [None], cand_log + [None])) if a != b)
-            result["differences"].append({"snapshot": "script log", "chunk": "", "element": str(first + 1), "field": "line",
-                                          "reference": repr(ref_log[first] if first < len(ref_log) else None),
-                                          "candidate": repr(cand_log[first] if first < len(cand_log) else None)})
+    """Run both binaries twice (with and without desync snapshots) and compare.
+
+    -vnull:ticks counts loop iterations, and the game pauses for iterations
+    while a threaded link graph job is late (StateGameLoop_LinkGraphPauseControl),
+    so how far a run gets depends on machine load. State at a given date is
+    deterministic: snapshots are compared by date, a longer run's extra trailing
+    snapshots and log lines are ignored, and exit saves are compared only when
+    both runs stopped at the same moment (the short plain run is retried)."""
+    name = scenario["name"]
+    result = {"scenario": name, "differences": [], "known_failures": [], "problems": [], "notes": [],
+              "snapshots": 0, "stats": {"chunks": 0, "elements": 0, "masked": {}}}
+
+    def compare(mode, snapshot):
+        records = compare_saves(out / name / mode / "reference/save/autosave" / snapshot,
+                                out / name / mode / "candidate/save/autosave" / snapshot, name, limit, result["stats"])
+        for record in records:
+            record["snapshot"] = f"{mode}/{snapshot}"
+            result["known_failures" if "issue" in record else "differences"].append(record)
+
+    try:
+        for mode, desync in (("snapshots", True), ("plain", False)):
+            for attempt in range(1 if desync else 3):
+                runs = {role: run_game(scenario, binaries[role], builds[role], out / name / mode / role, timeout, env, desync)
+                        for role in ("reference", "candidate")}
+                exits = [runs[role]["snapshots"][-1] if runs[role]["snapshots"] and runs[role]["snapshots"][-1].name == "exit.sav"
+                         else None for role in ("reference", "candidate")]
+                same_end = all(exits) and save_moment(exits[0]) == save_moment(exits[1])
+                if same_end:
+                    break
+            for role, run in runs.items():
+                result[f"{mode}_{role}_seconds"] = run["seconds"]
+                if run["exit"] != 0:
+                    result["problems"].append(f"{mode}: {role} exited with {run['exit']}")
+                # Cache-check mismatches are repaired before the next tick, so they
+                # never reach a save; any desync warning fails the scenario.
+                warning = next((line for line in run["log"] if "[desync:" in line), None)
+                if warning:
+                    result["problems"].append(f"{mode}: {role} logged {warning!r}")
+            if not all(exits):
+                result["problems"].append(f"{mode}: an exit save is missing")
+            periodic = [[p.name for p in runs[role]["snapshots"] if p.name != "exit.sav"] for role in ("reference", "candidate")]
+            shorter = min(periodic, key=len)
+            if periodic[0][:len(shorter)] != periodic[1][:len(shorter)]:
+                result["problems"].append(f"{mode}: snapshot dates differ: {first_difference(*periodic)}")
+            elif len(periodic[0]) != len(periodic[1]):
+                result["notes"].append(f"{mode}: runs reached different dates ({len(periodic[0])} vs {len(periodic[1])} snapshots)")
+            if mode == "snapshots":
+                result["snapshots"] = len(shorter) + bool(same_end)
+                if len(shorter) < 2:
+                    result["problems"].append("fewer than two periodic snapshots were written")
+            for snapshot in shorter:
+                compare(mode, snapshot)
+                if result["differences"]:
+                    break  # Later snapshots only repeat the first divergence.
+            if same_end and not result["differences"]:
+                compare(mode, "exit.sav")
+            elif not same_end and not desync and all(exits):
+                result["problems"].append(f"plain: runs ended at different moments after {attempt + 1} attempts: "
+                                          f"{save_moment(exits[0])} vs {save_moment(exits[1])}")
+            for label in ("log", "stdout"):
+                a, b = (runs[role][label] if label == "log" else runs[role][label].splitlines() for role in ("reference", "candidate"))
+                if not same_end:
+                    a, b = a[:min(len(a), len(b))], b[:min(len(a), len(b))]
+                if a != b:
+                    index, ref_line, cand_line = first_difference(a, b)
+                    result["differences"].append({"snapshot": f"{mode}/{label}", "chunk": "", "element": str(index + 1),
+                                                  "field": "line", "reference": repr(ref_line), "candidate": repr(cand_line)})
+    except Exception as error:  # Record and continue, so the report covers every scenario.
+        result["problems"].append(f"harness error: {type(error).__name__}: {error}")
     result["passed"] = not result["differences"] and not result["problems"]
     if result["passed"]:
-        shutil.rmtree(out / scenario["name"])  # Keep only failing runs.
+        shutil.rmtree(out / name, ignore_errors=True)  # Keep only failing runs.
     return result
 
 
@@ -374,6 +448,8 @@ def main():
     args = parser.parse_args()
 
     scenarios = [s for s in scenario_list(args.soak) if not args.names or any(n in s["name"] for n in args.names)]
+    if not scenarios:
+        parser.error(f"no scenario matches {args.names}; see --list")
     if args.list:
         print("\n".join(s["name"] for s in scenarios))
         return 0
@@ -411,7 +487,7 @@ def main():
             status = "ok  " if result["passed"] else "FAIL"
             known = f", {len(result['known_failures'])} known" if result["known_failures"] else ""
             print(f"{status} {result['scenario']}: {result['snapshots']} snapshots, "
-                  f"{result['chunks_compared']} chunks{known}", flush=True)
+                  f"{result['stats']['chunks']} chunks, {result['stats']['elements']} elements{known}", flush=True)
             for problem in result["problems"]:
                 print(f"     {problem}", flush=True)
             for diff in result["differences"][:args.limit]:
@@ -421,8 +497,12 @@ def main():
     report = {
         "mode": "reference-vs-reference" if args.self else "reference-vs-candidate",
         "candidate_commit": migration.git("rev-parse", "HEAD"),
+        "binaries": {role: {"path": str(path), "sha256": hashlib.sha256(Path(path).read_bytes()).hexdigest()}
+                     for role, path in binaries.items()},
         "masks": {":".join(key): reason for key, reason in MASKS.items()},
         "known_failures": {":".join(key): issue for key, issue in KNOWN_FAILURES.items()},
+        "masked_differences": {key: sum(r["stats"]["masked"].get(key, 0) for r in results)
+                               for key in sorted({k for r in results for k in r["stats"]["masked"]})},
         "seconds": round(time.monotonic() - started, 1),
         "results": results,
         "passed": all(r["passed"] for r in results),

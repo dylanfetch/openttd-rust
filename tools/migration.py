@@ -417,7 +417,9 @@ def main():
             if missing:
                 raise RuntimeError(f"Candidate removed reference tests: {sorted(missing)}")
         if args.action == "simulate":
-            log = run("simulate", [sys.executable, str(ROOT / "tools/simulate.py"), *simulate_args])
+            # --jobs is the driver's; each simulation job runs two game processes.
+            log = run("simulate", [sys.executable, str(ROOT / "tools/simulate.py"),
+                                   "--jobs", str(max(1, args.jobs // 2)), *simulate_args])
             print(log.read_text(errors="replace"), end="", flush=True)
         ensure_reference()
         report["passed"] = True
