@@ -7,20 +7,26 @@
 
 //! Migrated game and text kernels exposed through the documented `src/rust` ABIs.
 
+mod admin_conversion;
 mod alternating;
+mod auth;
 mod byte_strings;
 mod consumer;
 mod history;
 mod integer;
 mod landscape;
 mod math;
+mod script_list;
+mod widget_parser;
 
+pub use admin_conversion::Action as AdminAction;
 pub use alternating::{AlternatingState, AlternatingStep};
 pub use consumer::{
     BoundResult as ConsumerBound, ByteResult as ConsumerByte, MatchResult as ConsumerMatch,
     SeparatorResult as ConsumerSeparator,
 };
 pub use integer::IntegerResult;
+pub use widget_parser::Action as WidgetAction;
 
 /// Height at a coordinate within a tile, preserving `OpenTTD`'s slope rounding.
 ///
@@ -747,4 +753,101 @@ mod abi;
 #[unsafe(no_mangle)]
 pub extern "C" fn openttd_rust_abi_layout(type_id: u8, item: u8) -> usize {
     abi::layout(type_id, item)
+}
+
+/// Create independent admin conversion control; typed VM/JSON state stays in C++.
+/// No C++ pointer/callback enters Rust. OOM/panic abort; the C ABI never unwinds.
+#[allow(unsafe_code)] // Only the export symbol attribute.
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_admin_conversion_create(
+    direction: u8,
+    index: i64,
+    depth: i32,
+) -> *mut std::ffi::c_void {
+    Box::into_raw(Box::new(admin_conversion::Engine::new(
+        direction, index, depth,
+    )))
+    .cast()
+}
+
+/// Return an action; execute it in C++ only after this function has returned.
+///
+/// # Safety
+/// Handle is a live, nonnull, exclusively accessed owner returned by create.
+/// The previous scalar response follows `admin_conversion_ffi.h`. No typed borrow
+/// or callback survives return; reentrant VM actions use separate owners.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_admin_conversion_advance(
+    handle: *mut std::ffi::c_void,
+    response: u64,
+) -> AdminAction {
+    // SAFETY: The caller exclusively owns the live engine for this call.
+    unsafe { &mut *handle.cast::<admin_conversion::Engine>() }.advance(response)
+}
+
+/// Destroy control allocations without executing pending typed VM cleanup.
+///
+/// # Safety
+/// Handle is live/non-null, returned by create, and destroyed exactly once with
+/// no active access. No C++ allocation is freed; exceptions never enter Rust.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_admin_conversion_destroy(handle: *mut std::ffi::c_void) {
+    // SAFETY: Return unique ownership to the allocating Rust Box exactly once.
+    drop(unsafe { Box::from_raw(handle.cast::<admin_conversion::Engine>()) });
+}
+
+/// Classify exact raw widget part tags; attributes and containers are distinct.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_widget_part_classify(kind: u8) -> u8 {
+    u8::from(widget_parser::attribute(kind)) | (u8::from(widget_parser::container(kind)) << 1)
+}
+
+/// Create widget-only traversal state; descriptor/widget pointers stay in C++.
+///
+/// # Panics
+/// Invalid window/trailing-check selectors violate the scalar protocol and abort.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_widget_parser_create(
+    length: u64,
+    window: u8,
+    trailing_check: u8,
+) -> *mut std::ffi::c_void {
+    assert!(window <= 1 && trailing_check <= 1);
+    Box::into_raw(Box::new(widget_parser::Engine::new(
+        length,
+        window != 0,
+        trailing_check != 0,
+    )))
+    .cast()
+}
+
+/// Return an action for execution in C++ after this function returns.
+///
+/// # Safety
+/// Handle is live, nonnull, exclusive and returned by create. Scalar responses
+/// follow `widget_parser_ffi.h`; no callback or C++ object borrow crosses the call.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_widget_parser_advance(
+    handle: *mut std::ffi::c_void,
+    response: u8,
+) -> WidgetAction {
+    // SAFETY: The caller exclusively owns the live engine for this call.
+    unsafe { &mut *handle.cast::<widget_parser::Engine>() }.advance(response)
+}
+
+/// Destroy control allocations without pending typed construction or cleanup.
+///
+/// # Safety
+/// Handle is live/non-null, returned by create and destroyed exactly once with
+/// no active access. No C++ ownership or exception enters Rust.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_widget_parser_destroy(handle: *mut std::ffi::c_void) {
+    // SAFETY: Return unique ownership to the allocating Rust Box exactly once.
+    drop(unsafe { Box::from_raw(handle.cast::<widget_parser::Engine>()) });
 }

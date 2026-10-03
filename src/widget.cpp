@@ -25,6 +25,10 @@
 #include "table/strings.h"
 #include "table/string_colours.h"
 
+#ifdef WITH_RUST
+#include "rust/widget_parser_ffi.h"
+#endif
+
 #include "safeguards.h"
 
 WidgetDimensions WidgetDimensions::scaled = {};
@@ -3152,9 +3156,13 @@ bool NWidgetLeaf::ButtonHit(const Point &pt)
  * @param tp WidgetType to test.
  * @return True iff WidgetType is an attribute widget.
  */
-static bool IsAttributeWidgetPartType(WidgetType tp)
+[[maybe_unused]] static bool IsAttributeWidgetPartType(WidgetType tp)
 {
+#ifdef WITH_RUST
+	return (openttd_rust_widget_part_classify(tp) & 1) != 0;
+#else
 	return tp > WPT_ATTRIBUTE_BEGIN && tp < WPT_ATTRIBUTE_END;
+#endif
 }
 
 /**
@@ -3323,6 +3331,7 @@ static std::unique_ptr<NWidgetBase> MakeNWidget(const NWidgetPart &nwid)
  * @param[out] fill_dest Fill the composed widget with child widgets.
  * @return Iterator to remaining nested widget parts.
  */
+#ifndef WITH_RUST
 static std::span<const NWidgetPart>::iterator MakeNWidget(std::span<const NWidgetPart>::iterator nwid_begin, std::span<const NWidgetPart>::iterator nwid_end, std::unique_ptr<NWidgetBase> &dest, bool &fill_dest)
 {
 	dest = nullptr;
@@ -3344,6 +3353,7 @@ static std::span<const NWidgetPart>::iterator MakeNWidget(std::span<const NWidge
 
 	return nwid_begin;
 }
+#endif /* !WITH_RUST */
 
 /**
  * Test if WidgetType is a container widget.
@@ -3352,8 +3362,12 @@ static std::span<const NWidgetPart>::iterator MakeNWidget(std::span<const NWidge
  */
 bool IsContainerWidgetType(WidgetType tp)
 {
+#ifdef WITH_RUST
+	return (openttd_rust_widget_part_classify(tp) & 2) != 0;
+#else
 	return tp == NWID_HORIZONTAL || tp == NWID_HORIZONTAL_LTR || tp == NWID_VERTICAL || tp == NWID_MATRIX
 		|| tp == WWT_PANEL || tp == WWT_FRAME || tp == WWT_INSET || tp == NWID_SELECTION || tp == NWID_LAYER;
+#endif
 }
 
 /**
@@ -3363,6 +3377,7 @@ bool IsContainerWidgetType(WidgetType tp)
  * @param parent Pointer or container to use for storing the child widgets (*parent == nullptr or *parent == container or background widget).
  * @return Iterator to remaining nested widget parts.
  */
+#ifndef WITH_RUST
 static std::span<const NWidgetPart>::iterator MakeWidgetTree(std::span<const NWidgetPart>::iterator nwid_begin, std::span<const NWidgetPart>::iterator nwid_end, std::unique_ptr<NWidgetBase> &parent)
 {
 	/* If *parent == nullptr, only the first widget is read and returned. Otherwise, *parent must point to either
@@ -3399,6 +3414,128 @@ static std::span<const NWidgetPart>::iterator MakeWidgetTree(std::span<const NWi
 	assert(nwid_begin->type == WPT_ENDCONTAINER);
 	return std::next(nwid_begin); // *nwid_begin is also 'used'
 }
+#else
+
+static_assert(sizeof(WidgetType) == 1);
+static_assert(WWT_PANEL == 1 && WWT_INSET == 2 && WWT_FRAME == 13);
+static_assert(WWT_CAPTION == 14 && WWT_SHADEBOX == 16);
+static_assert(NWID_HORIZONTAL == 24 && NWID_HORIZONTAL_LTR == 25 && NWID_VERTICAL == 26 && NWID_MATRIX == 27);
+static_assert(NWID_SELECTION == 29 && NWID_LAYER == 30);
+static_assert(WPT_ATTRIBUTE_BEGIN == 36 && WPT_ATTRIBUTE_END == 50 && WPT_FUNCTION == 51 && WPT_ENDCONTAINER == 52);
+static_assert(offsetof(OpenTTDRustWidgetAction, part) == 0 && offsetof(OpenTTDRustWidgetAction, slot) == 8);
+static_assert(offsetof(OpenTTDRustWidgetAction, other) == 16 && offsetof(OpenTTDRustWidgetAction, kind) == 24);
+
+namespace {
+
+/** Stable typed owners; the initial owner is a reference, not consumed on entry. */
+struct WidgetParserSlot {
+	std::unique_ptr<NWidgetBase> storage;
+	std::unique_ptr<NWidgetBase> *owner = &this->storage;
+	NWidgetContainer *container = nullptr;
+	NWidgetBackground *background = nullptr;
+
+	explicit WidgetParserSlot(std::unique_ptr<NWidgetBase> *borrowed = nullptr)
+	{
+		if (borrowed != nullptr) this->owner = borrowed;
+	}
+};
+
+/** Match recursive temporary destruction, without executing pending actions. */
+struct WidgetParserSlots {
+	std::vector<std::unique_ptr<WidgetParserSlot>> entries;
+	~WidgetParserSlots()
+	{
+		while (!this->entries.empty()) this->entries.pop_back();
+	}
+};
+
+std::unique_ptr<NWidgetBase> RunWidgetParser(std::span<const NWidgetPart> parts, std::unique_ptr<NWidgetBase> &initial, NWidgetStacked **shade_select)
+{
+#ifdef WITH_ASSERT
+	constexpr uint8_t trailing_check = 1;
+#else
+	constexpr uint8_t trailing_check = 0;
+#endif
+	/* Typed construction, callbacks and exceptions occur after each Rust return.
+	 * On exceptions the borrowed initial owner keeps already-committed children. */
+	using Owner = std::unique_ptr<OpenTTDRustWidgetParser, decltype(&openttd_rust_widget_parser_destroy)>;
+	Owner parser{openttd_rust_widget_parser_create(parts.size(), shade_select != nullptr ? 1 : 0, trailing_check), openttd_rust_widget_parser_destroy};
+	WidgetParserSlots slots;
+	slots.entries.emplace_back(std::make_unique<WidgetParserSlot>(&initial));
+	auto slot_at = [&slots](uint64_t id) -> WidgetParserSlot & {
+		assert(id <= std::numeric_limits<size_t>::max() && id < slots.entries.size() && slots.entries[static_cast<size_t>(id)] != nullptr);
+		return *slots.entries[static_cast<size_t>(id)];
+	};
+	auto create_slot = [&slots, &slot_at](uint64_t id) -> WidgetParserSlot & {
+		if (id == slots.entries.size()) slots.entries.emplace_back(std::make_unique<WidgetParserSlot>());
+		return slot_at(id);
+	};
+	auto part_at = [&parts](uint64_t offset) -> const NWidgetPart & {
+		assert(offset <= std::numeric_limits<size_t>::max() && offset < parts.size());
+		return parts[static_cast<size_t>(offset)];
+	};
+	NWidgetHorizontal *horizontal = nullptr;
+	uint8_t response = 0;
+	for (;;) {
+		const auto action = openttd_rust_widget_parser_advance(parser.get(), response);
+		response = 0;
+		switch (action.kind) {
+			case OTTD_WIDGET_DONE: return std::move(*slot_at(action.slot).owner);
+			case OTTD_WIDGET_CHECK_NONNULL: response = *slot_at(action.slot).owner != nullptr ? 1 : 0; break;
+			case OTTD_WIDGET_CREATE_VERTICAL: {
+				auto &slot = create_slot(action.slot);
+				*slot.owner = std::make_unique<NWidgetVertical>();
+				slot.container = static_cast<NWidgetVertical *>(slot.owner->get());
+				break;
+			}
+			case OTTD_WIDGET_OBSERVE_PARENT: {
+				auto &slot = slot_at(action.slot);
+				slot.container = dynamic_cast<NWidgetContainer *>(slot.owner->get());
+				slot.background = dynamic_cast<NWidgetBackground *>(slot.owner->get());
+				assert(*slot.owner == nullptr || (slot.container != nullptr && slot.background == nullptr) || (slot.container == nullptr && slot.background != nullptr));
+				response = (*slot.owner != nullptr ? 1 : 0) | (slot.container != nullptr ? 2 : 0) | (slot.background != nullptr ? 4 : 0);
+				break;
+			}
+			case OTTD_WIDGET_READ_PART: response = part_at(action.part).type; break;
+			case OTTD_WIDGET_CREATE_NODE: {
+				auto &slot = create_slot(action.slot);
+				*slot.owner = MakeNWidget(part_at(action.part));
+				response = *slot.owner != nullptr ? 1 : 0;
+				break;
+			}
+			case OTTD_WIDGET_APPLY_ATTRIBUTE: ApplyNWidgetPartAttribute(part_at(action.part), slot_at(action.slot).owner->get()); break;
+			case OTTD_WIDGET_OBSERVE_TYPE: response = (*slot_at(action.slot).owner)->type; break;
+			case OTTD_WIDGET_ADD_CONTAINER: slot_at(action.slot).container->Add(std::move(*slot_at(action.other).owner)); break;
+			case OTTD_WIDGET_ADD_BACKGROUND: slot_at(action.slot).background->Add(std::move(*slot_at(action.other).owner)); break;
+			case OTTD_WIDGET_ASSIGN_PARENT: *slot_at(action.slot).owner = std::move(*slot_at(action.other).owner); break;
+			case OTTD_WIDGET_RELEASE: slots.entries[static_cast<size_t>(action.slot)].reset(); break;
+			case OTTD_WIDGET_ASSERT_END:
+				assert(action.part < parts.size());
+				assert(part_at(action.part).type == WPT_ENDCONTAINER);
+				break;
+			case OTTD_WIDGET_ERROR_ATTRIBUTE: throw std::runtime_error("Expected non-attribute NWidgetPart type");
+			case OTTD_WIDGET_ERROR_TRAILING: throw std::runtime_error("Did not consume all NWidgetParts");
+			case OTTD_WIDGET_ASSERT_FIRST: assert(*slot_at(action.slot).owner != nullptr); break;
+			case OTTD_WIDGET_OBSERVE_HORIZONTAL:
+				horizontal = dynamic_cast<NWidgetHorizontal *>(slot_at(action.slot).owner->get());
+				response = horizontal != nullptr ? 1 : 0;
+				break;
+			case OTTD_WIDGET_QUERY_CAPTION: response = horizontal->GetWidgetOfType(WWT_CAPTION) != nullptr ? 1 : 0; break;
+			case OTTD_WIDGET_QUERY_SHADE: response = horizontal->GetWidgetOfType(WWT_SHADEBOX) != nullptr ? 1 : 0; break;
+			case OTTD_WIDGET_CREATE_SHADE: {
+				auto &slot = create_slot(action.slot);
+				*slot.owner = std::make_unique<NWidgetStacked>(INVALID_WIDGET);
+				slot.container = static_cast<NWidgetStacked *>(slot.owner->get());
+				break;
+			}
+			case OTTD_WIDGET_WRITE_SHADE: *shade_select = static_cast<NWidgetStacked *>(slot_at(action.slot).owner->get()); break;
+			default: NOT_REACHED();
+		}
+	}
+}
+
+} // namespace
+#endif /* WITH_RUST */
 
 /**
  * Construct a nested widget tree from an array of parts.
@@ -3409,12 +3546,16 @@ static std::span<const NWidgetPart>::iterator MakeWidgetTree(std::span<const NWi
  */
 std::unique_ptr<NWidgetBase> MakeNWidgets(std::span<const NWidgetPart> nwid_parts, std::unique_ptr<NWidgetBase> &&container)
 {
+#ifdef WITH_RUST
+	return RunWidgetParser(nwid_parts, container, nullptr);
+#else
 	if (container == nullptr) container = std::make_unique<NWidgetVertical>();
 	[[maybe_unused]] auto nwid_part = MakeWidgetTree(std::begin(nwid_parts), std::end(nwid_parts), container);
 #ifdef WITH_ASSERT
 	if (nwid_part != std::end(nwid_parts)) [[unlikely]] throw std::runtime_error("Did not consume all NWidgetParts");
 #endif
 	return std::move(container);
+#endif
 }
 
 /**
@@ -3428,6 +3569,12 @@ std::unique_ptr<NWidgetBase> MakeNWidgets(std::span<const NWidgetPart> nwid_part
  */
 std::unique_ptr<NWidgetBase> MakeWindowNWidgetTree(std::span<const NWidgetPart> nwid_parts, NWidgetStacked **shade_select)
 {
+#ifdef WITH_RUST
+	/* Preserve the unconditional entry write before any new control allocations. */
+	*shade_select = nullptr;
+	std::unique_ptr<NWidgetBase> first;
+	return RunWidgetParser(nwid_parts, first, shade_select);
+#else
 	auto nwid_begin = std::begin(nwid_parts);
 	auto nwid_end = std::end(nwid_parts);
 
@@ -3456,6 +3603,7 @@ std::unique_ptr<NWidgetBase> MakeWindowNWidgetTree(std::span<const NWidgetPart> 
 
 	/* Load the remaining parts into 'root'. */
 	return MakeNWidgets({nwid_begin, nwid_end}, std::move(root));
+#endif
 }
 
 /**

@@ -33,6 +33,124 @@ archive; actual call-site coverage is described below. These replacements do not
 complete their containing subsystems. Preserve the complete game,
 including networking, saves, NewGRF mods, graphics, and shared random-number behavior.
 
+### Paired Script Admin conversion
+
+`ScriptAdminMakeJSON` and `ScriptEventAdminPort::GetObject` keep their public C++
+interfaces. With Rust enabled, an Admin-specific owner selects types, walks both
+conversion directions, propagates results, and schedules the original VM and JSON
+operations. An opaque per-invocation handle returns scalar actions; C++ executes
+each action after the Rust call returns. The adapter retains the bundled Squirrel
+VM, nlohmann parser and JSON objects, script logger, and network send/framing.
+Portable builds retain the original recursive bodies.
+
+Outgoing traversal checks `depth == 25` before reading the VM type or changing
+JSON, including calls with an explicit initial depth. It preserves live Squirrel
+iteration, key stringification and byte copying before child conversion, duplicate
+stringified-key overwrite order, `index - 1`, and `depth + 1` for the original
+defined arithmetic domain. A failed child leaves completed root children intact:
+the original two VM pops and iterator pop occur before failed temporary cleanup.
+Arrays copy their completed temporary; tables move the copied key and value.
+Incoming traversal accepts only an object root, rejects floats, and has no depth
+25 limit. Ordinary failure restores the saved stack top before logging and pushing
+null. Parsing malformed input still supplies the original root diagnostic.
+
+No JSON tree or byte string crosses the ABI. Stable C++ heap frames retain actual
+JSON temporaries, iterators, and copied keys; Rust retains only traversal state and
+scalar frame slots. Raw Squirrel and nlohmann type encodings are pinned with C++
+assertions. `SQInteger` and `SQRESULT` remain signed 64-bit, `SQBool` unsigned
+64-bit, and outgoing depth signed 32-bit, including the original VM widths on
+i686. The incoming unsigned JSON conversion still calls `get<int64_t>()`.
+Arbitrary NUL and non-UTF-8 bytes retain the original byte-string operations.
+
+Typed allocation errors, `Script_FatalError`, nlohmann exceptions, and reentrant
+key metamethods occur entirely between Rust calls. RAII destroys control owners and
+typed temporaries on C++ unwinding, without executing pending VM pops, rollback,
+logging, or null pushes. Nested conversions own independent engines. The matching
+Rust destroy function owns deallocation; no C++ exception crosses a live Rust
+frame. Rust panic and allocation exhaustion abort. Additional control/frame
+allocations change resource-exhaustion timing; this port does not claim identical
+failure timing for all memory limits or arbitrary allocation positions.
+
+The two unchanged `test_script_admin.cpp` cases retain their 15 outgoing and 27
+incoming checks. `python3 tools/admin-conversion-comparison.py` adds only the
+demonstrated coverage gaps, extracting unchanged pinned conversion bodies and
+`ScriptAllocator`, and using the actual bundled VM and candidate entry points.
+It compares both mixed original/candidate directions and directly inspects VM
+values, stack state, partial JSON, diagnostic entry text/order, and owner cleanup
+at O0 and O2. The scoped fixture includes depth 25/26, incoming depth 40, integer
+extrema and unsigned overflow, byte strings/keys, completed siblings before
+failure, colliding key stringification, a reentrant `_tostring`, typed string/key
+copy allocation failures, and a real script allocation limit. The GNU link-wrap
+cleanup checks currently run on native Linux; game-log storage, every allocation
+failure, arbitrary recursion depths, network simulation, and complete script/game
+equivalence remain outside this evidence. Native platform builds exercise the
+unchanged game tests through their actual Rust/C++ ABI.
+
+### Nested widget descriptor parser
+
+With Rust enabled, `MakeNWidgets` and `MakeWindowNWidgetTree` use a widget-specific
+pull parser. Rust owns the descriptor cursor, contiguous attribute traversal,
+declared/produced container decisions, recursive tree control, end-marker handling,
+complete-consumption policy, and first/root/body/shade composition. C++ retains
+the unchanged single-part factory, attribute operations, real widget classes,
+RTTI observations, `unique_ptr` owners, Add/GetWidgetOfType operations and generator
+callbacks. Each typed operation executes after the Rust call returns; generators
+may safely invoke an independent nested parser. Portable builds retain the original
+recursive control bodies. The constexpr descriptor builders and public signatures
+remain C++.
+
+The scalar ABI carries unsigned 64-bit descriptor offsets and stable owner slots,
+raw uint8 widget tags and capability observations. No C++ union, virtual object,
+RTTI layout, function pointer or owner enters Rust. Native valid span/iterator
+domains apply; no descriptor pointer survives completion. Enum widths, attribute
+range markers, exact container tags and action field offsets are asserted in C++.
+Push-button bits are not masked when classifying containers. A function-produced
+subtree is complete and never acquires following descriptor nodes as children.
+
+EOF inside a declared container remains accepted. Null function results retain
+their original unconsumed cursor and end-marker assertion; release behavior is
+preserved only for originally defined cases. Ordinary assertions remain separate
+from the `WITH_ASSERT`-only trailing-parts exception. Window construction clears
+the shade output on entry, recognizes actual horizontal subclasses, queries
+caption then shade only when there is a remaining body, and writes the new shade
+pointer before constructing that body. The inserted stacked wrapper retains
+INVALID_WIDGET and its original vertical body container.
+
+The initial `unique_ptr&&` remains a C++ reference until successful return.
+Constructor, attribute, generator and Add exceptions retain already-committed
+children in a caller-supplied container. Stable C++ slots hold unattached objects
+and typed temporaries; RAII destroys them in reverse construction order without
+executing pending parser actions. The shade output is not reset on an exception
+and may be unusable after failure, as originally. Rust owns only control allocations
+and its matching destroy function; exceptions never unwind through a Rust frame.
+Panic and Rust allocation exhaustion abort. Additional control/slot allocations
+change resource-exhaustion timing; identical failure timing for arbitrary allocation
+positions is not claimed.
+
+All four unchanged `test_window_desc.cpp` bodies remain primary evidence, including
+constructing/destroying every registered WindowDesc through the production parser.
+The source inventory has 156 static WindowDesc declarations and 34 NWidgetFunction
+callsites; these counts do not establish platform registration or identical shape.
+`python3 tools/widget-parser-comparison.py` records the actual native registered
+count (163 in the recorded native build) and compares a small semantic/ownership
+fixture against unchanged pinned
+parser bodies with the same real construction primitives and MockEnvironment.
+It inspects type/order/index, selected explicit attributes, shade membership,
+partial caller ownership, callback/cleanup order and exception messages. Cases
+cover nested background attributes, shade body/no-body, function-produced and
+reentrant subtrees, permissive EOF, trailing end markers, throwing attributes and
+generators, and shade output timing. Null-generator failures run separately under
+custom assertions, standard assertions and release policy.
+
+This production-object fixture currently runs on native Linux. It varies assertion
+policy in widget.cpp/oracle/fixture; the other real production objects retain their
+native build flags. Fatal probes compare termination category and callback entry,
+not changed assertion expression/source-location text. Its background shapes use
+the unchanged default vertical child. Rendering, layout, events, complete widget
+ownership migration, arbitrary malformed descriptors, all allocation failures and
+full GUI equivalence remain outside this evidence. Existing generator/comparison
+checks remain required; the shared Rust archive imports no widget-library callbacks.
+
 ## Build and verification
 
 The current verification setup targets native Linux and needs a C++20 compiler,
@@ -928,3 +1046,101 @@ CRT and assertion commands, maps, ABI execution, refusal/freshness reports, none
 test inventories, JUnit and fresh generated files. Parser unit checks and Linux
 ABI/Cargo checks are preliminary evidence; actual x86/x64 Windows artifacts and
 existing macOS checks are required before claiming platform support or integration.
+
+## Authentication and streaming owners
+
+The X25519 session and encryption-owner migration (#35) uses a versioned,
+primitive-only host function table. The bundled Monocypher algorithms remain
+unchanged. Rust owns stable key/session allocations and vendor-context storage;
+C++ supplies each vendor context's actual size/alignment and starts its trivial
+object lifetime before initialization or copying. This avoids a Rust mirror of
+platform-dependent vendor structs and adds no vendor-symbol dependency to other
+Rust archive consumers. Packet, RNG, policy and logging calls happen after each
+Rust call returns, so application exceptions cannot unwind through Rust.
+
+Secret fields are initialized directly in their final allocation. Deep copies
+copy heap to heap; assignment overwrites existing fixed storage as the original
+C++ member assignment did. Rvalue facade copies preserve the original source
+state. Destruction invokes bundled volatile wiping before Rust deallocation,
+including the original reverse session-field order. Hash finalization performs
+its original context wipe. Temporary shared secrets have independently wiped
+stable storage. Opaque streaming contexts retain the bundled successful-rekey
+behavior; their counter does not advance, and failed authentication leaves the
+context and output unchanged. Allocation failure/panics abort as for the other
+Rust kernels. Register spills, caller-held input copies and the vendor
+algorithms' internal temporaries remain outside this owner-storage guarantee;
+this does not claim complete deallocation security.
+
+Borrowed fixed-width views retain their address across completed mutation and
+assignment, until owner destruction. Callers serialize access and never read a
+view during a mutating call. Exchange extra payload may alias existing derived
+key bytes because all input hashing precedes key replacement. Callers provide
+initialized readable/writable buffers and byte lengths
+no greater than `PTRDIFF_MAX`, and keep MAC/message regions disjoint. Encryption
+is in place through raw primitive pointers; Rust never creates overlapping
+shared and mutable message slices. Empty variable spans may use null pointers.
+The existing short nonempty `Packet::Recv_bytes` path is undefined because its
+callback takes an unchecked subspan; deferred fork issue #41 records this
+separately. Zero-length, full-length and trailing-data paths are defined and
+remain within #35's reproduction contract.
+
+`python3 tools/auth-comparison.py` compiles the actual pinned and candidate
+session/Packet/vendor sources into separate endpoints. Both mixed directions,
+Rust/Rust and portable C++ are compared with original/original transcripts:
+request/response/enable bytes, derived halves, results/cursor/diagnostic bytes,
+prescribed RNG traces, failure/retry state and independent stream keys/counters.
+The corpus includes empty and block-boundary messages, wrong/empty/NUL payload,
+low-order peers, exact-size errors, tampering, copy/assignment/self/rvalue copies,
+self-key-payload aliasing, span stability, and cleanup after first/second RNG,
+packet/output allocation and logger exceptions. Primitive observers invoke the
+real bundled algorithms, use fixed-capacity nonthrowing records, and check
+outer wiping order and hash-final zero bytes. Fixture observations retain only
+known test values. They do not establish constant-time execution or whole-system
+secret erasure. The C++ fixture/vendor/Packet/adapter sanitizer run also observes
+Rust allocator leaks, but does not instrument Rust memory accesses.
+
+Clean core `f308ac2cda` passed all four Cargo gates and full 97-reference /
+110-candidate tests, including the five unchanged network cases. Fresh native
+Rust/portable tools and all inherited comparison suites passed. The focused
+corpus passed 1,800 mixed endpoint records plus both sanitizer directions before
+its final evidence commit; exact final-head evidence and platform review remain
+required. Original source hashes, commands and transcripts are retained under
+`.local/auth-comparison/`; `.local/auth-linkage.json` records actual Rust calls in
+both game/test binaries. The migration workflow runs the authentication
+comparison unconditionally and retains its evidence.
+
+## ScriptList storage and iteration
+
+The ScriptList owner migration (#44) moves both deterministic item/value indexes,
+all four sort modes, live pending-cursor/end state, mutation accounting, filters
+and list algebra into Rust. C++ retains script identity/bindings, pool enumeration,
+VM/error/operation charging and save/load adapters. Valuation and serialization
+read copied ascending-item scalars; every Rust borrow ends before a VM operation
+can reenter the list. The mutation token is validated after the original callback
+return-type check; SetValue occurs before the original pop and five-operation
+charge. Earlier commits and callback side effects remain on failure.
+
+The scalar/pointer ABI avoids aggregate-return layout differences on 32-bit
+hosts; items/values are explicitly signed 64-bit and modification tokens signed
+32-bit. Two-list operations recognize self-aliasing before creating references.
+Rust allocation/panics abort. Defined-input reproduction excludes original signed
+modification-counter overflow, nonempty rank decrement overflow and overflowing
+Count()-count, and callbacks that leave original iterators invalid while evading
+its modification check. Resource-exhaustion exception behavior is not promised
+identical. Clone content uses the original target sort/initialization flow;
+saving traverses item order without resetting public iteration. The original
+mixed-type load validation remains unchanged. The unchanged full-game regressions
+`regression_regression` and `regression_stationlist` pass alongside all reference
+tests. `python3 tools/script-list-comparison.py` compares only the identified gaps
+against the actual pinned C++ implementation, with separate original, Rust-enabled
+and portable binaries at O0/O2. It covers active/ended cursor swaps and insertions,
+self operations, pending removals/value changes, no-op mutations, empty-list
+union, strict/reversed/equal filters and zero/negative ranks. The actual bundled
+Squirrel VM and allocator exercise callback failure/error precedence, partial
+commits, operation charges and command-scope restoration. Valid List and TileList
+save/load representations and independent clones are compared without resetting
+the source cursor. The fixture substitutes only a command-permission bool for the
+full game instance and extracts unchanged TileList persistence bodies without
+simulating world population. This evidence does not establish arbitrary VM,
+savegame or allocation-failure equivalence. CI retains these comparisons along
+with the existing checks.

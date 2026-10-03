@@ -5,6 +5,8 @@ if(OPTION_TOOLS_ONLY)
 endif()
 
 add_files(
+    admin_conversion.cpp
+    admin_conversion.hpp
     script_cmd.h
     script_config.cpp
     script_config.hpp
