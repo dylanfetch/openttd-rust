@@ -42,6 +42,7 @@ games; commercial game assets are unnecessary. The verification driver requires
 the pinned Rust toolchain and always configures the candidate with `OPTION_RUST=ON`.
 Ordinary CMake builds default to `OPTION_RUST=OFF`, preserving the original portable
 C++ path. Rust linkage supports native GNU/Linux (64-bit x86 or ARM) and native macOS arm64.
+The scoped native Windows MSVC mode is described below.
 Other platforms, cross compilation, and macOS universal/Intel configurations reject
 an enabled Rust option; their portable fallback remains migration work.
 
@@ -738,6 +739,11 @@ any references, without changing their declared layout. All exports retain
 `extern "C"`; the [MSVC target ABI](https://doc.rust-lang.org/rustc/platform-support/windows-msvc.html)
 uses cdecl on i686. Borrowed byte spans retain `isize::MAX` limits and release
 panics abort. Rust owns and frees its allocations.
+
+The accepted history engine is included in this audit: descriptor/step layout and
+by-value calls round-trip live C++ HistoryRange identities, high-bit masks and all
+staged operation modes. Only opaque Rust-allocated engine handles enter Rust by
+pointer; typed C++ storage and exception execution remain outside Rust.
 
 `windows-rust-evidence.py` checks PE machine headers, retained Ninja response files,
 exact archive linkage, MSVC maps and static CRT imports. It executes a shared

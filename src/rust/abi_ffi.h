@@ -17,7 +17,8 @@ extern "C" {
  * Type IDs: 0 integer, 1 UTF8 encoded, 2 UTF8 decoded, 3 LE bytes, 4 formatted,
  * 5 alternating state, 6 alternating step, 7 consumer bound, 8 consumer byte,
  * 9 consumer match, 10 consumer separator, 11 encoded parameter, 12 encoded view,
- * 13 encoded diagnostic, 14 spiral state, 15 byte trim.
+ * 13 encoded diagnostic, 14 spiral state, 15 byte trim,
+ * 16 history descriptor, 17 history step.
  * Item 0 size, 1 alignment, then every field offset in declaration order.
  * Unknown type/item returns SIZE_MAX. No memory borrow, ownership or callback.
  * Native extern-C convention (cdecl on i686 MSVC); Rust panic never unwinds.

@@ -45,6 +45,12 @@ def linked_archive(command, build, archive):
     return any((build / (quoted or plain)).resolve() == archive.resolve() for quoted, plain in tokens)
 
 
+def native_arguments_linked(command, arguments):
+    """Require the complete native argument group, including repeated libraries."""
+    tokens = [r'(?:"' + re.escape(arg) + r'"|' + re.escape(arg) + r')' for arg in arguments]
+    return bool(tokens) and re.search(r'(?:^|\s)' + r'\s+'.join(tokens) + r'(?=\s|$)', command, re.I) is not None
+
+
 def select_link(lines, build, binary_name):
     """Find the target output after expanding retained linker response files."""
     selected = []
@@ -118,6 +124,8 @@ def main():
             link, expanded, responses = select_link(lines, build, binary_name)
             if not linked_archive(expanded, build, archive):
                 raise RuntimeError(f"{label}/{consumer} did not link the exact target archive")
+            if not native_arguments_linked(expanded, configuration["native_libraries"]):
+                raise RuntimeError(f"{label}/{consumer} did not retain the ordered native argument group")
             (output / f"{label}-{consumer}-link-and-responses.json").write_text(json.dumps({"command": link, "responses": responses}, indent=2) + "\n")
             machine = "14C" if configuration["pointer_bytes"] == 4 else "8664"
             headers = run(["dumpbin", "/headers", build / binary_name], f"{label}-{consumer}-pe-headers")

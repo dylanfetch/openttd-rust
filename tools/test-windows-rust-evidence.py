@@ -12,6 +12,14 @@ evidence = runpy.run_path(str(Path(__file__).with_name("windows-rust-evidence.py
 
 
 class WindowsEvidenceTests(unittest.TestCase):
+    def test_ordered_native_options_preserve_duplicates_and_quotes(self):
+        arguments = ["kernel32.lib", "kernel32.lib", "C:/Program Files/SDK/native.lib", "/defaultlib:libcmt"]
+        command = 'link.exe kernel32.lib kernel32.lib "C:/Program Files/SDK/native.lib" /defaultlib:libcmt /out:test.exe'
+        self.assertTrue(evidence["native_arguments_linked"](command, arguments))
+        self.assertFalse(evidence["native_arguments_linked"](command.replace("kernel32.lib kernel32.lib", "kernel32.lib"), arguments))
+        self.assertFalse(evidence["native_arguments_linked"](command.replace(" /defaultlib:libcmt", " unrelated.lib /defaultlib:libcmt"), arguments))
+        self.assertFalse(evidence["native_arguments_linked"](command, []))
+
     def test_both_target_archive_metadata_and_refusals(self):
         with tempfile.TemporaryDirectory() as directory:
             # Windows TEMP can use an 8.3 alias; the locator returns canonical paths.

@@ -698,7 +698,7 @@ mod abi;
 
 /// Return size, alignment or field offsets for the bounded public ABI audit.
 ///
-/// Type IDs 0..15 follow `abi_ffi.h`; item 0 is size, 1 alignment, then fields in
+/// Type IDs 0..17 follow `abi_ffi.h`; item 0 is size, 1 alignment, then fields in
 /// declaration order. Unknown IDs/items return `usize::MAX` (C++ `SIZE_MAX`).
 /// Scalar metadata only: no allocation, pointers, ownership or callbacks.
 #[allow(unsafe_code)] // Exported scalar C symbol, like the existing kernel entry points.

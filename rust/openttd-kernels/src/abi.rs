@@ -46,6 +46,10 @@ pub fn layout(type_id: u8, item: u8) -> usize {
             layout!(crate::SpiralState, item; max_radius, extent, cur_radius, position, x, y, direction)
         }
         15 => layout!(crate::byte_strings::TrimResult, item; offset, length),
+        16 => {
+            layout!(crate::HistoryDescriptor, item; child, periods, records, first, last, division, total_division, child_periods, child_division)
+        }
+        17 => layout!(crate::HistoryStep, item; kind, count, first, last, target, token, value),
         _ => usize::MAX,
     }
 }
