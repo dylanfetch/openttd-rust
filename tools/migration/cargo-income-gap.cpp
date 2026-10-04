@@ -9,7 +9,7 @@
 #include "stdafx.h"
 #include "core/overflowsafe_type.hpp"
 #include "core/bitmath_func.hpp"
-#include "rust/cargo_payment_ffi.h"
+#include "tests/cargo_payment_stubs.hpp"
 using Money = OverflowSafeInt64;
 using CargoType = uint8_t;
 using TileIndex = uint32_t;
@@ -45,7 +45,7 @@ static struct { struct { uint8_t feeder_payment_share; } economy; } _settings_ga
 #include "cargo-destination-gap.inc"
 int main()
 {
-	OpenTTDCargoServices s{};
+	OpenTTDCargoServices s = CargoTestServices();
 	s.spec = [](uint8_t, OpenTTDCargoSpec *out) noexcept { *out = {spec.current_payment.base(), uint8_t(spec.valid), uint8_t(spec.callback_mask.value), spec.transit_periods[0], spec.transit_periods[1]}; };
 	s.callback = [](uint8_t, uint32_t arg) noexcept { callback_argument = arg; return callback_value; };
 	s.feeder = [](const void *p, uint32_t) noexcept { return static_cast<const CargoPacket *>(p)->feeder.base(); };

@@ -38,7 +38,8 @@ struct OpenTTDCargoPaymentFields {
  * Money add/sub/neg/multiply saturate; shifts retain the source bit operations.
  * Each shell owns exactly one new/destroy payment; the delivery owner is process
  * lifetime. Calls are serialized, with live nonnull owner/table/output pointers
- * and exclusive mutation access; destroy permits a null table only when cleaning.
+ * and exclusive mutation access. Every function-table entry must be nonnull and
+ * have the declared native C ABI; destroy permits a null table only when cleaning.
  * Import/export copy the unresolved front reference without dereferencing it.
  * Integer argument widths, slot bounds and pool lifetimes are caller preconditions.
  */

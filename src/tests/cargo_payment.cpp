@@ -10,7 +10,7 @@
 #include "../3rdparty/catch2/catch.hpp"
 #include "../core/overflowsafe_type.hpp"
 #ifdef WITH_RUST
-#include "../rust/cargo_payment_ffi.h"
+#include "cargo_payment_stubs.hpp"
 #include "../rust/abi_ffi.h"
 #endif
 #include "../safeguards.h"
@@ -19,7 +19,7 @@
 static std::vector<std::tuple<uint8_t, int64_t, int64_t>> settlement;
 TEST_CASE("Cargo payment - settlement order, Money boundaries and cleanup")
 {
-	OpenTTDCargoServices s{};
+	OpenTTDCargoServices s = CargoTestServices();
 	s.settle = [](void *, uint8_t op, int64_t first, int64_t second) noexcept -> uint32_t {
 		settlement.emplace_back(op, first, second);
 		return op == 1 ? 17 : op == 4 ? 1 : 0;

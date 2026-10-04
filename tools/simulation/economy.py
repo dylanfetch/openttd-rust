@@ -222,14 +222,29 @@ def check(scenario, run, mode, role, result):
     )
     if not any(p["route_profit"] != 0 for p in payments) and delivered_delta <= 0:
         result["problems"].append(f"{mode}/{role}: no final delivery payment")
-    if (
-        scenario["economy"] == "cargodist"
-        and not any(p["visual_transfer"] != 0 for p in payments)
-        and not any(
-            p["feeder_share"] != 0 for c in saved for p in rows(c, "CAPA").values()
-        )
-    ):
-        result["problems"].append(f"{mode}/{role}: no transfer payment")
+    if scenario["economy"] == "cargodist":
+        # In this vanilla fixture new packets have zero feeder share; split/merge
+        # preserves total credit and delivery removes it. A net increase requires
+        # new PayTransfer credit, rather than merely inheriting loaded shares.
+        def feeder(chunks):
+            return sum(p["feeder_share"] for p in rows(chunks, "CAPA").values())
+
+        credit_states = [read_save(Path(scenario["save"])), *saved]
+        if any(
+            packet["feeder_share"] < 0
+            for chunks in credit_states
+            for packet in rows(chunks, "CAPA").values()
+        ):
+            result["problems"].append(
+                f"{mode}/{role}: negative feeder credit invalidates transfer witness"
+            )
+        before = feeder(credit_states[0])
+        after = max(feeder(chunks) for chunks in saved)
+        result[f"{mode}_{role}_feeder_credit"] = {"before": before, "after": after}
+        if after <= before:
+            result["problems"].append(
+                f"{mode}/{role}: no new transfer credit ({before} -> {after})"
+            )
     result[f"{mode}_{role}_payment_samples"] = len(payments)
     result[f"{mode}_{role}_delivered_delta"] = delivered_delta
 
