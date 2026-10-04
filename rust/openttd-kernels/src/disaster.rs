@@ -624,7 +624,7 @@ async fn aircraft(w: World, id: u32, leave_top: bool) -> i64 {
     }
     1
 }
-fn rotors(w: World, id: u32) -> i64 {
+fn rotors(w: &World, id: u32) -> i64 {
     if w.increment(id, TICK) & 1 != 0 {
         return 1;
     }
@@ -791,7 +791,7 @@ async fn tick(w: World, id: u32) -> i64 {
         2 => small_ufo(w, id).await,
         4 => aircraft(w, id, true).await,
         6 => aircraft(w, id, false).await,
-        8 => rotors(w, id),
+        8 => rotors(&w, id),
         9 => big_ufo(w, id).await,
         11 => destroyer(w, id).await,
         13 | 14 => submarine(w, id).await,
@@ -964,7 +964,7 @@ async fn schedule(w: World, startup: bool) -> i64 {
     let kind = available[w.range(length as u32) as usize];
     initialize(w, kind).await
 }
-fn construct(w: World, id: u32, x: i64, y: i64, dir: i64, subtype: u32) -> i64 {
+fn construct(w: &World, id: u32, x: i64, y: i64, dir: i64, subtype: u32) -> i64 {
     w.set(id, STATUS, 4);
     w.set(id, X, x);
     w.set(id, Y, y);
@@ -1000,7 +1000,7 @@ fn release_industry(w: &World, industry: u32) -> i64 {
     }
     0
 }
-fn release_vehicle(w: World, id: u32) -> i64 {
+fn release_vehicle(w: &World, id: u32) -> i64 {
     if w.read(14, id, 0, 0)[0] == 0 {
         return 0;
     }
@@ -1017,13 +1017,13 @@ async fn run(w: World, operation: u32, id: u32, a: i64, b: i64, c: i64, d: i64) 
         0 => tick(w, id).await,
         1 => schedule(w, false).await,
         2 => schedule(w, true).await,
-        3 => construct(w, id, a, b, c, d as u32),
+        3 => construct(&w, id, a, b, c, d as u32),
         4 => {
             w.update_position(id, a, b, c);
             0
         }
         5 => release_industry(&w, id),
-        6 => release_vehicle(w, id),
+        6 => release_vehicle(&w, id),
         7 => {
             w.clear(id).await;
             0
