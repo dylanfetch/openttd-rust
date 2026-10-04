@@ -33,21 +33,19 @@ pub use widget_parser::Action as WidgetAction;
 
 /// Height at a coordinate within a tile, preserving `OpenTTD`'s slope rounding.
 ///
-/// Coordinates must be in 0..16. Returns `u32::MAX` for an invalid coordinate or
-/// an unsupported base slope reached after half-tile handling; the C++ adapter
-/// invokes the original `NOT_REACHED` fatal handler on that sentinel.
+/// Coordinates retain the original int domain. A height is widened from u32;
+/// `u64::MAX` denotes only an unsupported base slope after half-tile handling,
+/// allowing the C++ adapter to invoke its original `NOT_REACHED` handler. In
+/// particular, `u32::MAX` remains a valid height.
 ///
 /// No pointers, ownership transfer, allocation, or mutable state cross this ABI.
-/// The fixed symbol is unique to this crate. Normal arithmetic is bounded by
-/// tile dimensions; release overflow checks stay enabled. Both build profiles
-/// abort on panic, and the non-unwinding C ABI also prevents unwinding into C++.
+/// Unsigned arithmetic wraps and signed results narrow exactly as in C++;
+/// source signed-overflow inputs have no equivalence guarantee. Both build
+/// profiles abort on panic, and this C ABI never unwinds into C++.
 #[allow(unsafe_code)] // Only the exported symbol attribute; the function is safe Rust.
 #[unsafe(no_mangle)]
-pub extern "C" fn openttd_rust_get_partial_pixel_z(x: i32, y: i32, corners: u8) -> u32 {
-    if !(0..16).contains(&x) || !(0..16).contains(&y) {
-        return u32::MAX;
-    }
-    landscape::partial_pixel_z(x, y, corners).unwrap_or(u32::MAX)
+pub extern "C" fn openttd_rust_get_partial_pixel_z(x: i32, y: i32, corners: u8) -> u64 {
+    landscape::partial_pixel_z(x, y, corners).map_or(u64::MAX, u64::from)
 }
 
 /// Parse borrowed arbitrary bytes using the original integer grammar.

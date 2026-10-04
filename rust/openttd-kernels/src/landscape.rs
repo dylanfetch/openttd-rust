@@ -5,115 +5,136 @@
  * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
  */
 
-const TILE_SIZE: i32 = 16;
-const TILE_HEIGHT: i32 = 8;
+const TILE_SIZE: u32 = 16;
+const TILE_HEIGHT: u32 = 8;
 const HALF_TILE: u8 = 0x20;
 const STEEP: u8 = 0x10;
 
-/// The caller bounds x and y to 0..16. Every selected arithmetic expression
-/// then lies in 0..=32 and each returned height in 0..=16, so signed arithmetic
-/// and the final checked unsigned conversion reproduce the C++ calculations.
+/// Preserve C++'s unsigned `TILE_SIZE`/`TILE_HEIGHT` promotions and logical shifts.
+/// Signed expressions use wrapping operations to avoid adding a panic path;
+/// equivalence covers inputs whose executed signed C++ operations are defined.
+// Casts implement the original unsigned promotions and return conversion;
+// keeping its slope table together makes the arithmetic directly comparable.
+#[allow(
+    clippy::cast_sign_loss,
+    clippy::cast_possible_wrap,
+    clippy::too_many_lines
+)]
 pub(super) fn partial_pixel_z(x: i32, y: i32, corners: u8) -> Option<u32> {
+    let sum = x.wrapping_add(y);
     if corners & HALF_TILE != 0 {
         let leveled = match (corners >> 6) & 3 {
             0 => x > y,
-            1 => x + y >= TILE_SIZE,
+            1 => sum >= TILE_SIZE as i32,
             2 => x <= y,
-            3 => x + y < TILE_SIZE,
+            3 => sum < TILE_SIZE as i32,
             _ => unreachable!(), // A two-bit value is always 0..=3.
         };
         if leveled {
-            // The complete slope has HALF_TILE set, so it is never SLOPE_FLAT.
             return Some(if corners & STEEP != 0 { 16 } else { 8 });
         }
     }
 
-    // Clear all half-tile bits even if the half-tile flag itself was unset,
-    // exactly as RemoveHalftileSlope does. Validate only after the early return.
-    let z = match corners & 0x1f {
-        0x00 => 0, // Flat.
+    // Clear all half-tile bits even when HALF_TILE was unset, after its return.
+    let north = || TILE_SIZE.wrapping_sub(x as u32).wrapping_sub(y as u32) >> 1;
+    let south = || (1_i32.wrapping_add(x).wrapping_add(y) as u32).wrapping_sub(TILE_SIZE) >> 1;
+    let east = || (1_i32.wrapping_add(y).wrapping_sub(x) >> 1) as u32;
+    let west = || (x.wrapping_sub(y) >> 1) as u32;
+    Some(match corners & 0x1f {
+        0x00 => 0,
         0x08 => {
-            if x + y <= TILE_SIZE {
-                (TILE_SIZE - x - y) >> 1
+            if sum <= TILE_SIZE as i32 {
+                north()
             } else {
                 0
             }
         }
         0x04 => {
             if y >= x {
-                (1 + y - x) >> 1
+                east()
             } else {
                 0
             }
         }
         0x02 => {
-            if x + y >= TILE_SIZE {
-                (1 + x + y - TILE_SIZE) >> 1
+            if sum >= TILE_SIZE as i32 {
+                south()
             } else {
                 0
             }
         }
         0x01 => {
             if x >= y {
-                (x - y) >> 1
+                west()
             } else {
                 0
             }
         }
-        0x0c => (TILE_SIZE - x) >> 1,
-        0x06 => (y + 1) >> 1,
-        0x03 => (x + 1) >> 1,
-        0x09 => (TILE_SIZE - y) >> 1,
+        0x0c => TILE_SIZE.wrapping_sub(x as u32) >> 1,
+        0x06 => (y.wrapping_add(1) >> 1) as u32,
+        0x03 => (x.wrapping_add(1) >> 1) as u32,
+        0x09 => TILE_SIZE.wrapping_sub(y as u32) >> 1,
         0x0d => {
-            if x + y >= TILE_SIZE {
-                TILE_HEIGHT - ((1 + x + y - TILE_SIZE) >> 1)
+            if sum >= TILE_SIZE as i32 {
+                TILE_HEIGHT.wrapping_sub(south())
             } else {
                 TILE_HEIGHT
             }
         }
         0x0e => {
             if y < x {
-                TILE_HEIGHT - ((x - y) >> 1)
+                TILE_HEIGHT.wrapping_sub(west())
             } else {
                 TILE_HEIGHT
             }
         }
         0x07 => {
-            if x + y <= TILE_SIZE {
-                TILE_HEIGHT - ((TILE_SIZE - x - y) >> 1)
+            if sum <= TILE_SIZE as i32 {
+                TILE_HEIGHT.wrapping_sub(north())
             } else {
                 TILE_HEIGHT
             }
         }
         0x0b => {
             if x < y {
-                TILE_HEIGHT - ((1 + y - x) >> 1)
+                TILE_HEIGHT.wrapping_sub(east())
             } else {
                 TILE_HEIGHT
             }
         }
         0x0a => {
-            if x + y < TILE_SIZE {
-                (TILE_SIZE - x - y) >> 1
+            if sum < TILE_SIZE as i32 {
+                north()
             } else {
-                (1 + x + y - TILE_SIZE) >> 1
+                south()
             }
         }
         0x05 => {
             if x >= y {
-                (x - y) >> 1
+                west()
             } else {
-                (1 + y - x) >> 1
+                east()
             }
         }
         0x0f => TILE_HEIGHT,
-        0x1d => (TILE_SIZE - x + TILE_SIZE - y) >> 1,
-        0x1e => (TILE_SIZE + 1 + y - x) >> 1,
-        0x17 => (1 + x + y) >> 1,
-        0x1b => (TILE_SIZE + x - y) >> 1,
+        0x1d => {
+            TILE_SIZE
+                .wrapping_sub(x as u32)
+                .wrapping_add(TILE_SIZE)
+                .wrapping_sub(y as u32)
+                >> 1
+        }
+        0x1e => {
+            TILE_SIZE
+                .wrapping_add(1)
+                .wrapping_add(y as u32)
+                .wrapping_sub(x as u32)
+                >> 1
+        }
+        0x17 => (1_i32.wrapping_add(x).wrapping_add(y) >> 1) as u32,
+        0x1b => TILE_SIZE.wrapping_add(x as u32).wrapping_sub(y as u32) >> 1,
         _ => return None,
-    };
-    u32::try_from(z).ok()
+    })
 }
 
 #[cfg(test)]
@@ -134,16 +155,25 @@ mod tests {
     fn half_tile_precedes_invalid_base_validation() {
         // Invalid steep-flat base: northern leveled half still has defined height.
         assert_eq!(height(0, 0, 0xf0), 16);
-        assert_eq!(height(15, 15, 0xf0), u32::MAX);
+        assert_eq!(height(15, 15, 0xf0), u64::MAX);
         // Half-flat maximum is eight, even though the removed base is flat.
         assert_eq!(height(0, 0, 0xe0), 8);
         assert_eq!(height(15, 15, 0xe0), 0);
     }
 
     #[test]
-    fn invalid_inputs_report_fatal_sentinel() {
-        assert_eq!(height(0, 0, 0x10), u32::MAX);
-        assert_eq!(height(-1, 0, 0), u32::MAX);
-        assert_eq!(height(0, 16, 0), u32::MAX);
+    fn out_of_tile_coordinates_keep_unsigned_promotions_and_signed_returns() {
+        assert_eq!(height(i32::MIN, i32::MAX, 0), 0);
+        assert_eq!(height(-2, 0, 0x03), u64::from(u32::MAX));
+        assert_eq!(height(0, -3, 0x06), u64::from(u32::MAX));
+        assert_eq!(height(17, 0, 0x0c), 0x7fff_ffff);
+        assert_eq!(height(0, 34, 0x0d), u64::from(u32::MAX));
+        assert_eq!(height(i32::MIN, 0, 0x1b), 0x4000_0008);
+        assert_eq!(height(-1, 16, 0x20), 0);
+    }
+
+    #[test]
+    fn unsupported_slopes_report_fatal_sentinel() {
+        assert_eq!(height(0, 0, 0x10), u64::MAX);
     }
 }

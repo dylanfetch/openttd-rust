@@ -18,11 +18,11 @@ extern "C" {
 #endif
 
 /**
- * Height for tile-relative x/y in [0, 15] and the original eight-bit slope.
- * No pointers or ownership transfer. UINT32_MAX requests the C++ fatal handler.
- * Rust never unwinds into C++; panic aborts. Actual heights are at most 16.
+ * Height for original signed coordinates and the original eight-bit slope.
+ * The uint32_t height is widened; UINT64_MAX requests the C++ fatal handler.
+ * No pointers or ownership transfer. Rust never unwinds into C++; panic aborts.
  */
-uint32_t openttd_rust_get_partial_pixel_z(int32_t x, int32_t y, uint8_t corners);
+uint64_t openttd_rust_get_partial_pixel_z(int32_t x, int32_t y, uint8_t corners);
 
 /** Integer result: width-sized value bits, parse length, and diagnostic byte spans. */
 typedef struct OpenTTDRustIntegerResult {

@@ -246,9 +246,9 @@ uint GetPartialPixelZ(int x, int y, Slope corners)
 	static_assert(SLOPE_NWS == 0x0B && SLOPE_WSE == 0x07 && SLOPE_SEN == 0x0E && SLOPE_ENW == 0x0D);
 	static_assert(SLOPE_STEEP == 0x10 && SLOPE_HALFTILE == 0x20 && SLOPE_HALFTILE_MASK == 0xE0);
 	static_assert(SLOPE_STEEP_W == 0x1B && SLOPE_STEEP_S == 0x17 && SLOPE_STEEP_E == 0x1E && SLOPE_STEEP_N == 0x1D);
-	uint32_t result = openttd_rust_get_partial_pixel_z(x, y, static_cast<uint8_t>(corners));
-	if (result == UINT32_MAX) NOT_REACHED();
-	return result;
+	uint64_t result = openttd_rust_get_partial_pixel_z(x, y, static_cast<uint8_t>(corners));
+	if (result == UINT64_MAX) NOT_REACHED();
+	return static_cast<uint>(result);
 #else
 	if (IsHalftileSlope(corners)) {
 		/* A foundation is placed on half the tile at a specific corner. This means that,

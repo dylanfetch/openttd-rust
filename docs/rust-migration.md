@@ -325,23 +325,24 @@ Unless an entry says otherwise, these properties hold for every port:
 
 `GetPartialPixelZ`, the scalar landscape height kernel, runs in Rust behind its
 original C++ interface. The ABI takes two `int32_t` coordinates and one `uint8_t`
-slope and returns `uint32_t`; no pointers, allocations, shared state or ownership
-cross it. The C++ adapter asserts integer widths, tile dimensions and slope/corner
-encodings. For coordinates 0 through 15, arithmetic stays within 0 through 32 and
-heights within 0 through 16. Rust preserves half-tile returns before base-slope
-validation, clears all upper slope bits and retains asymmetric rounding. Unsafe
-code is denied except for the scoped export-symbol attribute.
+slope; a `uint64_t` result carries the complete `uint32_t` height domain plus
+`UINT64_MAX` for the original unsupported-base-slope `NOT_REACHED` dispatch.
+No pointers, allocations, shared state or ownership cross it. C++ asserts widths,
+tile dimensions and slope/corner encodings. Rust preserves half-tile returns
+before base validation, upper-bit clearing, signed arithmetic shifts, unsigned
+TILE_SIZE/TILE_HEIGHT promotions and wrapping, and signed-to-unsigned returns.
+Coordinates outside the tile remain accepted, including legitimate `UINT32_MAX`
+heights. Original signed-overflow inputs have no equivalence guarantee; Rust
+adds no overflow panic. Unsafe code is denied except for the export attribute.
 
-Known divergence (#75): the reserved `UINT32_MAX` result invokes the existing C++
-`NOT_REACHED` handler for an unsupported base slope or an out-of-contract
-coordinate. The coordinate guard is new; the original may compute a height for
-some out-of-range inputs. Equivalence is limited to the documented coordinate
-range; inspected callers use 0 through 15.
-
-Evidence: 32 unchanged upstream cases through the C++ entry point (fixed grids at
-all 256 tile positions, addition properties, ordinary and steep slopes, half-tile
-foundations), plus small Rust tests for the flat/elevated gap and unusual
-half-tile/invalid-input handling.
+Evidence: 32 unchanged upstream cases through the C++ entry point, Rust boundary
+cases, native ABI sentinel/height probes, and `python3 tools/math-comparison.py`
+against the unchanged pinned body, portable C++ and Rust: all 256 slope bytes on
+an extended -32..32 grid and selected full-width coordinate pairs, with C++ UBSan.
+The comparator excludes only executed signed-overflow expressions; it exercises
+the out-of-tile arithmetic gap that the simulation harness's callers cannot reach.
+The harness checks game state; the direct corpus is bounded, not exhaustive over
+all coordinate pairs.
 
 ### StringConsumer integer parsing
 
