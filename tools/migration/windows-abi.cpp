@@ -8,6 +8,7 @@
 /** @file windows-abi.cpp Bounded first-32-bit layout and real C ABI call checks. */
 #include "rust/abi_ffi.h"
 #include "rust/linkgraph_ffi.h"
+#include "rust/trees_ffi.h"
 #include "rust/ffi.h"
 #include "rust/utf8_ffi.h"
 #include "rust/builder_ffi.h"
@@ -88,6 +89,7 @@ static void Layouts()
 	Layout(34, "OpenTTDLinkGraphNode", {sizeof(OpenTTDLinkGraphNode), alignof(OpenTTDLinkGraphNode), offsetof(OpenTTDLinkGraphNode, supply), offsetof(OpenTTDLinkGraphNode, demand), offsetof(OpenTTDLinkGraphNode, station), offsetof(OpenTTDLinkGraphNode, x), offsetof(OpenTTDLinkGraphNode, y), offsetof(OpenTTDLinkGraphNode, edge_begin), offsetof(OpenTTDLinkGraphNode, edge_count)});
 	Layout(35, "OpenTTDLinkGraphEdge", {sizeof(OpenTTDLinkGraphEdge), alignof(OpenTTDLinkGraphEdge), offsetof(OpenTTDLinkGraphEdge, capacity), offsetof(OpenTTDLinkGraphEdge, travel_time), offsetof(OpenTTDLinkGraphEdge, dest)});
 	Layout(36, "OpenTTDLinkGraphSettings", {sizeof(OpenTTDLinkGraphSettings), alignof(OpenTTDLinkGraphSettings), offsetof(OpenTTDLinkGraphSettings, accuracy), offsetof(OpenTTDLinkGraphSettings, demand_distance), offsetof(OpenTTDLinkGraphSettings, demand_size), offsetof(OpenTTDLinkGraphSettings, saturation), offsetof(OpenTTDLinkGraphSettings, distribution), offsetof(OpenTTDLinkGraphSettings, express), offsetof(OpenTTDLinkGraphSettings, map_max_x), offsetof(OpenTTDLinkGraphSettings, map_max_y), offsetof(OpenTTDLinkGraphSettings, runtime)});
+	Layout(38, "OpenTTDTreeAction", {sizeof(OpenTTDTreeAction), alignof(OpenTTDTreeAction), offsetof(OpenTTDTreeAction, kind), offsetof(OpenTTDTreeAction, tile), offsetof(OpenTTDTreeAction, a), offsetof(OpenTTDTreeAction, b), offsetof(OpenTTDTreeAction, cost)});
 	Layout(37, "OpenTTDLinkGraphShare", {sizeof(OpenTTDLinkGraphShare), alignof(OpenTTDLinkGraphShare), offsetof(OpenTTDLinkGraphShare, node), offsetof(OpenTTDLinkGraphShare, origin), offsetof(OpenTTDLinkGraphShare, via), offsetof(OpenTTDLinkGraphShare, cumulative), offsetof(OpenTTDLinkGraphShare, unrestricted), offsetof(OpenTTDLinkGraphShare, has_share)});
 	CHECK(openttd_rust_abi_layout(255, 0) == SIZE_MAX);
 	CHECK(static_cast<size_t>(PTRDIFF_MAX) == (SIZE_MAX >> 1));
@@ -589,10 +591,59 @@ static void LinkGraphJob()
 	std::printf("linkgraph owned snapshot/result and cdecl abort callback passed\n");
 }
 
+// ABI/lifetime probe, not simulation evidence. The full game harness compares map/DATE.
+struct TreeProbe {
+	std::array<uint64_t, 12> settings{0, 15, 35, 4096, 64, 64, 10, 0, 0, 2, 15, 0};
+	std::array<uint32_t, 10> tile{7};
+	uint32_t writes = 0;
+};
+static void TreeSettings(void *context, uint64_t *out) { auto &p = *static_cast<TreeProbe *>(context); std::copy(p.settings.begin(), p.settings.end(), out); }
+static void TreeObserve(void *context, uint32_t, uint32_t *out) { auto &p = *static_cast<TreeProbe *>(context); std::copy(p.tile.begin(), p.tile.end(), out); }
+static uint64_t TreeWrite(void *context, uint32_t op, uint32_t, uint32_t a, uint32_t b, uint32_t c, uint32_t d)
+{
+	auto &p = *static_cast<TreeProbe *>(context);
+	++p.writes;
+	CHECK(op == 0 && a == 12 && b == 2 && c == 6 && d == (2U << 8));
+	return 0;
+}
+static uint32_t TreeRandom() { return UINT32_MAX; }
+static float TreeTrig(uint32_t, float value) { return value; }
+static void Trees()
+{
+	using Owner = std::unique_ptr<void, decltype(&openttd_rust_trees_destroy)>;
+	TreeProbe probe;
+	auto make = [&](uint32_t kind, uint32_t a = 0, uint32_t b = 0, uint32_t c = 0) {
+		return Owner(openttd_rust_trees_create(kind, 1, a, b, c, &probe, TreeSettings, TreeObserve, TreeWrite, TreeRandom, TreeTrig), openttd_rust_trees_destroy);
+	};
+	uint8_t *counter = openttd_rust_tree_counter();
+	openttd_rust_trees_initialize();
+	CHECK(*counter == 0);
+	*counter = 37; // Same boundary write made by DATE/TTD descriptors.
+	auto tick = make(6);
+	CHECK(openttd_rust_trees_advance(tick.get(), 0, 0).kind == 0);
+	CHECK(*counter == 36 && counter == openttd_rust_tree_counter());
+	probe.settings[3] = 4096 * 4096; probe.settings[4] = probe.settings[5] = 4096;
+	tick = make(6);
+	CHECK(openttd_rust_trees_advance(tick.get(), 0, 0).kind == 0 && *counter == 36);
+	probe.tile = {0, 0, 0, 0, 0, 2};
+	auto plant = make(3, 12, 2, 6);
+	CHECK(openttd_rust_trees_advance(plant.get(), 0, 0).kind == 0 && probe.writes == 1);
+	probe.tile = {4, 0, 0, 0, 3, 3, 12, 1, 3};
+	auto loop = make(5);
+	CHECK(openttd_rust_trees_advance(loop.get(), 0, 0).kind == 4);
+	// Abandon a suspended water action: C++ exception cleanup must not call the world.
+	loop.reset();
+	CHECK(probe.writes == 1);
+	openttd_rust_trees_initialize();
+	CHECK(*counter == 0 && counter == openttd_rust_tree_counter());
+	std::printf("tree_owner_callbacks_counter passed\n");
+}
+
 int main()
 {
 	Layouts();
 	LinkGraphJob();
+	Trees();
 	Calls();
 	Encoded();
 	History();
