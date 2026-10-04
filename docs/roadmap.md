@@ -5,15 +5,15 @@ Root owns this file and updates it when a phase completes or priorities change.
 to work on next. If an issue conflicts with this roadmap, follow the roadmap;
 a subagent stops and reports the conflict in its hand-off to root.
 
-## Where the fork stands (2026-10-03, `rust-migration` at `f40b0a73f8`)
+## Where the fork stands (2026-10-03, `rust-migration` at `8edca751f7`)
 
 - Ported: one landscape kernel, StringConsumer/StringBuilder/UTF-8/byte-string
   utilities, history and spiral/alternating iterators, Script Admin JSON
-  conversion, ScriptList storage, the widget descriptor parser, authentication
-  contexts, monocypher ChaCha20/Poly1305/AEAD, and station cargo-list reducers.
-- Size: about 5.8k lines of Rust, 5.6k lines of comparison tooling and about
-  3.3k lines of new C++ glue, against roughly 382k lines of first-party C++.
-  Almost all of the ported code is utility or vendored-library code.
+  conversion, ScriptList storage and VM control (#70), the widget descriptor
+  parser, authentication contexts, monocypher ChaCha20/Poly1305/AEAD/BLAKE2b/
+  X25519, Packet, string validation, and station cargo-list reducers.
+- Almost all of the ported code is still utility or vendored-library code.
+  Track each port with `tools/port-metrics.py`; phase 2 must change that balance.
 - Quality: the original behavior has been preserved carefully, every platform
   build is green, and reviews are thorough.
 - Workflow (#80): worktrees share one reference build and a compiler cache, a
@@ -41,13 +41,13 @@ Three habits held back progress. The rules in `AGENTS.md` now prevent them.
 
 | Item | Disposition |
 | --- | --- |
-| Issue #88 (ruff for `tools/`) | Do it first, before new port work: a linter is worth most before findings accumulate. Luna medium. |
-| PR #70 / issue #65 (ScriptList VM control) | CI green and mergeable (#62 landed). Finish its review, integrate, and close #65. |
+| Issue #88 (ruff for `tools/`) | In progress, owner `/root/ruff` (Luna medium). Finish before new port work; CI/review may overlap the next item. |
+| PR #70 / issue #65 (ScriptList VM control) | Integrated at `8edca751f7` after final Astra medium review and green required CI; #65 closed. |
 | PR #66 / issue #64 (curve family) | Paused: its macOS Release check fails, which needs another implementation round. Leave the draft open; no further work. |
 | Issue #68 (SHA-512/HMAC/HKDF/Ed25519) | Paused. No new `src/3rdparty` work beyond finishing #62/#66 as stated. |
 | Issue #69 (tile areas, bitmap, tile lists) | Paused. Revisit as an ownership port when station/industry work needs it. |
-| Issue #75 (GetPartialPixelZ full-domain fidelity) | Do it. Small. |
-| Issue #76 (worktree/branch cleanup) | Local worktrees done 2026-10-03. Remaining: delete remote branches of merged or closed PRs, then close. Luna low. |
+| Issue #75 (GetPartialPixelZ full-domain fidelity) | In progress, owner `/root/partial_pixel` (Sol high): coordinate domain and valid-result sentinel collision. |
+| Issue #76 (worktree/branch cleanup) | Complete: 37 merged-PR remote branches deleted; open PR and unrelated branches retained. #76 closed. |
 
 ## Phase 1: simulation comparison harness (#72), the critical path
 
@@ -77,11 +77,10 @@ phase 2 or 3 work.
 
 ## Phase 2: first game-logic ports with Rust-owned state
 
-Implementation of both starts now, in parallel with #72: the Rust code, its
-unit tests, and the C++ facade, on their own branches. Integration waits for
-#72 and a clean harness run that includes scenarios exercising the component
-(add them to the harness's scenario list). Both are self-contained,
-game-visible and deterministic, with a clean ownership boundary.
+Both ports start after #88 reaches CI/review, on separate branches. The harness
+prerequisite is complete (#85/#87); integration requires a clean harness run with
+scenarios exercising the component (extend its scenario list). Both are
+self-contained, game-visible and deterministic, with a clean ownership boundary.
 
 - **#73 TGP terrain generator** (`src/tgp.cpp`). Rust owns the height map and
   every generation stage. C++ keeps a facade plus callbacks for `Random` and
@@ -111,18 +110,18 @@ coupling:
 - After those: town growth, road/rail vehicle controllers, YAPF rail/road.
 
 Map/tile storage and pool ownership will need a design note before any of
-these crosses into shared world state. Astra high writes it now, as
-`docs/design/world-state.md` (about 80 lines: options, the chosen boundary,
-callback costs, and how saves and the harness stay unchanged), and root
-accepts it by merging it like any other PR.
+these crosses into shared world state. The design is
+[`docs/design/world-state.md`](design/world-state.md) (#90), authored by Astra high
+and accepted by root under the docs-only direct-commit rule. It chooses component
+owners with one canonical world store and specifies callback, lifetime and save
+constraints; storage transfers still require explicit roadmap selection.
 
 ## Choosing the next task
 
 Take the first unblocked item from the earliest phase that has one. Work
 already in CI or review is not blocking: start the next item while it runs.
-Phases 1 and 2 and the design note run concurrently. At most two ports may sit
-implemented but unintegrated while they wait for #72; put spare capacity into
-#72, its harness scenarios and the bugs it finds. Paused, deferred and
+Phases 1 and 2 and the design note run concurrently. Keep the two selected ownership ports in flight; put spare capacity into
+their harness scenarios, independent review and any bugs the harness finds. Paused, deferred and
 out-of-scope issues are not fallbacks. Once #73 or #74 integrates, root picks
 the next phase 3 candidate and adds its issue here.
 
