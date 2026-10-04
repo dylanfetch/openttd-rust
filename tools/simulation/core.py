@@ -65,9 +65,9 @@ SNAPSHOT_TICKS = 32 * TICKS_PER_DAY
 
 def scenario_modules():
     """Families in scenario-list order; import after shared core initialization."""
-    from . import effects, generated, play_saves, rails, towns, trees
+    from . import disasters, effects, generated, play_saves, rails, ships, towns, trees
 
-    return generated, play_saves, towns, trees, effects, rails
+    return generated, play_saves, towns, trees, effects, rails, ships, disasters
 
 
 def scenario_list(soak):
@@ -418,7 +418,7 @@ def run_game(scenario, binary, build, run_dir, timeout, base_env=None, desync=Tr
         snapshots.append(autosave / "exit.sav")
     return {
         "exit": code,
-        "seconds": round(time.monotonic() - started, 1),
+        "seconds": round(time.monotonic() - started, 3),
         "snapshots": snapshots,
         "log": log_lines(run_dir),
         "stdout": (run_dir / "stdout.log").read_bytes(),
@@ -619,7 +619,11 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
                 )
             if mode == "snapshots":
                 result["snapshots"] = len(shorter) + bool(same_end)
-                if len(shorter) < 2 and "effects" not in scenario:
+                if (
+                    len(shorter) < 2
+                    and "effects" not in scenario
+                    and not scenario.get("short_checkpoint")
+                ):
                     result["problems"].append(
                         "fewer than two periodic snapshots were written"
                     )
@@ -685,6 +689,7 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
             or "town_name_input" in result
             or "tree_input" in result
             or "effect_input" in result
+            or "disaster_input" in result
         ):
             for mode in ("snapshots", "plain"):
                 shutil.rmtree(out / name / mode, ignore_errors=True)
@@ -749,6 +754,11 @@ def main():
         "--timeout", type=int, default=1200, help="seconds per game run"
     )
     parser.add_argument("--list", action="store_true")
+    parser.add_argument(
+        "--prepare-water-save",
+        choices=("ferry", "structures"),
+        help="build a committed ship fixture using only the pinned reference",
+    )
     args = parser.parse_args()
 
     every = scenario_list(args.soak)
@@ -775,6 +785,11 @@ def main():
     migration.COMMON_LOCAL.mkdir(parents=True, exist_ok=True)
     MACHINE = MachineLock(migration.COMMON_LOCAL / "simulation.lock")
     out.mkdir(parents=True)
+    if args.prepare_water_save:
+        from .ships import prepare_water_save
+
+        prepare_water_save(args.prepare_water_save, migration, out, args.timeout)
+        return 0
     # This is the checkout at invocation, not proof that an arbitrary --candidate
     # was built from it. The frozen executable's hash identifies what we execute.
     candidate_commit = migration.git("rev-parse", "HEAD")

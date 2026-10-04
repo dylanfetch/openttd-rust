@@ -2231,7 +2231,7 @@ bool AfterLoadGame()
 	if (IsSavegameVersionBefore(SLV_121)) {
 		/* Delete small ufos heading for non-existing vehicles */
 		for (DisasterVehicle *v : DisasterVehicle::Iterate()) {
-			if (v->subtype == 2 /* ST_SMALL_UFO */ && v->state != 0) {
+			if (v->subtype == 2 /* ST_SMALL_UFO */ && v->State() != 0) {
 				const Vehicle *u = Vehicle::GetIfValid(v->dest_tile.base());
 				if (u == nullptr || u->type != VEH_ROAD || !RoadVehicle::From(u)->IsFrontEngine()) {
 					delete v;

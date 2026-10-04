@@ -12,6 +12,7 @@ mod alternating;
 mod auth;
 mod byte_strings;
 mod consumer;
+mod disaster;
 mod history;
 mod integer;
 mod landscape;
@@ -1295,3 +1296,5 @@ pub unsafe extern "C" fn openttd_rust_inplace_write(
     }
     result
 }
+
+mod water_regions;

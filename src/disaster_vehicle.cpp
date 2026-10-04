@@ -53,6 +53,9 @@
 
 #include "safeguards.h"
 
+#ifdef WITH_RUST
+#include "rust/disaster_adapter.hpp"
+#else
 /** Delay counter for considering the next disaster. */
 uint16_t _disaster_delay;
 
@@ -993,6 +996,8 @@ void ReleaseDisasterVehicle(VehicleID vehicle)
 	GetAircraftFlightLevelBounds(v, &v->z_pos, nullptr);
 	v->age = CalendarTime::MIN_DATE;
 }
+
+#endif /* WITH_RUST */
 
 void DisasterVehicle::UpdateDeltaXY()
 {

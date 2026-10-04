@@ -25,6 +25,8 @@ add_test_files(
     test_script_admin.cpp
     test_window_desc.cpp
     townname.cpp
+    water_regions.cpp
+    water_regions_protocol.hpp
     tilearea.cpp
     utf8.cpp
 )
