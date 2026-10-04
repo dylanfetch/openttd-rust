@@ -5,17 +5,19 @@ Root owns this file and updates it when a phase completes or priorities change.
 to work on next. If an issue conflicts with this roadmap, follow the roadmap;
 a subagent stops and reports the conflict in its hand-off to root.
 
-## Where the fork stands (2026-10-03, `rust-migration` at `584aa2bd82`)
+## Where the fork stands (2026-10-03, `rust-migration` at `7a2858c469`)
 
 - Ported: one landscape kernel, StringConsumer/StringBuilder/UTF-8/byte-string
   utilities, history and spiral/alternating iterators, Script Admin JSON
   conversion, ScriptList storage and VM control (#70), the widget descriptor
   parser, authentication contexts, monocypher ChaCha20/Poly1305/AEAD/BLAKE2b/
-  X25519, Packet, string validation, and station cargo-list reducers.
-- Almost all of the ported code is still utility or vendored-library code.
-  Track each port with `tools/port-metrics.py`; phase 2 must change that balance.
-- Quality: the original behavior has been preserved carefully, every platform
-  build is green, and reviews are thorough.
+  X25519, Packet, string validation, and station cargo-list reducers. Rust now
+  also owns complete TGP terrain generation (#94) and link graph computation (#95).
+- Much of the simulation remains in C++. The first ownership ports retired
+  2,111 C++ lines with 219 lines of glue and 244 lines of tooling. Continue
+  selecting game logic and tracking each port with `tools/port-metrics.py`.
+- Quality: both ownership PRs passed required platform CI and independent review;
+  combined-branch evidence is recorded below.
 - Workflow (#80): worktrees share one reference build and a compiler cache, a
   fresh-worktree `verify` takes about a minute, comparisons run in parallel,
   and merges no longer force other PRs to be up to date.
@@ -55,7 +57,8 @@ Status: the harness is `python3 tools/migration.py simulate` (see
 `docs/rust-migration.md`, "Simulation comparison"); its default set runs in CI.
 The `play-*` scenarios cover road networks under manual distribution and
 cargodist (#84). Reload testing for #74 exposed build-history differences even
-without that port (#93); its fixture-only history reset is under review with #74.
+without that port (#93), fixed in #95 by resetting only prepared-input history
+and verifying all other chunks unchanged. No output masks were added.
 Port differences still require `KNOWN_FAILURES`, never masks. Rail, ship and
 aircraft scenarios (#86) come before ports of those vehicle types.
 
@@ -77,33 +80,38 @@ and CI fails on any other. The list is emptied by fixing the ports, never by
 masking fields. Those bug fixes are phase 1 items and take priority over new
 phase 2 or 3 work.
 
-## Phase 2: first game-logic ports with Rust-owned state
+## Phase 2: first game-logic ownership ports complete
 
-Both ports are implemented on separate branches and finishing evidence/review:
-`/root/tgp` owns #73 and `/root/link_graph` owns #74 (Sol high). The harness
-prerequisite is complete (#85/#87); integration requires a clean harness run with
-scenarios exercising the component (extend its scenario list). Both are
-self-contained, game-visible and deterministic, with a clean ownership boundary.
+Both ports integrated after separate Astra medium review and green required CI:
 
-- **#73 TGP terrain generator** (`src/tgp.cpp`). Rust owns the height map and
-  every generation stage. C++ keeps a facade plus callbacks for `Random` and
-  progress. The random-draw order and the float/double arithmetic must match
-  exactly.
-- **#74 Link graph job** (`src/linkgraph/demands.cpp`, `mcf.cpp`,
-  `flowmapper.cpp`). The job already runs on its own thread over a copy of the
-  graph. Rust takes a snapshot of that copy, computes the flows and returns them.
-  C++ keeps scheduling, save/load and the join.
+- **#73 TGP terrain generator**, PR #94 (`014968bd38`). Rust owns the height map
+  and every generation stage. C++ keeps settings, shared RNG, progress dispatch
+  and tile writes. Metrics: Rust 658, tooling 85, glue 84, C++ retired 991.
+- **#74 Link graph job**, PR #95 (`7a2858c469`). Rust owns demands, both MCF passes,
+  paths/cycles and flow mapping over copied job inputs. C++ keeps scheduling,
+  threads, save/load and station joins. Metrics: Rust 1040, tooling 159, glue 135,
+  C++ retired 1120. Both original implementations compile only in portable builds.
 
-Both issues set a budget for C++ glue, and both require the C++ body to be
-compiled only in the portable build.
+Local evidence includes 42 TGP soak cases (1,800 snapshots), 14 road soak cases
+(994), reference-self settings/reload runs and final-head default runs. PRs retain
+commands, receipts and limits. Root verified the combined `7a2858c469` branch: all four
+Cargo checks, 97 reference/111 candidate CTests, native generators, all 12 existing
+comparisons, Ruff and the default harness (20/20 scenarios, 401 snapshots, no differences) passed.
 
-## Phase 3 candidates
+## Phase 3: selected next task
 
-Start these after #73 or #74 integrates, choosing by what it taught about
-callback-heavy boundaries. The candidates are roughly in order of increasing
-coupling:
+**#96 Built-in town-name generation** (`src/townname.cpp`) is next. Implementation
+owner: `/root/town_names` (Sol high); a separate Astra medium agent reviews it.
+Rust will own all 21 generators, seed selection, private output and generator
+constants. C++ keeps NewGRF routing, town-name retry/uniqueness checks and the
+legacy loader's shared tables. The harness must compare rendered names through
+observer AI logs as well as saved state, using identical prepared inputs for
+explicit name seeds. This samples the 32-bit seed domain; it is not exhaustive.
 
-- Town name generation (`townname.cpp`): pure, and can be compared exhaustively.
+TGP and link graph favor coarse calls over copied inputs with private Rust state,
+nonthrowing leaf callbacks and complete results. Apply that boundary to #96.
+Remaining candidates, roughly in order of increasing coupling:
+
 - Tree tile loop and tree placement (`tree_cmd.cpp`): tile-loop callbacks and
   `Random`.
 - Effect and disaster vehicles (`effectvehicle.cpp`, `disaster_vehicle.cpp`):
@@ -123,10 +131,10 @@ constraints; storage transfers still require explicit roadmap selection.
 
 Take the first unblocked item from the earliest phase that has one. Work
 already in CI or review is not blocking: start the next item while it runs.
-Phases 1 and 2 and the design note run concurrently. Keep the two selected ownership ports in flight; put spare capacity into
-their harness scenarios, independent review and any bugs the harness finds. Paused, deferred and
-out-of-scope issues are not fallbacks. Once #73 or #74 integrates, root picks
-the next phase 3 candidate and adds its issue here.
+Harness regressions remain the first priority; otherwise proceed with #96.
+Keep spare capacity on its scenarios and independent review. Paused, deferred
+and out-of-scope issues are not fallbacks. Root selects further ownership work
+here before implementation starts.
 
 ## Out of scope for the near term
 
