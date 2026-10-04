@@ -5,18 +5,19 @@ Root owns this file and updates it when a phase completes or priorities change.
 to work on next. If an issue conflicts with this roadmap, follow the roadmap;
 a subagent stops and reports the conflict in its hand-off to root.
 
-## Where the fork stands (2026-10-04, `rust-migration` at `5991a6aacd`)
+## Where the fork stands (2026-10-04, `rust-migration` at `ff3648ba09`)
 
 - Ported: one landscape kernel, StringConsumer/StringBuilder/UTF-8/byte-string
   utilities, history and spiral/alternating iterators, Script Admin JSON
   conversion, ScriptList storage and VM control (#70), the widget descriptor
   parser, authentication contexts, monocypher ChaCha20/Poly1305/AEAD/BLAKE2b/
   X25519, Packet, string validation, and station cargo-list reducers. Rust now
-  also owns complete TGP terrain generation (#94) and link graph computation (#95).
+  also owns complete TGP terrain generation (#94), link graph computation (#95)
+  and all 21 built-in town-name generators (#98).
 - Much of the simulation remains in C++. The first ownership ports retired
   2,111 C++ lines with 219 lines of glue and 244 lines of tooling. Continue
   selecting game logic and tracking each port with `tools/port-metrics.py`.
-- Quality: both ownership PRs passed required platform CI and independent review;
+- Quality: these ownership PRs passed required platform CI and independent review;
   combined-branch evidence is recorded below.
 - Workflow (#80): worktrees share one reference build and a compiler cache, a
   fresh-worktree `verify` takes about a minute, comparisons run in parallel,
@@ -62,11 +63,11 @@ and verifying all other chunks unchanged. No output masks were added.
 Port differences still require `KNOWN_FAILURES`, never masks. Rail, ship and
 aircraft scenarios (#86) come before ports of those vehicle types.
 
-Selected evidence fix: **#97 freeze simulation runtime/provenance**. Long runs
-currently hash executables and read HEAD at the end; a rebuild can mix candidate
-executions and mislabel evidence. Root owns the isolated runtime and initial
-identity capture; Astra medium reviews it. Run this alongside #96, without
-changing semantic decoding or output masks.
+**#97 runtime/provenance freeze is complete** in #100 (`1c04143c36`). Both
+executables and runtime assets are copied before scenarios, with initial checkout
+identity and executed-file hashes. Three controlled rebuild tests cover default,
+custom and reference-self runs. Independent review and required CI passed; semantic
+decoding and output masks are unchanged.
 
 Original scope: run the reference and the candidate headlessly on identical
 scenarios, take periodic uncompressed snapshots using the existing `-d desync=3`
@@ -104,19 +105,24 @@ commands, receipts and limits. Root verified the combined `7a2858c469` branch: a
 Cargo checks, 97 reference/111 candidate CTests, native generators, all 12 existing
 comparisons, Ruff and the default harness (20/20 scenarios, 401 snapshots, no differences) passed.
 
-## Phase 3: selected next task
+## Phase 3: current ownership work
 
-**#96 Built-in town-name generation** (`src/townname.cpp`) is in progress. Implementation
-owner: `/root/town_names` (Sol high); a separate Astra medium agent reviews it.
-Rust will own all 21 generators, seed selection, private output and generator
-constants. C++ keeps NewGRF routing, town-name retry/uniqueness checks and the
-legacy loader's shared tables. The harness must compare rendered names through
-observer AI logs as well as saved state, using identical prepared inputs for
-explicit name seeds. This samples the 32-bit seed domain; it is not exhaustive.
-PR #98 is in CI with source review and local evidence complete.
+**#96 Built-in town-name generation is complete** in #98 (`ff3648ba09`). Rust
+owns all 21 generators, seed selection, private output and generator constants.
+C++ keeps NewGRF routing, retry/uniqueness and four legacy-loader tables. Independent
+Astra medium review and required CI passed. The harness compares rendered names
+and saved state: 42 generated/prepared cases with 106 explicit seed witnesses;
+default 62/62 scenarios (566 snapshots), town-name self/soak 42/42 each. This samples
+the 32-bit seed domain. Metrics: Rust 3296, tooling 241, glue 122, C++ retired 3848.
 
-**#99 Tree generation, simulation and planting commands** is selected alongside
-that review/CI. `/root/link_graph` (Sol high) owns implementation and
+Root checked the combined `ff3648ba09` branch: Cargo's four checks, 97 reference/
+112 candidate CTests, three provenance regression tests and Ruff passed. The
+default harness matched 62/62 scenarios, 562 snapshots in 140.6 seconds; receipts
+are `.local/verification/20261004T050321.116498Z/report.json` and
+`.local/simulation/20261004T050424Z-1034522/report.json`. No new differences or masks.
+
+**#99 Tree generation, simulation and planting commands** is in implementation
+and review. `/root/link_graph` (Sol high) owns implementation and
 `/root/town_name_evidence` (Sol high) owns harness scenarios; Astra medium reviews.
 Rust owns generation/placement, tree tile/tick loops and the private counter,
 plus planting/clearing command control. Apply the world-state design to live map
@@ -124,12 +130,21 @@ reads and reentrant water/NewGRF/command services. The standalone editor forest
 brush (`PlaceTreeGroupAroundTile`, InteractiveRandom and zone sweep) is an explicit
 follow-up; it uses the migrated placement helper. Rendering and GUI stay in C++.
 
+**#101 Effect-vehicle controllers and private state** is selected alongside #99
+review. `/root/town_names` (Sol high) owns implementation; Astra medium reviews.
+Move all 12 subtype controllers and private animation bytes into Rust; shared
+Vehicle fields, pools, viewport updates and rendering stay canonical in C++.
+Preserve caller setters and modern/legacy save adapters without a persistent
+state mirror. Short-horizon harness checkpoints must observe these brief-lived
+effects, plus natural creation and breakdown/bubble caller paths. Ordinary
+rail/ship/aircraft controllers remain untouched, so #86 is not a prerequisite.
+
 TGP and link graph favor coarse calls over copied inputs with private Rust state,
-nonthrowing leaf callbacks and complete results. Apply that boundary to #96.
+nonthrowing leaf callbacks and complete results. Trees and effects apply the
+world-state design where shared services can reenter or throw.
 Remaining candidates, roughly in order of increasing coupling:
 
-- Effect and disaster vehicles (`effectvehicle.cpp`, `disaster_vehicle.cpp`):
-  the first vehicle-type ownership work.
+- Disaster vehicles (`disaster_vehicle.cpp`).
 - Ship pathfinding (`pathfinder/water_regions.cpp`, YAPF ship).
 - Economy: cargo payment, inflation, station rating, industry production.
 - After those: town growth, road/rail vehicle controllers, YAPF rail/road.
@@ -145,8 +160,8 @@ constraints; storage transfers still require explicit roadmap selection.
 
 Take the first unblocked item from the earliest phase that has one. Work
 already in CI or review is not blocking: start the next item while it runs.
-Harness regressions remain the first priority; finish #97 while #96 integrates
-and #99 proceeds. Keep spare capacity on scenarios and independent review. Paused, deferred
+Harness regressions remain the first priority; complete #99 while #101 proceeds.
+Keep spare capacity on scenarios and independent review. Paused, deferred
 and out-of-scope issues are not fallbacks. Root selects further ownership work
 here before implementation starts.
 
