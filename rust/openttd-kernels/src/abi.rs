@@ -55,7 +55,7 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         18 => {
             layout!(crate::station_cargo::Collector, item; amount, previous, last_key, other, origin, selector, finalized)
         }
-        19..=21 => crate::crypto_primitives::abi_layout(type_id, item),
+        19..=21 => crate::crypto_primitives::abi_layout(u8::try_from(type_id).unwrap(), item),
         22 => crate::blake2b::abi_layout(item),
         23 => layout!(crate::packet::State, item; limit, position),
         24 => layout!(crate::packet::Frame, item; message, payload),
