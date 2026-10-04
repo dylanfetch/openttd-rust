@@ -193,6 +193,35 @@ def patch(source, target, changes, ai=None):
     }
 
 
+def negative_probes(source, folder, main):
+    """The unchanged semantic decoder must expose each Rust-private saved field."""
+    baseline = folder / "negative-baseline.sav"
+    patch(source, baseline, {})
+    observed = disasters(source)[main]
+    checked = []
+    for field in ("state", "image_override", "big_ufo_destroyer_target", "flags"):
+        changed = folder / f"negative-{field}.sav"
+        key = f"disaster[0]/{field}"
+        patch(source, changed, {"VEHS": {main: {key: observed[field] ^ 1}}})
+        differences = core.compare_saves(
+            baseline,
+            changed,
+            "disaster-negative",
+            2,
+            {"chunks": 0, "elements": 0, "masked": {}},
+        )
+        if (
+            len(differences) != 1
+            or differences[0]["chunk"] != "VEHS"
+            or differences[0]["element"] != str(main)
+            or differences[0]["field"] != key
+            or "issue" in differences[0]
+        ):
+            raise RuntimeError(f"semantic decoder hid private disaster field {field}")
+        checked.append(field)
+    return checked
+
+
 def calendar(year):
     return year * 365 + (year - 1) // 4 - (year - 1) // 100 + (year - 1) // 400 + 1
 
@@ -363,6 +392,7 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
             main = next(
                 index for index, row in live.items() if row["subtype"] == subtype
             )
+            receipt["negative_fields"] = negative_probes(natural, folder, main)
             edits = {"DATE": {0: {"next_disaster_start": 65535}}}
             params = {}
             if kind.startswith("industry"):

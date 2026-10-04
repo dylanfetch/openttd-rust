@@ -1139,3 +1139,31 @@ writes, transient service order, RNG thresholds, state lifetime and save staging
 factory tests cover Above/Rel coordinates. Viewport pixels, audible output,
 full legacy fixtures and every caller remain limits. Environmental exceptions
 terminate inside noexcept wrappers; Rust panics/OOM abort.
+
+### Disaster scheduling and vehicles
+
+Issue #103 moves all fifteen subtype controllers, eight initializers, eligibility,
+countdown/reset, industry construction reset and square-clearing policy, movement,
+shadow/rotor updates and both target-release hooks into Rust. Rust owns each
+shell's state, flags, image override and destroyer target, plus the persisted
+global delay. Original bodies compile only in portable builds. Canonical Vehicle
+fields, pools, map storage, save/load adapters, timer registration and rendering
+remain C++.
+
+Copied observations and direct noexcept shared services preserve original ordering
+and shared RNG draws. Private scalar addresses remain stable through modern and
+legacy save staging; flight helpers borrow only the flags scalar for their call.
+Returned actions are limited to vehicle deletion, RoadVehicle::Crash's window
+invalidation callbacks and landscape-clear command callbacks/nested release
+hooks; no world/private-state reference survives them. Per-call continuations
+hold copied IDs and observations; panics and environmental failures abort.
+
+`python3 tools/migration.py simulate disasters` checks naturally scheduled families,
+countdown boundaries, small/large airport crash/block/clear and queued events,
+real human-train UFO selection/landing/nearby breakdown/area clearing, road UFO
+crash/removal, industry reset/removal, submarine movement/expiry and live-target
+reload. `--self` checks the original against itself; `--soak` extends completion
+runs. Every saved chunk and debug log compares, with declared typed input edits.
+Native ABI/Rust tests exercise stable owners, width/wrap behavior, direct services
+and deletion cancellation. Legacy save fixtures, viewport pixels, sound output,
+allocator failure timing and exhaustive NewGRF combinations remain limits.
