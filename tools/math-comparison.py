@@ -14,11 +14,16 @@ import migration
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--reference", type=Path, default=migration.REFERENCE)
-    parser.add_argument("--output", type=Path, default=migration.LOCAL / "math-comparison")
+    parser.add_argument(
+        "--output", type=Path, default=migration.LOCAL / "math-comparison"
+    )
     args = parser.parse_args()
     reference = args.reference.resolve()
     output = args.output.resolve()
-    if migration.git("rev-parse", "HEAD", cwd=reference) != migration.BASELINE["commit"]:
+    if (
+        migration.git("rev-parse", "HEAD", cwd=reference)
+        != migration.BASELINE["commit"]
+    ):
         raise RuntimeError("Math oracle is not the pinned reference revision")
     if migration.git("status", "--porcelain", "--untracked-files=all", cwd=reference):
         raise RuntimeError("Math oracle source tree is dirty")
@@ -28,54 +33,134 @@ def main():
     records = []
 
     def run(command, name, *, expected_failure=False):
-        result = subprocess.run(command, cwd=migration.ROOT, env=env, text=True,
-                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        result = subprocess.run(
+            command,
+            cwd=migration.ROOT,
+            env=env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
         (output / f"{name}.log").write_text(result.stdout)
-        records.append({"name": name, "argv": list(map(str, command)), "exit_code": result.returncode,
-                        "expected_failure": expected_failure})
+        records.append(
+            {
+                "name": name,
+                "argv": list(map(str, command)),
+                "exit_code": result.returncode,
+                "expected_failure": expected_failure,
+            }
+        )
         if bool(result.returncode) != expected_failure:
-            raise RuntimeError(f"{name} had unexpected status {result.returncode}: {result.stdout}")
+            raise RuntimeError(
+                f"{name} had unexpected status {result.returncode}: {result.stdout}"
+            )
         return result.stdout
 
     configuration = migration.rust_configuration(migration.ROOT / "build-rust")
-    run(["cargo", "build", "--release", "--locked", "--target", configuration["target"]], "rust-build")
-    archive = migration.rust_archive(migration.ROOT / "build-rust", target_dir=output / "cargo")
+    run(
+        [
+            "cargo",
+            "build",
+            "--release",
+            "--locked",
+            "--target",
+            configuration["target"],
+        ],
+        "rust-build",
+    )
+    archive = migration.rust_archive(
+        migration.ROOT / "build-rust", target_dir=output / "cargo"
+    )
     fixture = migration.ROOT / "tools/migration/math-comparison.cpp"
-    report = {"baseline": migration.BASELINE, "candidate_commit": migration.git("rev-parse", "HEAD"),
-              "candidate_status": migration.git("status", "--short"), "commands": records,
-              "reference_sources": {}, "passed": False}
-    for name in ("src/core/math_func.cpp", "src/core/math_func.hpp", "src/core/overflowsafe_type.hpp", "src/core/strong_typedef_type.hpp"):
-        report["reference_sources"][name] = hashlib.sha256((reference / name).read_bytes()).hexdigest()
+    report = {
+        "baseline": migration.BASELINE,
+        "candidate_commit": migration.git("rev-parse", "HEAD"),
+        "candidate_status": migration.git("status", "--short"),
+        "commands": records,
+        "reference_sources": {},
+        "passed": False,
+    }
+    for name in (
+        "src/core/math_func.cpp",
+        "src/core/math_func.hpp",
+        "src/core/overflowsafe_type.hpp",
+        "src/core/strong_typedef_type.hpp",
+    ):
+        report["reference_sources"][name] = hashlib.sha256(
+            (reference / name).read_bytes()
+        ).hexdigest()
     try:
         for mode in ("asserts", "ndebug"):
             streams = {}
-            for label, source in (("reference", reference), ("portable", migration.ROOT), ("candidate", migration.ROOT)):
+            for label, source in (
+                ("reference", reference),
+                ("portable", migration.ROOT),
+                ("candidate", migration.ROOT),
+            ):
                 executable = output / f"{label}-{mode}"
-                command = ["c++", "-std=c++20", "-O2", "-ffunction-sections", "-fdata-sections", "-DFMT_HEADER_ONLY",
-                           "-I", str(source / "src"), str(fixture),
-                           str(source / "src/core/math_func.cpp"),
-                           "-Wl,--gc-sections", "-o", str(executable)]
+                command = [
+                    "c++",
+                    "-std=c++20",
+                    "-O2",
+                    "-ffunction-sections",
+                    "-fdata-sections",
+                    "-DFMT_HEADER_ONLY",
+                    "-I",
+                    str(source / "src"),
+                    str(fixture),
+                    str(source / "src/core/math_func.cpp"),
+                    "-Wl,--gc-sections",
+                    "-o",
+                    str(executable),
+                ]
                 if mode == "ndebug":
                     command.append("-DNDEBUG")
                 if label == "candidate":
-                    command.extend(["-DWITH_RUST", "-DMATH_ROUTE_PROBE", str(archive), "-ldl", "-lpthread", "-lm",
-                                    "-Wl,--wrap=openttd_rust_int_sqrt", "-Wl,--wrap=openttd_rust_clamp_to",
-                                    "-Wl,--wrap=openttd_rust_soft_clamp"])
+                    command.extend(
+                        [
+                            "-DWITH_RUST",
+                            "-DMATH_ROUTE_PROBE",
+                            str(archive),
+                            "-ldl",
+                            "-lpthread",
+                            "-lm",
+                            "-Wl,--wrap=openttd_rust_int_sqrt",
+                            "-Wl,--wrap=openttd_rust_clamp_to",
+                            "-Wl,--wrap=openttd_rust_soft_clamp",
+                        ]
+                    )
                 run(command, f"compile-{label}-{mode}")
                 stream = run([str(executable)], f"{label}-{mode}")
-                streams[label] = "".join(line + "\n" for line in stream.splitlines() if not line.startswith("Rust routing:"))
+                streams[label] = "".join(
+                    line + "\n"
+                    for line in stream.splitlines()
+                    if not line.startswith("Rust routing:")
+                )
                 if label == "candidate":
-                    report[f"{mode}_routing"] = next(line for line in stream.splitlines() if line.startswith("Rust routing:"))
+                    report[f"{mode}_routing"] = next(
+                        line
+                        for line in stream.splitlines()
+                        if line.startswith("Rust routing:")
+                    )
                     run(["nm", "-C", str(executable)], f"symbols-{mode}")
             for label in ("portable", "candidate"):
                 if streams["reference"] != streams[label]:
-                    diff = "".join(difflib.unified_diff(streams["reference"].splitlines(keepends=True),
-                                                       streams[label].splitlines(keepends=True),
-                                                       fromfile="reference", tofile=label))
+                    diff = "".join(
+                        difflib.unified_diff(
+                            streams["reference"].splitlines(keepends=True),
+                            streams[label].splitlines(keepends=True),
+                            fromfile="reference",
+                            tofile=label,
+                        )
+                    )
                     (output / f"difference-{label}-{mode}.diff").write_text(diff)
-                    raise RuntimeError(f"Math mismatch: {output / f'difference-{label}-{mode}.diff'}")
+                    raise RuntimeError(
+                        f"Math mismatch: {output / f'difference-{label}-{mode}.diff'}"
+                    )
             report[f"{mode}_lines"] = len(streams["reference"].splitlines())
-            report[f"{mode}_sha256"] = hashlib.sha256(streams["reference"].encode()).hexdigest()
+            report[f"{mode}_sha256"] = hashlib.sha256(
+                streams["reference"].encode()
+            ).hexdigest()
         # These strict-mode extended-type combinations were never accepted by
         # the pinned template; preserve failures while accepting unsigned widening.
         rejected = {
@@ -85,14 +170,31 @@ def main():
         }
         for name, expression in rejected.items():
             source_file = output / f"{name}.cpp"
-            source_file.write_text('#include "stdafx.h"\n#include "core/math_func.hpp"\nauto result = ' + expression + ';\n')
-            for label, source in (("reference", reference), ("portable", migration.ROOT), ("candidate", migration.ROOT)):
-                command = ["c++", "-std=c++20", "-fsyntax-only", "-I", str(source / "src"), str(source_file)]
+            source_file.write_text(
+                '#include "stdafx.h"\n#include "core/math_func.hpp"\nauto result = '
+                + expression
+                + ";\n"
+            )
+            for label, source in (
+                ("reference", reference),
+                ("portable", migration.ROOT),
+                ("candidate", migration.ROOT),
+            ):
+                command = [
+                    "c++",
+                    "-std=c++20",
+                    "-fsyntax-only",
+                    "-I",
+                    str(source / "src"),
+                    str(source_file),
+                ]
                 if label == "candidate":
                     command.append("-DWITH_RUST")
                 run(command, f"reject-{label}-{name}", expected_failure=True)
         report["preserved_rejections"] = list(rejected)
-        if migration.git("status", "--porcelain", "--untracked-files=all", cwd=reference):
+        if migration.git(
+            "status", "--porcelain", "--untracked-files=all", cwd=reference
+        ):
             raise RuntimeError("Reference became dirty during comparison")
         report["passed"] = True
     finally:

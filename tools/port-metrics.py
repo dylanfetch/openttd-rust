@@ -27,7 +27,9 @@ NEGATIVE = re.compile(r"^\s*!\s*defined\s*\(?\s*WITH_RUST\s*\)?\s*$")
 
 
 def git(*args):
-    return subprocess.check_output(["git", *args], cwd=ROOT, text=True, errors="replace")
+    return subprocess.check_output(
+        ["git", *args], cwd=ROOT, text=True, errors="replace"
+    )
 
 
 def classify(text):
@@ -39,11 +41,22 @@ def classify(text):
         lines.pop()
     for line in lines:
         match = DIRECTIVE.match(line)
-        kind, rest = (match.group(1), re.sub(r"/\*.*?\*/", " ", match.group(2)).split("//")[0].strip()) if match else (None, "")
+        kind, rest = (
+            (
+                match.group(1),
+                re.sub(r"/\*.*?\*/", " ", match.group(2)).split("//")[0].strip(),
+            )
+            if match
+            else (None, "")
+        )
         if kind in ("if", "ifdef", "ifndef"):
-            if (kind == "ifdef" and rest == "WITH_RUST") or (kind == "if" and POSITIVE.match(rest)):
+            if (kind == "ifdef" and rest == "WITH_RUST") or (
+                kind == "if" and POSITIVE.match(rest)
+            ):
                 frame = "rust"
-            elif (kind == "ifndef" and rest == "WITH_RUST") or (kind == "if" and NEGATIVE.match(rest)):
+            elif (kind == "ifndef" and rest == "WITH_RUST") or (
+                kind == "if" and NEGATIVE.match(rest)
+            ):
                 frame = "cpp"
             else:
                 frame = None
@@ -73,16 +86,26 @@ def state(stack):
 
 
 def show(rev, path):
-    result = subprocess.run(["git", "show", f"{rev}:{path}"], cwd=ROOT, capture_output=True, text=True, errors="replace")
+    result = subprocess.run(
+        ["git", "show", f"{rev}:{path}"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        errors="replace",
+    )
     return result.stdout if result.returncode == 0 else ""
 
 
 def hunks(base, head, old, new):
     """Yield (old start, old count, new start, new count) of a zero-context diff."""
-    for line in git("diff", "-U0", "-M", base, head, "--", *dict.fromkeys((old, new))).splitlines():
+    for line in git(
+        "diff", "-U0", "-M", base, head, "--", *dict.fromkeys((old, new))
+    ).splitlines():
         hunk = re.match(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", line)
         if hunk:
-            yield tuple(int(value) if value is not None else 1 for value in hunk.groups())
+            yield tuple(
+                int(value) if value is not None else 1 for value in hunk.groups()
+            )
 
 
 def added_lines(changes):
@@ -95,7 +118,12 @@ def surviving(changes, length):
     removed, shift, mapping = set(), [], {}
     for old_start, old_count, new_start, new_count in changes:
         removed.update(range(old_start, old_start + old_count))
-        shift.append((old_start + old_count - 1 if old_count else old_start, new_count - old_count))
+        shift.append(
+            (
+                old_start + old_count - 1 if old_count else old_start,
+                new_count - old_count,
+            )
+        )
     for n in range(1, length + 1):
         if n not in removed:
             mapping[n] = n + sum(delta for end, delta in shift if end < n)
@@ -120,29 +148,45 @@ def metrics(base, head="HEAD"):
     result = {"rust": 0, "tooling": 0, "glue": 0, "retired": 0}
     sources = (".cpp", ".h", ".hpp", ".c", ".cc", ".mm")
     for status, old, new in changes(base, head):
-        before, after = ("" if status == "A" else show(base, old)), ("" if status == "D" else show(head, new))
+        before, after = (
+            ("" if status == "A" else show(base, old)),
+            ("" if status == "D" else show(head, new)),
+        )
         diff = [] if status == "D" else list(hunks(base, head, old, new))
         # Lines of `new` that do not come from `old` (all of them for an added file).
         numbers = added_lines(diff)
         if new.startswith(("rust/", "tools/")) and status != "D":
             result["rust" if new.startswith("rust/") else "tooling"] += len(numbers)
-        if not (old.startswith("src/") or new.startswith("src/")) or not new.endswith(sources):
+        if not (old.startswith("src/") or new.startswith("src/")) or not new.endswith(
+            sources
+        ):
             continue
         head_tags, base_tags = classify(after), classify(before)
         kept = {} if status == "D" else surviving(diff, len(base_tags))
         # Original lines compiled with WITH_RUST that are now removed or C++-only.
-        result["retired"] += sum(1 for n, tag in enumerate(base_tags, 1)
-                                 if tag == "common" and (n not in kept or head_tags[kept[n] - 1] == "cpp"))
+        result["retired"] += sum(
+            1
+            for n, tag in enumerate(base_tags, 1)
+            if tag == "common" and (n not in kept or head_tags[kept[n] - 1] == "cpp")
+        )
         if status == "D":
             continue
-        result["glue"] += sum(1 for n in numbers if n <= len(head_tags) and head_tags[n - 1] != "cpp")
+        result["glue"] += sum(
+            1 for n in numbers if n <= len(head_tags) and head_tags[n - 1] != "cpp"
+        )
     return result
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--target", default="origin/rust-migration", help="branch the PR targets (default: origin/rust-migration)")
-    parser.add_argument("--head", default="HEAD", help="revision to measure (default: HEAD)")
+    parser.add_argument(
+        "--target",
+        default="origin/rust-migration",
+        help="branch the PR targets (default: origin/rust-migration)",
+    )
+    parser.add_argument(
+        "--head", default="HEAD", help="revision to measure (default: HEAD)"
+    )
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
     base = git("merge-base", args.target, args.head).strip()
@@ -150,8 +194,10 @@ def main():
     if args.json:
         print(json.dumps(dict(result, base=base)))
     else:
-        print(f"Rust added: {result['rust']} | tooling added: {result['tooling']} | "
-              f"C++ glue added: {result['glue']} | C++ retired: {result['retired']}")
+        print(
+            f"Rust added: {result['rust']} | tooling added: {result['tooling']} | "
+            f"C++ glue added: {result['glue']} | C++ retired: {result['retired']}"
+        )
 
 
 if __name__ == "__main__":

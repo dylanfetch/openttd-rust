@@ -27,8 +27,14 @@ def wire(payload):
 class Endpoint:
     def __init__(self, binary, role, transcript, env):
         self.role, self.transcript = role, transcript
-        self.process = subprocess.Popen([str(binary)], env=env, stdin=subprocess.PIPE,
-                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        self.process = subprocess.Popen(
+            [str(binary)],
+            env=env,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
 
     def call(self, command):
         self.process.stdin.write(command + "\n")
@@ -60,7 +66,8 @@ def scenario(server_binary, client_binary, env, extra_server, extra_client, mode
         result = server.call(f"recv-response {response} {hex_bytes(extra_server)}")
         success = extra_server == extra_client
         assert result == ("0 0" if success else "1 0")
-        server.call("state"); client.call("state")
+        server.call("state")
+        client.call("state")
         if mode == "failures":
             # Covered after a valid exchange so prior peer/key preservation is defined.
             for payload in (b"", bytes(55), bytes(57)):
@@ -69,21 +76,31 @@ def scenario(server_binary, client_binary, env, extra_server, extra_client, mode
                 client.call(f"recv-request {wire(payload)}")
                 client.call("state")
             for point in (3, 35, 51, len(bytes.fromhex(response)) - 1):
-                damaged = bytearray.fromhex(response); damaged[point] ^= 1
+                damaged = bytearray.fromhex(response)
+                damaged[point] ^= 1
                 server.call(f"recv-response {damaged.hex()} {hex_bytes(extra_server)}")
                 server.call("state")
                 server.call(f"recv-response {response} {hex_bytes(extra_server)}")
             for low_order in (bytes(32), b"\x01" + bytes(31)):
-                bad_request = bytearray.fromhex(request); bad_request[3:35] = low_order
+                bad_request = bytearray.fromhex(request)
+                bad_request[3:35] = low_order
                 client.call(f"recv-request {bad_request.hex()}")
-                assert client.call(f"response {hex_bytes(extra_client)}").split()[0] == "0"
+                assert (
+                    client.call(f"response {hex_bytes(extra_client)}").split()[0] == "0"
+                )
                 client.call("state")
-                bad_response = bytearray.fromhex(response); bad_response[3:35] = low_order
-                server.call(f"recv-response {bad_response.hex()} {hex_bytes(extra_server)}")
+                bad_response = bytearray.fromhex(response)
+                bad_response[3:35] = low_order
+                server.call(
+                    f"recv-response {bad_response.hex()} {hex_bytes(extra_server)}"
+                )
                 server.call("state")
             client.call(f"recv-request {request}")
             response = client.call(f"response {hex_bytes(extra_client)}").split()[1]
-            assert server.call(f"recv-response {response} {hex_bytes(extra_server)}") == "0 0"
+            assert (
+                server.call(f"recv-response {response} {hex_bytes(extra_server)}")
+                == "0 0"
+            )
             # Nonzero short nonce input is undefined in pinned Packet::Recv_bytes (#41).
             before = client.call("nonce")
             assert client.call(f"recv-nonce {wire(b'')}") == "0 0"
@@ -96,30 +113,43 @@ def scenario(server_binary, client_binary, env, extra_server, extra_client, mode
         if success:
             for side in (0, 1):
                 sender, receiver = (client, server) if side == 0 else (server, client)
-                sender.call(f"init-stream {side}"); receiver.call(f"init-stream {side}")
+                sender.call(f"init-stream {side}")
+                receiver.call(f"init-stream {side}")
                 for length in (0, 1, 8, 15, 16, 17, 63, 64, 65, 127, 256):
                     plaintext = bytes((i * 17 + length) & 255 for i in range(length))
                     encrypted = sender.call(f"encrypt {hex_bytes(plaintext)}").split()
                     mac, ciphertext = encrypted[1:3]
                     if mode == "failures":
-                        tampered = bytearray.fromhex(mac); tampered[0] ^= 128
-                        failed = receiver.call(f"decrypt {ciphertext} {tampered.hex()}").split()
+                        tampered = bytearray.fromhex(mac)
+                        tampered[0] ^= 128
+                        failed = receiver.call(
+                            f"decrypt {ciphertext} {tampered.hex()}"
+                        ).split()
                         assert failed[0] == "0" and failed[2] == ciphertext
                     if mode == "failures" and length:
-                        damaged = bytearray.fromhex(ciphertext); damaged[-1] ^= 1
-                        assert receiver.call(f"decrypt {damaged.hex()} {mac}").split()[0] == "0"
+                        damaged = bytearray.fromhex(ciphertext)
+                        damaged[-1] ^= 1
+                        assert (
+                            receiver.call(f"decrypt {damaged.hex()} {mac}").split()[0]
+                            == "0"
+                        )
                     decrypted = receiver.call(f"decrypt {ciphertext} {mac}").split()
                     assert decrypted[0] == "1" and decrypted[2] == hex_bytes(plaintext)
                     assert decrypted[3:] == encrypted[3:] and decrypted[4] == "0"
                     if mode == "failures":
-                        assert receiver.call(f"decrypt {ciphertext} {mac}").split()[0] == "0"
+                        assert (
+                            receiver.call(f"decrypt {ciphertext} {mac}").split()[0]
+                            == "0"
+                        )
                 sender.call("copy-stream")
                 first = sender.call("encrypt 010203")
                 sender.call("swap-stream")
                 assert sender.call("encrypt 010203") == first
-                sender.call("assign-stream"); sender.call("swap-stream")
+                sender.call("assign-stream")
+                sender.call("swap-stream")
         for endpoint in (server, client):
-            endpoint.call("copy"); assert endpoint.call("move-copy") == "1"
+            endpoint.call("copy")
+            assert endpoint.call("move-copy") == "1"
             endpoint.call("assign")
         # Separate public derived-key facade: exact halves, rejected peer preservation, copies.
         server_pub = bytes.fromhex(request)[3:35].hex()
@@ -139,7 +169,8 @@ def scenario(server_binary, client_binary, env, extra_server, extra_client, mode
         assert server.call("drop").split()[0] == "1"
         assert client.call("drop").split()[0] == "1"
     finally:
-        server.close(); client.close()
+        server.close()
+        client.close()
     return transcript
 
 
@@ -151,109 +182,274 @@ def main():
     archive = MIGRATION["rust_archive"](ROOT / "build-rust")
     fixture = ROOT / "tools/migration/auth-comparison.cpp"
     commands, binaries, ladder_shims = [], {}, {}
-    sources = ("src/network/network_crypto.cpp", "src/network/network_crypto_internal.h",
-               "src/network/core/packet.cpp", "src/3rdparty/monocypher/monocypher.cpp",
-               "src/3rdparty/monocypher/monocypher.h", "src/string.cpp", "src/core/string_builder.cpp", "src/core/string_inplace.cpp", "src/core/utf8.cpp")
-    for label, source in (("reference", REFERENCE), ("candidate", ROOT), ("candidate-cpp", ROOT)):
+    sources = (
+        "src/network/network_crypto.cpp",
+        "src/network/network_crypto_internal.h",
+        "src/network/core/packet.cpp",
+        "src/3rdparty/monocypher/monocypher.cpp",
+        "src/3rdparty/monocypher/monocypher.h",
+        "src/string.cpp",
+        "src/core/string_builder.cpp",
+        "src/core/string_inplace.cpp",
+        "src/core/utf8.cpp",
+    )
+    for label, source in (
+        ("reference", REFERENCE),
+        ("candidate", ROOT),
+        ("candidate-cpp", ROOT),
+    ):
         binary = OUT / label
         # Include unchanged actual vendor source and expose only its private
         # coarse helper. No copied field/ladder oracle or altered vendor body.
         shim = OUT / f"{label}-ladder.cpp"
-        shim.write_text(f'#include "{source / "src/3rdparty/monocypher/monocypher.cpp"}"\n'
-                        'extern "C" void FixtureLadder(uint8_t *out, const uint8_t *scalar, const uint8_t *point, int32_t bits) { scalarmult(out, scalar, point, bits); }\n')
-        ladder_shims[label] = {"path": str(shim), "sha256": hashlib.sha256(shim.read_bytes()).hexdigest()}
-        command = ["g++", "-std=c++20", "-O2", "-DUNIX", "-DFMT_HEADER_ONLY", "-ffunction-sections", "-fdata-sections",
-                   "-I", str(source / "src"), str(fixture),
-                   *[str(shim if name == "src/3rdparty/monocypher/monocypher.cpp" else source / name)
-                     for name in sources if name.endswith(".cpp") and name != "src/network/network_crypto.cpp"],
-                   "-Wl,--gc-sections", "-o", str(binary)]
+        shim.write_text(
+            f'#include "{source / "src/3rdparty/monocypher/monocypher.cpp"}"\n'
+            'extern "C" void FixtureLadder(uint8_t *out, const uint8_t *scalar, const uint8_t *point, int32_t bits) { scalarmult(out, scalar, point, bits); }\n'
+        )
+        ladder_shims[label] = {
+            "path": str(shim),
+            "sha256": hashlib.sha256(shim.read_bytes()).hexdigest(),
+        }
+        command = [
+            "g++",
+            "-std=c++20",
+            "-O2",
+            "-DUNIX",
+            "-DFMT_HEADER_ONLY",
+            "-ffunction-sections",
+            "-fdata-sections",
+            "-I",
+            str(source / "src"),
+            str(fixture),
+            *[
+                str(
+                    shim
+                    if name == "src/3rdparty/monocypher/monocypher.cpp"
+                    else source / name
+                )
+                for name in sources
+                if name.endswith(".cpp") and name != "src/network/network_crypto.cpp"
+            ],
+            "-Wl,--gc-sections",
+            "-o",
+            str(binary),
+        ]
         if label == "candidate":
             command.extend(["-DWITH_RUST", str(archive), "-ldl", "-lpthread", "-lm"])
         commands.append(command)
         with (OUT / f"{label}-compile.log").open("wb") as log:
-            subprocess.run(command, env=env, stdout=log, stderr=subprocess.STDOUT, check=True)
+            subprocess.run(
+                command, env=env, stdout=log, stderr=subprocess.STDOUT, check=True
+            )
         binaries[label] = binary
-    scenarios = [(b"", b"", "normal"), (b"password", b"password", "normal"),
-                 (b"a\x00b\xff", b"a\x00b\xff", "failures"), (b"password", b"wrong", "normal"),
-                 (b"password", b"", "normal")]
+    scenarios = [
+        (b"", b"", "normal"),
+        (b"password", b"password", "normal"),
+        (b"a\x00b\xff", b"a\x00b\xff", "failures"),
+        (b"password", b"wrong", "normal"),
+        (b"password", b"", "normal"),
+    ]
     comparisons, counts, hashes = 0, Counter(), {}
     for index, (server_extra, client_extra, mode) in enumerate(scenarios):
-        expected = scenario(binaries["reference"], binaries["reference"], env, server_extra, client_extra, mode)
+        expected = scenario(
+            binaries["reference"],
+            binaries["reference"],
+            env,
+            server_extra,
+            client_extra,
+            mode,
+        )
         counts.update(row[1].split()[0] for row in expected)
-        for server_label, client_label in (("reference", "candidate"), ("candidate", "reference"),
-                                          ("candidate", "candidate"), ("candidate-cpp", "candidate-cpp")):
+        for server_label, client_label in (
+            ("reference", "candidate"),
+            ("candidate", "reference"),
+            ("candidate", "candidate"),
+            ("candidate-cpp", "candidate-cpp"),
+        ):
             name = f"scenario-{index}-{server_label}-{client_label}"
-            actual = scenario(binaries[server_label], binaries[client_label], env, server_extra, client_extra, mode)
-            (OUT / f"{name}.json").write_text(json.dumps({"expected": expected, "actual": actual}, indent=2) + "\n")
+            actual = scenario(
+                binaries[server_label],
+                binaries[client_label],
+                env,
+                server_extra,
+                client_extra,
+                mode,
+            )
+            (OUT / f"{name}.json").write_text(
+                json.dumps({"expected": expected, "actual": actual}, indent=2) + "\n"
+            )
             if actual != expected:
-                raise RuntimeError(f"Mixed authentication discrepancy: {name}; see retained transcript")
+                raise RuntimeError(
+                    f"Mixed authentication discrepancy: {name}; see retained transcript"
+                )
             comparisons += len(actual)
             hashes[name] = hashlib.sha256(json.dumps(actual).encode()).hexdigest()
     # Only uncovered primitive variants/alias/buffer/padding/state cases. Expected
     # bytes always come from the actual pinned vendor binary, never from Rust.
     primitive_outputs = {}
     for label in ("reference", "candidate", "candidate-cpp"):
-        result = subprocess.run([str(binaries[label]), "--primitives"], env=env,
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        result = subprocess.run(
+            [str(binaries[label]), "--primitives"],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
         (OUT / f"{label}-primitives.out").write_bytes(result.stdout)
         (OUT / f"{label}-primitives.err").write_bytes(result.stderr)
         if result.returncode or result.stderr:
             raise RuntimeError(f"{label} direct primitives failed; see retained output")
         primitive_outputs[label] = result.stdout
         if label != "reference" and result.stdout != primitive_outputs["reference"]:
-            expected, actual = primitive_outputs["reference"].splitlines(), result.stdout.splitlines()
-            failures = [{"line": i + 1,
-                         "expected": expected[i].decode() if i < len(expected) else "<missing>",
-                         "actual": actual[i].decode() if i < len(actual) else "<missing>"}
-                        for i in range(max(len(expected), len(actual)))
-                        if (expected[i] if i < len(expected) else None) != (actual[i] if i < len(actual) else None)]
-            (OUT / "primitive-failures.json").write_text(json.dumps(failures, indent=2) + "\n")
+            expected, actual = (
+                primitive_outputs["reference"].splitlines(),
+                result.stdout.splitlines(),
+            )
+            failures = [
+                {
+                    "line": i + 1,
+                    "expected": expected[i].decode()
+                    if i < len(expected)
+                    else "<missing>",
+                    "actual": actual[i].decode() if i < len(actual) else "<missing>",
+                }
+                for i in range(max(len(expected), len(actual)))
+                if (expected[i] if i < len(expected) else None)
+                != (actual[i] if i < len(actual) else None)
+            ]
+            (OUT / "primitive-failures.json").write_text(
+                json.dumps(failures, indent=2) + "\n"
+            )
             raise RuntimeError(f"{label} primitive discrepancies: {len(failures)}")
     # Instrument the complete C++ fixture, Packet, vendor and facade boundary;
     # stable Rust allocations are leak-observable, Rust accesses are not ASan-instrumented.
     sanitizer = next(list(command) for command in commands if "-DWITH_RUST" in command)
     sanitizer[sanitizer.index("-o") + 1] = str(OUT / "candidate-sanitized")
-    sanitizer.extend(["-fsanitize=address,undefined", "-fno-omit-frame-pointer", "-g", "-no-pie"])
+    sanitizer.extend(
+        ["-fsanitize=address,undefined", "-fno-omit-frame-pointer", "-g", "-no-pie"]
+    )
     commands.append(sanitizer)
     with (OUT / "candidate-sanitized-compile.log").open("wb") as log:
-        subprocess.run(sanitizer, env=env, stdout=log, stderr=subprocess.STDOUT, check=True)
+        subprocess.run(
+            sanitizer, env=env, stdout=log, stderr=subprocess.STDOUT, check=True
+        )
     sanitized_env = env.copy()
     sanitized_env["ASAN_OPTIONS"] = "detect_leaks=1:abort_on_error=1"
     sanitized_env["UBSAN_OPTIONS"] = "halt_on_error=1:print_stacktrace=1"
-    for server_label, client_label in (("reference", "candidate-sanitized"), ("candidate-sanitized", "reference")):
-        server_binary = binaries[server_label] if server_label == "reference" else OUT / server_label
-        client_binary = binaries[client_label] if client_label == "reference" else OUT / client_label
-        actual = scenario(server_binary, client_binary, sanitized_env, b"a\x00b\xff", b"a\x00b\xff", "failures")
-        expected = scenario(binaries["reference"], binaries["reference"], env, b"a\x00b\xff", b"a\x00b\xff", "failures")
+    for server_label, client_label in (
+        ("reference", "candidate-sanitized"),
+        ("candidate-sanitized", "reference"),
+    ):
+        server_binary = (
+            binaries[server_label]
+            if server_label == "reference"
+            else OUT / server_label
+        )
+        client_binary = (
+            binaries[client_label]
+            if client_label == "reference"
+            else OUT / client_label
+        )
+        actual = scenario(
+            server_binary,
+            client_binary,
+            sanitized_env,
+            b"a\x00b\xff",
+            b"a\x00b\xff",
+            "failures",
+        )
+        expected = scenario(
+            binaries["reference"],
+            binaries["reference"],
+            env,
+            b"a\x00b\xff",
+            b"a\x00b\xff",
+            "failures",
+        )
         if actual != expected:
             raise RuntimeError("Sanitizer output changed")
-    result = subprocess.run([str(OUT / "candidate-sanitized"), "--primitives"], env=sanitized_env,
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    result = subprocess.run(
+        [str(OUT / "candidate-sanitized"), "--primitives"],
+        env=sanitized_env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
     (OUT / "candidate-sanitized-primitives.out").write_bytes(result.stdout)
     (OUT / "candidate-sanitized-primitives.err").write_bytes(result.stderr)
-    if result.returncode or result.stderr or result.stdout != primitive_outputs["reference"]:
-        raise RuntimeError("Direct primitive C++ boundary sanitizer failed; see retained output")
-    primitives = {"records": len(primitive_outputs["reference"].splitlines()),
-                  "record_counts": dict(Counter(row.split()[0].decode() for row in primitive_outputs["reference"].splitlines())),
-                  "output_sha256": {label: hashlib.sha256(output).hexdigest() for label, output in primitive_outputs.items()},
-                  "all_context_bytes_prefilled": True, "cpp_boundary_sanitizers_passed": True, "passed": True}
-    primitives["blake2b_records"] = sum(count for kind, count in primitives["record_counts"].items() if kind.startswith("blake-"))
-    primitives["x25519_records"] = sum(count for kind, count in primitives["record_counts"].items() if kind.startswith("x25519-"))
-    primitives["prior_cipher_mac_records"] = primitives["records"] - primitives["blake2b_records"] - primitives["x25519_records"]
+    if (
+        result.returncode
+        or result.stderr
+        or result.stdout != primitive_outputs["reference"]
+    ):
+        raise RuntimeError(
+            "Direct primitive C++ boundary sanitizer failed; see retained output"
+        )
+    primitives = {
+        "records": len(primitive_outputs["reference"].splitlines()),
+        "record_counts": dict(
+            Counter(
+                row.split()[0].decode()
+                for row in primitive_outputs["reference"].splitlines()
+            )
+        ),
+        "output_sha256": {
+            label: hashlib.sha256(output).hexdigest()
+            for label, output in primitive_outputs.items()
+        },
+        "all_context_bytes_prefilled": True,
+        "cpp_boundary_sanitizers_passed": True,
+        "passed": True,
+    }
+    primitives["blake2b_records"] = sum(
+        count
+        for kind, count in primitives["record_counts"].items()
+        if kind.startswith("blake-")
+    )
+    primitives["x25519_records"] = sum(
+        count
+        for kind, count in primitives["record_counts"].items()
+        if kind.startswith("x25519-")
+    )
+    primitives["prior_cipher_mac_records"] = (
+        primitives["records"]
+        - primitives["blake2b_records"]
+        - primitives["x25519_records"]
+    )
     MIGRATION["ensure_reference"]()
-    report = {"baseline": MIGRATION["BASELINE"], "candidate_commit": MIGRATION["git"]("rev-parse", "HEAD"),
-              "candidate_status": MIGRATION["git"]("status", "--porcelain"), "rust_archive": str(archive),
-              "commands": commands, "ladder_shims": ladder_shims, "scenario_count": len(scenarios), "compared_endpoint_records": comparisons, "primitives": primitives,
-              "original_record_counts": dict(counts), "transcript_sha256": hashes,
-              "reference_source_sha256": {name: hashlib.sha256((REFERENCE / name).read_bytes()).hexdigest() for name in sources},
-              "fixture_sha256": hashlib.sha256(fixture.read_bytes()).hexdigest(),
-              "sanitizer_scope": {"cpp_vendor_packet_fixture_and_facade": True, "rust_accesses_instrumented": False, "rust_allocation_leaks_checked": True, "passed": True},
-              "limits": ["Prescribed entropy verifies call order/bytes, not operating-system RNG quality",
-                         "Nonempty-short enable nonce is undefined in pinned Packet and excluded (#41)",
-                         "Observed outer session/shared/hash wipes are supplemented by prefilled Poly1305/BLAKE2b final context checks; compiler spills are not fully observable",
-                         "Protocol primitives are real bundled Monocypher, not mock crypto"], "passed": True}
+    report = {
+        "baseline": MIGRATION["BASELINE"],
+        "candidate_commit": MIGRATION["git"]("rev-parse", "HEAD"),
+        "candidate_status": MIGRATION["git"]("status", "--porcelain"),
+        "rust_archive": str(archive),
+        "commands": commands,
+        "ladder_shims": ladder_shims,
+        "scenario_count": len(scenarios),
+        "compared_endpoint_records": comparisons,
+        "primitives": primitives,
+        "original_record_counts": dict(counts),
+        "transcript_sha256": hashes,
+        "reference_source_sha256": {
+            name: hashlib.sha256((REFERENCE / name).read_bytes()).hexdigest()
+            for name in sources
+        },
+        "fixture_sha256": hashlib.sha256(fixture.read_bytes()).hexdigest(),
+        "sanitizer_scope": {
+            "cpp_vendor_packet_fixture_and_facade": True,
+            "rust_accesses_instrumented": False,
+            "rust_allocation_leaks_checked": True,
+            "passed": True,
+        },
+        "limits": [
+            "Prescribed entropy verifies call order/bytes, not operating-system RNG quality",
+            "Nonempty-short enable nonce is undefined in pinned Packet and excluded (#41)",
+            "Observed outer session/shared/hash wipes are supplemented by prefilled Poly1305/BLAKE2b final context checks; compiler spills are not fully observable",
+            "Protocol primitives are real bundled Monocypher, not mock crypto",
+        ],
+        "passed": True,
+    }
     (OUT / "report.json").write_text(json.dumps(report, indent=2) + "\n")
-    print(f"Authentication comparisons passed: {comparisons} mixed endpoint records + {primitives['records']} bounded primitive records; {OUT / 'report.json'}")
+    print(
+        f"Authentication comparisons passed: {comparisons} mixed endpoint records + {primitives['records']} bounded primitive records; {OUT / 'report.json'}"
+    )
 
 
 if __name__ == "__main__":
