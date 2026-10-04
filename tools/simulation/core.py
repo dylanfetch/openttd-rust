@@ -70,6 +70,7 @@ def scenario_modules():
         economy,
         effects,
         generated,
+        industries,
         play_saves,
         rails,
         ships,
@@ -87,6 +88,7 @@ def scenario_modules():
         ships,
         disasters,
         economy,
+        industries,
     )
 
 

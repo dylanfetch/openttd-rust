@@ -820,6 +820,9 @@ static bool LoadOldStation(LoadgameState &ls, int num)
 static std::array<Industry::AcceptedCargo, INDUSTRY_ORIGINAL_NUM_INPUTS> _old_accepted{};
 static std::array<Industry::ProducedCargo, INDUSTRY_ORIGINAL_NUM_OUTPUTS> _old_produced{};
 
+#ifdef WITH_RUST
+static OpenTTDIndustryFields _old_industry_fields;
+#endif
 static const OldChunks industry_chunk[] = {
 	OCL_SVAR(   OC_TILE, Industry, location.tile ),
 	OCL_VAR ( OC_UINT32,   1, &_old_town_index ),
@@ -837,7 +840,11 @@ static const OldChunks industry_chunk[] = {
 
 	OCL_NULL( 3 ),  ///< used to be industry's accepts_cargo
 
+#ifdef WITH_RUST
+	OCL_VAR( OC_UINT8, 1, &_old_industry_fields.prod_level ),
+#else
 	OCL_SVAR(  OC_UINT8, Industry, prod_level ),
+#endif
 
 	OCL_VAR( OC_UINT16, 1, &_old_produced[0].history[THIS_MONTH].production ),
 	OCL_VAR( OC_UINT16, 1, &_old_produced[1].history[THIS_MONTH].production ),
@@ -852,12 +859,28 @@ static const OldChunks industry_chunk[] = {
 	OCL_VAR( OC_UINT16, 1, &_old_produced[1].history[LAST_MONTH].transported ),
 
 	OCL_SVAR(  OC_UINT8, Industry, type ),
+#ifdef WITH_RUST
+	OCL_VAR( OC_TTO | OC_FILE_U8 | OC_VAR_U16, 1, &_old_industry_fields.counter ),
+#else
 	OCL_SVAR( OC_TTO | OC_FILE_U8 | OC_VAR_U16, Industry, counter ),
+#endif
 	OCL_SVAR(  OC_UINT8, Industry, owner ),
 	OCL_SVAR(  OC_UINT8, Industry, random_colour ),
+#ifdef WITH_RUST
+	OCL_VAR( OC_TTD | OC_FILE_U8 | OC_VAR_I32, 1, &_old_industry_fields.last_prod_year ),
+#else
 	OCL_SVAR( OC_TTD | OC_FILE_U8 | OC_VAR_I32, Industry, last_prod_year ),
+#endif
+#ifdef WITH_RUST
+	OCL_VAR( OC_TTD | OC_UINT16, 1, &_old_industry_fields.counter ),
+#else
 	OCL_SVAR( OC_TTD | OC_UINT16, Industry, counter ),
+#endif
+#ifdef WITH_RUST
+	OCL_VAR( OC_TTD | OC_UINT8, 1, &_old_industry_fields.was_cargo_delivered ),
+#else
 	OCL_SVAR( OC_TTD | OC_UINT8, Industry, was_cargo_delivered ),
+#endif
 
 	OCL_CNULL( OC_TTD, 9 ), ///< Random junk at the end of this chunk
 
@@ -867,7 +890,14 @@ static const OldChunks industry_chunk[] = {
 static bool LoadOldIndustry(LoadgameState &ls, int num)
 {
 	Industry *i = new (IndustryID(num)) Industry();
+#ifdef WITH_RUST
+	_old_industry_fields = i->ProductionFields();
+	bool loaded = LoadChunk(ls, i, industry_chunk);
+	i->ProductionFields() = _old_industry_fields;
+	if (!loaded) return false;
+#else
 	if (!LoadChunk(ls, i, industry_chunk)) return false;
+#endif
 
 	if (i->location.tile != 0) {
 		/* Copy data from old fixed arrays to industry. */

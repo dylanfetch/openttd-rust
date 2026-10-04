@@ -1230,3 +1230,30 @@ and recalc time 9000; existing play scenarios retain frequent link-graph jobs.
 CTest/Windows ABI evidence checks owner settlement/cleanup and layouts.
 NewGRF resolver execution, legacy CAPY files and every industry layout are not
 exhaustive in the semantic corpus; the narrow fixture supplies callback results.
+
+### Industry periodic production and builder ownership (#129)
+
+Rust owns the produced/accepted slots, optional accepted histories, production
+fields, sound countdown and industry-builder records. C++ industry shells expose
+nonowning views of these allocations; INDY, IBLD, ITBL, ECMY and TTO/TTD load
+adapters preserve the original names, widths, version gates and ordering.
+Rust controls production/transport ticks, farm fields/fences, lumber harvesting,
+NewGRF production repeats/application, production commands and trimming,
+monthly statistics/change/closure, daily changes and builder targets/retries.
+The original selected bodies remain in the portable C++ path.
+
+Pool/map/spec storage, construction and landscape-clear transactions, presentation
+and bounded NewGRF resolution remain direct `noexcept` world services. Construction,
+clearing, cargo distribution and destruction can reenter industry accessors;
+Rust retains no owner reference across them. Script events only enqueue; save/load
+errors remain native. CargoPayment delivery and its original-end flush remain #117.
+ABI IDs 130–138 cover canonical records and synchronous services.
+
+`python3 tools/migration.py simulate industry-` reuses real cargo saves, generated
+climates/economies and disaster reset/release, with explicit production-control,
+closure and builder inputs. A committed reference setup AI funds a tropical lumber
+mill; checks witness harvesting, farm growth, history and builder backoff. `--self`
+and `--soak` add determinism and yearly history evidence. `python3 -m
+tools.simulation.industries` checks absent NewGRF versions/repeat/arithmetic against
+the unchanged pinned callback body. The corpus does not exhaust legacy saves,
+NewGRF resolver programs or every industry layout; native tests check ABI/lifetimes.
