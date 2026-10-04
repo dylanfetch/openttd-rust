@@ -11,6 +11,7 @@ mod admin_conversion;
 mod alternating;
 mod auth;
 mod byte_strings;
+mod cargo_payment;
 mod consumer;
 mod disaster;
 mod history;

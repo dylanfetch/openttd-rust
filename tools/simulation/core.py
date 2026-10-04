@@ -65,9 +65,29 @@ SNAPSHOT_TICKS = 32 * TICKS_PER_DAY
 
 def scenario_modules():
     """Families in scenario-list order; import after shared core initialization."""
-    from . import disasters, effects, generated, play_saves, rails, ships, towns, trees
+    from . import (
+        disasters,
+        economy,
+        effects,
+        generated,
+        play_saves,
+        rails,
+        ships,
+        towns,
+        trees,
+    )
 
-    return generated, play_saves, towns, trees, effects, rails, ships, disasters
+    return (
+        generated,
+        play_saves,
+        towns,
+        trees,
+        effects,
+        rails,
+        ships,
+        disasters,
+        economy,
+    )
 
 
 def scenario_list(soak):
@@ -619,13 +639,14 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
                 )
             if mode == "snapshots":
                 result["snapshots"] = len(shorter) + bool(same_end)
-                if (
-                    len(shorter) < 2
-                    and "effects" not in scenario
-                    and not scenario.get("short_checkpoint")
+                if len(shorter) < scenario.get(
+                    "snapshot_minimum",
+                    0
+                    if "effects" in scenario or scenario.get("short_checkpoint")
+                    else 2,
                 ):
                     result["problems"].append(
-                        "fewer than two periodic snapshots were written"
+                        "fewer than the required periodic snapshots were written"
                     )
                 # Console output is invisible without a GUI, so confirm each
                 # setting line took effect in the first snapshot of both runs.
@@ -689,6 +710,7 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
             or "town_name_input" in result
             or "tree_input" in result
             or "effect_input" in result
+            or "economy_input" in result
             or "disaster_input" in result
         ):
             for mode in ("snapshots", "plain"):
