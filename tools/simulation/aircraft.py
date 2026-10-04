@@ -1,8 +1,10 @@
-"""Reference-built supplemental aircraft transport fixture (#86)."""
+"""Reference-built aircraft transport/controller evidence (#86/#136)."""
 
 import hashlib
 import json
 import shutil
+import subprocess
+import threading
 from pathlib import Path
 
 from . import core
@@ -16,11 +18,15 @@ from .core import (
     run_game,
     save_moment,
 )
+from .disasters import patch, rows
 from .play_saves import DISTRIBUTIONS
+
+AI_FOLDER = "aircraft-controller-ai"
+LOCK = threading.Lock()
 
 
 def scenarios(soak):
-    return [
+    cases = [
         {
             "name": f"aircraft-route-{distribution}",
             "kind": "save",
@@ -32,9 +38,53 @@ def scenarios(soak):
         for distribution, commands in DISTRIBUTIONS.items()
     ]
 
+    cases += [
+        {
+            "name": f"aircraft-controller-{kind}",
+            "kind": "save",
+            "aircraft_control": kind,
+            "ticks": (2 if soak else 1) * 365 * TICKS_PER_DAY + SNAPSHOT_TICKS
+            if kind in ("traffic", "closure", "ownerless")
+            else 6000,
+            "short_checkpoint": True,
+            "console": ["unpause"],
+        }
+        for kind in (
+            "traffic",
+            "closure",
+            "zeppelin",
+            "removal",
+            "crash",
+            "reload",
+            "ownerless",
+        )
+    ]
+    return cases
+
+
+def uses_ai(scenario):
+    return "aircraft_control" in scenario
+
+
+def install(scenario, run_dir):
+    if scenario.get("aircraft_controller_setup") or scenario.get("aircraft_action"):
+        scripts = run_dir / "ai/aircraft-controller"
+        shutil.copytree(scenario["scenario_ai"], scripts)
+        (scripts / "parameters.nut").write_text(
+            f'AIRCRAFT_ACTION <- "{scenario.get("aircraft_action", "none")}";\n'
+            f"AIRCRAFT_TARGET <- {scenario.get('aircraft_action_target', 0)};\n"
+            f"AIRCRAFT_COUNT <- {scenario.get('aircraft_count', 8)};\n"
+            f"AIRCRAFT_AIRPORTS <- {json.dumps(scenario.get('aircraft_action_airports', []))};\n"
+            f"AIRCRAFT_OILRIG <- {str(scenario.get('aircraft_oilrig', False)).lower()};\n"
+        )
+
 
 def game_args(scenario):
-    return ["-d", "script=2"] if scenario.get("aircraft_setup") else []
+    return (
+        ["-d", "script=2"]
+        if scenario.get("aircraft_setup") or scenario.get("aircraft_controller_setup")
+        else []
+    )
 
 
 def prepare_aircraft_save(migration, out, timeout):
@@ -127,6 +177,9 @@ def prepare_aircraft_save(migration, out, timeout):
 
 
 def check(scenario, run, mode, role, result):
+    if scenario.get("aircraft_control"):
+        check_control(scenario, run, mode, role, result)
+        return
     if not scenario.get("aircraft_fixture"):
         return
     source = Path(scenario["save"])
@@ -199,3 +252,468 @@ def check(scenario, run, mode, role, result):
             "positive_profit_deltas": paid,
         }
     result[f"{mode}_{role}_aircraft"] = witnesses
+
+
+def finite_range_probe(folder, candidate_build, env):
+    """No supplied NewGRF gives finite aircraft range: check unchanged bodies."""
+    import migration
+
+    source = (migration.REFERENCE / "src/aircraft_cmd.cpp").read_text()
+    begin = source.index("static void AircraftHandleDestTooFar(")
+    end = source.index("bool Aircraft::Tick()", begin)
+    (folder / "aircraft-range-reference.inc").write_text(source[begin:end])
+    archive = next((candidate_build / "cargo").glob("*/release/libopenttd_kernels.a"))
+    probe = folder / "aircraft-range"
+    command = [
+        "c++",
+        "-std=c++20",
+        "-O2",
+        "-fno-strict-overflow",
+        "-I",
+        str(ROOT / "src"),
+        "-I",
+        str(folder),
+        str(ROOT / "tools/migration/aircraft-range.cpp"),
+        str(archive),
+        "-ldl",
+        "-lpthread",
+        "-lm",
+        "-o",
+        str(probe),
+    ]
+    compiled = subprocess.run(
+        command, env=env, text=True, capture_output=True, check=True
+    )
+    (folder / "range-build.log").write_text(compiled.stdout + compiled.stderr)
+    checked = subprocess.run(
+        [str(probe)], env=env, text=True, capture_output=True, check=True
+    )
+    (folder / "range-check.log").write_text(checked.stdout + checked.stderr)
+    return {
+        "command": command,
+        "output": checked.stdout.strip(),
+        "reference_sha256": hashlib.sha256(source[begin:end].encode()).hexdigest(),
+    }
+
+
+def prepare(scenario, binaries, builds, out, timeout, env, result):
+    """Reference-built airport layouts and explicitly declared branch inputs."""
+    if not scenario.get("aircraft_control"):
+        return scenario
+    with LOCK:
+        kind = scenario["aircraft_control"]
+        count = 1 if kind in ("removal", "crash", "ownerless") else 8
+        folder = (
+            out
+            / f"aircraft-controller-fixture-{count}{'-oilrig' if kind == 'ownerless' else ''}"
+        )
+        source = folder / "save/autosave/exit.sav"
+        if not source.exists():
+            setup = {
+                "kind": "generate",
+                "aircraft_controller_setup": True,
+                "aircraft_count": count,
+                "aircraft_oilrig": kind == "ownerless",
+                "scenario_ai": scenario["scenario_ai"],
+                "seed": 86,
+                "map_log2": 7,
+                "land_generator": 1,
+                "ticks": 6000,
+                "console": ["start_ai MigrationAircraftController", "unpause"],
+                "settings": {
+                    "game_creation": {
+                        "starting_year": 2000,
+                        "terrain_type": 0,
+                        "quantity_sea_lakes": 0,
+                        "variety": 0,
+                        "custom_town_number": 20,
+                    },
+                    "difficulty": {
+                        "number_towns": 4,
+                        "max_loan": 20_000_000,
+                        "disasters": "false",
+                    },
+                    "economy": {"initial_city_size": 4, "inflation": "false"},
+                    "vehicle": {"plane_crashes": 0},
+                },
+            }
+            if kind == "ownerless":
+                setup["settings"]["difficulty"]["quantity_sea_lakes"] = 2
+                setup["settings"]["construction"] = {"raw_industry_construction": 1}
+            with core.MACHINE.hold(alone=False):
+                trial = run_game(
+                    setup,
+                    binaries["reference"],
+                    builds["reference"],
+                    folder,
+                    timeout,
+                    env,
+                    False,
+                )
+            if trial["exit"] or not any(
+                "AIRCRAFT-CONTROL-END" in line for line in trial["log"]
+            ):
+                raise RuntimeError(
+                    f"reference aircraft controller construction failed: {folder}"
+                )
+        if kind == "zeppelin":
+            for attempt in range(40):
+                current = rows(source)
+                landing = next(
+                    (
+                        index
+                        for index, row in current.items()
+                        if row["type"] == 3
+                        and row["aircraft[0]/common[0]/subtype"] == 2
+                        and row["aircraft[0]/state"] == 15
+                        and row["aircraft[0]/pos"] == 33
+                    ),
+                    None,
+                )
+                if landing is not None:
+                    break
+                with core.MACHINE.hold(alone=False):
+                    trial = run_game(
+                        {
+                            "kind": "save",
+                            "save": str(source),
+                            "ticks": 64,
+                            "console": ["unpause"],
+                        },
+                        binaries["reference"],
+                        builds["reference"],
+                        folder / f"landing-{attempt}",
+                        timeout,
+                        env,
+                        False,
+                    )
+                if trial["exit"]:
+                    raise RuntimeError("reference landing preparation failed")
+                source = trial["snapshots"][-1]
+            else:
+                raise RuntimeError("reference aircraft never entered landing approach")
+        original = source.read_bytes()
+        ai_configuration = original[slice(*read_save(source)["AIPL"]["span"])]
+        if kind in ("removal", "crash"):
+            for attempt in range(30):
+                current = rows(source)
+                if any(
+                    row["type"] == 3
+                    and row["aircraft[0]/common[0]/subtype"] == 2
+                    and row["aircraft[0]/state"] == 14
+                    and row["aircraft[0]/targetairport"] == 1
+                    for row in current.values()
+                ):
+                    break
+                with core.MACHINE.hold(alone=False):
+                    trial = run_game(
+                        {
+                            "kind": "save",
+                            "save": str(source),
+                            "ticks": 128,
+                            "console": ["unpause"],
+                        },
+                        binaries["reference"],
+                        builds["reference"],
+                        folder / f"airborne-{attempt}",
+                        timeout,
+                        env,
+                        False,
+                    )
+                if trial["exit"]:
+                    raise RuntimeError("reference airborne removal preparation failed")
+                source = trial["snapshots"][-1]
+        allrows = rows(source)
+        heads = [
+            index
+            for index, row in allrows.items()
+            if row["type"] == 3 and row["aircraft[0]/common[0]/subtype"] <= 2
+        ]
+        stations = rows(source, "STNN")
+        airports = {
+            index: row
+            for index, row in stations.items()
+            if row.get("normal[0]/airport.type") in (4, 8, 9)
+        }
+        if len(heads) != 2 * count or len(airports) != (
+            4 if kind == "ownerless" else 3
+        ):
+            raise RuntimeError(
+                "controller reference input lacks all aircraft/airport layouts"
+            )
+        edits = {}
+        flight = next(
+            (
+                index
+                for index in heads
+                if (kind == "ownerless" or allrows[index]["aircraft[0]/state"] == 14)
+                and allrows[index]["aircraft[0]/common[0]/subtype"] == 2
+                and (
+                    kind not in ("removal", "crash")
+                    or allrows[index]["aircraft[0]/targetairport"] == 1
+                )
+            ),
+            None,
+        )
+        if flight is None:
+            raise RuntimeError("controller input lacks an airborne plane")
+        if kind == "zeppelin":
+            flight = landing
+        target = allrows[flight]["aircraft[0]/targetairport"]
+        action = {}
+        if kind in ("closure", "removal"):
+            action = {
+                "aircraft_action": kind,
+                "aircraft_action_target": target
+                if kind == "closure"
+                else airports[target]["normal[0]/airport.tile"],
+            }
+        elif kind == "crash":
+            action = {
+                "aircraft_action": "crash",
+                "aircraft_action_airports": [
+                    airports[index]["normal[0]/airport.tile"]
+                    for index in sorted(airports, reverse=True)
+                ],
+            }
+        elif kind == "zeppelin":
+            flags = airports[target]["normal[0]/airport.flags"]
+            edits["STNN"] = {
+                target: {"normal[0]/airport.flags": flags | (1 << 62) | (1 << 8)}
+            }
+        elif kind == "reload":
+            # A second reference run produces a live rotor/FTA reload, rather than
+            # changing candidate fields or expectations together.
+            resumed = folder / "reload"
+            with core.MACHINE.hold(alone=False):
+                trial = run_game(
+                    {
+                        "kind": "save",
+                        "save": str(source),
+                        "ticks": 411,
+                        "console": ["unpause"],
+                    },
+                    binaries["reference"],
+                    builds["reference"],
+                    resumed,
+                    timeout,
+                    env,
+                    False,
+                )
+            if trial["exit"]:
+                raise RuntimeError("reference live aircraft reload failed")
+            source = trial["snapshots"][-1]
+        destination = out / scenario["name"] / "input.sav"
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        receipt = patch(source, destination, edits)
+        if action:
+            # Reference stepping installed a dummy AI. Restore only the setup's
+            # exact AIPL configuration so both roles execute the frozen command.
+            data = destination.read_bytes()
+            begin, end = read_save(destination)["AIPL"]["span"]
+            destination.write_bytes(data[:begin] + ai_configuration + data[end:])
+            receipt["assignments"].append(
+                ["AIPL", "configuration", "reference setup AI restored"]
+            )
+            receipt["sha256"] = hashlib.sha256(destination.read_bytes()).hexdigest()
+        if "range_probe" not in scenario and not (folder / "range-check.log").exists():
+            import migration
+
+            result["aircraft_range_gap"] = finite_range_probe(
+                folder, migration.ROOT / "build-rust", env
+            )
+        result["aircraft_input"] = receipt
+        result["aircraft_input"]["heads"] = heads
+        result["aircraft_input"]["airports"] = sorted(airports)
+        result["aircraft_input"]["selected"] = flight
+        return dict(
+            scenario,
+            save=str(destination),
+            aircraft_heads=heads,
+            aircraft_selected=flight,
+            aircraft_airports=sorted(airports),
+            aircraft_target=target,
+            **action,
+        )
+
+
+def check_control(scenario, run, mode, role, result):
+    if scenario.get("aircraft_action") and not any(
+        f"AIRCRAFT-ACTION {scenario['aircraft_action']} true" in line
+        for line in run["log"]
+    ):
+        raise RuntimeError("aircraft airport command did not execute")
+    observations = [
+        rows(Path(scenario["save"])),
+        *[rows(path) for path in run["snapshots"]],
+    ]
+    stations = [
+        rows(Path(scenario["save"]), "STNN"),
+        *[rows(path, "STNN") for path in run["snapshots"]],
+    ]
+    states, pads, groups, waiting = set(), set(), set(), 0
+    rotor_states, shadow_positions = set(), set()
+    service, plane_service = False, False
+    waiting_details = []
+    occupied_wait = 0
+    blocked = []
+    closed_circling = 0
+    ownerless_landing = 0
+    for sample, snapshot in enumerate(observations):
+        for head in scenario["aircraft_heads"]:
+            if head not in snapshot:
+                continue
+            row = snapshot[head]
+            state = row["aircraft[0]/state"]
+            states.add(state)
+            target = row["aircraft[0]/targetairport"]
+            if (
+                state in (8, 9, 17, 18, 21)
+                and target in stations[sample]
+                and stations[sample][target]["normal[0]/airport.type"] == 9
+                and stations[sample][target]["normal[0]/base[0]/owner"] == 16
+            ):
+                ownerless_landing += 1
+            if (
+                scenario["aircraft_control"] == "closure"
+                and head == scenario["aircraft_selected"]
+                and state == 14
+                and row["aircraft[0]/targetairport"] == scenario["aircraft_target"]
+                and stations[sample][scenario["aircraft_target"]][
+                    "normal[0]/airport.flags"
+                ]
+                & (1 << 63)
+            ):
+                closed_circling += 1
+            if state in (8, 9, 21):
+                pads.add(state)
+            if state in range(2, 8):
+                groups.add(0 if state < 5 else 1)
+            prefix = "aircraft[0]/common[0]/"
+            if row[prefix + "cur_speed"] == 0 and state in (1, 10, 16, 18):
+                waiting += 1
+                target = row["aircraft[0]/targetairport"]
+                station = stations[sample][target]
+                mask = station["normal[0]/airport.flags"]
+                position = row["aircraft[0]/pos"]
+                waiting_details.append(
+                    [head, state, position, station["normal[0]/airport.type"], mask]
+                )
+                # Unchanged international FTA roots: hangar0 -> entrance block13;
+                # hangar1 -> hangar2-area block16. These source HasBlock paths
+                # reset speed while another aircraft owns the actual next block.
+                if (
+                    state == 1
+                    and station["normal[0]/airport.type"] == 4
+                    and position in (0, 1)
+                ):
+                    bit = 13 if position == 0 else 16
+                    if mask & (1 << bit):
+                        occupied_wait += 1
+                        blocked.append((sample, head, target, position, bit))
+                # Helistation buffer16 -> hangar-entry23 takes Hangar2Area16;
+                # an aircraft headed to HANGAR waits here for its owner to leave.
+                if (
+                    state == 1
+                    and station["normal[0]/airport.type"] == 8
+                    and position == 16
+                ):
+                    if mask & (1 << 16):
+                        occupied_wait += 1
+                        blocked.append((sample, head, target, position, 16))
+            shadow = snapshot[row[prefix + "next"] - 1]
+            shadow_positions.add(
+                tuple(shadow[prefix + field] for field in ("x_pos", "y_pos", "z_pos"))
+            )
+            if row[prefix + "subtype"] == 2:
+                plane_service |= (
+                    row[prefix + "date_of_last_service"]
+                    != observations[0][head][prefix + "date_of_last_service"]
+                )
+            if row[prefix + "subtype"] == 0:
+                rotor = snapshot[shadow[prefix + "next"] - 1]
+                rotor_states.add(rotor["aircraft[0]/state"])
+                service |= (
+                    row[prefix + "date_of_last_service"]
+                    != observations[0][head][prefix + "date_of_last_service"]
+                )
+    masks = [
+        snapshot[station]["normal[0]/airport.flags"]
+        for snapshot in stations
+        for station in scenario["aircraft_airports"]
+        if station in snapshot
+    ]
+    released_wait = sum(
+        any(
+            head in snapshot
+            and target in stations[later]
+            and snapshot[head]["aircraft[0]/pos"] != position
+            and not stations[later][target]["normal[0]/airport.flags"] & (1 << bit)
+            for later, snapshot in enumerate(observations)
+            if later > sample
+        )
+        for sample, head, target, position, bit in blocked
+    )
+    kind = scenario["aircraft_control"]
+    if (
+        kind == "traffic"
+        and mode == "snapshots"
+        and not (
+            groups == {0, 1}
+            and pads
+            and occupied_wait
+            and released_wait
+            and service
+            and plane_service
+            and len(set(masks)) > 3
+            and len(rotor_states) > 1
+            and len(shadow_positions) > 10
+        )
+    ):
+        raise RuntimeError(
+            f"controller branches missing: groups={groups}, pads={pads}, waits={waiting_details}, occupied={occupied_wait}, heli-service={service}, plane-service={plane_service}, rotors={rotor_states}"
+        )
+    if kind == "crash" and scenario["aircraft_selected"] in observations[-1]:
+        raise RuntimeError("crashed aircraft did not complete animation/deletion")
+    if kind == "removal" and any(
+        snapshot.get(1, {}).get("normal[0]/airport.tile", 0xFFFFFFFF) != 0xFFFFFFFF
+        for snapshot in stations[1:]
+    ):
+        raise RuntimeError("airborne airport removal did not persist")
+    if kind == "removal":
+        final = observations[-1].get(scenario["aircraft_selected"])
+        if (
+            final is None
+            or final["aircraft[0]/targetairport"] == scenario["aircraft_target"]
+        ):
+            raise RuntimeError("aircraft did not divert from its removed airport")
+    if kind == "zeppelin":
+        initial = observations[0][scenario["aircraft_selected"]]
+        if initial["aircraft[0]/state"] != 15 or not any(
+            snapshot[scenario["aircraft_selected"]]["aircraft[0]/state"] == 14
+            for snapshot in observations[1:]
+        ):
+            raise RuntimeError("zeppelin did not abort an actual aircraft landing")
+    if kind == "closure" and not any(mask & (1 << 63) for mask in masks):
+        raise RuntimeError("airport closure bit disappeared")
+    if kind == "closure" and mode == "snapshots" and closed_circling < 3:
+        raise RuntimeError("closed-airport aircraft did not continue circling")
+    if kind == "ownerless" and mode == "snapshots" and not ownerless_landing:
+        raise RuntimeError("helicopter did not land at the real ownerless oilrig")
+    if kind == "zeppelin" and not any(mask & (1 << 62) for mask in masks):
+        raise RuntimeError("zeppelin reservation bit disappeared")
+    result[f"{mode}_{role}_controller"] = {
+        "states": sorted(states),
+        "terminal_groups": sorted(groups),
+        "pads": sorted(pads),
+        "waiting": waiting_details,
+        "occupied_next_block_wait": occupied_wait,
+        "waited_block_released": released_wait,
+        "closed_airport_circling": closed_circling,
+        "ownerless_oilrig_landing": ownerless_landing,
+        "plane_service": plane_service,
+        "rotor_states": sorted(rotor_states),
+        "shadow_positions": len(shadow_positions),
+        "service": service,
+        "block_masks": sorted(set(masks)),
+    }

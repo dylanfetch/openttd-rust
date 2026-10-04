@@ -1431,3 +1431,58 @@ Validation uses the existing Padhattan manual/cargodist, realistic acceleration,
 A narrow unchanged-source comparison covers variable-length curve/reversal inputs
 unavailable in the stock fixture. The PR records commands and branch/NewGRF limits; passing these inputs does not prove
 exhaustive train equivalence.
+
+### Station cargo service
+
+Issue #125 moves the ordered loading queue, station service counters, acceptance
+mask and per-cargo rating/pickup/speed/age/waiting/fraction metadata into one
+canonical opaque Rust owner per BaseStation. C++ scalar references and the queue
+facade address that allocation; ordinary/indexed construction, retirement, reuse,
+STNN/STNS and legacy fixups share it without persistent native mirrors. Rust owns
+PrepareUnload, complete station/vehicle loading, refit/reservation/completion,
+acceptance, ratings/truncation, admission/distribution and periodic/stale-link
+control. Packet, flow, link-graph, map and geometry storage remain C++.
+
+ABI IDs 110-115 pin layouts and direct noexcept service tables. Raw field-sized
+access ends before every service; native refit/cache/command-scope GUI readers and
+payment/industry reentry see current canonical state. Stable raw-owned queue nodes
+preserve list iterator identity. Save/fixup errors unwind through a native stack
+scope and retain partial list changes. #117 production flush remains once at the
+original end of LoadUnloadStation. Original bodies remain in portable builds.
+
+`python3 tools/migration.py simulate stations economy` uses the existing road/CAPY
+inputs for loading queues, fractional admission, acceptance loss, full/gradual
+loading, rating expiry/decay/capping, stale-link refresh/removal and active reload.
+`--self` and `--soak` reuse these cases. Native tests cover ABI, stable aliases,
+queue mutation, partial/nested save failure and actual retirement/indexed reuse.
+The corpus is not exhaustive for legacy versions, NewGRF cargo callbacks,
+articulated/multiheaded refits or every transport combination.
+
+### Aircraft controllers and airport movement
+
+Issue #136 moves both tick passes, movement/speed/flight levels, shadow/rotor,
+all FTA traversal, terminal/group/helipad reservation, service/diversion/range,
+crash cleanup and airport replacement/destruction policies into Rust. Fixed Rust
+allocations own aircraft counters/cache and each station's airport block mask;
+placement-constructed trivial C++ facades retain save, legacy load and external-write
+addresses. Original bodies compile only in portable builds. Shared Vehicle/pools,
+orders/loading, airport geometry/FTA records and rendering remain C++.
+
+Rust copies world/FTA observations and calls bounded noexcept services directly,
+releasing scalar access before each call. ProcessOrders/UpdateOrderDest,
+VehicleEnterDepot/refit, Vehicle::Crash, depot commands and deletion return to
+the C++ stack for actual reentry; AI/Game event insertion only queues. Owners
+survive their original destruction policies and modern/legacy descriptor access.
+Flight helpers still accept disaster vehicles. Panics/environmental failures abort;
+wrapping counters and shared RNG retain original order.
+
+`python3 tools/migration.py simulate aircraft-route aircraft-controller disasters`
+compares every saved chunk and debug log: planes/helicopters, terminal groups,
+dedicated pads, occupied-block waits, service, closure diversion, zeppelin landing
+abort, airborne airport removal, out-of-fuel crash/destruction and live reload. `--self` and
+`--soak` check reproducibility/longer runs. A scenario-local native probe compares
+800 finite-range branches against unchanged reference helpers because supplied
+engines have unlimited range. ABI checks cover owner defaults/layout/lifetime.
+Full legacy files, arbitrary NewGRFs/airport rotations and viewport/sound output
+remain evidence limits. A reference-built ownerless oilrig route checks public
+helicopter landing through the ordinary FTA path.

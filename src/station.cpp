@@ -66,10 +66,12 @@ Station::Station(TileIndex tile) :
 	bus_station(INVALID_TILE, 0, 0),
 	truck_station(INVALID_TILE, 0, 0),
 	ship_station(INVALID_TILE, 0, 0),
-	indtype(IT_INVALID),
-	time_since_load(255),
+	indtype(IT_INVALID)
+#ifndef WITH_RUST
+	, time_since_load(255),
 	time_since_unload(255),
 	last_vehicle_type(VEH_INVALID)
+#endif
 {
 	/* this->random_bits is set in Station::AddFacility() */
 }
@@ -95,10 +97,14 @@ Station::~Station()
 		this->loading_vehicles.front()->LeaveStation();
 	}
 
+#ifdef WITH_RUST
+	InvalidateAircraftTargetStation(this->index);
+#else
 	for (Aircraft *a : Aircraft::Iterate()) {
 		if (!a->IsNormalAircraft()) continue;
 		if (a->targetairport == this->index) a->targetairport = StationID::Invalid();
 	}
+#endif
 
 	for (CargoType cargo = 0; cargo < NUM_CARGO; ++cargo) {
 		LinkGraph *lg = LinkGraph::GetIfValid(this->goods[cargo].link_graph);

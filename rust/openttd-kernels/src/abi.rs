@@ -194,6 +194,28 @@ pub fn layout(type_id: u8, item: u8) -> usize {
         }
         152 => layout!(crate::train::Leaves, item; observe,write,leaf,owner,nearby),
         153 => layout!(crate::train::Action, item; op,id,a,b,c),
+        110 => {
+            layout!(crate::station_service::CargoFields, item; max_waiting_cargo, status, time_since_pickup, rating, last_speed, last_age, amount_fract)
+        }
+        111 => {
+            layout!(crate::station_service::Fields, item; always_accepted, delete_ctr, time_since_load, time_since_unload, last_vehicle_type)
+        }
+        112 => {
+            layout!(crate::station_service::World, item; get, owner, read, effect, rating_callback, tiles, tile_next, tile_destroy, accept_tile, truncate, truncate_next, truncate_destroy, random)
+        }
+        113 => {
+            layout!(crate::station_service::Edge, item; destination, last_update, unrestricted, restricted, distance, node)
+        }
+        114 => {
+            layout!(crate::station_service::Links, item; graph, read, edge, effect, order_list, order_read, order_vehicle, next_vehicle, vehicle_read, refresh, reroute)
+        }
+        115 => {
+            layout!(crate::station_service::Loading, item; read, write, next, next_stations, next_stations_destroy, cargo, load_callback, payment, effect, refit)
+        }
+        180 => {
+            layout!(crate::aircraft::State, item; cached_max_range_sqr, cached_max_range, cache_padding, crashed_counter, targetairport, pos, previous_pos, state, last_direction, number_consecutive_turns, turn_counter, flags)
+        }
+        181 => layout!(crate::aircraft::Action, item; kind, id, other, a, b, c, d),
         _ => usize::MAX,
     }
 }
