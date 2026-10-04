@@ -1302,6 +1302,19 @@ mod tests {
         destroy(outer);
     }
     #[test]
+    fn shared_viewport_reentry_refreshes_canonical_age_before_phase_transition() {
+        let mut fixture = Fixture::default();
+        fixture.vehicle[TICK] = 1;
+        fixture.private.state = 1;
+        let run = owner(&mut fixture, 0, 17);
+        assert_eq!(advance(run, 0).kind, 5);
+        assert_eq!(advance(run, 100).kind, 4);
+        fixture.vehicle[AGE] = 37; // A shared service changed canonical age while suspended.
+        assert_eq!(advance(run, 0).kind, 0);
+        assert_eq!((fixture.private.state, fixture.vehicle[AGE]), (2, 0));
+        destroy(run);
+    }
+    #[test]
     fn failed_pool_capacity_consumes_no_initializer_rng() {
         for kind in 0..7 {
             let mut fixture = Fixture::default();
