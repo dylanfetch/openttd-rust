@@ -19,4 +19,14 @@ their settings appear in the first snapshot.
 | `opus-5-133-009.sav` | 133-game-time-variance-opus-episode-009 |
 | `fable-152-004.sav` | 152-game-time-variance-fable-episode-004 |
 
-Road vehicles only. Rail, ship and aircraft scenarios are #86.
+These are road vehicles only.
+
+## Hand-built multimodal save (#86)
+
+`padhattan-ridge-1996.sav` was built by hand by the repository owner in
+OpenTTD 15.3 (savegame version 362) on a 128x128 temperate map: one human
+company (no AI, no GameScript, no NewGRFs), started 1990 and saved paused in
+August 1996 with breakdowns on. It runs a two-train rail network with signals,
+one ship route and road vehicles. No aircraft yet; the aircraft slice of #86
+remains open. The `play-padhattan-ridge-1996-*` scenarios load it with manual
+distribution and with cargodist.

@@ -50,6 +50,8 @@ MASKS = {
     # vehicle built in a reused pool slot saves stale heap bytes until its first
     # measured round trip; the reference differs from itself here (#83).
     ("VEHS", "*/common/round_trip_time"): "uninitialized in the original",
+    # Not a field pattern: see gamelog_elements().
+    ("GLOG", "load entry with only a revision change"): "build identity",
 }
 
 # Known reference-vs-candidate divergences caused by existing ports, recorded by
@@ -74,6 +76,10 @@ PLAY_SAVES = (
     "opus-5-133-009",
     "fable-152-004",
 )
+# Hand-built by the repository owner for #86 (migration/saves/README.md): one
+# human company running trains with signals, road vehicles and a ship on a
+# 128x128 temperate map saved in OpenTTD 15.3. No aircraft yet. Runs by default.
+MULTIMODAL_SAVES = ("padhattan-ridge-1996",)
 # Console commands run from scripts/game_start.scr after loading; the saves were
 # written paused. cargodist uses short link graph intervals so jobs recur often.
 DISTRIBUTIONS = {
@@ -260,7 +266,7 @@ def scenario_list(soak):
                 },
             }
         )
-    for save in PLAY_SAVES if soak else PLAY_SAVES[:2]:
+    for save in (PLAY_SAVES if soak else PLAY_SAVES[:2]) + MULTIMODAL_SAVES:
         for distribution, commands in DISTRIBUTIONS.items():
             scenarios.append(
                 {
@@ -582,6 +588,27 @@ def mask_for(cid, path):
     )
 
 
+def gamelog_elements(chunk, stats):
+    """GLOG elements by position, without load entries that only record the build.
+
+    Loading logs a revision change only when the save's writer differs from the
+    running binary (Gamelog::TestRevision), so a save written by stock 15.3 makes
+    the candidate log one and the reference none. Those entries are build
+    identity, like the masked revision fields; dropping them keeps the rest
+    aligned."""
+    kept = []
+    for _, element in chunk["elements"]:
+        fields = decode_element(chunk, element)
+        if fields is not None and fields.get("at") == 1:  # GLAT_LOAD
+            changes = {v for k, v in fields.items() if k.endswith("/ct")}
+            if changes == {1}:  # GLCT_REVISION only
+                key = "GLOG:load entry with only a revision change"
+                stats["masked"][key] = stats["masked"].get(key, 0) + 1
+                continue
+        kept.append(element)
+    return dict(enumerate(kept))
+
+
 def compare_chunk(cid, ref, cand, stats):
     """Yield (element, field, reference, candidate) differences in one chunk."""
     if ref["kind"] != cand["kind"]:
@@ -600,7 +627,10 @@ def compare_chunk(cid, ref, cand, stats):
     if ref["header"] != cand["header"]:
         yield ("", "table header", "differs", "differs")
         return
-    left, right = dict(ref["elements"]), dict(cand["elements"])
+    if cid == "GLOG":
+        left, right = (gamelog_elements(chunk, stats) for chunk in (ref, cand))
+    else:
+        left, right = dict(ref["elements"]), dict(cand["elements"])
     for index in sorted(set(left) | set(right)):
         stats["elements"] += 1
         a, b = left.get(index), right.get(index)
