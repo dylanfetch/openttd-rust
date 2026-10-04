@@ -902,6 +902,27 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
     return result
 
 
+def copy_runtime(build, binary, destination):
+    """Freeze the executable and its data, including symlink targets, for one run."""
+
+    def missing_links(directory, names):
+        # Extracted basesets can contain dangling documentation links. They were
+        # unavailable in the source runtime too; resolve relative links there.
+        return [
+            name
+            for name in names
+            if (path := Path(directory) / name).is_symlink() and not path.exists()
+        ]
+
+    destination.mkdir()
+    executable = destination / binary.name
+    shutil.copy2(binary, executable)
+    for name in RUNTIME_DIRECTORIES:
+        if (build / name).is_dir():
+            shutil.copytree(build / name, destination / name, ignore=missing_links)
+    return executable
+
+
 def main():
     sys.path.insert(0, str(ROOT / "tools"))
     import importlib.util
@@ -963,31 +984,40 @@ def main():
     migration.COMMON_LOCAL.mkdir(parents=True, exist_ok=True)
     MACHINE = MachineLock(migration.COMMON_LOCAL / "simulation.lock")
     out.mkdir(parents=True)
-    builds = {"reference": out / "reference-runtime", "candidate": ROOT / "build-rust"}
+    # This is the checkout at invocation, not proof that an arbitrary --candidate
+    # was built from it. The frozen executable's hash identifies what we execute.
+    candidate_commit = migration.git("rev-parse", "HEAD")
+    candidate_status = migration.git("status", "--short")
+    builds = {role: out / f"{role}-runtime" for role in ("reference", "candidate")}
     # The game finds its data next to the executable, so copy the shared
     # reference's runtime (about 16 MB) while no other worktree can rebuild it,
     # then run without holding the lock.
     with migration.reference_lock(shared=True):
         shared = migration.REFERENCE_BUILD.resolve()
-        builds["reference"].mkdir()
-        shutil.copy2(shared / "openttd", builds["reference"] / "openttd")
-        for name in RUNTIME_DIRECTORIES:
-            if (shared / name).is_dir():
-                shutil.copytree(
-                    shared / name, builds["reference"] / name, symlinks=True
-                )
-    reference = builds["reference"] / "openttd"
-    binaries = {
-        "reference": reference,
-        "candidate": args.candidate or builds["candidate"] / "openttd-rust",
-    }
+        reference = copy_runtime(shared, shared / "openttd", builds["reference"])
+    sources = {"reference": shared / "openttd"}
+    binaries = {"reference": reference}
     if args.self:
         builds["candidate"], binaries["candidate"] = builds["reference"], reference
-    for role, binary in binaries.items():
-        if not Path(binary).is_file():
+        sources["candidate"] = sources["reference"]
+    else:
+        candidate = (args.candidate or ROOT / "build-rust/openttd-rust").resolve()
+        if not candidate.is_file():
             parser.error(
-                f"{role} binary {binary} is missing; run python3 tools/migration.py build"
+                f"candidate binary {candidate} is missing; run python3 tools/migration.py build"
             )
+        sources["candidate"] = candidate
+        binaries["candidate"] = copy_runtime(
+            candidate.parent, candidate, builds["candidate"]
+        )
+    binary_evidence = {
+        role: {
+            "path": str(path),
+            "source_path": str(sources[role]),
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        }
+        for role, path in binaries.items()
+    }
 
     started = time.monotonic()
     results = []
@@ -1025,14 +1055,10 @@ def main():
     results.sort(key=lambda r: r["scenario"])
     report = {
         "mode": "reference-vs-reference" if args.self else "reference-vs-candidate",
-        "candidate_commit": migration.git("rev-parse", "HEAD"),
-        "binaries": {
-            role: {
-                "path": str(path),
-                "sha256": hashlib.sha256(Path(path).read_bytes()).hexdigest(),
-            }
-            for role, path in binaries.items()
-        },
+        "started_at": stamp,
+        "candidate_commit": candidate_commit,
+        "candidate_status": candidate_status,
+        "binaries": binary_evidence,
         "masks": {":".join(key): reason for key, reason in MASKS.items()},
         "known_failures": {
             ":".join(key): issue for key, issue in KNOWN_FAILURES.items()
@@ -1046,7 +1072,8 @@ def main():
         "passed": all(r["passed"] for r in results),
     }
     (out / "report.json").write_text(json.dumps(report, indent=2) + "\n")
-    shutil.rmtree(out / "reference-runtime", ignore_errors=True)
+    for build in set(builds.values()):
+        shutil.rmtree(build, ignore_errors=True)
     passed = sum(r["passed"] for r in results)
     print(
         f"Simulation: {passed}/{len(results)} scenarios equal, "
