@@ -144,7 +144,15 @@ struct CompanyProperties {
 
 	std::array<Livery, LS_END> livery{};
 
-	EngineRenewList engine_renew_list = nullptr; ///< Engine renewals of this company.
+#ifdef WITH_RUST
+	FleetOwner<EngineRenewList, 3> renewal_head{};
+	EngineRenewList &RenewalList() { return *renewal_head.state; }
+	const EngineRenewList &RenewalList() const { return *renewal_head.state; }
+#else
+	EngineRenewList engine_renew_list = nullptr;
+	EngineRenewList &RenewalList() { return engine_renew_list; }
+	const EngineRenewList &RenewalList() const { return engine_renew_list; }
+#endif
 	CompanySettings settings{}; ///< settings specific for each company
 };
 

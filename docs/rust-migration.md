@@ -1513,3 +1513,23 @@ references/actions, aging, feeder credits and forced policies. Rust tests cover
 partial movement, payment getter reentry, same-list rerouting and capacity changes;
 `python3 tools/cargo-storage-comparison.py` checks the named unreachable pool-limit
 Split failure against the unchanged pinned body. Legacy conversions remain adapters.
+
+### Fleet state checkpoint (#147; incomplete)
+
+The WIP fleet slice allocates group scalar metadata/name/ordered children,
+statistics and ordered engine-count maps, renewal-rule contents/links,
+company renewal heads and vehicle group membership in Rust. C++ pool shells
+retain typed IDs, indexed/first-free allocation, group-number allocation and
+GUI folded state. Scalar views alias canonical allocations; property copies
+construct independent owners while preserving the original shallow rule link.
+GRPS names use a call-local string adapter. GRPS/ERNW/PLYR/VEHS retain original
+field names, widths, reference fixups and legacy conversions.
+
+This checkpoint does **not** complete #147: group/rule command and traversal
+policy, replacement eligibility/refits/speculative build/rearrangement/rollback,
+transaction scratch and ordered pending-map/tick-end drain remain in C++.
+No selected control-flow retirement or simulation-equivalence claim is made.
+Native fleet tests check ABI340-342, scalar alias/copy lifetimes, name/children
+storage and uint16 engine-count wrapping. Resume with the complete selected
+Rust control flow and compact fleet simulation witnesses, then full verification,
+independent review and required CI before integration.

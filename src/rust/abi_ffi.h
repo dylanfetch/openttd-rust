@@ -32,6 +32,7 @@ extern "C" {
  * 210 company history entry, 211 finances, 212 economy, 213 action, 214 leaves.
  * 110 station cargo metadata, 111 station scalars, 112 station services,
  * 113 station edge observations, 114 station links, 115 station loading.
+ * 340 fleet group fields, 341 statistics fields, 342 renewal fields (WIP).
  * Item 0 size, 1 alignment, then every field offset in declaration order.
  * Unknown type/item returns SIZE_MAX. No memory borrow, ownership or callback.
  * Native extern-C convention (cdecl on i686 MSVC); Rust panic never unwinds.

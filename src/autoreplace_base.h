@@ -30,6 +30,28 @@ extern EngineRenewPool _enginerenew_pool;
  * placed here so the only exception to this rule, the saveload code, can use
  * it.
  */
+#ifdef WITH_RUST
+#include "rust/fleet_owner.hpp"
+struct FleetRenewFields {
+	EngineID from = EngineID::Invalid();
+	EngineID to = EngineID::Invalid();
+	EngineRenew *next = nullptr;
+	GroupID group_id = GroupID::Invalid();
+	bool replace_when_old = false;
+};
+struct EngineRenew : EngineRenewPool::PoolItem<&_enginerenew_pool> {
+	FleetOwner<FleetRenewFields, 2> state{};
+	EngineID &from = state.state->from;
+	EngineID &to = state.state->to;
+	EngineRenew *&next = state.state->next;
+	GroupID &group_id = state.state->group_id;
+	bool &replace_when_old = state.state->replace_when_old;
+	EngineRenew() = default;
+	EngineRenew(EngineID from, EngineID to, GroupID group, bool when_old, EngineRenew *next) {
+		this->from = from; this->to = to; this->group_id = group; this->replace_when_old = when_old; this->next = next;
+	}
+};
+#else
 struct EngineRenew : EngineRenewPool::PoolItem<&_enginerenew_pool> {
 	EngineID from = EngineID::Invalid();
 	EngineID to = EngineID::Invalid();
@@ -42,5 +64,6 @@ struct EngineRenew : EngineRenewPool::PoolItem<&_enginerenew_pool> {
 		from(from), to(to), next(next), group_id(group_id), replace_when_old(replace_when_old) {}
 	~EngineRenew() {}
 };
+#endif
 
 #endif /* AUTOREPLACE_BASE_H */

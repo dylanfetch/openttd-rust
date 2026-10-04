@@ -26,7 +26,7 @@ macro_rules! layout {
 #[allow(clippy::too_many_lines)]
 pub fn layout(type_id: u16, item: u8) -> usize {
     match type_id {
-        210..=214 => crate::company::abi_layout(type_id, item),
+        210..=214 => crate::company::abi_layout(u8::try_from(type_id).unwrap(), item),
         0 => {
             layout!(crate::IntegerResult, item; value_bits, length, error_offset, error_length, error_kind)
         }
@@ -234,6 +234,13 @@ pub fn layout(type_id: u16, item: u8) -> usize {
             layout!(crate::cargo_storage::Vehicle, item; list, capacity, cargo, train, articulated)
         }
         311 => layout!(crate::cargo_storage::CapacityServices, item; read, pointer, cargo),
+        340 => {
+            layout!(crate::fleet::GroupFields, item; owner, vehicle_type, flags, livery, parent, number)
+        }
+        341 => {
+            layout!(crate::fleet::StatsFields, item; profit, profit_min_age, vehicles, vehicles_min_age, defined, finished)
+        }
+        342 => layout!(crate::fleet::Renew, item; from, to, next, group, when_old),
         _ => usize::MAX,
     }
 }

@@ -38,7 +38,11 @@ void GroupStatistics::Clear()
 	this->profit_last_year_min_age = 0;
 
 	/* This is also called when NewGRF change. So the number of engines might have changed. Reset. */
+#ifdef WITH_RUST
+	openttd_rust_fleet_stats_clear(this->state.state, 0);
+#else
 	this->num_engines.clear();
+#endif
 }
 
 /**
@@ -67,9 +71,13 @@ void UpdateGroupChildren()
  */
 uint16_t GroupStatistics::GetNumEngines(EngineID engine) const
 {
+#ifdef WITH_RUST
+	return openttd_rust_fleet_engine_count(this->state.state, engine.base());
+#else
 	auto found = this->num_engines.find(engine);
 	if (found != std::end(this->num_engines)) return found->second;
 	return 0;
+#endif
 }
 
 /**
@@ -252,7 +260,7 @@ uint16_t GroupStatistics::GetNumEngines(EngineID engine) const
 		g->statistics.ClearAutoreplace();
 	}
 
-	for (EngineRenewList erl = c->engine_renew_list; erl != nullptr; erl = erl->next) {
+	for (EngineRenewList erl = c->RenewalList(); erl != nullptr; erl = erl->next) {
 		const Engine *e = Engine::Get(erl->from);
 		GroupStatistics &stats = GroupStatistics::Get(company, erl->group_id, e->type);
 		if (!stats.autoreplace_defined) {
@@ -313,7 +321,7 @@ static void PropagateChildLivery(const Group *g, bool reset_cache)
 		}
 	}
 
-	for (const GroupID &childgroup : g->children) {
+	for (const GroupID &childgroup : g->ChildGroups()) {
 		Group *cg = Group::Get(childgroup);
 		if (!cg->livery.in_use.Test(Livery::Flag::Primary)) cg->livery.colour1 = g->livery.colour1;
 		if (!cg->livery.in_use.Test(Livery::Flag::Secondary)) cg->livery.colour2 = g->livery.colour2;
@@ -399,7 +407,7 @@ CommandCost CmdDeleteGroup(DoCommandFlags flags, GroupID group_id)
 	Command<CMD_REMOVE_ALL_VEHICLES_GROUP>::Do(flags, group_id);
 
 	/* Delete sub-groups, using a copy to avoid invalid iteration. */
-	FlatSet<GroupID> children = g->children;
+	auto children = g->ChildGroups();
 	for (const GroupID &childgroup : children) {
 		Command<CMD_DELETE_GROUP>::Do(flags, childgroup);
 	}
@@ -462,9 +470,9 @@ CommandCost CmdAlterGroup(DoCommandFlags flags, AlterGroupMode mode, GroupID gro
 		if (flags.Test(DoCommandFlag::Execute)) {
 			/* Assign the new one */
 			if (reset) {
-				g->name.clear();
+				g->SetName({});
 			} else {
-				g->name = text;
+				g->SetName(text);
 			}
 		}
 	} else if (mode == AlterGroupMode::SetParent) {
@@ -725,7 +733,7 @@ static void SetGroupFlag(Group *g, GroupFlag flag, bool set, bool children)
 
 	if (!children) return;
 
-	for (const GroupID &childgroup : g->children) {
+	for (const GroupID &childgroup : g->ChildGroups()) {
 		SetGroupFlag(Group::Get(childgroup), flag, set, true);
 	}
 }
@@ -821,7 +829,7 @@ uint GetGroupNumEngines(CompanyID company, GroupID id_g, EngineID id_e)
 	uint count = 0;
 
 	if (const Group *g = Group::GetIfValid(id_g); g != nullptr) {
-		for (const GroupID &childgroup : g->children) {
+		for (const GroupID &childgroup : g->ChildGroups()) {
 			count += GetGroupNumEngines(company, childgroup, id_e);
 		}
 	}
@@ -842,7 +850,7 @@ uint GetGroupNumVehicle(CompanyID company, GroupID id_g, VehicleType type)
 	uint count = 0;
 
 	if (const Group *g = Group::GetIfValid(id_g); g != nullptr) {
-		for (const GroupID &childgroup : g->children) {
+		for (const GroupID &childgroup : g->ChildGroups()) {
 			count += GetGroupNumVehicle(company, childgroup, type);
 		}
 	}
@@ -863,7 +871,7 @@ uint GetGroupNumVehicleMinAge(CompanyID company, GroupID id_g, VehicleType type)
 	uint count = 0;
 
 	if (const Group *g = Group::GetIfValid(id_g); g != nullptr) {
-		for (const GroupID &childgroup : g->children) {
+		for (const GroupID &childgroup : g->ChildGroups()) {
 			count += GetGroupNumVehicleMinAge(company, childgroup, type);
 		}
 	}
@@ -884,7 +892,7 @@ Money GetGroupProfitLastYearMinAge(CompanyID company, GroupID id_g, VehicleType 
 	Money sum = 0;
 
 	if (const Group *g = Group::GetIfValid(id_g); g != nullptr) {
-		for (const GroupID &childgroup : g->children) {
+		for (const GroupID &childgroup : g->ChildGroups()) {
 			sum += GetGroupProfitLastYearMinAge(company, childgroup, type);
 		}
 	}
