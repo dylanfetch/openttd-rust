@@ -9,6 +9,7 @@
 #ifndef TREES_FFI_H
 #define TREES_FFI_H
 #include <cstdint>
+#include "services_ffi.h"
 
 struct OpenTTDTreeAction {
 	uint32_t kind, tile, a, b;
@@ -16,29 +17,27 @@ struct OpenTTDTreeAction {
 };
 extern "C" {
 /* Entry kinds: 0 generate, 1 scatter, 2 place(tile,r,keep), 3 plant(tile,type,count,growth),
- * 5 tile loop, 6 tick, 8 command(end,start,type,diagonal), 9 clear. Valid game inputs only;
- * placement callers supply suitable tiles and valid nonrandom species to plant.
- * Copied settings[12]: tick, build/clear Money bits, map size/x/y, snowline bits,
- * climate, placer, extra placement, height limit, editor/ambient/freeform/execute/company-valid bits.
- * Copied tile[10]: type, bridge, zone, height, ground, density, species, count, growth,
- * snow/coast/one-raised-corner bits. Helpers read only fields valid for the tile type.
- * Leaf operations: make tree, ground/density, add count, add growth, set growth, dirty,
- * make clear, make shore, make snow, set zone, company debit, iterator read/advance.
- * Callbacks must be nonthrowing, cannot reenter Rust and borrow output only for their call.
- * Trigonometry uses the same native sinf/cosf as the original grove generator. */
+ * 5 tile loop, 6 tick, 8 command(end,start,type,diagonal), 9 clear. Original game
+ * preconditions apply. Settings[12]: tick, build/clear Money bits, map size/x/y,
+ * snowline bits, climate, placer, extra, height limit, editor/ambient/freeform/
+ * execute/company-valid bits. Settings and leaf callbacks must be noexcept,
+ * nonreentrant and borrow output only for the call. Shared table is copied.
+ * Progress leaves return 1 only for cancellation, before progress effects; Rust
+ * immediately propagates it, with no resumed loop, to action 12.
+ * Component leaves: progress(1,2), clear nonflood flags(3), sound(6), square
+ * clear(7), town rating(8), iterator start(9), company debit(10), iterator next(11).
+ * Original bodies remain the portable fallback; map/pools stay canonical C++.
+ * Panic/OOM/environmental failures abort. No exception unwinds through Rust. */
 void *openttd_rust_trees_create(uint32_t kind, uint32_t tile, uint32_t a, uint32_t b, uint32_t c,
-	void *context, void (*settings)(void *, uint64_t *), void (*observe)(void *, uint32_t, uint32_t *),
-	uint64_t (*write)(void *, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t),
-	float (*trig)(uint32_t, float));
-/* Actions execute AFTER advance returns: 0 done (a result, b error, cost), 1 progress,
- * 2 set progress(a), 3 clear neighbour nonflood flags, 4 water loop, 5 ambient,
- * 6 sound(a), 7 clear square, 8 town rating(a=up), 9 start iterator(tile,a=start,b=diagonal),
- * 10 landscape clear, 11 one shared Random draw (including possibly throwing debug logging).
- * Response is RNG word, iterator limit or clear failure; cost is nested clear cost.
- * A per-invocation owner is exclusive during advance only. Reentrant actions create separate
- * owners; all world reads following actions are fresh. Panic/OOM abort; no unwinding across ABI. */
+	void *context, void (*settings)(void *, uint64_t *) noexcept, const OpenTTDSharedServices *,
+	uint64_t (*leaf)(void *, uint32_t, uint32_t, uint32_t, uint32_t) noexcept);
+/* Only actions: 0 done (a result, b error, cost), 4 water flooding (may dispatch
+ * nested clears), 5 NewGRF ambient callback (arbitrary code), 10 landscape clear
+ * command (may reenter tree code), 12 world-generation abort (callback + throw).
+ * Actions run after advance returns; fresh
+ * settings/map reads follow them. Response/cost are nested clear failure/cost. */
 OpenTTDTreeAction openttd_rust_trees_advance(void *, uint64_t response, int64_t cost);
-/* Destroy exactly once, including C++ exceptions; no callback/context access on destroy. */
+/* Destroy once, including C++ exception cleanup; no callback/context access. */
 void openttd_rust_trees_destroy(void *);
 /* Stable Rust-owned byte; game-thread initialization/ticks and serial save/load access only.
  * C++ never retains a C++ reference across a Rust call. DATE LoadCheck omits this field.
