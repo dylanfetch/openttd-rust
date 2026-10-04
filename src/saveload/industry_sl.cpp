@@ -55,7 +55,7 @@ public:
 	}
 };
 
-class SlIndustryAccepted : public VectorSaveLoadHandler<SlIndustryAccepted, Industry, Industry::AcceptedCargo, INDUSTRY_NUM_INPUTS> {
+class SlIndustryAccepted : public VectorSaveLoadHandler<SlIndustryAccepted, Industry, Industry::AcceptedCargo, INDUSTRY_NUM_INPUTS, Industry::AcceptedCargoes> {
 public:
 	static inline const SaveLoad description[] = {
 		 SLE_VAR(Industry::AcceptedCargo, cargo, SLE_UINT8),
@@ -66,7 +66,7 @@ public:
 	};
 	static inline const SaveLoadCompatTable compat_description = _industry_accepts_sl_compat;
 
-	std::vector<Industry::AcceptedCargo> &GetVector(Industry *i) const override { return i->accepted; }
+	Industry::AcceptedCargoes &GetVector(Industry *i) const override { return i->accepted; }
 
 	/* Old array structure used by INDYChunkHandler for savegames before SLV_INDUSTRY_CARGO_REORGANISE. */
 	static inline std::array<CargoType, INDUSTRY_NUM_INPUTS> old_cargo;
@@ -115,7 +115,7 @@ public:
 	}
 };
 
-class SlIndustryProduced : public VectorSaveLoadHandler<SlIndustryProduced, Industry, Industry::ProducedCargo, INDUSTRY_NUM_OUTPUTS> {
+class SlIndustryProduced : public VectorSaveLoadHandler<SlIndustryProduced, Industry, Industry::ProducedCargo, INDUSTRY_NUM_OUTPUTS, Industry::ProducedCargoes> {
 public:
 	static inline const SaveLoad description[] = {
 		 SLE_VAR(Industry::ProducedCargo, cargo, SLE_UINT8),
@@ -125,7 +125,7 @@ public:
 	};
 	static inline const SaveLoadCompatTable compat_description = _industry_produced_sl_compat;
 
-	std::vector<Industry::ProducedCargo> &GetVector(Industry *i) const override { return i->produced; }
+	Industry::ProducedCargoes &GetVector(Industry *i) const override { return i->produced; }
 
 	/* Old array structure used by INDYChunkHandler for savegames before SLV_INDUSTRY_CARGO_REORGANISE. */
 	static inline std::array<CargoType, INDUSTRY_NUM_OUTPUTS> old_cargo;
@@ -148,6 +148,21 @@ public:
 	}
 };
 
+#ifdef WITH_RUST
+struct IndustryProductionSaveScope {
+	static inline OpenTTDIndustryFields current{};
+	Industry *industry;
+	bool loading;
+	OpenTTDIndustryFields previous;
+	IndustryProductionSaveScope(Industry *industry, bool loading) : industry(industry), loading(loading), previous(current) { current = industry->ProductionFields(); }
+	~IndustryProductionSaveScope()
+	{
+		if (this->loading) this->industry->ProductionFields() = current;
+		current = this->previous;
+	}
+};
+#endif
+
 static const SaveLoad _industry_desc[] = {
 	SLE_CONDVAR(Industry, location.tile,              SLE_FILE_U16 | SLE_VAR_U32,  SL_MIN_VERSION, SLV_6),
 	SLE_CONDVAR(Industry, location.tile,              SLE_UINT32,                  SLV_6, SL_MAX_VERSION),
@@ -165,7 +180,11 @@ static const SaveLoad _industry_desc[] = {
 	SLEG_CONDARR("production_rate",            SlIndustryProduced::old_rate,                   SLE_UINT8,  INDUSTRY_NUM_OUTPUTS, SLV_EXTEND_INDUSTRY_CARGO_SLOTS, SLV_INDUSTRY_CARGO_REORGANISE),
 	SLEG_CONDARR("accepts_cargo",              SlIndustryAccepted::old_cargo,                  SLE_UINT8,  INDUSTRY_ORIGINAL_NUM_INPUTS, SLV_78, SLV_EXTEND_INDUSTRY_CARGO_SLOTS),
 	SLEG_CONDARR("accepts_cargo",              SlIndustryAccepted::old_cargo,                  SLE_UINT8,  INDUSTRY_NUM_INPUTS, SLV_EXTEND_INDUSTRY_CARGO_SLOTS, SLV_INDUSTRY_CARGO_REORGANISE),
+#ifdef WITH_RUST
+	    SLEG_VAR("prod_level", IndustryProductionSaveScope::current.prod_level,                 SLE_UINT8),
+#else
 	    SLE_VAR(Industry, prod_level,                 SLE_UINT8),
+#endif
 	SLEG_CONDARR("this_month_production",      SlIndustryProduced::old_this_month_production,  SLE_UINT16, INDUSTRY_ORIGINAL_NUM_OUTPUTS, SL_MIN_VERSION, SLV_EXTEND_INDUSTRY_CARGO_SLOTS),
 	SLEG_CONDARR("this_month_production",      SlIndustryProduced::old_this_month_production,  SLE_UINT16, INDUSTRY_NUM_OUTPUTS, SLV_EXTEND_INDUSTRY_CARGO_SLOTS, SLV_INDUSTRY_CARGO_REORGANISE),
 	SLEG_CONDARR("this_month_transported",     SlIndustryProduced::old_this_month_transported, SLE_UINT16, INDUSTRY_ORIGINAL_NUM_OUTPUTS, SL_MIN_VERSION, SLV_EXTEND_INDUSTRY_CARGO_SLOTS),
@@ -175,15 +194,35 @@ static const SaveLoad _industry_desc[] = {
 	SLEG_CONDARR("last_month_transported",     SlIndustryProduced::old_last_month_transported, SLE_UINT16, INDUSTRY_ORIGINAL_NUM_OUTPUTS, SL_MIN_VERSION, SLV_EXTEND_INDUSTRY_CARGO_SLOTS),
 	SLEG_CONDARR("last_month_transported",     SlIndustryProduced::old_last_month_transported, SLE_UINT16, INDUSTRY_NUM_OUTPUTS, SLV_EXTEND_INDUSTRY_CARGO_SLOTS, SLV_INDUSTRY_CARGO_REORGANISE),
 
+#ifdef WITH_RUST
+	    SLEG_VAR("counter", IndustryProductionSaveScope::current.counter,                    SLE_UINT16),
+#else
 	    SLE_VAR(Industry, counter,                    SLE_UINT16),
+#endif
 
 	    SLE_VAR(Industry, type,                       SLE_UINT8),
 	    SLE_VAR(Industry, owner,                      SLE_UINT8),
 	    SLE_VAR(Industry, random_colour,              SLE_UINT8),
+#ifdef WITH_RUST
+	SLEG_CONDVAR("last_prod_year", IndustryProductionSaveScope::current.last_prod_year,             SLE_FILE_U8 | SLE_VAR_I32,  SL_MIN_VERSION, SLV_31),
+#else
 	SLE_CONDVAR(Industry, last_prod_year,             SLE_FILE_U8 | SLE_VAR_I32,  SL_MIN_VERSION, SLV_31),
+#endif
+#ifdef WITH_RUST
+	SLEG_CONDVAR("last_prod_year", IndustryProductionSaveScope::current.last_prod_year,             SLE_INT32,                 SLV_31, SL_MAX_VERSION),
+#else
 	SLE_CONDVAR(Industry, last_prod_year,             SLE_INT32,                 SLV_31, SL_MAX_VERSION),
+#endif
+#ifdef WITH_RUST
+	    SLEG_VAR("was_cargo_delivered", IndustryProductionSaveScope::current.was_cargo_delivered,        SLE_UINT8),
+#else
 	    SLE_VAR(Industry, was_cargo_delivered,        SLE_UINT8),
+#endif
+#ifdef WITH_RUST
+	SLEG_CONDVAR("ctlflags", IndustryProductionSaveScope::current.ctlflags,                   SLE_UINT8,                 SLV_GS_INDUSTRY_CONTROL, SL_MAX_VERSION),
+#else
 	SLE_CONDVAR(Industry, ctlflags,                   SLE_UINT8,                 SLV_GS_INDUSTRY_CONTROL, SL_MAX_VERSION),
+#endif
 
 	SLE_CONDVAR(Industry, founder,                    SLE_UINT8,                 SLV_70, SL_MAX_VERSION),
 	SLE_CONDVAR(Industry, construction_date,          SLE_INT32,                 SLV_70, SL_MAX_VERSION),
@@ -200,7 +239,11 @@ static const SaveLoad _industry_desc[] = {
 	SLE_CONDVAR(Industry, random,                     SLE_UINT16,                SLV_82, SL_MAX_VERSION),
 	SLE_CONDSSTR(Industry, text,     SLE_STR | SLF_ALLOW_CONTROL,     SLV_INDUSTRY_TEXT, SL_MAX_VERSION),
 
+#ifdef WITH_RUST
+	SLEG_CONDVAR("valid_history", IndustryProductionSaveScope::current.valid_history, SLE_UINT64, SLV_INDUSTRY_NUM_VALID_HISTORY, SL_MAX_VERSION),
+#else
 	SLE_CONDVAR(Industry, valid_history, SLE_UINT64, SLV_INDUSTRY_NUM_VALID_HISTORY, SL_MAX_VERSION),
+#endif
 
 	SLEG_CONDSTRUCTLIST("accepted", SlIndustryAccepted,                          SLV_INDUSTRY_CARGO_REORGANISE, SL_MAX_VERSION),
 	SLEG_CONDSTRUCTLIST("produced", SlIndustryProduced,                          SLV_INDUSTRY_CARGO_REORGANISE, SL_MAX_VERSION),
@@ -216,6 +259,9 @@ struct INDYChunkHandler : ChunkHandler {
 		/* Write the industries */
 		for (Industry *ind : Industry::Iterate()) {
 			SlSetArrayIndex(ind->index);
+#ifdef WITH_RUST
+			IndustryProductionSaveScope scope(ind, false);
+#endif
 			SlObject(ind, _industry_desc);
 		}
 	}
@@ -254,7 +300,11 @@ struct INDYChunkHandler : ChunkHandler {
 
 		while ((index = SlIterateArray()) != -1) {
 			Industry *i = new (IndustryID(index)) Industry();
+#ifdef WITH_RUST
+			{ IndustryProductionSaveScope scope(i, true); SlObject(i, slt); }
+#else
 			SlObject(i, slt);
+#endif
 
 			/* Before savegame version 161, persistent storages were not stored in a pool. */
 			if (IsSavegameVersionBefore(SLV_161) && !IsSavegameVersionBefore(SLV_76)) {
@@ -293,6 +343,9 @@ struct INDYChunkHandler : ChunkHandler {
 	void FixPointers() const override
 	{
 		for (Industry *i : Industry::Iterate()) {
+#ifdef WITH_RUST
+			IndustryProductionSaveScope scope(i, false);
+#endif
 			SlObject(i, _industry_desc);
 		}
 	}
@@ -307,8 +360,15 @@ struct TIDSChunkHandler : NewGRFMappingChunkHandler {
 };
 
 /** Description of the data to save and load in #IndustryBuildData. */
+#ifdef WITH_RUST
+static uint32_t _industry_wanted_save;
+#endif
 static const SaveLoad _industry_builder_desc[] = {
+#ifdef WITH_RUST
+	SLEG_VAR("wanted_inds", _industry_wanted_save, SLE_UINT32),
+#else
 	SLEG_VAR("wanted_inds", _industry_builder.wanted_inds, SLE_UINT32),
+#endif
 };
 
 /** Industry builder. */
@@ -320,6 +380,9 @@ struct IBLDChunkHandler : ChunkHandler {
 		SlTableHeader(_industry_builder_desc);
 
 		SlSetArrayIndex(0);
+#ifdef WITH_RUST
+		_industry_wanted_save = _industry_builder.wanted_inds;
+#endif
 		SlGlobList(_industry_builder_desc);
 	}
 
@@ -328,7 +391,13 @@ struct IBLDChunkHandler : ChunkHandler {
 		const std::vector<SaveLoad> slt = SlCompatTableHeader(_industry_builder_desc, _industry_builder_sl_compat);
 
 		if (!IsSavegameVersionBefore(SLV_RIFF_TO_ARRAY) && SlIterateArray() == -1) return;
+#ifdef WITH_RUST
+		_industry_wanted_save = _industry_builder.wanted_inds;
+#endif
 		SlGlobList(slt);
+#ifdef WITH_RUST
+		_industry_builder.wanted_inds = _industry_wanted_save;
+#endif
 		if (!IsSavegameVersionBefore(SLV_RIFF_TO_ARRAY) && SlIterateArray() != -1) SlErrorCorrupt("Too many IBLD entries");
 	}
 };

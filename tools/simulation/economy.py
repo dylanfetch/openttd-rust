@@ -16,7 +16,8 @@ def scenarios(soak):
             "name": f"economy-{mode}",
             "kind": "save",
             "save": str(ROOT / "migration/saves/grok-159-001.sav"),
-            "snapshot_minimum": 1 if mode == "stockpile" else 2,
+            "snapshot_minimum": 0 if mode == "stockpile" else 2,
+            "short_checkpoint": mode == "stockpile",
             "console": (
                 ["setting order.gradual_loading 0"] if mode == "stockpile" else []
             )
@@ -143,6 +144,11 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
         patches.append((cid, index, field, value))
 
     if scenario["economy"] == "stockpile":
+        # Reloaded overdue link jobs can consume the null driver's entire short
+        # unload window while waiting for worker threads. Move their input join
+        # dates together, retaining relative order, beyond this checkpoint.
+        for index, job in rows(original, "LGRJ").items():
+            patch("LGRJ", index, "join_date", job["join_date"] + 32)
         front = pending(original)
         prefix = "roadveh[0]/common[0]/"
         # Stop other transport vehicles, make this real staged unload immediate,

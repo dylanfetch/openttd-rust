@@ -21,8 +21,10 @@ mod landscape;
 mod linkgraph;
 mod math;
 mod packet;
+pub mod rail_yapf;
 mod road;
 mod road_data;
+mod road_yapf;
 mod script_list;
 pub mod services;
 mod station_cargo;
@@ -1302,5 +1304,6 @@ pub unsafe extern "C" fn openttd_rust_inplace_write(
 
 mod water_regions;
 
+mod industry;
 #[allow(unsafe_code)]
 mod ship_yapf;

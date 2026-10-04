@@ -9,6 +9,7 @@ add_test_files(
     effect_protocol.hpp
     enum_over_optimisation.cpp
     flatset_type.cpp
+    industry.cpp
     history_func.cpp
     landscape_partial_pixel_z.cpp
     math_func.cpp
@@ -16,6 +17,9 @@ add_test_files(
     mock_fontcache.h
     mock_spritecache.cpp
     mock_spritecache.h
+    rail_yapf.cpp
+    rail_yapf_protocol.hpp
+    road_yapf.cpp
     roadvehicle.cpp
     spiral_iterator_state.cpp
     string_builder.cpp

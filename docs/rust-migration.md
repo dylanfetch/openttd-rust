@@ -1297,8 +1297,8 @@ turn commands into Rust. Rust owns seven private scalars and the ordered path;
 modern, historical split-vector and TTD/TTO save adapters stage them in C++.
 Original algorithms and road/tram movement data compile only in portable builds.
 Shared Vehicle/GroundVehicle physics, pools, orders/loading, map/road stops,
-construction, rendering and road YAPF remain C++. A temporary YAPF result exists
-only for an empty canonical path and transfers before result handling.
+construction and rendering remain C++. Road YAPF uses the same canonical path
+through #124; there is no temporary C++ search result cache.
 
 Rust uses copied IDs/observations and direct noexcept services, including shared
 RNG. Actions return to C++ for owner reentry, commands, NewGRF callbacks, viewport
@@ -1341,3 +1341,73 @@ command boundary/test/execute cases unavailable through AI scripting.
 Actual transfers cover a road bus/depot/station/group and town rating. Subsidies,
 exclusive rights, goals/story pages, hostile purchase, multiplayer runtime,
 arbitrary NewGRFs and complete historical saves remain evidence limits.
+### Rail YAPF search, caches and reservation
+
+[#133](https://github.com/dylanfetch/openttd-rust/pull/133) moves all four searches,
+node/segment arenas, exact-order heap, costs, lookahead, limits and reconstruction
+into Rust. Rust owns six specialization-specific cache banks, rail-change
+invalidation, reservation traversal and ordered signal rollback. C++ retains
+the train controller, shared track follower, PBS and canonical world services.
+Station animation/randomisation returns to C++ with affected borrows released.
+Original search bodies remain portable-only; diagnostic dumps use temporary
+views and the original format, with no canonical C++ search mirror.
+
+`python3 tools/migration.py simulate padhattan rail-reservation` and its self/soak
+variants exercise cache reuse, reversal, depot/safe-tile search, reservation,
+busy targets, rollback and active-state reload under both 90-degree policies.
+Native unchanged-base/heap probes cover finite limits, live cost invalidation
+and ordered opposing PBS signal restoration absent from the supplied network.
+They do not prove full rail-cost semantics for arbitrary maps, NewGRFs, legacy
+saves or every signal family. Controller reservation extension belongs to #130.
+
+### Road YAPF search and path construction
+
+Issue #124 moves both track/depot searches, road exit-direction keys, node arena,
+lookup maps, exact-order heap, segment traversal/cost, heuristic, limits and best
+intermediate fallback into Rust. Reconstruction and station-area trimming write
+#121's sole canonical path directly; cache ownership is not counted twice.
+Original road specialization and node types compile only in portable builds.
+C++ keeps map/pools/settings, closest station-area and road-stop observations,
+and shared `CFollowTrackRoad` behind copied scalar `noexcept` leaves. None runs
+scripts, mutates/reenters the search or canonical road owner, or throws during
+ordinary play. Short owner access ends before leaves. RNG is unchanged (neither
+search draws); integer narrowing/wrapping, exit-key replacement, strict ties and
+follow-before-limit timing retain source behavior. Panics/OOM abort.
+
+`python3 tools/migration.py simulate roads` covers the controller's original eight
+cases, actual station-area prefix trimming and a forced cache miss with competing
+penalties; original road plays and Padhattan traffic run in `--soak`. Paired/self runs
+compare every saved field in plain/desync modes. Native tests compare actual heap
+and origin masks with unchanged C++ and actual depot-search transcript/counters
+with `CYapfBaseT` at node limits 0/1/2/7 and depot cost bounds 0/70/71/100
+(loaded node settings clamp to >=500). Native ABI checks
+cover every field on supported hosts. Arbitrary maps/NewGRFs, articulated/tram,
+road waypoints, exhaustive occupied-stop/loop/segment-length branches and actual
+legacy saves remain limits; shared follower logic is deliberately unported.
+
+### Industry periodic production and builder ownership (#129)
+
+Rust owns the produced/accepted slots, optional accepted histories, production
+fields, sound countdown and industry-builder records. C++ industry shells expose
+nonowning views of these allocations; INDY, IBLD, ITBL, ECMY and TTO/TTD load
+adapters preserve the original names, widths, version gates and ordering.
+Rust controls production/transport ticks, farm fields/fences, lumber harvesting,
+NewGRF production repeats/application, production commands and trimming,
+monthly statistics/change/closure, daily changes and builder targets/retries.
+The original selected bodies remain in the portable C++ path.
+
+Pool/map/spec storage, construction and landscape-clear transactions, presentation
+and bounded NewGRF resolution remain direct `noexcept` world services. Construction,
+clearing, cargo distribution and destruction can reenter industry accessors;
+Rust retains no owner reference across them. Script events only enqueue; save/load
+errors remain native. CargoPayment delivery and its original-end flush remain #117.
+ABI IDs 130–138 cover canonical records and synchronous services.
+
+`python3 tools/migration.py simulate industry-` reuses real cargo saves, generated
+climates/economies and disaster reset/release, with explicit production-control,
+closure and builder inputs. A committed reference setup AI funds a tropical lumber
+mill; checks witness harvesting, farm growth, history and builder backoff. `--self`
+and `--soak` add determinism and yearly history evidence. `python3 -m
+tools.simulation.industries` checks absent NewGRF versions/repeat/arithmetic against
+the unchanged pinned callback body. The corpus does not exhaust legacy saves,
+NewGRF resolver programs or every industry layout; native tests check ABI/lifetimes.

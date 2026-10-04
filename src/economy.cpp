@@ -960,6 +960,9 @@ void SetPriceBaseMultiplier(Price price, int factor)
  */
 void StartupIndustryDailyChanges(bool init_counter)
 {
+#ifdef WITH_RUST
+	openttd_rust_industry_daily_start(_industry_builder.owner.get(), Map::LogX() + Map::LogY(), init_counter);
+#else
 	uint map_size = Map::LogX() + Map::LogY();
 	/* After getting map size, it needs to be scaled appropriately and divided by 31,
 	 * which stands for the days in a month.
@@ -969,10 +972,13 @@ void StartupIndustryDailyChanges(bool init_counter)
 	 * on the overall total number of changes performed */
 	_economy.industry_daily_increment = (1 << map_size) / 31;
 
+
 	if (init_counter) {
 		/* A new game or a savegame from an older version will require the counter to be initialized */
 		_economy.industry_daily_change_counter = 0;
+
 	}
+#endif
 }
 
 void StartupEconomy()

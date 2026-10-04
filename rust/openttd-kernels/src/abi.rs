@@ -22,6 +22,8 @@ macro_rules! layout {
     };
 }
 
+// Keep ABI IDs in one registry so duplicate match arms remain compiler-checked.
+#[allow(clippy::too_many_lines)]
 pub fn layout(type_id: u8, item: u8) -> usize {
     match type_id {
         210..=214 => crate::company::abi_layout(type_id, item),
@@ -115,6 +117,64 @@ pub fn layout(type_id: u8, item: u8) -> usize {
         56 => layout!(crate::ship_yapf::Result, item; direction, found, origin, stats),
         60 => layout!(crate::town::Action, item; kind, town, tile, a, b, c, d, cost),
         61 => layout!(crate::town::Leaves, item; observe, leaf, state, stations),
+        90 => {
+            layout!(crate::rail_yapf::Settings, item; max_nodes, firstred, firstred_exit, lastred, lastred_exit, station, slope, curve45, curve90, depot_reverse, crossing, lookahead, p0, p1, p2, pbs_cross, pbs_station, pbs_back, doubleslip, longer, longer_tile, shorter, shorter_tile, firstred_eol)
+        }
+        91 => {
+            layout!(crate::rail_yapf::Tile, item; flags, other_end, station, railtype, tracks, reserved, station_track, tunnel_dir, uphill, flat_ramp, signal_along, signal_against, signal_green, signal_type, oneway)
+        }
+        92 => {
+            layout!(crate::rail_yapf::Follow, item; tile, skipped, min_speed, max_speed, dirs, followed, error, station)
+        }
+        93 => {
+            layout!(crate::rail_yapf::Leaves, item; train, tile, follow, safe, free, compatible_station, platform_length, closest_station, destination_dirs, origin, write, output, debug)
+        }
+        94 => {
+            layout!(crate::rail_yapf::Input, item; context, settings, map_x, tile, max_cost, desync, kind, td, override_railtype, forbid90, reserve)
+        }
+        95 => {
+            layout!(crate::rail_yapf::Step, item; tile, destination, target_tile, best_length, action, td, found, reverse, value, target_td, target_okay)
+        }
+        97 => {
+            layout!(crate::rail_yapf::Train, item; compatible, all_compatible, tile, rear_tile, virtual_tile, rear_virtual_tile, dest_tile, length, speed, order_destination, td, rear_td, wormhole, rear_wormhole, order, nearest_depot, complex_waypoint)
+        }
+        100 => {
+            layout!(crate::road_yapf::Input, item; map_x, map_y, tile, dest_tile, max_nodes, slope, crossing, stop, occupied, bay, curve, display_speed, order_destination, order_speed, order_type, bus, articulated, trackdir)
+        }
+        101 => {
+            layout!(crate::road_yapf::Tile, item; occupied, length, station, r#type, station_type, depot, depot_dir, crossing, waypoint, drive_through, continuation, busy_bays)
+        }
+        102 => {
+            layout!(crate::road_yapf::Follow, item; tile, skipped, max_speed, min_speed, dirs, followed)
+        }
+        103 => {
+            layout!(crate::road_yapf::Area, item; tile, width, height, valid, stop, drive_through, next)
+        }
+        104 => layout!(crate::road_yapf::Leaves, item; tile, follow, tracks, height, closest, area),
+        105 => {
+            layout!(crate::road_yapf::Result, item; tile, cost, direction, found, rounds, open, closed, calcs, distance)
+        }
+        130 => {
+            layout!(crate::industry::Fields, item; valid_history, last_prod_year, counter, prod_level, was_cargo_delivered, ctlflags)
+        }
+        131 => {
+            layout!(crate::industry::BuildFields, item; probability, min_number, target_count, max_wait, wait_count)
+        }
+        132 => {
+            layout!(crate::industry::BuilderFields, item; builddata, wanted_inds, daily_counter, daily_increment, sound_tile, sound_ctr)
+        }
+        133 => layout!(crate::industry::Slots, item; data, size),
+        134 => layout!(crate::industry::Produced, item; cargo, waiting, rate, history),
+        135 => {
+            layout!(crate::industry::Accepted, item; cargo, waiting, accumulated_waiting, last_accepted, history)
+        }
+        136 => {
+            layout!(crate::industry::Observation, item; owner, tile, behaviour, id, width, height, callbacks, sound_count, life, original, minimal_cargo, kind, up_text, down_text, closure_text)
+        }
+        137 => layout!(crate::industry::Services, item; observe, next, setting, world),
+        138 => {
+            layout!(crate::industry::ProductionResult, item; subtract, add, again, cargo_input, cargo_output, version, num_input, num_output, present)
+        }
         _ => usize::MAX,
     }
 }
