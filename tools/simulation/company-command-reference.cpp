@@ -113,7 +113,8 @@ int main()
 	for (uint32_t op : {21, 22, 23, 24, 25}) for (bool execute : {false, true}) {
 		for (int64_t money : {INT64_MIN, int64_t(-1), int64_t(0), int64_t(9999), int64_t(10000), int64_t(30000000), INT64_MAX}) {
 			for (int64_t loan : {int64_t(0), int64_t(100000), int64_t(300000), INT64_MAX}) for (int64_t amount : {INT64_MIN, int64_t(-1), int64_t(0), int64_t(9999), int64_t(10000), int64_t(10001), int64_t(20000001), int64_t(2000000001), INT64_MAX}) {
-				for (uint8_t variant : {0, 1, 2, 3, 12, 13, 255}) {
+				/* All expense buckets; 14 repeats construction with deity permission. */
+				for (uint8_t variant : {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 255}) {
 					bool infinite = variant == 3, networking = variant == 12, give = variant != 13;
 					CompanyID current = op >= 24 && variant != 0 ? OWNER_DEITY : 0;
 					uint32_t id = (op == 21 || op >= 24) && variant == 255 ? 255 : 1;
@@ -124,7 +125,7 @@ int main()
 					if (op == 21) expected = CmdGiveMoney({execute}, amount, id);
 					if (op == 22 || op == 23) { a = variant; b = amount; c = execute; expected = op == 22 ? CmdIncreaseLoan({execute}, LoanCommand(variant), amount) : CmdDecreaseLoan({execute}, LoanCommand(variant), amount); }
 					if (op == 24) expected = CmdSetCompanyMaxLoan({execute}, id, amount);
-					if (op == 25) { b = variant; c = execute; d = variant % 2; expected = CmdChangeBankBalance({execute}, d, amount, id, ExpensesType(variant)); }
+					if (op == 25) { b = variant == 14 ? 0 : variant; c = execute; d = variant % 2; expected = CmdChangeBankBalance({execute}, d, amount, id, ExpensesType(b)); }
 					auto expected_trace = trace; auto expected_current = _current_company; trace.clear(); _current_company = current;
 					auto *run = openttd_rust_company_create(op, id, a, b, c, d, &leaves);
 					auto actual = openttd_rust_company_advance(run, 0); openttd_rust_company_destroy(run);

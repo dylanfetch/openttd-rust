@@ -1335,7 +1335,7 @@ and nested service-interval commands return to C++ for ordinary reentry.
 for warning/sale/rank/tie/timeout/limit/acquisition/recovery/deletion/ID reuse,
 finance and reload; `companies-finance --soak` extends periodic accounting.
 Native CTest covers property lifetimes and network deferred deletion. `python3
--m tools.simulation.companies` compares 17,640 unchanged-reference financial
+-m tools.simulation.companies` compares 40,320 unchanged-reference financial
 command boundary/test/execute cases unavailable through AI scripting.
 Actual transfers cover a road bus/depot/station/group and town rating. Subsidies,
 exclusive rights, goals/story pages, hostile purchase, multiplayer runtime,
