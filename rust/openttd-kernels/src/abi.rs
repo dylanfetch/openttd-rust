@@ -153,6 +153,20 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         105 => {
             layout!(crate::road_yapf::Result, item; tile, cost, direction, found, rounds, open, closed, calcs, distance)
         }
+        240 => {
+            layout!(crate::orders::Order, item; kind, flags, destination, refit, wait, travel, speed)
+        }
+        241 => {
+            layout!(crate::orders::Consist, item; time, lateness, start, last_departure, next_departure, round_trip, real, implicit, flags)
+        }
+        242 => layout!(crate::orders::VehicleOrders, item; current, orders, next, previous),
+        243 => layout!(crate::orders::List, item; manual, vehicles, first, timetable, total),
+        244 => layout!(crate::orders::Backup, item; user, tile, group, clone),
+        245 => {
+            layout!(crate::orders::Leaves, item; vehicle, consist, list, vector, backup, backup_vector, backup_consist, query, write)
+        }
+        246 => layout!(crate::orders::Action, item; operation, context, a, b, c),
+        247 => layout!(crate::orders::Closest, item; tile, destination, reverse, found),
         _ => usize::MAX,
     }
 }

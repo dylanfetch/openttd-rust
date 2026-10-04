@@ -277,7 +277,13 @@ void AfterLoadVehiclesPhase1(bool part_of_load)
 		std::map<uint32_t, OrderList *> mapping;
 
 		for (Vehicle *v : Vehicle::Iterate()) {
-			if (v->orders != nullptr) {
+			if (
+#ifdef WITH_RUST
+				IsSavegameVersionBefore(SLV_105) ? v->old_orders != 0 : v->orders != nullptr
+#else
+				v->orders != nullptr
+#endif
+			) {
 				if (IsSavegameVersionBefore(SLV_105)) { // Pre-105 didn't save an OrderList
 					if (mapping[v->old_orders] == nullptr) {
 						/* This adds the whole shared vehicle chain for case b */
