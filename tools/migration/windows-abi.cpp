@@ -8,6 +8,7 @@
 /** @file windows-abi.cpp Bounded first-32-bit layout and real C ABI call checks. */
 #include "rust/abi_ffi.h"
 #include "rust/linkgraph_ffi.h"
+#include "rust/townname_ffi.h"
 #include "rust/ffi.h"
 #include "rust/utf8_ffi.h"
 #include "rust/builder_ffi.h"
@@ -593,6 +594,12 @@ int main()
 {
 	Layouts();
 	LinkGraphJob();
+	/* Opaque owner, native size_t, immutable byte borrow and complete UTF-8 output. */
+	auto *townname = openttd_rust_townname_generate(1, UINT32_MAX);
+	size_t name_length;
+	const char *name = openttd_rust_townname_data(townname, &name_length);
+	CHECK(name_length == 8 && std::memcmp(name, "Alen\xc3\xa7on", name_length) == 0);
+	openttd_rust_townname_destroy(townname);
 	Calls();
 	Encoded();
 	History();

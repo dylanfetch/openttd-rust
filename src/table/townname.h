@@ -7,6 +7,7 @@
 
 /** @file table/townname.h Namepart tables for the town name generator */
 
+#ifndef WITH_RUST
 #include "../core/enum_type.hpp"
 
 static const std::string_view _name_original_english_1[] = {
@@ -616,6 +617,9 @@ static const std::string_view _name_german_4_am[] = {
 	"Main",
 };
 
+#endif /* !WITH_RUST */
+
+/* These four tables remain shared with the legacy save loader. */
 static const std::string_view _name_spanish_real[] = {
 	"Caracas",
 	"Maracay",
@@ -887,6 +891,7 @@ static const std::string_view _name_silly_2[] = {
 	"bridge",
 };
 
+#ifndef WITH_RUST
 static const std::string_view _name_swedish_1[] = {
 	"Gamla ",
 	"Lilla ",
@@ -3312,3 +3317,5 @@ static const std::string_view _name_catalan_river1[] = {
 	" de Segre",
 	" de Francol\u00ed",
 };
+
+#endif /* !WITH_RUST */
