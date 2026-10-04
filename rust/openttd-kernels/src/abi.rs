@@ -72,6 +72,7 @@ pub fn layout(type_id: u8, item: u8) -> usize {
         37 => {
             layout!(crate::linkgraph::OutputShare, item; node, origin, via, cumulative, unrestricted, has_share)
         }
+        38 => layout!(crate::trees::Action, item; kind, tile, a, b, cost),
         _ => usize::MAX,
     }
 }

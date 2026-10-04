@@ -37,6 +37,8 @@
 #include "../table/engines.h"
 #include "../table/townname.h"
 
+#include "../rust/tree_counter.h"
+
 #include "../safeguards.h"
 
 static bool _read_ttdpatch_flags;    ///< Have we (tried to) read TTDPatch extra flags?
@@ -1620,7 +1622,6 @@ static bool LoadTTDPatchExtraChunks(LoadgameState &ls, int)
 
 extern TileIndex _cur_tileloop_tile;
 extern uint16_t _disaster_delay;
-extern uint8_t _trees_tick_ctr;
 extern uint8_t _age_cargo_skip_counter; // From misc_sl.cpp
 extern uint8_t _old_diff_level;
 extern uint8_t _old_units;
