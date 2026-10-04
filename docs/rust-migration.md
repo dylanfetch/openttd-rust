@@ -1123,7 +1123,7 @@ portable build. Vehicle fields, pools, factories, tick dispatch, bounds,
 transparency, viewport/hash updates and rendering stay canonical C++.
 
 Copied call-scoped observations and immediate scalar writes keep original
-mutation order. Rust calls common Random and effect-specific map, sound,
+mutation order. Rust calls common Random/map and effect-specific sound,
 viewport and animated-tile noexcept wrappers directly; none can reenter Rust.
 Private-owner access scopes end before every service. Expiry returns false
 before C++ deletion, Vehicle::~Vehicle and Pool::FreeItem/PostDestructor.
@@ -1139,3 +1139,4 @@ writes, transient service order, RNG thresholds, state lifetime and save staging
 factory tests cover Above/Rel coordinates. Viewport pixels, audible output,
 full legacy fixtures and every caller remain limits. Environmental exceptions
 terminate inside noexcept wrappers; Rust panics/OOM abort.
+RANDOM_DEBUG source locations name the common wrapper.
