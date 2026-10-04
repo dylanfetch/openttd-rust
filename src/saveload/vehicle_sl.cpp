@@ -1008,8 +1008,13 @@ public:
 		     SLE_VAR(Vehicle, progress,              SLE_UINT8),
 		     SLE_VAR(Vehicle, vehstatus,             SLE_UINT8),
 
+#ifdef WITH_RUST
+		    SLEG_VAR("animation_state", EffectVehicleAnimationScope::State(), SLE_UINT16),
+		    SLEG_VAR("animation_substate", EffectVehicleAnimationScope::Substate(), SLE_UINT8),
+#else
 		     SLE_VAR(EffectVehicle, animation_state,    SLE_UINT16),
 		     SLE_VAR(EffectVehicle, animation_substate, SLE_UINT8),
+#endif
 
 		 SLE_CONDVAR(Vehicle, spritenum,             SLE_UINT8,                    SLV_2, SL_MAX_VERSION),
 	};
@@ -1018,18 +1023,27 @@ public:
 	void Save(Vehicle *v) const override
 	{
 		if (v->type != VEH_EFFECT) return;
+#ifdef WITH_RUST
+		EffectVehicleAnimationScope scope(EffectVehicle::From(v), false);
+#endif
 		SlObject(v, this->GetDescription());
 	}
 
 	void Load(Vehicle *v) const override
 	{
 		if (v->type != VEH_EFFECT) return;
+#ifdef WITH_RUST
+		EffectVehicleAnimationScope scope(EffectVehicle::From(v), true);
+#endif
 		SlObject(v, this->GetLoadDescription());
 	}
 
 	void FixPointers(Vehicle *v) const override
 	{
 		if (v->type != VEH_EFFECT) return;
+#ifdef WITH_RUST
+		EffectVehicleAnimationScope scope(EffectVehicle::From(v), false);
+#endif
 		SlObject(v, this->GetDescription());
 	}
 };

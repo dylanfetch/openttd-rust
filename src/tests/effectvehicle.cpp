@@ -1,0 +1,109 @@
+/*
+ * This file is part of OpenTTD.
+ * OpenTTD is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, version 2.
+ * OpenTTD is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
+ */
+
+/** @file effectvehicle.cpp Effect owner lifetime and serialization-boundary evidence. */
+#include "../stdafx.h"
+#include "../3rdparty/catch2/catch.hpp"
+#include "../effectvehicle_base.h"
+#include "../effectvehicle_func.h"
+#include "../vehicle_func.h"
+#include "../map_func.h"
+#include "../landscape.h"
+#include "../core/random_func.hpp"
+#include "mock_environment.h"
+#ifdef WITH_RUST
+#include "effect_protocol.hpp"
+#endif
+#include "../safeguards.h"
+
+#ifdef WITH_RUST
+TEST_CASE("Effect vehicles - native action protocol and ownership")
+{
+	CheckEffectProtocol([](bool result) { CHECK(result); });
+}
+
+TEST_CASE("Effect vehicles - zero construction, nested save staging and pool cleanup")
+{
+	REQUIRE(Vehicle::CanAllocateItem(2));
+	auto *a = new EffectVehicle();
+	auto *b = new EffectVehicle();
+	CHECK(a->GetAnimationState() == 0);
+	CHECK(a->GetAnimationSubstate() == 0);
+	a->SetAnimationState(65535);
+	a->SetAnimationSubstate(255);
+	{
+		EffectVehicleAnimationScope saving(a, false);
+		CHECK(EffectVehicleAnimationScope::State() == 65535);
+		CHECK(EffectVehicleAnimationScope::Substate() == 255);
+		{
+			EffectVehicleAnimationScope loading(b, true);
+			EffectVehicleAnimationScope::State() = 17;
+			EffectVehicleAnimationScope::Substate() = 19;
+			CHECK(b->GetAnimationState() == 0); // No persistent C++ mirror.
+		}
+		CHECK((b->GetAnimationState() == 17 && b->GetAnimationSubstate() == 19));
+		CHECK(EffectVehicleAnimationScope::State() == 65535); // Parent restored.
+	}
+	try {
+		EffectVehicleAnimationScope loading(a, true);
+		EffectVehicleAnimationScope::State() = 31;
+		throw 1; // Partial historical load writes survive failure, as in C++.
+	} catch (int) {}
+	CHECK((a->GetAnimationState() == 31 && a->GetAnimationSubstate() == 255));
+	/* The derived owner's deleter still runs when Vehicle's base destructor takes
+	 * the Pool::Cleaning early return; no world/map initialization is needed. */
+	_vehicle_pool.CleanPool();
+}
+#endif
+
+/* Use the real controller's expiry route for ordinary owner destruction. This
+ * also avoids invoking the pool's post-destructor index read directly from a
+ * test translation unit, which GCC 15 diagnoses when devirtualizing delete. */
+static void ExpireEffect(EffectVehicle *v)
+{
+	v->subtype = EV_BREAKDOWN_SMOKE;
+	v->SetAnimationState(1);
+	CHECK_FALSE(v->Tick());
+}
+
+TEST_CASE("Effect vehicles - all factory variants and relative terrain coordinates")
+{
+	MockEnvironment::Instance();
+	Map::Allocate(64, 64);
+	ResetVehicleHash();
+	SavedRandomSeeds saved;
+	SaveRandomSeeds(&saved);
+	SetRandomSeed(12345);
+	auto expected_random = _random;
+	const uint32_t chimney_random = expected_random.Next();
+	static constexpr uint32_t sprites[]{3701,3079,3073,3084,2040,3709,3737,3725,1416,4751,2040,2040};
+	static constexpr uint8_t progress[]{0,12,0,1,12,0,0,0,0,0,12,12};
+	for (uint8_t subtype = 0; subtype < EV_END; subtype++) {
+		auto *v = CreateEffectVehicle(40, 50, 60, static_cast<EffectVehicleType>(subtype));
+		REQUIRE(v != nullptr);
+		CHECK(v->sprite_cache.sprite_seq.seq[0].sprite == sprites[subtype] + (subtype == 0 ? chimney_random & 7 : 0));
+		CHECK(v->progress == (subtype == 0 ? (chimney_random >> 16) & 7 : progress[subtype]));
+		CHECK((v->x_pos == 40 && v->y_pos == 50 && v->z_pos == 60));
+		CHECK(v->GetAnimationState() == 0);
+		CHECK(v->GetAnimationSubstate() == 0);
+		CHECK(v->tile == TileIndex{});
+		CHECK(v->spritenum == 0);
+		auto *relative = CreateEffectVehicleRel(v, -4, 5, -6, EV_ELECTRIC_SPARK);
+		REQUIRE(relative != nullptr);
+		CHECK((relative->x_pos == 36 && relative->y_pos == 55 && relative->z_pos == 54));
+		ExpireEffect(relative);
+		ExpireEffect(v);
+	}
+	CHECK((_random.state[0] == expected_random.state[0] && _random.state[1] == expected_random.state[1]));
+	/* Above clamps only the terrain query. Original x/y remain outside the map. */
+	auto *above = CreateEffectVehicleAbove(-9, 2000, 17, EV_ELECTRIC_SPARK);
+	REQUIRE(above != nullptr);
+	CHECK((above->x_pos == -9 && above->y_pos == 2000));
+	CHECK(above->z_pos == GetSlopePixelZ(0, Map::MaxY() * TILE_SIZE) + 17);
+	ExpireEffect(above);
+	RestoreRandomSeeds(saved);
+}

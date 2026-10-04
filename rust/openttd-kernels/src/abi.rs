@@ -73,6 +73,11 @@ pub fn layout(type_id: u8, item: u8) -> usize {
             layout!(crate::linkgraph::OutputShare, item; node, origin, via, cumulative, unrestricted, has_share)
         }
         38 => layout!(crate::trees::Action, item; kind, tile, a, b, cost),
+        39 => {
+            layout!(crate::effect::View, item; x, y, z, sprite, progress, spritenum, subtype, ambient, sprite_write)
+        }
+        40 => layout!(crate::effect::Cursor, item; phase, animation, tile, random),
+        41 => layout!(crate::effect::Leaves, item; industry),
         _ => usize::MAX,
     }
 }

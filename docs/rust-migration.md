@@ -1107,3 +1107,29 @@ Rust protocol tests cover explicit/editor types, diagonal forwarding, Money
 bounds, bitpattern7 and callback resumption; native ABI checks cover owner/counter
 lifetime. Actual editor interactions, diagonal map traversal, legacy save files
 and custom NewGRF ambient callbacks remain source-reviewed evidence limits.
+
+### Effect vehicles
+
+Issue #101 moves all twelve effect init/tick controllers, movement tables, sprite
+and expiry decisions, and private animation state/substate into Rust. Each C++
+EffectVehicle shell owns one zero-created opaque state, including indexed loading;
+RAII destroys it even during pool cleanup. Original controllers compile only in
+portable builds. Shared Vehicle fields, pools, tick dispatch, bounds, transparency,
+viewport/hash updates, factories and rendering stay canonical C++ state/services.
+
+ABI IDs 39-41 cover temporary scalar observations, an invocation continuation and
+one nonallocating/nonthrowing/nonreentrant industry-query leaf. RNG, sound, viewport,
+animated-tile insertion and deletion execute after Rust returns, preserving source
+write/action order without outstanding Rust borrows. Explicit byte/word wrapping,
+sprite `!=` termination and bubble RNG short-circuit/rounding retain historical
+behavior. Narrow caller setters and nested stack-only save staging keep private
+bytes out of the C++ shell; modern/FixPointers and ten-byte legacy union layouts
+retain field names, widths, ordering and subtype conversion. Panics/OOM abort.
+
+Evidence: semantic scenarios compare every save chunk at short, asserted tick
+horizons across all subtypes, expiry, reload, natural creation and actual callers.
+Native ABI/CTest fixtures cover every init, returned service ordering, RNG threshold,
+reentry/throw gaps, owner lifetime and partial/nested staging; factory CTest checks
+Above/Rel coordinates. Viewport pixels and audible output are not compared; full
+legacy-save fixtures, allocator failure timing and all vehicle callers are not
+exhaustive. These effects do not migrate transport/disaster vehicle controllers.

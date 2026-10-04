@@ -10,6 +10,8 @@
 #include "rust/linkgraph_ffi.h"
 #include "rust/trees_ffi.h"
 #include "rust/townname_ffi.h"
+#include "rust/effect_ffi.h"
+#include "tests/effect_protocol.hpp"
 #include "rust/ffi.h"
 #include "rust/utf8_ffi.h"
 #include "rust/builder_ffi.h"
@@ -93,6 +95,9 @@ static void Layouts()
 	Layout(36, "OpenTTDLinkGraphSettings", {sizeof(OpenTTDLinkGraphSettings), alignof(OpenTTDLinkGraphSettings), offsetof(OpenTTDLinkGraphSettings, accuracy), offsetof(OpenTTDLinkGraphSettings, demand_distance), offsetof(OpenTTDLinkGraphSettings, demand_size), offsetof(OpenTTDLinkGraphSettings, saturation), offsetof(OpenTTDLinkGraphSettings, distribution), offsetof(OpenTTDLinkGraphSettings, express), offsetof(OpenTTDLinkGraphSettings, map_max_x), offsetof(OpenTTDLinkGraphSettings, map_max_y), offsetof(OpenTTDLinkGraphSettings, runtime)});
 	Layout(38, "OpenTTDTreeAction", {sizeof(OpenTTDTreeAction), alignof(OpenTTDTreeAction), offsetof(OpenTTDTreeAction, kind), offsetof(OpenTTDTreeAction, tile), offsetof(OpenTTDTreeAction, a), offsetof(OpenTTDTreeAction, b), offsetof(OpenTTDTreeAction, cost)});
 	Layout(37, "OpenTTDLinkGraphShare", {sizeof(OpenTTDLinkGraphShare), alignof(OpenTTDLinkGraphShare), offsetof(OpenTTDLinkGraphShare, node), offsetof(OpenTTDLinkGraphShare, origin), offsetof(OpenTTDLinkGraphShare, via), offsetof(OpenTTDLinkGraphShare, cumulative), offsetof(OpenTTDLinkGraphShare, unrestricted), offsetof(OpenTTDLinkGraphShare, has_share)});
+	Layout(39, "OpenTTDEffectView", {sizeof(OpenTTDEffectView), alignof(OpenTTDEffectView), offsetof(OpenTTDEffectView, x), offsetof(OpenTTDEffectView, y), offsetof(OpenTTDEffectView, z), offsetof(OpenTTDEffectView, sprite), offsetof(OpenTTDEffectView, progress), offsetof(OpenTTDEffectView, spritenum), offsetof(OpenTTDEffectView, subtype), offsetof(OpenTTDEffectView, ambient), offsetof(OpenTTDEffectView, sprite_write)});
+	Layout(40, "OpenTTDEffectCursor", {sizeof(OpenTTDEffectCursor), alignof(OpenTTDEffectCursor), offsetof(OpenTTDEffectCursor, phase), offsetof(OpenTTDEffectCursor, animation), offsetof(OpenTTDEffectCursor, tile), offsetof(OpenTTDEffectCursor, random)});
+	Layout(41, "OpenTTDEffectLeaves", {sizeof(OpenTTDEffectLeaves), alignof(OpenTTDEffectLeaves), offsetof(OpenTTDEffectLeaves, industry)});
 	CHECK(openttd_rust_abi_layout(255, 0) == SIZE_MAX);
 	CHECK(static_cast<size_t>(PTRDIFF_MAX) == (SIZE_MAX >> 1));
 	std::printf("pointer_bytes %zu sentinel %zu borrow_limit %zu\n", sizeof(void *), SIZE_MAX, static_cast<size_t>(PTRDIFF_MAX));
@@ -655,6 +660,7 @@ static void Trees()
 int main()
 {
 	Layouts();
+	CheckEffectProtocol([](bool result) { CHECK(result); });
 	LinkGraphJob();
 	Trees();
 	/* Opaque owner, native size_t, immutable byte borrow and complete UTF-8 output. */

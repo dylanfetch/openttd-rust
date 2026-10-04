@@ -827,7 +827,7 @@ static void TileLoopIndustry_BubbleGenerator(TileIndex tile)
 		EV_BUBBLE
 	);
 
-	if (v != nullptr) v->animation_substate = dir;
+	if (v != nullptr) v->SetAnimationSubstate(dir);
 }
 
 static void TileLoop_Industry(TileIndex tile)

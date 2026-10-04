@@ -432,6 +432,7 @@ pub extern "C" fn openttd_rust_spiral_equal(left: SpiralState, right: SpiralStat
     u8::from(spiral::equal(left, right))
 }
 
+mod effect;
 mod encoded;
 pub use encoded::{
     Descriptor as EncodedDescriptor, Diagnostic as EncodedDiagnostic, View as EncodedView,
