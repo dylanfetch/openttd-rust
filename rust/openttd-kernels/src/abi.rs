@@ -88,6 +88,15 @@ pub fn layout(type_id: u8, item: u8) -> usize {
         46 => layout!(crate::water_regions::Patch, item; x, y, label),
         47 => layout!(crate::water_regions::Snapshot, item; edges, labels, patches, aqueducts),
         48 => layout!(crate::water_regions::Leaves, item; tracks, follow, aqueduct, debug),
+        49 => {
+            layout!(crate::cargo_payment::Spec, item; payment, valid, callback, periods1, periods2)
+        }
+        50 => {
+            layout!(crate::cargo_payment::Fields, item; front, route_profit, visual_profit, visual_transfer)
+        }
+        51 => {
+            layout!(crate::cargo_payment::Services, item; spec, callback, near, station_read, industry_read, industry_write, refuses, accept, statistics, monitor, subsidised, industry_effect, vehicle_read, settle, feeder, setting)
+        }
         _ => usize::MAX,
     }
 }

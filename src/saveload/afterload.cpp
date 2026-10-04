@@ -841,8 +841,7 @@ bool AfterLoadGame()
 
 	/* Fix the cache for cargo payments. */
 	for (CargoPayment *cp : CargoPayment::Iterate()) {
-		cp->front->cargo_payment = cp;
-		cp->current_station = cp->front->last_station_visited;
+		cp->AfterLoad();
 	}
 
 
