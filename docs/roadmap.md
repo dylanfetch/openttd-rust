@@ -5,7 +5,7 @@ Root owns this file and updates it when a phase completes or priorities change.
 to work on next. If an issue conflicts with this roadmap, follow the roadmap;
 a subagent stops and reports the conflict in its hand-off to root.
 
-## Where the fork stands (2026-10-04, `rust-migration` at `602b5a60ff`)
+## Where the fork stands (2026-10-04, `rust-migration` at `f6a0d66b63`)
 
 - Ported: one landscape kernel, StringConsumer/StringBuilder/UTF-8/byte-string
   utilities, history and spiral/alternating iterators, Script Admin JSON
@@ -14,7 +14,8 @@ a subagent stops and reports the conflict in its hand-off to root.
   X25519, Packet, string validation, and station cargo-list reducers. Rust now
   also owns complete TGP terrain generation (#94), link graph computation (#95)
   and all 21 built-in town-name generators (#98), plus tree generation, tile/tick
-  simulation and planting/clearing commands (#102).
+  simulation and planting/clearing commands (#102), and all twelve effect-vehicle
+  controllers with private animation state (#105).
 - Much of the simulation remains in C++. The first ownership ports retired
   2,111 C++ lines with 219 lines of glue and 244 lines of tooling. Continue
   selecting game logic and tracking each port with `tools/port-metrics.py`.
@@ -138,14 +139,16 @@ CTests, three provenance tests and Ruff passed. Default simulation matched 102/1
 723 snapshots in 203.6 seconds. Receipts: `.local/verification/20261004T055433.812150Z/`
 and `.local/simulation/20261004T055516Z-1202665/`. No new differences or masks.
 
-**#101 Effect-vehicle controllers and private state** is selected alongside #99
-review. `/root/town_names` (Sol high) owns implementation; Astra medium reviews.
-Move all 12 subtype controllers and private animation bytes into Rust; shared
-Vehicle fields, pools, viewport updates and rendering stay canonical in C++.
-Preserve caller setters and modern/legacy save adapters without a persistent
-state mirror. Short-horizon harness checkpoints must observe these brief-lived
-effects, plus natural creation and breakdown/bubble caller paths. Ordinary
-rail/ship/aircraft controllers remain untouched, so #86 is not a prerequisite.
+**#101 Effect-vehicle controllers and private state is complete** in #105
+(`f6a0d66b63`). Rust owns all twelve controllers and private animation bytes;
+shared Vehicle fields, pools, viewport and rendering remain in C++. Returned
+actions and temporary save-boundary staging preserve service order and layouts.
+Independent Astra medium review and every required CI check passed. Final local
+evidence: Cargo's four checks, 97 reference/115 candidate CTests, native generators,
+12 comparisons, Ruff, effects paired/self 17/17 and soak 22/22; full default
+119/119 (746 snapshots). Root confirmed integrated source/tools match the reviewed
+commit exactly. Metrics: Rust 494, tooling 553, glue 412, C++ retired 548; 222 glue
+lines are tests/registration. The PR explains the evidence budget and coverage limits.
 
 **#103 Disaster scheduling, vehicles and event control** is selected next while
 #99/#101 validate. `/root/link_graph` (Sol high) owns implementation after its tree
@@ -157,6 +160,12 @@ company/AIPL edits let a big UFO select the human train, and a zeppelin block th
 airport. Turn these into reproducible harness witnesses with actual event outcomes.
 This covers disaster interactions; #86's ordinary rail/ship/aircraft route corpus
 remains needed before ports of those controllers. No shared pool storage transfer.
+Wind-down checkpoint: clean local `port-disaster-vehicles` at `ccb9586fe3`;
+Cargo/verify and two smoke cases (39 snapshots) pass. The eager company-lookup
+crash (#106) was fixed and closed. This is not a reviewed complete port: the full
+controller review, harness integration, comparisons and CI remain. Evidence branch
+`evidence-disaster-vehicles` has AI checkpoint `a775543162`; drop its borrowed
+effect-helper commit `73ccd511fb` when rebasing onto the now-integrated #105.
 
 **#104 Water-region cache and graph service** is selected as the complete first
 component before ship YAPF. `/root/town_names` (Sol high) implements after the effect
@@ -168,6 +177,13 @@ The ship slice of #86 is now active: a reference-built ferry has demonstrated re
 loading and paid delivery. Commit reproducible setup/save evidence and require
 manual/cargodist routes, reload, canal/lock/aqueduct and warm-cache mutation cases
 before integration. Ordinary rail/aircraft coverage in #86 remains open.
+Wind-down checkpoint: `port-water-regions` is clean with no source changes.
+Local `evidence-water-regions` at `c752070cde` contains two reference-built saves,
+setup/command AIs and five scenarios. Reference-self and existing-main comparisons
+both pass 5/5 (164 snapshots), including lost/recovery and depot return. This is
+baseline evidence, not a water-port comparison. Rebase/deduplicate `field_spans`
+from #105, then finish negative probes, soak, independent review and candidate-port
+evidence. Both WIP branches remain local and have no PR.
 
 TGP and link graph favor coarse calls over copied inputs with private Rust state,
 nonthrowing leaf callbacks and complete results. Trees and effects apply the
@@ -189,9 +205,10 @@ constraints; storage transfers still require explicit roadmap selection.
 
 Take the first unblocked item from the earliest phase that has one. Work
 already in CI or review is not blocking: start the next item while it runs.
-Harness regressions remain the first priority. #101 is in final review/validation;
-#103 implementation/evidence are active. Use effect handoff
-capacity for #104, with its #86 ship evidence developed in parallel.
+Harness regressions remain the first priority. At the user's requested wind-down,
+#103 and #104 are checkpointed as above and agents have stopped. On resumption,
+finish #103's harness and final review while #104's source/evidence proceed;
+update both WIP bases for #105 before combining their changes.
 Keep spare capacity on scenarios and independent review. Paused, deferred
 and out-of-scope issues are not fallbacks. Root selects further ownership work
 here before implementation starts.
