@@ -35,7 +35,8 @@ typedef struct {
  * other end or INVALID_TILE. Initialized outputs are exclusive for each call.
  * Visitor cursor owns only traversal progress and copied per-side labels. next
  * returns before arbitrary C++ visitor work; no cache borrow survives it. The
- * next call observes live cache changes at the original observation points.
+ * next call receives the live caller descriptor and observes live cache changes
+ * at the original observation points, retaining the original region origin.
  * Map replacement during a visitor violates the original region-reference
  * lifetime. Destroy each owner/cursor once, including visitor exception paths.
  * Panics/OOM abort; no exception or panic crosses the ABI. */
@@ -46,7 +47,7 @@ void OPENTTD_WATER_CALL openttd_rust_water_invalidate(OpenTTDWaterRegions *, con
 void OPENTTD_WATER_CALL openttd_rust_water_snapshot(OpenTTDWaterRegions *, const OpenTTDWaterLeaves *, uint32_t, OpenTTDWaterSnapshot *);
 OpenTTDWaterVisit *OPENTTD_WATER_CALL openttd_rust_water_visit_new(OpenTTDWaterRegions *, const OpenTTDWaterLeaves *, OpenTTDWaterPatch);
 void OPENTTD_WATER_CALL openttd_rust_water_visit_destroy(OpenTTDWaterVisit *);
-uint8_t OPENTTD_WATER_CALL openttd_rust_water_visit_next(OpenTTDWaterRegions *, const OpenTTDWaterLeaves *, OpenTTDWaterVisit *, OpenTTDWaterPatch *);
+uint8_t OPENTTD_WATER_CALL openttd_rust_water_visit_next(OpenTTDWaterRegions *, const OpenTTDWaterLeaves *, OpenTTDWaterVisit *, OpenTTDWaterPatch, OpenTTDWaterPatch *);
 #ifdef __cplusplus
 }
 #endif

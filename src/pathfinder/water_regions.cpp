@@ -108,7 +108,7 @@ void VisitWaterRegionPatchNeighbours(const WaterRegionPatchDesc &patch, VisitWat
 	using VisitOwner = std::unique_ptr<OpenTTDWaterVisit, decltype(&openttd_rust_water_visit_destroy)>;
 	VisitOwner visit{openttd_rust_water_visit_new(_water_regions.get(), &_water_leaves, {patch.x, patch.y, patch.label.base()}), openttd_rust_water_visit_destroy};
 	OpenTTDWaterPatch next{};
-	while (openttd_rust_water_visit_next(_water_regions.get(), &_water_leaves, visit.get(), &next)) {
+	while (openttd_rust_water_visit_next(_water_regions.get(), &_water_leaves, visit.get(), {patch.x, patch.y, patch.label.base()}, &next)) {
 		callback(WaterRegionPatchDesc{next.x, next.y, WaterRegionPatchLabel{next.label}});
 	}
 }

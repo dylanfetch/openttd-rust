@@ -207,6 +207,9 @@ impl Regions {
     }
 
     fn adjacent(&mut self, patch: Patch, side: usize, leaves: &Leaves) -> Vec<Patch> {
+        if patch.label == 0 {
+            return Vec::new();
+        }
         let current = self.update(patch.x, patch.y, leaves);
         let (dx, dy) = OFFSETS[side];
         let nx = patch.x + dx;
@@ -262,7 +265,7 @@ pub struct Visit {
 }
 
 impl Visit {
-    fn next(&mut self, regions: &mut Regions, leaves: &Leaves) -> Option<Patch> {
+    fn next(&mut self, regions: &mut Regions, leaves: &Leaves, live_patch: Patch) -> Option<Patch> {
         if self.patch.label == 0 {
             return None;
         }
@@ -273,7 +276,7 @@ impl Visit {
             if self.side == 4 {
                 break;
             }
-            self.pending = regions.adjacent(self.patch, self.side, leaves).into_iter();
+            self.pending = regions.adjacent(live_patch, self.side, leaves).into_iter();
             self.side += 1;
         }
         // The original current_region is a live cache reference. Read its flag
@@ -287,9 +290,13 @@ impl Visit {
         });
         if has_aqueducts {
             while self.aqueduct_tile < 256 {
-                let tile = regions.tile(self.patch.x, self.patch.y, self.aqueduct_tile);
+                let tile = regions.tile(
+                    i32::from(self.patch.x as u16),
+                    i32::from(self.patch.y as u16),
+                    self.aqueduct_tile,
+                );
                 self.aqueduct_tile += 1;
-                if regions.patch(tile, leaves) != self.patch {
+                if regions.patch(tile, leaves) != live_patch {
                     continue;
                 }
                 // SAFETY: No world or cache storage is borrowed by the query.
@@ -422,7 +429,8 @@ pub unsafe extern "C" fn openttd_rust_water_visit_destroy(visit: *mut Visit) {
     drop(unsafe { Box::from_raw(visit) });
 }
 
-/// Return the next visitor argument, with no owner borrow surviving the return.
+/// Return the next visitor argument, observing the live caller-owned descriptor.
+/// No owner borrow survives the return.
 /// # Safety
 /// Owner/leaves follow `water_label`; cursor/output are exclusive, live disjoint allocations.
 #[unsafe(no_mangle)]
@@ -430,10 +438,11 @@ pub unsafe extern "C" fn openttd_rust_water_visit_next(
     owner: *mut Regions,
     leaves: *const Leaves,
     visit: *mut Visit,
+    live_patch: Patch,
     out: *mut Patch,
 ) -> u8 {
     // SAFETY: All borrows end on return, before C++ invokes arbitrary visitors.
-    if let Some(patch) = unsafe { (&mut *visit).next(&mut *owner, &*leaves) } {
+    if let Some(patch) = unsafe { (&mut *visit).next(&mut *owner, &*leaves, live_patch) } {
         // SAFETY: Output addresses an initialized writable Patch.
         unsafe {
             *out = patch;

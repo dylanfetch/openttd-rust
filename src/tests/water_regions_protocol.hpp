@@ -52,13 +52,18 @@ template <typename Check> void Run(Check check)
 	check(std::all_of(std::begin(snapshot.labels), std::end(snapshot.labels), [](auto label) { return label == 1; }));
 	Cursor visit{openttd_rust_water_visit_new(owner.get(), &leaves, {0, 0, 1}), openttd_rust_water_visit_destroy};
 	OpenTTDWaterPatch next{};
-	check(openttd_rust_water_visit_next(owner.get(), &leaves, visit.get(), &next) && next.x == 0 && next.y == 1);
+	check(openttd_rust_water_visit_next(owner.get(), &leaves, visit.get(), {0, 0, 1}, &next) && next.x == 0 && next.y == 1);
+	/* Const-reference arguments may be mutated through a caller-owned alias. */
+	Cursor aliased{openttd_rust_water_visit_new(owner.get(), &leaves, {0, 0, 1}), openttd_rust_water_visit_destroy};
+	check(openttd_rust_water_visit_next(owner.get(), &leaves, aliased.get(), {0, 0, 1}, &next) && next.x == 0 && next.y == 1);
+	check(openttd_rust_water_visit_next(owner.get(), &leaves, aliased.get(), {0, 0, 0}, &next) == 0);
+	aliased.reset();
 	/* Reentrant visitor removes the east connection. The next side must refresh. */
 	for (uint32_t y = 0; y < 16; y++) {
 		water[16 + y * 32] = false;
 		openttd_rust_water_invalidate(owner.get(), &leaves, 16 + y * 32);
 	}
-	check(openttd_rust_water_visit_next(owner.get(), &leaves, visit.get(), &next) == 0);
+	check(openttd_rust_water_visit_next(owner.get(), &leaves, visit.get(), {0, 0, 1}, &next) == 0);
 	visit.reset(); // Same cleanup used when a C++ visitor throws.
 	water.fill(false);
 	water[0] = true; water[2] = true;
