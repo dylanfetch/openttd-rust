@@ -204,7 +204,7 @@ void RoadStop::Leave(RoadVehicle *rv)
 {
 	if (IsBayRoadStopTile(rv->tile)) {
 		/* Vehicle is leaving a road stop tile, mark bay as free */
-		this->FreeBay(HasBit(rv->state, RVS_USING_SECOND_BAY));
+		this->FreeBay(HasBit(rv->GetState(), RVS_USING_SECOND_BAY));
 		this->SetEntranceBusy(false);
 	} else {
 		/* Otherwise just leave the drive through's entry cache. */
@@ -224,11 +224,13 @@ bool RoadStop::Enter(RoadVehicle *rv)
 		 * Check if station is busy or if there are no free bays or whether it is a articulated vehicle. */
 		if (this->IsEntranceBusy() || !this->HasFreeBay() || rv->HasArticulatedPart()) return false;
 
-		SetBit(rv->state, RVS_IN_ROAD_STOP);
+		rv->SetState(rv->GetState() | (1U << RVS_IN_ROAD_STOP));
 
 		/* Allocate a bay and update the road state */
 		uint bay_nr = this->AllocateBay();
-		SB(rv->state, RVS_USING_SECOND_BAY, 1, bay_nr);
+		uint8_t state = rv->GetState();
+		SB(state, RVS_USING_SECOND_BAY, 1, bay_nr);
+		rv->SetState(state);
 
 		/* Mark the station entrance as busy */
 		this->SetEntranceBusy(true);
@@ -239,7 +241,7 @@ bool RoadStop::Enter(RoadVehicle *rv)
 	this->GetEntry(DirToDiagDir(rv->direction)).Enter(rv);
 
 	/* Indicate a drive-through stop */
-	SetBit(rv->state, RVS_IN_DT_ROAD_STOP);
+	rv->SetState(rv->GetState() | (1U << RVS_IN_DT_ROAD_STOP));
 	return true;
 }
 
@@ -338,7 +340,7 @@ void RoadStop::Entry::Rebuild(const RoadStop *rs, int side)
 
 			const RoadVehicle *rv = RoadVehicle::From(v);
 			/* Don't add ones not in a road stop */
-			if (rv->state < RVSB_IN_ROAD_STOP) continue;
+			if (rv->GetState() < RVSB_IN_ROAD_STOP) continue;
 
 			include(vehicles, rv);
 		}

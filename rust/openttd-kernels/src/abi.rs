@@ -83,11 +83,37 @@ pub fn layout(type_id: u8, item: u8) -> usize {
         42 => {
             layout!(crate::services::Services, item; context, random, observe_tile, write_tile, trig, industry)
         }
+        80 => layout!(crate::road::PathElement, item; trackdir, tile),
+        81 => {
+            layout!(crate::road::View, item; r#type, first, next, previous, tile, dest, x, y, z, direction, speed, tick, running, day, order_time, progress, status, owner, engine, last_station, order_destination, order_type, order_max_speed, breakdown, max_track_speed, length, total_length, roadtype, front, articulated, tram, bus, order_nonstop)
+        }
+        82 => layout!(crate::road::Leaves, item; observe, write, leaf, owner, nearby),
+        83 => layout!(crate::road::Action, item; op, id, a, b, c),
         44 => layout!(crate::disaster::State, item; image_override, target, state, flags),
         45 => layout!(crate::disaster::Action, item; kind, id, other, a, b, c, d),
         46 => layout!(crate::water_regions::Patch, item; x, y, label),
         47 => layout!(crate::water_regions::Snapshot, item; edges, labels, patches, aqueducts),
         48 => layout!(crate::water_regions::Leaves, item; tracks, follow, aqueduct, debug),
+        49 => {
+            layout!(crate::cargo_payment::Spec, item; payment, valid, callback, periods1, periods2)
+        }
+        50 => {
+            layout!(crate::cargo_payment::Fields, item; front, route_profit, visual_profit, visual_transfer)
+        }
+        51 => {
+            layout!(crate::cargo_payment::Services, item; spec, callback, near, station_read, industry_read, industry_write, refuses, accept, statistics, monitor, subsidised, industry_effect, vehicle_read, settle, feeder, setting)
+        }
+        52 => {
+            layout!(crate::ship_yapf::Input, item; map_x, map_y, tile, dest_tile, curve90, curve45, max_speed, dest_dirs, reverse_dirs, trackdir, ocean_frac, canal_frac, station, unit_number)
+        }
+        53 => {
+            layout!(crate::ship_yapf::Leaves, item; destination, follow, tile, patch, visit_new, visit_next, visit_destroy, debug)
+        }
+        54 => layout!(crate::ship_yapf::Follow, item; tile, skipped, dirs, followed),
+        55 => layout!(crate::ship_yapf::Tile, item; ships, docking, sea, lock_middle, destination),
+        56 => layout!(crate::ship_yapf::Result, item; direction, found, origin, stats),
+        60 => layout!(crate::town::Action, item; kind, town, tile, a, b, c, d, cost),
+        61 => layout!(crate::town::Leaves, item; observe, leaf, state, stations),
         _ => usize::MAX,
     }
 }

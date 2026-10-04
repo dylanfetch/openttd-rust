@@ -2290,9 +2290,9 @@ static VehicleEnterTileStates VehicleEnter_Road(Vehicle *v, TileIndex tile, int,
 			if (v->type != VEH_ROAD) break;
 
 			RoadVehicle *rv = RoadVehicle::From(v);
-			if (rv->frame == RVC_DEPOT_STOP_FRAME &&
-					_roadveh_enter_depot_dir[GetRoadDepotDirection(tile)] == rv->state) {
-				rv->state = RVSB_IN_DEPOT;
+			if (rv->GetFrame() == RVC_DEPOT_STOP_FRAME &&
+					_roadveh_enter_depot_dir[GetRoadDepotDirection(tile)] == rv->GetState()) {
+				rv->SetState(RVSB_IN_DEPOT);
 				rv->vehstatus.Set(VehState::Hidden);
 				rv->direction = ReverseDir(rv->direction);
 				if (rv->Next() == nullptr) VehicleEnterDepot(rv->First());
