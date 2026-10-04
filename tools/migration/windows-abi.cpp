@@ -57,7 +57,7 @@
 
 #define CHECK(condition) do { if (!(condition)) { std::fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #condition); std::abort(); } } while (0)
 
-static void Layout(uint8_t type, const char *name, std::initializer_list<size_t> values)
+static void Layout(uint16_t type, const char *name, std::initializer_list<size_t> values)
 {
 	uint8_t item = 0;
 	std::printf("layout %s", name);

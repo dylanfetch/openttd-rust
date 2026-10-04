@@ -24,7 +24,7 @@ macro_rules! layout {
 
 // Keep ABI IDs in one registry so duplicate match arms remain compiler-checked.
 #[allow(clippy::too_many_lines)]
-pub fn layout(type_id: u8, item: u8) -> usize {
+pub fn layout(type_id: u16, item: u8) -> usize {
     match type_id {
         0 => {
             layout!(crate::IntegerResult, item; value_bits, length, error_offset, error_length, error_kind)
