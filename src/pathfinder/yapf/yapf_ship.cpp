@@ -18,7 +18,6 @@
 
 #include "../../safeguards.h"
 
-
 #ifdef WITH_RUST
 #include "../../rust/ship_yapf_ffi.h"
 
@@ -27,13 +26,13 @@
 #include <cstdlib>
 struct ShipYapfProfile {
 	bool enabled = std::getenv("OPENTTD_SHIP_PROFILE") != nullptr;
-	uint64_t counts[16]{};
+	uint64_t counts[17]{};
 	void Record(const OpenTTDShipYapfResult &result, uint32_t kind)
 	{
 		if (!this->enabled) return;
-		for (uint32_t i = 0; i < 12; ++i) this->counts[i] += result.stats[i];
+		for (uint32_t i = 0; i < 13; ++i) this->counts[i] += result.stats[i];
 		++this->counts[kind];
-		if (kind == 13 && result.found) ++this->counts[15];
+		if (kind == 14 && result.found) ++this->counts[16];
 	}
 	~ShipYapfProfile()
 	{
@@ -41,9 +40,9 @@ struct ShipYapfProfile {
 		const char *personal = std::getenv("HOME");
 		if (personal == nullptr) return;
 		if (FILE *file = std::fopen(fmt::format("{}/ship-yapf-profile.json", personal).c_str(), "w")) {
-			constexpr const char *names[] = {"region_nodes", "track_nodes", "retries", "track_limits", "intermediate", "cache_truncations", "final_region_clears", "lost", "random_draws", "reverse_origins", "blocked_fallbacks", "region_limits", "choose_calls", "reverse_calls", "blocked_calls", "reverse_chosen"};
+			constexpr const char *names[] = {"region_nodes", "track_nodes", "retries", "track_limits", "intermediate", "cache_truncations", "final_region_clears", "lost", "random_draws", "reverse_origins", "blocked_fallbacks", "region_limits", "alternate_docking", "choose_calls", "reverse_calls", "blocked_calls", "reverse_chosen"};
 			fmt::print(file, "{{");
-			for (uint32_t i = 0; i < 16; ++i) fmt::print(file, "{}\"{}\":{}", i == 0 ? "" : ",", names[i], this->counts[i]);
+			for (uint32_t i = 0; i < 17; ++i) fmt::print(file, "{}\"{}\":{}", i == 0 ? "" : ",", names[i], this->counts[i]);
 			fmt::print(file, "}}\n");
 			std::fclose(file);
 		}
@@ -123,7 +122,7 @@ Track YapfShipChooseTrack(const Ship *v, TileIndex tile, bool &found, ShipPathCa
 	const auto input = ShipInput(v);
 	const auto origins = ShipOrigins(v);
 	const auto result = openttd_rust_ship_choose(cache.GetOwner(), &input, &_ship_yapf_leaves, &GetRustSharedServices(), v, tile.base(), TrackdirToTrackdirBits(v->GetVehicleTrackdir()), TRACKDIR_BIT_NONE, origins.data(), origins.size());
-	_ship_yapf_profile.Record(result, 12);
+	_ship_yapf_profile.Record(result, 13);
 	found = result.found;
 	return result.direction == INVALID_TRACKDIR ? INVALID_TRACK : TrackdirToTrack(static_cast<Trackdir>(result.direction));
 }
@@ -132,7 +131,7 @@ bool YapfShipCheckReverse(const Ship *v, Trackdir *trackdir)
 	const auto input = ShipInput(v, trackdir != nullptr);
 	const auto origins = ShipOrigins(v);
 	const auto result = openttd_rust_ship_reverse(&input, &_ship_yapf_leaves, &GetRustSharedServices(), v, trackdir != nullptr, origins.data(), origins.size());
-	_ship_yapf_profile.Record(result, trackdir == nullptr ? 13 : 14);
+	_ship_yapf_profile.Record(result, trackdir == nullptr ? 14 : 15);
 	if (trackdir != nullptr) *trackdir = static_cast<Trackdir>(result.direction);
 	return result.found;
 }

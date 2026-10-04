@@ -212,7 +212,22 @@ def check(scenario, run, mode, role, result):
             result[f"{mode}_{role}_water_profile"] = json.loads(profile.read_text())
         profile = run["snapshots"][-1].parents[2] / "ship-yapf-profile.json"
         if profile.is_file():
-            result[f"{mode}_{role}_ship_yapf_profile"] = json.loads(profile.read_text())
+            branches = json.loads(profile.read_text())
+            required = [
+                "region_nodes",
+                "track_nodes",
+                "cache_truncations",
+                "final_region_clears",
+                "reverse_chosen",
+            ]
+            required += (
+                ["intermediate", "alternate_docking"]
+                if scenario["water"] == "ferry"
+                else ["retries", "lost", "random_draws", "blocked_calls"]
+            )
+            if any(not branches[key] for key in required):
+                raise RuntimeError("ship YAPF branch witnesses are incomplete")
+            result[f"{mode}_{role}_ship_yapf_profile"] = branches
 
 
 def prepare_water_save(layout, migration, out, timeout):
@@ -390,6 +405,11 @@ def profile_report(path):
         for mode in ("snapshots", "plain"):
             profile = case.get(f"{mode}_candidate_water_profile")
             if profile is None:
+                branches = case.get(f"{mode}_candidate_ship_yapf_profile")
+                if branches is not None:
+                    rows.append(
+                        {"scenario": case["scenario"], "mode": mode, **branches}
+                    )
                 continue
             rows.append(
                 {
@@ -407,7 +427,7 @@ def profile_report(path):
                 }
             )
     if not rows:
-        raise RuntimeError("report has no OPENTTD_WATER_PROFILE measurements")
+        raise RuntimeError("report has no water/ship profile measurements")
     return rows
 
 

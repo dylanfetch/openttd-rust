@@ -1175,8 +1175,8 @@ closure and recovery, cross-region aqueduct, nearest depot, and reference-built
 live-path reload. `--self` and `--soak` retain the same witnesses. Native ABI
 probes cover visitor invalidation and owner replacement that ordinary YAPF
 visitors cannot trigger. `tools/water-scenario-ai/README.md` gives preparation,
-negative-probe and optional crossing/timing measurement commands. Full ship
-YAPF, arbitrary maps/NewGRFs and exhaustive path retry limits remain unported.
+negative-probe and optional crossing/timing measurement commands. Arbitrary
+maps/NewGRFs and exhaustive region/path limits remain evidence limits.
 
 
 ### Ship YAPF searches and canonical path cache
@@ -1201,6 +1201,7 @@ The existing `python3 tools/migration.py simulate water --jobs 2` corpus compare
 all chunks for ferry manual/cargodist, canal/lock loss and recovery, aqueducts,
 depot reversals and reference-produced live-path reload. Native checks compare
 2,000 heap operations to unchanged CBinaryHeapT and check path copy/lifetime and
-both reversal interfaces. Optional `OPENTTD_SHIP_PROFILE=1` records internal
-branch counters in the same scenario reports. Rare node limits/retries, custom
-NewGRFs and complete legacy-save fixtures are not exhaustively covered.
+reversal and fixed/map-derived limit control against unchanged CYapfBaseT.
+`OPENTTD_SHIP_PROFILE=1` records alternate docking, retries and cache/reversal
+witnesses in scenario reports; node limits use injected graphs, not reachable-map
+claims. Arbitrary maps/NewGRFs and complete legacy saves are not exhaustive.

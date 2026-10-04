@@ -18,13 +18,31 @@ namespace ShipYapfProbe {
 inline uint32_t draws;
 inline uint32_t Random(void *) noexcept { ++draws; return 0x9abcdef0; }
 inline uint32_t destination;
+inline bool snake, region_chain;
 inline void Destination(const void *, uint32_t *tile, uint16_t *dirs) noexcept { *tile = destination; *dirs = (1 << 1) | (1 << 9); }
-inline OpenTTDShipFollow Follow(const void *, uint32_t tile, uint8_t td) noexcept { return {static_cast<uint32_t>(tile + (td == 1 ? 32 : -32)), 0, static_cast<uint16_t>(1 << td), 1}; }
+inline OpenTTDShipFollow Follow(const void *, uint32_t tile, uint8_t td) noexcept
+{
+	if (!snake) return {static_cast<uint32_t>(tile + (td == 1 ? 32 : -32)), 0, static_cast<uint16_t>(1 << td), 1};
+	const uint32_t next = tile + (td == 8 ? 1 : td == 0 ? -1 : 128);
+	const uint32_t x = next % 128, y = next / 128;
+	const uint8_t direction = (y & 1) ? (x == 126 ? 1 : 8) : (x == 1 ? 1 : 0);
+	return {next, 0, static_cast<uint16_t>(1 << direction), 1};
+}
 inline OpenTTDShipTile Tile(const void *, uint32_t, uint8_t) noexcept { return {0, 0, 1, 0, 0}; }
-inline OpenTTDWaterPatch Patch(uint32_t tile) noexcept { return {static_cast<int32_t>(tile % 32 / 16), static_cast<int32_t>(tile / 32 / 16), 1}; }
-inline void *VisitNew(OpenTTDWaterPatch) noexcept { return nullptr; }
-inline uint8_t VisitNext(void *, OpenTTDWaterPatch, OpenTTDWaterPatch *) noexcept { return 0; }
-inline void VisitDestroy(void *) noexcept {}
+inline OpenTTDWaterPatch Patch(uint32_t tile) noexcept
+{
+	if (region_chain) return {static_cast<int32_t>(tile), 0, 1};
+	return snake ? OpenTTDWaterPatch{0, 0, 1} : OpenTTDWaterPatch{static_cast<int32_t>(tile % 32 / 16), static_cast<int32_t>(tile / 32 / 16), 1};
+}
+struct Cursor { bool used = false; };
+inline void *VisitNew(OpenTTDWaterPatch) noexcept { return new Cursor{}; }
+inline uint8_t VisitNext(void *cursor, OpenTTDWaterPatch from, OpenTTDWaterPatch *out) noexcept
+{
+	auto &state = *static_cast<Cursor *>(cursor);
+	if (!region_chain || state.used) return 0;
+	state.used = true; *out = {from.x + 1, 0, 1}; return 1;
+}
+inline void VisitDestroy(void *cursor) noexcept { delete static_cast<Cursor *>(cursor); }
 inline void Observe(void *, uint32_t, uint32_t *) noexcept {}
 inline void Write(void *, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) noexcept {}
 inline float Trig(uint32_t, float) noexcept { return 0; }
@@ -79,6 +97,24 @@ template <typename Check> void Run(Check check)
 	using RegionOwner = std::unique_ptr<OpenTTDShipRegionPath, decltype(&openttd_rust_ship_regions_destroy)>;
 	RegionOwner regions{openttd_rust_ship_regions(&input, &leaves, input.tile, 5, &destination, 1), openttd_rust_ship_regions_destroy};
 	check(openttd_rust_ship_regions_size(regions.get()) == 1 && openttd_rust_ship_regions_get(regions.get(), 0).label == 1);
+	/* Injected single-successor track graph isolates fixed-limit/retry control.
+	 * The patch query intentionally reports one patch for all graph vertices;
+	 * this is boundary/algorithm evidence, not a reachable-map simulation claim. */
+	snake = true; draws = 0;
+	input = {128, 128, 1 + 128, 1 + 128 * 90, 100, 20, 100, 0, 0, 8, 0, 0, 0};
+	destination = input.dest_tile;
+	result = openttd_rust_ship_choose(path.get(), &input, &leaves, &services, nullptr, input.tile, 1 << 8, 0, &destination, 1);
+	check(result.found == 0 && result.stats[3] == 1 && result.stats[2] == 1 && result.stats[7] == 1);
+	check(result.stats[1] == 5121 + 15 && result.stats[8] == 8 && draws == 8 && openttd_rust_ship_path_size(path.get()) == 7);
+	snake = false;
+	/* Map-derived high-level node limit, with a synthetic one-edge region graph. */
+	region_chain = true; draws = 0;
+	input = {128, 128, 600, 0, 100, 20, 100, 0, 0, 1, 0, 0, 0};
+	destination = 0; openttd_rust_ship_path_clear(path.get());
+	result = openttd_rust_ship_choose(path.get(), &input, &leaves, &services, nullptr, input.tile, 1 << 1, 0, &destination, 1);
+	check(result.found == 0 && result.stats[0] == 257 && result.stats[11] == 1 && result.stats[1] == 0);
+	check(result.stats[7] == 1 && result.stats[8] == 8 && draws == 8);
+	region_chain = false;
 }
 }
 #endif

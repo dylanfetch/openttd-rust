@@ -23,7 +23,7 @@ struct OpenTTDShipYapfInput {
 };
 struct OpenTTDShipFollow { uint32_t tile; int32_t skipped; uint16_t dirs; uint8_t followed; };
 struct OpenTTDShipTile { uint32_t ships; uint8_t docking, sea, lock_middle, destination; };
-struct OpenTTDShipYapfResult { uint8_t direction, found, origin; uint32_t stats[12]; };
+struct OpenTTDShipYapfResult { uint8_t direction, found, origin; uint32_t stats[13]; };
 struct OpenTTDShipYapfLeaves {
 	void (*destination)(const void *, uint32_t *, uint16_t *) noexcept;
 	OpenTTDShipFollow (*follow)(const void *, uint32_t, uint8_t) noexcept;
@@ -54,7 +54,10 @@ OpenTTDShipRegionPath *openttd_rust_ship_regions(const OpenTTDShipYapfInput *, c
 size_t openttd_rust_ship_regions_size(const OpenTTDShipRegionPath *);
 OpenTTDWaterPatch openttd_rust_ship_regions_get(const OpenTTDShipRegionPath *, size_t);
 void openttd_rust_ship_regions_destroy(OpenTTDShipRegionPath *);
-/* Evidence-only heap operations on synthetic nodes, valid indices and heap membership. */
+/* Evidence-only heap operations: costs[nodes], commands[count], values[count]
+ * readable initialized spans, out[count] exclusive writable; extents <=isize::MAX.
+ * Inputs remain live/read-only and do not overlap output. Node indices and heap
+ * membership obey Include/Remove preconditions; no pointer survives the call. */
 void openttd_rust_ship_heap_probe(const int32_t *, size_t, const uint32_t *, const int32_t *, size_t, uint32_t *);
 }
 #endif

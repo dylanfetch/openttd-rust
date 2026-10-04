@@ -60,7 +60,7 @@ pub struct Result {
     pub direction: u8,
     pub found: u8,
     pub origin: u8,
-    pub stats: [u32; 12],
+    pub stats: [u32; 13],
 }
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -240,7 +240,7 @@ fn region_path(
     start: u32,
     max_length: i32,
     origins: &[u32],
-    stats: &mut [u32; 12],
+    stats: &mut [u32; 13],
 ) -> Vec<Patch> {
     // SAFETY: copied world leaves do not reenter this search. Water cache is a distinct owner.
     let start_patch = unsafe { (leaves.patch)(start) };
@@ -360,8 +360,8 @@ fn low_search(
     dirs: u16,
     path: &[Patch],
     restricted: bool,
-    stats: &mut [u32; 12],
-) -> Option<(Search, usize)> {
+    stats: &mut [u32; 13],
+) -> Option<(Search, usize, u32)> {
     let mut observations = *input;
     // Destination observations occur only when the region search succeeds.
     unsafe {
@@ -399,7 +399,7 @@ fn low_search(
         let index = search.best()?;
         let parent = search.arena[index];
         if matches(input, leaves, context, parent, intermediate) {
-            return Some((search, index));
+            return Some((search, index, input.dest_tile));
         }
         stats[1] += 1;
         let f = unsafe { (leaves.follow)(context, parent.tile, parent.td) };
@@ -499,7 +499,7 @@ fn random_path(
     services: &Services,
     context: *const c_void,
     length: i32,
-    stats: &mut [u32; 12],
+    stats: &mut [u32; 13],
 ) -> u8 {
     let mut tile = input.tile;
     let mut td = input.trackdir;
@@ -539,7 +539,7 @@ fn choose(
         direction: INVALID,
         found: 0,
         origin: INVALID,
-        stats: [0; 12],
+        stats: [0; 13],
     };
     let path = region_path(input, leaves, start, 5, origins, &mut result.stats);
     if path.len() >= 5 {
@@ -562,7 +562,7 @@ fn choose(
         if attempt > 0 {
             result.stats[2] += 1;
         }
-        let Some((search, mut index)) = low_search(
+        let Some((search, mut index, closest)) = low_search(
             input,
             leaves,
             context,
@@ -587,6 +587,9 @@ fn choose(
             return result;
         };
         result.found = 1;
+        if input.station != 0 && path.len() < 5 && search.arena[index].tile != closest {
+            result.stats[12] += 1;
+        }
         let end = unsafe { (leaves.patch)(search.arena[index].tile) };
         while let Some(parent) = search.arena[index].parent {
             let node = search.arena[index];
@@ -765,7 +768,7 @@ pub unsafe extern "C" fn openttd_rust_ship_regions(
             start,
             max,
             origin_slice(origins, len),
-            &mut [0; 12],
+            &mut [0; 13],
         )
     })))
 }
