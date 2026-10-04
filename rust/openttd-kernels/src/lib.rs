@@ -19,6 +19,7 @@ mod landscape;
 mod linkgraph;
 mod math;
 mod packet;
+pub mod rail_yapf;
 mod script_list;
 pub mod services;
 mod station_cargo;
