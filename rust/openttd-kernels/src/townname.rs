@@ -1,0 +1,659 @@
+/*
+ * This file is part of OpenTTD.
+ * OpenTTD is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, version 2.
+ * OpenTTD is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
+ */
+
+//! Complete built-in town-name generation. No shared RNG or world state is used.
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss
+)]
+
+use super::townname_data::{
+    CZG_FREE, CZG_NFREE, CZG_PNEUT, CZG_SNEUT, NAME_ADDITIONAL_ENGLISH_1A,
+    NAME_ADDITIONAL_ENGLISH_1B1, NAME_ADDITIONAL_ENGLISH_1B2, NAME_ADDITIONAL_ENGLISH_1B3A,
+    NAME_ADDITIONAL_ENGLISH_1B3B, NAME_ADDITIONAL_ENGLISH_2, NAME_ADDITIONAL_ENGLISH_3,
+    NAME_ADDITIONAL_ENGLISH_PREFIX, NAME_AUSTRIAN_A1, NAME_AUSTRIAN_A2, NAME_AUSTRIAN_A3,
+    NAME_AUSTRIAN_A4, NAME_AUSTRIAN_A5, NAME_AUSTRIAN_A6, NAME_AUSTRIAN_B1, NAME_AUSTRIAN_B2,
+    NAME_AUSTRIAN_F1, NAME_AUSTRIAN_F2, NAME_CATALAN_1F, NAME_CATALAN_1M, NAME_CATALAN_2F,
+    NAME_CATALAN_2M, NAME_CATALAN_3, NAME_CATALAN_PREF, NAME_CATALAN_REAL, NAME_CATALAN_RIVER1,
+    NAME_CZECH_ADJ, NAME_CZECH_PATMOD, NAME_CZECH_REAL, NAME_CZECH_SUBST_ENDING,
+    NAME_CZECH_SUBST_FULL, NAME_CZECH_SUBST_POSTFIX, NAME_CZECH_SUBST_STEM, NAME_CZECH_SUFFIX,
+    NAME_DANISH_1, NAME_DANISH_2, NAME_DANISH_3, NAME_DUTCH_1, NAME_DUTCH_2, NAME_DUTCH_3,
+    NAME_DUTCH_4, NAME_DUTCH_5, NAME_FINNISH_1, NAME_FINNISH_2, NAME_FINNISH_3, NAME_FINNISH_REAL,
+    NAME_FRENCH_REAL, NAME_GERMAN_1, NAME_GERMAN_2, NAME_GERMAN_3_AM, NAME_GERMAN_3_AN_DER,
+    NAME_GERMAN_4_AM, NAME_GERMAN_4_AN_DER, NAME_GERMAN_PRE, NAME_GERMAN_REAL, NAME_HUNGARIAN_1,
+    NAME_HUNGARIAN_2, NAME_HUNGARIAN_3, NAME_HUNGARIAN_4, NAME_HUNGARIAN_REAL, NAME_ITALIAN_1F,
+    NAME_ITALIAN_1M, NAME_ITALIAN_2, NAME_ITALIAN_2I, NAME_ITALIAN_3, NAME_ITALIAN_PREF,
+    NAME_ITALIAN_REAL, NAME_ITALIAN_RIVER1, NAME_ITALIAN_RIVER2, NAME_NORWEGIAN_1,
+    NAME_NORWEGIAN_2, NAME_NORWEGIAN_REAL, NAME_ORIGINAL_ENGLISH_1, NAME_ORIGINAL_ENGLISH_2,
+    NAME_ORIGINAL_ENGLISH_3, NAME_ORIGINAL_ENGLISH_4, NAME_ORIGINAL_ENGLISH_5,
+    NAME_ORIGINAL_ENGLISH_6, NAME_POLISH_1_F, NAME_POLISH_1_M, NAME_POLISH_1_N, NAME_POLISH_2_F,
+    NAME_POLISH_2_M, NAME_POLISH_2_N, NAME_POLISH_2_O, NAME_POLISH_3_F, NAME_POLISH_3_M,
+    NAME_POLISH_3_N, NAME_ROMANIAN_REAL, NAME_SILLY_1, NAME_SILLY_2, NAME_SLOVAK_REAL,
+    NAME_SPANISH_REAL, NAME_SWEDISH_1, NAME_SWEDISH_2, NAME_SWEDISH_2A, NAME_SWEDISH_2B,
+    NAME_SWEDISH_2C, NAME_SWEDISH_3, NAME_SWISS_REAL, NAME_TURKISH_MIDDLE, NAME_TURKISH_PREFIX,
+    NAME_TURKISH_REAL, NAME_TURKISH_SUFFIX,
+};
+
+// GB(..., 16) masks after shifting, and ClampTo<uint16_t> saturates the table size.
+fn seed_chance(shift: u8, max: usize, seed: u32) -> usize {
+    ((((seed >> shift) & 0xffff) * max.min(u16::MAX as usize) as u32) >> 16) as usize
+}
+fn seed_mod_chance(shift: u8, max: usize, seed: u32) -> usize {
+    (seed >> shift) as usize % max
+}
+fn seed_chance_bias(shift: u8, max: usize, seed: u32, bias: i32) -> i32 {
+    (seed_chance(shift, max + bias as usize, seed) as u32).wrapping_sub(bias as u32) as i32
+}
+fn replace_english_words(builder: &mut String, original: bool) {
+    if original {
+        for (org, rep) in [("Ce", "Ke"), ("Ci", "Ki")] {
+            if builder.starts_with(org) {
+                builder.replace_range(..org.len(), rep);
+            }
+        }
+    }
+    for (org, rep) in [
+        ("Cunt", "East"),
+        ("Slag", "Pits"),
+        ("Slut", "Edin"),
+        ("Fart", "Boot"),
+        ("Drar", "Quar"),
+        ("Dreh", "Bash"),
+        ("Frar", "Shor"),
+        ("Grar", "Aber"),
+        ("Brar", "Over"),
+        ("Wrar", if original { "Inve" } else { "Stan" }),
+    ] {
+        if original && org == "Fart" {
+            continue;
+        }
+        if builder.starts_with(org) {
+            builder.replace_range(..org.len(), rep);
+        }
+    }
+}
+
+fn english_original(builder: &mut String, seed: u32) {
+    let mut i = seed_chance_bias(0, NAME_ORIGINAL_ENGLISH_1.len(), seed, 50);
+    if i >= 0 {
+        builder.push_str(NAME_ORIGINAL_ENGLISH_1[i as usize]);
+    }
+
+    builder.push_str(NAME_ORIGINAL_ENGLISH_2[seed_chance(4, NAME_ORIGINAL_ENGLISH_2.len(), seed)]);
+    builder.push_str(NAME_ORIGINAL_ENGLISH_3[seed_chance(7, NAME_ORIGINAL_ENGLISH_3.len(), seed)]);
+    builder.push_str(NAME_ORIGINAL_ENGLISH_4[seed_chance(10, NAME_ORIGINAL_ENGLISH_4.len(), seed)]);
+    builder.push_str(NAME_ORIGINAL_ENGLISH_5[seed_chance(13, NAME_ORIGINAL_ENGLISH_5.len(), seed)]);
+
+    i = seed_chance_bias(15, NAME_ORIGINAL_ENGLISH_6.len(), seed, 60);
+    if i >= 0 {
+        builder.push_str(NAME_ORIGINAL_ENGLISH_6[i as usize]);
+    }
+
+    replace_english_words(builder, true);
+}
+
+fn english_additional(builder: &mut String, seed: u32) {
+    let mut i = seed_chance_bias(0, NAME_ADDITIONAL_ENGLISH_PREFIX.len(), seed, 50);
+    if i >= 0 {
+        builder.push_str(NAME_ADDITIONAL_ENGLISH_PREFIX[i as usize]);
+    }
+
+    if seed_chance(3, 20, seed) >= 14 {
+        builder.push_str(
+            NAME_ADDITIONAL_ENGLISH_1A[seed_chance(6, NAME_ADDITIONAL_ENGLISH_1A.len(), seed)],
+        );
+    } else {
+        builder.push_str(
+            NAME_ADDITIONAL_ENGLISH_1B1[seed_chance(6, NAME_ADDITIONAL_ENGLISH_1B1.len(), seed)],
+        );
+        builder.push_str(
+            NAME_ADDITIONAL_ENGLISH_1B2[seed_chance(9, NAME_ADDITIONAL_ENGLISH_1B2.len(), seed)],
+        );
+        if seed_chance(11, 20, seed) >= 4 {
+            builder.push_str(
+                NAME_ADDITIONAL_ENGLISH_1B3A
+                    [seed_chance(12, NAME_ADDITIONAL_ENGLISH_1B3A.len(), seed)],
+            );
+        } else {
+            builder.push_str(
+                NAME_ADDITIONAL_ENGLISH_1B3B
+                    [seed_chance(12, NAME_ADDITIONAL_ENGLISH_1B3B.len(), seed)],
+            );
+        }
+    }
+
+    builder.push_str(
+        NAME_ADDITIONAL_ENGLISH_2[seed_chance(14, NAME_ADDITIONAL_ENGLISH_2.len(), seed)],
+    );
+
+    i = seed_chance_bias(15, NAME_ADDITIONAL_ENGLISH_3.len(), seed, 60);
+    if i >= 0 {
+        builder.push_str(NAME_ADDITIONAL_ENGLISH_3[i as usize]);
+    }
+
+    replace_english_words(builder, false);
+}
+
+fn austrian(builder: &mut String, seed: u32) {
+    let mut i = seed_chance_bias(0, NAME_AUSTRIAN_A1.len(), seed, 15);
+    if i >= 0 {
+        builder.push_str(NAME_AUSTRIAN_A1[i as usize]);
+    }
+
+    let mut j = 0;
+
+    i = seed_chance(4, 6, seed) as i32;
+    if i >= 4 {
+        builder.push_str(NAME_AUSTRIAN_A2[seed_chance(7, NAME_AUSTRIAN_A2.len(), seed)]);
+        builder.push_str(NAME_AUSTRIAN_A3[seed_chance(13, NAME_AUSTRIAN_A3.len(), seed)]);
+    } else if i >= 2 {
+        builder.push_str(NAME_AUSTRIAN_A5[seed_chance(7, NAME_AUSTRIAN_A5.len(), seed)]);
+        builder.push_str(NAME_AUSTRIAN_A6[seed_chance(9, NAME_AUSTRIAN_A6.len(), seed)]);
+        j = 1;
+    } else {
+        builder.push_str(NAME_AUSTRIAN_A4[seed_chance(7, NAME_AUSTRIAN_A4.len(), seed)]);
+    }
+
+    i = seed_chance(1, 6, seed) as i32;
+    if i >= 4 - j {
+        builder.push_str(NAME_AUSTRIAN_F1[seed_chance(4, NAME_AUSTRIAN_F1.len(), seed)]);
+        builder.push_str(NAME_AUSTRIAN_F2[seed_chance(5, NAME_AUSTRIAN_F2.len(), seed)]);
+    } else if i >= 2 - j {
+        builder.push_str(NAME_AUSTRIAN_B1[seed_chance(4, NAME_AUSTRIAN_B1.len(), seed)]);
+        builder.push_str(NAME_AUSTRIAN_B2[seed_chance(5, NAME_AUSTRIAN_B2.len(), seed)]);
+    }
+}
+
+fn german(builder: &mut String, seed: u32) {
+    let seed_derivative = seed_chance(7, 28, seed);
+
+    if seed_derivative == 12 || seed_derivative == 19 {
+        let i = seed_chance(2, NAME_GERMAN_PRE.len(), seed);
+        builder.push_str(NAME_GERMAN_PRE[i]);
+    }
+
+    let mut i = seed_chance(3, NAME_GERMAN_REAL.len() + NAME_GERMAN_1.len(), seed);
+    if i < NAME_GERMAN_REAL.len() {
+        builder.push_str(NAME_GERMAN_REAL[i]);
+    } else {
+        builder.push_str(NAME_GERMAN_1[i - NAME_GERMAN_REAL.len()]);
+
+        i = seed_chance(5, NAME_GERMAN_2.len(), seed);
+        builder.push_str(NAME_GERMAN_2[i]);
+    }
+
+    if seed_derivative == 24 {
+        i = seed_chance(9, NAME_GERMAN_4_AN_DER.len() + NAME_GERMAN_4_AM.len(), seed);
+        if i < NAME_GERMAN_4_AN_DER.len() {
+            builder.push_str(NAME_GERMAN_3_AN_DER[0]);
+            builder.push_str(NAME_GERMAN_4_AN_DER[i]);
+        } else {
+            builder.push_str(NAME_GERMAN_3_AM[0]);
+            builder.push_str(NAME_GERMAN_4_AM[i - NAME_GERMAN_4_AN_DER.len()]);
+        }
+    }
+}
+
+fn spanish(builder: &mut String, seed: u32) {
+    builder.push_str(NAME_SPANISH_REAL[seed_chance(0, NAME_SPANISH_REAL.len(), seed)]);
+}
+
+fn french(builder: &mut String, seed: u32) {
+    builder.push_str(NAME_FRENCH_REAL[seed_chance(0, NAME_FRENCH_REAL.len(), seed)]);
+}
+
+fn silly(builder: &mut String, seed: u32) {
+    builder.push_str(NAME_SILLY_1[seed_chance(0, NAME_SILLY_1.len(), seed)]);
+    builder.push_str(NAME_SILLY_2[seed_chance(16, NAME_SILLY_2.len(), seed)]);
+}
+
+fn swedish(builder: &mut String, seed: u32) {
+    let i = seed_chance_bias(0, NAME_SWEDISH_1.len(), seed, 50);
+    if i >= 0 {
+        builder.push_str(NAME_SWEDISH_1[i as usize]);
+    }
+
+    if seed_chance(4, 5, seed) >= 3 {
+        builder.push_str(NAME_SWEDISH_2[seed_chance(7, NAME_SWEDISH_2.len(), seed)]);
+    } else {
+        builder.push_str(NAME_SWEDISH_2A[seed_chance(7, NAME_SWEDISH_2A.len(), seed)]);
+        builder.push_str(NAME_SWEDISH_2B[seed_chance(10, NAME_SWEDISH_2B.len(), seed)]);
+        builder.push_str(NAME_SWEDISH_2C[seed_chance(13, NAME_SWEDISH_2C.len(), seed)]);
+    }
+
+    builder.push_str(NAME_SWEDISH_3[seed_chance(16, NAME_SWEDISH_3.len(), seed)]);
+}
+
+fn dutch(builder: &mut String, seed: u32) {
+    let i = seed_chance_bias(0, NAME_DUTCH_1.len(), seed, 50);
+    if i >= 0 {
+        builder.push_str(NAME_DUTCH_1[i as usize]);
+    }
+
+    if seed_chance(6, 9, seed) > 4 {
+        builder.push_str(NAME_DUTCH_2[seed_chance(9, NAME_DUTCH_2.len(), seed)]);
+    } else {
+        builder.push_str(NAME_DUTCH_3[seed_chance(9, NAME_DUTCH_3.len(), seed)]);
+        builder.push_str(NAME_DUTCH_4[seed_chance(12, NAME_DUTCH_4.len(), seed)]);
+    }
+
+    builder.push_str(NAME_DUTCH_5[seed_chance(15, NAME_DUTCH_5.len(), seed)]);
+}
+
+fn finnish(builder: &mut String, seed: u32) {
+    if seed_chance(0, 15, seed) >= 10 {
+        builder.push_str(NAME_FINNISH_REAL[seed_chance(2, NAME_FINNISH_REAL.len(), seed)]);
+        return;
+    }
+
+    if seed_chance(0, 15, seed) >= 5 {
+        let sel = seed_chance(0, NAME_FINNISH_1.len(), seed);
+        builder.push_str(NAME_FINNISH_1[sel]);
+
+        if builder.ends_with('i') {
+            builder.pop();
+            builder.push('e');
+        }
+
+        if builder.bytes().any(|c| b"aouAOU".contains(&c)) {
+            builder.push_str("la");
+        } else {
+            builder.push_str("lä");
+        }
+        return;
+    }
+
+    let sel = seed_chance(2, NAME_FINNISH_1.len() + NAME_FINNISH_2.len(), seed);
+    if sel >= NAME_FINNISH_1.len() {
+        builder.push_str(NAME_FINNISH_2[sel - NAME_FINNISH_1.len()]);
+    } else {
+        builder.push_str(NAME_FINNISH_1[sel]);
+    }
+
+    builder.push_str(NAME_FINNISH_3[seed_chance(10, NAME_FINNISH_3.len(), seed)]);
+}
+
+fn polish(builder: &mut String, seed: u32) {
+    let i = seed_chance(
+        0,
+        NAME_POLISH_2_O.len()
+            + NAME_POLISH_2_M.len()
+            + NAME_POLISH_2_F.len()
+            + NAME_POLISH_2_N.len(),
+        seed,
+    );
+    let j = seed_chance(2, 20, seed);
+
+    if i < NAME_POLISH_2_O.len() {
+        builder.push_str(NAME_POLISH_2_O[seed_chance(3, NAME_POLISH_2_O.len(), seed)]);
+        return;
+    }
+
+    if i < NAME_POLISH_2_M.len() + NAME_POLISH_2_O.len() {
+        if j < 4 {
+            builder.push_str(NAME_POLISH_1_M[seed_chance(5, NAME_POLISH_1_M.len(), seed)]);
+        }
+
+        builder.push_str(NAME_POLISH_2_M[seed_chance(7, NAME_POLISH_2_M.len(), seed)]);
+
+        if (4..16).contains(&j) {
+            builder.push_str(NAME_POLISH_3_M[seed_chance(10, NAME_POLISH_3_M.len(), seed)]);
+        }
+
+        return;
+    }
+
+    if i < NAME_POLISH_2_F.len() + NAME_POLISH_2_M.len() + NAME_POLISH_2_O.len() {
+        if j < 4 {
+            builder.push_str(NAME_POLISH_1_F[seed_chance(5, NAME_POLISH_1_F.len(), seed)]);
+        }
+
+        builder.push_str(NAME_POLISH_2_F[seed_chance(7, NAME_POLISH_2_F.len(), seed)]);
+
+        if (4..16).contains(&j) {
+            builder.push_str(NAME_POLISH_3_F[seed_chance(10, NAME_POLISH_3_F.len(), seed)]);
+        }
+
+        return;
+    }
+
+    if j < 4 {
+        builder.push_str(NAME_POLISH_1_N[seed_chance(5, NAME_POLISH_1_N.len(), seed)]);
+    }
+
+    builder.push_str(NAME_POLISH_2_N[seed_chance(7, NAME_POLISH_2_N.len(), seed)]);
+
+    if (4..16).contains(&j) {
+        builder.push_str(NAME_POLISH_3_N[seed_chance(10, NAME_POLISH_3_N.len(), seed)]);
+    }
+}
+
+fn romanian(builder: &mut String, seed: u32) {
+    builder.push_str(NAME_ROMANIAN_REAL[seed_chance(0, NAME_ROMANIAN_REAL.len(), seed)]);
+}
+
+fn slovak(builder: &mut String, seed: u32) {
+    builder.push_str(NAME_SLOVAK_REAL[seed_chance(0, NAME_SLOVAK_REAL.len(), seed)]);
+}
+
+fn norwegian(builder: &mut String, seed: u32) {
+    if seed_chance(0, 15, seed) < 3 {
+        builder.push_str(NAME_NORWEGIAN_REAL[seed_chance(4, NAME_NORWEGIAN_REAL.len(), seed)]);
+        return;
+    }
+
+    builder.push_str(NAME_NORWEGIAN_1[seed_chance(4, NAME_NORWEGIAN_1.len(), seed)]);
+
+    builder.push_str(NAME_NORWEGIAN_2[seed_chance(11, NAME_NORWEGIAN_2.len(), seed)]);
+}
+
+fn hungarian(builder: &mut String, seed: u32) {
+    if seed_chance(12, 15, seed) < 3 {
+        builder.push_str(NAME_HUNGARIAN_REAL[seed_chance(0, NAME_HUNGARIAN_REAL.len(), seed)]);
+        return;
+    }
+
+    let mut i = seed_chance(3, NAME_HUNGARIAN_1.len() * 3, seed);
+    if i < NAME_HUNGARIAN_1.len() {
+        builder.push_str(NAME_HUNGARIAN_1[i]);
+    }
+
+    builder.push_str(NAME_HUNGARIAN_2[seed_chance(3, NAME_HUNGARIAN_2.len(), seed)]);
+    builder.push_str(NAME_HUNGARIAN_3[seed_chance(6, NAME_HUNGARIAN_3.len(), seed)]);
+
+    i = seed_chance(10, NAME_HUNGARIAN_4.len() * 3, seed);
+    if i < NAME_HUNGARIAN_4.len() {
+        builder.push_str(NAME_HUNGARIAN_4[i]);
+    }
+}
+
+fn swiss(builder: &mut String, seed: u32) {
+    builder.push_str(NAME_SWISS_REAL[seed_chance(0, NAME_SWISS_REAL.len(), seed)]);
+}
+
+fn danish(builder: &mut String, seed: u32) {
+    let i = seed_chance_bias(0, NAME_DANISH_1.len(), seed, 50);
+    if i >= 0 {
+        builder.push_str(NAME_DANISH_1[i as usize]);
+    }
+
+    builder.push_str(NAME_DANISH_2[seed_chance(7, NAME_DANISH_2.len(), seed)]);
+    builder.push_str(NAME_DANISH_3[seed_chance(16, NAME_DANISH_3.len(), seed)]);
+}
+
+fn turkish(builder: &mut String, seed: u32) {
+    let i = seed_mod_chance(0, 5, seed);
+
+    match i {
+        0 => {
+            builder
+                .push_str(NAME_TURKISH_PREFIX[seed_mod_chance(2, NAME_TURKISH_PREFIX.len(), seed)]);
+
+            builder
+                .push_str(NAME_TURKISH_MIDDLE[seed_mod_chance(4, NAME_TURKISH_MIDDLE.len(), seed)]);
+
+            if seed_mod_chance(0, 7, seed) == 0 {
+                builder.push_str(
+                    NAME_TURKISH_SUFFIX[seed_mod_chance(10, NAME_TURKISH_SUFFIX.len(), seed)],
+                );
+            }
+        }
+
+        1 | 2 => {
+            builder
+                .push_str(NAME_TURKISH_PREFIX[seed_mod_chance(2, NAME_TURKISH_PREFIX.len(), seed)]);
+            builder
+                .push_str(NAME_TURKISH_SUFFIX[seed_mod_chance(4, NAME_TURKISH_SUFFIX.len(), seed)]);
+        }
+
+        _ => {
+            builder.push_str(NAME_TURKISH_REAL[seed_mod_chance(4, NAME_TURKISH_REAL.len(), seed)]);
+        }
+    }
+}
+
+fn italian(builder: &mut String, seed: u32) {
+    if seed_mod_chance(0, 6, seed) == 0 {
+        builder.push_str(NAME_ITALIAN_REAL[seed_mod_chance(4, NAME_ITALIAN_REAL.len(), seed)]);
+        return;
+    }
+
+    let mascul_femin_italian = ["o", "a"];
+
+    if seed_mod_chance(0, 8, seed) == 0 {
+        builder.push_str(NAME_ITALIAN_PREF[seed_mod_chance(11, NAME_ITALIAN_PREF.len(), seed)]);
+    }
+
+    let i = seed_chance(0, 2, seed);
+    if i == 0 {
+        builder.push_str(NAME_ITALIAN_1M[seed_mod_chance(4, NAME_ITALIAN_1M.len(), seed)]);
+    } else {
+        builder.push_str(NAME_ITALIAN_1F[seed_mod_chance(4, NAME_ITALIAN_1F.len(), seed)]);
+    }
+
+    if seed_mod_chance(3, 3, seed) == 0 {
+        builder.push_str(NAME_ITALIAN_2[seed_mod_chance(11, NAME_ITALIAN_2.len(), seed)]);
+        builder.push_str(mascul_femin_italian[i]);
+    } else {
+        builder.push_str(NAME_ITALIAN_2I[seed_mod_chance(16, NAME_ITALIAN_2I.len(), seed)]);
+    }
+
+    if seed_mod_chance(15, 4, seed) == 0 {
+        if seed_mod_chance(5, 2, seed) == 0 {
+            builder.push_str(NAME_ITALIAN_3[seed_mod_chance(4, NAME_ITALIAN_3.len(), seed)]);
+        } else {
+            builder
+                .push_str(NAME_ITALIAN_RIVER1[seed_mod_chance(4, NAME_ITALIAN_RIVER1.len(), seed)]);
+            builder.push_str(
+                NAME_ITALIAN_RIVER2[seed_mod_chance(16, NAME_ITALIAN_RIVER2.len(), seed)],
+            );
+        }
+    }
+}
+
+fn catalan(builder: &mut String, seed: u32) {
+    if seed_mod_chance(0, 3, seed) == 0 {
+        builder.push_str(NAME_CATALAN_REAL[seed_mod_chance(4, NAME_CATALAN_REAL.len(), seed)]);
+        return;
+    }
+
+    if seed_mod_chance(0, 2, seed) == 0 {
+        builder.push_str(NAME_CATALAN_PREF[seed_mod_chance(11, NAME_CATALAN_PREF.len(), seed)]);
+    }
+
+    let i = seed_chance(0, 2, seed);
+    if i == 0 {
+        builder.push_str(NAME_CATALAN_1M[seed_mod_chance(4, NAME_CATALAN_1M.len(), seed)]);
+        builder.push_str(NAME_CATALAN_2M[seed_mod_chance(11, NAME_CATALAN_2M.len(), seed)]);
+    } else {
+        builder.push_str(NAME_CATALAN_1F[seed_mod_chance(4, NAME_CATALAN_1F.len(), seed)]);
+        builder.push_str(NAME_CATALAN_2F[seed_mod_chance(11, NAME_CATALAN_2F.len(), seed)]);
+    }
+
+    if seed_mod_chance(15, 5, seed) == 0 {
+        if seed_mod_chance(5, 2, seed) == 0 {
+            builder.push_str(NAME_CATALAN_3[seed_mod_chance(4, NAME_CATALAN_3.len(), seed)]);
+        } else {
+            builder
+                .push_str(NAME_CATALAN_RIVER1[seed_mod_chance(4, NAME_CATALAN_RIVER1.len(), seed)]);
+        }
+    }
+}
+
+// Czech generator and tables copyright Petr Baudis 2005 (GPL).
+#[allow(clippy::too_many_lines, clippy::if_not_else)]
+fn czech(builder: &mut String, seed: u32) {
+    if seed_mod_chance(0, 4, seed) == 0 {
+        builder.push_str(NAME_CZECH_REAL[seed_mod_chance(4, NAME_CZECH_REAL.len(), seed)]);
+        return;
+    }
+    let prob_tails = seed_mod_chance(2, 32, seed);
+    let mut do_prefix = prob_tails < 12;
+    let do_suffix = prob_tails > 11 && prob_tails < 17;
+    let mut prefix = 0;
+    let mut suffix = 0;
+    let mut ending = 0;
+    let mut postfix = 0;
+    if do_prefix {
+        prefix = seed_mod_chance(5, NAME_CZECH_ADJ.len() * 12, seed) / 12;
+    }
+    if do_suffix {
+        suffix = seed_mod_chance(7, NAME_CZECH_SUFFIX.len(), seed);
+    }
+    let mut stem = seed_mod_chance(
+        9,
+        NAME_CZECH_SUBST_FULL.len() + 3 * NAME_CZECH_SUBST_STEM.len(),
+        seed,
+    );
+    let dynamic_subst = stem >= NAME_CZECH_SUBST_FULL.len();
+    let mut gender;
+    let mut choose;
+
+    if !dynamic_subst {
+        let s = NAME_CZECH_SUBST_FULL[stem];
+        gender = s.gender;
+        choose = s.choose;
+    } else {
+        stem -= NAME_CZECH_SUBST_FULL.len();
+        stem %= NAME_CZECH_SUBST_STEM.len();
+        let s = NAME_CZECH_SUBST_STEM[stem];
+        gender = s.gender;
+        choose = s.choose;
+        let allow = s.allow;
+        postfix = seed_mod_chance(14, NAME_CZECH_SUBST_POSTFIX.len() * 2, seed);
+        if choose & 2 != 0 {
+            postfix %= NAME_CZECH_SUBST_POSTFIX.len();
+        }
+        if choose & 4 != 0 {
+            postfix += NAME_CZECH_SUBST_POSTFIX.len();
+        }
+        choose |= if postfix < NAME_CZECH_SUBST_POSTFIX.len() {
+            2
+        } else {
+            4
+        };
+        let mut ending_start = -1i32;
+        let mut ending_stop = -1i32;
+        let mut pos = 0;
+        while pos < NAME_CZECH_SUBST_ENDING.len() {
+            let e = NAME_CZECH_SUBST_ENDING[pos];
+            if gender == CZG_FREE
+                || (gender == CZG_NFREE && e.gender != CZG_SNEUT && e.gender != CZG_PNEUT)
+                || gender == e.gender
+            {
+                if ending_start < 0 {
+                    ending_start = pos as i32;
+                }
+            } else if ending_start >= 0 {
+                ending_stop = pos as i32 - 1;
+                break;
+            }
+            pos += 1;
+        }
+        if ending_stop < 0 {
+            ending_stop = pos as i32 - 1;
+        }
+        let mut map = [0usize; NAME_CZECH_SUBST_ENDING.len()];
+        let mut count = 0;
+        for pos in ending_start..=ending_stop {
+            let e = NAME_CZECH_SUBST_ENDING[pos as usize];
+            if e.choose & choose == choose && e.allow & allow != 0 {
+                map[count] = pos as usize;
+                count += 1;
+            }
+        }
+        // The unchanged tables guarantee a matching real gender for every stem/seed.
+        ending = map[seed_mod_chance(16, count, seed)];
+        gender = NAME_CZECH_SUBST_ENDING[ending].gender;
+    }
+    if do_prefix && NAME_CZECH_ADJ[prefix].choose & choose != choose {
+        do_prefix = false;
+    }
+    if do_prefix {
+        let a = NAME_CZECH_ADJ[prefix];
+        builder.push_str(a.name);
+        builder.push_str(NAME_CZECH_PATMOD[gender][a.pattern]);
+        builder.push(' ');
+    }
+    if dynamic_subst {
+        builder.push_str(NAME_CZECH_SUBST_STEM[stem].name);
+        if postfix < NAME_CZECH_SUBST_POSTFIX.len() {
+            let poststr = NAME_CZECH_SUBST_POSTFIX[postfix];
+            let endstr = NAME_CZECH_SUBST_ENDING[ending].name;
+            // Original compares the second UTF-8 byte, including accented endings.
+            if poststr.as_bytes()[1] != b'v' || poststr.as_bytes()[1] != endstr.as_bytes()[1] {
+                builder.push_str(poststr);
+            }
+        }
+        builder.push_str(NAME_CZECH_SUBST_ENDING[ending].name);
+    } else {
+        builder.push_str(NAME_CZECH_SUBST_FULL[stem].name);
+    }
+    if do_suffix {
+        builder.push(' ');
+        builder.push_str(NAME_CZECH_SUFFIX[suffix]);
+    }
+}
+
+const GENERATORS: [fn(&mut String, u32); 21] = [
+    english_original,
+    french,
+    german,
+    english_additional,
+    spanish,
+    silly,
+    swedish,
+    dutch,
+    finnish,
+    polish,
+    slovak,
+    norwegian,
+    hungarian,
+    austrian,
+    romanian,
+    czech,
+    swiss,
+    danish,
+    turkish,
+    italian,
+    catalan,
+];
+
+/// Owns the complete immutable output; the C++ builder is accessed only after return.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_townname_generate(lang: usize, seed: u32) -> *mut String {
+    let mut output = Box::new(String::new());
+    GENERATORS[lang](&mut output, seed);
+    Box::into_raw(output)
+}
+
+/// # Safety
+/// Owner is live from generate; length points to writable `size_t`. Returned bytes
+/// are an immutable borrow valid until destroy. No pointer/callback is retained.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_townname_data(
+    owner: *const String,
+    length: *mut usize,
+) -> *const u8 {
+    let output = unsafe { &*owner };
+    unsafe {
+        *length = output.len();
+    }
+    output.as_ptr()
+}
+
+/// # Safety
+/// Destroy exactly once an owner returned by generate, after its last byte borrow.
+/// All exports abort on panic/OOM and cannot unwind into C++.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_townname_destroy(owner: *mut String) {
+    drop(unsafe { Box::from_raw(owner) });
+}

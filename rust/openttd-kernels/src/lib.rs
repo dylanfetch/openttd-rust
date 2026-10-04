@@ -22,6 +22,8 @@ mod script_list;
 mod station_cargo;
 mod string_validation;
 mod tgp;
+mod townname;
+mod townname_data;
 mod widget_parser;
 
 pub use admin_conversion::Action as AdminAction;

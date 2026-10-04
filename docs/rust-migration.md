@@ -1053,3 +1053,30 @@ Native ABI smoke covers snapshot/result/abort ownership; Rust unit cases retain
 negative capacity promotion and wrapped/empty shares. No armoured network is in
 the road corpus. Graphs, allocator failures and abort timing are not exhaustive;
 resource exhaustion timing differs with the allocation strategy.
+
+### Built-in town-name generation
+
+Issue #96 moves all 21 built-in generators, seed selection, English replacements,
+Finnish vowel handling, Czech grammatical matching and private constants into Rust.
+C++ keeps NewGRF routing, town-name retries/uniqueness, settings and save/load.
+Original bodies and unshared tables compile only in portable builds; four
+French/Spanish/Silly tables remain in C++ for unchanged legacy save remapping and
+are duplicated privately in Rust. This does not migrate town growth or storage.
+
+One coarse call owns complete output behind an opaque result. C++ appends the
+immutable byte view with RAII destruction, including on append exceptions; no
+builder/world pointer, callback or shared RNG enters Rust. All u32 seeds and
+original language IDs retain explicit arithmetic, exact UTF-8 bytes and dispatch
+order. English replacement and Finnish vowel scans start at the generated suffix,
+so existing builder bytes do not influence them. Panics/OOM abort; allocation and
+partial-output failure timing differ with the owned-output strategy.
+
+Evidence: the semantic harness observes actual built-in rendered names through
+read-only AI logs and compares every saved field in plain/desync modes. Identical
+reference-derived inputs patch only intended CITY type/parts; all 21 styles cover
+bit/complement seeds and source-derived English/Finnish/Czech branch witnesses.
+Focused CTest covers both u32 endpoints for every style, arbitrary UTF-8/NUL
+prefixes, repeated appends, Finnish prefix-vowel isolation and the actual company
+string-ID renderer. Native ABI smoke checks owned-output lifetime/UTF-8 bytes.
+This samples seeds; it is not exhaustive coverage of 21 * 2^32 combinations,
+every allocator failure or NewGRF town-name behavior.
