@@ -35,6 +35,15 @@ fork; the remaining upstream documentation explains behavior and architecture.
   casts; Rust overflow checks (enabled in release, with `panic = "abort"`) may
   only back up operations that cannot overflow in the original. This applies to
   new work; known divergences in existing ports are tracked as issues (#75).
+- Call shared services directly. Rust calls `Random`, map and pool accessors and
+  other shared services through `noexcept` C++ wrappers and keeps the original's
+  control flow, so a port reads like the C++ body it replaces. Environmental
+  failures are not simulation behavior: allocation failure, I/O errors in debug
+  or log output, and paths that need developer-only defines such as
+  `RANDOM_DEBUG`. An exception escaping a wrapper terminates. Return control to
+  C++ (an action protocol) only where the original throws or reenters during
+  ordinary play: script VMs, save/load errors, or callbacks that can run
+  arbitrary code or mutate state Rust holds borrowed. Name each such service.
 - Evidence for game-logic ports is the semantic simulation harness (`python3
   tools/migration.py simulate`, #72) plus the existing tests; a new game-logic
   port integrates only after the harness exists and its scenarios exercise the
@@ -65,6 +74,11 @@ checks that run; do not restate them in paragraphs.
   instead of re-describing them. `.github/PULL_REQUEST_TEMPLATE.md` and the
   migration issue form follow this budget.
 - Component entry in `docs/rust-migration.md`: about 25 lines at most.
+- Roadmap: forward-looking. A completed item becomes one table row (issue, PR,
+  commit, metrics); its evidence stays in the PR. Committed docs do not cite
+  `.local/` receipts, which nobody else can check.
+- Harness tooling for a port goes in that component's scenario module. Tooling
+  is code to maintain; keep it proportionate to the C++ the port retires.
 - Review report: reviewed commit, findings, and dispositions. Do not narrate
   what was verified when there are no findings.
 - One PR per component, targeting `rust-migration` directly. Use an integration
@@ -93,6 +107,11 @@ the agent, exact model, and reasoning effort, including artifacts authored by ro
 For example: `Agent: /root/implementation | Model: gpt-6.1-sol | Reasoning effort: high`.
 A user-directed session outside Codex (for example Claude Code) names its exact
 model and states its effort as reported by its host.
+
+Spawn a fresh agent for each task and name it after that task. Do not reassign a
+finished agent to unrelated work: its name is its attribution, and its context
+carries over. Each PR gets its own reviewer, not one reused from another PR; that
+reviewer re-reviews the same PR's fixes.
 
 For substantive changes:
 

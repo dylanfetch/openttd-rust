@@ -48,9 +48,13 @@ No Rust reference into world storage survives an operation that can mutate,
 reallocate or destroy it. Resolve IDs when needed under the source's lifetime
 rules; reacquiring an ID alone does not make reuse safe. Document callback reentry
 for each component and release affected owner borrows before it can reenter.
-Nonthrowing leaf callbacks can run within Rust; potentially throwing or VM calls
+Shared services (`Random`, map and pool accessors) are `noexcept` C++ wrappers
+that Rust calls directly, so ports keep the original control flow. Environmental
+failures (allocation, debug/log I/O, developer-only defines such as `RANDOM_DEBUG`)
+terminate inside the wrapper; they are not simulation behavior. Script VMs,
+save/load errors and callbacks that run arbitrary code or mutate borrowed state
 use a return-to-C++ action protocol. Neither C++ exceptions nor Rust panics unwind
-across FFI; preserve source failure order rather than adding abort paths.
+across FFI; for ordinary-play failures preserve source failure order.
 
 Per-field callbacks inside tile or vehicle loops may dominate runtime. Prefer
 copied records for fields observed together and batches only where the original
