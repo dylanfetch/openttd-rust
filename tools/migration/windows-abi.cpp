@@ -8,13 +8,18 @@
 /** @file windows-abi.cpp Bounded first-32-bit layout and real C ABI call checks. */
 #include "rust/abi_ffi.h"
 #include "rust/water_regions_ffi.h"
+#include "rust/cargo_payment_ffi.h"
+#include "rust/ship_yapf_ffi.h"
 #include "rust/linkgraph_ffi.h"
 #include "rust/trees_ffi.h"
 #include "rust/disaster_ffi.h"
 #include "rust/townname_ffi.h"
 #include "rust/effect_ffi.h"
+#include "rust/road_ffi.h"
 #include "tests/effect_protocol.hpp"
 #include "tests/water_regions_protocol.hpp"
+#include "tests/ship_yapf_protocol.hpp"
+#include "tests/town_protocol.hpp"
 #include "rust/ffi.h"
 #include "rust/utf8_ffi.h"
 #include "rust/builder_ffi.h"
@@ -101,12 +106,27 @@ static void Layouts()
 	Layout(37, "OpenTTDLinkGraphShare", {sizeof(OpenTTDLinkGraphShare), alignof(OpenTTDLinkGraphShare), offsetof(OpenTTDLinkGraphShare, node), offsetof(OpenTTDLinkGraphShare, origin), offsetof(OpenTTDLinkGraphShare, via), offsetof(OpenTTDLinkGraphShare, cumulative), offsetof(OpenTTDLinkGraphShare, unrestricted), offsetof(OpenTTDLinkGraphShare, has_share)});
 	Layout(39, "OpenTTDEffectView", {sizeof(OpenTTDEffectView), alignof(OpenTTDEffectView), offsetof(OpenTTDEffectView, x), offsetof(OpenTTDEffectView, y), offsetof(OpenTTDEffectView, z), offsetof(OpenTTDEffectView, sprite), offsetof(OpenTTDEffectView, progress), offsetof(OpenTTDEffectView, spritenum), offsetof(OpenTTDEffectView, subtype), offsetof(OpenTTDEffectView, ambient)});
 	Layout(41, "OpenTTDEffectLeaves", {sizeof(OpenTTDEffectLeaves), alignof(OpenTTDEffectLeaves), offsetof(OpenTTDEffectLeaves, observe), offsetof(OpenTTDEffectLeaves, write), offsetof(OpenTTDEffectLeaves, viewport), offsetof(OpenTTDEffectLeaves, sound), offsetof(OpenTTDEffectLeaves, animated)});
+	Layout(80, "OpenTTDRoadPathElement", {sizeof(OpenTTDRoadPathElement), alignof(OpenTTDRoadPathElement), offsetof(OpenTTDRoadPathElement, trackdir), offsetof(OpenTTDRoadPathElement, tile)});
+	Layout(81, "OpenTTDRoadView", {sizeof(OpenTTDRoadView), alignof(OpenTTDRoadView), offsetof(OpenTTDRoadView, type), offsetof(OpenTTDRoadView, first), offsetof(OpenTTDRoadView, next), offsetof(OpenTTDRoadView, previous), offsetof(OpenTTDRoadView, tile), offsetof(OpenTTDRoadView, dest), offsetof(OpenTTDRoadView, x), offsetof(OpenTTDRoadView, y), offsetof(OpenTTDRoadView, z), offsetof(OpenTTDRoadView, direction), offsetof(OpenTTDRoadView, speed), offsetof(OpenTTDRoadView, tick), offsetof(OpenTTDRoadView, running), offsetof(OpenTTDRoadView, day), offsetof(OpenTTDRoadView, order_time), offsetof(OpenTTDRoadView, progress), offsetof(OpenTTDRoadView, status), offsetof(OpenTTDRoadView, owner), offsetof(OpenTTDRoadView, engine), offsetof(OpenTTDRoadView, last_station), offsetof(OpenTTDRoadView, order_destination), offsetof(OpenTTDRoadView, order_type), offsetof(OpenTTDRoadView, order_max_speed), offsetof(OpenTTDRoadView, breakdown), offsetof(OpenTTDRoadView, max_track_speed), offsetof(OpenTTDRoadView, length), offsetof(OpenTTDRoadView, total_length), offsetof(OpenTTDRoadView, roadtype), offsetof(OpenTTDRoadView, front), offsetof(OpenTTDRoadView, articulated), offsetof(OpenTTDRoadView, tram), offsetof(OpenTTDRoadView, bus), offsetof(OpenTTDRoadView, order_nonstop)});
+	Layout(82, "OpenTTDRoadLeaves", {sizeof(OpenTTDRoadLeaves), alignof(OpenTTDRoadLeaves), offsetof(OpenTTDRoadLeaves, observe), offsetof(OpenTTDRoadLeaves, write), offsetof(OpenTTDRoadLeaves, leaf), offsetof(OpenTTDRoadLeaves, owner), offsetof(OpenTTDRoadLeaves, nearby)});
+	Layout(83, "OpenTTDRoadAction", {sizeof(OpenTTDRoadAction), alignof(OpenTTDRoadAction), offsetof(OpenTTDRoadAction, op), offsetof(OpenTTDRoadAction, id), offsetof(OpenTTDRoadAction, a), offsetof(OpenTTDRoadAction, b), offsetof(OpenTTDRoadAction, c)});
 	Layout(44, "OpenTTDDisasterState", {sizeof(OpenTTDDisasterState), alignof(OpenTTDDisasterState), offsetof(OpenTTDDisasterState, image_override), offsetof(OpenTTDDisasterState, target), offsetof(OpenTTDDisasterState, state), offsetof(OpenTTDDisasterState, flags)});
 	Layout(45, "OpenTTDDisasterAction", {sizeof(OpenTTDDisasterAction), alignof(OpenTTDDisasterAction), offsetof(OpenTTDDisasterAction, kind), offsetof(OpenTTDDisasterAction, id), offsetof(OpenTTDDisasterAction, other), offsetof(OpenTTDDisasterAction, a), offsetof(OpenTTDDisasterAction, b), offsetof(OpenTTDDisasterAction, c), offsetof(OpenTTDDisasterAction, d)});
 	Layout(46, "OpenTTDWaterPatch", {sizeof(OpenTTDWaterPatch), alignof(OpenTTDWaterPatch), offsetof(OpenTTDWaterPatch, x), offsetof(OpenTTDWaterPatch, y), offsetof(OpenTTDWaterPatch, label)});
 	Layout(47, "OpenTTDWaterSnapshot", {sizeof(OpenTTDWaterSnapshot), alignof(OpenTTDWaterSnapshot), offsetof(OpenTTDWaterSnapshot, edges), offsetof(OpenTTDWaterSnapshot, labels), offsetof(OpenTTDWaterSnapshot, patches), offsetof(OpenTTDWaterSnapshot, aqueducts)});
 	Layout(48, "OpenTTDWaterLeaves", {sizeof(OpenTTDWaterLeaves), alignof(OpenTTDWaterLeaves), offsetof(OpenTTDWaterLeaves, tracks), offsetof(OpenTTDWaterLeaves, follow), offsetof(OpenTTDWaterLeaves, aqueduct), offsetof(OpenTTDWaterLeaves, debug)});
 
+	Layout(49, "OpenTTDCargoSpec", {sizeof(OpenTTDCargoSpec), alignof(OpenTTDCargoSpec), offsetof(OpenTTDCargoSpec, payment), offsetof(OpenTTDCargoSpec, valid), offsetof(OpenTTDCargoSpec, callback), offsetof(OpenTTDCargoSpec, periods1), offsetof(OpenTTDCargoSpec, periods2)});
+	Layout(50, "OpenTTDCargoPaymentFields", {sizeof(OpenTTDCargoPaymentFields), alignof(OpenTTDCargoPaymentFields), offsetof(OpenTTDCargoPaymentFields, front), offsetof(OpenTTDCargoPaymentFields, route_profit), offsetof(OpenTTDCargoPaymentFields, visual_profit), offsetof(OpenTTDCargoPaymentFields, visual_transfer)});
+	Layout(51, "OpenTTDCargoServices", {sizeof(OpenTTDCargoServices), alignof(OpenTTDCargoServices), offsetof(OpenTTDCargoServices, spec), offsetof(OpenTTDCargoServices, callback), offsetof(OpenTTDCargoServices, near), offsetof(OpenTTDCargoServices, station_read), offsetof(OpenTTDCargoServices, industry_read), offsetof(OpenTTDCargoServices, industry_write), offsetof(OpenTTDCargoServices, refuses), offsetof(OpenTTDCargoServices, accept), offsetof(OpenTTDCargoServices, statistics), offsetof(OpenTTDCargoServices, monitor), offsetof(OpenTTDCargoServices, subsidised), offsetof(OpenTTDCargoServices, industry_effect), offsetof(OpenTTDCargoServices, vehicle_read), offsetof(OpenTTDCargoServices, settle), offsetof(OpenTTDCargoServices, feeder), offsetof(OpenTTDCargoServices, setting)});
+	Layout(52, "OpenTTDShipYapfInput", {sizeof(OpenTTDShipYapfInput), alignof(OpenTTDShipYapfInput), offsetof(OpenTTDShipYapfInput, map_x), offsetof(OpenTTDShipYapfInput, map_y), offsetof(OpenTTDShipYapfInput, tile), offsetof(OpenTTDShipYapfInput, dest_tile), offsetof(OpenTTDShipYapfInput, curve90), offsetof(OpenTTDShipYapfInput, curve45), offsetof(OpenTTDShipYapfInput, max_speed), offsetof(OpenTTDShipYapfInput, dest_dirs), offsetof(OpenTTDShipYapfInput, reverse_dirs), offsetof(OpenTTDShipYapfInput, trackdir), offsetof(OpenTTDShipYapfInput, ocean_frac), offsetof(OpenTTDShipYapfInput, canal_frac), offsetof(OpenTTDShipYapfInput, station), offsetof(OpenTTDShipYapfInput, unit_number)});
+	Layout(53, "OpenTTDShipYapfLeaves", {sizeof(OpenTTDShipYapfLeaves), alignof(OpenTTDShipYapfLeaves), offsetof(OpenTTDShipYapfLeaves, destination), offsetof(OpenTTDShipYapfLeaves, follow), offsetof(OpenTTDShipYapfLeaves, tile), offsetof(OpenTTDShipYapfLeaves, patch), offsetof(OpenTTDShipYapfLeaves, visit_new), offsetof(OpenTTDShipYapfLeaves, visit_next), offsetof(OpenTTDShipYapfLeaves, visit_destroy), offsetof(OpenTTDShipYapfLeaves, debug)});
+	Layout(54, "OpenTTDShipFollow", {sizeof(OpenTTDShipFollow), alignof(OpenTTDShipFollow), offsetof(OpenTTDShipFollow, tile), offsetof(OpenTTDShipFollow, skipped), offsetof(OpenTTDShipFollow, dirs), offsetof(OpenTTDShipFollow, followed)});
+	Layout(55, "OpenTTDShipTile", {sizeof(OpenTTDShipTile), alignof(OpenTTDShipTile), offsetof(OpenTTDShipTile, ships), offsetof(OpenTTDShipTile, docking), offsetof(OpenTTDShipTile, sea), offsetof(OpenTTDShipTile, lock_middle), offsetof(OpenTTDShipTile, destination)});
+	Layout(56, "OpenTTDShipYapfResult", {sizeof(OpenTTDShipYapfResult), alignof(OpenTTDShipYapfResult), offsetof(OpenTTDShipYapfResult, direction), offsetof(OpenTTDShipYapfResult, found), offsetof(OpenTTDShipYapfResult, origin), offsetof(OpenTTDShipYapfResult, stats)});
+
+	Layout(60, "OpenTTDTownAction", {sizeof(OpenTTDTownAction), alignof(OpenTTDTownAction), offsetof(OpenTTDTownAction, kind), offsetof(OpenTTDTownAction, town), offsetof(OpenTTDTownAction, tile), offsetof(OpenTTDTownAction, a), offsetof(OpenTTDTownAction, b), offsetof(OpenTTDTownAction, c), offsetof(OpenTTDTownAction, d), offsetof(OpenTTDTownAction, cost)});
+	Layout(61, "OpenTTDTownLeaves", {sizeof(OpenTTDTownLeaves), alignof(OpenTTDTownLeaves), offsetof(OpenTTDTownLeaves, observe), offsetof(OpenTTDTownLeaves, leaf), offsetof(OpenTTDTownLeaves, state), offsetof(OpenTTDTownLeaves, stations)});
 	CHECK(openttd_rust_abi_layout(255, 0) == SIZE_MAX);
 	CHECK(static_cast<size_t>(PTRDIFF_MAX) == (SIZE_MAX >> 1));
 	std::printf("pointer_bytes %zu sentinel %zu borrow_limit %zu\n", sizeof(void *), SIZE_MAX, static_cast<size_t>(PTRDIFF_MAX));
@@ -117,6 +137,25 @@ static void Layouts()
 
 static void Calls()
 {
+	CheckTownProtocol([](bool condition) { CHECK(condition); });
+	std::unique_ptr<OpenTTDRoadState, decltype(&openttd_rust_road_destroy)> road(openttd_rust_road_new(), openttd_rust_road_destroy);
+	for (uint8_t field = 0; field < 7; ++field) {
+		CHECK(openttd_rust_road_get(road.get(), field) == 0);
+		openttd_rust_road_set(road.get(), field, 65535);
+		CHECK(openttd_rust_road_get(road.get(), field) == (field == 2 || field == 5 ? 65535 : 255));
+	}
+	CHECK(openttd_rust_road_path_size(road.get()) == 0);
+	const OpenTTDRoadPathElement road_path[] = {{255, UINT32_MAX}, {9, 123456}};
+	openttd_rust_road_path_replace(road.get(), road_path, 2);
+	CHECK(openttd_rust_road_path_get(road.get(), 1).tile == 123456);
+	openttd_rust_road_path_push(road.get(), {6, 42});
+	CHECK(openttd_rust_road_path_get(road.get(), 2).trackdir == 6);
+	openttd_rust_road_path_pop(road.get());
+	CHECK(openttd_rust_road_path_size(road.get()) == 2);
+	openttd_rust_road_path_clear(road.get());
+	openttd_rust_road_path_replace(road.get(), nullptr, 0);
+	CHECK(openttd_rust_road_path_size(road.get()) == 0);
+	road.reset();
 	const std::array<uint8_t, 8> bytes{0x10, 0x32, 0x54, 0x76, 0x98, 0xBA, 0xDC, 0xFE};
 	constexpr uint64_t bits = UINT64_C(0xFEDCBA9876543210);
 	auto le = openttd_rust_encode_uint_le(bits);
@@ -665,6 +704,139 @@ static void Trees()
 	std::printf("tree_direct_services_counter_cancel_and_reentry_lifetime passed\n");
 }
 
+/* Complete typed tables exercise road cdecl calls without importing game globals.
+ * These are boundary/lifetime checks, not a second simulation oracle. */
+struct RoadAbiProbe {
+	OpenTTDRoadState *state;
+	OpenTTDRoadView view{};
+	uint32_t leaves = 0;
+};
+static RoadAbiProbe *road_abi_probe;
+static void OPENTTD_ROAD_CALL RoadAbiObserve(uint32_t, OpenTTDRoadView *view) noexcept { *view = road_abi_probe->view; }
+static void OPENTTD_ROAD_CALL RoadAbiWrite(uint32_t, uint32_t field, uint64_t value) noexcept
+{
+	CHECK(field == ROAD_WRITE_TICK);
+	road_abi_probe->view.tick = static_cast<uint8_t>(value);
+}
+static uint64_t OPENTTD_ROAD_CALL RoadAbiLeaf(uint32_t op, uint32_t, uint64_t, uint64_t, uint64_t) noexcept
+{
+	CHECK(op == ROAD_OP_ROADSTOP_LEAVE);
+	++road_abi_probe->leaves;
+	return 0;
+}
+static OpenTTDRoadState *OPENTTD_ROAD_CALL RoadAbiOwner(uint32_t) noexcept { return road_abi_probe->state; }
+static size_t OPENTTD_ROAD_CALL RoadAbiNearby(uint32_t, uint32_t, int32_t, int32_t, uint32_t *, size_t) noexcept { return 0; }
+static void RoadBoundary()
+{
+	RoadAbiProbe probe{openttd_rust_road_new()};
+	road_abi_probe = &probe;
+	probe.view.tick = 255;
+	const OpenTTDRoadLeaves leaves{RoadAbiObserve, RoadAbiWrite, RoadAbiLeaf, RoadAbiOwner, RoadAbiNearby};
+	/* All shared fields are typed functions, even unused fields. */
+	EffectTestWorld world;
+	effect_test_world = &world;
+	const OpenTTDSharedServices services{&world, EffectTestRandom, EffectTestTile, EffectTestMapWrite, EffectTestTrig, EffectTestIndustry};
+	auto create = [&](uint32_t kind) {
+		return std::unique_ptr<void, decltype(&openttd_rust_road_task_destroy)>(openttd_rust_road_create(kind, 17, 0, 0, 0, &leaves, &services), openttd_rust_road_task_destroy);
+	};
+	auto tick = create(0);
+	CHECK(openttd_rust_road_advance(tick.get(), 0).op == 0);
+	CHECK(probe.view.tick == 0 && world.draws == 0);
+	auto crash = create(3);
+	CHECK(openttd_rust_road_advance(crash.get(), 0).op == ROAD_OP_GROUND_CRASH);
+	/* An actual callback may mutate owner state before the continuation resumes. */
+	probe.view.front = 1;
+	openttd_rust_road_set(probe.state, 0, 64);
+	auto done = openttd_rust_road_advance(crash.get(), 7);
+	CHECK(done.op == 0 && done.a == 8 && probe.leaves == 1);
+	CHECK(openttd_rust_road_get(probe.state, 5) == 1);
+	crash.reset();
+	tick.reset();
+	openttd_rust_road_destroy(probe.state);
+	std::printf("road_native_tables_owner_reentry_and_tick_wrap passed\n");
+}
+
+/* Moving and partly entered consists cannot use IsChainInDepot's service path,
+ * but FindClosestRoadDepot still selects their current depot at distance zero. */
+struct RoadServiceProbe {
+	OpenTTDRoadState *head = openttd_rust_road_new();
+	OpenTTDRoadState *tail = openttd_rust_road_new();
+	OpenTTDRoadView view{};
+	bool depot_tile = true;
+	uint32_t depot_orders = 0;
+	uint32_t services = 0;
+};
+static RoadServiceProbe *road_service_probe;
+static void OPENTTD_ROAD_CALL RoadServiceObserve(uint32_t id, OpenTTDRoadView *view) noexcept
+{
+	*view = road_service_probe->view;
+	view->next = id == 17 ? 18 : UINT32_MAX;
+}
+static void OPENTTD_ROAD_CALL RoadServiceWrite(uint32_t, uint32_t field, uint64_t) noexcept
+{
+	CHECK(field == ROAD_WRITE_DAY || field == ROAD_WRITE_SUPPRESS_IMPLICIT);
+}
+static uint64_t OPENTTD_ROAD_CALL RoadServiceLeaf(uint32_t op, uint32_t, uint64_t a, uint64_t, uint64_t) noexcept
+{
+	auto &probe = *road_service_probe;
+	switch (op) {
+		case ROAD_OP_SERVINT: case ROAD_OP_NEEDS_SERVICE: return 1;
+		case ROAD_OP_IS_DEPOT: CHECK(a == probe.view.tile); return probe.depot_tile;
+		case ROAD_OP_MAX_PENALTY: return 300;
+		case ROAD_OP_DEPOT_INDEX: CHECK(a == probe.view.tile); return 55;
+		case ROAD_OP_ORDER_DEPOT: CHECK(a == 55); ++probe.depot_orders; break;
+		case ROAD_OP_SET_DEST: CHECK(a == probe.view.tile); probe.view.dest = static_cast<uint32_t>(a); break;
+		case ROAD_OP_SERVICE: ++probe.services; break;
+		case ROAD_OP_ECONOMY_AGE: case ROAD_OP_CHECK_BREAKDOWN:
+		case ROAD_OP_CHECK_ORDERS: case ROAD_OP_START_STOP_DIRTY: break;
+		default: CHECK(false);
+	}
+	return 0;
+}
+static OpenTTDRoadState *OPENTTD_ROAD_CALL RoadServiceOwner(uint32_t id) noexcept
+{
+	return id == 17 ? road_service_probe->head : road_service_probe->tail;
+}
+static void RoadServiceBoundary()
+{
+	RoadServiceProbe probe;
+	road_service_probe = &probe;
+	probe.view.front = 1;
+	probe.view.first = 17;
+	probe.view.tile = 3091;
+	probe.view.speed = 5;
+	const OpenTTDRoadLeaves leaves{RoadServiceObserve, RoadServiceWrite, RoadServiceLeaf, RoadServiceOwner, RoadAbiNearby};
+	EffectTestWorld world;
+	effect_test_world = &world;
+	const OpenTTDSharedServices services{&world, EffectTestRandom, EffectTestTile, EffectTestMapWrite, EffectTestTrig, EffectTestIndustry};
+	using Task = std::unique_ptr<void, decltype(&openttd_rust_road_task_destroy)>;
+	auto day = [&]() { return Task(openttd_rust_road_create(6, 17, 0, 0, 0, &leaves, &services), openttd_rust_road_task_destroy); };
+	for (bool moving : {true, false}) {
+		probe.view.speed = moving ? 5 : 0;
+		probe.view.dest = 42;
+		openttd_rust_road_set(probe.head, 0, 254);
+		openttd_rust_road_set(probe.tail, 0, moving ? 254 : 1);
+		openttd_rust_road_path_push(probe.head, {10, 10815});
+		auto run = day();
+		CHECK(openttd_rust_road_advance(run.get(), 0).op == 0);
+		CHECK(probe.view.dest == probe.view.tile && openttd_rust_road_path_size(probe.head) == 0);
+	}
+	CHECK(probe.depot_orders == 2 && probe.services == 0 && world.draws == 0);
+	openttd_rust_road_set(probe.tail, 0, 254);
+	auto parked = day();
+	CHECK(openttd_rust_road_advance(parked.get(), 0).op == 0);
+	CHECK(probe.services == 1 && probe.depot_orders == 2);
+	probe.depot_tile = false;
+	auto outside = day();
+	const auto search = openttd_rust_road_advance(outside.get(), 0);
+	CHECK(search.op == ROAD_OP_FIND_DEPOT && search.a == 300);
+	outside.reset();
+	parked.reset();
+	openttd_rust_road_destroy(probe.head);
+	openttd_rust_road_destroy(probe.tail);
+	std::printf("road_service_moving_partial_parked_and_search_branches passed\n");
+}
+
 struct DisasterProbe { uint32_t reads = 0, writes = 0, draws = 0, random = 0; };
 static void OPENTTD_DISASTER_CALL DisasterProbeRead(void *context, uint32_t kind, uint32_t, int64_t, int64_t, int64_t *out) noexcept
 {
@@ -708,7 +880,10 @@ static void Disasters()
 int main()
 {
 	Layouts();
+	RoadBoundary();
+	RoadServiceBoundary();
 	WaterProbe::Run([](bool result) { CHECK(result); });
+	ShipYapfProbe::Run([](bool result) { CHECK(result); });
 	CheckEffectProtocol([](bool result) { CHECK(result); });
 	LinkGraphJob();
 	Trees();
