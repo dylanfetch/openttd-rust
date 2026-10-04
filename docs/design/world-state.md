@@ -64,6 +64,47 @@ and explicit layout/lifetime rules; it is not the default interface. Measure
 crossings per update, copied bytes and elapsed time on the same harness scenarios
 before enlarging the boundary. Keep source computation out of callback bodies.
 
+## Map access decision (#108, accepted 2026-10-04)
+
+Keep canonical map arrays in C++ and use direct `noexcept` operations for the
+next selected tile-heavy owners. Prefer existing semantic operations and copied
+records over one callback per bitfield; trees already copy ten words per read,
+and water-region traversal calls track/follower services rather than individual
+map fields. The measurements in [PR #116](https://github.com/dylanfetch/openttd-rust/pull/116)
+and [PR #114](https://github.com/dylanfetch/openttd-rust/pull/114) establish crossing density,
+not a map-access bottleneck. No shared-storage implementation is selected now.
+
+For the 256x512 tree soak, generation uses 191,315 (temperate) / 321,489 (tropic)
+map-service calls. Tree updates average 204--245 map calls per 512-tile batch
+(including generation warm-up where applicable), around one third of tree-facing
+FFI calls; copied tree tile-loop observation/settings records total 321--389 MB over a run.
+Water plain soak uses 9,302--169,534 map-service calls and 18--88 region rebuilds:
+281--1,995 track/follower calls per 16x16-region rebuild; aqueduct-neighbour
+queries are counted separately from flood fill.
+Plain tree reference/candidate process times were 0.214--0.315 / 0.264--0.365 s;
+counted, counter-disabled and uninstrumented-parent times were indistinguishable
+within the subprocess wait granularity (up to 50 ms). This does not establish
+zero profiling overhead or performance equivalence. Elapsed time includes
+startup, other ports, save I/O and profiling overhead;
+these runs do not compare raw-array alternatives or establish a whole-game gain.
+
+A future raw view must retain one canonical allocation, pin both C++ and Rust
+size/alignment/offsets, use field-sized raw `ptr::read`/`write` with no Rust
+references/slices over shared arrays, and refresh pointers at each component
+entry. End its access scope before callbacks that may reenter, replace the map,
+or run arbitrary code. Prove a serial access interval excluding concurrent map reset or mutation.
+C++ field references may alias those pointers; absence of Rust references does
+not permit concurrent conflicting access. Preserve original
+observation/write order rather than copying a whole tile back after a callback.
+
+Moving allocation to Rust adds reset, destruction, allocator and C++ object-
+lifetime obligations without itself removing calls or aliases. Do not couple
+that move to the next simulation port. `Map::Allocate` covers new-game, modern
+and legacy load, and tests. Existing field-wise save adapters remain unchanged;
+serialization reads live fields before the asynchronous compression thread starts.
+Link-graph workers use private graph copies and map dimensions, not tile arrays;
+retain the existing job join/reset ordering. Portable builds keep the C++ owner.
+
 ## Transferring shared storage later
 Root selects a storage port when measured coupling warrants it. Move its canonical
 owner, accessors, allocation/reset and destruction together;
@@ -80,10 +121,11 @@ legacy load rules and pointer fixups. Keep those C++ adapters initially; when an
 owner moves, adapt its reads/writes and load lifecycle without changing the format.
 Rust-owned persistent state must be visible to saving before the call returns.
 
-Extend `scenario_list()` in `tools/simulate.py` for component save/load and
+Extend the component module under `tools/simulation/` for save/load and
 mutation/reuse paths. Run `python3 tools/migration.py simulate` and `--soak`/`--self`
 as needed. Keep desync snapshots and plain runs: cache rebuilding can conceal
 faults. The existing semantic decoder remains unchanged. Port divergences belong in `KNOWN_FAILURES` with an issue, never new
 `MASKS`; #83's masked `round_trip_time` needs separate evidence if touched. Saves
 do not expose every transient state: add a narrow direct check only for a named
-unreachable gap. Rail/ship/aircraft work first needs #86; retain existing tests.
+unreachable gap. Vehicle ports first need applicable #86/#104 evidence; aircraft remains gated
+on its fixture. Retain existing tests.

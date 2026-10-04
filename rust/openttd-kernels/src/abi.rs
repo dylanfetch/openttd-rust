@@ -74,12 +74,14 @@ pub fn layout(type_id: u8, item: u8) -> usize {
         }
         38 => layout!(crate::trees::Action, item; kind, tile, a, b, cost),
         39 => {
-            layout!(crate::effect::View, item; x, y, z, sprite, progress, spritenum, subtype, ambient, sprite_write)
+            layout!(crate::effect::View, item; x, y, z, sprite, progress, spritenum, subtype, ambient)
         }
-        40 => layout!(crate::effect::Cursor, item; phase, animation, tile, random),
-        41 => layout!(crate::effect::Leaves, item; industry),
+        40 => 0, // Retired effect invocation cursor.
+        41 => {
+            layout!(crate::effect::Leaves, item; observe, write, viewport, sound, animated)
+        }
         42 => {
-            layout!(crate::services::Services, item; context, random, observe_tile, write_tile, trig)
+            layout!(crate::services::Services, item; context, random, observe_tile, write_tile, trig, industry)
         }
         _ => usize::MAX,
     }

@@ -557,38 +557,50 @@ static const std::array<EffectProcs, EV_END> _effect_procs = {{
 }};
 
 #else
-/** Pure map query; no allocation, reentry or C++ exception crosses into Rust. */
-static uint32_t OPENTTD_EFFECT_CALL EffectIndustry(int32_t x, int32_t y, uint32_t *index) noexcept
+static void OPENTTD_EFFECT_CALL EffectObserve(void *context, OpenTTDEffectView *view) noexcept
 {
-	TileIndex tile = TileVirtXY(x, y);
-	*index = tile.base();
-	if (!IsTileType(tile, MP_INDUSTRY)) return 0;
-	return GetIndustryGfx(tile) == GFX_BUBBLE_CATCHER ? 2 : 1;
+	auto *v = static_cast<EffectVehicle *>(context);
+	*view = {v->x_pos, v->y_pos, v->z_pos, v->sprite_cache.sprite_seq.seq[0].sprite, v->progress, v->spritenum, v->subtype, static_cast<uint8_t>(_settings_client.sound.ambient)};
+}
+
+static void OPENTTD_EFFECT_CALL EffectWrite(void *context, uint8_t field, uint32_t value) noexcept
+{
+	auto *v = static_cast<EffectVehicle *>(context);
+	switch (field) {
+		case 0: v->x_pos = static_cast<int32_t>(value); break;
+		case 1: v->y_pos = static_cast<int32_t>(value); break;
+		case 2: v->z_pos = static_cast<int32_t>(value); break;
+		case 3: v->sprite_cache.sprite_seq.Set(value); break;
+		case 4: v->sprite_cache.sprite_seq.seq[0].sprite = value; break;
+		case 5: v->progress = static_cast<uint8_t>(value); break;
+		case 6: v->spritenum = static_cast<uint8_t>(value); break;
+	}
+}
+
+static void OPENTTD_EFFECT_CALL EffectViewport(void *context) noexcept
+{
+	/* Effects skip UpdatePosition; UpdateViewport has no NewGRF/script callbacks. */
+	static_cast<EffectVehicle *>(context)->UpdatePositionAndViewport();
+}
+
+static void OPENTTD_EFFECT_CALL EffectSound(void *context, uint8_t success) noexcept
+{
+	SndPlayVehicleFx(success == 0 ? SND_2F_BUBBLE_GENERATOR_FAIL : SND_31_BUBBLE_GENERATOR_SUCCESS, static_cast<EffectVehicle *>(context));
+}
+
+static void OPENTTD_EFFECT_CALL EffectAnimated(uint32_t tile) noexcept
+{
+	AddAnimatedTile(TileIndex{tile});
 }
 
 static bool RunEffect(EffectVehicle *v, bool initialize)
 {
-	static const OpenTTDEffectLeaves leaves{EffectIndustry};
-	OpenTTDEffectCursor cursor{};
-	for (;;) {
-		OpenTTDEffectView view{v->x_pos, v->y_pos, v->z_pos, v->sprite_cache.sprite_seq.seq[0].sprite, v->progress, v->spritenum, v->subtype, static_cast<uint8_t>(_settings_client.sound.ambient), 0};
-		uint8_t action = openttd_rust_effect_step(v->rust_state.get(), &view, &cursor, &leaves, initialize);
-		v->x_pos = view.x; v->y_pos = view.y; v->z_pos = view.z;
-		v->progress = view.progress; v->spritenum = view.spritenum;
-		if (view.sprite_write == 1) v->sprite_cache.sprite_seq.seq[0].sprite = view.sprite;
-		if (view.sprite_write == 2) v->sprite_cache.sprite_seq.Set(view.sprite);
-		/* All allocating/reentrant work runs with no Rust borrow active. */
-		switch (action) {
-			case 0: return true;
-			case 1: v->UpdatePositionAndViewport(); return true;
-			case 2: v->UpdatePositionAndViewport(); break;
-			case 3: SndPlayVehicleFx(SND_2F_BUBBLE_GENERATOR_FAIL, v); break;
-			case 4: SndPlayVehicleFx(SND_31_BUBBLE_GENERATOR_SUCCESS, v); break;
-			case 5: AddAnimatedTile(TileIndex{cursor.tile}); break;
-			case 6: delete v; return false;
-			case 7: cursor.random = Random(); break;
-		}
-	}
+	static const OpenTTDEffectLeaves leaves{EffectObserve, EffectWrite, EffectViewport, EffectSound, EffectAnimated};
+	if (openttd_rust_effect_run(v->rust_state.get(), v, &leaves, &GetRustSharedServices(), initialize) != 0) return true;
+	/* Expiry returns before destroying the Rust owner. Vehicle::~Vehicle and
+	 * Pool::FreeItem/PostDestructor run wholly outside any Rust frame/borrow. */
+	delete v;
+	return false;
 }
 #endif /* WITH_RUST */
 

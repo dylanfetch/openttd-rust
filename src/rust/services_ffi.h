@@ -18,6 +18,8 @@
  * for the tile type are read. Writes 0..9: make tree, ground/density, add count,
  * add growth, set growth, dirty, make clear, make shore, make snow, set zone.
  * Random logging still runs, but its debug source location names this wrapper.
+ * Industry query returns 0 not industry,1 industry,2 bubble catcher and writes
+ * TileVirtXY(x,y). It observes only type and industry graphics.
  * An environmental exception terminates rather than unwinding through Rust. */
 struct OpenTTDSharedServices {
 	void *context;
@@ -25,6 +27,7 @@ struct OpenTTDSharedServices {
 	void (*observe_tile)(void *, uint32_t, uint32_t *) noexcept;
 	void (*write_tile)(void *, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) noexcept;
 	float (*trig)(uint32_t, float) noexcept;
+	uint32_t (*industry)(int32_t, int32_t, uint32_t *) noexcept;
 };
 const OpenTTDSharedServices &GetRustSharedServices() noexcept;
 #endif /* RUST_SERVICES_FFI_H */
