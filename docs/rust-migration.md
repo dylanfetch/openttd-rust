@@ -145,7 +145,12 @@ pushes, which checks each merge.
 ## Simulation comparison
 
 `python3 tools/migration.py simulate` builds both games, then runs
-`tools/simulate.py`; CI runs its default set after the comparisons. It is the
+`tools/simulate.py`; CI runs its default set after the comparisons. Shared decoding,
+comparison, execution and reporting live in `tools/simulation/core.py`. Add each
+port's scenario dictionaries and prepare/check hooks to its component module in
+`tools/simulation/`; `scenario_modules()` assembles the families. Optional
+install/game-argument and AI-selection hooks keep scenario setup in that module.
+It is the
 evidence for game-logic ports. Each scenario runs the reference and the
 candidate headlessly in isolated directories under `.local/simulation/`, twice:
 with `-d desync=3`, which writes an uncompressed snapshot every 32 economy days,
