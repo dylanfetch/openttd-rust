@@ -77,23 +77,6 @@ def scenarios(soak):
 
 def prepare(scenario, binaries, builds, out, timeout, env, result):
     mode = scenario.get("industry")
-    if mode == "cargo" and scenario.get("economy") == "stockpile":
-        source = Path(scenario["save"])
-        chunks = read_save(source)
-        # As in the existing road controller inputs, preserve saved job order
-        # while moving joins beyond this short unloading window.
-        changes = {
-            "LGRJ": {
-                index: {"join_date": row["join_date"] + 32}
-                for index, row in economy.rows(chunks, "LGRJ").items()
-            }
-        }
-        target = out / scenario["name"] / "input" / "stockpile.sav"
-        target.parent.mkdir(parents=True, exist_ok=True)
-        result["industry_input"] = disasters.patch(source, target, changes)
-        return dict(
-            scenario, save=str(target), snapshot_minimum=0, short_checkpoint=True
-        )
     if mode == "lumber":
         setup = dict(
             scenario,
