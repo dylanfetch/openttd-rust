@@ -66,7 +66,7 @@ template <typename Check> void Run(Check check)
 		const size_t id = (random >> 16) % nodes.size();
 		const uint32_t operation = !included[id] ? 0 : (random & 1) ? 1 : 2;
 		const int32_t cost = static_cast<int32_t>((random >> 8) % 7);
-		commands.push_back((operation << 30) | id); values.push_back(cost);
+		commands.push_back((operation << 30) | static_cast<uint32_t>(id)); values.push_back(cost);
 		if (operation == 0) { heap.Include(&nodes[id]); included[id] = true; }
 		else if (operation == 1) { heap.Remove(heap.FindIndex(nodes[id])); included[id] = false; }
 		else { heap.Remove(heap.FindIndex(nodes[id])); nodes[id].estimate = cost; heap.Include(&nodes[id]); }
