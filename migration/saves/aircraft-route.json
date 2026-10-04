@@ -1,0 +1,59 @@
+{
+  "baseline": {
+    "repository": "https://github.com/OpenTTD/OpenTTD.git",
+    "tag": "15.3",
+    "commit": "14ec60f248547d4d062a1160f0fc26d742319888"
+  },
+  "reference_binary_sha256": "5d22b1015057d280fcd4a81501fb67507b6490be9567222931fd1a32e17dcafe",
+  "raw_sha256": "36c40fffd291976a2543af336f3bcfe8319d27e88943bb38c16e667a68d42e7f",
+  "normalized_sha256": "c6716bf1cc5a1f78bef148014b14ec3614f18a6ff3714a3926b2cf17355584ab",
+  "setup_files": {
+    "info.nut": "c428cac3ecaa1c78444f45c912089777d003e467d35a226e757d59f95eab6bc4",
+    "main.nut": "5598cc2a77148b61cfe0d4f7a811097fb8279a745ea563a644a3d67fb40aee67"
+  },
+  "setup": {
+    "kind": "generate",
+    "aircraft_setup": true,
+    "seed": 86,
+    "map_log2": 7,
+    "land_generator": 1,
+    "ticks": 6000,
+    "console": [
+      "start_ai MigrationAircraft",
+      "unpause"
+    ],
+    "settings": {
+      "game_creation": {
+        "starting_year": 1980,
+        "terrain_type": 0,
+        "quantity_sea_lakes": 0,
+        "variety": 0,
+        "custom_town_number": 20
+      },
+      "difficulty": {
+        "number_towns": 4,
+        "max_loan": 2000000
+      },
+      "economy": {
+        "initial_city_size": 4
+      }
+    }
+  },
+  "airports": [
+    9556,
+    5353
+  ],
+  "aircraft": {
+    "plane": 1,
+    "helicopter": 3
+  },
+  "removed_chunk": "GLOG",
+  "setup_markers": [
+    "9556 5353 1 3"
+  ],
+  "save_moment": [
+    723261,
+    6,
+    7280
+  ]
+}

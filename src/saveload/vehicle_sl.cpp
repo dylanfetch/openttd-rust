@@ -854,17 +854,40 @@ public:
 	};
 	static inline const SaveLoadCompatTable compat_description = {};
 
-	std::vector<RoadVehPathElement> &GetVector(RoadVehicle *rv) const override { return rv->path; }
+	std::vector<RoadVehPathElement> &GetVector([[maybe_unused]] RoadVehicle *rv) const override
+	{
+#ifdef WITH_RUST
+		return RoadVehicleStateScope::Path();
+#else
+		return rv->path;
+#endif
+	}
 };
 
 class SlVehicleRoadVeh : public DefaultSaveLoadHandler<SlVehicleRoadVeh, Vehicle> {
 public:
-	/* RoadVehicle path is stored in std::pair which cannot be directly saved. */
+	/* Historical saves store trackdirs and tiles in separate vectors. */
+#ifdef WITH_RUST
+	static std::vector<Trackdir> &PathTrackdirs() { return RoadVehicleStateScope::PathTrackdirs(); }
+	static std::vector<TileIndex> &PathTiles() { return RoadVehicleStateScope::PathTiles(); }
+#else
 	static inline std::vector<Trackdir> rv_path_td;
 	static inline std::vector<TileIndex> rv_path_tile;
+	static std::vector<Trackdir> &PathTrackdirs() { return rv_path_td; }
+	static std::vector<TileIndex> &PathTiles() { return rv_path_tile; }
+#endif
 
 	static inline const SaveLoad description[] = {
 		  SLEG_STRUCT("common", SlVehicleCommon),
+#ifdef WITH_RUST
+		     SLEG_VAR("state", RoadVehicleStateScope::State(), SLE_UINT8),
+		     SLEG_VAR("frame", RoadVehicleStateScope::Frame(), SLE_UINT8),
+		     SLEG_VAR("blocked_ctr", RoadVehicleStateScope::BlockedCounter(), SLE_UINT16),
+		     SLEG_VAR("overtaking", RoadVehicleStateScope::Overtaking(), SLE_UINT8),
+		     SLEG_VAR("overtaking_ctr", RoadVehicleStateScope::OvertakingCounter(), SLE_UINT8),
+		     SLEG_VAR("crashed_ctr", RoadVehicleStateScope::CrashedCounter(), SLE_UINT16),
+		     SLEG_VAR("reverse_ctr", RoadVehicleStateScope::ReverseCounter(), SLE_UINT8),
+#else
 		      SLE_VAR(RoadVehicle, state,                SLE_UINT8),
 		      SLE_VAR(RoadVehicle, frame,                SLE_UINT8),
 		      SLE_VAR(RoadVehicle, blocked_ctr,          SLE_UINT16),
@@ -872,8 +895,9 @@ public:
 		      SLE_VAR(RoadVehicle, overtaking_ctr,       SLE_UINT8),
 		      SLE_VAR(RoadVehicle, crashed_ctr,          SLE_UINT16),
 		      SLE_VAR(RoadVehicle, reverse_ctr,          SLE_UINT8),
-		SLEG_CONDVECTOR("path.td",   rv_path_td,         SLE_UINT8,                  SLV_ROADVEH_PATH_CACHE, SLV_PATH_CACHE_FORMAT),
-		SLEG_CONDVECTOR("path.tile", rv_path_tile,       SLE_UINT32,                 SLV_ROADVEH_PATH_CACHE, SLV_PATH_CACHE_FORMAT),
+#endif
+		SLEG_CONDVECTOR("path.td",   PathTrackdirs(),         SLE_UINT8,                  SLV_ROADVEH_PATH_CACHE, SLV_PATH_CACHE_FORMAT),
+		SLEG_CONDVECTOR("path.tile", PathTiles(),       SLE_UINT32,                 SLV_ROADVEH_PATH_CACHE, SLV_PATH_CACHE_FORMAT),
 		SLEG_CONDSTRUCTLIST("path", SlVehicleRoadVehPath, SLV_PATH_CACHE_FORMAT, SL_MAX_VERSION),
 		  SLE_CONDVAR(RoadVehicle, gv_flags,             SLE_UINT16,                 SLV_139, SL_MAX_VERSION),
 	};
@@ -881,6 +905,8 @@ public:
 
 	static void ConvertPathCache(RoadVehicle &rv)
 	{
+		auto &rv_path_td = PathTrackdirs();
+		auto &rv_path_tile = PathTiles();
 		/* The two vectors should be the same size, but if not we can just ignore the cache and not cause more issues. */
 		if (rv_path_td.size() != rv_path_tile.size()) {
 			Debug(sl, 1, "Found RoadVehicle {} with invalid path cache, ignoring.", rv.index);
@@ -889,24 +915,35 @@ public:
 		size_t n = std::min(rv_path_td.size(), rv_path_tile.size());
 		if (n == 0) return;
 
-		rv.path.reserve(n);
+#ifdef WITH_RUST
+		auto &path = RoadVehicleStateScope::Path();
+#else
+		auto &path = rv.path;
+#endif
+		path.reserve(n);
 		for (size_t c = 0; c < n; ++c) {
-			rv.path.emplace_back(rv_path_td[c], rv_path_tile[c]);
+			path.emplace_back(rv_path_td[c], rv_path_tile[c]);
 		}
 
 		/* Path cache is now taken from back instead of front, so needs reversing. */
-		std::reverse(std::begin(rv.path), std::end(rv.path));
+		std::reverse(std::begin(path), std::end(path));
 	}
 
 	void Save(Vehicle *v) const override
 	{
 		if (v->type != VEH_ROAD) return;
+#ifdef WITH_RUST
+		RoadVehicleStateScope scope(RoadVehicle::From(v), false);
+#endif
 		SlObject(v, this->GetDescription());
 	}
 
 	void Load(Vehicle *v) const override
 	{
 		if (v->type != VEH_ROAD) return;
+#ifdef WITH_RUST
+		RoadVehicleStateScope scope(RoadVehicle::From(v), true);
+#endif
 		SlObject(v, this->GetLoadDescription());
 		if (!IsSavegameVersionBefore(SLV_ROADVEH_PATH_CACHE) && IsSavegameVersionBefore(SLV_PATH_CACHE_FORMAT)) {
 			ConvertPathCache(*static_cast<RoadVehicle *>(v));
@@ -916,10 +953,44 @@ public:
 	void FixPointers(Vehicle *v) const override
 	{
 		if (v->type != VEH_ROAD) return;
+#ifdef WITH_RUST
+		RoadVehicleStateScope scope(RoadVehicle::From(v), false);
+#endif
 		SlObject(v, this->GetDescription());
 	}
 };
 
+#ifdef WITH_RUST
+class SlVehicleShipPath : public DefaultSaveLoadHandler<SlVehicleShipPath, Ship> {
+public:
+	static inline const SaveLoad description[] = { SLE_VAR(ShipPathElement, trackdir, SLE_UINT8) };
+	static inline const SaveLoadCompatTable compat_description = {};
+	void Save(Ship *s) const override
+	{
+		SlSetStructListLength(s->path.size());
+		for (size_t i = 0; i < s->path.size(); ++i) {
+			auto item = s->path.at(i);
+			SlObject(&item, this->GetDescription());
+		}
+	}
+	void Load(Ship *s) const override
+	{
+		size_t count = SlGetStructListLength(UINT32_MAX);
+		while (count-- > 0) {
+			s->path.push_back(ShipPathElement{});
+			/* Commit the staged byte even if the C++ save loader throws. No
+			 * save operation crosses a Rust frame or retains a Rust vector view. */
+			struct Stage {
+				ShipPathCache &path;
+				size_t index;
+				ShipPathElement item;
+				~Stage() { this->path.set(this->index, this->item); }
+			} stage{s->path, s->path.size() - 1, {}};
+			SlObject(&stage.item, this->GetLoadDescription());
+		}
+	}
+};
+#else
 class SlVehicleShipPath : public VectorSaveLoadHandler<SlVehicleShipPath, Ship, ShipPathElement> {
 public:
 	static inline const SaveLoad description[] = {
@@ -929,6 +1000,8 @@ public:
 
 	std::vector<ShipPathElement> &GetVector(Ship *s) const override { return s->path; }
 };
+
+#endif
 
 class SlVehicleShip : public DefaultSaveLoadHandler<SlVehicleShip, Vehicle> {
 public:
@@ -957,7 +1030,11 @@ public:
 		if (IsSavegameVersionBefore(SLV_PATH_CACHE_FORMAT)) {
 			/* Path cache is now taken from back instead of front, so needs reversing. */
 			Ship *s = static_cast<Ship *>(v);
+#ifdef WITH_RUST
+			for (auto it = ship_path_td.rbegin(); it != ship_path_td.rend(); ++it) s->path.push_back(*it);
+#else
 			std::transform(std::rbegin(ship_path_td), std::rend(ship_path_td), std::back_inserter(s->path), [](Trackdir trackdir) { return trackdir; });
+#endif
 		}
 	}
 

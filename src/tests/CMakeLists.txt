@@ -2,6 +2,8 @@ add_test_files(
     alternating_iterator.cpp
     alternating_iterator_state.cpp
     bitmath_func.cpp
+    cargo_payment.cpp
+    cargo_payment_stubs.hpp
     effectvehicle.cpp
     effect_protocol.hpp
     enum_over_optimisation.cpp
@@ -17,6 +19,8 @@ add_test_files(
     train_reservation.cpp
     train.cpp
     rail_yapf_protocol.hpp
+    road_yapf.cpp
+    roadvehicle.cpp
     spiral_iterator_state.cpp
     string_builder.cpp
     string_consumer.cpp
@@ -27,7 +31,11 @@ add_test_files(
     test_network_crypto.cpp
     test_script_admin.cpp
     test_window_desc.cpp
+    town_growth.cpp
+    town_protocol.hpp
     townname.cpp
+    ship_yapf.cpp
+    ship_yapf_protocol.hpp
     water_regions.cpp
     water_regions_protocol.hpp
     tilearea.cpp
