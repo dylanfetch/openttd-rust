@@ -116,8 +116,18 @@ never in masks.
    growth-rate/funding transitions and canonical counters/flags with CITY and
    legacy adapters. Keep unrelated town accounting and shared world state in C++.
    Add actual growth witnesses to the existing towns module.
-7. **Next selections:** road/rail vehicle controllers and YAPF rail/road.
-   Aircraft stays gated on #111 and the remaining #86 fixture.
+7. **#121 Complete road vehicle control and private state.** Own consist/tick
+   movement, blocking/overtaking/crash/servicing and day handling, canonical road
+   counters and path cache, plus save/legacy/external mutation adapters. Existing
+   road YAPF may return a temporary result for transfer to the empty Rust cache.
+8. **#122 Complete rail YAPF search, caches and reservation.** Own all four
+   searches, six specialization-specific global cache banks, rail-change
+   invalidation, reservation traversal and rollback. Reuse the rail corpus and
+   ship search machinery only where ordering matches; require branch witnesses.
+9. **Following selections:** rail vehicle controller, road YAPF, then stations,
+   industries, company/economy loop, orders, cargo and their commands. Rail
+   controller needs broader reversal/crossing/reservation evidence than the
+   current two-train save. Aircraft stays gated on #111 and the remaining #86 input.
 
 Storage transfers (map arrays, pools) still require explicit selection here,
 following `docs/design/world-state.md` as amended by #108.
@@ -130,12 +140,14 @@ Worktrees are siblings of the main checkout unless a path says otherwise.
 
 | Issue / owner | Branch and checkpoint commit | Worktree | Next step |
 | --- | --- | --- | --- |
-| #103 `/root/disaster_ownership_103` (Sol high) | `port-disaster-vehicles` at `9f9c265afc`, PR #118 | `openttd-rust-disasters` | `/root/review_disasters_pr118` (Astra medium) accepts final owner/evidence; required CI running. |
-| #104 `/root/water_regions_104` (Sol high) | `port-water-regions` from reviewed `048502be36`, PR #114 | `openttd-rust-water-regions` | Base merge resolves ABI table adjacency conflicts; owner verifies, same reviewer checks source resolution, then new CI. |
+| #103 `/root/disaster_ownership_103` (Sol high) | `port-disaster-vehicles` at `390fff0025`, PR #118 | `openttd-rust-disasters` | Review accepts9f9c; root base update changes docs/scenario registration only, src/rust identical. Combined smoke passes; required CI reruns. |
+| #104 `/root/water_regions_104` (Sol high) | `port-water-regions` at `b3eea95239`, PR #114 | `openttd-rust-water-regions` | Base ABI resolution verified; `/root/review_water_pr114` rechecks9c72 source resolution at finalb3ee. Subsequent docs/core merge passes Ruff/provenance; required CI running. |
 | #108 `/root/map_access_decision_108` (Astra high) | `map-access-measurements-108` at `3c3ffa09b4`, PR #116 | `openttd-rust-map-access` | Review accepts original code; conflict-free base merge, verify and focused smoke pass. Required CI rerunning; root integrates when green. |
-| #117 `/root/cargo_payment_delivery` (Sol high) | `cargo-payment-delivery-117` from `9f5f580078`, uncommitted owner | `openttd-rust-cargo-payment` | Build and initial road pair pass; payment/reload/acceptance witnesses underway. `/root/cargo_multidestination_scenario` supplies a narrow unchanged-reference ordered flush check for the documented multi-industry corpus gap. ABI 49/50/51 reserved. |
-| #119 `/root/ship_yapf_ownership` (Sol high) | `ship-yapf-ownership-119` from current base, actual #104 dependency | `openttd-rust-ship-yapf` | Implement complete search/cache owner and reuse ship scenarios; coordinate water dependency. ABI IDs start at 52. |
-| #120 `/root/town_growth_ownership` (Sol high) | `town-growth-ownership-120` from current base | `openttd-rust-town-growth` | Implement full growth/house-placement owner and persistent state adapters. ABI IDs start at 60; add actual growth witnesses. |
+| #117 `/root/cargo_payment_delivery` (Sol high) | `cargo-payment-delivery-117` at `d72e8afb59`, uncommitted owner | `openttd-rust-cargo-payment` | Verify and focused payment/reload/acceptance pass. Income/transfer/destination reference checks pass; finish documented link-graph job-drain preparation for the cargodist input, merge latest base and open PR. ABI49/50/51. |
+| #119 `/root/ship_yapf_ownership` (Sol high) | `ship-yapf-ownership-119` at `ea5a304f1c`, actual #104 dependency | `openttd-rust-ship-yapf` | Implement complete search/cache owner and reuse ship scenarios; coordinate water dependency. ABI52-56 reserved. |
+| #120 `/root/town_growth_ownership` (Sol high) | `town-growth-ownership-120` at `350aec9e30` | `openttd-rust-town-growth` | Implement growth/house-placement owner and persistent state adapters (ABI60+); `/root/town_growth_scenarios` owns towns.py evidence additions. |
+| #121 `/root/road_vehicle_ownership` (Sol high) | Not started; branch from integration base | To create `openttd-rust-road-vehicles` | Selected after fresh Astra high planning; start when implementation capacity frees. |
+| #122 `/root/rail_yapf_ownership` (Sol high) | Not started; branch from integration base | To create `openttd-rust-rail-yapf` | Selected next; own search/cache/reservation together and strengthen applicable rail witnesses. |
 
 Preserved evidence branches: `evidence-disaster-vehicles` at `a775543162`
 (`openttd-rust-disasters-evidence`) and `evidence-water-regions` at `c752070cde`
@@ -148,7 +160,10 @@ ending and recycling a task thread has killed unfinished background processes.
 Fresh planner `/root/plan_next_ownership_selections` (Astra high) selected the
 cargo/ship sequence. `/root/plan_town_growth_ownership` (Astra high) supplied the
 whole growth-loop and house-placement scope now selected as #120. Continue
-per-PR reviews while CI runs; plan following vehicle owners before this queue runs low.
+per-PR reviews while CI runs. `/root/plan_next_vehicle_owners` (Astra high)
+selected road control then rail YAPF as #121/#122; reserve complete rail control
+until its coupled branches have suitable evidence. Replenish the queue before
+fewer than two unstarted selections remain.
 
 ## Choosing the next task
 
