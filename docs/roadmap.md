@@ -113,13 +113,21 @@ constants. C++ keeps NewGRF routing, town-name retry/uniqueness checks and the
 legacy loader's shared tables. The harness must compare rendered names through
 observer AI logs as well as saved state, using identical prepared inputs for
 explicit name seeds. This samples the 32-bit seed domain; it is not exhaustive.
+PR #98 is in CI with source review and local evidence complete.
+
+**#99 Tree generation, simulation and planting commands** is selected alongside
+that review/CI. `/root/link_graph` (Sol high) owns implementation and
+`/root/town_name_evidence` (Sol high) owns harness scenarios; Astra medium reviews.
+Rust owns generation/placement, tree tile/tick loops and the private counter,
+plus planting/clearing command control. Apply the world-state design to live map
+reads and reentrant water/NewGRF/command services. The standalone editor forest
+brush (`PlaceTreeGroupAroundTile`, InteractiveRandom and zone sweep) is an explicit
+follow-up; it uses the migrated placement helper. Rendering and GUI stay in C++.
 
 TGP and link graph favor coarse calls over copied inputs with private Rust state,
 nonthrowing leaf callbacks and complete results. Apply that boundary to #96.
 Remaining candidates, roughly in order of increasing coupling:
 
-- Tree tile loop and tree placement (`tree_cmd.cpp`): tile-loop callbacks and
-  `Random`.
 - Effect and disaster vehicles (`effectvehicle.cpp`, `disaster_vehicle.cpp`):
   the first vehicle-type ownership work.
 - Ship pathfinding (`pathfinder/water_regions.cpp`, YAPF ship).
@@ -137,8 +145,8 @@ constraints; storage transfers still require explicit roadmap selection.
 
 Take the first unblocked item from the earliest phase that has one. Work
 already in CI or review is not blocking: start the next item while it runs.
-Harness regressions remain the first priority; otherwise proceed with #96.
-Keep spare capacity on its scenarios and independent review. Paused, deferred
+Harness regressions remain the first priority; finish #97 while #96 integrates
+and #99 proceeds. Keep spare capacity on scenarios and independent review. Paused, deferred
 and out-of-scope issues are not fallbacks. Root selects further ownership work
 here before implementation starts.
 
