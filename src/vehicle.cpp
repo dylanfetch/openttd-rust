@@ -1362,7 +1362,7 @@ bool Vehicle::HandleBreakdown()
 
 				if (!this->vehstatus.Test(VehState::Hidden) && !EngInfo(this->engine_type)->misc_flags.Test(EngineMiscFlag::NoBreakdownSmoke)) {
 					EffectVehicle *u = CreateEffectVehicleRel(this, 4, 4, 5, EV_BREAKDOWN_SMOKE);
-					if (u != nullptr) u->animation_state = this->breakdown_delay * 2;
+					if (u != nullptr) u->SetAnimationState(this->breakdown_delay * 2);
 				}
 			}
 

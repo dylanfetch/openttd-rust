@@ -2,6 +2,8 @@ add_test_files(
     alternating_iterator.cpp
     alternating_iterator_state.cpp
     bitmath_func.cpp
+    effectvehicle.cpp
+    effect_protocol.hpp
     enum_over_optimisation.cpp
     flatset_type.cpp
     history_func.cpp

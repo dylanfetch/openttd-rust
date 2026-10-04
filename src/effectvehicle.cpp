@@ -20,6 +20,7 @@
 #include "safeguards.h"
 
 
+#ifndef WITH_RUST
 /**
  * Increment the sprite unless it has reached the end of the animation.
  * @param v Vehicle to increment sprite of.
@@ -555,6 +556,42 @@ static const std::array<EffectProcs, EV_END> _effect_procs = {{
 	{ SmokeInit,          SmokeTick,          TO_INDUSTRIES }, // EV_COPPER_MINE_SMOKE
 }};
 
+#else
+/** Pure map query; no allocation, reentry or C++ exception crosses into Rust. */
+static uint32_t OPENTTD_EFFECT_CALL EffectIndustry(int32_t x, int32_t y, uint32_t *index) noexcept
+{
+	TileIndex tile = TileVirtXY(x, y);
+	*index = tile.base();
+	if (!IsTileType(tile, MP_INDUSTRY)) return 0;
+	return GetIndustryGfx(tile) == GFX_BUBBLE_CATCHER ? 2 : 1;
+}
+
+static bool RunEffect(EffectVehicle *v, bool initialize)
+{
+	static const OpenTTDEffectLeaves leaves{EffectIndustry};
+	OpenTTDEffectCursor cursor{};
+	for (;;) {
+		OpenTTDEffectView view{v->x_pos, v->y_pos, v->z_pos, v->sprite_cache.sprite_seq.seq[0].sprite, v->progress, v->spritenum, v->subtype, static_cast<uint8_t>(_settings_client.sound.ambient), 0};
+		uint8_t action = openttd_rust_effect_step(v->rust_state.get(), &view, &cursor, &leaves, initialize);
+		v->x_pos = view.x; v->y_pos = view.y; v->z_pos = view.z;
+		v->progress = view.progress; v->spritenum = view.spritenum;
+		if (view.sprite_write == 1) v->sprite_cache.sprite_seq.seq[0].sprite = view.sprite;
+		if (view.sprite_write == 2) v->sprite_cache.sprite_seq.Set(view.sprite);
+		/* All allocating/reentrant work runs with no Rust borrow active. */
+		switch (action) {
+			case 0: return true;
+			case 1: v->UpdatePositionAndViewport(); return true;
+			case 2: v->UpdatePositionAndViewport(); break;
+			case 3: SndPlayVehicleFx(SND_2F_BUBBLE_GENERATOR_FAIL, v); break;
+			case 4: SndPlayVehicleFx(SND_31_BUBBLE_GENERATOR_SUCCESS, v); break;
+			case 5: AddAnimatedTile(TileIndex{cursor.tile}); break;
+			case 6: delete v; return false;
+			case 7: cursor.random = Random(); break;
+		}
+	}
+}
+#endif /* WITH_RUST */
+
 /**
  * Create an effect vehicle at a particular location.
  * @param x The x location on the map.
@@ -576,7 +613,11 @@ EffectVehicle *CreateEffectVehicle(int x, int y, int z, EffectVehicleType type)
 	v->UpdateDeltaXY();
 	v->vehstatus = VehState::Unclickable;
 
+#ifdef WITH_RUST
+	RunEffect(v, true);
+#else
 	_effect_procs[type].init_proc(v);
+#endif
 
 	v->UpdatePositionAndViewport();
 
@@ -614,7 +655,11 @@ EffectVehicle *CreateEffectVehicleRel(const Vehicle *v, int x, int y, int z, Eff
 
 bool EffectVehicle::Tick()
 {
+#ifdef WITH_RUST
+	return RunEffect(this, false);
+#else
 	return _effect_procs[this->subtype].tick_proc(this);
+#endif
 }
 
 void EffectVehicle::UpdateDeltaXY()
@@ -628,5 +673,10 @@ void EffectVehicle::UpdateDeltaXY()
  */
 TransparencyOption EffectVehicle::GetTransparencyOption() const
 {
+#ifdef WITH_RUST
+	static const std::array<TransparencyOption, EV_END> transparency{TO_INDUSTRIES, TO_INVALID, TO_INVALID, TO_INVALID, TO_INVALID, TO_INVALID, TO_INVALID, TO_INVALID, TO_INVALID, TO_INDUSTRIES, TO_INVALID, TO_INDUSTRIES};
+	return transparency[this->subtype];
+#else
 	return _effect_procs[this->subtype].transparency;
+#endif
 }
