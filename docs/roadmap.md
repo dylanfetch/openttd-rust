@@ -135,18 +135,19 @@ following `docs/design/world-state.md` as amended by #108.
 ## Resume checkpoint (2026-10-04)
 
 Root: `/root` (gpt-6-astra, ultra). Integration base `350aec9e30`; four
-integrations since steering, stocktake updated. Next stocktake after two more integrations. All rows below are active, not integrated completion.
+integrations since steering, stocktake updated. Next stocktake after two more
+integrations. All rows below are active, not integrated completion.
 Worktrees are siblings of the main checkout unless a path says otherwise.
 
 | Issue / owner | Branch and checkpoint commit | Worktree | Next step |
 | --- | --- | --- | --- |
-| #103 `/root/disaster_ownership_103` (Sol high) | `port-disaster-vehicles` at `390fff0025`, PR #118 | `openttd-rust-disasters` | Review accepts9f9c; root base update changes docs/scenario registration only, src/rust identical. Combined smoke passes; required CI reruns. |
-| #104 `/root/water_regions_104` (Sol high) | `port-water-regions` at `b3eea95239`, PR #114 | `openttd-rust-water-regions` | Base ABI resolution verified; `/root/review_water_pr114` rechecks9c72 source resolution at finalb3ee. Subsequent docs/core merge passes Ruff/provenance; required CI running. |
+| #103 `/root/disaster_ownership_103` (Sol high) | `port-disaster-vehicles` at `390fff0025`, PR #118 | `openttd-rust-disasters` | Review accepts `9f9c265afc`; root base update changes docs/scenario registration only, src/rust identical. Combined smoke passes; required CI reruns. |
+| #104 `/root/water_regions_104` (Sol high) | `port-water-regions` at `b3eea95239`, PR #114 | `openttd-rust-water-regions` | `/root/review_water_pr114` accepts final head after ABI resolution re-review. Verify, Ruff/provenance pass; required CI remains. |
 | #108 `/root/map_access_decision_108` (Astra high) | `map-access-measurements-108` at `3c3ffa09b4`, PR #116 | `openttd-rust-map-access` | Review accepts original code; conflict-free base merge, verify and focused smoke pass. Required CI rerunning; root integrates when green. |
-| #117 `/root/cargo_payment_delivery` (Sol high) | `cargo-payment-delivery-117` at `d72e8afb59`, uncommitted owner | `openttd-rust-cargo-payment` | Verify and focused payment/reload/acceptance pass. Income/transfer/destination reference checks pass; finish documented link-graph job-drain preparation for the cargodist input, merge latest base and open PR. ABI49/50/51. |
-| #119 `/root/ship_yapf_ownership` (Sol high) | `ship-yapf-ownership-119` at `ea5a304f1c`, actual #104 dependency | `openttd-rust-ship-yapf` | Implement complete search/cache owner and reuse ship scenarios; coordinate water dependency. ABI52-56 reserved. |
-| #120 `/root/town_growth_ownership` (Sol high) | `town-growth-ownership-120` at `350aec9e30` | `openttd-rust-town-growth` | Implement growth/house-placement owner and persistent state adapters (ABI60+); `/root/town_growth_scenarios` owns towns.py evidence additions. |
-| #121 `/root/road_vehicle_ownership` (Sol high) | Not started; branch from integration base | To create `openttd-rust-road-vehicles` | Selected after fresh Astra high planning; start when implementation capacity frees. |
+| #117 `/root/cargo_payment_delivery` (Sol high) | `cargo-payment-delivery-117` at `c301dccb87`, PR #123 | `openttd-rust-cargo-payment` | `/root/review_cargo_pr123` (Astra medium) reviews full owner and evidence. Verify, self/soak, native gap checks pass; reference job drain is documented. CI running; ABI 49/50/51. |
+| #119 `/root/ship_yapf_ownership` (Sol high) | `ship-yapf-ownership-119` at `ea5a304f1c`, actual #104 dependency | `openttd-rust-ship-yapf` | Full owner builds; first structures pair passes. Audit source ordering, complete existing corpus and narrow native heap gap check. ABI 52-56. |
+| #120 `/root/town_growth_ownership` (Sol high) | `town-growth-ownership-120` at `350aec9e30` | `openttd-rust-town-growth` | Implement full owner/adapters (ABI 60+). Scenario delegate completed towns.py: self default 6/6, soak 10/10. Candidate pairs next; tunnel and command/lifetime gaps stated. |
+| #121 `/root/road_vehicle_ownership` (Sol high) | `road-vehicle-ownership-121` at `aa14879225`, uncommitted implementation | `openttd-rust-road-vehicles` | Owner writes Rust/controller/FFI (ABI 80-89 reserved). Delegate roadveh.h and external/save adapters when a slot opens; exact interfaces pinned in road_ffi.h. |
 | #122 `/root/rail_yapf_ownership` (Sol high) | Not started; branch from integration base | To create `openttd-rust-rail-yapf` | Selected next; own search/cache/reservation together and strengthen applicable rail witnesses. |
 
 Preserved evidence branches: `evidence-disaster-vehicles` at `a775543162`
@@ -163,7 +164,8 @@ whole growth-loop and house-placement scope now selected as #120. Continue
 per-PR reviews while CI runs. `/root/plan_next_vehicle_owners` (Astra high)
 selected road control then rail YAPF as #121/#122; reserve complete rail control
 until its coupled branches have suitable evidence. Replenish the queue before
-fewer than two unstarted selections remain.
+fewer than two unstarted selections remain. Only #122 is now unstarted; the next
+freed planning slot must select further whole owners from the following list.
 
 ## Choosing the next task
 
