@@ -189,6 +189,16 @@ Any `[desync:` warning (a cache mismatch) and any log or stdout difference fail
   initial checkout, not proof of an arbitrary binary's source revision (#97).
   Evidence: `.local/simulation/<time>-<pid>/report.json`.
 
+Tree map-access measurements (#108) use the same scenarios and comparisons:
+`OPENTTD_TREE_PROFILE=1 python3 tools/migration.py simulate trees --jobs 1`;
+`PYTHONPATH=tools python3 -m simulation.trees <report.json>` summarizes the
+profile. Repeat the scenario command without the environment variable for timing
+without counters. Counts include generation warm-up; one tile-loop batch visits
+`Map::Size()/256` tiles, so 256 batches are a full-map sweep equivalent. The table
+separates generation and tree-tile-loop calls, counts FFI calls once (not returns),
+and reports copied record bytes. Elapsed times include startup, other components
+and save I/O; they neither isolate FFI cost nor establish a raw-map speedup.
+
 ## Native macOS arm64 Rust linkage
 
 CMake verifies the pinned `rustc -vV` host against the actual C++ platform,
