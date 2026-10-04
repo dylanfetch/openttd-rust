@@ -765,9 +765,13 @@ int GetAircraftHoldMaxAltitude(const Aircraft *v)
 	return tile_height + ((v->subtype == AIR_HELICOPTER) ? HELICOPTER_HOLD_MAX_FLYING_ALTITUDE : PLANE_HOLD_MAX_FLYING_ALTITUDE);
 }
 
+static uint8_t &GetFlightFlags(Aircraft *v) { return v->flags; }
+static uint8_t &GetFlightFlags(DisasterVehicle *v) { return v->Flags(); }
+
 template <class T>
 int GetAircraftFlightLevel(T *v, bool takeoff)
 {
+	uint8_t &flags = GetFlightFlags(v);
 	/* Aircraft is in flight. We want to enforce it being somewhere
 	 * between the minimum and the maximum allowed altitude. */
 	int aircraft_min_altitude;
@@ -781,24 +785,24 @@ int GetAircraftFlightLevel(T *v, bool takeoff)
 
 	int z = v->z_pos;
 	if (z < aircraft_min_altitude ||
-			(HasBit(v->flags, VAF_IN_MIN_HEIGHT_CORRECTION) && z < aircraft_middle_altitude)) {
+			(HasBit(flags, VAF_IN_MIN_HEIGHT_CORRECTION) && z < aircraft_middle_altitude)) {
 		/* Ascend. And don't fly into that mountain right ahead.
 		 * And avoid our aircraft become a stairclimber, so if we start
 		 * correcting altitude, then we stop correction not too early. */
-		SetBit(v->flags, VAF_IN_MIN_HEIGHT_CORRECTION);
+		SetBit(flags, VAF_IN_MIN_HEIGHT_CORRECTION);
 		z += takeoff ? 2 : 1;
 	} else if (!takeoff && (z > aircraft_max_altitude ||
-			(HasBit(v->flags, VAF_IN_MAX_HEIGHT_CORRECTION) && z > aircraft_middle_altitude))) {
+			(HasBit(flags, VAF_IN_MAX_HEIGHT_CORRECTION) && z > aircraft_middle_altitude))) {
 		/* Descend lower. You are an aircraft, not an space ship.
 		 * And again, don't stop correcting altitude too early. */
-		SetBit(v->flags, VAF_IN_MAX_HEIGHT_CORRECTION);
+		SetBit(flags, VAF_IN_MAX_HEIGHT_CORRECTION);
 		z--;
-	} else if (HasBit(v->flags, VAF_IN_MIN_HEIGHT_CORRECTION) && z >= aircraft_middle_altitude) {
+	} else if (HasBit(flags, VAF_IN_MIN_HEIGHT_CORRECTION) && z >= aircraft_middle_altitude) {
 		/* Now, we have corrected altitude enough. */
-		ClrBit(v->flags, VAF_IN_MIN_HEIGHT_CORRECTION);
-	} else if (HasBit(v->flags, VAF_IN_MAX_HEIGHT_CORRECTION) && z <= aircraft_middle_altitude) {
+		ClrBit(flags, VAF_IN_MIN_HEIGHT_CORRECTION);
+	} else if (HasBit(flags, VAF_IN_MAX_HEIGHT_CORRECTION) && z <= aircraft_middle_altitude) {
 		/* Now, we have corrected altitude enough. */
-		ClrBit(v->flags, VAF_IN_MAX_HEIGHT_CORRECTION);
+		ClrBit(flags, VAF_IN_MAX_HEIGHT_CORRECTION);
 	}
 
 	return z;

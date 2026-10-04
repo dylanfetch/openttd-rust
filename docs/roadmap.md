@@ -21,7 +21,7 @@ the PR (`AGENTS.md`, "Evidence budget").
   visitor probes. Pending disasters is 1,101 for 968 and cargo payment is 960
   for 315 after review fixes. Each PR records its concrete evidence cost.
 - Larger owners are now producing usable code: full ship search retires 646
-  against 400 glue/tooling; town growth and road control own substantially larger
+  against 547 glue/tooling; town growth and road control own substantially larger
   complete loops. Reuse the current fixtures and native checks. Do not expand
   generic harness tools or polish evidence already accepted by review.
 - The direct-service and map prerequisites are complete. Prioritize integration
@@ -60,6 +60,7 @@ Metrics are `tools/port-metrics.py`: Rust / tooling / C++ glue / C++ retired.
 | #99 | Tree generation, simulation, planting | #102 | `602b5a60ff` | 1288 / 561 / 247 / 816 |
 | #101 | Effect vehicles | #105 | `f6a0d66b63` | 494 / 553 / 412 / 548 |
 | #104 | Water-region cache and graph service | #114 | `9732d8bfa2` | 459 / 610 / 273 / 407 |
+| #103 | Disaster scheduling, vehicles and event control | #118 | `d5edfcb4c5` | 1404 / 795 / 306 / 968 |
 
 Harness and process: #72 harness (#85), #84 play saves (#87), #97 provenance
 freeze (#100), #88 Ruff (#92), #75 partial-pixel fidelity (#91), #90 world-state
@@ -84,51 +85,58 @@ never in masks.
 
 - **#86 Rail and aircraft scenarios** (the ship slice is part of #104). Run on spare
   capacity starting now; each controller/YAPF port needs evidence for its vehicle
-  type. Rail/ship evidence is integrated in #110; #104 adds ship routing. Aircraft needs
-  an owner-built input unless the owner permits a supplemental setup AI (#111).
+  type. Rail/ship evidence is integrated in #110; #104 adds ship routing. The owner
+  authorized a separate reference-generated aircraft fixture on 2026-10-04
+  (#111, decision recorded on #86). Commit the deterministic setup AI, preserve
+  the supplied save, and require movement/delivery, self/pair and negative-probe
+  witnesses. `/root/aircraft_fixture_86` owns this at the next available slot.
 
 ## Phase 3: current ownership work, in order
 
-1. **#103 Disaster scheduling, vehicles and event control, PR #118.**
-   Final independent review accepts the owner and evidence; wait required CI.
-   Actual #109/#113/#115 dependency ancestry is included; retain the real UFO/train,
-   airport, industry, release/reload and submarine lifecycle witnesses.
-2. **#117 Cargo payment and delivery ownership.** Selected after a fresh Astra
+1. **#117 Cargo payment and delivery ownership.** Selected after a fresh Astra
    high comparison with station ratings and industry production. Own CargoPayment
    state and lifetime, delivery acceptance/payment control, destination collection
    and the complete production-flush loop. Preserve Money saturation, native-width
    intermediates and CAPY lifecycle. Loading/reservation and shared industry state
    remain C++; this is not an income-formula extraction. Begin while earlier PRs
    are in review/CI, using the existing road scenarios and #107/#109 interfaces.
-3. **#119 Complete ship YAPF and path cache ownership.** Own both search levels,
+2. **#119 Complete ship YAPF and path cache ownership.** Own both search levels,
    their queues/arenas/corridor/retries and canonical `Ship::path`, including all
    controller and save adapters. Reuse #104's corpus; no separate comparison tool.
    Use integrated #104 and its real dependency ancestry.
-4. **#120 Complete town-growth control and private state.** Own tick traversal,
+3. **#120 Complete town-growth control and private state.** Own tick traversal,
    growth road walking/build choices, house selection and placement control,
    growth-rate/funding transitions and canonical counters/flags with CITY and
    legacy adapters. Keep unrelated town accounting and shared world state in C++.
    Add actual growth witnesses to the existing towns module.
-5. **#121 Complete road vehicle control and private state.** Own consist/tick
+4. **#121 Complete road vehicle control and private state.** Own consist/tick
    movement, blocking/overtaking/crash/servicing and day handling, canonical road
    counters and path cache, plus save/legacy/external mutation adapters. Existing
    road YAPF may return a temporary result for transfer to the empty Rust cache.
-6. **#122 Complete rail YAPF search, caches and reservation.** Own all four
+5. **#122 Complete rail YAPF search, caches and reservation.** Own all four
    searches, six specialization-specific global cache banks, rail-change
    invalidation, reservation traversal and rollback. Reuse the rail corpus and
    ship search machinery only where ordering matches; require branch witnesses.
-7. **#124 Complete road YAPF search and path construction.** Own both track and
+6. **#124 Complete road YAPF search and path construction.** Own both track and
    depot searches, all node/queue/segment state and reconstruction. Replace
    #121's temporary result bridge using its canonical path cache; do not claim
    the cache twice. Reuse road scenarios and compatible search support.
-8. **#125 Complete station cargo-service control and state.** Own loading order,
+7. **#125 Complete station cargo-service control and state.** Own loading order,
    service/cargo metadata, full loading/reservation/refit policy, acceptance,
    ratings/distribution and periodic service loops. Preserve #117's payment and
    production-flush owner and shared packet/flow/map storage. Reuse its fixtures.
-9. **Following selections:** rail vehicle controller, complete industry periodic
-   owner, company/economy loop, orders, cargo and their commands. Rail controller
-   needs broader reversal/crossing/reservation evidence than the current two-train
-   save; #122 should supply it. Aircraft stays gated on #111 and #86 input.
+8. **#129 Complete industry periodic production and builder ownership.** Own
+   canonical cargo slots/histories, production and transport control, daily/monthly
+   closure, farm/lumber loops, NewGRF production repeat/apply policy and weighted
+   builder targets/retries/backoff. Reuse #117 and #125 boundaries and fixtures.
+9. **#130 Complete rail vehicle control and private state.** Own consist/tick
+   movement, reversal/crossings/crash, speed/service/day loops and controller
+   reservation extension/rollback, with canonical train-private state and adapters.
+   #122 search reservation does not cover controller rollback. Establish missing
+   collision/crossing/reversal witnesses as part of the port before integration.
+10. **Following selections:** company/economy lifecycle, orders, further cargo and
+    their commands. Aircraft controller selection still needs #86 evidence, now
+    authorized; fixture availability alone does not select a controller port.
 
 The accepted #108 decision keeps canonical map arrays in C++ with direct bundled
 `noexcept` services. Counts establish crossing density, not a bottleneck; no raw
@@ -137,21 +145,23 @@ selection following `docs/design/world-state.md`.
 
 ## Resume checkpoint (2026-10-04)
 
-Root: `/root` (gpt-6-astra, ultra). Integration base `9732d8bfa2`; six
-integrations since steering, stocktake updated. Next stocktake after two more
-integrations. All rows below are active, not integrated completion.
+Root: `/root` (gpt-6-astra, ultra). Integration base `d5edfcb4c5`; seven
+integrations since steering. Stocktake covers the sixth; update it after the
+next integration. All rows below are active, not integrated completion.
 Worktrees are siblings of the main checkout unless a path says otherwise.
 
 | Issue / owner | Branch and checkpoint commit | Worktree | Next step |
 | --- | --- | --- | --- |
-| #103 `/root/disaster_ownership_103` (Sol high) | `port-disaster-vehicles` at `390fff0025`, PR #118 | `openttd-rust-disasters` | Review accepts `9f9c265afc`; root base update changes docs/scenario registration only, src/rust identical. Combined smoke passes; required CI reruns. |
-| #117 `/root/cargo_payment_delivery` (Sol high) | `cargo-payment-delivery-117` at local `bbc1925d4d`, PR #123 | `openttd-rust-cargo-payment` | Two findings fixed in447b5e5608, clean base merge bbc1925d4d. Pair/self pass; finish soak, push once, same reviewer checks final commit and new CI. ABI 49/50/51. |
-| #119 `/root/ship_yapf_ownership` (Sol high) | `ship-yapf-ownership-119` at `f85a8a727f`, PR #126 | `openttd-rust-ship-yapf` | Full corpus pair6/6 passes, native heap/path and Cargo checks pass. Finish soak/self and counter-based branch audit; fresh reviewer next. Rare limit/retry/docking gaps need explicit disposition. ABI 52-56. |
-| #120 `/root/town_growth_ownership` (Sol high) | `town-growth-ownership-120` at `350aec9e30` | `openttd-rust-town-growth` | Full owner builds and candidate pair6/6 passes; native ABI/growth tests pass. Finish verify/soak, bounded unchanged-reference tunnel gap check, then draft PR and fresh review. ABI 60+. |
-| #121 `/root/road_vehicle_ownership` (Sol high) | `road-vehicle-ownership-121` at `aa14879225`, uncommitted implementation | `openttd-rust-road-vehicles` | Owner writes Rust/controller/FFI (ABI 80-83; 84-89 released). `/root/road_state_save_adapters` owns roadveh.h/external/save adapters in the same worktree; signatures pinned in road_ffi.h. |
-| #122 `/root/rail_yapf_ownership` (Sol high) | Not started; branch from integration base | To create `openttd-rust-rail-yapf` | Selected next; own search/cache/reservation together and strengthen applicable rail witnesses. |
-| #124 `/root/road_yapf_ownership` (Sol high) | Not started; use #121 path API | To create `openttd-rust-road-yapf` | Selected; full road search and reconstruction, no separate persistent cache. |
-| #125 `/root/station_service_ownership` (Sol high) | Not started; depends on #117 owner | To create `openttd-rust-station-service` | Selected; complete station service state and periodic/loading control, reusing economic fixtures. |
+| #117 `/root/cargo_payment_delivery` (Sol high) | `cargo-payment-delivery-117` at `2abf956bdf`, PR #123 | `openttd-rust-cargo-payment` | Same reviewer accepts explicit MSVC conversions and disaster-base update; verify and combined pair4/4 pass. Required CI reruns. ABI 49-51. |
+| #119 `/root/ship_yapf_ownership` (Sol high) | `ship-yapf-ownership-119` at `465a8376a9`, PR #126 | `openttd-rust-ship-yapf` | Explicit native-fixture MSVC conversion and disaster-base update pass verify and combined pair2/2. Same reviewer accepts small delta; required CI reruns. ABI 52-56. |
+| #120 `/root/town_growth_ownership` (Sol high) | `town-growth-ownership-120` at `9fbeaa00d1`, PR #127 | `openttd-rust-town-growth` | `/root/review_town_growth_pr127` (Astra medium) accepts final owner and evidence. Verify and unchanged soak10/10 pass after coast predicate and live callback-mask fixes. Required CI remains; base conflicts need an ordinary update before integration. ABI 60/61. |
+| #121 `/root/road_vehicle_ownership` (Sol high) | `road-vehicle-ownership-121` at `a8a2525557`, PR #128 | `openttd-rust-road-vehicles` | Actual disaster dependency included. Final verify, roads8/8 and soak10/10 pass. `/root/review_road_control_pr128` (Astra medium) accepts the restored current-depot shortcut and native regression; exact-head verify and pair10/10 pass. Required CI remains. Short road inputs explicitly postpone five LGRJ joins, leaving vehicle/map fields unchanged. ABI 80-83. |
+| #122 `/root/rail_yapf_ownership` (Sol high) | `rail-yapf-ownership-122` at `72ddedf780`, uncommitted owner | `openttd-rust-rail-yapf` | Candidate soak6/6 proves search, depot/reversal, safe search, reservation success/busy/rollback and cache reuse. `/root/rail_yapf_limit_probe` supplies bounded limit/heap/invalidation/signal-order checks. Finish diagnostic fidelity, base update, verify and draft PR. ABI 90-95/97. |
+| #124 `/root/road_yapf_ownership` (Sol high) | `road-yapf-ownership-124` at `2f59e67086` | `openttd-rust-road-yapf` | Whole search builds and roads8/8 passes after origin-mask fix. Finish native limit gap and valid penalty witnesses; merge latest #128 a8a2525557 dependency, then verify/draft PR. ABI 100-109 reserved. |
+| #125 `/root/station_service_ownership` (Sol high) | `station-service-ownership-125` at `0db650e1bd` | `openttd-rust-station-service` | Actual #123 dependency merged. Implement canonical service/metadata and complete loading/periodic control; audit stable scalar references and named refit reentry. Queue/save adapters are a bounded helper task when capacity permits. ABI 110-129 reserved. |
+| #129 `/root/industry_periodic_ownership` (Sol high) | Not started | To create `openttd-rust-industry-periodic` | Selected next after station service; whole production/state/history/builder owner. |
+| #130 `/root/rail_vehicle_ownership` (Sol high) | Not started; uses #122 search owner | To create `openttd-rust-rail-vehicles` | Selected after industry; include separate controller reservation and missing branch evidence. |
+| #86 `/root/aircraft_fixture_86` (Sol high) | `aircraft-evidence-86` at `a8aabad40a`, uncommitted fixture | `openttd-rust-aircraft-evidence` | Authorized reference-built 258KB save has two airports, plane and helicopter. Self/pair and four-year soak pass movement/delivery witnesses. Finish negative-probe restoration, verify and draft PR for fresh review. |
 
 Preserved evidence branches: `evidence-disaster-vehicles` at `a775543162`
 (`openttd-rust-disasters-evidence`) and `evidence-water-regions` at `c752070cde`
@@ -166,11 +176,12 @@ cargo/ship sequence. `/root/plan_town_growth_ownership` (Astra high) supplied th
 whole growth-loop and house-placement scope now selected as #120. Continue
 per-PR reviews while CI runs. `/root/plan_next_vehicle_owners` (Astra high)
 selected road control then rail YAPF as #121/#122; reserve complete rail control
-until its coupled branches have suitable evidence. Replenish the queue before
-fewer than two unstarted selections remain. Fresh Astra high planner `/root/plan_after_vehicle_pathfinding` selected #124
-and #125. Three unstarted owners are queued; replenish when fewer than two
-remain. A future industry selection must include histories, daily/monthly control,
-closure and builder targets/backoff, not only the short production tick.
+until its coupled branches have suitable evidence. Fresh Astra high planner `/root/plan_after_vehicle_pathfinding` selected #124
+and #125. Fresh Astra high planner `/root/plan_next_simulation_owners` selected
+#129 then #130; root accepted both. Two unstarted owners remain while station
+service and the authorized aircraft evidence task are active. Replenish when fewer than two remain. Industry
+includes histories, complete periodic control and builder backoff; rail includes
+its own reservation rollback, distinct from #122.
 
 ## Choosing the next task
 
