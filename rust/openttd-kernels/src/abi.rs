@@ -83,6 +83,8 @@ pub fn layout(type_id: u8, item: u8) -> usize {
         42 => {
             layout!(crate::services::Services, item; context, random, observe_tile, write_tile, trig, industry)
         }
+        44 => layout!(crate::disaster::State, item; image_override, target, state, flags),
+        45 => layout!(crate::disaster::Action, item; kind, id, other, a, b, c, d),
         _ => usize::MAX,
     }
 }
