@@ -95,7 +95,7 @@ TEST_CASE("Road vehicles - original movement and stop tables")
 		}
 	}
 	for (size_t index = 0; index < std::size(_road_stop_stop_frame); ++index) {
-		CHECK(openttd_rust_road_stop_frame(index) == _road_stop_stop_frame[index]);
+		CHECK(openttd_rust_road_stop_frame(static_cast<uint32_t>(index)) == _road_stop_stop_frame[index]);
 	}
 }
 
