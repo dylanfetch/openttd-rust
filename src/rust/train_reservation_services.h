@@ -98,6 +98,7 @@ static uint64_t TrainReservationLeaf(void *context, uint32_t op, uint32_t id, ui
 		case TR_CHECK_REVERSE: { return YapfTrainCheckReverse(v); }
 		case TR_CONDITIONAL: { return ProcessConditionalOrder(v->GetOrder(static_cast<VehicleOrderID>(a)), v); }
 		case TR_SERVICE: { CheckIfTrainNeedsService(v); break; }
+		case TR_PROFILE: if (_train_profile.enabled) ++_train_profile.counts[a]; break;
 		default: NOT_REACHED();
 	}
 	return 0;

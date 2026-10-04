@@ -125,4 +125,5 @@ constexpr uint32_t TR_STATION_RAIL = 73;
 constexpr uint32_t TR_CHECK_REVERSE = 74;
 constexpr uint32_t TR_CONDITIONAL = 75;
 constexpr uint32_t TR_SERVICE = 76;
+constexpr uint32_t TR_PROFILE = 77;
 #endif

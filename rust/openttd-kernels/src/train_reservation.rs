@@ -26,6 +26,7 @@ use std::{
     task::{Context, Poll, Waker},
 };
 const INVALID: u32 = u32::MAX;
+const PROFILE: u32 = 77;
 const STATION_RAIL: u32 = 73;
 const CHECK_REVERSE: u32 = 74;
 const CONDITIONAL: u32 = 75;
@@ -223,6 +224,9 @@ impl Future for Call {
     }
 }
 impl Game {
+    fn count(&self, id: u32, index: u64) {
+        self.val(PROFILE, id, index);
+    }
     fn read(&self, id: u32) -> View {
         let mut v = View::default();
         (self.leaves.observe)(id, &raw mut v);
@@ -419,6 +423,7 @@ fn clear(g: &Game, id: u32, tile: u32, td: u8) {
     }
 }
 fn free(g: &Game, id: u32) {
+    g.count(id, 27);
     let v = g.read(id);
     let mut tile = v.tile;
     let mut td = g.td(id);
@@ -488,6 +493,7 @@ fn free(g: &Game, id: u32) {
     g.op(UPDATE_BUFFER, id);
 }
 fn extend(g: &Game, id: u32, new_tracks: &mut u8, enterdir: &mut u8) -> Pbs {
+    g.count(id, 22);
     let origin = g.origin(id, false);
     let types = g.get(id, 3);
     let mut ft = Follow::default();
@@ -539,6 +545,7 @@ fn extend(g: &Game, id: u32, new_tracks: &mut u8, enterdir: &mut u8) -> Pbs {
                 break;
             }
             if g.has(HAS_PBS, id, tile, rev) && g.has(GREEN, id, tile, rev) {
+                g.count(id, 25);
                 red.push((tile, rev));
                 g.signal(id, tile, rev, false);
                 g.val(MARK_TILE, id, u64::from(tile));
@@ -554,6 +561,7 @@ fn extend(g: &Game, id: u32, new_tracks: &mut u8, enterdir: &mut u8) -> Pbs {
             break;
         }
         if g.has(HAS_PBS, id, tile, rev) && g.has(GREEN, id, tile, rev) {
+            g.count(id, 25);
             red.push((tile, rev));
             g.signal(id, tile, rev, false);
             g.val(MARK_TILE, id, u64::from(tile));
@@ -567,6 +575,7 @@ fn extend(g: &Game, id: u32, new_tracks: &mut u8, enterdir: &mut u8) -> Pbs {
             other: INVALID,
         };
     }
+    g.count(id, 23);
     tile = origin.tile;
     td = origin.td;
     let stopped = ft.old_tile;
@@ -580,9 +589,11 @@ fn extend(g: &Game, id: u32, new_tracks: &mut u8, enterdir: &mut u8) -> Pbs {
         }
         tile = ft.new_tile;
         td = first(ft.dirs);
+        g.count(id, 24);
         g.unreserve(id, tile, td);
     }
     for (tile, td) in red {
+        g.count(id, 26);
         g.signal(id, tile, td, true);
     }
     Pbs::default()
@@ -611,6 +622,7 @@ impl Orders {
         }
     }
     fn restore(&mut self) {
+        self.g.count(self.id, 30);
         self.g.op(RESTORE_ORDER, self.id);
         self.g.val(WRITE_DEST, self.id, u64::from(self.dest));
         self.g.val(WRITE_LAST, self.id, u64::from(self.last));
@@ -619,6 +631,7 @@ impl Orders {
         self.restored = true;
     }
     async fn next(&mut self, skip: bool) -> bool {
+        self.g.count(self.id, 29);
         let g = self.g.clone();
         let id = self.id;
         if g.read(id).num_orders == 0 {
@@ -691,6 +704,7 @@ async fn choose(
     force: bool,
     mark: bool,
 ) -> (u8, bool) {
+    g.count(id, 28);
     let mut best = 0xff;
     let mut reserve = g.op(RESERVE_PATHS, id) != 0 || force;
     let mut changed = false;
@@ -1175,7 +1189,7 @@ mod tests {
         // SAFETY: Test game provides its exclusive live mock; this borrow ends on return.
         let mock = unsafe { &mut *context.cast::<Mock>() };
         match op {
-            BLOCKING | RAIL90 | IS_RAILWAY | STATION_RAIL => 0,
+            BLOCKING | RAIL90 | IS_RAILWAY | STATION_RAIL | PROFILE => 0,
             SAFE => u64::from(mock.stop == 2 && a == 2),
             FREE | HAS_PBS | GREEN => 1,
             TRY_TRACK => {

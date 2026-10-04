@@ -1297,3 +1297,8 @@ pub unsafe extern "C" fn openttd_rust_inplace_write(
 }
 
 mod water_regions;
+
+mod train;
+mod train_state;
+
+mod train_reservation;
