@@ -86,6 +86,27 @@ pub fn layout(type_id: u8, item: u8) -> usize {
         46 => layout!(crate::water_regions::Patch, item; x, y, label),
         47 => layout!(crate::water_regions::Snapshot, item; edges, labels, patches, aqueducts),
         48 => layout!(crate::water_regions::Leaves, item; tracks, follow, aqueduct, debug),
+        90 => {
+            layout!(crate::rail_yapf::Settings, item; max_nodes, firstred, firstred_exit, lastred, lastred_exit, station, slope, curve45, curve90, depot_reverse, crossing, lookahead, p0, p1, p2, pbs_cross, pbs_station, pbs_back, doubleslip, longer, longer_tile, shorter, shorter_tile, firstred_eol)
+        }
+        91 => {
+            layout!(crate::rail_yapf::Tile, item; flags, other_end, station, railtype, tracks, reserved, station_track, tunnel_dir, uphill, flat_ramp, signal_along, signal_against, signal_green, signal_type, oneway)
+        }
+        92 => {
+            layout!(crate::rail_yapf::Follow, item; tile, skipped, min_speed, max_speed, dirs, followed, error, station)
+        }
+        93 => {
+            layout!(crate::rail_yapf::Leaves, item; train, tile, follow, safe, free, compatible_station, platform_length, closest_station, destination_dirs, origin, write, output, debug)
+        }
+        94 => {
+            layout!(crate::rail_yapf::Input, item; context, settings, map_x, tile, max_cost, desync, kind, td, override_railtype, forbid90, reserve)
+        }
+        95 => {
+            layout!(crate::rail_yapf::Step, item; tile, destination, target_tile, best_length, action, td, found, reverse, value, target_td, target_okay)
+        }
+        97 => {
+            layout!(crate::rail_yapf::Train, item; compatible, all_compatible, tile, rear_tile, virtual_tile, rear_virtual_tile, dest_tile, length, speed, order_destination, td, rear_td, wormhole, rear_wormhole, order, nearest_depot, complex_waypoint)
+        }
         _ => usize::MAX,
     }
 }
