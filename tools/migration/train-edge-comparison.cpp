@@ -101,11 +101,16 @@ static uint64_t Leaf(uint32_t op, uint32_t id, uint64_t a, uint64_t b, uint64_t)
 }
 static OpenTTDTrainState *Owner(uint32_t id) noexcept { return trains[id].state; }
 static size_t Nearby(uint32_t, uint32_t, int32_t, int32_t, uint32_t *, size_t) noexcept { std::abort(); }
+static uint32_t UnexpectedRandom(void *) noexcept { std::abort(); }
+static void UnexpectedObserve(void *, uint32_t, uint32_t *) noexcept { std::abort(); }
+static void UnexpectedWrite(void *, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) noexcept { std::abort(); }
+static float UnexpectedTrig(uint32_t, float) noexcept { std::abort(); }
+static uint32_t UnexpectedIndustry(int32_t, int32_t, uint32_t *) noexcept { std::abort(); }
 static uint64_t Rust(uint32_t kind, uint64_t a = 0, uint64_t b = 0)
 {
 	const OpenTTDTrainServices leaves{Observe, Write, Leaf, Owner, Nearby};
 	/* No selected body uses shared RNG/map services. Unexpected use aborts. */
-	const OpenTTDSharedServices shared{};
+	const OpenTTDSharedServices shared{nullptr, UnexpectedRandom, UnexpectedObserve, UnexpectedWrite, UnexpectedTrig, UnexpectedIndustry};
 	void *task = openttd_rust_train_create(kind, 0, a, b, 0, &leaves, &shared);
 	uint64_t reply = 0;
 	for (;;) {
