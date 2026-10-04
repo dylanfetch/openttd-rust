@@ -46,6 +46,9 @@ enum ExtraTreePlacement : uint8_t {
 
 static_assert(MP_CLEAR == 0 && MP_TREES == 4 && MP_WATER == 6);
 static_assert(TREE_CACTUS == 27 && TREE_INVALID == 255 && TREE_COUNT_TEMPERATE == 12);
+static_assert(to_underlying(LandscapeType::Temperate) == 0 && to_underlying(LandscapeType::Arctic) == 1 && to_underlying(LandscapeType::Tropic) == 2 && to_underlying(LandscapeType::Toyland) == 3);
+static_assert(CLEAR_GRASS == 0 && CLEAR_ROUGH == 1 && CLEAR_ROCKS == 2 && CLEAR_FIELDS == 3 && CLEAR_DESERT == 5);
+static_assert(TROPICZONE_NORMAL == 0 && TROPICZONE_DESERT == 1 && TROPICZONE_RAINFOREST == 2);
 static_assert(TP_NONE == 0 && TP_ORIGINAL == 1 && TP_IMPROVED == 2);
 static_assert(TREE_GROUND_GRASS == 0 && TREE_GROUND_ROUGH == 1 && TREE_GROUND_SNOW_DESERT == 2 && TREE_GROUND_SHORE == 3 && TREE_GROUND_ROUGH_SNOW == 4);
 static_assert(to_underlying(TreeGrowthStage::Growing1) == 0 && to_underlying(TreeGrowthStage::Grown) == 3 && to_underlying(TreeGrowthStage::Dead) == 6);

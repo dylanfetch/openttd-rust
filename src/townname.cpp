@@ -17,7 +17,11 @@
 #include "gfx_layout.h"
 #include "strings_internal.h"
 
+#ifdef WITH_RUST
+#include "rust/townname_ffi.h"
+#else
 #include "table/townname.h"
+#endif
 
 #include "safeguards.h"
 
@@ -155,6 +159,7 @@ bool GenerateTownName(Randomizer &randomizer, uint32_t *townnameparts, TownNames
 
 
 
+#ifndef WITH_RUST
 /**
  * Generates a number from given seed.
  * @param shift_by number of bits seed is shifted to the right
@@ -966,6 +971,8 @@ static TownNameGenerator *const _town_name_generators[] = {
 };
 
 
+#endif /* !WITH_RUST */
+
 /**
  * Generates town name from given seed.
  * @param builder string builder to write to
@@ -974,6 +981,16 @@ static TownNameGenerator *const _town_name_generators[] = {
  */
 void GenerateTownNameString(StringBuilder &builder, size_t lang, uint32_t seed)
 {
+#ifdef WITH_RUST
+	static_assert(BUILTIN_TOWNNAME_GENERATOR_COUNT == 21);
+	assert(lang < BUILTIN_TOWNNAME_GENERATOR_COUNT);
+	/* Append outside Rust; RAII also frees the result if the C++ allocation throws. */
+	auto result = std::unique_ptr<OpenTTDTownNameResult, decltype(&openttd_rust_townname_destroy)>(openttd_rust_townname_generate(lang, seed), openttd_rust_townname_destroy);
+	size_t length;
+	const char *data = openttd_rust_townname_data(result.get(), &length);
+	builder.Put(std::string_view(data, length));
+#else
 	assert(lang < std::size(_town_name_generators));
 	return _town_name_generators[lang](builder, seed);
+#endif
 }

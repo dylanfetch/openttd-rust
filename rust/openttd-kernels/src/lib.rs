@@ -22,6 +22,8 @@ mod script_list;
 mod station_cargo;
 mod string_validation;
 mod tgp;
+mod townname;
+mod townname_data;
 mod trees;
 mod widget_parser;
 
