@@ -321,6 +321,31 @@ Unless an entry says otherwise, these properties hold for every port:
 - Evidence is the unchanged upstream tests first; the named comparison tool covers
   only listed gaps, and nothing here establishes whole-game equivalence.
 
+### TGP terrain generation
+
+Rust owns the temporary height map and every TerraGenesis generation stage,
+including maximum-height estimation, amplitudes/noise, water histogram, coast
+noise and smoothing, sine redistribution and regional curves. `src/tgp.cpp`
+keeps settings extraction, shared RNG callbacks, progress and final tile writes;
+the original implementation compiles only without `WITH_RUST`.
+
+An opaque owner advances through generation and normalization, returning progress
+actions to C++. Abortion frees the owner after Rust returns, so the C++ progress
+exception never crosses a Rust frame. RNG callbacks are nonthrowing leaves;
+settings are copied and no vector view or borrowed pointer survives a call.
+Fixed-point narrowing/wrapping, random draw order and float/double promotions
+follow the source. Coast noise preserves the low 31 polynomial bits on LP64 and
+Windows alike. Rust panics/allocation failures abort, as for the other ports.
+
+Evidence: `python3 tools/migration.py verify --jobs 2`, existing comparisons,
+`python3 tools/migration.py simulate --jobs 2`, and
+`python3 tools/migration.py simulate generate-tgp-settings --soak --jobs 2`.
+Four default and fourteen additional settings cases cover all climates, terrain
+and smoothness selections, variety, sea/border choices, height limits, high-bit
+seeds and non-square maps, including extreme aspect ratios. They compare decoded
+snapshots and plain exit saves. This is sampled evidence; maximum 4096 maps, interactive
+progress cancellation and Windows/macOS runtime parity are not exercised locally.
+
 ### Landscape partial-pixel height
 
 `GetPartialPixelZ`, the scalar landscape height kernel, runs in Rust behind its
