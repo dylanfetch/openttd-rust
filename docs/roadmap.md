@@ -20,7 +20,7 @@ the PR (`AGENTS.md`, "Evidence budget").
   water adds 883 for 407, including the reusable ship corpus and visitor probes;
   disasters adds 1,101 for 968. Pending cargo adds 960 for 315. Each PR names its
   concrete evidence cost; do not expand generic tooling to improve a metric.
-- The accepted cargo/ship/town/road batch retires 5,351 lines against 4,470
+- The accepted cargo/ship/town/road batch retires 5,351 lines against 4,450
   glue/tooling, including 1,475 road movement table lines. These remain pending
   until the combined PR passes CI. Ship, town and road each retire more than
   their glue/tooling; cargo is an explicit overrun. Larger owners are now ready
@@ -94,6 +94,8 @@ reuse the supplied rail/ship save and authorized aircraft setup AI.
 CI capacity requires one integration batch (#131) for accepted component PRs
 #123/#126/#127/#128. Keep their component reviews/evidence; require independent
 review of the combined resolutions and all required CI on the integration PR.
+The following batch #140 combines accepted searches #133/#135 using actual #134
+ancestry; #134 must integrate first, and #140 has its own review and required CI.
 
 1. **#117 Cargo payment and delivery ownership.** Selected after a fresh Astra
    high comparison with station ratings and industry production. Own CargoPayment
@@ -146,9 +148,16 @@ review of the combined resolutions and all required CI on the integration PR.
     world ownership-transfer traversal, periodic economy/prices and financial
     commands. Preserve real VM/deletion reentry and #129 ECMY fields. Require
     multiple-company recovery/transfer/deletion evidence, not only profitable play.
-12. **Following selections:** complete orders/shared-list/backup ownership, further
-    cargo and commands. Orders must include editing/sharing/current-order and
-    timetable adapters, not a ProcessOrders-only extraction.
+12. **#138 Complete orders, shared lists, backups and timetable ownership.** Own
+    canonical vectors/current orders/shared links/backups, editing/validation/
+    execution/destination resolution, timetable and depot-unbunching control.
+    Preserve controller reentry, save formats and #83 unmasked timing evidence.
+13. **#139 Complete cargo packet, list, flow and movement ownership.** Own packet
+    contents, ordered station/vehicle containers, actions/caches/flows and the
+    completed-link-job live-flow application. Preserve #117/#125/#74 policy
+    boundaries, stable identity/iteration and shared pool-shell allocation.
+14. **Following selections:** remaining simulation components and commands that
+    change them, guided by canonical state and complete control-loop ownership.
 
 The accepted #108 decision keeps canonical map arrays in C++ with direct bundled
 `noexcept` services. Counts establish crossing density, not a bottleneck; no raw
@@ -164,18 +173,21 @@ Worktrees are siblings of the main checkout unless a path says otherwise.
 
 | Issue / owner | Branch and checkpoint commit | Worktree | Next step |
 | --- | --- | --- | --- |
-| #131 `/root` (Astra ultra) | `integrate-reviewed-owners` at `3c4e9da0b0`, PR #134 | `openttd-rust-owner-batch` | Combined verify97/124 and focused24/24 (261 snapshots) pass. `/root/review_owner_batch_pr134` (Astra medium) accepts original joins and test-only conversion fix. Include integrated aircraft fixture base, check registration, then final required CI. |
+| #131 `/root` (Astra ultra) | `integrate-reviewed-owners` at `03b8a0c3ae`, PR #134 | `openttd-rust-owner-batch` | Exact verify97/124 and final aircraft2/2 pass; combined source26/26 (316 snapshots) passed before base-update commit. `/root/review_owner_batch_pr134` (Astra medium) accepts joins/test conversion. Aircraft base update has only scenario-list conflict; 177 unique defaults, no src/rust changes. Required CI running. |
 | #117 `/root/cargo_payment_delivery` (Sol high) | `cargo-payment-delivery-117` at `2abf956bdf`, PR #123 | `openttd-rust-cargo-payment` | Same reviewer accepts explicit MSVC conversions and disaster-base update; verify and combined pair4/4 pass. Accepted head is included in #131; combined CI gates integration. ABI 49-51. |
 | #119 `/root/ship_yapf_ownership` (Sol high) | `ship-yapf-ownership-119` at `465a8376a9`, PR #126 | `openttd-rust-ship-yapf` | Explicit native-fixture MSVC conversion and disaster-base update pass verify and combined pair2/2. Same reviewer accepts small delta; included in #131. ABI 52-56. |
 | #120 `/root/town_growth_ownership` (Sol high) | `town-growth-ownership-120` at `9fbeaa00d1`, PR #127 | `openttd-rust-town-growth` | `/root/review_town_growth_pr127` (Astra medium) accepts final owner and evidence. Verify and unchanged soak10/10 pass after coast predicate and live callback-mask fixes. Accepted head and resolved base conflicts are included in #131. ABI 60/61. |
 | #121 `/root/road_vehicle_ownership` (Sol high) | `road-vehicle-ownership-121` at `682a8151f3`, PR #128 | `openttd-rust-road-vehicles` | Actual disaster dependency included. Final verify, roads8/8 and soak10/10 pass. `/root/review_road_control_pr128` (Astra medium) accepts the restored current-depot shortcut and native regression; exact-head verify and pair10/10 pass. Explicit native test conversion fixes the Windows annotation; same reviewer accepts, exact verify passes and fix is included in #131. Short road inputs explicitly postpone five LGRJ joins, leaving vehicle/map fields unchanged. ABI 80-83. |
 | #122 `/root/rail_yapf_ownership` (Sol high) | `rail-yapf-ownership-122` at `ef1b981101`, PR #133 | `openttd-rust-rail-yapf` | Merged main base; verify/Cargo and all comparisons pass. Actual soak branches plus native limit/heap/invalidation/signal-order tests pass; original dump format retained through temporary views. Final soak6/6 (426 snapshots) and `/root/review_rail_yapf_pr133` (Astra medium) acceptance complete. Native test conversion fix passes exact verify and same-reviewer acceptance; fresh CI running. ABI 90-95/97. |
-| #124 `/root/road_yapf_ownership` (Sol high) | `road-yapf-ownership-124` at `ab09ce9306`, PR #135 | `openttd-rust-road-yapf` | Final verify97/121, roads9/9 pair/self and six-year12/12 soak pass. `/root/review_road_yapf_pr135` (Astra medium) accepts final source/evidence. Clean dependency update includes accepted #128 test conversion fix; exact verify passes. Root repeats clean-head soak to remove precommit provenance ambiguity; required CI gates integration. ABI 100-109 reserved. |
-| #125 `/root/station_service_ownership` (Sol high) | `station-service-ownership-125` at `0db650e1bd` | `openttd-rust-station-service` | Actual #123 dependency merged. Complete service/loading/refit/reservation and periodic policy implemented; native build and semantic evidence next. `/root/station_loading_queue_adapters` finished stable-node queue and stack-only save/fixup staging; focused tests await native build. Audit field-sized raw access and actual refit reentry. ABI 110-129 reserved. |
+| #124 `/root/road_yapf_ownership` (Sol high) | `road-yapf-ownership-124` at `ab09ce9306`, PR #135 | `openttd-rust-road-yapf` | Final verify97/121, roads9/9 pair/self and six-year12/12 soak pass. `/root/review_road_yapf_pr135` (Astra medium) accepts final source/evidence. Clean dependency update includes accepted #128 test conversion fix; exact verify passes. Root clean-head soak12/12 (222 snapshots) passes. Standalone branch conflicts with newer scenario registration; #140 resolves it with #133 and #134 ancestry before final combined CI. ABI 100-109 reserved. |
+| #125 `/root/station_service_ownership` (Sol high) | `station-service-ownership-125` at `0db650e1bd` | `openttd-rust-station-service` | Actual #123 dependency merged. Full policy implemented; native ABI/lifetime/save tests and station6/6 plus economy3/3 paired pass. Queue uses raw-owned nodes to preserve native iterator provenance; stack-only save staging. Final verify/soak and PR next. ABI 110-129 reserved. |
 | #129 `/root/industry_periodic_ownership` (Sol high) | `industry-periodic-ownership-129` at `6b17fad17e` | `openttd-rust-industry-periodic` | Actual #123 dependency merged. Implement canonical slots/histories, complete production/periodic and builder owner; coordinate #125. ABI 130-149 reserved. |
-| #130 `/root/rail_vehicle_ownership` (Sol high) | `rail-vehicle-ownership-130` at `73d18db`, actual #133 dependency | `openttd-rust-rail-vehicles` | Whole controller audit/implementation; `/root/rail_vehicle_ownership/train_state_adapters` (Sol high) owns canonical state/external/save adapters. Include separate controller rollback and branch evidence. ABI 150-179 reserved. |
+| #130 `/root/rail_vehicle_ownership` (Sol high) | `rail-vehicle-ownership-130` at `6cf00b4ce6`, actual #133 dependency | `openttd-rust-rail-vehicles` | Canonical state/external/save adapters committed and syntax-checked in both modes; full controller implementation continues. Fresh `/root/rail_vehicle_ownership/train_reservation_ownership` (Sol high) handles coupled controller reservation. Include missing branch evidence. ABI 150-179 reserved. |
 | #136 `/root/aircraft_controller_ownership` (Sol high) | `aircraft-controller-ownership-136` from `320711cccd` | `openttd-rust-aircraft-controller` | Whole aircraft/airport block owner and branch evidence now active; coordinate #125 station lifetime. ABI 180-209 reserved. |
 | #137 fresh `/root/company_economy_ownership` (Sol high) | Not started | To create `openttd-rust-company-economy` | Selected after aircraft; whole company/economy state, periodic lifecycle and transfer/financial commands. |
+| #138 fresh `/root/order_lifecycle_ownership` (Sol high) | Not started | To create `openttd-rust-order-lifecycle` | Selected after company; include full shared/current/backed-up state, all commands and timetable/unbunching. |
+| #139 fresh `/root/cargo_storage_movement_ownership` (Sol high) | Not started | To create `openttd-rust-cargo-storage` | Selected after orders; canonical packet/list/flow owner and complete movement/application loops. |
+| #140 `/root` (Astra ultra) | To create `integrate-reviewed-pathfinding` from actual #134 `03b8a0c3ae` | To create `openttd-rust-pathfinding-batch` | Merge accepted #133 `ef1b981101` and #135 `ab09ce9306`, resolve shared joins, verify/pair, fresh review and required CI. Integrate only after #134. |
 
 Preserved evidence branches: `evidence-disaster-vehicles` at `a775543162`
 (`openttd-rust-disasters-evidence`) and `evidence-water-regions` at `c752070cde`
@@ -185,12 +197,11 @@ required CI supplies default/all-comparison checks where local component evidenc
 already covers the change. Keep long-running checks in an active agent session:
 ending and recycling a task thread has killed unfinished background processes.
 
-Fresh Astra high planning selected the current ownership queue. Latest planner
-`/root/plan_after_industry_and_rail` selected #136 then #137; root accepted both.
-Aircraft has a usable reference-built input gate, with new airport/control branch
-witnesses still required. Company needs complete transfer/lifecycle orchestration;
-orders remain a later whole-owner selection. Only #137 remains unstarted. Fresh planning must replenish
-the queue before the next implementation slot opens; keep per-PR review and CI concurrent.
+Fresh Astra high planning selected the current queue. Latest planner
+`/root/plan_after_aircraft_and_company` supplied #138 then #139; root accepted both.
+Company, orders and cargo remain unstarted. Replenish when fewer than two are ahead
+of active work. Preserve complete owners, native-width behavior and explicit
+reentry boundaries; CI/review runs concurrently with later implementation.
 
 ## Choosing the next task
 
