@@ -12,6 +12,7 @@ mod alternating;
 mod auth;
 mod byte_strings;
 mod cargo_payment;
+mod company;
 mod consumer;
 mod disaster;
 mod history;

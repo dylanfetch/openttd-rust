@@ -2,6 +2,7 @@ add_test_files(
     alternating_iterator.cpp
     alternating_iterator_state.cpp
     bitmath_func.cpp
+    company_economy.cpp
     cargo_payment.cpp
     cargo_payment_stubs.hpp
     effectvehicle.cpp

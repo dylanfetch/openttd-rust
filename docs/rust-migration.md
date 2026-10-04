@@ -1313,3 +1313,31 @@ exercise widths, ordered paths, nested save staging, partial-load unwind, indexe
 pool reuse and reentry. These establish covered behavior; actual legacy saves,
 NewGRFs, articulated/tram turns, level-crossing collisions, sounds and viewport
 pixels remain unexercised controller domains.
+
+### Company finances and economy lifecycle
+
+Issue #137 moves cash/fraction accounting, loans, histories, rating/value,
+construction budgets, maintenance/interest/year rotation, bankruptcy/recovery,
+ranked offers, creation/deletion, acquisition and the complete ownership-transfer
+traversal into Rust. Rust also owns periodic scheduling, prices/multipliers,
+inflation/recession, score parts and the company tick cursor. Original selected
+bodies compile only in portable builds; identity, settings, network transport,
+UI, AI objects and shared map/pools/group/infrastructure services remain C++.
+One Rust allocation per CompanyProperties holds all finance/history fields;
+C++ starts native field object lifetimes in it and reads/writes stable addresses.
+Property copies own independent allocations; assignment preserves field addresses.
+Modern/legacy descriptors keep names/widths and operate directly on that storage,
+so save errors never cross Rust. Economy/prices/scores have process lifetimes.
+ABI210-214 check layouts. Panics/OOM/environmental failures abort.
+Direct leaves are noexcept; copied IDs/scalars end all field accesses before
+company-control Post, AI start/stop, tile handlers, shared destruction, allocation
+and nested service-interval commands return to C++ for ordinary reentry.
+`python3 tools/migration.py simulate companies --jobs 1` compares all chunks/RNG
+for warning/sale/rank/tie/timeout/limit/acquisition/recovery/deletion/ID reuse,
+finance and reload; `companies-finance --soak` extends periodic accounting.
+Native CTest covers property lifetimes and network deferred deletion. `python3
+-m tools.simulation.companies` compares 17,640 unchanged-reference financial
+command boundary/test/execute cases unavailable through AI scripting.
+Actual transfers cover a road bus/depot/station/group and town rating. Subsidies,
+exclusive rights, goals/story pages, hostile purchase, multiplayer runtime,
+arbitrary NewGRFs and complete historical saves remain evidence limits.

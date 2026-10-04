@@ -23,10 +23,21 @@ void ResetPriceBaseMultipliers();
 void SetPriceBaseMultiplier(Price price, int factor);
 
 extern const ScoreInfo _score_info[];
+#ifdef WITH_RUST
+#include "rust/company_ffi.h"
+using CompanyScoreParts = TypedIndexContainer<std::array<std::array<int64_t, SCORE_END>, MAX_COMPANIES>, CompanyID>;
+Economy &GetRustEconomy();
+Prices &GetRustPrices();
+CompanyScoreParts &GetRustCompanyScores();
+#define _economy (GetRustEconomy())
+#define _price (GetRustPrices())
+#define _score_part (GetRustCompanyScores())
+#else
 extern TypedIndexContainer<std::array<std::array<int64_t, SCORE_END>, MAX_COMPANIES>, CompanyID> _score_part;
 extern Economy _economy;
 /* Prices and also the fractional part. */
 extern Prices _price;
+#endif
 
 int UpdateCompanyRatingAndValue(Company *c, bool update);
 void StartupIndustryDailyChanges(bool init_counter);

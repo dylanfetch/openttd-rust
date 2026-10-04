@@ -366,17 +366,17 @@ public:
 
 	void Save(CompanyProperties *c) const override
 	{
-		SlObject(&c->cur_economy, this->GetDescription());
+		SlObject(&c->Finances().cur_economy, this->GetDescription());
 	}
 
 	void Load(CompanyProperties *c) const override
 	{
-		SlObject(&c->cur_economy, this->GetLoadDescription());
+		SlObject(&c->Finances().cur_economy, this->GetLoadDescription());
 	}
 
 	void FixPointers(CompanyProperties *c) const override
 	{
-		SlObject(&c->cur_economy, this->GetDescription());
+		SlObject(&c->Finances().cur_economy, this->GetDescription());
 	}
 
 	void LoadCheck(CompanyProperties *c) const override { this->Load(c); }
@@ -386,21 +386,21 @@ class SlCompanyOldEconomy : public SlCompanyEconomy {
 public:
 	void Save(CompanyProperties *c) const override
 	{
-		SlSetStructListLength(c->num_valid_stat_ent);
-		for (int i = 0; i < c->num_valid_stat_ent; i++) {
-			SlObject(&c->old_economy[i], this->GetDescription());
+		SlSetStructListLength(c->Finances().num_valid_stat_ent);
+		for (int i = 0; i < c->Finances().num_valid_stat_ent; i++) {
+			SlObject(&c->Finances().old_economy[i], this->GetDescription());
 		}
 	}
 
 	void Load(CompanyProperties *c) const override
 	{
 		if (!IsSavegameVersionBefore(SLV_SAVELOAD_LIST_LENGTH)) {
-			c->num_valid_stat_ent = (uint8_t)SlGetStructListLength(UINT8_MAX);
+			c->Finances().num_valid_stat_ent = (uint8_t)SlGetStructListLength(UINT8_MAX);
 		}
-		if (c->num_valid_stat_ent > std::size(c->old_economy)) SlErrorCorrupt("Too many old economy entries");
+		if (c->Finances().num_valid_stat_ent > std::size(c->Finances().old_economy)) SlErrorCorrupt("Too many old economy entries");
 
-		for (int i = 0; i < c->num_valid_stat_ent; i++) {
-			SlObject(&c->old_economy[i], this->GetLoadDescription());
+		for (int i = 0; i < c->Finances().num_valid_stat_ent; i++) {
+			SlObject(&c->Finances().old_economy[i], this->GetLoadDescription());
 		}
 	}
 
@@ -504,16 +504,16 @@ static const SaveLoad _company_desc[] = {
 	SLE_CONDSSTRNAME(CompanyProperties, face.style_label, "face_style", SLE_STR, SLV_FACE_STYLES, SL_MAX_VERSION),
 
 	/* money was changed to a 64 bit field in savegame version 1. */
-	SLE_CONDVAR(CompanyProperties, money,                 SLE_VAR_I64 | SLE_FILE_I32,  SL_MIN_VERSION, SLV_1),
-	SLE_CONDVAR(CompanyProperties, money,                 SLE_INT64,                   SLV_1, SL_MAX_VERSION),
+	SLE_CONDVARNAME(CompanyProperties, Finances().money, "money",                 SLE_VAR_I64 | SLE_FILE_I32,  SL_MIN_VERSION, SLV_1),
+	SLE_CONDVARNAME(CompanyProperties, Finances().money, "money",                 SLE_INT64,                   SLV_1, SL_MAX_VERSION),
 
-	SLE_CONDVAR(CompanyProperties, current_loan,          SLE_VAR_I64 | SLE_FILE_I32,  SL_MIN_VERSION, SLV_65),
-	SLE_CONDVAR(CompanyProperties, current_loan,          SLE_INT64,                  SLV_65, SL_MAX_VERSION),
-	SLE_CONDVAR(CompanyProperties, max_loan,              SLE_INT64, SLV_MAX_LOAN_FOR_COMPANY, SL_MAX_VERSION),
+	SLE_CONDVARNAME(CompanyProperties, Finances().current_loan, "current_loan",          SLE_VAR_I64 | SLE_FILE_I32,  SL_MIN_VERSION, SLV_65),
+	SLE_CONDVARNAME(CompanyProperties, Finances().current_loan, "current_loan",          SLE_INT64,                  SLV_65, SL_MAX_VERSION),
+	SLE_CONDVARNAME(CompanyProperties, Finances().max_loan, "max_loan",              SLE_INT64, SLV_MAX_LOAN_FOR_COMPANY, SL_MAX_VERSION),
 
 	    SLE_VAR(CompanyProperties, colour,                SLE_UINT8),
-	    SLE_VAR(CompanyProperties, money_fraction,        SLE_UINT8),
-	    SLE_VAR(CompanyProperties, block_preview,         SLE_UINT8),
+	    SLE_VARNAME(CompanyProperties, Finances().money_fraction, "money_fraction",        SLE_UINT8),
+	    SLE_VARNAME(CompanyProperties, Finances().block_preview, "block_preview",         SLE_UINT8),
 
 	SLE_CONDVAR(CompanyProperties, location_of_HQ,        SLE_FILE_U16 | SLE_VAR_U32,  SL_MIN_VERSION,  SLV_6),
 	SLE_CONDVAR(CompanyProperties, location_of_HQ,        SLE_UINT32,                  SLV_6, SL_MAX_VERSION),
@@ -523,24 +523,24 @@ static const SaveLoad _company_desc[] = {
 	SLE_CONDVAR(CompanyProperties, inaugurated_year,      SLE_INT32,                  SLV_31, SL_MAX_VERSION),
 	SLE_CONDVAR(CompanyProperties, inaugurated_year_calendar, SLE_INT32,               SLV_COMPANY_INAUGURATED_PERIOD_V2, SL_MAX_VERSION),
 
-	SLE_CONDVAR(CompanyProperties, num_valid_stat_ent,    SLE_UINT8,                   SL_MIN_VERSION, SLV_SAVELOAD_LIST_LENGTH),
+	SLE_CONDVARNAME(CompanyProperties, Finances().num_valid_stat_ent, "num_valid_stat_ent",    SLE_UINT8,                   SL_MIN_VERSION, SLV_SAVELOAD_LIST_LENGTH),
 
-	    SLE_VAR(CompanyProperties, months_of_bankruptcy,  SLE_UINT8),
-	SLE_CONDVAR(CompanyProperties, bankrupt_asked,        SLE_FILE_U8  | SLE_VAR_U16,  SL_MIN_VERSION, SLV_104),
-	SLE_CONDVAR(CompanyProperties, bankrupt_asked,        SLE_UINT16,                SLV_104, SL_MAX_VERSION),
-	    SLE_VAR(CompanyProperties, bankrupt_timeout,      SLE_INT16),
-	SLE_CONDVAR(CompanyProperties, bankrupt_value,        SLE_VAR_I64 | SLE_FILE_I32,  SL_MIN_VERSION, SLV_65),
-	SLE_CONDVAR(CompanyProperties, bankrupt_value,        SLE_INT64,                  SLV_65, SL_MAX_VERSION),
+	    SLE_VARNAME(CompanyProperties, Finances().months_of_bankruptcy, "months_of_bankruptcy",  SLE_UINT8),
+	SLE_CONDVARNAME(CompanyProperties, Finances().bankrupt_asked, "bankrupt_asked",        SLE_FILE_U8  | SLE_VAR_U16,  SL_MIN_VERSION, SLV_104),
+	SLE_CONDVARNAME(CompanyProperties, Finances().bankrupt_asked, "bankrupt_asked",        SLE_UINT16,                SLV_104, SL_MAX_VERSION),
+	    SLE_VARNAME(CompanyProperties, Finances().bankrupt_timeout, "bankrupt_timeout",      SLE_INT16),
+	SLE_CONDVARNAME(CompanyProperties, Finances().bankrupt_value, "bankrupt_value",        SLE_VAR_I64 | SLE_FILE_I32,  SL_MIN_VERSION, SLV_65),
+	SLE_CONDVARNAME(CompanyProperties, Finances().bankrupt_value, "bankrupt_value",        SLE_INT64,                  SLV_65, SL_MAX_VERSION),
 
 	/* yearly expenses was changed to 64-bit in savegame version 2. */
-	SLE_CONDARR(CompanyProperties, yearly_expenses,       SLE_FILE_I32 | SLE_VAR_I64, 3 * 13, SL_MIN_VERSION, SLV_2),
-	SLE_CONDARR(CompanyProperties, yearly_expenses,       SLE_INT64, 3 * 13,                  SLV_2, SL_MAX_VERSION),
+	SLE_CONDARRNAME(CompanyProperties, Finances().yearly_expenses, "yearly_expenses",       SLE_FILE_I32 | SLE_VAR_I64, 3 * 13, SL_MIN_VERSION, SLV_2),
+	SLE_CONDARRNAME(CompanyProperties, Finances().yearly_expenses, "yearly_expenses",       SLE_INT64, 3 * 13,                  SLV_2, SL_MAX_VERSION),
 
 	SLE_CONDVAR(CompanyProperties, is_ai,                 SLE_BOOL,                    SLV_2, SL_MAX_VERSION),
 
-	SLE_CONDVAR(CompanyProperties, terraform_limit,       SLE_UINT32,                SLV_156, SL_MAX_VERSION),
-	SLE_CONDVAR(CompanyProperties, clear_limit,           SLE_UINT32,                SLV_156, SL_MAX_VERSION),
-	SLE_CONDVAR(CompanyProperties, tree_limit,            SLE_UINT32,                SLV_175, SL_MAX_VERSION),
+	SLE_CONDVARNAME(CompanyProperties, Finances().terraform_limit, "terraform_limit",       SLE_UINT32,                SLV_156, SL_MAX_VERSION),
+	SLE_CONDVARNAME(CompanyProperties, Finances().clear_limit, "clear_limit",           SLE_UINT32,                SLV_156, SL_MAX_VERSION),
+	SLE_CONDVARNAME(CompanyProperties, Finances().tree_limit, "tree_limit",            SLE_UINT32,                SLV_175, SL_MAX_VERSION),
 	SLEG_STRUCT("settings", SlCompanySettings),
 	SLEG_CONDSTRUCT("old_ai", SlCompanyOldAI,                                        SL_MIN_VERSION, SLV_107),
 	SLEG_STRUCT("cur_economy", SlCompanyEconomy),

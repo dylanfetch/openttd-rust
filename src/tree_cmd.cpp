@@ -176,8 +176,8 @@ static uint64_t RustTreeLeaf(void *opaque, uint32_t op, uint32_t index, uint32_t
 		case 9:
 			ctx.company = _game_mode != GM_EDITOR ? Company::GetIfValid(_current_company) : nullptr;
 			ctx.iter = TileIterator::Create(tile, TileIndex{a}, b != 0);
-			return ctx.company == nullptr ? INT32_MAX : GB(ctx.company->tree_limit, 16, 16);
-		case 10: if (ctx.company != nullptr) ctx.company->tree_limit -= 1 << 16; break;
+			return ctx.company == nullptr ? INT32_MAX : GB(ctx.company->Finances().tree_limit, 16, 16);
+		case 10: if (ctx.company != nullptr) ctx.company->Finances().tree_limit -= 1 << 16; break;
 		case 11: if (a != 0) ++(*ctx.iter); return static_cast<TileIndex>(*ctx.iter).base();
 	}
 	return 0;
@@ -735,7 +735,7 @@ CommandCost CmdPlantTree(DoCommandFlags flags, TileIndex tile, TileIndex start_t
 	if (tree_to_plant != TREE_INVALID && !IsInsideBS(tree_to_plant, _tree_base_by_landscape[to_underlying(_settings_game.game_creation.landscape)], _tree_count_by_landscape[to_underlying(_settings_game.game_creation.landscape)])) return CMD_ERROR;
 
 	Company *c = (_game_mode != GM_EDITOR) ? Company::GetIfValid(_current_company) : nullptr;
-	int limit = (c == nullptr ? INT32_MAX : GB(c->tree_limit, 16, 16));
+	int limit = (c == nullptr ? INT32_MAX : GB(c->Finances().tree_limit, 16, 16));
 
 	std::unique_ptr<TileIterator> iter = TileIterator::Create(tile, start_tile, diagonal);
 	for (; *iter != INVALID_TILE; ++(*iter)) {
@@ -757,7 +757,7 @@ CommandCost CmdPlantTree(DoCommandFlags flags, TileIndex tile, TileIndex start_t
 				if (flags.Test(DoCommandFlag::Execute)) {
 					AddTreeCount(current_tile, 1);
 					MarkTileDirtyByTile(current_tile);
-					if (c != nullptr) c->tree_limit -= 1 << 16;
+					if (c != nullptr) c->Finances().tree_limit -= 1 << 16;
 				}
 				/* 2x as expensive to add more trees to an existing tile */
 				cost.AddCost(_price[PR_BUILD_TREES] * 2);
@@ -824,7 +824,7 @@ CommandCost CmdPlantTree(DoCommandFlags flags, TileIndex tile, TileIndex start_t
 					/* Plant full grown trees in scenario editor */
 					PlantTreesOnTile(current_tile, treetype, 0, _game_mode == GM_EDITOR ? TreeGrowthStage::Grown : TreeGrowthStage::Growing1);
 					MarkTileDirtyByTile(current_tile);
-					if (c != nullptr) c->tree_limit -= 1 << 16;
+					if (c != nullptr) c->Finances().tree_limit -= 1 << 16;
 
 					/* When planting rainforest-trees, set tropiczone to rainforest in editor. */
 					if (_game_mode == GM_EDITOR && IsInsideMM(treetype, TREE_RAINFOREST, TREE_CACTUS)) {

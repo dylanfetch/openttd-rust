@@ -4,6 +4,7 @@ import datetime
 import hashlib
 import lzma
 import shutil
+import subprocess
 from pathlib import Path
 
 from . import core
@@ -11,6 +12,78 @@ from .core import ROOT, SNAPSHOT_TICKS, decode_element, read_save, run_game
 from .disasters import patch
 
 AI_FOLDER = "company-scenario-ai"
+
+
+def command_gap():
+    """Unchanged native financial commands for deity/network/Money boundaries."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "migration", ROOT / "tools/migration.py"
+    )
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    out = ROOT / ".local/company-command-gap"
+    out.mkdir(parents=True, exist_ok=True)
+    sources = {
+        name: subprocess.check_output(
+            ["git", "show", migration.BASELINE["commit"] + ":src/" + name], cwd=ROOT
+        ).decode()
+        for name in ("misc_cmd.cpp", "company_cmd.cpp")
+    }
+
+    def function(file, signature):
+        source = sources[file]
+        start = source.index(signature)
+        opening = source.index("{", start)
+        depth = 1
+        end = opening + 1
+        while depth:
+            depth += (source[end] == "{") - (source[end] == "}")
+            end += 1
+        return source[start:end]
+
+    bodies = [
+        function("company_cmd.cpp", signature)
+        for signature in (
+            "Money Company::GetMaxLoan() const",
+            "Money GetAvailableMoney(CompanyID company)",
+            "Money GetAvailableMoneyForCommand()",
+            "static void SubtractMoneyFromAnyCompany(",
+        )
+    ]
+    bodies += [
+        function("misc_cmd.cpp", "CommandCost " + name + "(")
+        for name in (
+            "CmdIncreaseLoan",
+            "CmdDecreaseLoan",
+            "CmdSetCompanyMaxLoan",
+            "CmdChangeBankBalance",
+        )
+    ]
+    bodies.append(function("company_cmd.cpp", "CommandCost CmdGiveMoney("))
+    (out / "company-command-reference.inc").write_text("\n".join(bodies))
+    subprocess.run(
+        [
+            "c++",
+            "-std=c++20",
+            "-O2",
+            "-DPOINTER_IS_64BIT",
+            "-I" + str(ROOT / "src"),
+            "-I" + str(out),
+            str(ROOT / "tools/simulation/company-command-reference.cpp"),
+            str(migration.rust_archive(ROOT / "build-rust")),
+            "-ldl",
+            "-lpthread",
+            "-lm",
+            "-o",
+            str(out / "probe"),
+        ],
+        cwd=ROOT,
+        env=migration.environment(),
+        check=True,
+    )
+    subprocess.run([str(out / "probe")], cwd=ROOT, check=True)
 
 
 def scenarios(soak):
@@ -396,3 +469,7 @@ def check(scenario, run, mode, role, result):
         }
         for i, row in after.items()
     }
+
+
+if __name__ == "__main__":
+    command_gap()

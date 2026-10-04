@@ -82,7 +82,7 @@ private:
 	/** Sort the company league by performance history */
 	static bool PerformanceSorter(const Company * const &c1, const Company * const &c2)
 	{
-		return c2->old_economy[0].performance_history < c1->old_economy[0].performance_history;
+		return c2->Finances().old_economy[0].performance_history < c1->Finances().old_economy[0].performance_history;
 	}
 
 public:
@@ -120,7 +120,7 @@ public:
 
 			DrawCompanyIcon(c->index, icon_rect.left, ir.top + icon_y_offset);
 
-			DrawString(text_rect.left, text_rect.right, ir.top + text_y_offset, GetString(STR_COMPANY_LEAGUE_COMPANY_NAME, c->index, c->index, GetPerformanceTitleFromValue(c->old_economy[0].performance_history)));
+			DrawString(text_rect.left, text_rect.right, ir.top + text_y_offset, GetString(STR_COMPANY_LEAGUE_COMPANY_NAME, c->index, c->index, GetPerformanceTitleFromValue(c->Finances().old_economy[0].performance_history)));
 			ir.top += this->line_height;
 		}
 	}
