@@ -18,6 +18,7 @@
     clippy::struct_field_names,
     clippy::verbose_bit_mask
 )]
+use crate::services::{Services, chance16_i};
 use std::cell::Cell;
 use std::ffi::c_void;
 use std::future::Future;
@@ -71,6 +72,8 @@ struct World {
     read: unsafe extern "C" fn(*mut c_void, u32, u32, i64, i64, *mut i64),
     write: unsafe extern "C" fn(*mut c_void, u32, u32, i64),
     channel: Rc<Channel>,
+    services: Services,
+    service: unsafe extern "C" fn(*mut c_void, *const Action) -> i64,
 }
 // The fixed copied-record slots below are shared with disaster_adapter.hpp.
 const SUBTYPE: usize = 0;
@@ -96,9 +99,8 @@ const INVALID: u32 = 1_048_575;
 const INVALID_TILE: u32 = u32::MAX;
 impl World {
     fn read(&self, kind: u32, id: u32, a: i64, b: i64) -> [i64; 24] {
-        // Reuse copied observations only within this poll. No shared service runs
-        // here; canonical leaf writes update/invalidate the copy below. Every
-        // return-to-C++ action discards these observations before the next poll.
+        // Reuse observations between canonical scalar writes. Direct services
+        // and returned actions discard these copies before the next observation.
         if kind == 0 && a == 0 {
             if let Some(record) = self.channel.world.get() {
                 return record;
@@ -229,49 +231,67 @@ impl World {
         }
         .await
     }
-    async fn random(&self) -> u32 {
-        self.action(1, 0, 0, 0, 0, 0, 0).await as u32
+    fn service(&self, kind: u32, id: u32, other: u32, a: i64, b: i64, c: i64, d: i64) -> i64 {
+        // No world/private owner reference survives the synchronous wrapper. The
+        // shell constructor can invoke a separate Rust owner; it cannot delete
+        // an existing vehicle. Refresh observations after canonical services.
+        let action = Action {
+            kind,
+            id,
+            other,
+            a,
+            b,
+            c,
+            d,
+        };
+        let result = unsafe { (self.service)(self.context, &raw const action) };
+        self.channel.vehicle.set(None);
+        self.channel.world.set(None);
+        result
     }
-    async fn random_tile(&self) -> u32 {
-        self.random().await & self.world()[4] as u32
+    fn random(&self) -> u32 {
+        self.services.random()
     }
-    async fn range(&self, n: u32) -> u32 {
-        ((u64::from(self.random().await) * u64::from(n)) >> 32) as u32
+    fn random_tile(&self) -> u32 {
+        self.random() & self.world()[4] as u32
     }
-    async fn chance(&self, b: u32) -> bool {
-        ((u32::from(self.random().await as u16) * b + b / 2) >> 16) < 1
+    fn range(&self, n: u32) -> u32 {
+        self.services.random_range(n)
+    }
+    fn chance(&self, b: u32) -> bool {
+        chance16_i(1, b, self.random())
     }
     async fn delete(&self, id: u32) -> i64 {
         self.action(2, id, 0, 0, 0, 0, 0).await;
         0
     }
-    async fn flight(&self, id: u32) -> i64 {
-        self.action(5, id, 0, 0, 0, 0, 0).await
+    fn flight(&self, id: u32) -> i64 {
+        self.service(5, id, 0, 0, 0, 0, 0)
     }
-    async fn bounds(&self, id: u32) -> i64 {
-        self.action(6, id, 0, 0, 0, 0, 0).await
+    fn bounds(&self, id: u32) -> i64 {
+        self.service(6, id, 0, 0, 0, 0, 0)
     }
-    async fn viewport(&self, id: u32) {
-        self.action(4, id, 0, 0, 0, 0, 0).await;
+    fn viewport(&self, id: u32) {
+        self.service(4, id, 0, 0, 0, 0, 0);
     }
-    async fn effect_rel(&self, id: u32, x: i64, y: i64, z: i64, kind: u32) {
-        self.action(7, id, kind, x, y, z, 0).await;
+    fn effect_rel(&self, id: u32, x: i64, y: i64, z: i64, kind: u32) {
+        self.service(7, id, kind, x, y, z, 0);
     }
-    async fn effect_above(&self, x: i64, y: i64, z: i64, kind: u32) {
-        self.action(8, 0, kind, x, y, z, 0).await;
+    fn effect_above(&self, x: i64, y: i64, z: i64, kind: u32) {
+        self.service(8, 0, kind, x, y, z, 0);
     }
-    async fn sound_vehicle(&self, id: u32) {
+    fn sound_vehicle(&self, id: u32) {
         if self.world()[7] != 0 {
-            self.action(9, id, 0, 0, 0, 0, 0).await;
+            self.service(9, id, 0, 0, 0, 0, 0);
         }
     }
-    async fn sound_tile(&self, tile: u32) {
+    fn sound_tile(&self, tile: u32) {
         if self.world()[7] != 0 {
-            self.action(10, tile, 0, 0, 0, 0, 0).await;
+            self.service(10, tile, 0, 0, 0, 0, 0);
         }
     }
-    async fn news(&self, kind: u32, id: u32, a: i64) {
-        self.action(11, id, kind, a, 0, 0, 0).await;
+    fn news(&self, kind: u32, id: u32, a: i64) {
+        self.service(11, id, kind, a, 0, 0, 0);
     }
     fn update_image(&self, id: u32) {
         let image = self.image(id);
@@ -293,13 +313,13 @@ impl World {
         };
         self.set(id, SPRITE, i64::from(image));
     }
-    async fn update_position(&self, id: u32, x: i64, y: i64, z: i64) {
+    fn update_position(&self, id: u32, x: i64, y: i64, z: i64) {
         self.set(id, X, x);
         self.set(id, Y, y);
         self.set(id, Z, z);
         self.set(id, TILE, i64::from(self.tile_virt(x, y)));
         self.update_image(id);
-        self.viewport(id).await;
+        self.viewport(id);
         let shadow = self.v(id, NEXT) as u32;
         if shadow != INVALID {
             let w = self.world();
@@ -318,51 +338,51 @@ impl World {
             self.set(shadow, Z, self.slope(safe_x, safe_y));
             self.set(shadow, DIR, self.v(id, DIR));
             self.update_image(shadow);
-            self.viewport(shadow).await;
+            self.viewport(shadow);
             let rotor = self.v(shadow, NEXT) as u32;
             if rotor != INVALID {
                 self.set(rotor, X, x);
                 self.set(rotor, Y, y);
                 self.set(rotor, Z, z + 5);
-                self.viewport(rotor).await;
+                self.viewport(rotor);
             }
         }
     }
-    async fn move_flight(&self, id: u32) {
+    fn move_flight(&self, id: u32) {
         let gp = self.position(id);
-        let z = self.flight(id).await;
-        self.update_position(id, gp[0], gp[1], z).await;
+        let z = self.flight(id);
+        self.update_position(id, gp[0], gp[1], z);
     }
-    async fn create_vehicle(&self, x: i64, y: i64, dir: i64, subtype: u32, target: u32) -> u32 {
-        self.action(15, subtype, target, x, y, dir, 0).await as u32
+    fn create_vehicle(&self, x: i64, y: i64, dir: i64, subtype: u32, target: u32) -> u32 {
+        self.service(15, subtype, target, x, y, dir, 0) as u32
     }
     fn link(&self, id: u32, next: u32) {
         self.set(id, NEXT, i64::from(next));
     }
 
     async fn clear(&self, tile: u32) {
-        if self.action(16, tile, 0, 0, 0, 0, 0).await != 0 {
+        if self.service(16, tile, 0, 0, 0, 0, 0) != 0 {
             return;
         }
         let t = self.tile(tile);
         match t[1] {
             1 if self.read(15, t[2] as u32, 0, 0)[0] != 0 && t[4] == 0 => {
                 self.action(17, tile, 0, 0, 0, 0, 0).await;
-                self.action(18, 0, 0, 0, 0, 0, 0).await;
+                self.service(18, 0, 0, 0, 0, 0, 0);
             }
             3 => {
                 self.action(17, tile, 1, 0, 0, 0, 0).await;
             }
             0 | 4 => {
-                self.action(19, tile, 0, 0, 0, 0, 0).await;
+                self.service(19, tile, 0, 0, 0, 0, 0);
             }
             _ => {}
         }
     }
-    async fn destruct_industry(&self, id: u32) {
+    fn destruct_industry(&self, id: u32) {
         for tile in 0..=self.world()[4] as u32 {
             if self.read(11, id, i64::from(tile), 0)[0] != 0 {
-                self.action(20, tile, 0, 0, 0, 0, 0).await;
+                self.service(20, tile, 0, 0, 0, 0, 0);
             }
         }
     }
@@ -384,22 +404,22 @@ async fn zeppelin(w: World, id: u32) -> i64 {
         if tick & 1 != 0 {
             return 1;
         }
-        w.move_flight(id).await;
+        w.move_flight(id);
         if w.state(id) == 1 {
             if w.increment(id, AGE) == 38 {
                 w.set_state(id, 2);
                 w.set(id, AGE, 0);
             }
             if w.v(id, TICK) & 7 == 0 {
-                w.effect_rel(id, 0, -17, 2, 4).await;
+                w.effect_rel(id, 0, -17, 2, 4);
             }
         } else if w.state(id) == 0 {
             let t = w.tile(w.v(id, TILE) as u32);
             if t[0] != 0 && t[5] != 0 {
                 w.set_state(id, 1);
                 w.set(id, AGE, 0);
-                w.news(0, w.v(id, TILE) as u32, t[6]).await;
-                w.action(12, w.v(id, TILE) as u32, 0, 0, 0, 0, 0).await;
+                w.news(0, w.v(id, TILE) as u32, t[6]);
+                w.service(12, w.v(id, TILE) as u32, 0, 0, 0, 0, 0);
             }
         }
         if w.v(id, Y) >= ((w.world()[1] + 9) * 16 - 1) {
@@ -410,7 +430,7 @@ async fn zeppelin(w: World, id: u32) -> i64 {
     let tile = w.v(id, TILE) as u32;
     let t = w.tile(tile);
     if t[0] != 0 && t[5] != 0 {
-        w.action(13, t[6] as u32, 1, 0, 0, 0, 0).await;
+        w.service(13, t[6] as u32, 1, 0, 0, 0, 0);
     }
     if w.state(id) > 2 {
         if w.increment(id, AGE) <= 13320 {
@@ -419,13 +439,13 @@ async fn zeppelin(w: World, id: u32) -> i64 {
         let tile = w.v(id, TILE) as u32;
         let t = w.tile(tile);
         if t[0] != 0 && t[5] != 0 {
-            w.action(13, t[6] as u32, 0, 0, 0, 0, 0).await;
-            w.action(12, tile, 1, i64::from(t[6] as u32), 0, 0, 0).await;
+            w.service(13, t[6] as u32, 0, 0, 0, 0, 0);
+            w.service(12, tile, 1, i64::from(t[6] as u32), 0, 0, 0);
         }
         let x = w.v(id, X);
         let y = w.v(id, Y);
-        let z = w.flight(id).await;
-        w.update_position(id, x, y, z).await;
+        let z = w.flight(id);
+        w.update_position(id, x, y, z);
         return w.delete(id).await;
     }
     let x = w.v(id, X);
@@ -434,25 +454,24 @@ async fn zeppelin(w: World, id: u32) -> i64 {
     if z < w.v(id, Z) {
         z = w.v(id, Z) - 1;
     }
-    w.update_position(id, x, y, z).await;
+    w.update_position(id, x, y, z);
     let age = w.increment(id, AGE);
     if age == 1 {
-        w.effect_rel(id, 0, 7, 8, 5).await;
-        w.sound_vehicle(id).await;
+        w.effect_rel(id, 0, 7, 8, 5);
+        w.sound_vehicle(id);
         w.set_image(id, 3906);
     } else if age == 70 {
         w.set_image(id, 3907);
     } else if age <= 300 {
         if w.v(id, TICK) & 7 == 0 {
-            let r = w.random().await;
+            let r = w.random();
             w.effect_rel(
                 id,
                 i64::from(r & 15) - 7,
                 i64::from((r >> 4) & 15) - 7,
                 i64::from((r >> 8) & 7) + 5,
                 7,
-            )
-            .await;
+            );
         }
     } else if age == 350 {
         w.set_state(id, 3);
@@ -469,11 +488,11 @@ async fn small_ufo(w: World, id: u32) -> i64 {
         let y = w.tile_y(dest) * 16;
         if distance(x, y, w.v(id, X), w.v(id, Y)) >= 16 {
             w.set(id, DIR, w.toward(id, x, y));
-            w.move_flight(id).await;
+            w.move_flight(id);
             return 1;
         }
         if w.increment(id, AGE) < 6 {
-            let tile = w.random_tile().await;
+            let tile = w.random_tile();
             w.set(id, DEST, i64::from(tile));
             return 1;
         }
@@ -487,7 +506,7 @@ async fn small_ufo(w: World, id: u32) -> i64 {
         if n == 0 {
             return w.delete(id).await;
         }
-        n = w.range(n).await;
+        n = w.range(n);
         let mut target = w.next(1, INVALID);
         while target != INVALID {
             let t = w.vehicle(target);
@@ -521,19 +540,19 @@ async fn small_ufo(w: World, id: u32) -> i64 {
     if dist <= 16 && z > w.v(target, Z) {
         z -= 1;
     }
-    w.update_position(id, gp[0], gp[1], z).await;
+    w.update_position(id, gp[0], gp[1], z);
     if z <= w.v(target, Z) {
         w.increment(id, AGE);
         if w.v(target, STATUS) & 1 == 0 && w.v(target, CRASHED) == 0 {
             let victims = w.action(14, target, 0, 0, 0, 0, 0).await;
             w.set(target, BACKLINK, i64::from(INVALID));
-            w.news(1, w.v(target, TILE) as u32, 0).await;
-            w.action(12, target, 2, victims, 0, 0, 0).await;
+            w.news(1, w.v(target, TILE) as u32, 0);
+            w.service(12, target, 2, victims, 0, 0, 0);
         }
     }
     if w.v(id, AGE) > 50 {
-        w.effect_rel(id, 0, 7, 8, 5).await;
-        w.sound_vehicle(id).await;
+        w.effect_rel(id, 0, 7, 8, 5);
+        w.sound_vehicle(id);
         return w.delete(id).await;
     }
     1
@@ -549,8 +568,8 @@ async fn aircraft(w: World, id: u32, leave_top: bool) -> i64 {
         },
     );
     let gp = w.position(id);
-    let z = w.flight(id).await;
-    w.update_position(id, gp[0], gp[1], z).await;
+    let z = w.flight(id);
+    w.update_position(id, gp[0], gp[1], z);
     if (leave_top && gp[0] < -160) || (!leave_top && gp[0] > (w.world()[0] + 9) * 16 - 1) {
         return w.delete(id).await;
     }
@@ -560,14 +579,13 @@ async fn aircraft(w: World, id: u32, leave_top: bool) -> i64 {
                 let i = w.read(2, w.v(id, DEST) as u32, 0, 0);
                 let x = w.tile_x(i[0] as u32) * 16;
                 let y = w.tile_y(i[0] as u32) * 16;
-                let r = w.random().await;
+                let r = w.random();
                 w.effect_above(
                     i64::from(r & 63) + x,
                     i64::from((r >> 6) & 63) + y,
                     i64::from((r >> 12) & 15),
                     7,
-                )
-                .await;
+                );
                 if w.increment(id, AGE) >= 55 {
                     w.set_state(id, 3);
                 }
@@ -578,10 +596,10 @@ async fn aircraft(w: World, id: u32, leave_top: bool) -> i64 {
                 w.set_state(id, 2);
                 w.set(id, AGE, 0);
                 let industry = w.v(id, DEST) as u32;
-                w.destruct_industry(industry).await;
+                w.destruct_industry(industry);
                 let i = w.read(2, industry, 0, 0);
-                w.news(if leave_top { 2 } else { 3 }, industry, i[5]).await;
-                w.sound_tile(w.read(2, industry, 0, 0)[0] as u32).await;
+                w.news(if leave_top { 2 } else { 3 }, industry, i[5]);
+                w.sound_tile(w.read(2, industry, 0, 0)[0] as u32);
             }
         }
         0 => {
@@ -606,7 +624,7 @@ async fn aircraft(w: World, id: u32, leave_top: bool) -> i64 {
     }
     1
 }
-async fn rotors(w: World, id: u32) -> i64 {
+fn rotors(w: World, id: u32) -> i64 {
     if w.increment(id, TICK) & 1 != 0 {
         return 1;
     }
@@ -616,7 +634,7 @@ async fn rotors(w: World, id: u32) -> i64 {
         SPRITE,
         i64::from(if image > 3904 { 3902 } else { image }),
     );
-    w.viewport(id).await;
+    w.viewport(id);
     1
 }
 fn valid_train(w: &World, id: u32) -> bool {
@@ -634,7 +652,7 @@ async fn big_ufo(w: World, id: u32) -> i64 {
         let y = w.tile_y(dest) * 16 + 8;
         if distance(w.v(id, X), w.v(id, Y), x, y) >= 8 {
             w.set(id, DIR, w.toward(id, x, y));
-            w.move_flight(id).await;
+            w.move_flight(id);
             return 1;
         }
         if w.tile(w.v(id, DEST) as u32)[0] == 0 {
@@ -642,8 +660,7 @@ async fn big_ufo(w: World, id: u32) -> i64 {
         }
         let z = w.slope(w.v(id, X), w.v(id, Y));
         if z < w.v(id, Z) {
-            w.update_position(id, w.v(id, X), w.v(id, Y), w.v(id, Z) - 1)
-                .await;
+            w.update_position(id, w.v(id, X), w.v(id, Y), w.v(id, Z) - 1);
             return 1;
         }
         w.set_state(id, 2);
@@ -656,14 +673,14 @@ async fn big_ufo(w: World, id: u32) -> i64 {
             }
             target = w.next(2, target);
         }
-        let town = w.action(21, w.v(id, DEST) as u32, 0, 0, 0, 0, 0).await;
-        w.news(4, w.v(id, TILE) as u32, town).await;
+        let town = w.service(21, w.v(id, DEST) as u32, 0, 0, 0, 0, 0);
+        w.news(4, w.v(id, TILE) as u32, town);
         if w.read(0, 0, 2, 0)[9] == 0 {
             return w.delete(id).await;
         }
         let y = w.v(id, Y);
-        let destroyer = w.create_vehicle(-96, y, 5, 11, id).await;
-        let shadow = w.create_vehicle(-96, w.v(id, Y), 5, 12, INVALID).await;
+        let destroyer = w.create_vehicle(-96, y, 5, 11, id);
+        let shadow = w.create_vehicle(-96, w.v(id, Y), 5, 12, INVALID);
         w.link(destroyer, shadow);
     } else if w.state(id) == 0 {
         let dest = w.v(id, DEST) as u32;
@@ -671,11 +688,11 @@ async fn big_ufo(w: World, id: u32) -> i64 {
         let y = w.tile_y(dest) * 16;
         if distance(x, y, w.v(id, X), w.v(id, Y)) >= 16 {
             w.set(id, DIR, w.toward(id, x, y));
-            w.move_flight(id).await;
+            w.move_flight(id);
             return 1;
         }
         if w.increment(id, AGE) < 6 {
-            let tile = w.random_tile().await;
+            let tile = w.random_tile();
             w.set(id, DEST, i64::from(tile));
             return 1;
         }
@@ -691,7 +708,7 @@ async fn big_ufo(w: World, id: u32) -> i64 {
         if n == 0 {
             return w.delete(id).await;
         }
-        n = w.range(n).await;
+        n = w.range(n);
         train = w.next(3, INVALID);
         while train != INVALID {
             if valid_train(&w, train) {
@@ -711,8 +728,8 @@ async fn big_ufo(w: World, id: u32) -> i64 {
 async fn destroyer(w: World, id: u32) -> i64 {
     w.increment(id, TICK);
     let gp = w.position(id);
-    let z = w.flight(id).await;
-    w.update_position(id, gp[0], gp[1], z).await;
+    let z = w.flight(id);
+    w.update_position(id, gp[0], gp[1], z);
     if gp[0] > (w.world()[0] + 9) * 16 - 1 {
         return w.delete(id).await;
     }
@@ -722,18 +739,17 @@ async fn destroyer(w: World, id: u32) -> i64 {
             return 1;
         }
         w.set_state(id, 1);
-        w.effect_rel(target, 0, 7, 8, 5).await;
-        w.sound_vehicle(target).await;
+        w.effect_rel(target, 0, 7, 8, 5);
+        w.sound_vehicle(target);
         w.delete(target).await;
         for _ in 0..80 {
-            let r = w.random().await;
+            let r = w.random();
             w.effect_above(
                 i64::from(r & 63) + w.v(id, X) - 32,
                 i64::from((r >> 5) & 63) + w.v(id, Y) - 32,
                 0,
                 7,
-            )
-            .await;
+            );
         }
         for dy in -3..3 {
             for dx in -3..3 {
@@ -757,14 +773,14 @@ async fn submarine(w: World, id: u32) -> i64 {
     let step = w.read(13, 0, w.v(id, DIR) >> 1, 0)[0] as u32;
     let tile = (w.v(id, TILE) as u32).wrapping_add(step);
     if w.tile(tile)[0] != 0 {
-        let bits = w.action(23, tile, 0, 0, 0, 0, 0).await;
-        if bits == 63 && !w.chance(90).await {
+        let bits = w.service(23, tile, 0, 0, 0, 0, 0);
+        if bits == 63 && !w.chance(90) {
             let gp = w.position(id);
-            w.update_position(id, gp[0], gp[1], w.v(id, Z)).await;
+            w.update_position(id, gp[0], gp[1], w.v(id, Z));
             return 1;
         }
     }
-    let r = w.random().await;
+    let r = w.random();
     let dir = (w.v(id, DIR) + if r & 1 != 0 { 2 } else { 6 }) & 7;
     w.set(id, DIR, dir);
     1
@@ -775,7 +791,7 @@ async fn tick(w: World, id: u32) -> i64 {
         2 => small_ufo(w, id).await,
         4 => aircraft(w, id, true).await,
         6 => aircraft(w, id, false).await,
-        8 => rotors(w, id).await,
+        8 => rotors(w, id),
         9 => big_ufo(w, id).await,
         11 => destroyer(w, id).await,
         13 | 14 => submarine(w, id).await,
@@ -795,7 +811,7 @@ async fn initialize(w: World, kind: u32) -> i64 {
     }
     match kind {
         0 | 1 | 4 => {
-            let tile = w.random_tile().await;
+            let tile = w.random_tile();
             let mut x = w.tile_x(tile) * 16 + 8;
             if kind == 0 {
                 let mut station = w.next(4, INVALID);
@@ -813,7 +829,7 @@ async fn initialize(w: World, kind: u32) -> i64 {
             } else {
                 (0, 3, kind * 2)
             };
-            let id = w.create_vehicle(x, y, dir, subtype, INVALID).await;
+            let id = w.create_vehicle(x, y, dir, subtype, INVALID);
             if kind != 0 {
                 let s = w.world();
                 w.set(
@@ -822,7 +838,7 @@ async fn initialize(w: World, kind: u32) -> i64 {
                     i64::from(w.tile_xy(s[0] as u32 / 2, s[1] as u32 / 2)),
                 );
             }
-            let shadow = w.create_vehicle(x, y, dir, subtype + 1, INVALID).await;
+            let shadow = w.create_vehicle(x, y, dir, subtype + 1, INVALID);
             w.link(id, shadow);
         }
         2 | 3 => {
@@ -830,7 +846,7 @@ async fn initialize(w: World, kind: u32) -> i64 {
             let mut industry = w.next(5, INVALID);
             while industry != INVALID {
                 if w.read(2, industry, 0, 0)[kind as usize] != 0
-                    && (found == INVALID || w.chance(2).await)
+                    && (found == INVALID || w.chance(2))
                 {
                     found = industry;
                 }
@@ -847,16 +863,16 @@ async fn initialize(w: World, kind: u32) -> i64 {
             let y = w.tile_y(w.read(2, found, 0, 0)[0] as u32) * 16 + 37;
             let dir = if kind == 2 { 1 } else { 5 };
             let subtype = if kind == 2 { 4 } else { 6 };
-            let id = w.create_vehicle(x, y, dir, subtype, INVALID).await;
-            let shadow = w.create_vehicle(x, y, dir, subtype + 1, INVALID).await;
+            let id = w.create_vehicle(x, y, dir, subtype, INVALID);
+            let shadow = w.create_vehicle(x, y, dir, subtype + 1, INVALID);
             w.link(id, shadow);
             if kind == 3 {
-                let rotor = w.create_vehicle(x, y, dir, 8, INVALID).await;
+                let rotor = w.create_vehicle(x, y, dir, 8, INVALID);
                 w.link(shadow, rotor);
             }
         }
         5 | 6 => {
-            let r = w.random().await;
+            let r = w.random();
             let x = w.tile_x(r & w.world()[4] as u32) * 16 + 8;
             let (y, dir) = if r & 0x8000_0000 != 0 {
                 (w.world()[3] * 16 - 9, 7)
@@ -866,10 +882,10 @@ async fn initialize(w: World, kind: u32) -> i64 {
             if w.tile(w.tile_virt(x, y))[1] != 6 {
                 return 0;
             }
-            w.create_vehicle(x, y, dir, kind + 8, INVALID).await;
+            w.create_vehicle(x, y, dir, kind + 8, INVALID);
         }
         7 => {
-            let mut index = (w.random().await & 15) as i32;
+            let mut index = (w.random() & 15) as i32;
             for _ in 0..15 {
                 let mut industry = w.next(5, INVALID);
                 while industry != INVALID {
@@ -878,9 +894,9 @@ async fn initialize(w: World, kind: u32) -> i64 {
                         index -= 1;
                         if index < 0 {
                             let news_tile = (i[0] as u32).wrapping_add(w.world()[0] as u32 + 1);
-                            w.news(5, news_tile, i[5]).await;
+                            w.news(5, news_tile, i[5]);
                             let mut tile = w.read(2, industry, 0, 0)[0] as u32;
-                            let dir = w.random().await & 3;
+                            let dir = w.random() & 3;
                             let step = w.read(13, 0, i64::from(dir), 0)[0] as u32;
                             for _ in 0..30 {
                                 w.clear(tile).await;
@@ -900,8 +916,8 @@ async fn initialize(w: World, kind: u32) -> i64 {
     }
     0
 }
-async fn reset_delay(w: &World) {
-    let delay = (w.random().await & 511) + 730;
+fn reset_delay(w: &World) {
+    let delay = (w.random() & 511) + 730;
     // SAFETY: Stable Rust-owned scalar, game thread only; no reference is formed.
     unsafe {
         DELAY = delay as u16;
@@ -919,7 +935,7 @@ async fn schedule(w: World, startup: bool) -> i64 {
             return 0;
         }
     }
-    reset_delay(&w).await;
+    reset_delay(&w);
     if startup || w.world()[6] == 0 {
         return 0;
     }
@@ -945,16 +961,16 @@ async fn schedule(w: World, startup: bool) -> i64 {
     if length == 0 {
         return 0;
     }
-    let kind = available[w.range(length as u32).await as usize];
+    let kind = available[w.range(length as u32) as usize];
     initialize(w, kind).await
 }
-async fn construct(w: World, id: u32, x: i64, y: i64, dir: i64, subtype: u32) -> i64 {
+fn construct(w: World, id: u32, x: i64, y: i64, dir: i64, subtype: u32) -> i64 {
     w.set(id, STATUS, 4);
     w.set(id, X, x);
     w.set(id, Y, y);
     let z = match subtype {
-        0 | 2 | 4 | 6 | 9 | 11 => w.bounds(id).await,
-        8 => w.bounds(id).await + 5,
+        0 | 2 | 4 | 6 | 9 | 11 => w.bounds(id),
+        8 => w.bounds(id) + 5,
         13 | 14 => 0,
         _ => {
             w.set(id, STATUS, w.v(id, STATUS) | 32);
@@ -965,12 +981,12 @@ async fn construct(w: World, id: u32, x: i64, y: i64, dir: i64, subtype: u32) ->
     w.set(id, DIR, dir);
     w.set(id, TILE, i64::from(w.tile_virt(x, y)));
     w.set(id, SUBTYPE, i64::from(subtype));
-    w.action(24, id, 0, 0, 0, 0, 0).await;
+    w.service(24, id, 0, 0, 0, 0, 0);
     w.set(id, OWNER, 16);
     w.set_image(id, 0);
     w.set_state(id, 0);
     w.update_image(id);
-    w.viewport(id).await;
+    w.viewport(id);
     0
 }
 fn release_industry(w: &World, industry: u32) -> i64 {
@@ -984,14 +1000,14 @@ fn release_industry(w: &World, industry: u32) -> i64 {
     }
     0
 }
-async fn release_vehicle(w: World, id: u32) -> i64 {
+fn release_vehicle(w: World, id: u32) -> i64 {
     if w.read(14, id, 0, 0)[0] == 0 {
         return 0;
     }
     w.set_state(id, 0);
-    let tile = w.random_tile().await;
+    let tile = w.random_tile();
     w.set(id, DEST, i64::from(tile));
-    let z = w.bounds(id).await;
+    let z = w.bounds(id);
     w.set(id, Z, z);
     w.set(id, AGE, 0);
     0
@@ -1001,13 +1017,13 @@ async fn run(w: World, operation: u32, id: u32, a: i64, b: i64, c: i64, d: i64) 
         0 => tick(w, id).await,
         1 => schedule(w, false).await,
         2 => schedule(w, true).await,
-        3 => construct(w, id, a, b, c, d as u32).await,
+        3 => construct(w, id, a, b, c, d as u32),
         4 => {
-            w.update_position(id, a, b, c).await;
+            w.update_position(id, a, b, c);
             0
         }
         5 => release_industry(&w, id),
-        6 => release_vehicle(w, id).await,
+        6 => release_vehicle(w, id),
         7 => {
             w.clear(id).await;
             0
@@ -1052,8 +1068,11 @@ pub extern "C" fn openttd_rust_disaster_delay() -> *mut u16 {
 /// Create one component continuation; arguments and IDs follow original preconditions.
 /// # Safety
 /// Context/callbacks remain live until destruction. Leaf callbacks cannot throw or
-/// reenter, and copy/write only source-valid canonical scalars. Raw State access
-/// must not overlap a Rust call. All operations run on the game thread.
+/// reenter, and copy/write only source-valid canonical scalars. Services are
+/// synchronous and noexcept; allocation may construct a separate owner. No raw
+/// State reference spans any service; flight helpers access flags only during
+/// their call. Returned actions 2/14/17 allow deletion/Crash/clear callbacks on
+/// the C++ stack. All operations run on the game thread.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_disaster_create(
     operation: u32,
@@ -1065,6 +1084,8 @@ pub unsafe extern "C" fn openttd_rust_disaster_create(
     context: *mut c_void,
     read: unsafe extern "C" fn(*mut c_void, u32, u32, i64, i64, *mut i64),
     write: unsafe extern "C" fn(*mut c_void, u32, u32, i64),
+    services: *const Services,
+    service: unsafe extern "C" fn(*mut c_void, *const Action) -> i64,
 ) -> *mut Run {
     let channel = Rc::new(Channel {
         action: Cell::new(Action::default()),
@@ -1076,6 +1097,8 @@ pub unsafe extern "C" fn openttd_rust_disaster_create(
         context,
         read,
         write,
+        services: unsafe { *services },
+        service,
         channel: channel.clone(),
     };
     Box::into_raw(Box::new(Run {
@@ -1124,6 +1147,10 @@ mod tests {
         writes: u32,
         reads: u32,
         disaster_in_pool: bool,
+        rng: u32,
+        draws: u32,
+        calls: Vec<Action>,
+        viewport_age: Option<i64>,
     }
     impl Default for Fixture {
         fn default() -> Self {
@@ -1143,6 +1170,10 @@ mod tests {
                 writes: 0,
                 reads: 0,
                 disaster_in_pool: false,
+                rng: 5,
+                draws: 0,
+                calls: Vec::new(),
+                viewport_age: None,
             }
         }
     }
@@ -1196,6 +1227,41 @@ mod tests {
         fixture.writes += 1;
         fixture.vehicle[field as usize] = value;
     }
+    extern "C" fn random(context: *mut c_void) -> u32 {
+        // SAFETY: The call-scoped exclusive fixture has no active Rust borrow.
+        let fixture = unsafe { &mut *context.cast::<Fixture>() };
+        fixture.draws += 1;
+        fixture.rng
+    }
+    extern "C" fn tile(_: *mut c_void, _: u32, _: *mut u32) {}
+    extern "C" fn tile_write(_: *mut c_void, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32) {}
+    extern "C" fn trig(_: u32, value: f32) -> f32 {
+        value
+    }
+    extern "C" fn industry(_: i32, _: i32, _: *mut u32) -> u32 {
+        0
+    }
+    unsafe extern "C" fn service(context: *mut c_void, request: *const Action) -> i64 {
+        // SAFETY: Call-scoped fixture/request; no borrow spans nested world access.
+        let fixture = unsafe { &mut *context.cast::<Fixture>() };
+        let action = unsafe { *request };
+        fixture.calls.push(action);
+        match action.kind {
+            4 => {
+                if let Some(age) = fixture.viewport_age {
+                    fixture.vehicle[AGE] = age;
+                }
+                0
+            }
+            5 => {
+                fixture.private.flags = 0xab;
+                100
+            }
+            6 => 100,
+            15 => 16 + fixture.calls.iter().filter(|a| a.kind == 15).count() as i64,
+            _ => 0,
+        }
+    }
     fn owner(fixture: &mut Fixture, operation: u32, id: u32) -> *mut Run {
         // SAFETY: Fixture remains stable until its run is destroyed; leaves never reenter.
         unsafe {
@@ -1209,6 +1275,15 @@ mod tests {
                 std::ptr::from_mut(fixture).cast(),
                 read,
                 write,
+                &Services {
+                    context: std::ptr::from_mut(fixture).cast(),
+                    random,
+                    observe_tile: tile,
+                    write_tile: tile_write,
+                    trig,
+                    industry,
+                },
+                service,
             )
         }
     }
@@ -1223,17 +1298,17 @@ mod tests {
         }
     }
     #[test]
-    fn cancelling_each_suspended_rng_draw_drops_future_without_world_access() {
-        for operation in [2, 8] {
-            let mut fixture = Fixture::default();
-            let run = owner(&mut fixture, operation, 1);
-            let channel = unsafe { Rc::downgrade(&(*run).channel) };
-            assert_eq!(advance(run, 0).kind, 1);
-            let counts = (fixture.reads, fixture.writes);
-            destroy(run);
-            assert_eq!((fixture.reads, fixture.writes), counts);
-            assert!(channel.upgrade().is_none());
-        }
+    fn cancelling_suspended_deletion_calls_no_world_service() {
+        let mut fixture = Fixture::default();
+        fixture.vehicle[SUBTYPE] = 13;
+        fixture.vehicle[AGE] = 8880;
+        let run = owner(&mut fixture, 0, 17);
+        let channel = unsafe { Rc::downgrade(&(*run).channel) };
+        assert_eq!(advance(run, 0).kind, 2);
+        let counts = (fixture.reads, fixture.writes, fixture.draws);
+        destroy(run);
+        assert_eq!((fixture.reads, fixture.writes, fixture.draws), counts);
+        assert!(channel.upgrade().is_none());
     }
     #[test]
     fn submarine_expiry_wraps_tick_before_returning_delete() {
@@ -1249,69 +1324,65 @@ mod tests {
         destroy(run);
     }
     #[test]
-    fn private_state_address_survives_flight_suspension_and_external_flag_write() {
+    fn flight_helper_mutates_stable_private_flags_synchronously() {
         let mut fixture = Fixture::default();
         fixture.vehicle[TICK] = 1;
-        let run = owner(&mut fixture, 0, 17);
-        assert_eq!(advance(run, 0).kind, 5);
-        fixture.private.flags = 0xab;
         let address = &raw mut fixture.private;
-        assert_eq!(advance(run, 100).kind, 4);
-        assert_eq!(
-            (&raw mut fixture.private, address, fixture.private.flags),
-            (address, address, 0xab)
-        );
+        let run = owner(&mut fixture, 0, 17);
         assert_eq!(advance(run, 0).kind, 0);
+        assert_eq!(
+            (&raw mut fixture.private, fixture.private.flags),
+            (address, 0xab)
+        );
+        assert_eq!(
+            fixture.calls.iter().map(|a| a.kind).collect::<Vec<_>>(),
+            [5, 4]
+        );
         destroy(run);
     }
     #[test]
     fn big_ufo_initializer_uses_map_max_x_for_y_on_rectangular_maps() {
         let mut fixture = Fixture::default();
         let run = owner(&mut fixture, 8, 4);
-        assert_eq!(advance(run, 0).kind, 1);
-        let main = advance(run, 5);
+        assert_eq!(advance(run, 0).kind, 0);
+        let creations: Vec<_> = fixture.calls.iter().filter(|a| a.kind == 15).collect();
         assert_eq!(
-            (main.kind, main.id, main.a, main.b, main.c),
-            (15, 9, 88, 1007, 7)
+            (
+                creations[0].id,
+                creations[0].a,
+                creations[0].b,
+                creations[0].c
+            ),
+            (9, 88, 1007, 7)
         );
-        let shadow = advance(run, 17);
         assert_eq!(
-            (shadow.kind, shadow.id, shadow.a, shadow.b),
-            (15, 10, 88, 1007)
+            (creations[1].id, creations[1].a, creations[1].b),
+            (10, 88, 1007)
         );
         assert_eq!(fixture.vehicle[DEST], i64::from(64 * 64 + 32));
-        assert_eq!(advance(run, 18).kind, 0);
         assert_eq!(fixture.vehicle[NEXT], 18);
+        assert_eq!(fixture.draws, 1);
         destroy(run);
     }
     #[test]
-    fn reentrant_industry_release_updates_suspended_controller_state() {
+    fn industry_release_commits_private_state_before_return() {
         let mut fixture = Fixture::default();
         fixture.vehicle[SUBTYPE] = 4;
         fixture.private.state = 1;
         fixture.vehicle[DEST] = 99;
-        fixture.vehicle[AGE] = 111;
         fixture.disaster_in_pool = true;
-        let outer = owner(&mut fixture, 0, 17);
-        assert_eq!(advance(outer, 0).kind, 5);
         let release = owner(&mut fixture, 5, 99);
         assert_eq!(advance(release, 0).kind, 0);
-        destroy(release);
         assert_eq!(fixture.private.state, 3);
-        assert_eq!(advance(outer, 100).kind, 4);
-        assert_eq!(advance(outer, 0).kind, 0);
-        assert_eq!(fixture.vehicle[AGE], 111);
-        destroy(outer);
+        destroy(release);
     }
     #[test]
-    fn shared_viewport_reentry_refreshes_canonical_age_before_phase_transition() {
+    fn direct_service_refreshes_canonical_age_before_phase_transition() {
         let mut fixture = Fixture::default();
         fixture.vehicle[TICK] = 1;
         fixture.private.state = 1;
+        fixture.viewport_age = Some(37);
         let run = owner(&mut fixture, 0, 17);
-        assert_eq!(advance(run, 0).kind, 5);
-        assert_eq!(advance(run, 100).kind, 4);
-        fixture.vehicle[AGE] = 37; // A shared service changed canonical age while suspended.
         assert_eq!(advance(run, 0).kind, 0);
         assert_eq!((fixture.private.state, fixture.vehicle[AGE]), (2, 0));
         destroy(run);
@@ -1323,7 +1394,7 @@ mod tests {
             fixture.world[9] = 0;
             let run = owner(&mut fixture, 8, kind);
             assert_eq!(advance(run, 0).kind, 0);
-            assert_eq!(fixture.writes, 0);
+            assert_eq!((fixture.writes, fixture.draws), (0, 0));
             destroy(run);
         }
     }

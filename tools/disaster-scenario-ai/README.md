@@ -1,22 +1,14 @@
-# Disaster evidence checkpoint (#103)
+# Disaster scenario AI (#103)
 
-Agent: /root/town_name_evidence | Model: gpt-6.1-sol | Reasoning effort: high
+This harness AI builds the stationlist fixture's rail extension, parks the real
+front train, replaces its small airport with a large airport, executes target
+removal commands, and observes queued disaster events. The harness freezes its
+sources before workers start and supplies `parameters.nut` for each invocation.
 
-This is a tested reference-probe AI, not an integrated simulation scenario.
-`parameters.nut` must define `DISASTER_SETUP` (bool), `DISASTER_ACTION`
-(`none`, `industry`, `road-sale`, or `large-airport`), and `DISASTER_TARGET`.
-The rail and airport actions use assets in `regression/stationlist/test.sav`.
+Parameters: `DISASTER_SETUP` (bool), `DISASTER_ACTION` (`none`, `industry`,
+`road-sale`, `large-airport`), and `DISASTER_TARGET` (tile or vehicle ID).
+All actions use the existing assets in `regression/stationlist/test.sav`.
 Industry demolition requires the declared magic-bulldozer input setting.
 
-The unchanged reference accepted rail setup, sale of road vehicle 12,
-demolition of refinery 3, and replacement of airport 0 with a large airport.
-Its observer logged zeppelin crash/clear, a small-UFO road crash, and industry
-closure. Probe scripts, saves, logs, hashes, and tick receipts are retained in
-`.local/disaster-probes/` in the disaster evidence worktree.
-
-Before acceptance, integrate immutable inputs and this AI into `scenario_list`,
-validate every allowed input edit against exact schemas and unrelated bytes,
-assert branch outcomes and elapsed ticks in each runtime mode, and run
-reference-self, negative probes, candidate comparisons, and soak checks.
-The current probes do not complete all fifteen controllers, live target reload,
-human-train big-UFO landing/destruction, scheduler boundaries, or map policy.
+Run through `python3 tools/migration.py simulate disasters`; source-only setup
+and event checks live in `tools/simulation/disasters.py`.

@@ -7,6 +7,7 @@
 /** @file disaster_adapter.hpp Copied canonical observations and returned shared services. */
 #include "disaster_ffi.h"
 #include "disaster_counter.h"
+#include "services_ffi.h"
 
 static_assert(VehicleID::Invalid().base() == 1048575);
 static_assert(ST_BIG_SUBMARINE == 14 && ROTOR_Z_OFFSET == 5);
@@ -26,7 +27,7 @@ template <class T> static uint32_t DisasterNext(size_t from)
 
 /* These leaves neither allocate nor invoke scripts/NewGRF/logging. Every record
  * is copied before returning. Original source preconditions govern ID access. */
-static void OPENTTD_DISASTER_CALL DisasterRead(void *, uint32_t kind, uint32_t id, int64_t a, int64_t b, int64_t *out)
+static void OPENTTD_DISASTER_CALL DisasterRead(void *, uint32_t kind, uint32_t id, int64_t a, int64_t b, int64_t *out) noexcept
 {
 	switch (kind) {
 		case 0:
@@ -85,7 +86,7 @@ static void OPENTTD_DISASTER_CALL DisasterRead(void *, uint32_t kind, uint32_t i
 	}
 }
 
-static void OPENTTD_DISASTER_CALL DisasterWrite(void *, uint32_t field, uint32_t id, int64_t value)
+static void OPENTTD_DISASTER_CALL DisasterWrite(void *, uint32_t field, uint32_t id, int64_t value) noexcept
 {
 	Vehicle *v = Vehicle::Get(id);
 	switch (field) {
@@ -108,64 +109,72 @@ static void OPENTTD_DISASTER_CALL DisasterWrite(void *, uint32_t field, uint32_t
 	}
 }
 
+static int64_t OPENTTD_DISASTER_CALL DisasterService(void *, const OpenTTDDisasterAction *request) noexcept
+{
+	const auto &step = *request;
+	int64_t response = 0;
+	switch (step.kind) {
+		case 4: Vehicle::Get(step.id)->UpdatePositionAndViewport(); break;
+		case 5: response = GetAircraftFlightLevel(DisasterVehicle::Get(step.id)); break;
+		case 6: { int z; GetAircraftFlightLevelBounds(DisasterVehicle::Get(step.id), &z, nullptr); response = z; break; }
+		case 7: CreateEffectVehicleRel(Vehicle::Get(step.id), step.a, step.b, step.c, static_cast<EffectVehicleType>(step.other)); break;
+		case 8: CreateEffectVehicleAbove(step.a, step.b, step.c, static_cast<EffectVehicleType>(step.other)); break;
+		case 9: SndPlayVehicleFx(SND_12_EXPLOSION, Vehicle::Get(step.id)); break;
+		case 10: SndPlayTileFx(SND_12_EXPLOSION, TileIndex{step.id}); break;
+		case 11:
+			switch (step.other) {
+				case 0: AddTileNewsItem(GetEncodedString(STR_NEWS_DISASTER_ZEPPELIN, step.a), NewsType::Accident, TileIndex{step.id}); break;
+				case 1: AddTileNewsItem(GetEncodedString(STR_NEWS_DISASTER_SMALL_UFO), NewsType::Accident, TileIndex{step.id}); break;
+				case 2: AddIndustryNewsItem(GetEncodedString(STR_NEWS_DISASTER_AIRPLANE_OIL_REFINERY, step.a), NewsType::Accident, IndustryID{static_cast<uint16_t>(step.id)}); break;
+				case 3: AddIndustryNewsItem(GetEncodedString(STR_NEWS_DISASTER_HELICOPTER_FACTORY, step.a), NewsType::Accident, IndustryID{static_cast<uint16_t>(step.id)}); break;
+				case 4: AddTileNewsItem(GetEncodedString(STR_NEWS_DISASTER_BIG_UFO, step.a), NewsType::Accident, TileIndex{step.id}); break;
+				case 5: AddTileNewsItem(GetEncodedString(STR_NEWS_DISASTER_COAL_MINE_SUBSIDENCE, step.a), NewsType::Accident, TileIndex{step.id}); break;
+			}
+			break;
+		case 12:
+			if (step.other == 0) { TileIndex tile{step.id}; AI::NewEvent(GetTileOwner(tile), new ScriptEventDisasterZeppelinerCrashed(GetStationIndex(tile))); }
+			else if (step.other == 1) { TileIndex tile{step.id}; AI::NewEvent(GetTileOwner(tile), new ScriptEventDisasterZeppelinerCleared(StationID{static_cast<uint16_t>(step.a)})); }
+			else {
+				RoadVehicle *target = RoadVehicle::Get(step.id);
+				AI::NewEvent(target->owner, new ScriptEventVehicleCrashed(target->index, target->tile, ScriptEventVehicleCrashed::CRASH_RV_UFO, step.a, target->owner));
+				Game::NewEvent(new ScriptEventVehicleCrashed(target->index, target->tile, ScriptEventVehicleCrashed::CRASH_RV_UFO, step.a, target->owner));
+			}
+			break;
+		case 13: {
+			Station *st = Station::Get(step.id);
+			if (step.other) st->airport.blocks.Set({AirportBlock::Zeppeliner, AirportBlock::RunwayIn});
+			else st->airport.blocks.Reset({AirportBlock::Zeppeliner, AirportBlock::RunwayIn});
+			break;
+		}
+		case 15: response = (new DisasterVehicle(step.a, step.b, static_cast<Direction>(step.c), static_cast<DisasterSubType>(step.id), VehicleID{step.other}))->index.base(); break;
+		case 16: response = EnsureNoVehicleOnGround(TileIndex{step.id}).Failed(); break;
+		case 18: UpdateSignalsInBuffer(); break;
+		case 19: DoClearSquare(TileIndex{step.id}); break;
+		case 20: ResetIndustryConstructionStage(TileIndex{step.id}); MarkTileDirtyByTile(TileIndex{step.id}); break;
+		case 21: response = ClosestTownFromTile(TileIndex{step.id}, UINT_MAX)->index.base(); break;
+		case 23: response = TrackStatusToTrackBits(GetTileTrackStatus(TileIndex{step.id}, TRANSPORT_WATER, 0)); break;
+		case 24: DisasterVehicle::Get(step.id)->UpdateDeltaXY(); break;
+	}
+	return response;
+}
+
 static int64_t RunDisaster(uint32_t operation, uint32_t id = 0, int64_t a = 0, int64_t b = 0, int64_t c = 0, int64_t d = 0)
 {
 	std::unique_ptr<OpenTTDDisasterRun, decltype(&openttd_rust_disaster_destroy)> run{
-		openttd_rust_disaster_create(operation, id, a, b, c, d, nullptr, DisasterRead, DisasterWrite), openttd_rust_disaster_destroy};
+		openttd_rust_disaster_create(operation, id, a, b, c, d, nullptr, DisasterRead, DisasterWrite, &GetRustSharedServices(), DisasterService), openttd_rust_disaster_destroy};
 	int64_t response = 0;
 	for (;;) {
 		auto step = openttd_rust_disaster_advance(run.get(), response);
 		response = 0;
 		switch (step.kind) {
 			case 0: return step.a;
-			case 1: response = Random(); break;
 			case 2: delete Vehicle::Get(step.id); break;
-			case 4: Vehicle::Get(step.id)->UpdatePositionAndViewport(); break;
-			case 5: response = GetAircraftFlightLevel(DisasterVehicle::Get(step.id)); break;
-			case 6: { int z; GetAircraftFlightLevelBounds(DisasterVehicle::Get(step.id), &z, nullptr); response = z; break; }
-			case 7: CreateEffectVehicleRel(Vehicle::Get(step.id), step.a, step.b, step.c, static_cast<EffectVehicleType>(step.other)); break;
-			case 8: CreateEffectVehicleAbove(step.a, step.b, step.c, static_cast<EffectVehicleType>(step.other)); break;
-			case 9: SndPlayVehicleFx(SND_12_EXPLOSION, Vehicle::Get(step.id)); break;
-			case 10: SndPlayTileFx(SND_12_EXPLOSION, TileIndex{step.id}); break;
-			case 11:
-				switch (step.other) {
-					case 0: AddTileNewsItem(GetEncodedString(STR_NEWS_DISASTER_ZEPPELIN, step.a), NewsType::Accident, TileIndex{step.id}); break;
-					case 1: AddTileNewsItem(GetEncodedString(STR_NEWS_DISASTER_SMALL_UFO), NewsType::Accident, TileIndex{step.id}); break;
-					case 2: AddIndustryNewsItem(GetEncodedString(STR_NEWS_DISASTER_AIRPLANE_OIL_REFINERY, step.a), NewsType::Accident, IndustryID{static_cast<uint16_t>(step.id)}); break;
-					case 3: AddIndustryNewsItem(GetEncodedString(STR_NEWS_DISASTER_HELICOPTER_FACTORY, step.a), NewsType::Accident, IndustryID{static_cast<uint16_t>(step.id)}); break;
-					case 4: AddTileNewsItem(GetEncodedString(STR_NEWS_DISASTER_BIG_UFO, step.a), NewsType::Accident, TileIndex{step.id}); break;
-					case 5: AddTileNewsItem(GetEncodedString(STR_NEWS_DISASTER_COAL_MINE_SUBSIDENCE, step.a), NewsType::Accident, TileIndex{step.id}); break;
-				}
-				break;
-			case 12:
-				if (step.other == 0) { TileIndex tile{step.id}; AI::NewEvent(GetTileOwner(tile), new ScriptEventDisasterZeppelinerCrashed(GetStationIndex(tile))); }
-				else if (step.other == 1) { TileIndex tile{step.id}; AI::NewEvent(GetTileOwner(tile), new ScriptEventDisasterZeppelinerCleared(StationID{static_cast<uint16_t>(step.a)})); }
-				else {
-					RoadVehicle *target = RoadVehicle::Get(step.id);
-					AI::NewEvent(target->owner, new ScriptEventVehicleCrashed(target->index, target->tile, ScriptEventVehicleCrashed::CRASH_RV_UFO, step.a, target->owner));
-					Game::NewEvent(new ScriptEventVehicleCrashed(target->index, target->tile, ScriptEventVehicleCrashed::CRASH_RV_UFO, step.a, target->owner));
-				}
-				break;
-			case 13: {
-				Station *st = Station::Get(step.id);
-				if (step.other) st->airport.blocks.Set({AirportBlock::Zeppeliner, AirportBlock::RunwayIn});
-				else st->airport.blocks.Reset({AirportBlock::Zeppeliner, AirportBlock::RunwayIn});
-				break;
-			}
 			case 14: response = RoadVehicle::Get(step.id)->Crash(); break;
-			case 15: response = (new DisasterVehicle(step.a, step.b, static_cast<Direction>(step.c), static_cast<DisasterSubType>(step.id), VehicleID{step.other}))->index.base(); break;
-			case 16: response = EnsureNoVehicleOnGround(TileIndex{step.id}).Failed(); break;
 			case 17: {
 				Backup<CompanyID> cur_company(_current_company, step.other == 0 ? OWNER_WATER : OWNER_NONE);
 				Command<CMD_LANDSCAPE_CLEAR>::Do(DoCommandFlag::Execute, TileIndex{step.id});
 				cur_company.Restore(); break;
 			}
-			case 18: UpdateSignalsInBuffer(); break;
-			case 19: DoClearSquare(TileIndex{step.id}); break;
-			case 20: ResetIndustryConstructionStage(TileIndex{step.id}); MarkTileDirtyByTile(TileIndex{step.id}); break;
-			case 21: response = ClosestTownFromTile(TileIndex{step.id}, UINT_MAX)->index.base(); break;
-			case 23: response = TrackStatusToTrackBits(GetTileTrackStatus(TileIndex{step.id}, TRANSPORT_WATER, 0)); break;
-			case 24: DisasterVehicle::Get(step.id)->UpdateDeltaXY(); break;
 		}
 	}
 }
