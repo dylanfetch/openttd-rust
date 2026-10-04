@@ -174,8 +174,13 @@ Any `[desync:` warning (a cache mismatch) and any log or stdout difference fail
   running (a lock shared by all worktrees); a consistently slower link graph
   job fails on timing, not state.
   GameScripts run while paused, so scenarios must not use an active one.
-- The reference runtime is copied under a shared lock, so simulations never
-  block other worktrees. Evidence: `.local/simulation/<time>-<pid>/report.json`.
+- Both executable/runtime trees are copied before scenarios, dereferencing data
+  symlinks; the reference copy holds its shared build lock. Keep the candidate
+  build idle during its initial copy; later builds cannot change the test run.
+  `--candidate` uses data beside that executable. Reports hash the executed
+  copies before running; `candidate_commit`/`candidate_status` describe the
+  initial checkout, not proof of an arbitrary binary's source revision (#97).
+  Evidence: `.local/simulation/<time>-<pid>/report.json`.
 
 ## Native macOS arm64 Rust linkage
 
