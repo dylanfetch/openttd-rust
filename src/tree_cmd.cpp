@@ -45,6 +45,70 @@ enum ExtraTreePlacement : uint8_t {
 #include "rust/trees_ffi.h"
 #include "rust/services_ffi.h"
 #include "progress.h"
+#include <cstdio>
+#include <cstdlib>
+
+/* Opt-in measurement of actual tree invocations. Simulation and generation are
+ * serial; nested commands restore the active row before their caller resumes.
+ * The ordinary service table is unchanged when profiling is disabled. */
+struct TreeProfile {
+	struct Row {
+		uint64_t calls = 0, random = 0, observe = 0, write = 0, trig = 0, settings = 0, leaf = 0, advance = 0;
+	};
+	bool enabled = std::getenv("OPENTTD_TREE_PROFILE") != nullptr;
+	Row rows[10]{};
+	Row *active = nullptr;
+	uint64_t tile_loop_batches = 0;
+	~TreeProfile()
+	{
+		if (!this->enabled) return;
+		const char *personal = std::getenv("HOME");
+		if (personal == nullptr) return;
+		if (FILE *file = std::fopen(fmt::format("{}/tree-profile.json", personal).c_str(), "w")) {
+			fmt::print(file, "{{\"tile_loop_batches\":{},\"kinds\":[", this->tile_loop_batches);
+			for (uint i = 0; i < lengthof(this->rows); ++i) {
+				const auto &r = this->rows[i];
+				fmt::print(file, "{}{{\"calls\":{},\"random\":{},\"observe\":{},\"write\":{},\"trig\":{},\"settings\":{},\"leaf\":{},\"advance\":{}}}",
+					i == 0 ? "" : ",", r.calls, r.random, r.observe, r.write, r.trig, r.settings, r.leaf, r.advance);
+			}
+			fmt::print(file, "]}}\n");
+			std::fclose(file);
+		}
+	}
+};
+static TreeProfile _tree_profile;
+
+void ProfileRustTreeTileLoop() noexcept
+{
+	if (_tree_profile.enabled) ++_tree_profile.tile_loop_batches;
+}
+
+struct TreeProfileScope {
+	TreeProfile::Row *previous = _tree_profile.active;
+
+	explicit TreeProfileScope(uint32_t kind)
+	{
+		if (!_tree_profile.enabled) return;
+		_tree_profile.active = &_tree_profile.rows[kind];
+		++_tree_profile.active->calls;
+	}
+	~TreeProfileScope() { _tree_profile.active = this->previous; }
+};
+
+static const OpenTTDSharedServices &ProfiledTreeServices()
+{
+	static const OpenTTDSharedServices services = [] {
+		auto result = GetRustSharedServices();
+		result.random = [](void *ctx) noexcept { ++_tree_profile.active->random; return GetRustSharedServices().random(ctx); };
+		result.observe_tile = [](void *ctx, uint32_t tile, uint32_t *v) noexcept { ++_tree_profile.active->observe; GetRustSharedServices().observe_tile(ctx, tile, v); };
+		result.write_tile = [](void *ctx, uint32_t op, uint32_t tile, uint32_t a, uint32_t b, uint32_t c, uint32_t d) noexcept {
+			++_tree_profile.active->write; GetRustSharedServices().write_tile(ctx, op, tile, a, b, c, d);
+		};
+		result.trig = [](uint32_t kind, float value) noexcept { ++_tree_profile.active->trig; return GetRustSharedServices().trig(kind, value); };
+		return result;
+	}();
+	return services;
+}
 
 static_assert(MP_CLEAR == 0 && MP_TREES == 4 && MP_WATER == 6);
 static_assert(TREE_CACTUS == 27 && TREE_INVALID == 255 && TREE_COUNT_TEMPERATE == 12);
@@ -121,11 +185,21 @@ static uint64_t RustTreeLeaf(void *opaque, uint32_t op, uint32_t index, uint32_t
 
 static OpenTTDTreeAction RunRustTrees(RustTreeContext &ctx, uint32_t kind, TileIndex tile = TileIndex{0}, uint32_t a = 0, uint32_t b = 0, uint32_t c = 0)
 {
+	TreeProfileScope profile(kind);
+	auto settings = RustTreeSettings;
+	auto leaf = RustTreeLeaf;
+	if (_tree_profile.enabled) {
+		settings = [](void *opaque, uint64_t *v) noexcept { ++_tree_profile.active->settings; RustTreeSettings(opaque, v); };
+		leaf = [](void *opaque, uint32_t op, uint32_t tile, uint32_t a, uint32_t b) noexcept {
+			++_tree_profile.active->leaf; return RustTreeLeaf(opaque, op, tile, a, b);
+		};
+	}
 	std::unique_ptr<void, decltype(&openttd_rust_trees_destroy)> owner(openttd_rust_trees_create(kind, tile.base(), a, b, c,
-		&ctx, RustTreeSettings, &GetRustSharedServices(), RustTreeLeaf), openttd_rust_trees_destroy);
+		&ctx, settings, _tree_profile.enabled ? &ProfiledTreeServices() : &GetRustSharedServices(), leaf), openttd_rust_trees_destroy);
 	uint64_t response = 0;
 	int64_t cost = 0;
 	for (;;) {
+		if (_tree_profile.enabled) ++_tree_profile.active->advance;
 		auto action = openttd_rust_trees_advance(owner.get(), response, cost);
 		response = 0; cost = 0;
 		TileIndex current{action.tile};
