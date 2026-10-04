@@ -21,7 +21,7 @@ the PR (`AGENTS.md`, "Evidence budget").
   visitor probes. Pending disasters is 1,101 for 968 and cargo payment is 960
   for 315 after review fixes. Each PR records its concrete evidence cost.
 - Larger owners are now producing usable code: full ship search retires 646
-  against 400 glue/tooling; town growth and road control own substantially larger
+  against 547 glue/tooling; town growth and road control own substantially larger
   complete loops. Reuse the current fixtures and native checks. Do not expand
   generic harness tools or polish evidence already accepted by review.
 - The direct-service and map prerequisites are complete. Prioritize integration
@@ -144,12 +144,12 @@ Worktrees are siblings of the main checkout unless a path says otherwise.
 
 | Issue / owner | Branch and checkpoint commit | Worktree | Next step |
 | --- | --- | --- | --- |
-| #103 `/root/disaster_ownership_103` (Sol high) | `port-disaster-vehicles` at `390fff0025`, PR #118 | `openttd-rust-disasters` | Review accepts `9f9c265afc`; root base update changes docs/scenario registration only, src/rust identical. Combined smoke passes; required CI reruns. |
-| #117 `/root/cargo_payment_delivery` (Sol high) | `cargo-payment-delivery-117` at local `bbc1925d4d`, PR #123 | `openttd-rust-cargo-payment` | Two findings fixed in447b5e5608, clean base merge bbc1925d4d. Pair/self pass; finish soak, push once, same reviewer checks final commit and new CI. ABI 49/50/51. |
-| #119 `/root/ship_yapf_ownership` (Sol high) | `ship-yapf-ownership-119` at `f85a8a727f`, PR #126 | `openttd-rust-ship-yapf` | Full corpus pair6/6 passes, native heap/path and Cargo checks pass. Finish soak/self and counter-based branch audit; fresh reviewer next. Rare limit/retry/docking gaps need explicit disposition. ABI 52-56. |
-| #120 `/root/town_growth_ownership` (Sol high) | `town-growth-ownership-120` at `350aec9e30` | `openttd-rust-town-growth` | Full owner builds and candidate pair6/6 passes; native ABI/growth tests pass. Finish verify/soak, bounded unchanged-reference tunnel gap check, then draft PR and fresh review. ABI 60+. |
-| #121 `/root/road_vehicle_ownership` (Sol high) | `road-vehicle-ownership-121` at `aa14879225`, uncommitted implementation | `openttd-rust-road-vehicles` | Owner writes Rust/controller/FFI (ABI 80-83; 84-89 released). `/root/road_state_save_adapters` owns roadveh.h/external/save adapters in the same worktree; signatures pinned in road_ffi.h. |
-| #122 `/root/rail_yapf_ownership` (Sol high) | Not started; branch from integration base | To create `openttd-rust-rail-yapf` | Selected next; own search/cache/reservation together and strengthen applicable rail witnesses. |
+| #103 `/root/disaster_ownership_103` (Sol high) | `port-disaster-vehicles` at `fa70c20cbf`, PR #118 | `openttd-rust-disasters` | Required CI remains; all platform builds pass. `/root/review_disasters_pr118` (Astra medium) accepts final water-base conflict resolution; local verify and component pair/self/soak pass. ABI 44/45. |
+| #117 `/root/cargo_payment_delivery` (Sol high) | `cargo-payment-delivery-117` at `0523686b93`, PR #123 | `openttd-rust-cargo-payment` | Required CI remains. `/root/review_cargo_pr123` (Astra medium) accepts service-table validity and fresh-transfer fixes plus final water-base resolution; verify, pair/self/soak pass. ABI 49-51. |
+| #119 `/root/ship_yapf_ownership` (Sol high) | `ship-yapf-ownership-119` at `10164c2c4b`, PR #126 | `openttd-rust-ship-yapf` | Required CI remains. `/root/review_ship_yapf_pr126` (Astra medium) accepts final owner and evidence: corpus pair/self/soak, real alternate docking, native unreachable limits and detected cache mutation. ABI 52-56. |
+| #120 `/root/town_growth_ownership` (Sol high) | `town-growth-ownership-120` at `350aec9e30`, uncommitted owner | `openttd-rust-town-growth` | Coast versus plain-water bridge predicate fixed after soak RNG divergence; retained failing tick and unchanged soak10/10 match. Finish verify/comparisons, merge current base, open draft PR and assign fresh reviewer. Tunnel gap: 1,508 unchanged-reference cases. ABI 60+. |
+| #121 `/root/road_vehicle_ownership` (Sol high) | `road-vehicle-ownership-121` at `a2eadaedb1` | `openttd-rust-road-vehicles` | Actual disaster dependency included; road+disaster pair31/31 passes. Save adapters complete; `/root/road_controller_scenarios` supplies eight focused witnesses in roads.py. Finish combined evidence and open draft PR for fresh review. ABI 80-83. |
+| #122 `/root/rail_yapf_ownership` (Sol high) | `rail-yapf-ownership-122` at `72ddedf780`, implementation underway | `openttd-rust-rail-yapf` | Owner implements all searches, caches and reservation. `/root/rail_yapf_scenarios` extends rails.py with actual reservation/reload and 90-degree-policy witnesses; establish cache reuse and name unreachable limits for native checks. ABI 90-95. |
 | #124 `/root/road_yapf_ownership` (Sol high) | Not started; use #121 path API | To create `openttd-rust-road-yapf` | Selected; full road search and reconstruction, no separate persistent cache. |
 | #125 `/root/station_service_ownership` (Sol high) | Not started; depends on #117 owner | To create `openttd-rust-station-service` | Selected; complete station service state and periodic/loading control, reusing economic fixtures. |
 
@@ -166,9 +166,8 @@ cargo/ship sequence. `/root/plan_town_growth_ownership` (Astra high) supplied th
 whole growth-loop and house-placement scope now selected as #120. Continue
 per-PR reviews while CI runs. `/root/plan_next_vehicle_owners` (Astra high)
 selected road control then rail YAPF as #121/#122; reserve complete rail control
-until its coupled branches have suitable evidence. Replenish the queue before
-fewer than two unstarted selections remain. Fresh Astra high planner `/root/plan_after_vehicle_pathfinding` selected #124
-and #125. Three unstarted owners are queued; replenish when fewer than two
+until its coupled branches have suitable evidence. Fresh Astra high planner `/root/plan_after_vehicle_pathfinding` selected #124
+and #125. Two unstarted owners are queued; replenish when fewer than two
 remain. A future industry selection must include histories, daily/monthly control,
 closure and builder targets/backoff, not only the short production tick.
 
