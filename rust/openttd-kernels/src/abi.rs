@@ -55,7 +55,7 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         18 => {
             layout!(crate::station_cargo::Collector, item; amount, previous, last_key, other, origin, selector, finalized)
         }
-        19..=21 => crate::crypto_primitives::abi_layout(type_id as u8, item),
+        19..=21 => crate::crypto_primitives::abi_layout(u8::try_from(type_id).unwrap(), item),
         22 => crate::blake2b::abi_layout(item),
         23 => layout!(crate::packet::State, item; limit, position),
         24 => layout!(crate::packet::Frame, item; message, payload),
@@ -171,6 +171,24 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         115 => {
             layout!(crate::station_service::Loading, item; read, write, next, next_stations, next_stations_destroy, cargo, load_callback, payment, effect, refit)
         }
+        280 => {
+            layout!(crate::cargo_storage::Packet, item; feeder_share, source_xy, count, periods_in_transit, first_station, next_hop, source_id, travelled_x, travelled_y, source_type, in_vehicle)
+        }
+        281 => {
+            layout!(crate::cargo_storage::Fields, item; cargo_periods_in_transit, feeder_share, count, reserved_count, action_counts)
+        }
+        282 => {
+            layout!(crate::cargo_storage::Services, item; can_allocate, create, packet, destroy, random, coordinate, flow, pay, origin, flow_owner, random_draw, packet_next)
+        }
+        300 => layout!(crate::cargo_flow::Share, item; cumulative, station, found),
+        301 => layout!(crate::cargo_flow::Origin, item; flow, origin, found),
+        302 => {
+            layout!(crate::cargo_flow::Services, item; context, read, job_flows, live_flows, reroute, finish)
+        }
+        310 => {
+            layout!(crate::cargo_storage::Vehicle, item; list, capacity, cargo, train, articulated)
+        }
+        311 => layout!(crate::cargo_storage::CapacityServices, item; read, pointer, cargo),
         _ => usize::MAX,
     }
 }

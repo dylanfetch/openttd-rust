@@ -11,6 +11,7 @@ mod admin_conversion;
 mod alternating;
 mod auth;
 mod byte_strings;
+mod cargo_flow;
 mod cargo_payment;
 mod consumer;
 mod disaster;
@@ -1306,3 +1307,5 @@ mod water_regions;
 
 #[allow(unsafe_code)]
 mod ship_yapf;
+
+mod cargo_storage;

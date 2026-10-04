@@ -26,6 +26,9 @@
 static const uint8_t INITIAL_STATION_RATING = 175;
 static const uint8_t MAX_STATION_RATING = 255;
 
+#ifdef WITH_RUST
+#include "rust/cargo_flow.hpp"
+#else
 /**
  * Flow statistics telling how much flow should be sent along a link. This is
  * done by creating "flow shares" and using std::map's upper_bound() method to
@@ -168,6 +171,8 @@ public:
 	void ReleaseFlows(StationID via);
 	void FinalizeLocalConsumption(StationID self);
 };
+
+#endif /* WITH_RUST */
 
 /**
  * Stores station stats for a single cargo.

@@ -1534,9 +1534,9 @@ struct StationViewWindow : public Window {
 			const FlowStatMap &flowmap = ge.GetData().flows;
 			FlowStatMap::const_iterator map_it = flowmap.find(source);
 			if (map_it != flowmap.end()) {
-				const FlowStat::SharesMap *shares = map_it->second.GetShares();
+				const auto *shares = map_it->second.GetShares();
 				uint32_t prev_count = 0;
-				for (FlowStat::SharesMap::const_iterator i = shares->begin(); i != shares->end(); ++i) {
+				for (auto i = shares->begin(); i != shares->end(); ++i) {
 					tmp.InsertOrRetrieve(i->second).Update(i->first - prev_count);
 					prev_count = i->first;
 				}
@@ -1586,8 +1586,8 @@ struct StationViewWindow : public Window {
 		for (FlowStatMap::const_iterator it = flows.begin(); it != flows.end(); ++it) {
 			StationID from = it->first;
 			const CargoDataEntry *source_entry = source_dest->Retrieve(from);
-			const FlowStat::SharesMap *shares = it->second.GetShares();
-			for (FlowStat::SharesMap::const_iterator flow_it = shares->begin(); flow_it != shares->end(); ++flow_it) {
+			const auto *shares = it->second.GetShares();
+			for (auto flow_it = shares->begin(); flow_it != shares->end(); ++flow_it) {
 				const CargoDataEntry *via_entry = source_entry->Retrieve(flow_it->second);
 				for (CargoDataSet::iterator dest_it = via_entry->Begin(); dest_it != via_entry->End(); ++dest_it) {
 					CargoDataEntry &dest_entry = **dest_it;
@@ -1606,7 +1606,8 @@ struct StationViewWindow : public Window {
 	void BuildCargoList(CargoType cargo, const StationCargoList &packets, CargoDataEntry *entry)
 	{
 		const CargoDataEntry *source_dest = this->cached_destinations.Retrieve(cargo);
-		for (StationCargoList::ConstIterator it = packets.Packets()->begin(); it != packets.Packets()->end(); it++) {
+		auto packet_snapshot = packets.Packets();
+		for (StationCargoList::ConstIterator it = packet_snapshot->begin(); it != packet_snapshot->end(); it++) {
 			const CargoPacket *cp = *it;
 			StationID next = it.GetKey();
 
