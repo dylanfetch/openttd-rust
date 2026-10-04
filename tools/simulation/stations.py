@@ -106,6 +106,15 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
                     VEHICLE + "vehstatus",
                     vehicle[VEHICLE + "vehstatus"] | 2,
                 )
+    if mode.startswith("rating-") or mode == "stale-remove":
+        # These manual-distribution witnesses inspect stationary cargo and edge
+        # expiry, not completed link jobs. Keep the saved jobs' relative order
+        # but defer their joins beyond the whole run so asynchronous reload
+        # pauses cannot consume its null-driver iteration budget. Cargodist and
+        # stale-refresh retain their live-flow preparation and job coverage.
+        delay = (scenario["ticks"] + core.TICKS_PER_DAY - 1) // core.TICKS_PER_DAY + 32
+        for index, job in economy.rows(original, "LGRJ").items():
+            patch("LGRJ", index, "join_date", job["join_date"] + delay)
     if mode.startswith("stale-"):
         date = economy.rows(original, "DATE")[0]["economy_date"]
         old = date - 2000
