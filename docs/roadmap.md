@@ -5,7 +5,7 @@ Root owns this file and updates it when a phase completes or priorities change.
 to work on next. If an issue conflicts with this roadmap, follow the roadmap;
 a subagent stops and reports the conflict in its hand-off to root.
 
-## Where the fork stands (2026-10-03, `rust-migration` at `8edca751f7`)
+## Where the fork stands (2026-10-03, `rust-migration` at `584aa2bd82`)
 
 - Ported: one landscape kernel, StringConsumer/StringBuilder/UTF-8/byte-string
   utilities, history and spiral/alternating iterators, Script Admin JSON
@@ -37,16 +37,16 @@ Three habits held back progress. The rules in `AGENTS.md` now prevent them.
    detail in prose, which costs more than the code. Fix: a size budget for each
    artifact (see `AGENTS.md`), and the harness replaces most bespoke fixtures.
 
-## Phase 0: close out in-flight work (now)
+## Phase 0: active close-out items complete
 
 | Item | Disposition |
 | --- | --- |
-| Issue #88 (ruff for `tools/`) | In progress, owner `/root/ruff` (Luna medium). Finish before new port work; CI/review may overlap the next item. |
+| Issue #88 (ruff for `tools/`) | Complete in #92 (`584aa2bd82`): pinned lint/format gates, separate formatting commit, independent review and required CI passed. |
 | PR #70 / issue #65 (ScriptList VM control) | Integrated at `8edca751f7` after final Astra medium review and green required CI; #65 closed. |
 | PR #66 / issue #64 (curve family) | Paused: its macOS Release check fails, which needs another implementation round. Leave the draft open; no further work. |
 | Issue #68 (SHA-512/HMAC/HKDF/Ed25519) | Paused. No new `src/3rdparty` work beyond finishing #62/#66 as stated. |
 | Issue #69 (tile areas, bitmap, tile lists) | Paused. Revisit as an ownership port when station/industry work needs it. |
-| Issue #75 (GetPartialPixelZ full-domain fidelity) | In progress, owner `/root/partial_pixel` (Sol high): coordinate domain and valid-result sentinel collision. |
+| Issue #75 (GetPartialPixelZ full-domain fidelity) | Complete in #91 (`498bcb8f42`): original coordinate domain and valid UINT32_MAX heights restored; review, comparisons, simulation and required CI passed. |
 | Issue #76 (worktree/branch cleanup) | Complete: 37 merged-PR remote branches deleted; open PR and unrelated branches retained. #76 closed. |
 
 ## Phase 1: simulation comparison harness (#72), the critical path
@@ -54,8 +54,10 @@ Three habits held back progress. The rules in `AGENTS.md` now prevent them.
 Status: the harness is `python3 tools/migration.py simulate` (see
 `docs/rust-migration.md`, "Simulation comparison"); its default set runs in CI.
 The `play-*` scenarios cover road networks under manual distribution and
-cargodist (#84). Remaining phase 1 work: any bugs the harness finds. Rail, ship
-and aircraft scenarios (#86) come before ports of those vehicle types.
+cargodist (#84). Reload testing for #74 exposed build-history differences even
+without that port (#93); its fixture-only history reset is under review with #74.
+Port differences still require `KNOWN_FAILURES`, never masks. Rail, ship and
+aircraft scenarios (#86) come before ports of those vehicle types.
 
 Original scope: run the reference and the candidate headlessly on identical
 scenarios, take periodic uncompressed snapshots using the existing `-d desync=3`
@@ -77,7 +79,8 @@ phase 2 or 3 work.
 
 ## Phase 2: first game-logic ports with Rust-owned state
 
-Both ports start after #88 reaches CI/review, on separate branches. The harness
+Both ports are implemented on separate branches and finishing evidence/review:
+`/root/tgp` owns #73 and `/root/link_graph` owns #74 (Sol high). The harness
 prerequisite is complete (#85/#87); integration requires a clean harness run with
 scenarios exercising the component (extend its scenario list). Both are
 self-contained, game-visible and deterministic, with a clean ownership boundary.
