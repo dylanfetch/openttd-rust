@@ -994,10 +994,10 @@ static const OpenTTDCargoServices _cargo_services = {
 			case 3: return i->accepted[slot].waiting;
 			case 4: {
 				auto mask = GetIndustrySpec(i->type)->callback_mask;
-				return mask.Test(IndustryCallbackMask::ProductionCargoArrival) | (mask.Test(IndustryCallbackMask::Production256Ticks) << 1);
+				return uint32_t(mask.Test(IndustryCallbackMask::ProductionCargoArrival)) | (uint32_t(mask.Test(IndustryCallbackMask::Production256Ticks)) << 1);
 			}
-			case 5: return i->accepted.size();
-			case 6: return i->produced.size();
+			case 5: return static_cast<uint32_t>(i->accepted.size());
+			case 6: return static_cast<uint32_t>(i->produced.size());
 			case 7: return i->accepted[slot].cargo;
 			case 8: return i->produced[slot].cargo;
 			case 9: return i->produced[slot].waiting;
