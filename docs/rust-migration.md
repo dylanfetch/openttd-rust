@@ -1314,6 +1314,25 @@ pool reuse and reentry. These establish covered behavior; actual legacy saves,
 NewGRFs, articulated/tram turns, level-crossing collisions, sounds and viewport
 pixels remain unexercised controller domains.
 
+### Rail YAPF search, caches and reservation
+
+[#133](https://github.com/dylanfetch/openttd-rust/pull/133) moves all four searches,
+node/segment arenas, exact-order heap, costs, lookahead, limits and reconstruction
+into Rust. Rust owns six specialization-specific cache banks, rail-change
+invalidation, reservation traversal and ordered signal rollback. C++ retains
+the train controller, shared track follower, PBS and canonical world services.
+Station animation/randomisation returns to C++ with affected borrows released.
+Original search bodies remain portable-only; diagnostic dumps use temporary
+views and the original format, with no canonical C++ search mirror.
+
+`python3 tools/migration.py simulate padhattan rail-reservation` and its self/soak
+variants exercise cache reuse, reversal, depot/safe-tile search, reservation,
+busy targets, rollback and active-state reload under both 90-degree policies.
+Native unchanged-base/heap probes cover finite limits, live cost invalidation
+and ordered opposing PBS signal restoration absent from the supplied network.
+They do not prove full rail-cost semantics for arbitrary maps, NewGRFs, legacy
+saves or every signal family. Controller reservation extension belongs to #130.
+
 ### Road YAPF search and path construction
 
 Issue #124 moves both track/depot searches, road exit-direction keys, node arena,
