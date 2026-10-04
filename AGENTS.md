@@ -147,6 +147,11 @@ Iterate locally: incremental builds take seconds to minutes, while every push
 starts roughly 15 minutes of CI. Push when a change is ready for CI or review,
 with its commits batched, and keep working while CI runs.
 
+Docs-only changes (only `docs/` or `*.md` files, such as roadmap updates) are
+committed directly to `rust-migration` as a single commit, without a PR.
+Everything else (code, tools, workflows, saves) goes through a PR that passes
+CI before it merges; never merge a PR past CI with `--admin`.
+
 Rust changes require reproducible `cargo fmt --all -- --check`,
 `cargo check --workspace --all-targets --locked`,
 `cargo clippy --workspace --all-targets --locked -- -D warnings`, and
