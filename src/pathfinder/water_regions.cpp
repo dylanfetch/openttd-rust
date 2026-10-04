@@ -113,6 +113,20 @@ void VisitWaterRegionPatchNeighbours(const WaterRegionPatchDesc &patch, VisitWat
 	}
 }
 
+/* Ship search calls the distinct cache visitor directly; no callback reenters its arena. */
+void *ShipWaterVisitNew(OpenTTDWaterPatch patch) noexcept
+{
+	return openttd_rust_water_visit_new(_water_regions.get(), &_water_leaves, patch);
+}
+uint8_t ShipWaterVisitNext(void *cursor, OpenTTDWaterPatch patch, OpenTTDWaterPatch *out) noexcept
+{
+	return openttd_rust_water_visit_next(_water_regions.get(), &_water_leaves, static_cast<OpenTTDWaterVisit *>(cursor), patch, out);
+}
+void ShipWaterVisitDestroy(void *cursor) noexcept
+{
+	openttd_rust_water_visit_destroy(static_cast<OpenTTDWaterVisit *>(cursor));
+}
+
 void AllocateWaterRegions()
 {
 	_water_regions.reset(openttd_rust_water_new(Map::SizeX(), Map::SizeY()));

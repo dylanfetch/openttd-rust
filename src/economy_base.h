@@ -11,6 +11,9 @@
 #define ECONOMY_BASE_H
 
 #include "cargopacket.h"
+#ifdef WITH_RUST
+#include "rust/cargo_payment_ffi.h"
+#endif
 
 /** Type of pool to store cargo payments in; little over 1 million. */
 using CargoPaymentPool = Pool<CargoPayment, CargoPaymentID, 512>;
@@ -21,6 +24,12 @@ extern CargoPaymentPool _cargo_payment_pool;
  * Helper class to perform the cargo payment.
  */
 struct CargoPayment : CargoPaymentPool::PoolItem<&_cargo_payment_pool> {
+#ifdef WITH_RUST
+	OpenTTDCargoPayment *rust_state; ///< Sole owner of payment state.
+	CargoPayment();
+	Vehicle *GetFront() const;
+	void AfterLoad();
+#else
 	/* CargoPaymentID index member of CargoPaymentPool is 4 bytes. */
 	StationID current_station = StationID::Invalid(); ///< NOSAVE: The current station
 
@@ -31,6 +40,9 @@ struct CargoPayment : CargoPaymentPool::PoolItem<&_cargo_payment_pool> {
 
 	/** Constructor for pool saveload */
 	CargoPayment() {}
+	Vehicle *GetFront() const { return this->front; }
+	void AfterLoad();
+#endif
 	CargoPayment(Vehicle *front);
 	~CargoPayment();
 
