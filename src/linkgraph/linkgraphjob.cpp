@@ -283,7 +283,7 @@ void LinkGraphJob::RunRust()
 	auto runtime = this->JoinDate() - s.recalc_time / CalendarTime::SECONDS_PER_DAY - this->LastCompression() + 1;
 	OpenTTDLinkGraphSettings settings{s.accuracy, s.demand_distance, s.demand_size, s.short_path_saturation, static_cast<uint32_t>(s.GetDistributionType(this->Cargo())),
 		IsCargoInClass(this->Cargo(), CargoClass::Passengers) || IsCargoInClass(this->Cargo(), CargoClass::Mail) || IsCargoInClass(this->Cargo(), CargoClass::Express), Map::MaxX(), Map::MaxY(), static_cast<uint32_t>(runtime.base())};
-	auto abort = [](const void *ctx) -> uint8_t { return static_cast<const LinkGraphJob *>(ctx)->IsJobAborted(); };
+	auto abort = [](const void *ctx) noexcept -> uint8_t { return static_cast<const LinkGraphJob *>(ctx)->IsJobAborted(); };
 	std::unique_ptr<OpenTTDLinkGraphResult, decltype(&openttd_rust_linkgraph_destroy)> result(
 		openttd_rust_linkgraph_run(input_nodes.data(), input_nodes.size(), input_edges.data(), input_edges.size(), &settings, this, abort), &openttd_rust_linkgraph_destroy);
 	if (this->IsJobAborted()) return;

@@ -43,6 +43,8 @@ enum ExtraTreePlacement : uint8_t {
 
 #ifdef WITH_RUST
 #include "rust/trees_ffi.h"
+#include "rust/services_ffi.h"
+#include "progress.h"
 
 static_assert(MP_CLEAR == 0 && MP_TREES == 4 && MP_WATER == 6);
 static_assert(TREE_CACTUS == 27 && TREE_INVALID == 255 && TREE_COUNT_TEMPERATE == 12);
@@ -61,7 +63,7 @@ struct RustTreeContext {
 	CommandCost nested;
 };
 
-static void RustTreeSettings(void *opaque, uint64_t *v)
+static void RustTreeSettings(void *opaque, uint64_t *v) noexcept
 {
 	auto &ctx = *static_cast<RustTreeContext *>(opaque);
 	v[0] = TimerGameTick::counter;
@@ -79,48 +81,48 @@ static void RustTreeSettings(void *opaque, uint64_t *v)
 		(static_cast<uint64_t>(Company::IsValidID(_current_company)) << 4);
 }
 
-static void RustTreeObserve(void *, uint32_t index, uint32_t *v)
-{
-	TileIndex tile{index};
-	std::fill_n(v, 10, 0);
-	v[0] = GetTileType(tile); v[1] = IsBridgeAbove(tile); v[2] = GetTropicZone(tile); v[3] = GetTileZ(tile);
-	if (v[0] == MP_CLEAR) {
-		v[4] = GetClearGround(tile); v[5] = GetClearDensity(tile); v[9] = IsSnowTile(tile);
-	} else if (v[0] == MP_TREES) {
-		v[4] = GetTreeGround(tile); v[5] = GetTreeDensity(tile); v[6] = GetTreeType(tile);
-		v[7] = GetTreeCount(tile); v[8] = to_underlying(GetTreeGrowth(tile));
-	} else if (v[0] == MP_WATER) {
-		v[9] = (static_cast<uint32_t>(IsCoast(tile)) << 1) | (static_cast<uint32_t>(IsSlopeWithOneCornerRaised(GetTileSlope(tile))) << 2);
-	}
-}
-
-static uint64_t RustTreeWrite(void *opaque, uint32_t op, uint32_t index, uint32_t a, uint32_t b, uint32_t c, uint32_t d)
+/* Direct leaves cannot run arbitrary code or reenter this Rust tree invocation. */
+static uint64_t RustTreeLeaf(void *opaque, uint32_t op, uint32_t index, uint32_t a, uint32_t b) noexcept
 {
 	auto &ctx = *static_cast<RustTreeContext *>(opaque);
 	TileIndex tile{index};
 	switch (op) {
-		case 0: MakeTree(tile, static_cast<TreeType>(a), b, static_cast<TreeGrowthStage>(c), static_cast<TreeGround>(d & 255), d >> 8); break;
-		case 1: SetTreeGroundDensity(tile, static_cast<TreeGround>(a), b); break;
-		case 2: AddTreeCount(tile, static_cast<int>(a)); break;
-		case 3: AddTreeGrowth(tile, a); break;
-		case 4: SetTreeGrowth(tile, static_cast<TreeGrowthStage>(a)); break;
-		case 5: MarkTileDirtyByTile(tile); break;
-		case 6: MakeClear(tile, static_cast<ClearGround>(a), b); break;
-		case 7: MakeShore(tile); break;
-		case 8: MakeSnow(tile, a); break;
-		case 9: SetTropicZone(tile, static_cast<TropicZone>(a)); break;
+		case 1:
+		case 2:
+			/* Keep the original zero-total and no-modal guards before checking
+			 * cancellation. The abort callback and throw run only in C++. */
+			if (op == 2 && a == 0) return 0;
+			if (!HasModalProgress()) return 0;
+			if (IsGeneratingWorldAborted()) return 1;
+			if (op == 1) IncreaseGeneratingWorldProgress(GWP_TREE);
+			else SetGeneratingWorldProgress(GWP_TREE, a);
+			break;
+		case 3: ClearNeighbourNonFloodingStates(tile); break;
+		case 6: {
+			static const SoundID sounds[] = {SND_42_RAINFOREST_1, SND_43_RAINFOREST_2, SND_44_RAINFOREST_3, SND_48_RAINFOREST_4, SND_34_ARCTIC_SNOW_1, SND_39_ARCTIC_SNOW_2};
+			SndPlayTileFx(sounds[a], tile); break;
+		}
+		case 7: DoClearSquare(tile); break;
+		case 8: {
+			Town *town = ClosestTownFromTile(tile, _settings_game.economy.dist_local_authority);
+			if (town != nullptr) ChangeTownRating(town, a != 0 ? RATING_TREE_UP_STEP : RATING_TREE_DOWN_STEP,
+				a != 0 ? RATING_TREE_MAXIMUM : RATING_TREE_MINIMUM, ctx.flags);
+			break;
+		}
+		case 9:
+			ctx.company = _game_mode != GM_EDITOR ? Company::GetIfValid(_current_company) : nullptr;
+			ctx.iter = TileIterator::Create(tile, TileIndex{a}, b != 0);
+			return ctx.company == nullptr ? INT32_MAX : GB(ctx.company->tree_limit, 16, 16);
 		case 10: if (ctx.company != nullptr) ctx.company->tree_limit -= 1 << 16; break;
 		case 11: if (a != 0) ++(*ctx.iter); return static_cast<TileIndex>(*ctx.iter).base();
 	}
 	return 0;
 }
 
-static float RustTreeTrig(uint32_t kind, float value) { return kind == 0 ? sinf(value) : cosf(value); }
-
 static OpenTTDTreeAction RunRustTrees(RustTreeContext &ctx, uint32_t kind, TileIndex tile = TileIndex{0}, uint32_t a = 0, uint32_t b = 0, uint32_t c = 0)
 {
 	std::unique_ptr<void, decltype(&openttd_rust_trees_destroy)> owner(openttd_rust_trees_create(kind, tile.base(), a, b, c,
-		&ctx, RustTreeSettings, RustTreeObserve, RustTreeWrite, RustTreeTrig), openttd_rust_trees_destroy);
+		&ctx, RustTreeSettings, &GetRustSharedServices(), RustTreeLeaf), openttd_rust_trees_destroy);
 	uint64_t response = 0;
 	int64_t cost = 0;
 	for (;;) {
@@ -129,31 +131,14 @@ static OpenTTDTreeAction RunRustTrees(RustTreeContext &ctx, uint32_t kind, TileI
 		TileIndex current{action.tile};
 		switch (action.kind) {
 			case 0: return action;
-			case 1: IncreaseGeneratingWorldProgress(GWP_TREE); break;
-			case 2: SetGeneratingWorldProgress(GWP_TREE, action.a); break;
-			case 3: ClearNeighbourNonFloodingStates(current); break;
+			/* Flooding can dispatch nested clear commands. NewGRF callbacks run
+			 * arbitrary callback code. No Rust borrow survives these actions. */
 			case 4: TileLoop_Water(current); break;
 			case 5: AmbientSoundEffect(current); break;
-			case 6: {
-				static const SoundID sounds[] = {SND_42_RAINFOREST_1, SND_43_RAINFOREST_2, SND_44_RAINFOREST_3, SND_48_RAINFOREST_4, SND_34_ARCTIC_SNOW_1, SND_39_ARCTIC_SNOW_2};
-				SndPlayTileFx(sounds[action.a], current); break;
-			}
-			case 7: DoClearSquare(current); break;
-			case 8: {
-				Town *town = ClosestTownFromTile(current, _settings_game.economy.dist_local_authority);
-				if (town != nullptr) ChangeTownRating(town, action.a != 0 ? RATING_TREE_UP_STEP : RATING_TREE_DOWN_STEP,
-					action.a != 0 ? RATING_TREE_MAXIMUM : RATING_TREE_MINIMUM, ctx.flags);
-				break;
-			}
-			case 9:
-				ctx.company = _game_mode != GM_EDITOR ? Company::GetIfValid(_current_company) : nullptr;
-				response = ctx.company == nullptr ? INT32_MAX : GB(ctx.company->tree_limit, 16, 16);
-				ctx.iter = TileIterator::Create(current, TileIndex{action.a}, action.b != 0);
-				break;
+			case 12: HandleGeneratingWorldAbortion(); break;
 			case 10:
 				ctx.nested = Command<CMD_LANDSCAPE_CLEAR>::Do(ctx.flags, current);
 				response = ctx.nested.Failed(); cost = ctx.nested.GetCost(); break;
-			case 11: response = Random(); break;
 		}
 	}
 }
@@ -161,7 +146,7 @@ static OpenTTDTreeAction RunRustTrees(RustTreeContext &ctx, uint32_t kind, TileI
 static bool CanPlantTreesOnTile(TileIndex tile, bool allow_desert)
 {
 	uint32_t observation[10];
-	RustTreeObserve(nullptr, tile.base(), observation);
+	GetRustSharedServices().observe_tile(nullptr, tile.base(), observation);
 	return openttd_rust_trees_suitable(observation, allow_desert) != 0;
 }
 

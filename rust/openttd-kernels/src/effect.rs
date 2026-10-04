@@ -18,7 +18,12 @@ pub struct State {
     animation: u16,
     substate: u8,
 }
+use crate::services::{Services, chance16_i};
+use std::ffi::c_void;
+
+/// Call-scoped copied observation of canonical C++ fields.
 #[repr(C)]
+#[derive(Default)]
 pub struct View {
     pub x: i32,
     pub y: i32,
@@ -28,19 +33,17 @@ pub struct View {
     pub spritenum: u8,
     pub subtype: u8,
     pub ambient: u8,
-    pub sprite_write: u32,
 }
+/// All leaves are noexcept and cannot reenter or retain pointers. Shared vehicle
+/// fields remain canonical in C++; every mutation is written immediately.
 #[repr(C)]
-#[derive(Default)]
-pub struct Cursor {
-    pub phase: u32,
-    pub animation: u32,
-    pub tile: u32,
-    pub random: u32,
-}
-#[repr(C)]
+#[derive(Clone, Copy)]
 pub struct Leaves {
-    pub industry: extern "C" fn(i32, i32, *mut u32) -> u32,
+    pub observe: extern "C" fn(*mut c_void, *mut View),
+    pub write: extern "C" fn(*mut c_void, u8, u32),
+    pub viewport: extern "C" fn(*mut c_void),
+    pub sound: extern "C" fn(*mut c_void, u8),
+    pub animated: extern "C" fn(u32),
 }
 const INITIAL: [u32; 12] = [
     3701, 3079, 3073, 3084, 2040, 3709, 3737, 3725, 1416, 4751, 2040, 2040,
@@ -202,226 +205,228 @@ const BUBBLES: [&[(i32, i32, i32, u32)]; 6] = [
     BUBBLE_ABSORB,
 ];
 
-fn set_sprite(v: &mut View, sprite: u32) {
-    v.sprite = sprite;
-    v.sprite_write = 2;
+// No Rust reference to the private owner survives a service call. Its lifetime
+// ends only after run returns false and the C++ facade deletes the shell.
+struct Controller {
+    owner: *mut State,
+    context: *mut c_void,
+    leaves: Leaves,
+    services: Services,
+    v: View,
 }
-fn increment(v: &mut View) -> bool {
-    if v.sprite == LAST[usize::from(v.subtype)] {
-        return false;
+#[allow(unsafe_code)]
+impl Controller {
+    // Every call-scoped borrow ends at its statement, before any service call.
+    fn state(&mut self) -> &mut State {
+        unsafe { &mut *self.owner }
     }
-    v.sprite = v.sprite.wrapping_add(1);
-    v.sprite_write = 1;
-    true
-}
-fn init(s: &mut State, v: &mut View, c: &mut Cursor) -> u8 {
-    if v.subtype == 0 && c.phase == 0 {
-        c.phase = 10;
-        return 7;
+    fn write(&mut self, field: u8, value: u32) {
+        match field {
+            0 => self.v.x = value as i32,
+            1 => self.v.y = value as i32,
+            2 => self.v.z = value as i32,
+            3 | 4 => self.v.sprite = value,
+            5 => self.v.progress = value as u8,
+            6 => self.v.spritenum = value as u8,
+            _ => {} // Only the seven private field constants above reach this helper.
+        }
+        (self.leaves.write)(self.context, field, value);
     }
-    set_sprite(v, INITIAL[usize::from(v.subtype)]);
-    v.progress = match v.subtype {
-        1 | 4 | 10 | 11 => 12,
-        3 => 1,
-        _ => 0,
-    };
-    if v.subtype == 0 {
-        set_sprite(v, INITIAL[0] + (c.random & 7));
-        v.progress = ((c.random >> 16) & 7) as u8;
+    fn increment(&mut self) -> bool {
+        if self.v.sprite == LAST[usize::from(self.v.subtype)] {
+            return false;
+        }
+        self.write(4, self.v.sprite.wrapping_add(1));
+        true
     }
-    if v.subtype == 8 {
-        s.animation = 0;
-        s.substate = 0;
+    fn viewport(&self) {
+        (self.leaves.viewport)(self.context);
     }
-    if v.subtype == 9 {
-        v.spritenum = 0;
+    fn industry(&self, tile: &mut u32) -> u32 {
+        (self.services.industry)(self.v.x, self.v.y, tile)
     }
-    0
-}
-// Outcomes: done, viewport+done, viewport+resume, burst sound, success sound,
-// animated tile+resume, delete, RNG+resume. All external services run after Rust returns.
-fn countdown(s: &mut State) -> u8 {
-    s.animation = s.animation.wrapping_sub(1);
-    if s.animation == 0 { 6 } else { 0 }
-}
-fn bubble_finish(s: &mut State, v: &mut View, c: &Cursor) -> u8 {
-    s.animation = c.animation as u16;
-    let b = BUBBLES[usize::from(v.spritenum) - 1][c.animation as usize];
-    v.x = v.x.wrapping_add(b.0);
-    v.y = v.y.wrapping_add(b.1);
-    v.z = v.z.wrapping_add(b.2);
-    set_sprite(v, 4748 + b.3);
-    1
-}
-fn bubble_absorb(s: &mut State, v: &mut View, c: &mut Cursor, leaves: &Leaves) -> u8 {
-    if (leaves.industry)(v.x, v.y, &raw mut c.tile) == 2 {
-        c.phase = 4;
-        return 5;
-    }
-    bubble_finish(s, v, c)
-}
-fn bubble_burst(s: &mut State, v: &mut View, c: &mut Cursor, burst: bool) -> u8 {
-    if burst {
-        v.spritenum = 5;
-        if v.ambient != 0 {
-            c.animation = 0;
-            c.phase = 2;
-            return 3;
+    fn init(&mut self) {
+        if self.v.subtype == 0 {
+            let r = self.services.random();
+            self.write(3, INITIAL[0] + (r & 7));
+            self.write(5, (r >> 16) & 7);
+            return;
+        }
+        self.write(3, INITIAL[usize::from(self.v.subtype)]);
+        if self.v.subtype == 9 {
+            self.write(6, 0);
+        }
+        self.write(
+            5,
+            match self.v.subtype {
+                1 | 4 | 10 | 11 => 12,
+                3 => 1,
+                _ => 0,
+            },
+        );
+        if self.v.subtype == 8 {
+            self.state().animation = 0;
+            self.state().substate = 0;
         }
     }
-    c.animation = 0;
-    bubble_finish(s, v, c)
-}
-fn bubble_continue(s: &mut State, v: &mut View, c: &mut Cursor, leaves: &Leaves) -> u8 {
-    let b = BUBBLES[usize::from(v.spritenum) - 1][c.animation as usize];
-    if b.1 == 4 && b.0 == 0 {
-        return 6;
+    fn countdown(&mut self) -> bool {
+        self.state().animation = self.state().animation.wrapping_sub(1);
+        self.state().animation != 0
     }
-    if b.1 == 4 && b.0 == 1 {
-        if v.z <= 180 {
-            c.phase = 6;
-            return 7;
+    fn bubble(&mut self) -> bool {
+        if self.v.progress & 3 != 0 {
+            return true;
         }
-        return bubble_burst(s, v, c, true);
-    }
-    if b.1 == 4 && b.0 == 2 {
-        c.animation += 1;
-        if v.ambient != 0 {
-            c.phase = 3;
-            return 4;
-        }
-        return bubble_absorb(s, v, c, leaves);
-    }
-    bubble_finish(s, v, c)
-}
-fn bubble(s: &mut State, v: &mut View, c: &mut Cursor, leaves: &Leaves) -> u8 {
-    if v.progress & 3 != 0 {
-        return 0;
-    }
-    if v.spritenum == 0 {
-        v.sprite = v.sprite.wrapping_add(1);
-        v.sprite_write = 1;
-        if v.sprite < 4754 {
-            return 1;
-        }
-        if s.substate != 0 {
-            c.phase = 5;
-            return 7;
-        }
-        v.spritenum = 6;
-        c.animation = 0;
-    } else {
-        c.animation = u32::from(s.animation) + 1;
-    }
-    bubble_continue(s, v, c, leaves)
-}
-#[allow(clippy::too_many_lines)]
-fn step(s: &mut State, v: &mut View, c: &mut Cursor, leaves: &Leaves) -> u8 {
-    match c.phase {
-        1 => return countdown(s),
-        2 | 4 => return bubble_finish(s, v, c),
-        3 => return bubble_absorb(s, v, c, leaves),
-        5 => {
-            v.spritenum = (c.random & 3) as u8 + 1;
-            c.animation = 0;
-            return bubble_continue(s, v, c, leaves);
-        }
-        6 => return bubble_burst(s, v, c, ((u32::from(c.random as u16) * 96 + 48) >> 16) < 1),
-        _ => {}
-    }
-    // Match the source's promotion/narrowing of each byte/word separately.
-    match v.subtype {
-        0 => {
-            if v.progress > 0 {
-                v.progress -= 1;
-                return 0;
+        let mut animation;
+        if self.v.spritenum == 0 {
+            self.write(4, self.v.sprite.wrapping_add(1));
+            if self.v.sprite < 4754 {
+                self.viewport();
+                return true;
             }
-            if (leaves.industry)(v.x, v.y, &raw mut c.tile) == 0 {
-                return 6;
-            }
-            if !increment(v) {
-                set_sprite(v, 3701);
-            }
-            v.progress = 7;
-            1
+            let spritenum = if self.state().substate != 0 {
+                (self.services.random() & 3) + 1
+            } else {
+                6
+            };
+            self.write(6, spritenum);
+            animation = 0;
+        } else {
+            animation = u32::from(self.state().animation) + 1;
         }
-        3 => {
-            if v.progress < 2 {
-                v.progress += 1;
-                return 0;
-            }
-            v.progress = 0;
-            if increment(v) { 1 } else { 6 }
+        let b = BUBBLES[usize::from(self.v.spritenum) - 1][animation as usize];
+        if b.1 == 4 && b.0 == 0 {
+            return false;
         }
-        _ => {
-            v.progress = v.progress.wrapping_add(1);
-            match v.subtype {
-                1 | 4 | 10 | 11 => {
-                    let mut moved = false;
-                    if v.progress & (if v.subtype == 1 { 7 } else { 3 }) == 0 {
-                        v.z = v.z.wrapping_add(1);
-                        moved = true;
-                    }
-                    if v.progress & 15 == 4 {
-                        if !increment(v) {
-                            return 6;
+        if b.1 == 4 && b.0 == 1 {
+            if self.v.z > 180 || chance16_i(1, 96, self.services.random()) {
+                self.write(6, 5);
+                if self.v.ambient != 0 {
+                    (self.leaves.sound)(self.context, 0);
+                }
+            }
+            animation = 0;
+        }
+        if b.1 == 4 && b.0 == 2 {
+            animation += 1;
+            if self.v.ambient != 0 {
+                (self.leaves.sound)(self.context, 1);
+            }
+            let mut tile = 0;
+            if self.industry(&mut tile) == 2 {
+                (self.leaves.animated)(tile);
+            }
+        }
+        self.state().animation = animation as u16;
+        let b = BUBBLES[usize::from(self.v.spritenum) - 1][animation as usize];
+        self.write(0, self.v.x.wrapping_add(b.0) as u32);
+        self.write(1, self.v.y.wrapping_add(b.1) as u32);
+        self.write(2, self.v.z.wrapping_add(b.2) as u32);
+        self.write(3, 4748 + b.3);
+        self.viewport();
+        true
+    }
+    #[allow(clippy::too_many_lines)]
+    fn tick(&mut self) -> bool {
+        match self.v.subtype {
+            0 => {
+                if self.v.progress > 0 {
+                    self.write(5, u32::from(self.v.progress - 1));
+                    return true;
+                }
+                if self.industry(&mut 0) == 0 {
+                    return false;
+                }
+                if !self.increment() {
+                    self.write(3, 3701);
+                }
+                self.write(5, 7);
+                self.viewport();
+            }
+            3 => {
+                if self.v.progress < 2 {
+                    self.write(5, u32::from(self.v.progress + 1));
+                    return true;
+                }
+                self.write(5, 0);
+                if !self.increment() {
+                    return false;
+                }
+                self.viewport();
+            }
+            _ => {
+                self.write(5, u32::from(self.v.progress.wrapping_add(1)));
+                match self.v.subtype {
+                    1 | 4 | 10 | 11 => {
+                        let mut moved = false;
+                        if self.v.progress & (if self.v.subtype == 1 { 7 } else { 3 }) == 0 {
+                            self.write(2, self.v.z.wrapping_add(1) as u32);
+                            moved = true;
                         }
-                        moved = true;
-                    }
-                    u8::from(moved)
-                }
-                2 => {
-                    if v.progress & 3 == 0 {
-                        v.z = v.z.wrapping_add(1);
-                        return 1;
-                    }
-                    if v.progress & 7 == 1 {
-                        return if increment(v) { 1 } else { 6 };
-                    }
-                    0
-                }
-                5 | 7 => {
-                    if v.progress & 3 == 0 {
-                        if increment(v) { 1 } else { 6 }
-                    } else {
-                        0
-                    }
-                }
-                6 => {
-                    if v.progress & 7 == 0 {
-                        if !increment(v) {
-                            set_sprite(v, 3737);
+                        if self.v.progress & 15 == 4 {
+                            if !self.increment() {
+                                return false;
+                            }
+                            moved = true;
                         }
-                        c.phase = 1;
-                        return 2;
-                    }
-                    countdown(s)
-                }
-                8 => {
-                    if v.progress & 7 != 0 {
-                        return 0;
-                    }
-                    let b = BULLDOZER[usize::from(s.animation)];
-                    set_sprite(v, 1416 + b.1);
-                    v.x = v.x.wrapping_add(INC[b.0].0);
-                    v.y = v.y.wrapping_add(INC[b.0].1);
-                    s.substate = s.substate.wrapping_add(1);
-                    if s.substate >= b.2 {
-                        s.substate = 0;
-                        s.animation = s.animation.wrapping_add(1);
-                        if usize::from(s.animation) == BULLDOZER.len() {
-                            return 6;
+                        if moved {
+                            self.viewport();
                         }
                     }
-                    1
-                }
-                9 => bubble(s, v, c, leaves),
-                _ => {
-                    let _ = INITIAL[usize::from(v.subtype)];
-                    0
+                    2 => {
+                        if self.v.progress & 3 == 0 {
+                            self.write(2, self.v.z.wrapping_add(1) as u32);
+                            self.viewport();
+                        } else if self.v.progress & 7 == 1 {
+                            if !self.increment() {
+                                return false;
+                            }
+                            self.viewport();
+                        }
+                    }
+                    5 | 7 => {
+                        if self.v.progress & 3 == 0 {
+                            if !self.increment() {
+                                return false;
+                            }
+                            self.viewport();
+                        }
+                    }
+                    6 => {
+                        if self.v.progress & 7 == 0 {
+                            if !self.increment() {
+                                self.write(3, 3737);
+                            }
+                            self.viewport();
+                        }
+                        return self.countdown();
+                    }
+                    8 => {
+                        if self.v.progress & 7 != 0 {
+                            return true;
+                        }
+                        let b = BULLDOZER[usize::from(self.state().animation)];
+                        self.write(3, 1416 + b.1);
+                        self.write(0, self.v.x.wrapping_add(INC[b.0].0) as u32);
+                        self.write(1, self.v.y.wrapping_add(INC[b.0].1) as u32);
+                        self.state().substate = self.state().substate.wrapping_add(1);
+                        if self.state().substate >= b.2 {
+                            self.state().substate = 0;
+                            self.state().animation = self.state().animation.wrapping_add(1);
+                            if usize::from(self.state().animation) == BULLDOZER.len() {
+                                return false;
+                            }
+                        }
+                        self.viewport();
+                    }
+                    9 => return self.bubble(),
+                    _ => {
+                        let _ = INITIAL[usize::from(self.v.subtype)];
+                    }
                 }
             }
         }
+        true
     }
 }
 
@@ -464,25 +469,37 @@ pub unsafe extern "C" fn openttd_rust_effect_get(owner: *const State, field: u8)
     }
 }
 /// # Safety
-/// Owner and disjoint view/cursor/table are live, aligned, initialized and exclusive
-/// for this call. Table leaves cannot throw, reenter, allocate or retain pointers.
-/// Only private bytes persist; view/cursor are per-invocation copied observations.
-/// Returned external actions run after this call; reacquire current shared fields
-/// before resuming. No reference crosses an external action. Original subtype,
-/// animation-table and position preconditions apply. Panics/OOM abort.
+/// Owner is live/exclusive for this invocation. Context identifies its live C++
+/// shell. Tables and observation output are call-scoped and disjoint from owner;
+/// leaves cannot throw, reenter, destroy owner or retain output pointers. They may
+/// allocate (environmental failures terminate). No private-owner borrow survives
+/// a leaf. Shared mutations are immediate; only private animation bytes persist.
+/// False requests deletion after return; no Rust frame then accesses the owner.
+/// Save/load uses separate get/set exports and never runs these controllers.
+/// Original subtype, table-index and coordinate preconditions apply. Panics abort.
 #[allow(unsafe_code)]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_effect_step(
+pub unsafe extern "C" fn openttd_rust_effect_run(
     owner: *mut State,
-    view: *mut View,
-    cursor: *mut Cursor,
+    context: *mut c_void,
     leaves: *const Leaves,
+    services: *const Services,
     initialize: u8,
 ) -> u8 {
-    let (s, v, c, l) = unsafe { (&mut *owner, &mut *view, &mut *cursor, &*leaves) };
+    let leaves = unsafe { *leaves };
+    let mut v = View::default();
+    (leaves.observe)(context, &raw mut v);
+    let mut controller = Controller {
+        owner,
+        context,
+        leaves,
+        services: unsafe { *services },
+        v,
+    };
     if initialize != 0 {
-        init(s, v, c)
+        controller.init();
+        1
     } else {
-        step(s, v, c, l)
+        u8::from(controller.tick())
     }
 }
