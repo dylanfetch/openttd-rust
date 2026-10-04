@@ -29,6 +29,10 @@ def uses_ai(scenario):
     return scenario.get("water") == "structures"
 
 
+def game_args(scenario):
+    return ["-d", "yapf=3"] if scenario.get("water") else []
+
+
 def install(scenario, run_dir):
     if uses_ai(scenario):
         ai = run_dir / "ai/water-scenarios"

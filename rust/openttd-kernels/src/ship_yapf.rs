@@ -36,6 +36,7 @@ pub struct Input {
     pub ocean_frac: u8,
     pub canal_frac: u8,
     pub station: u8,
+    pub unit_number: u32,
 }
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -72,6 +73,7 @@ pub struct Leaves {
     pub visit_new: unsafe extern "C" fn(Patch) -> *mut c_void,
     pub visit_next: unsafe extern "C" fn(*mut c_void, Patch, *mut Patch) -> u8,
     pub visit_destroy: unsafe extern "C" fn(*mut c_void),
+    pub debug: unsafe extern "C" fn(u32, u8, u8, u32, u32, u32, i32, i32),
 }
 #[derive(Clone, Default)]
 pub struct Path(Vec<u8>);
@@ -187,6 +189,26 @@ impl Search {
     fn best(&self) -> Option<usize> {
         self.heap.get(1).copied()
     }
+    fn report(&self, input: &Input, leaves: &Leaves, kind: u8, rounds: u32, found: Option<usize>) {
+        let (cost, distance) = found.map_or((-1, -1), |index| {
+            let node = self.arena[index];
+            (node.cost, node.estimate.wrapping_sub(node.cost))
+        });
+        // SAFETY: the diagnostic leaf only formats copied scalars. It cannot
+        // reenter this owner; environmental output failures terminate in C++.
+        unsafe {
+            (leaves.debug)(
+                input.unit_number,
+                kind,
+                u8::from(found.is_some()),
+                rounds,
+                self.open.len() as u32,
+                self.closed.len() as u32,
+                cost,
+                distance,
+            );
+        }
+    }
     fn close(&mut self, index: usize) -> bool {
         if self.limit != 0 && self.closed.len() as i32 >= self.limit {
             return false;
@@ -257,12 +279,16 @@ fn region_path(
     if search.open.contains_key(&goal) {
         return path;
     }
+    let mut rounds = 0_u32;
     let best = loop {
+        rounds = rounds.wrapping_add(1);
         let Some(index) = search.best() else {
+            search.report(input, leaves, 0, rounds, None);
             return Vec::new();
         };
         let node = search.arena[index];
         if node.key == goal {
+            search.report(input, leaves, 0, rounds, Some(index));
             break index;
         }
         stats[0] += 1;
@@ -296,6 +322,7 @@ fn region_path(
         unsafe { (leaves.visit_destroy)(cursor) };
         if !search.close(index) {
             stats[11] += 1;
+            search.report(input, leaves, 0, rounds, None);
             return Vec::new();
         }
     };
@@ -395,10 +422,16 @@ fn low_search(
             None,
         ));
     }
+    let mut rounds = 0_u32;
     loop {
-        let index = search.best()?;
+        rounds = rounds.wrapping_add(1);
+        let Some(index) = search.best() else {
+            search.report(input, leaves, 1, rounds, None);
+            return None;
+        };
         let parent = search.arena[index];
         if matches(input, leaves, context, parent, intermediate) {
+            search.report(input, leaves, 1, rounds, Some(index));
             return Some((search, index, input.dest_tile));
         }
         stats[1] += 1;
@@ -476,6 +509,7 @@ fn low_search(
         }
         if !search.close(index) {
             stats[3] += 1;
+            search.report(input, leaves, 1, rounds, None);
             return None;
         }
     }

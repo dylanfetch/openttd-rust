@@ -104,10 +104,10 @@ pub fn layout(type_id: u8, item: u8) -> usize {
             layout!(crate::cargo_payment::Services, item; spec, callback, near, station_read, industry_read, industry_write, refuses, accept, statistics, monitor, subsidised, industry_effect, vehicle_read, settle, feeder, setting)
         }
         52 => {
-            layout!(crate::ship_yapf::Input, item; map_x, map_y, tile, dest_tile, curve90, curve45, max_speed, dest_dirs, reverse_dirs, trackdir, ocean_frac, canal_frac, station)
+            layout!(crate::ship_yapf::Input, item; map_x, map_y, tile, dest_tile, curve90, curve45, max_speed, dest_dirs, reverse_dirs, trackdir, ocean_frac, canal_frac, station, unit_number)
         }
         53 => {
-            layout!(crate::ship_yapf::Leaves, item; destination, follow, tile, patch, visit_new, visit_next, visit_destroy)
+            layout!(crate::ship_yapf::Leaves, item; destination, follow, tile, patch, visit_new, visit_next, visit_destroy, debug)
         }
         54 => layout!(crate::ship_yapf::Follow, item; tile, skipped, dirs, followed),
         55 => layout!(crate::ship_yapf::Tile, item; ships, docking, sea, lock_middle, destination),
