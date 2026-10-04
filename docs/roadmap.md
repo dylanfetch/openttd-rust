@@ -60,6 +60,7 @@ Metrics are `tools/port-metrics.py`: Rust / tooling / C++ glue / C++ retired.
 | #99 | Tree generation, simulation, planting | #102 | `602b5a60ff` | 1288 / 561 / 247 / 816 |
 | #101 | Effect vehicles | #105 | `f6a0d66b63` | 494 / 553 / 412 / 548 |
 | #104 | Water-region cache and graph service | #114 | `9732d8bfa2` | 459 / 610 / 273 / 407 |
+| #103 | Disaster scheduling, vehicles and event control | #118 | `d5edfcb4c5` | 1404 / 795 / 306 / 968 |
 
 Harness and process: #72 harness (#85), #84 play saves (#87), #97 provenance
 freeze (#100), #88 Ruff (#92), #75 partial-pixel fidelity (#91), #90 world-state
@@ -89,43 +90,39 @@ never in masks.
 
 ## Phase 3: current ownership work, in order
 
-1. **#103 Disaster scheduling, vehicles and event control, PR #118.**
-   Final independent review accepts the owner and evidence; wait required CI.
-   Actual #109/#113/#115 dependency ancestry is included; retain the real UFO/train,
-   airport, industry, release/reload and submarine lifecycle witnesses.
-2. **#117 Cargo payment and delivery ownership.** Selected after a fresh Astra
+1. **#117 Cargo payment and delivery ownership.** Selected after a fresh Astra
    high comparison with station ratings and industry production. Own CargoPayment
    state and lifetime, delivery acceptance/payment control, destination collection
    and the complete production-flush loop. Preserve Money saturation, native-width
    intermediates and CAPY lifecycle. Loading/reservation and shared industry state
    remain C++; this is not an income-formula extraction. Begin while earlier PRs
    are in review/CI, using the existing road scenarios and #107/#109 interfaces.
-3. **#119 Complete ship YAPF and path cache ownership.** Own both search levels,
+2. **#119 Complete ship YAPF and path cache ownership.** Own both search levels,
    their queues/arenas/corridor/retries and canonical `Ship::path`, including all
    controller and save adapters. Reuse #104's corpus; no separate comparison tool.
    Use integrated #104 and its real dependency ancestry.
-4. **#120 Complete town-growth control and private state.** Own tick traversal,
+3. **#120 Complete town-growth control and private state.** Own tick traversal,
    growth road walking/build choices, house selection and placement control,
    growth-rate/funding transitions and canonical counters/flags with CITY and
    legacy adapters. Keep unrelated town accounting and shared world state in C++.
    Add actual growth witnesses to the existing towns module.
-5. **#121 Complete road vehicle control and private state.** Own consist/tick
+4. **#121 Complete road vehicle control and private state.** Own consist/tick
    movement, blocking/overtaking/crash/servicing and day handling, canonical road
    counters and path cache, plus save/legacy/external mutation adapters. Existing
    road YAPF may return a temporary result for transfer to the empty Rust cache.
-6. **#122 Complete rail YAPF search, caches and reservation.** Own all four
+5. **#122 Complete rail YAPF search, caches and reservation.** Own all four
    searches, six specialization-specific global cache banks, rail-change
    invalidation, reservation traversal and rollback. Reuse the rail corpus and
    ship search machinery only where ordering matches; require branch witnesses.
-7. **#124 Complete road YAPF search and path construction.** Own both track and
+6. **#124 Complete road YAPF search and path construction.** Own both track and
    depot searches, all node/queue/segment state and reconstruction. Replace
    #121's temporary result bridge using its canonical path cache; do not claim
    the cache twice. Reuse road scenarios and compatible search support.
-8. **#125 Complete station cargo-service control and state.** Own loading order,
+7. **#125 Complete station cargo-service control and state.** Own loading order,
    service/cargo metadata, full loading/reservation/refit policy, acceptance,
    ratings/distribution and periodic service loops. Preserve #117's payment and
    production-flush owner and shared packet/flow/map storage. Reuse its fixtures.
-9. **Following selections:** rail vehicle controller, complete industry periodic
+8. **Following selections:** rail vehicle controller, complete industry periodic
    owner, company/economy loop, orders, cargo and their commands. Rail controller
    needs broader reversal/crossing/reservation evidence than the current two-train
    save; #122 should supply it. Aircraft stays gated on #111 and #86 input.
@@ -137,20 +134,19 @@ selection following `docs/design/world-state.md`.
 
 ## Resume checkpoint (2026-10-04)
 
-Root: `/root` (gpt-6-astra, ultra). Integration base `9732d8bfa2`; six
-integrations since steering, stocktake updated. Next stocktake after two more
-integrations. All rows below are active, not integrated completion.
+Root: `/root` (gpt-6-astra, ultra). Integration base `d5edfcb4c5`; seven
+integrations since steering. Stocktake covers the sixth; update it after the
+next integration. All rows below are active, not integrated completion.
 Worktrees are siblings of the main checkout unless a path says otherwise.
 
 | Issue / owner | Branch and checkpoint commit | Worktree | Next step |
 | --- | --- | --- | --- |
-| #103 `/root/disaster_ownership_103` (Sol high) | `port-disaster-vehicles` at `fa70c20cbf`, PR #118 | `openttd-rust-disasters` | Required CI remains; all platform builds pass. `/root/review_disasters_pr118` (Astra medium) accepts final water-base conflict resolution; local verify and component pair/self/soak pass. ABI 44/45. |
-| #117 `/root/cargo_payment_delivery` (Sol high) | `cargo-payment-delivery-117` at `0523686b93`, PR #123 | `openttd-rust-cargo-payment` | Required CI remains. `/root/review_cargo_pr123` (Astra medium) accepts service-table validity and fresh-transfer fixes plus final water-base resolution; verify, pair/self/soak pass. ABI 49-51. |
-| #119 `/root/ship_yapf_ownership` (Sol high) | `ship-yapf-ownership-119` at `10164c2c4b`, PR #126 | `openttd-rust-ship-yapf` | Required CI remains. `/root/review_ship_yapf_pr126` (Astra medium) accepts final owner and evidence: corpus pair/self/soak, real alternate docking, native unreachable limits and detected cache mutation. ABI 52-56. |
-| #120 `/root/town_growth_ownership` (Sol high) | `town-growth-ownership-120` at `350aec9e30`, uncommitted owner | `openttd-rust-town-growth` | Coast versus plain-water bridge predicate fixed after soak RNG divergence; retained failing tick and unchanged soak10/10 match. Finish verify/comparisons, merge current base, open draft PR and assign fresh reviewer. Tunnel gap: 1,508 unchanged-reference cases. ABI 60+. |
-| #121 `/root/road_vehicle_ownership` (Sol high) | `road-vehicle-ownership-121` at `a2eadaedb1` | `openttd-rust-road-vehicles` | Actual disaster dependency included; road+disaster pair31/31 passes. Save adapters complete; `/root/road_controller_scenarios` supplies eight focused witnesses in roads.py. Finish combined evidence and open draft PR for fresh review. ABI 80-83. |
-| #122 `/root/rail_yapf_ownership` (Sol high) | `rail-yapf-ownership-122` at `72ddedf780`, implementation underway | `openttd-rust-rail-yapf` | Owner implements all searches, caches and reservation. `/root/rail_yapf_scenarios` extends rails.py with actual reservation/reload and 90-degree-policy witnesses; establish cache reuse and name unreachable limits for native checks. ABI 90-95. |
-| #124 `/root/road_yapf_ownership` (Sol high) | Not started; use #121 path API | To create `openttd-rust-road-yapf` | Selected; full road search and reconstruction, no separate persistent cache. |
+| #117 `/root/cargo_payment_delivery` (Sol high) | `cargo-payment-delivery-117` at `0523686b93`, PR #123 | `openttd-rust-cargo-payment` | Accepted review; root fixes three MSVC conversion warnings and updates disaster base before same-reviewer recheck and CI. ABI 49-51. |
+| #119 `/root/ship_yapf_ownership` (Sol high) | `ship-yapf-ownership-119` at `10164c2c4b`, PR #126 | `openttd-rust-ship-yapf` | Accepted review; root fixes native-fixture size_t conversion warning and updates disaster base before same-reviewer recheck and CI. ABI 52-56. |
+| #120 `/root/town_growth_ownership` (Sol high) | `town-growth-ownership-120` at `9fbeaa00d1`, PR #127 | `openttd-rust-town-growth` | `/root/review_town_growth_pr127` (Astra medium) accepts final owner and evidence. Verify and unchanged soak10/10 pass after coast predicate and live callback-mask fixes. Required CI remains; update disaster base if conflicting. ABI 60/61. |
+| #121 `/root/road_vehicle_ownership` (Sol high) | `road-vehicle-ownership-121` at `44e18fce02`, PR #128 | `openttd-rust-road-vehicles` | Actual disaster dependency included. Final verify, roads8/8 and soak10/10 pass. `/root/review_road_control_pr128` (Astra medium) reviews; required CI runs. Short road inputs explicitly postpone five LGRJ joins, leaving vehicle/map fields unchanged. ABI 80-83. |
+| #122 `/root/rail_yapf_ownership` (Sol high) | `rail-yapf-ownership-122` at `72ddedf780`, uncommitted owner | `openttd-rust-rail-yapf` | Owner implements all searches/caches/reservation and builds. Scenario helper complete: reference-self/soak6/6 prove cache reuse, reservations/reload and both 90-degree policies. Run candidate; bounded native gaps remain for node limit, safe/rollback and live mutation. ABI 90-95/97. |
+| #124 `/root/road_yapf_ownership` (Sol high) | `road-yapf-ownership-124` at `2f59e67086` | `openttd-rust-road-yapf` | Actual #121 dependency merged; replace temporary path-result bridge with whole Rust search. Reuse road evidence and exact heap ordering. ABI 100-109 reserved. |
 | #125 `/root/station_service_ownership` (Sol high) | Not started; depends on #117 owner | To create `openttd-rust-station-service` | Selected; complete station service state and periodic/loading control, reusing economic fixtures. |
 
 Preserved evidence branches: `evidence-disaster-vehicles` at `a775543162`
@@ -167,8 +163,9 @@ whole growth-loop and house-placement scope now selected as #120. Continue
 per-PR reviews while CI runs. `/root/plan_next_vehicle_owners` (Astra high)
 selected road control then rail YAPF as #121/#122; reserve complete rail control
 until its coupled branches have suitable evidence. Fresh Astra high planner `/root/plan_after_vehicle_pathfinding` selected #124
-and #125. Two unstarted owners are queued; replenish when fewer than two
-remain. A future industry selection must include histories, daily/monthly control,
+and #125. Only #125 remains unstarted. Fresh Astra high planner
+`/root/plan_next_simulation_owners` compares complete rail control, industry
+periodic ownership and company/economy or orders for the next selections. A future industry selection must include histories, daily/monthly control,
 closure and builder targets/backoff, not only the short production tick.
 
 ## Choosing the next task
