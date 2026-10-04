@@ -440,7 +440,7 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 				uint8_t user_def_data = 0;
 
 				for (const Vehicle *u = v; u != nullptr; u = u->Next()) {
-					if (v->type == VEH_TRAIN) user_def_data |= Train::From(u)->tcache.user_def_data;
+					if (v->type == VEH_TRAIN) user_def_data |= Train::From(u)->GetUserDefData();
 
 					/* Skip empty engines */
 					if (!u->GetEngine()->CanCarryCargo()) continue;
@@ -565,7 +565,7 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 					RailType rt = GetTileRailType(v->tile);
 					const RailTypeInfo *rti = GetRailTypeInfo(rt);
 					return (rti->flags.Test(RailTypeFlag::Catenary) ? 0x200 : 0) |
-						(HasPowerOnRail(Train::From(v)->railtypes, rt) ? 0x100 : 0) |
+						(HasPowerOnRail(Train::From(v)->GetRailTypes(), rt) ? 0x100 : 0) |
 						GetReverseRailTypeTranslation(rt, object->ro.grffile);
 				}
 
@@ -728,15 +728,15 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 
 			if (v->type == VEH_TRAIN) {
 				const Train *t = Train::From(v);
-				bool is_powered_wagon = t->flags.Test(VehicleRailFlag::PoweredWagon);
+				bool is_powered_wagon = t->GetTrainFlags().Test(VehicleRailFlag::PoweredWagon);
 				const Train *u = is_powered_wagon ? t->First() : t; // for powered wagons the engine defines the type of engine (i.e. railtype)
 				RailType railtype = GetRailType(v->tile);
 				bool powered = t->IsEngine() || is_powered_wagon;
-				bool has_power = HasPowerOnRail(u->railtypes, railtype);
+				bool has_power = HasPowerOnRail(u->GetRailTypes(), railtype);
 
 				if (powered && has_power) SetBit(modflags, 5);
 				if (powered && !has_power) SetBit(modflags, 6);
-				if (t->flags.Test(VehicleRailFlag::Reversed)) SetBit(modflags, 8);
+				if (t->GetTrainFlags().Test(VehicleRailFlag::Reversed)) SetBit(modflags, 8);
 			}
 			if (v->vehicle_flags.Test(VehicleFlag::CargoUnloading)) SetBit(modflags, 1);
 			if (v->vehicle_flags.Test(VehicleFlag::BuiltAsPrototype)) SetBit(modflags, 10);
@@ -775,7 +775,7 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 				ticks = v->load_unload_ticks;
 			} else {
 				switch (v->type) {
-					case VEH_TRAIN:    ticks = Train::From(v)->wait_counter; break;
+					case VEH_TRAIN:    ticks = Train::From(v)->GetWaitCounter(); break;
 					case VEH_AIRCRAFT: ticks = Aircraft::From(v)->turn_counter; break;
 					default:           ticks = 0; break;
 				}
@@ -850,7 +850,7 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 		case 0x47: return GB(v->GetEngine()->grf_prop.local_id, 8, 8);
 		case 0x48:
 			if (v->type != VEH_TRAIN || v->spritenum != CUSTOM_VEHICLE_SPRITENUM) return v->spritenum;
-			return Train::From(v)->flags.Test(VehicleRailFlag::Flipped) ? CUSTOM_VEHICLE_SPRITENUM_REVERSED : CUSTOM_VEHICLE_SPRITENUM;
+			return Train::From(v)->GetTrainFlags().Test(VehicleRailFlag::Flipped) ? CUSTOM_VEHICLE_SPRITENUM_REVERSED : CUSTOM_VEHICLE_SPRITENUM;
 
 		case 0x49: return v->day_counter;
 		case 0x4A: return v->breakdowns_since_last_service;
@@ -914,8 +914,8 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 		case VEH_TRAIN: {
 			Train *t = Train::From(v);
 			switch (variable - 0x80) {
-				case 0x62: return t->track;
-				case 0x66: return t->railtypes.GetNthSetBit(0).value_or(RailType::INVALID_RAILTYPE);
+				case 0x62: return t->GetTrack();
+				case 0x66: return t->GetRailTypes().GetNthSetBit(0).value_or(RailType::INVALID_RAILTYPE);
 				case 0x73: return 0x80 + VEHICLE_LENGTH - t->gcache.cached_veh_length;
 				case 0x74: return t->gcache.cached_power;
 				case 0x75: return GB(t->gcache.cached_power,  8, 24);

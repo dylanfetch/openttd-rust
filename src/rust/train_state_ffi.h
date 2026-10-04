@@ -1,0 +1,33 @@
+/*
+ * This file is part of OpenTTD.
+ * OpenTTD is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, version 2.
+ * OpenTTD is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
+ */
+
+/** @file train_state_ffi.h Canonical train-private state owner. */
+#ifndef RUST_TRAIN_STATE_FFI_H
+#define RUST_TRAIN_STATE_FFI_H
+#include <cstdint>
+#if defined(_MSC_VER)
+#define OPENTTD_TRAIN_STATE_CALL __cdecl
+#elif defined(__i386__)
+#define OPENTTD_TRAIN_STATE_CALL __attribute__((cdecl))
+#else
+#define OPENTTD_TRAIN_STATE_CALL
+#endif
+struct OpenTTDTrainState;
+extern "C" {
+/* One zero-created allocation per ordinary/indexed-load shell. Destroy exactly
+ * once after PreDestructor, including pool cleanup. Game-thread scalar access;
+ * no returned references, no owner borrow across callbacks, panic/OOM abort.
+ * Selectors 0..10: flags:u16, crash:u16, wait:u16, compatible-railtypes:u64,
+ * railtypes:u64, track:u8, force-proceed:u8, tilt:bool, user-data:u8,
+ * curve-modifier:i16, max-curve-speed:u16. Writes narrow to original widths.
+ * Signed curve values travel as their low 16-bit representation. */
+OpenTTDTrainState *OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_new();
+void OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_destroy(OpenTTDTrainState *);
+uint64_t OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_get(const OpenTTDTrainState *, uint8_t);
+void OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_set(OpenTTDTrainState *, uint8_t, uint64_t);
+}
+#endif /* RUST_TRAIN_STATE_FFI_H */

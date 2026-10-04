@@ -175,6 +175,25 @@ pub fn layout(type_id: u8, item: u8) -> usize {
         138 => {
             layout!(crate::industry::ProductionResult, item; subtract, add, again, cargo_input, cargo_output, version, num_input, num_output, present)
         }
+
+        160 => {
+            layout!(crate::train_reservation::View, item; tile, dest, next, destination, last_station, direction, order, num_orders, order_index, suppress, nearest)
+        }
+        161 => {
+            layout!(crate::train_reservation::Follow, item; old_tile, new_tile, skipped, dirs, old_td, exitdir, tunnel, bridge, station, error)
+        }
+        162 => layout!(crate::train_reservation::Pbs, item; tile, other, td, okay),
+        163 => {
+            layout!(crate::train_reservation::Step, item; value, action, id, tile, final_dest, td, dir, tracks, reserve, found, got, okay)
+        }
+        164 => {
+            layout!(crate::train_reservation::Leaves, item; observe, leaf, owner, follow, origin)
+        }
+        151 => {
+            layout!(crate::train::View, item; id,first,next,previous,next_unit,last,tile,dest,x,y,z,order_time,power,weight,length,total_length,max_speed,max_track_speed,speed,gv_flags,cargo_cap,refit_cap,engine,first_engine,order_destination,last_station,direction,status,tick,running,day,progress,subspeed,acceleration,order,nonstop,breakdown,front,free_wagon,articulated,engine_part,multiheaded,owner,vis_effect)
+        }
+        152 => layout!(crate::train::Leaves, item; observe,write,leaf,owner,nearby),
+        153 => layout!(crate::train::Action, item; op,id,a,b,c),
         _ => usize::MAX,
     }
 }

@@ -1,0 +1,318 @@
+/*
+ * This file is part of OpenTTD.
+ * OpenTTD is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, version 2.
+ * OpenTTD is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
+ */
+
+/** @file train_ffi.h Complete train owner shared-world boundary. */
+#ifndef RUST_TRAIN_FFI_H
+#define RUST_TRAIN_FFI_H
+#include <cstdint>
+#include <cstddef>
+#include "train_state_ffi.h"
+#include "services_ffi.h"
+/* One ordinary/indexed C++ train shell owns one opaque train_state allocation.
+ * Copied views describe shared Vehicle/GroundVehicle fields and topology only;
+ * no STL or pool object layout is visible to Rust. Scalar owner access ends before
+ * each world service. World leaves are noexcept; environmental failures terminate.
+ * Tasks own temporary control state and release every world/owner borrow before
+ * returning a named action. Only ordinary callback/reentry services are dispatched:
+ * tile/depot entry, generic orders/loading, station animation/sounds, destruction
+ * and controller/YAPF paths that can reserve station track. RNG, bounded reservation
+ * operations, depot search, and map/pool access are direct.
+ * C++ destroys the task once on completion or callback exception. Canonical state
+ * lives in the shell owner, never in a persistent copy. Panics/OOM abort.
+ * Descriptors and copied output pointers live for their individual calls; the
+ * immutable function table remains valid through task destruction. */
+extern "C" {
+struct OpenTTDTrainView {
+	uint32_t id;
+	uint32_t first;
+	uint32_t next;
+	uint32_t previous;
+	uint32_t next_unit;
+	uint32_t last;
+	uint32_t tile;
+	uint32_t dest;
+	int32_t x;
+	int32_t y;
+	int32_t z;
+	int32_t order_time;
+	uint32_t power;
+	uint32_t weight;
+	uint16_t length;
+	uint16_t total_length;
+	uint16_t max_speed;
+	uint16_t max_track_speed;
+	uint16_t speed;
+	uint16_t gv_flags;
+	uint16_t cargo_cap;
+	uint16_t refit_cap;
+	uint16_t engine;
+	uint16_t first_engine;
+	uint16_t order_destination;
+	uint16_t last_station;
+	uint8_t direction;
+	uint8_t status;
+	uint8_t tick;
+	uint8_t running;
+	uint8_t day;
+	uint8_t progress;
+	uint8_t subspeed;
+	uint8_t acceleration;
+	uint8_t order;
+	uint8_t nonstop;
+	uint8_t breakdown;
+	uint8_t front;
+	uint8_t free_wagon;
+	uint8_t articulated;
+	uint8_t engine_part;
+	uint8_t multiheaded;
+	uint8_t owner;
+	uint8_t vis_effect;
+};
+struct OpenTTDTrainServices {
+	void (*observe)(uint32_t, OpenTTDTrainView *) noexcept;
+	void (*write)(uint32_t, uint32_t, uint64_t) noexcept;
+	uint64_t (*leaf)(uint32_t, uint32_t, uint64_t, uint64_t, uint64_t) noexcept;
+	OpenTTDTrainState *(*owner)(uint32_t) noexcept;
+	size_t (*nearby)(uint32_t, uint32_t, int32_t, int32_t, uint32_t *, size_t) noexcept;
+};
+struct OpenTTDTrainAction { uint32_t op, id; uint64_t a, b, c; };
+void *openttd_rust_train_create(uint32_t, uint32_t, uint64_t, uint64_t, uint64_t, const OpenTTDTrainServices *, const OpenTTDSharedServices *);
+OpenTTDTrainAction openttd_rust_train_advance(void *, uint64_t);
+void openttd_rust_train_destroy(void *);
+}
+constexpr uint32_t TRAIN_WRITE_TILE = 0;
+constexpr uint32_t TRAIN_WRITE_DEST = 1;
+constexpr uint32_t TRAIN_WRITE_X = 2;
+constexpr uint32_t TRAIN_WRITE_Y = 3;
+constexpr uint32_t TRAIN_WRITE_Z = 4;
+constexpr uint32_t TRAIN_WRITE_DIRECTION = 5;
+constexpr uint32_t TRAIN_WRITE_SPEED = 6;
+constexpr uint32_t TRAIN_WRITE_TICK = 7;
+constexpr uint32_t TRAIN_WRITE_RUNNING = 8;
+constexpr uint32_t TRAIN_WRITE_DAY = 9;
+constexpr uint32_t TRAIN_WRITE_ORDER_TIME = 10;
+constexpr uint32_t TRAIN_WRITE_PROGRESS = 11;
+constexpr uint32_t TRAIN_WRITE_SUBSPEED = 12;
+constexpr uint32_t TRAIN_WRITE_GV_FLAGS = 13;
+constexpr uint32_t TRAIN_WRITE_ACCELERATION = 14;
+constexpr uint32_t TRAIN_WRITE_LENGTH = 15;
+constexpr uint32_t TRAIN_WRITE_TOTAL_LENGTH = 16;
+constexpr uint32_t TRAIN_WRITE_FIRST_ENGINE = 17;
+constexpr uint32_t TRAIN_WRITE_MAX_SPEED = 18;
+constexpr uint32_t TRAIN_WRITE_CARGO_CAP = 19;
+constexpr uint32_t TRAIN_WRITE_REFIT_CAP = 20;
+constexpr uint32_t TRAIN_WRITE_CARGO_AGE = 21;
+constexpr uint32_t TRAIN_WRITE_LAST_STATION = 22;
+constexpr uint32_t TRAIN_WRITE_COLOURMAP = 23;
+constexpr uint32_t TRAIN_WRITE_STATUS = 24;
+constexpr uint32_t TRAIN_OP_ACC_MODEL = 0;
+constexpr uint32_t TRAIN_OP_RAIL_TILT = 1;
+constexpr uint32_t TRAIN_OP_CURVE_MOD = 2;
+constexpr uint32_t TRAIN_OP_RAIL_TYPES = 3;
+constexpr uint32_t TRAIN_OP_USER_DEFAULT = 4;
+constexpr uint32_t TRAIN_OP_POW_WAG_POWER = 5;
+constexpr uint32_t TRAIN_OP_RAILVEH_WAGON = 6;
+constexpr uint32_t TRAIN_OP_ENGINE_POWER = 7;
+constexpr uint32_t TRAIN_OP_WAGON_OVERRIDE = 8;
+constexpr uint32_t TRAIN_OP_WAGON_SPEED_LIMITS = 9;
+constexpr uint32_t TRAIN_OP_SPEED_DEFAULT = 10;
+constexpr uint32_t TRAIN_OP_ALL_POWERED = 11;
+constexpr uint32_t TRAIN_OP_ALL_COMPATIBLE = 12;
+constexpr uint32_t TRAIN_OP_CARGO_AGE_DEFAULT = 13;
+constexpr uint32_t TRAIN_OP_GRF_VERSION = 14;
+constexpr uint32_t TRAIN_OP_LENGTH_CALLBACK = 15;
+constexpr uint32_t TRAIN_OP_LENGTH_DEFAULT = 16;
+constexpr uint32_t TRAIN_OP_INVALIDATE_GRF = 17;
+constexpr uint32_t TRAIN_OP_CACHE_OVERRIDE = 18;
+constexpr uint32_t TRAIN_OP_VIS_EFFECT = 19;
+constexpr uint32_t TRAIN_OP_PROPERTY = 20;
+constexpr uint32_t TRAIN_OP_CAPACITY = 21;
+constexpr uint32_t TRAIN_OP_TRUNCATE_CARGO = 22;
+constexpr uint32_t TRAIN_OP_CAPACITY_ERROR = 23;
+constexpr uint32_t TRAIN_OP_LENGTH_ERROR = 24;
+constexpr uint32_t TRAIN_OP_CALLBACK_LENGTH = 25;
+constexpr uint32_t TRAIN_OP_LENGTH_CHANGED = 26;
+constexpr uint32_t TRAIN_OP_CARGO_CHANGED = 27;
+constexpr uint32_t TRAIN_OP_CONSIST_WINDOWS = 28;
+constexpr uint32_t TRAIN_OP_CURVE_ADVANTAGE = 29;
+constexpr uint32_t TRAIN_OP_IS_STATION = 30;
+constexpr uint32_t TRAIN_OP_STATION = 31;
+constexpr uint32_t TRAIN_OP_ORDER_STOP = 32;
+constexpr uint32_t TRAIN_OP_PLATFORM_AHEAD = 33;
+constexpr uint32_t TRAIN_OP_PLATFORM_LENGTH = 34;
+constexpr uint32_t TRAIN_OP_STOP_LOCATION = 35;
+constexpr uint32_t TRAIN_OP_BRIDGE_SPEED = 36;
+constexpr uint32_t TRAIN_OP_ORDER_MAX_SPEED = 37;
+constexpr uint32_t TRAIN_OP_ACCELERATION = 38;
+constexpr uint32_t TRAIN_OP_UPDATE_SPEED = 39;
+constexpr uint32_t TRAIN_OP_VIEWPORT = 40;
+constexpr uint32_t TRAIN_OP_POSITION = 41;
+constexpr uint32_t TRAIN_OP_INCLINATION = 42;
+constexpr uint32_t TRAIN_OP_AGE = 43;
+constexpr uint32_t TRAIN_OP_ECONOMY_AGE = 44;
+constexpr uint32_t TRAIN_OP_DECREASE_VALUE = 45;
+constexpr uint32_t TRAIN_OP_CHECK_BREAKDOWN = 46;
+constexpr uint32_t TRAIN_OP_CHECK_ORDERS = 47;
+constexpr uint32_t TRAIN_OP_SERVINT = 48;
+constexpr uint32_t TRAIN_OP_NEEDS_SERVICE = 49;
+constexpr uint32_t TRAIN_OP_CHAIN_DEPOT = 50;
+constexpr uint32_t TRAIN_OP_SERVICE = 51;
+constexpr uint32_t TRAIN_OP_MAX_DEPOT_PENALTY = 52;
+constexpr uint32_t TRAIN_OP_DEPOT_INDEX = 53;
+constexpr uint32_t TRAIN_OP_ORDER_DUMMY = 54;
+constexpr uint32_t TRAIN_OP_ORDER_DEPOT_SERVICE = 55;
+constexpr uint32_t TRAIN_OP_SUPPRESS_IMPLICIT = 56;
+constexpr uint32_t TRAIN_OP_START_STOP_DIRTY = 57;
+constexpr uint32_t TRAIN_OP_STATION_DEST = 58;
+constexpr uint32_t TRAIN_OP_COST_CLASS = 59;
+constexpr uint32_t TRAIN_OP_COST_DEFAULT = 60;
+constexpr uint32_t TRAIN_OP_PRICE = 61;
+constexpr uint32_t TRAIN_OP_PAY_RUNNING = 62;
+constexpr uint32_t TRAIN_OP_RUNNING_WINDOWS = 63;
+constexpr uint32_t TRAIN_OP_COST_DIVISOR = 64;
+constexpr uint32_t TRAIN_OP_INVALID_PRICE = 65;
+constexpr uint32_t TRAIN_OP_IS_DEPOT = 66;
+constexpr uint32_t TRAIN_OP_DEPOT_DIR = 67;
+constexpr uint32_t TRAIN_OP_TUNNEL_DIR = 68;
+constexpr uint32_t TRAIN_OP_TRACK_DIRECTION = 69;
+constexpr uint32_t TRAIN_OP_DIAG_TRACKDIR = 70;
+constexpr uint32_t TRAIN_OP_DIR_DIAG = 71;
+constexpr uint32_t TRAIN_OP_FIRST_TRACK = 72;
+constexpr uint32_t TRAIN_OP_PROP_TRAIN_USER_DATA = 73;
+constexpr uint32_t TRAIN_OP_PROP_TRAIN_SPEED = 74;
+constexpr uint32_t TRAIN_OP_PROP_TRAIN_CARGO_AGE_PERIOD = 75;
+constexpr uint32_t TRAIN_OP_PROP_TRAIN_SHORTEN_FACTOR = 76;
+constexpr uint32_t TRAIN_OP_PROP_TRAIN_RUNNING_COST_FACTOR = 77;
+constexpr uint32_t TRAIN_OP_IS_TUNNELBRIDGE = 78;
+constexpr uint32_t TRAIN_OP_IS_BRIDGE = 79;
+constexpr uint32_t TRAIN_OP_IS_RAILWAY = 80;
+constexpr uint32_t TRAIN_OP_IS_PLAIN_RAIL = 81;
+constexpr uint32_t TRAIN_OP_IS_CROSSING = 82;
+constexpr uint32_t TRAIN_OP_IS_WAYPOINT = 83;
+constexpr uint32_t TRAIN_OP_MAP_SIZE = 84;
+constexpr uint32_t TRAIN_OP_VEH_EXIT_DIR = 85;
+constexpr uint32_t TRAIN_OP_TILE_ADD_DIAG = 86;
+constexpr uint32_t TRAIN_OP_TILE_OFFSET_DIAG = 87;
+constexpr uint32_t TRAIN_OP_TILE_VIRT = 88;
+constexpr uint32_t TRAIN_OP_TRACKDIR_EXIT = 89;
+constexpr uint32_t TRAIN_OP_DIAG_AXIS = 90;
+constexpr uint32_t TRAIN_OP_AXIS_DIAG = 91;
+constexpr uint32_t TRAIN_OP_CROSSING_ROAD_AXIS = 92;
+constexpr uint32_t TRAIN_OP_CROSSING_RAIL_AXIS = 93;
+constexpr uint32_t TRAIN_OP_CROSSING_RESERVED = 94;
+constexpr uint32_t TRAIN_OP_CROSSING_BARRED = 95;
+constexpr uint32_t TRAIN_OP_WRITE_CROSSING_RES = 96;
+constexpr uint32_t TRAIN_OP_WRITE_CROSSING_BAR = 97;
+constexpr uint32_t TRAIN_OP_DIRTY_TILE = 98;
+constexpr uint32_t TRAIN_OP_CROSSING_SOUND = 99;
+constexpr uint32_t TRAIN_OP_AMBIENT_SOUND = 100;
+constexpr uint32_t TRAIN_OP_COMPATIBLE_RAIL_OWNER = 101;
+constexpr uint32_t TRAIN_OP_RAIL_TYPE = 102;
+constexpr uint32_t TRAIN_OP_TILE_RAIL_TYPE = 103;
+constexpr uint32_t TRAIN_OP_SIGNALS_UPDATE = 104;
+constexpr uint32_t TRAIN_OP_SIGNALS_UPDATE_OWNER = 105;
+constexpr uint32_t TRAIN_OP_RESERVE_PATHS = 106;
+constexpr uint32_t TRAIN_OP_NO_90 = 107;
+constexpr uint32_t TRAIN_OP_TRACK_CROSSES = 108;
+constexpr uint32_t TRAIN_OP_TRACK_BITS = 109;
+constexpr uint32_t TRAIN_OP_TRACKDIR_REACHES = 110;
+constexpr uint32_t TRAIN_OP_DIAG_REACHES_TRACKS = 111;
+constexpr uint32_t TRAIN_OP_TRACK_STATUS = 112;
+constexpr uint32_t TRAIN_OP_DIAG_BETWEEN = 113;
+constexpr uint32_t TRAIN_OP_HAS_SIGNAL_TD = 114;
+constexpr uint32_t TRAIN_OP_HAS_SIGNAL = 115;
+constexpr uint32_t TRAIN_OP_SIGNAL_TYPE = 116;
+constexpr uint32_t TRAIN_OP_SIGNAL_PBS = 117;
+constexpr uint32_t TRAIN_OP_SIGNAL_HAS_PBS = 118;
+constexpr uint32_t TRAIN_OP_ONEWAY_BLOCKING = 119;
+constexpr uint32_t TRAIN_OP_HAS_SIGNALS = 120;
+constexpr uint32_t TRAIN_OP_SET_SIGNAL_STATE = 121;
+constexpr uint32_t TRAIN_OP_SHOW_RESERVATION = 122;
+constexpr uint32_t TRAIN_OP_HAS_DEPOT_RES = 123;
+constexpr uint32_t TRAIN_OP_SET_DEPOT_RES = 124;
+constexpr uint32_t TRAIN_OP_TRY_RESERVE = 125;
+constexpr uint32_t TRAIN_OP_HAS_RESERVED = 126;
+constexpr uint32_t TRAIN_OP_UNRESERVE = 127;
+constexpr uint32_t TRAIN_OP_OTHER_END = 128;
+constexpr uint32_t TRAIN_OP_SET_TUNNEL_RES = 129;
+constexpr uint32_t TRAIN_OP_SET_PLATFORM_RES = 130;
+constexpr uint32_t TRAIN_OP_STATION_AXIS = 131;
+constexpr uint32_t TRAIN_OP_STATION_COMPATIBLE = 132;
+constexpr uint32_t TRAIN_OP_SIGNALS_BOTH = 133;
+constexpr uint32_t TRAIN_OP_BACKOFF = 134;
+constexpr uint32_t TRAIN_OP_REVERSE_AT_SIGNALS = 135;
+constexpr uint32_t TRAIN_OP_WAIT_ONEWAY = 136;
+constexpr uint32_t TRAIN_OP_WAIT_TWOWAY = 137;
+constexpr uint32_t TRAIN_OP_WAIT_PBS = 138;
+constexpr uint32_t TRAIN_OP_DAY_TICKS = 139;
+constexpr uint32_t TRAIN_OP_SIGSEG_PBS = 140;
+constexpr uint32_t TRAIN_OP_SIGSEG_FULL = 141;
+constexpr uint32_t TRAIN_OP_ACC_TYPE = 142;
+constexpr uint32_t TRAIN_OP_WAIT_UNBUNCH = 143;
+constexpr uint32_t TRAIN_OP_LEAVE_UNBUNCH = 144;
+constexpr uint32_t TRAIN_OP_RESET_UNBUNCH = 145;
+constexpr uint32_t TRAIN_OP_LAST_SPEED = 146;
+constexpr uint32_t TRAIN_OP_DEPOT_DIRTY = 147;
+constexpr uint32_t TRAIN_OP_DEPOT_WINDOW = 148;
+constexpr uint32_t TRAIN_OP_VIEW_WINDOW = 149;
+constexpr uint32_t TRAIN_OP_TRAIN_LIST = 150;
+constexpr uint32_t TRAIN_OP_HIDE_FILL = 151;
+constexpr uint32_t TRAIN_OP_COUNT_CHAIN = 152;
+constexpr uint32_t TRAIN_OP_DEPOT_TRACK = 153;
+constexpr uint32_t TRAIN_OP_TICKS_LEAVE_DEPOT = 154;
+constexpr uint32_t TRAIN_OP_UPDATE_DELTA = 155;
+constexpr uint32_t TRAIN_OP_BASE_VIEWPORT = 156;
+constexpr uint32_t TRAIN_OP_SHOW_EFFECT = 157;
+constexpr uint32_t TRAIN_OP_ADVANCE_DISTANCE = 158;
+constexpr uint32_t TRAIN_OP_ORDER_FREE = 159;
+constexpr uint32_t TRAIN_OP_HANDLE_BREAKDOWN = 160;
+constexpr uint32_t TRAIN_OP_LOST_WARN = 161;
+constexpr uint32_t TRAIN_OP_LOCAL_COMPANY = 162;
+constexpr uint32_t TRAIN_OP_STUCK_NEWS = 163;
+constexpr uint32_t TRAIN_OP_SET_NEXT = 164;
+constexpr uint32_t TRAIN_OP_CRASH_GROUND = 165;
+constexpr uint32_t TRAIN_OP_CRASH_EVENT = 166;
+constexpr uint32_t TRAIN_OP_CRASH_NEWS = 167;
+constexpr uint32_t TRAIN_OP_CRASH_RATING = 168;
+constexpr uint32_t TRAIN_OP_DISASTER_SOUND = 169;
+constexpr uint32_t TRAIN_OP_CRASH_SOUND = 170;
+constexpr uint32_t TRAIN_OP_LARGE_EXPLOSION = 171;
+constexpr uint32_t TRAIN_OP_SMALL_EXPLOSION = 172;
+constexpr uint32_t TRAIN_OP_VISIT_TYPE = 173;
+constexpr uint32_t TRAIN_OP_WRITE_VISIT_TYPE = 174;
+constexpr uint32_t TRAIN_OP_TRAIN_VISIT = 175;
+constexpr uint32_t TRAIN_OP_ARRIVAL_NEWS = 176;
+constexpr uint32_t TRAIN_OP_DISCONNECT = 177;
+constexpr uint32_t TRAIN_OP_ENTER_TILE = 178;
+constexpr uint32_t TRAIN_OP_ENTER_DEPOT = 179;
+constexpr uint32_t TRAIN_OP_PROCESS_ORDERS = 180;
+constexpr uint32_t TRAIN_OP_LOADING = 181;
+constexpr uint32_t TRAIN_OP_LEAVE_STATION = 182;
+constexpr uint32_t TRAIN_OP_BEGIN_LOADING = 183;
+constexpr uint32_t TRAIN_OP_ARRIVAL_TRIGGERS = 184;
+constexpr uint32_t TRAIN_OP_LEAVE_SOUND = 185;
+constexpr uint32_t TRAIN_OP_DELETE_VEHICLE = 186;
+constexpr uint32_t TRAIN_OP_CHOOSE_TRACK = 187;
+constexpr uint32_t TRAIN_OP_CHECK_NEXT = 188;
+constexpr uint32_t TRAIN_OP_TRY_PATH = 189;
+constexpr uint32_t TRAIN_OP_FREE_RESERVATION = 190;
+constexpr uint32_t TRAIN_OP_CLEAR_RESERVATION = 191;
+constexpr uint32_t TRAIN_OP_CHECK_REVERSE = 192;
+constexpr uint32_t TRAIN_OP_FIND_DEPOT_TILE = 193;
+constexpr uint32_t TRAIN_OP_TILE_OWNER = 194;
+constexpr uint32_t TRAIN_OP_PBS_SIGNAL_TYPE = 195;
+constexpr uint32_t TRAIN_OP_TILE_OFFSET_AXIS = 196;
+constexpr uint32_t TRAIN_OP_REVERSE_SINGLE_BLOCKED = 197;
+constexpr uint32_t TRAIN_OP_STOPPED_IN_DEPOT = 198;
+constexpr uint32_t TRAIN_OP_REVERSE_WINDOWS = 199;
+constexpr uint32_t TRAIN_OP_RESERVE_UNDER = 200;
+constexpr uint32_t TRAIN_OP_FIND_DEPOT = 201;
+constexpr uint32_t TRAIN_OP_RESERVE_TRACK = 202;
+constexpr uint32_t TRAIN_OP_IS_STATION_ANY = 203;
+constexpr uint32_t TRAIN_OP_PROFILE = 204;
+constexpr uint32_t TRAIN_OP_IS_STATION_RAIL = 205;
+#endif

@@ -1307,3 +1307,8 @@ mod water_regions;
 mod industry;
 #[allow(unsafe_code)]
 mod ship_yapf;
+
+mod train;
+mod train_state;
+
+mod train_reservation;
