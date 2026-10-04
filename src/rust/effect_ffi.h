@@ -31,7 +31,6 @@ typedef struct {
 	void (OPENTTD_EFFECT_CALL *write)(void *, uint8_t, uint32_t) noexcept;
 	void (OPENTTD_EFFECT_CALL *viewport)(void *) noexcept;
 	void (OPENTTD_EFFECT_CALL *sound)(void *, uint8_t) noexcept;
-	uint32_t (OPENTTD_EFFECT_CALL *industry)(int32_t, int32_t, uint32_t *) noexcept;
 	void (OPENTTD_EFFECT_CALL *animated)(uint32_t) noexcept;
 } OpenTTDEffectLeaves;
 /* One shell owns one zero-created state; destroy once after final use. get/set:

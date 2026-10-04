@@ -11,6 +11,7 @@
 #ifdef WITH_RUST
 #include "../clear_map.h"
 #include "../tree_map.h"
+#include "../industry_map.h"
 #include "../water_map.h"
 #include "../landscape.h"
 #include "../viewport_func.h"
@@ -51,9 +52,18 @@ static void WriteTile(void *, uint32_t op, uint32_t index, uint32_t a, uint32_t 
 }
 static float SharedTrig(uint32_t kind, float value) noexcept { return kind == 0 ? sinf(value) : cosf(value); }
 
+/** Pure map query; no allocation, reentry or C++ exception crosses into Rust. */
+static uint32_t SharedIndustry(int32_t x, int32_t y, uint32_t *index) noexcept
+{
+	TileIndex tile = TileVirtXY(x, y);
+	*index = tile.base();
+	if (!IsTileType(tile, MP_INDUSTRY)) return 0;
+	return GetIndustryGfx(tile) == GFX_BUBBLE_CATCHER ? 2 : 1;
+}
+
 const OpenTTDSharedServices &GetRustSharedServices() noexcept
 {
-	static const OpenTTDSharedServices services{nullptr, SharedRandom, ObserveTile, WriteTile, SharedTrig};
+	static const OpenTTDSharedServices services{nullptr, SharedRandom, ObserveTile, WriteTile, SharedTrig, SharedIndustry};
 	return services;
 }
 #endif /* WITH_RUST */

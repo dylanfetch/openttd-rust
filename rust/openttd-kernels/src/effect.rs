@@ -43,7 +43,6 @@ pub struct Leaves {
     pub write: extern "C" fn(*mut c_void, u8, u32),
     pub viewport: extern "C" fn(*mut c_void),
     pub sound: extern "C" fn(*mut c_void, u8),
-    pub industry: extern "C" fn(i32, i32, *mut u32) -> u32,
     pub animated: extern "C" fn(u32),
 }
 const INITIAL: [u32; 12] = [
@@ -244,7 +243,7 @@ impl Controller {
         (self.leaves.viewport)(self.context);
     }
     fn industry(&self, tile: &mut u32) -> u32 {
-        (self.leaves.industry)(self.v.x, self.v.y, tile)
+        (self.services.industry)(self.v.x, self.v.y, tile)
     }
     fn init(&mut self) {
         if self.v.subtype == 0 {

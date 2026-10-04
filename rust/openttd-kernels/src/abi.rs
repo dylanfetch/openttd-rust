@@ -78,10 +78,10 @@ pub fn layout(type_id: u8, item: u8) -> usize {
         }
         40 => 0, // Retired effect invocation cursor.
         41 => {
-            layout!(crate::effect::Leaves, item; observe, write, viewport, sound, industry, animated)
+            layout!(crate::effect::Leaves, item; observe, write, viewport, sound, animated)
         }
         42 => {
-            layout!(crate::services::Services, item; context, random, observe_tile, write_tile, trig)
+            layout!(crate::services::Services, item; context, random, observe_tile, write_tile, trig, industry)
         }
         _ => usize::MAX,
     }

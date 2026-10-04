@@ -557,15 +557,6 @@ static const std::array<EffectProcs, EV_END> _effect_procs = {{
 }};
 
 #else
-/** Pure map query; no allocation, reentry or C++ exception crosses into Rust. */
-static uint32_t OPENTTD_EFFECT_CALL EffectIndustry(int32_t x, int32_t y, uint32_t *index) noexcept
-{
-	TileIndex tile = TileVirtXY(x, y);
-	*index = tile.base();
-	if (!IsTileType(tile, MP_INDUSTRY)) return 0;
-	return GetIndustryGfx(tile) == GFX_BUBBLE_CATCHER ? 2 : 1;
-}
-
 static void OPENTTD_EFFECT_CALL EffectObserve(void *context, OpenTTDEffectView *view) noexcept
 {
 	auto *v = static_cast<EffectVehicle *>(context);
@@ -604,7 +595,7 @@ static void OPENTTD_EFFECT_CALL EffectAnimated(uint32_t tile) noexcept
 
 static bool RunEffect(EffectVehicle *v, bool initialize)
 {
-	static const OpenTTDEffectLeaves leaves{EffectObserve, EffectWrite, EffectViewport, EffectSound, EffectIndustry, EffectAnimated};
+	static const OpenTTDEffectLeaves leaves{EffectObserve, EffectWrite, EffectViewport, EffectSound, EffectAnimated};
 	if (openttd_rust_effect_run(v->rust_state.get(), v, &leaves, &GetRustSharedServices(), initialize) != 0) return true;
 	/* Expiry returns before destroying the Rust owner. Vehicle::~Vehicle and
 	 * Pool::FreeItem/PostDestructor run wholly outside any Rust frame/borrow. */

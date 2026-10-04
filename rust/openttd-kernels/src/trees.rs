@@ -968,6 +968,9 @@ mod tests {
             _ => 0,
         }
     }
+    extern "C" fn industry(_: i32, _: i32, _: *mut u32) -> u32 {
+        0
+    }
     fn engine(w: &mut World, kind: u32, a: u32, b: u32, c: u32) -> Engine {
         let context = std::ptr::from_mut(w).cast();
         Engine {
@@ -980,6 +983,7 @@ mod tests {
                 observe_tile: observe,
                 write_tile: write,
                 trig,
+                industry,
             },
             leaf,
             pending: Pending::Start(kind, 2, a, b, c),

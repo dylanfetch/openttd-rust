@@ -65,8 +65,8 @@ template <typename Check> void CheckEffectProtocol(Check check)
 	 * observe immediate writes, transient service order and RNG short circuit. */
 	EffectTestWorld w;
 	effect_test_world = &w;
-	const OpenTTDEffectLeaves leaves{EffectTestObserve, EffectTestWrite, EffectTestViewport, EffectTestSound, EffectTestIndustry, EffectTestAnimated};
-	const OpenTTDSharedServices services{&w, EffectTestRandom, EffectTestTile, EffectTestMapWrite, EffectTestTrig};
+	const OpenTTDEffectLeaves leaves{EffectTestObserve, EffectTestWrite, EffectTestViewport, EffectTestSound, EffectTestAnimated};
+	const OpenTTDSharedServices services{&w, EffectTestRandom, EffectTestTile, EffectTestMapWrite, EffectTestTrig, EffectTestIndustry};
 	auto owner = std::unique_ptr<OpenTTDEffectState, decltype(&openttd_rust_effect_destroy)>(openttd_rust_effect_new(), openttd_rust_effect_destroy);
 	check(openttd_rust_effect_get(owner.get(), 0) == 0 && openttd_rust_effect_get(owner.get(), 1) == 0);
 	openttd_rust_effect_set(owner.get(), 0, 65535);
