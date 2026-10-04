@@ -41,8 +41,8 @@ Three habits held back progress. The rules in `AGENTS.md` now prevent them.
 
 | Item | Disposition |
 | --- | --- |
-| PR #62 (BLAKE2b, Packet, X25519, string validation) | Reviewed. Base-updated after #80; integrate when its CI is green. Then close the superseded component drafts #57, #60, #61, #63. |
-| PR #70 / issue #65 (ScriptList VM control) | Stacked on #62. After #62 lands, update it from base (take the base workflow file), finish its review, integrate, and close #65. |
+| Issue #88 (ruff for `tools/`) | Do it first, before new port work: a linter is worth most before findings accumulate. Luna medium. |
+| PR #70 / issue #65 (ScriptList VM control) | CI green and mergeable (#62 landed). Finish its review, integrate, and close #65. |
 | PR #66 / issue #64 (curve family) | Paused: its macOS Release check fails, which needs another implementation round. Leave the draft open; no further work. |
 | Issue #68 (SHA-512/HMAC/HKDF/Ed25519) | Paused. No new `src/3rdparty` work beyond finishing #62/#66 as stated. |
 | Issue #69 (tile areas, bitmap, tile lists) | Paused. Revisit as an ownership port when station/industry work needs it. |
