@@ -9,6 +9,7 @@
 
 #ifndef YAPF_DESTRAIL_HPP
 #define YAPF_DESTRAIL_HPP
+#ifndef WITH_RUST
 
 #include "../../train.h"
 #include "../pathfinder_func.h"
@@ -204,5 +205,7 @@ public:
 		return true;
 	}
 };
+
+#endif /* !WITH_RUST */
 
 #endif /* YAPF_DESTRAIL_HPP */

@@ -12,6 +12,7 @@ mod aircraft;
 mod alternating;
 mod auth;
 mod byte_strings;
+mod cargo_payment;
 mod consumer;
 mod disaster;
 mod history;
@@ -20,11 +21,17 @@ mod landscape;
 mod linkgraph;
 mod math;
 mod packet;
+pub mod rail_yapf;
+mod road;
+mod road_data;
+mod road_yapf;
 mod script_list;
 pub mod services;
 mod station_cargo;
+mod station_service;
 mod string_validation;
 mod tgp;
+mod town;
 mod townname;
 mod townname_data;
 mod trees;
@@ -1297,3 +1304,6 @@ pub unsafe extern "C" fn openttd_rust_inplace_write(
 }
 
 mod water_regions;
+
+#[allow(unsafe_code)]
+mod ship_yapf;

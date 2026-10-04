@@ -66,10 +66,12 @@ Station::Station(TileIndex tile) :
 	bus_station(INVALID_TILE, 0, 0),
 	truck_station(INVALID_TILE, 0, 0),
 	ship_station(INVALID_TILE, 0, 0),
-	indtype(IT_INVALID),
-	time_since_load(255),
+	indtype(IT_INVALID)
+#ifndef WITH_RUST
+	, time_since_load(255),
 	time_since_unload(255),
 	last_vehicle_type(VEH_INVALID)
+#endif
 {
 	/* this->random_bits is set in Station::AddFacility() */
 }

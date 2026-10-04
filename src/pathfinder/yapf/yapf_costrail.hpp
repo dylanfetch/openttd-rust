@@ -9,6 +9,7 @@
 
 #ifndef YAPF_COSTRAIL_HPP
 #define YAPF_COSTRAIL_HPP
+#ifndef WITH_RUST
 
 
 #include "../../pbs.h"
@@ -635,5 +636,7 @@ no_entry_cost: // jump here at the beginning if the node has no parent (it is th
 		this->disable_cache = disable;
 	}
 };
+
+#endif /* !WITH_RUST */
 
 #endif /* YAPF_COSTRAIL_HPP */
