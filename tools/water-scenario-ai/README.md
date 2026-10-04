@@ -39,7 +39,9 @@ PYTHONPATH=tools python3 -m simulation.ships <report.json>
 ```
 
 The summary counts tracks/follower/aqueduct calls, cold cache rebuilds, returned
-scalar bytes (2/5/4 respectively), and each mode's reference/candidate seconds.
+scalar payload upper bounds (2/5/4 respectively), and reference/candidate seconds.
+Failed follower queries return only the four-byte tile sentinel; their bridge
+byte is unwritten, so the five-byte term deliberately reports a maximum.
 Warm queries use Rust-owned cached labels without map crossings. Counts include
 startup and all simulation work; elapsed times include startup/save output.
 

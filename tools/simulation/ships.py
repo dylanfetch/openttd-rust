@@ -396,7 +396,7 @@ def profile_report(path):
                     "map_crossings": profile["tracks"]
                     + profile["follows"]
                     + profile["aqueducts"],
-                    "returned_scalar_bytes": 2 * profile["tracks"]
+                    "max_returned_scalar_bytes": 2 * profile["tracks"]
                     + 5 * profile["follows"]
                     + 4 * profile["aqueducts"],
                     "reference_seconds": case[f"{mode}_reference_seconds"],
