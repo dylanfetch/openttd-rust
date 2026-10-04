@@ -11,6 +11,7 @@
 #include "rust/linkgraph_ffi.h"
 #include "rust/trees_ffi.h"
 #include "rust/disaster_ffi.h"
+#include "rust/aircraft_ffi.h"
 #include "rust/townname_ffi.h"
 #include "rust/effect_ffi.h"
 #include "tests/effect_protocol.hpp"
@@ -106,6 +107,8 @@ static void Layouts()
 	Layout(46, "OpenTTDWaterPatch", {sizeof(OpenTTDWaterPatch), alignof(OpenTTDWaterPatch), offsetof(OpenTTDWaterPatch, x), offsetof(OpenTTDWaterPatch, y), offsetof(OpenTTDWaterPatch, label)});
 	Layout(47, "OpenTTDWaterSnapshot", {sizeof(OpenTTDWaterSnapshot), alignof(OpenTTDWaterSnapshot), offsetof(OpenTTDWaterSnapshot, edges), offsetof(OpenTTDWaterSnapshot, labels), offsetof(OpenTTDWaterSnapshot, patches), offsetof(OpenTTDWaterSnapshot, aqueducts)});
 	Layout(48, "OpenTTDWaterLeaves", {sizeof(OpenTTDWaterLeaves), alignof(OpenTTDWaterLeaves), offsetof(OpenTTDWaterLeaves, tracks), offsetof(OpenTTDWaterLeaves, follow), offsetof(OpenTTDWaterLeaves, aqueduct), offsetof(OpenTTDWaterLeaves, debug)});
+	Layout(180, "OpenTTDAircraftState", {sizeof(OpenTTDAircraftState), alignof(OpenTTDAircraftState), offsetof(OpenTTDAircraftState, cached_max_range_sqr), offsetof(OpenTTDAircraftState, cached_max_range), offsetof(OpenTTDAircraftState, cache_padding), offsetof(OpenTTDAircraftState, crashed_counter), offsetof(OpenTTDAircraftState, targetairport), offsetof(OpenTTDAircraftState, pos), offsetof(OpenTTDAircraftState, previous_pos), offsetof(OpenTTDAircraftState, state), offsetof(OpenTTDAircraftState, last_direction), offsetof(OpenTTDAircraftState, number_consecutive_turns), offsetof(OpenTTDAircraftState, turn_counter), offsetof(OpenTTDAircraftState, flags)});
+	Layout(181, "OpenTTDAircraftAction", {sizeof(OpenTTDAircraftAction), alignof(OpenTTDAircraftAction), offsetof(OpenTTDAircraftAction, kind), offsetof(OpenTTDAircraftAction, id), offsetof(OpenTTDAircraftAction, other), offsetof(OpenTTDAircraftAction, a), offsetof(OpenTTDAircraftAction, b), offsetof(OpenTTDAircraftAction, c), offsetof(OpenTTDAircraftAction, d)});
 
 	CHECK(openttd_rust_abi_layout(255, 0) == SIZE_MAX);
 	CHECK(static_cast<size_t>(PTRDIFF_MAX) == (SIZE_MAX >> 1));
@@ -705,6 +708,17 @@ static void Disasters()
 	std::printf("disaster_private_counter_direct_rng_delete_cancel passed\n");
 }
 
+static void AircraftOwnership()
+{
+	std::unique_ptr<OpenTTDAircraftState, decltype(&openttd_rust_aircraft_state_destroy)> state{openttd_rust_aircraft_state_new(), openttd_rust_aircraft_state_destroy};
+	std::unique_ptr<uint64_t, decltype(&openttd_rust_airport_blocks_destroy)> airport{openttd_rust_airport_blocks_new(), openttd_rust_airport_blocks_destroy};
+	CHECK(state->targetairport == 65535 && state->last_direction == 255 && state->cached_max_range_sqr == 0 && *airport == 0);
+	uint8_t &position = state->pos; uint16_t &counter = state->crashed_counter; uint64_t &blocks = *airport;
+	position = 255; counter = 65535; blocks = UINT64_MAX; state->cached_max_range = 65535; state->cached_max_range_sqr = UINT32_MAX;
+	CHECK(state->pos == 255 && state->crashed_counter == 65535 && *airport == UINT64_MAX && state->cached_max_range == 65535 && state->cached_max_range_sqr == UINT32_MAX);
+	std::printf("aircraft_airport_canonical_scalar_lifetime passed\n");
+}
+
 int main()
 {
 	Layouts();
@@ -713,6 +727,7 @@ int main()
 	LinkGraphJob();
 	Trees();
 	Disasters();
+	AircraftOwnership();
 	/* Opaque owner, native size_t, immutable byte borrow and complete UTF-8 output. */
 	auto *townname = openttd_rust_townname_generate(1, UINT32_MAX);
 	size_t name_length;

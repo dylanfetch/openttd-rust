@@ -1206,3 +1206,31 @@ runs. Every saved chunk and debug log compares, with declared typed input edits.
 Native ABI/Rust tests exercise stable owners, width/wrap behavior, direct services
 and deletion cancellation. Legacy save fixtures, viewport pixels, sound output,
 allocator failure timing and exhaustive NewGRF combinations remain limits.
+
+### Aircraft controllers and airport movement
+
+Issue #136 moves both tick passes, movement/speed/flight levels, shadow/rotor,
+all FTA traversal, terminal/group/helipad reservation, service/diversion/range,
+crash cleanup and airport replacement/destruction policies into Rust. Fixed Rust
+allocations own aircraft counters/cache and each station's airport block mask;
+field-sized C++ references retain existing save, legacy load and external-write
+addresses. Original bodies compile only in portable builds. Shared Vehicle/pools,
+orders/loading, airport geometry/FTA records and rendering remain C++.
+
+Rust copies world/FTA observations and calls bounded noexcept services directly,
+releasing scalar access before each call. ProcessOrders/UpdateOrderDest,
+VehicleEnterDepot/refit, Vehicle::Crash, depot commands and deletion return to
+the C++ stack for actual reentry; AI/Game event insertion only queues. Owners
+survive their original destruction policies and modern/legacy descriptor access.
+Flight helpers still accept disaster vehicles. Panics/environmental failures abort;
+wrapping counters and shared RNG retain original order.
+
+`python3 tools/migration.py simulate aircraft-route aircraft-controller disasters`
+compares every saved chunk and debug log: planes/helicopters, terminal groups,
+dedicated pads, occupied-block waits, service, closure diversion, zeppelin landing
+abort, airborne airport removal, out-of-fuel crash/destruction and live reload. `--self` and
+`--soak` check reproducibility/longer runs. A scenario-local native probe compares
+800 finite-range branches against unchanged reference helpers because supplied
+engines have unlimited range. ABI checks cover owner defaults/layout/lifetime.
+Full legacy files, arbitrary NewGRFs/airport rotations and viewport/sound output
+remain evidence limits.
