@@ -24,7 +24,6 @@ import shutil
 import struct
 import subprocess
 import sys
-import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -376,30 +375,28 @@ class MachineLock:
     A link graph job that has not finished by its join tick pauses the game, and
     the null driver keeps counting iterations while paused. The job has only a
     few milliseconds of wall time, so it misses that window when cores are
-    oversubscribed. Ordinary runs hold this lock shared across every harness
-    process of the clone; a retry holds it exclusively, and no new run in this
-    process starts while a retry waits."""
+    oversubscribed. Ordinary runs hold `path` shared across every harness
+    process and thread of the clone; a retry holds it exclusively. flock does
+    not favour a waiting exclusive holder, so every run first passes through a
+    gate lock that a retry keeps: once a retry waits, no new run starts and the
+    wait is bounded by the runs already in progress."""
 
     def __init__(self, path):
-        self.path, self.condition, self.retries = path, threading.Condition(), 0
+        self.path, self.gate = path, path.with_suffix(".gate")
 
     @contextlib.contextmanager
     def hold(self, alone):
-        import fcntl
-        with self.condition:
-            if alone:
-                self.retries += 1
-            else:
-                self.condition.wait_for(lambda: not self.retries)
         try:
-            with open(self.path, "w") as handle:
-                fcntl.flock(handle, fcntl.LOCK_EX if alone else fcntl.LOCK_SH)
-                yield
-        finally:
-            if alone:
-                with self.condition:
-                    self.retries -= 1
-                    self.condition.notify_all()
+            import fcntl
+        except ImportError:  # No flock (Windows): runs are not isolated.
+            yield
+            return
+        with open(self.gate, "w") as gate, open(self.path, "w") as handle:
+            fcntl.flock(gate, fcntl.LOCK_EX)
+            fcntl.flock(handle, fcntl.LOCK_EX if alone else fcntl.LOCK_SH)
+            if not alone:
+                fcntl.flock(gate, fcntl.LOCK_UN)
+            yield
 
 
 MACHINE = None  # MachineLock, set by main()
@@ -474,6 +471,8 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
                     result["problems"].append("fewer than two periodic snapshots were written")
                 # Console output is invisible without a GUI, so confirm each
                 # setting line took effect in the first snapshot of both runs.
+                # Values must be written as PATS stores them (numbers, not
+                # true/false or names), and only saved game settings qualify.
                 for role, run in runs.items():
                     first = next((p for p in run["snapshots"] if p.name != "exit.sav"), None)
                     for line in scenario.get("console", []) if first else []:
