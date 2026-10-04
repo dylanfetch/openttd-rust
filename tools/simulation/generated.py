@@ -1,0 +1,118 @@
+"""generated scenario evidence."""
+
+from .core import SNAPSHOT_TICKS, TICKS_PER_DAY
+
+
+def scenarios(soak):
+    scenarios = [
+        {
+            "name": "regression-regression",
+            "kind": "regression",
+            "test": "regression",
+            "ticks": 30000,
+        },
+        {
+            "name": "regression-stationlist",
+            "kind": "regression",
+            "test": "stationlist",
+            "ticks": 30000,
+        },
+    ]
+    seeds = (1, 12345, 777, 31337, 2024, 99) if soak else (1, 12345)
+    sizes = (6, 7, 8, 9) if soak else (7, 8)
+    years = 6 if soak else 2
+    for generator, label in ((1, "tgp"), (0, "original")):
+        for size in sizes:
+            for seed in seeds:
+                scenarios.append(
+                    {
+                        "name": f"generate-{label}-{1 << size}-{seed}",
+                        "kind": "generate",
+                        "seed": seed,
+                        "map_log2": size,
+                        "land_generator": generator,
+                        "ticks": years * 365 * TICKS_PER_DAY + SNAPSHOT_TICKS,
+                    }
+                )
+    # TGP ownership evidence: curated combinations avoid an expensive Cartesian
+    # product while exercising every climate, border mode, roughness and terrain.
+    generation_cases = [
+        (6, 7, 1, 0, 0, 1, 0, 1, 1, 15),
+        (7, 6, 12345, 1, 4, 4, 1, 2, 15, 30),
+        (7, 8, 777, 2, 3, 7, 2, 3, 16, 20),
+        (8, 7, 31337, 3, 5, 10, 3, 4, 5, 0),
+    ]
+    if soak:
+        generation_cases += [
+            (
+                6 + i % 3,
+                7 + i % 3,
+                seed,
+                i % 4,
+                i % 6,
+                i % 11,
+                (i + 1) % 4,
+                i % 5,
+                border,
+                limit,
+            )
+            for i, (seed, border, limit) in enumerate(
+                zip(
+                    (0, 99, 2024, 0xFFFFFFFE, 1, 12345, 777, 31337),
+                    (2, 4, 8, 0, 15, 16, 3, 10),
+                    (0, 15, 30, 40, 32, 64, 128, 255),
+                    strict=True,
+                )
+            )
+        ]
+        generation_cases += [
+            (10, 9, 0xFFFFFFFE, 0, 5, 1, 0, 4, 16, 255),
+            (9, 10, 2024, 1, 5, 10, 3, 0, 15, 0),
+            (10, 10, 99, 2, 4, 2, 2, 3, 0, 255),
+            (9, 9, 1, 3, 5, 6, 1, 2, 16, 15),
+            (6, 10, 777, 0, 5, 10, 2, 4, 8, 0),
+            (10, 6, 12345, 3, 5, 10, 0, 0, 16, 255),
+        ]
+    for index, (
+        mx,
+        my,
+        seed,
+        climate,
+        terrain,
+        variety,
+        smooth,
+        sea,
+        border,
+        limit,
+    ) in enumerate(generation_cases):
+        scenarios.append(
+            {
+                "name": f"generate-tgp-settings-{index}-{1 << mx}x{1 << my}-{seed}",
+                "kind": "generate",
+                "seed": seed,
+                "map_log2": mx,
+                "map_log2_y": my,
+                "land_generator": 1,
+                "ticks": 2 * SNAPSHOT_TICKS + TICKS_PER_DAY,
+                "settings": {
+                    "difficulty": {"terrain_type": terrain, "quantity_sea_lakes": sea},
+                    "game_creation": {
+                        "landscape": ("temperate", "arctic", "tropic", "toyland")[
+                            climate
+                        ],
+                        "variety": variety,
+                        "tgen_smoothness": smooth,
+                        "water_borders": border,
+                        "custom_terrain_type": 1
+                        if index == 16
+                        else (2, 255)[index % 2],
+                        "custom_sea_level": (1, 90)[index % 2],
+                    },
+                    "construction": {
+                        "map_height_limit": limit,
+                        "freeform_edges": "true" if index % 3 else "false",
+                    },
+                },
+            }
+        )
+    return scenarios
