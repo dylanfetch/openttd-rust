@@ -740,6 +740,87 @@ static void RoadBoundary()
 	std::printf("road_native_tables_owner_reentry_and_tick_wrap passed\n");
 }
 
+/* Moving and partly entered consists cannot use IsChainInDepot's service path,
+ * but FindClosestRoadDepot still selects their current depot at distance zero. */
+struct RoadServiceProbe {
+	OpenTTDRoadState *head = openttd_rust_road_new();
+	OpenTTDRoadState *tail = openttd_rust_road_new();
+	OpenTTDRoadView view{};
+	bool depot_tile = true;
+	uint32_t depot_orders = 0;
+	uint32_t services = 0;
+};
+static RoadServiceProbe *road_service_probe;
+static void OPENTTD_ROAD_CALL RoadServiceObserve(uint32_t id, OpenTTDRoadView *view) noexcept
+{
+	*view = road_service_probe->view;
+	view->next = id == 17 ? 18 : UINT32_MAX;
+}
+static void OPENTTD_ROAD_CALL RoadServiceWrite(uint32_t, uint32_t field, uint64_t) noexcept
+{
+	CHECK(field == ROAD_WRITE_DAY || field == ROAD_WRITE_SUPPRESS_IMPLICIT);
+}
+static uint64_t OPENTTD_ROAD_CALL RoadServiceLeaf(uint32_t op, uint32_t, uint64_t a, uint64_t, uint64_t) noexcept
+{
+	auto &probe = *road_service_probe;
+	switch (op) {
+		case ROAD_OP_SERVINT: case ROAD_OP_NEEDS_SERVICE: return 1;
+		case ROAD_OP_IS_DEPOT: CHECK(a == probe.view.tile); return probe.depot_tile;
+		case ROAD_OP_MAX_PENALTY: return 300;
+		case ROAD_OP_DEPOT_INDEX: CHECK(a == probe.view.tile); return 55;
+		case ROAD_OP_ORDER_DEPOT: CHECK(a == 55); ++probe.depot_orders; break;
+		case ROAD_OP_SET_DEST: CHECK(a == probe.view.tile); probe.view.dest = static_cast<uint32_t>(a); break;
+		case ROAD_OP_SERVICE: ++probe.services; break;
+		case ROAD_OP_ECONOMY_AGE: case ROAD_OP_CHECK_BREAKDOWN:
+		case ROAD_OP_CHECK_ORDERS: case ROAD_OP_START_STOP_DIRTY: break;
+		default: CHECK(false);
+	}
+	return 0;
+}
+static OpenTTDRoadState *OPENTTD_ROAD_CALL RoadServiceOwner(uint32_t id) noexcept
+{
+	return id == 17 ? road_service_probe->head : road_service_probe->tail;
+}
+static void RoadServiceBoundary()
+{
+	RoadServiceProbe probe;
+	road_service_probe = &probe;
+	probe.view.front = 1;
+	probe.view.first = 17;
+	probe.view.tile = 3091;
+	probe.view.speed = 5;
+	const OpenTTDRoadLeaves leaves{RoadServiceObserve, RoadServiceWrite, RoadServiceLeaf, RoadServiceOwner, RoadAbiNearby};
+	EffectTestWorld world;
+	effect_test_world = &world;
+	const OpenTTDSharedServices services{&world, EffectTestRandom, EffectTestTile, EffectTestMapWrite, EffectTestTrig, EffectTestIndustry};
+	using Task = std::unique_ptr<void, decltype(&openttd_rust_road_task_destroy)>;
+	auto day = [&]() { return Task(openttd_rust_road_create(6, 17, 0, 0, 0, &leaves, &services), openttd_rust_road_task_destroy); };
+	for (bool moving : {true, false}) {
+		probe.view.speed = moving ? 5 : 0;
+		probe.view.dest = 42;
+		openttd_rust_road_set(probe.head, 0, 254);
+		openttd_rust_road_set(probe.tail, 0, moving ? 254 : 1);
+		openttd_rust_road_path_push(probe.head, {10, 10815});
+		auto run = day();
+		CHECK(openttd_rust_road_advance(run.get(), 0).op == 0);
+		CHECK(probe.view.dest == probe.view.tile && openttd_rust_road_path_size(probe.head) == 0);
+	}
+	CHECK(probe.depot_orders == 2 && probe.services == 0 && world.draws == 0);
+	openttd_rust_road_set(probe.tail, 0, 254);
+	auto parked = day();
+	CHECK(openttd_rust_road_advance(parked.get(), 0).op == 0);
+	CHECK(probe.services == 1 && probe.depot_orders == 2);
+	probe.depot_tile = false;
+	auto outside = day();
+	const auto search = openttd_rust_road_advance(outside.get(), 0);
+	CHECK(search.op == ROAD_OP_FIND_DEPOT && search.a == 300);
+	outside.reset();
+	parked.reset();
+	openttd_rust_road_destroy(probe.head);
+	openttd_rust_road_destroy(probe.tail);
+	std::printf("road_service_moving_partial_parked_and_search_branches passed\n");
+}
+
 struct DisasterProbe { uint32_t reads = 0, writes = 0, draws = 0, random = 0; };
 static void OPENTTD_DISASTER_CALL DisasterProbeRead(void *context, uint32_t kind, uint32_t, int64_t, int64_t, int64_t *out) noexcept
 {
@@ -784,6 +865,7 @@ int main()
 {
 	Layouts();
 	RoadBoundary();
+	RoadServiceBoundary();
 	WaterProbe::Run([](bool result) { CHECK(result); });
 	CheckEffectProtocol([](bool result) { CHECK(result); });
 	LinkGraphJob();

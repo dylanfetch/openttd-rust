@@ -1531,7 +1531,13 @@ impl Game {
             return;
         }
         let penalty = self.q0(MAX_PENALTY, id);
-        let depot = self.action(FIND_DEPOT, id, u64::from(penalty), 0, 0).await;
+        // FindClosestRoadDepot returns this tile at distance zero even while
+        // moving or when only part of the consist has entered the depot.
+        let depot = if self.tile(IS_DEPOT, id, v.tile) != 0 {
+            u64::from(v.tile)
+        } else {
+            self.action(FIND_DEPOT, id, u64::from(penalty), 0, 0).await
+        };
         let tile = depot as u32;
         let length = (depot >> 32) as u32;
         if length == u32::MAX || length > penalty {
