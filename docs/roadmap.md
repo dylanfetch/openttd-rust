@@ -119,10 +119,18 @@ never in masks.
    searches, six specialization-specific global cache banks, rail-change
    invalidation, reservation traversal and rollback. Reuse the rail corpus and
    ship search machinery only where ordering matches; require branch witnesses.
-8. **Following selections:** rail vehicle controller, road YAPF, then stations,
-   industries, company/economy loop, orders, cargo and their commands. Rail
-   controller needs broader reversal/crossing/reservation evidence than the
-   current two-train save. Aircraft stays gated on #111 and the remaining #86 input.
+8. **#124 Complete road YAPF search and path construction.** Own both track and
+   depot searches, all node/queue/segment state and reconstruction. Replace
+   #121's temporary result bridge using its canonical path cache; do not claim
+   the cache twice. Reuse road scenarios and compatible search support.
+9. **#125 Complete station cargo-service control and state.** Own loading order,
+   service/cargo metadata, full loading/reservation/refit policy, acceptance,
+   ratings/distribution and periodic service loops. Preserve #117's payment and
+   production-flush owner and shared packet/flow/map storage. Reuse its fixtures.
+10. **Following selections:** rail vehicle controller, complete industry periodic
+   owner, company/economy loop, orders, cargo and their commands. Rail controller
+   needs broader reversal/crossing/reservation evidence than the current two-train
+   save; #122 should supply it. Aircraft stays gated on #111 and #86 input.
 
 The accepted #108 decision keeps canonical map arrays in C++ with direct bundled
 `noexcept` services. Counts establish crossing density, not a bottleneck; no raw
@@ -142,8 +150,10 @@ Worktrees are siblings of the main checkout unless a path says otherwise.
 | #117 `/root/cargo_payment_delivery` (Sol high) | `cargo-payment-delivery-117` at `c301dccb87`, PR #123 | `openttd-rust-cargo-payment` | `/root/review_cargo_pr123` requests two evidence fixes: fully initialized native service tables and newly earned transfer-credit witness. Owner fixes/tests, then same reviewer rechecks and CI reruns; ABI 49/50/51. |
 | #119 `/root/ship_yapf_ownership` (Sol high) | `ship-yapf-ownership-119` at `ea5a304f1c`, actual #104 dependency | `openttd-rust-ship-yapf` | Full owner builds; first structures pair passes. Audit source ordering, complete existing corpus and narrow native heap gap check. ABI 52-56. |
 | #120 `/root/town_growth_ownership` (Sol high) | `town-growth-ownership-120` at `350aec9e30` | `openttd-rust-town-growth` | Implement full owner/adapters (ABI 60+). Scenario delegate completed towns.py: self default 6/6, soak 10/10. Candidate pairs next; tunnel and command/lifetime gaps stated. |
-| #121 `/root/road_vehicle_ownership` (Sol high) | `road-vehicle-ownership-121` at `aa14879225`, uncommitted implementation | `openttd-rust-road-vehicles` | Owner writes Rust/controller/FFI (ABI 80-89 reserved). Delegate roadveh.h and external/save adapters when a slot opens; exact interfaces pinned in road_ffi.h. |
+| #121 `/root/road_vehicle_ownership` (Sol high) | `road-vehicle-ownership-121` at `aa14879225`, uncommitted implementation | `openttd-rust-road-vehicles` | Owner writes Rust/controller/FFI (ABI 80-89). `/root/road_state_save_adapters` owns roadveh.h/external/save adapters in the same worktree; signatures pinned in road_ffi.h. |
 | #122 `/root/rail_yapf_ownership` (Sol high) | Not started; branch from integration base | To create `openttd-rust-rail-yapf` | Selected next; own search/cache/reservation together and strengthen applicable rail witnesses. |
+| #124 `/root/road_yapf_ownership` (Sol high) | Not started; use #121 path API | To create `openttd-rust-road-yapf` | Selected; full road search and reconstruction, no separate persistent cache. |
+| #125 `/root/station_service_ownership` (Sol high) | Not started; depends on #117 owner | To create `openttd-rust-station-service` | Selected; complete station service state and periodic/loading control, reusing economic fixtures. |
 
 Preserved evidence branches: `evidence-disaster-vehicles` at `a775543162`
 (`openttd-rust-disasters-evidence`) and `evidence-water-regions` at `c752070cde`
@@ -159,9 +169,10 @@ whole growth-loop and house-placement scope now selected as #120. Continue
 per-PR reviews while CI runs. `/root/plan_next_vehicle_owners` (Astra high)
 selected road control then rail YAPF as #121/#122; reserve complete rail control
 until its coupled branches have suitable evidence. Replenish the queue before
-fewer than two unstarted selections remain. Only #122 is now unstarted. Fresh Astra high planner
-`/root/plan_after_vehicle_pathfinding` is scoping road YAPF and a cohesive station
-or industry owner; root records issues/selection before implementation.
+fewer than two unstarted selections remain. Fresh Astra high planner `/root/plan_after_vehicle_pathfinding` selected #124
+and #125. Three unstarted owners are queued; replenish when fewer than two
+remain. A future industry selection must include histories, daily/monthly control,
+closure and builder targets/backoff, not only the short production tick.
 
 ## Choosing the next task
 
