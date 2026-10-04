@@ -5,7 +5,7 @@ Root owns this file and updates it when a phase completes or priorities change.
 to work on next. If an issue conflicts with this roadmap, follow the roadmap;
 a subagent stops and reports the conflict in its hand-off to root.
 
-## Where the fork stands (2026-10-04, `rust-migration` at `ff3648ba09`)
+## Where the fork stands (2026-10-04, `rust-migration` at `1fecd819d8`)
 
 - Ported: one landscape kernel, StringConsumer/StringBuilder/UTF-8/byte-string
   utilities, history and spiral/alternating iterators, Script Admin JSON
@@ -129,6 +129,8 @@ plus planting/clearing command control. Apply the world-state design to live map
 reads and reentrant water/NewGRF/command services. The standalone editor forest
 brush (`PlaceTreeGroupAroundTile`, InteractiveRandom and zone sweep) is an explicit
 follow-up; it uses the migrated placement helper. Rendering and GUI stay in C++.
+PR #102 is validating a reviewed correction: live tree RNG draws return to C++
+because `RANDOM_DEBUG` logging can throw. Earlier green CI does not cover that fix.
 
 **#101 Effect-vehicle controllers and private state** is selected alongside #99
 review. `/root/town_names` (Sol high) owns implementation; Astra medium reviews.
@@ -139,12 +141,22 @@ state mirror. Short-horizon harness checkpoints must observe these brief-lived
 effects, plus natural creation and breakdown/bubble caller paths. Ordinary
 rail/ship/aircraft controllers remain untouched, so #86 is not a prerequisite.
 
+**#103 Disaster scheduling, vehicles and event control** is selected next while
+#99/#101 validate. `/root/link_graph` (Sol high) owns implementation after its tree
+handoff; Astra medium reviews. Move the whole disaster family, target-release hooks
+and private state/delay; keep shared Vehicle fields, pools and services canonical
+in C++. Astra high reference experiments established genuine targets using the
+stationlist save's train and airport: two reference-built rail tiles plus declared
+company/AIPL edits let a big UFO select the human train, and a zeppelin block the
+airport. Turn these into reproducible harness witnesses with actual event outcomes.
+This covers disaster interactions; #86's ordinary rail/ship/aircraft route corpus
+remains needed before ports of those controllers. No shared pool storage transfer.
+
 TGP and link graph favor coarse calls over copied inputs with private Rust state,
 nonthrowing leaf callbacks and complete results. Trees and effects apply the
 world-state design where shared services can reenter or throw.
 Remaining candidates, roughly in order of increasing coupling:
 
-- Disaster vehicles (`disaster_vehicle.cpp`).
 - Ship pathfinding (`pathfinder/water_regions.cpp`, YAPF ship).
 - Economy: cargo payment, inflation, station rating, industry production.
 - After those: town growth, road/rail vehicle controllers, YAPF rail/road.
@@ -160,7 +172,8 @@ constraints; storage transfers still require explicit roadmap selection.
 
 Take the first unblocked item from the earliest phase that has one. Work
 already in CI or review is not blocking: start the next item while it runs.
-Harness regressions remain the first priority; complete #99 while #101 proceeds.
+Harness regressions remain the first priority; close #102's corrected-head gates
+while #101 proceeds, then use freed implementation capacity for #103.
 Keep spare capacity on scenarios and independent review. Paused, deferred
 and out-of-scope issues are not fallbacks. Root selects further ownership work
 here before implementation starts.

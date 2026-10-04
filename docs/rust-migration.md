@@ -336,8 +336,10 @@ the original implementation compiles only without `WITH_RUST`.
 
 An opaque owner advances through generation and normalization, returning progress
 actions to C++. Abortion frees the owner after Rust returns, so the C++ progress
-exception never crosses a Rust frame. RNG callbacks are nonthrowing leaves;
-settings are copied and no vector view or borrowed pointer survives a call.
+exception never crosses a Rust frame. RNG callbacks are leaves in this synchronous
+phase: mode switching clears clients and modal generation suspends networking, so
+`RANDOM_DEBUG`'s live-network logging is unreachable. Live simulation cannot rely
+on that invariant. Settings are copied; no vector view survives a call.
 Fixed-point narrowing/wrapping, random draw order and float/double promotions
 follow the source. Coast noise preserves the low 31 polynomial bits on LP64 and
 Windows alike. Rust panics/allocation failures abort, as for the other ports.
