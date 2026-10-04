@@ -128,6 +128,14 @@ def main():
         + "}\n"
     )
     cargo_text = cargo_text.replace("CargoCollector", "ReferenceCargoCollector")
+    # Reader type deduction accepts both native shares and the Rust borrowing
+    # facade; the copied reference traversal and reduction expressions stay intact.
+    cargo_text = cargo_text.replace(
+        "const FlowStat::SharesMap *shares", "const auto *shares"
+    )
+    cargo_text = cargo_text.replace(
+        "FlowStat::SharesMap::const_iterator flow_iter", "auto flow_iter"
+    )
     (OUT / "cargo-reducer.hpp").write_text(cargo_text)
     vm_sources = sorted((REFERENCE / "src/3rdparty/squirrel/squirrel").glob("*.cpp"))
     for source in vm_sources:
