@@ -129,8 +129,10 @@ plus planting/clearing command control. Apply the world-state design to live map
 reads and reentrant water/NewGRF/command services. The standalone editor forest
 brush (`PlaceTreeGroupAroundTile`, InteractiveRandom and zone sweep) is an explicit
 follow-up; it uses the migrated placement helper. Rendering and GUI stay in C++.
-PR #102 is validating a reviewed correction: live tree RNG draws return to C++
-because `RANDOM_DEBUG` logging can throw. Earlier green CI does not cover that fix.
+PR #102 has a reviewed correction: live tree RNG draws return to C++ because
+`RANDOM_DEBUG` logging can throw. Corrected-head local default passed 102/102
+(729 snapshots); tree soak and reference-self soak passed 40/40 each (288 snapshots).
+Required corrected-head CI remains the integration gate.
 
 **#101 Effect-vehicle controllers and private state** is selected alongside #99
 review. `/root/town_names` (Sol high) owns implementation; Astra medium reviews.
@@ -152,12 +154,23 @@ airport. Turn these into reproducible harness witnesses with actual event outcom
 This covers disaster interactions; #86's ordinary rail/ship/aircraft route corpus
 remains needed before ports of those controllers. No shared pool storage transfer.
 
+**#104 Water-region cache and graph service** is selected as the complete first
+component before ship YAPF. `/root/town_names` (Sol high) implements after the effect
+handoff; root owns ship harness evidence and Astra medium reviews. Rust owns cache
+validity, labels, edge/aqueduct data, flood traversal, lazy rebuild, invalidation and
+ordered neighbour visits. Both YAPF levels and nearest-depot search remain external
+clients of this service. Arbitrary visitors return to C++ without a live cache borrow.
+The ship slice of #86 is now active: a reference-built ferry has demonstrated real
+loading and paid delivery. Commit reproducible setup/save evidence and require
+manual/cargodist routes, reload, canal/lock/aqueduct and warm-cache mutation cases
+before integration. Ordinary rail/aircraft coverage in #86 remains open.
+
 TGP and link graph favor coarse calls over copied inputs with private Rust state,
 nonthrowing leaf callbacks and complete results. Trees and effects apply the
 world-state design where shared services can reenter or throw.
 Remaining candidates, roughly in order of increasing coupling:
 
-- Ship pathfinding (`pathfinder/water_regions.cpp`, YAPF ship).
+- Complete ship YAPF searches, after #104 (both region and tile search levels).
 - Economy: cargo payment, inflation, station rating, industry production.
 - After those: town growth, road/rail vehicle controllers, YAPF rail/road.
 
@@ -173,7 +186,8 @@ constraints; storage transfers still require explicit roadmap selection.
 Take the first unblocked item from the earliest phase that has one. Work
 already in CI or review is not blocking: start the next item while it runs.
 Harness regressions remain the first priority; close #102's corrected-head gates
-while #101 proceeds, then use freed implementation capacity for #103.
+while #101 proceeds. #103 implementation/evidence are active; use effect handoff
+capacity for #104, with its #86 ship evidence developed in parallel.
 Keep spare capacity on scenarios and independent review. Paused, deferred
 and out-of-scope issues are not fallbacks. Root selects further ownership work
 here before implementation starts.
