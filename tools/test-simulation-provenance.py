@@ -35,6 +35,14 @@ class SimulationProvenanceTests(unittest.TestCase):
                 "def git(*args):\n"
                 "    return (ROOT / ('head' if args[0] == 'rev-parse' else 'status')).read_text()\n"
             )
+            ai_initial = {}
+            for folder in ("town-name-observer", "tree-scenario-ai"):
+                ai = root / "tools" / folder
+                ai.mkdir()
+                (ai / "main.nut").write_text(f"{folder}-before")
+                ai_initial[folder] = hashlib.sha256(
+                    (ai / "main.nut").read_bytes()
+                ).hexdigest()
             originals, initial, assets = {}, {}, {}
             for role in ("reference", "candidate"):
                 if role == "candidate" and self_compare:
@@ -70,6 +78,15 @@ class SimulationProvenanceTests(unittest.TestCase):
                         f"{original_role}-data-before",
                     )
                     self.assertFalse((builds[role] / "lang/missing-data").exists())
+                folder = (
+                    "town-name-observer"
+                    if "town_style" in scenario
+                    else "tree-scenario-ai"
+                )
+                self.assertEqual(
+                    (Path(scenario["scenario_ai"]) / "main.nut").read_text(),
+                    f"{folder}-before",
+                )
                 invocations.append(scenario["name"])
                 if len(invocations) == 1:
                     for role, binary in originals.items():
@@ -77,6 +94,10 @@ class SimulationProvenanceTests(unittest.TestCase):
                         replacement.write_text(f"print('{role}-after')\n")
                         replacement.replace(binary)
                         assets[role].write_text(f"{role}-data-after")
+                    for folder in ai_initial:
+                        (root / "tools" / folder / "main.nut").write_text(
+                            f"{folder}-after"
+                        )
                     (root / "head").write_text("later-checkout")
                     (root / "status").write_text("")
                 return {
@@ -100,7 +121,10 @@ class SimulationProvenanceTests(unittest.TestCase):
                 patch.object(
                     simulate,
                     "scenario_list",
-                    return_value=[{"name": "a"}, {"name": "b"}],
+                    return_value=[
+                        {"name": "a", "town_style": 0},
+                        {"name": "b", "trees": "commands"},
+                    ],
                 ),
                 patch.object(simulate, "run_scenario", side_effect=run),
                 patch.object(sys, "argv", argv),
@@ -113,6 +137,13 @@ class SimulationProvenanceTests(unittest.TestCase):
             self.assertEqual(invocations, ["a", "b"])
             self.assertEqual(report["candidate_commit"], "initial-checkout")
             self.assertEqual(report["candidate_status"], " M tracked-file")
+            for folder, digest in ai_initial.items():
+                evidence = report["scenario_ai"][folder]
+                self.assertEqual(evidence["files"], {"main.nut": digest})
+                self.assertEqual(
+                    (Path(evidence["path"]) / "main.nut").read_text(),
+                    f"{folder}-before",
+                )
             for role, evidence in report["binaries"].items():
                 original_role = "reference" if self_compare else role
                 self.assertEqual(evidence["sha256"], initial[original_role])

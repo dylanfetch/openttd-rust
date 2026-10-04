@@ -682,10 +682,10 @@ def run_game(scenario, binary, build, run_dir, timeout, base_env=None, desync=Tr
     run_dir.mkdir(parents=True)
     write_config(scenario, build, run_dir)
     if "town_style" in scenario:
-        shutil.copytree(ROOT / "tools/town-name-observer", run_dir / "ai/town-names")
+        shutil.copytree(scenario["scenario_ai"], run_dir / "ai/town-names")
     if scenario.get("trees") == "commands":
         ai = run_dir / "ai/tree-scenarios"
-        shutil.copytree(ROOT / "tools/tree-scenario-ai", ai)
+        shutil.copytree(scenario["scenario_ai"], ai)
         (ai / "parameters.nut").write_text(
             f"TREE_ANCHOR <- {scenario['tree_anchor']};\nTREE_WATER <- {scenario['tree_water']};\n"
         )
@@ -1609,6 +1609,30 @@ def main():
         for role, path in binaries.items()
     }
 
+    # Freeze the two scenario AIs before workers launch; both roles install the
+    # same immutable script bytes while command parameters remain per-run.
+    scenario_ai = {}
+    for folder, selected in (
+        ("town-name-observer", [s for s in scenarios if "town_style" in s]),
+        ("tree-scenario-ai", [s for s in scenarios if s.get("trees") == "commands"]),
+    ):
+        if not selected:
+            continue
+        frozen = out / "scenario-ai" / folder
+        shutil.copytree(ROOT / "tools" / folder, frozen)
+        scenario_ai[folder] = {
+            "path": str(frozen),
+            "files": {
+                str(path.relative_to(frozen)): hashlib.sha256(
+                    path.read_bytes()
+                ).hexdigest()
+                for path in sorted(frozen.rglob("*"))
+                if path.is_file()
+            },
+        }
+        for scenario in selected:
+            scenario["scenario_ai"] = str(frozen)
+
     started = time.monotonic()
     results = []
     with concurrent.futures.ThreadPoolExecutor(args.jobs) as pool:
@@ -1649,6 +1673,7 @@ def main():
         "candidate_commit": candidate_commit,
         "candidate_status": candidate_status,
         "binaries": binary_evidence,
+        "scenario_ai": scenario_ai,
         "masks": {":".join(key): reason for key, reason in MASKS.items()},
         "known_failures": {
             ":".join(key): issue for key, issue in KNOWN_FAILURES.items()
