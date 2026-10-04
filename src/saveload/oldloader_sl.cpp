@@ -1128,7 +1128,11 @@ static const OldChunks vehicle_road_chunk[] = {
 };
 
 static const OldChunks vehicle_ship_chunk[] = {
+#ifdef WITH_RUST
+	{ OC_UINT8, 1, nullptr, [] (void *) -> void * { return &ShipStateScope::State(); }, nullptr },
+#else
 	OCL_SVAR(  OC_UINT8, Ship, state ),
+#endif
 
 	OCL_NULL( 9 ), ///< Junk
 
@@ -1194,7 +1198,13 @@ static bool LoadOldVehicleUnion(LoadgameState &ls, int)
 				res = LoadChunk(ls, v, vehicle_road_chunk);
 				break;
 			}
-			case VEH_SHIP    : res = LoadChunk(ls, v, vehicle_ship_chunk);     break;
+			case VEH_SHIP: {
+#ifdef WITH_RUST
+				ShipStateScope scope(Ship::From(v), true);
+#endif
+				res = LoadChunk(ls, v, vehicle_ship_chunk);
+				break;
+			}
 			case VEH_AIRCRAFT: res = LoadChunk(ls, v, vehicle_air_chunk);      break;
 			case VEH_EFFECT: {
 #ifdef WITH_RUST

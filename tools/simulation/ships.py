@@ -210,6 +210,22 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
 
 def check(scenario, run, mode, role, result):
     if "water" in scenario:
+        profile = run["snapshots"][-1].parents[2] / "ship-control-profile.json"
+        if profile.is_file():
+            branches = json.loads(profile.read_text())
+            required = ["economy_day", "path_cache", "reverse", "rotate", "buoy"]
+            required += (
+                ["loading", "auto_service", "rotation_reload"]
+                if scenario["water"] == "ferry"
+                else ["lock_up", "lock_down", "aqueduct"]
+            )
+            if scenario.get("water_operation") == "depot":
+                required += ["depot_search", "depot_leave", "depot_enter"]
+            if any(not branches[key] for key in required):
+                raise RuntimeError(
+                    f"ship controller branch witnesses missing: {required}; {branches}"
+                )
+            result[f"{mode}_{role}_ship_control_profile"] = branches
         result[f"{mode}_{role}_water"] = check_water(scenario, run, mode == "snapshots")
         profile = run["snapshots"][-1].parents[2] / "water-profile.json"
         if profile.is_file():

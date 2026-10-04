@@ -2056,7 +2056,7 @@ static VehicleEnterTileStates VehicleEnter_TunnelBridge(Vehicle *v, TileIndex ti
 				}
 
 				case VEH_SHIP:
-					Ship::From(v)->state = TRACK_BIT_WORMHOLE;
+					Ship::From(v)->SetState(TRACK_BIT_WORMHOLE);
 					break;
 
 				default: NOT_REACHED();
@@ -2086,8 +2086,8 @@ static VehicleEnterTileStates VehicleEnter_TunnelBridge(Vehicle *v, TileIndex ti
 
 				case VEH_SHIP: {
 					Ship *ship = Ship::From(v);
-					if (ship->state == TRACK_BIT_WORMHOLE) {
-						ship->state = DiagDirToDiagTrackBits(vdir);
+					if (ship->GetState() == TRACK_BIT_WORMHOLE) {
+						ship->SetState(DiagDirToDiagTrackBits(vdir));
 						return VehicleEnterTileState::EnteredWormhole;
 					}
 					break;

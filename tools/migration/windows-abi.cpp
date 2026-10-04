@@ -17,6 +17,7 @@
 #include "rust/townname_ffi.h"
 #include "rust/effect_ffi.h"
 #include "rust/road_ffi.h"
+#include "rust/ship_control_ffi.h"
 #include "rust/road_yapf_ffi.h"
 #include "tests/effect_protocol.hpp"
 #include "tests/water_regions_protocol.hpp"
@@ -72,6 +73,10 @@ static void Layout(uint16_t type, const char *name, std::initializer_list<size_t
 
 static void Layouts()
 {
+	Layout(320, "OpenTTDShipView", {sizeof(OpenTTDShipView), alignof(OpenTTDShipView), offsetof(OpenTTDShipView, tile), offsetof(OpenTTDShipView, dest), offsetof(OpenTTDShipView, x), offsetof(OpenTTDShipView, y), offsetof(OpenTTDShipView, z), offsetof(OpenTTDShipView, direction), offsetof(OpenTTDShipView, speed), offsetof(OpenTTDShipView, tick), offsetof(OpenTTDShipView, running), offsetof(OpenTTDShipView, day), offsetof(OpenTTDShipView, order_time), offsetof(OpenTTDShipView, progress), offsetof(OpenTTDShipView, status), offsetof(OpenTTDShipView, owner), offsetof(OpenTTDShipView, engine), offsetof(OpenTTDShipView, last_station), offsetof(OpenTTDShipView, order_destination), offsetof(OpenTTDShipView, order_type), offsetof(OpenTTDShipView, order_max_speed), offsetof(OpenTTDShipView, acceleration), offsetof(OpenTTDShipView, max_speed)});
+	Layout(321, "OpenTTDShipLeaves", {sizeof(OpenTTDShipLeaves), alignof(OpenTTDShipLeaves), offsetof(OpenTTDShipLeaves, observe), offsetof(OpenTTDShipLeaves, write), offsetof(OpenTTDShipLeaves, leaf), offsetof(OpenTTDShipLeaves, owner), offsetof(OpenTTDShipLeaves, patch), offsetof(OpenTTDShipLeaves, neighbours), offsetof(OpenTTDShipLeaves, depots)});
+	Layout(322, "OpenTTDShipAction", {sizeof(OpenTTDShipAction), alignof(OpenTTDShipAction), offsetof(OpenTTDShipAction, op), offsetof(OpenTTDShipAction, id), offsetof(OpenTTDShipAction, a), offsetof(OpenTTDShipAction, b), offsetof(OpenTTDShipAction, c)});
+	Layout(323, "OpenTTDShipDepot", {sizeof(OpenTTDShipDepot), alignof(OpenTTDShipDepot), offsetof(OpenTTDShipDepot, id), offsetof(OpenTTDShipDepot, tile), offsetof(OpenTTDShipDepot, owner), offsetof(OpenTTDShipDepot, ship)});
 	Layout(0, "OpenTTDRustIntegerResult", {sizeof(OpenTTDRustIntegerResult), alignof(OpenTTDRustIntegerResult), offsetof(OpenTTDRustIntegerResult, value_bits), offsetof(OpenTTDRustIntegerResult, length), offsetof(OpenTTDRustIntegerResult, error_offset), offsetof(OpenTTDRustIntegerResult, error_length), offsetof(OpenTTDRustIntegerResult, error_kind)});
 	Layout(1, "OpenTTDRustUtf8Encoded", {sizeof(OpenTTDRustUtf8Encoded), alignof(OpenTTDRustUtf8Encoded), offsetof(OpenTTDRustUtf8Encoded, bytes), offsetof(OpenTTDRustUtf8Encoded, length)});
 	Layout(2, "OpenTTDRustUtf8Decoded", {sizeof(OpenTTDRustUtf8Decoded), alignof(OpenTTDRustUtf8Decoded), offsetof(OpenTTDRustUtf8Decoded, length), offsetof(OpenTTDRustUtf8Decoded, codepoint)});
@@ -893,9 +898,77 @@ static void Disasters()
 	std::printf("disaster_private_counter_direct_rng_delete_cancel passed\n");
 }
 
+
+/* The save corpus cannot observe NOSAVE rotation coordinates or suspended reentry.
+ * Compare narrowing against native C++ casts at the actual reverse boundary. */
+static OpenTTDShipView ship_probe_view{};
+static OpenTTDShipState *ship_probe_owner = nullptr;
+static uint32_t ship_probe_paths = 0, ship_probe_positions = 0;
+static void ShipProbeRead(uint32_t, OpenTTDShipView *out) noexcept { *out = ship_probe_view; }
+static void ShipProbeWrite(uint32_t, uint32_t field, uint64_t value) noexcept
+{
+	switch (field) {
+		case SHIP_WRITE_TICK: ship_probe_view.tick = static_cast<uint8_t>(value); break;
+		case SHIP_WRITE_RUNNING: ship_probe_view.running = static_cast<uint8_t>(value); break;
+		case SHIP_WRITE_ORDER_TIME: ship_probe_view.order_time = static_cast<uint32_t>(value); break;
+		case SHIP_WRITE_DIRECTION: ship_probe_view.direction = static_cast<uint8_t>(value); break;
+		case SHIP_WRITE_SPEED: ship_probe_view.speed = static_cast<uint16_t>(value); break;
+		case SHIP_WRITE_DEST: ship_probe_view.dest = static_cast<uint32_t>(value); break;
+		default: CHECK(false);
+	}
+}
+static uint64_t ShipProbeLeaf(uint32_t op, uint32_t, uint64_t, uint64_t, uint64_t) noexcept
+{
+	if (op == SHIP_OP_PATH_CLEAR) ++ship_probe_paths;
+	else if (op == SHIP_OP_POSITION) ++ship_probe_positions;
+	else CHECK(false);
+	return 0;
+}
+static OpenTTDShipState *ShipProbeOwner(uint32_t) noexcept { return ship_probe_owner; }
+static OpenTTDWaterPatch ShipProbePatch(uint32_t) noexcept { return {}; }
+static size_t ShipProbeNeighbours(OpenTTDWaterPatch, OpenTTDWaterPatch *) noexcept { return 0; }
+static size_t ShipProbeDepots(OpenTTDShipDepot *, size_t) noexcept { return 0; }
+static void ShipBoundary()
+{
+	using Owner = std::unique_ptr<OpenTTDShipState, decltype(&openttd_rust_ship_state_destroy)>;
+	using Task = std::unique_ptr<void, decltype(&openttd_rust_ship_control_destroy)>;
+	Owner state(openttd_rust_ship_state_new(), openttd_rust_ship_state_destroy);
+	ship_probe_owner = state.get();
+	CHECK(openttd_rust_ship_state_get(state.get(), 0) == 0 && openttd_rust_ship_state_get(state.get(), 1) == 255);
+	for (uint32_t value = 0; value <= UINT16_MAX; ++value) {
+		for (uint8_t field = 0; field < 4; ++field) {
+			openttd_rust_ship_state_set(state.get(), field, value);
+			CHECK(openttd_rust_ship_state_get(state.get(), field) == (field < 2 ? static_cast<uint8_t>(value) : static_cast<uint16_t>(value)));
+		}
+	}
+	ship_probe_view.direction = 1; ship_probe_view.speed = 33;
+	ship_probe_view.x = 32768; ship_probe_view.y = static_cast<uint32_t>(-32769);
+	ship_probe_view.tick = 255; ship_probe_view.running = 255; ship_probe_view.order_time = UINT32_MAX;
+	const OpenTTDShipLeaves leaves{ShipProbeRead, ShipProbeWrite, ShipProbeLeaf, ShipProbeOwner, ShipProbePatch, ShipProbeNeighbours, ShipProbeDepots};
+	const OpenTTDSharedServices services{};
+	Task task(openttd_rust_ship_control_create(0, 4, 0, 0, 0, &leaves, &services), openttd_rust_ship_control_destroy);
+	CHECK(openttd_rust_ship_control_advance(task.get(), 0).op == SHIP_OP_BREAKDOWN);
+	CHECK(ship_probe_view.tick == 0 && ship_probe_view.running == 0 && ship_probe_view.order_time == 0);
+	CHECK(openttd_rust_ship_control_advance(task.get(), 0).op == SHIP_OP_PROCESS_ORDERS);
+	CHECK(openttd_rust_ship_control_advance(task.get(), 1).op == SHIP_OP_YAPF_REVERSE);
+	CHECK(openttd_rust_ship_control_advance(task.get(), 1).op == SHIP_OP_VIEWPORT);
+	CHECK(ship_probe_view.direction == 5 && ship_probe_view.speed == 0 && ship_probe_paths == 1 && ship_probe_positions == 1);
+	CHECK(static_cast<int16_t>(openttd_rust_ship_state_get(state.get(), 2)) == static_cast<int16_t>(ship_probe_view.x));
+	CHECK(static_cast<int16_t>(openttd_rust_ship_state_get(state.get(), 3)) == static_cast<int16_t>(ship_probe_view.y));
+	/* Reentry can access and mutate the canonical owner before resumption. */
+	Task nested(openttd_rust_ship_control_create(4, 4, 17, 0, 0, &leaves, &services), openttd_rust_ship_control_destroy);
+	CHECK(openttd_rust_ship_control_advance(nested.get(), 0).op == 0 && ship_probe_view.dest == 17);
+	CHECK(openttd_rust_ship_control_advance(task.get(), 0).op == 0);
+	const auto paths = ship_probe_paths, positions = ship_probe_positions;
+	task.reset(); nested.reset(); CHECK(paths == ship_probe_paths && positions == ship_probe_positions);
+	state.reset(openttd_rust_ship_state_new());
+	CHECK(openttd_rust_ship_state_get(state.get(), 2) == 0 && openttd_rust_ship_state_get(state.get(), 1) == 255);
+	std::printf("ship scalar widths, transient native narrowing, reverse and nested reentry passed\n");
+}
 int main()
 {
 	Layouts();
+	ShipBoundary();
 	RoadBoundary();
 	RoadServiceBoundary();
 	WaterProbe::Run([](bool result) { CHECK(result); });

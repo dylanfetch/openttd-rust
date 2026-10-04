@@ -1384,3 +1384,27 @@ loading, rating expiry/decay/capping, stale-link refresh/removal and active relo
 queue mutation, partial/nested save failure and actual retirement/indexed reuse.
 The corpus is not exhaustive for legacy versions, NewGRF cargo callbacks,
 articulated/multiheaded refits or every transport combination.
+
+### Ship controller ownership checkpoint (#146)
+
+Rust owns the complete ship tick/movement, locks, acceleration, rotation/reversal,
+track/depot/destination policy, economy-day/service/cache/build initialization
+control, and nearest-depot region BFS plus ordered pool selection. Canonical
+state/rotation and signed-16-bit rotation coordinates belong to each Rust owner;
+#119 remains the sole path/search owner. Original bodies compile only portably.
+C++ retains shared Vehicle/map/pool storage, renderer bounds/sprites, allocation,
+Money accounting services and modern/legacy save staging. Four scalars have one
+ordinary/indexed-construction owner with cleanup after PreDestructor. NOSAVE
+coordinates reconstruct at the original afterload phase. No owner borrow spans
+services; only tile/depot entry, order/loading, viewport, breakdown, effects/sound
+and nested cache/YAPF reentry suspend. Bounded NewGRF queries/events stay direct.
+
+Checkpoint checks: `python3 tools/migration.py verify --jobs 2`, the four required
+Cargo checks, Ruff and the native ABI fixture (all scalar bit widths, native C++
+int16 narrowing, reversal and nested owner reentry). Opt-in controller branch
+receipts use `OPENTTD_SHIP_PROFILE=1 python3 tools/migration.py simulate water
+--jobs 2` and are validated in the existing ships module. This is not ready for
+integration: finish paired/self/soak/comparison evidence, build/sell/reuse and
+water-class-change witnesses, actual #137/#138/#139 dependency ancestry, final
+independent review and required CI. Legacy fixtures, viewport pixels and custom
+NewGRF combinations remain limits.

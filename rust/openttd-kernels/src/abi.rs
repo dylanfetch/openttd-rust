@@ -26,6 +26,14 @@ macro_rules! layout {
 #[allow(clippy::too_many_lines)]
 pub fn layout(type_id: u16, item: u8) -> usize {
     match type_id {
+        320 => {
+            layout!(crate::ship_control::View, item; tile, dest, x, y, z, direction, speed, tick, running, day, order_time, progress, status, owner, engine, last_station, order_destination, order_type, order_max_speed, acceleration, max_speed)
+        }
+        321 => {
+            layout!(crate::ship_control::Leaves, item; observe, write, leaf, owner, patch, neighbours, depots)
+        }
+        322 => layout!(crate::ship_control::Action, item; op, id, a, b, c),
+        323 => layout!(crate::ship_control::Depot, item; id, tile, owner, ship),
         0 => {
             layout!(crate::IntegerResult, item; value_bits, length, error_offset, error_length, error_kind)
         }
@@ -55,7 +63,7 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         18 => {
             layout!(crate::station_cargo::Collector, item; amount, previous, last_key, other, origin, selector, finalized)
         }
-        19..=21 => crate::crypto_primitives::abi_layout(type_id as u8, item),
+        19..=21 => crate::crypto_primitives::abi_layout(u8::try_from(type_id).unwrap(), item),
         22 => crate::blake2b::abi_layout(item),
         23 => layout!(crate::packet::State, item; limit, position),
         24 => layout!(crate::packet::Frame, item; message, payload),
