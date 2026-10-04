@@ -55,6 +55,10 @@ Harness and process: #72 harness (#85), #84 play saves (#87), #97 provenance
 freeze (#100), #88 Ruff (#92), #75 partial-pixel fidelity (#91), #90 world-state
 design (`docs/design/world-state.md`).
 
+| Issue | Completed maintenance | PR | Commit | Metrics (Rust / tooling / glue / retired) |
+| --- | --- | --- | --- | --- |
+| #109 | Component scenario modules | #112 | `9e1e5d175d` | 0 / 2414 / 0 / 0; moved code, net +190 lines |
+
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
 ## Phase 1: harness maintenance
@@ -64,9 +68,6 @@ The harness is `python3 tools/migration.py simulate` (`docs/rust-migration.md`,
 always the first priority. Port differences go in `KNOWN_FAILURES` with an issue,
 never in masks.
 
-- **#109 Split `tools/simulate.py` into per-component scenario modules.**
-  Behavior-preserving. In progress first; #103/#104 and #86 evidence must use
-  the new component modules before integration.
 - **#86 Rail and aircraft scenarios** (the ship slice is part of #104). Run on spare
   capacity starting now; required before any rail, road-vehicle or aircraft
   controller or YAPF port. PR #110 supplies the owner's rail/ship save; remove its
@@ -109,20 +110,20 @@ following `docs/design/world-state.md` as amended by #108.
 
 ## Resume checkpoint (2026-10-04)
 
-Root: `/root` (gpt-6-astra, ultra). Integration base `ce6ecea068`; no integration
-since the steering review. All rows below are active, not reviewed completion.
+Root: `/root` (gpt-6-astra, ultra). Integration base `9e1e5d175d`; one integration
+since the steering review. Update the stocktake after the next integration.
+All rows below are active, not integrated completion.
 Worktrees are siblings of the main checkout unless a path says otherwise.
 
 | Issue / owner | Branch and checkpoint commit | Worktree | Next step |
 | --- | --- | --- | --- |
-| #109 `/root/harness_modules_109` (Sol medium) | `harness-modules-109` at `6617573eca`, PR #112 | `openttd-rust-harness-modules` | CI green; `/root/review_harness_pr112` found no code issues. All four full before/after runs pass 119 scenarios; root is isolating timing-dependent snapshot-count differences, then final evidence review and merge. |
-| #107 trees `/root/trees_direct_services_107` (Sol high) | `trees-direct-services-107` at `cfcc04907b`, PR #113 | `openttd-rust-trees-direct` | `/root/review_trees_pr113` found no blocking code issues; root finishes final paired/soak evidence. All comparisons passed. Await green CI and integration. |
+| #107 trees `/root/trees_direct_services_107` (Sol high) | `trees-direct-services-107` at `cfcc04907b`, PR #113 | `openttd-rust-trees-direct` | Final `/root/review_trees_pr113` accepts code/evidence; required CI green. Root integrates next. |
 | #107 effects `/root/effects_direct_services_107` (Sol high) | `effects-direct-services-107` at `ef7187239f`, PR #115 | `openttd-rust-effects-direct` | Finish focused soak, assign fresh reviewer, then CI. Integration docs must name common Random/map services and accepted RANDOM_DEBUG wrapper source locations. |
 | #103 `/root/disaster_ownership_103` (Sol high) | `port-disaster-vehicles` at `5ce6534589` | `openttd-rust-disasters` | Final build/verify and candidate witness matrix, then component PR and fresh reviewer. Includes real #109/#113/#115 ancestry; no duplicate prerequisite patches. |
 | #104 `/root/water_regions_104` (Sol high) | `port-water-regions` at `8281876e72`, PR #114 | `openttd-rust-water-regions` | Owner fixes descriptor alias; `/root/review_water_pr114` re-reviews resulting commit/regression. Existing six-case soak, negative probe and verify pass; update base normally, never force-push. |
 | #86 `/root/rail_air_scenarios_86` (Sol high) | `harness-multimodal-save` at `5a99f2efe6`, PR #110 | `openttd-rust-saves` | `/root/review_rail_pr110` accepts source/evidence (independent 75-snapshot run). Merge after #112 and green CI. Aircraft input decision remains #111. |
 | #108 `/root/map_access_decision_108` (Astra high) | `map-access-measurements-108` at `bdb5313a50`, PR #116 | `openttd-rust-map-access` | Finish isolated timing trials, fresh review/CI of measurement code, and short design recommendation; root accepts decision and selects gated work. |
-| #117 `/root/cargo_payment_delivery` (Sol high) | New branch from current `rust-migration` | New isolated worktree | Start selected complete payment/delivery owner; reuse road evidence, open one component PR. |
+| #117 `/root/cargo_payment_delivery` (Sol high) | `cargo-payment-delivery-117` from `9f5f580078` | `openttd-rust-cargo-payment` | Complete payment/delivery owner drafted; build, adapters and economic witnesses next. ABI 49/50/51 reserved. |
 
 Preserved evidence branches: `evidence-disaster-vehicles` at `a775543162`
 (`openttd-rust-disasters-evidence`) and `evidence-water-regions` at `c752070cde`
