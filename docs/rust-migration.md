@@ -189,6 +189,16 @@ Any `[desync:` warning (a cache mismatch) and any log or stdout difference fail
   initial checkout, not proof of an arbitrary binary's source revision (#97).
   Evidence: `.local/simulation/<time>-<pid>/report.json`.
 
+Tree map-access measurements (#108) use the same scenarios and comparisons:
+`OPENTTD_TREE_PROFILE=1 python3 tools/migration.py simulate trees --jobs 1`;
+`PYTHONPATH=tools python3 -m simulation.trees <report.json>` summarizes the
+profile. Repeat the scenario command without the environment variable for timing
+without counters. Counts include generation warm-up; one tile-loop batch visits
+`Map::Size()/256` tiles, so 256 batches are a full-map sweep equivalent. The table
+separates generation and tree-tile-loop calls, counts FFI calls once (not returns),
+and reports copied record bytes. Elapsed times include startup, other components
+and save I/O; they neither isolate FFI cost nor establish a raw-map speedup.
+
 ## Native macOS arm64 Rust linkage
 
 CMake verifies the pinned `rustc -vV` host against the actual C++ platform,
@@ -1142,6 +1152,31 @@ factory tests cover Above/Rel coordinates. Viewport pixels, audible output,
 full legacy fixtures and every caller remain limits. Environmental exceptions
 terminate inside noexcept wrappers; Rust panics/OOM abort.
 RANDOM_DEBUG source locations name the common wrapper.
+
+### Water-region cache and graph service
+
+Rust owns the map-lifetime cache, validity, optional tile labels, edge masks,
+patch counts and aqueduct flags, flood scratch, lazy rebuild, invalidation and
+ordered neighbour traversal (#104). C++ keeps canonical map storage, shared
+water track/follower queries, formatting and the water_regions.h facade. The
+original implementation compiles only in portable builds; WRGN legacy skip is
+unchanged. No persistent cache mirror or RNG enters this port.
+
+Direct `noexcept` queries return copied scalars. A visitor cursor keeps only
+progress and per-side labels, returning before arbitrary C++ visitors with no
+cache borrow. Subsequent sides observe live changes; the aqueduct flag is read
+without a forced rebuild after side visitors, with original per-tile label
+rebuild points preserved. C++ RAII destroys the cursor when a visitor throws.
+Map replacement during a visitor violates original reference lifetimes.
+
+`python3 tools/migration.py simulate water --jobs 2` compares every semantic
+chunk in plain/desync runs: manual/cargodist cargo, paid delivery, lock/canal
+closure and recovery, cross-region aqueduct, nearest depot, and reference-built
+live-path reload. `--self` and `--soak` retain the same witnesses. Native ABI
+probes cover visitor invalidation and owner replacement that ordinary YAPF
+visitors cannot trigger. `tools/water-scenario-ai/README.md` gives preparation,
+negative-probe and optional crossing/timing measurement commands. Full ship
+YAPF, arbitrary maps/NewGRFs and exhaustive path retry limits remain unported.
 
 ### Town growth control and private state
 

@@ -7,11 +7,13 @@
 
 /** @file windows-abi.cpp Bounded first-32-bit layout and real C ABI call checks. */
 #include "rust/abi_ffi.h"
+#include "rust/water_regions_ffi.h"
 #include "rust/linkgraph_ffi.h"
 #include "rust/trees_ffi.h"
 #include "rust/townname_ffi.h"
 #include "rust/effect_ffi.h"
 #include "tests/effect_protocol.hpp"
+#include "tests/water_regions_protocol.hpp"
 #include "tests/town_protocol.hpp"
 #include "rust/ffi.h"
 #include "rust/utf8_ffi.h"
@@ -99,6 +101,10 @@ static void Layouts()
 	Layout(37, "OpenTTDLinkGraphShare", {sizeof(OpenTTDLinkGraphShare), alignof(OpenTTDLinkGraphShare), offsetof(OpenTTDLinkGraphShare, node), offsetof(OpenTTDLinkGraphShare, origin), offsetof(OpenTTDLinkGraphShare, via), offsetof(OpenTTDLinkGraphShare, cumulative), offsetof(OpenTTDLinkGraphShare, unrestricted), offsetof(OpenTTDLinkGraphShare, has_share)});
 	Layout(39, "OpenTTDEffectView", {sizeof(OpenTTDEffectView), alignof(OpenTTDEffectView), offsetof(OpenTTDEffectView, x), offsetof(OpenTTDEffectView, y), offsetof(OpenTTDEffectView, z), offsetof(OpenTTDEffectView, sprite), offsetof(OpenTTDEffectView, progress), offsetof(OpenTTDEffectView, spritenum), offsetof(OpenTTDEffectView, subtype), offsetof(OpenTTDEffectView, ambient)});
 	Layout(41, "OpenTTDEffectLeaves", {sizeof(OpenTTDEffectLeaves), alignof(OpenTTDEffectLeaves), offsetof(OpenTTDEffectLeaves, observe), offsetof(OpenTTDEffectLeaves, write), offsetof(OpenTTDEffectLeaves, viewport), offsetof(OpenTTDEffectLeaves, sound), offsetof(OpenTTDEffectLeaves, animated)});
+	Layout(46, "OpenTTDWaterPatch", {sizeof(OpenTTDWaterPatch), alignof(OpenTTDWaterPatch), offsetof(OpenTTDWaterPatch, x), offsetof(OpenTTDWaterPatch, y), offsetof(OpenTTDWaterPatch, label)});
+	Layout(47, "OpenTTDWaterSnapshot", {sizeof(OpenTTDWaterSnapshot), alignof(OpenTTDWaterSnapshot), offsetof(OpenTTDWaterSnapshot, edges), offsetof(OpenTTDWaterSnapshot, labels), offsetof(OpenTTDWaterSnapshot, patches), offsetof(OpenTTDWaterSnapshot, aqueducts)});
+	Layout(48, "OpenTTDWaterLeaves", {sizeof(OpenTTDWaterLeaves), alignof(OpenTTDWaterLeaves), offsetof(OpenTTDWaterLeaves, tracks), offsetof(OpenTTDWaterLeaves, follow), offsetof(OpenTTDWaterLeaves, aqueduct), offsetof(OpenTTDWaterLeaves, debug)});
+
 	Layout(60, "OpenTTDTownAction", {sizeof(OpenTTDTownAction), alignof(OpenTTDTownAction), offsetof(OpenTTDTownAction, kind), offsetof(OpenTTDTownAction, town), offsetof(OpenTTDTownAction, tile), offsetof(OpenTTDTownAction, a), offsetof(OpenTTDTownAction, b), offsetof(OpenTTDTownAction, c), offsetof(OpenTTDTownAction, d), offsetof(OpenTTDTownAction, cost)});
 	Layout(61, "OpenTTDTownLeaves", {sizeof(OpenTTDTownLeaves), alignof(OpenTTDTownLeaves), offsetof(OpenTTDTownLeaves, observe), offsetof(OpenTTDTownLeaves, leaf), offsetof(OpenTTDTownLeaves, state), offsetof(OpenTTDTownLeaves, stations)});
 	CHECK(openttd_rust_abi_layout(255, 0) == SIZE_MAX);
@@ -663,6 +669,7 @@ static void Trees()
 int main()
 {
 	Layouts();
+	WaterProbe::Run([](bool result) { CHECK(result); });
 	CheckEffectProtocol([](bool result) { CHECK(result); });
 	LinkGraphJob();
 	Trees();

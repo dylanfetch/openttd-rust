@@ -26,6 +26,8 @@ add_test_files(
     town_growth.cpp
     town_protocol.hpp
     townname.cpp
+    water_regions.cpp
+    water_regions_protocol.hpp
     tilearea.cpp
     utf8.cpp
 )
