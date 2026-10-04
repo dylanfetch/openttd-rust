@@ -292,7 +292,12 @@ static uint64_t TrainLeaf(uint32_t op, uint32_t id, uint64_t a, uint64_t b, uint
 		case TRAIN_OP_REVERSE_SINGLE_BLOCKED: { return EngInfo(v->engine_type)->callback_mask.Test(VehicleCallbackMask::ArticEngine); }
 		case TRAIN_OP_STOPPED_IN_DEPOT: { return v->IsStoppedInDepot(); }
 		case TRAIN_OP_REVERSE_WINDOWS: { SetWindowDirty(WC_VEHICLE_DEPOT, v->tile); SetWindowDirty(WC_VEHICLE_DETAILS, v->index); SetWindowDirty(WC_VEHICLE_VIEW, v->index); SetWindowClassesDirty(WC_TRAINS_LIST); break; }
+		case TRAIN_OP_FREE_RESERVATION: { FreeTrainTrackReservation(v); break; }
+		case TRAIN_OP_CLEAR_RESERVATION: { ClearPathReservation(v, TileIndex(a), static_cast<Trackdir>(b)); break; }
+		case TRAIN_OP_CHECK_REVERSE: { return CheckReverseTrain(v); }
+		case TRAIN_OP_FIND_DEPOT: { auto result = FindClosestTrainDepot(v, static_cast<int>(a)); return result.tile.base() | (static_cast<uint64_t>(result.best_length) << 32); }
 		case TRAIN_OP_IS_STATION_ANY: return IsTileType(TileIndex(a), MP_STATION);
+		case TRAIN_OP_IS_STATION_RAIL: return IsTileType(TileIndex(a), MP_STATION) && HasStationRail(TileIndex(a));
 		case TRAIN_OP_PROFILE: if (_train_profile.enabled) ++_train_profile.counts[a]; break;
 		default: NOT_REACHED();
 	}
@@ -331,12 +336,7 @@ static uint64_t TrainAction(const OpenTTDTrainAction &action)
 		case TRAIN_OP_CHOOSE_TRACK: { return ChooseTrainTrack(v, TileIndex(a), static_cast<DiagDirection>(b), static_cast<TrackBits>(c), false, nullptr, true); }
 		case TRAIN_OP_CHECK_NEXT: { CheckNextTrainTile(v); break; }
 		case TRAIN_OP_TRY_PATH: { return TryPathReserve(v, a != 0, b != 0); }
-		case TRAIN_OP_FREE_RESERVATION: { FreeTrainTrackReservation(v); break; }
-		case TRAIN_OP_CLEAR_RESERVATION: { ClearPathReservation(v, TileIndex(a), static_cast<Trackdir>(b)); break; }
-		case TRAIN_OP_CHECK_REVERSE: { return CheckReverseTrain(v); }
-		case TRAIN_OP_FIND_DEPOT_TILE: { return FindClosestTrainDepot(v, static_cast<int>(a)).tile.base(); }
 		case TRAIN_OP_RESERVE_UNDER: { v->ReserveTrackUnderConsist(); break; }
-		case TRAIN_OP_FIND_DEPOT: { auto result = FindClosestTrainDepot(v, static_cast<int>(a)); return result.tile.base() | (static_cast<uint64_t>(result.best_length) << 32); }
 		case TRAIN_OP_RESERVE_TRACK: { return TryReserveRailTrack(TileIndex(a), static_cast<Track>(b), c != 0); }
 		default: NOT_REACHED();
 	}

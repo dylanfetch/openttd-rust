@@ -19,7 +19,8 @@
  * Tasks own temporary control state and release every world/owner borrow before
  * returning a named action. Only ordinary callback/reentry services are dispatched:
  * tile/depot entry, generic orders/loading, station animation/sounds, destruction
- * and nested controller reservation/YAPF calls. RNG and map/pool operations are direct.
+ * and controller/YAPF paths that can reserve station track. RNG, bounded reservation
+ * operations, depot search, and map/pool access are direct.
  * C++ destroys the task once on completion or callback exception. Canonical state
  * lives in the shell owner, never in a persistent copy. Panics/OOM abort.
  * Descriptors and copied output pointers live for their individual calls; the
@@ -313,4 +314,5 @@ constexpr uint32_t TRAIN_OP_FIND_DEPOT = 201;
 constexpr uint32_t TRAIN_OP_RESERVE_TRACK = 202;
 constexpr uint32_t TRAIN_OP_IS_STATION_ANY = 203;
 constexpr uint32_t TRAIN_OP_PROFILE = 204;
+constexpr uint32_t TRAIN_OP_IS_STATION_RAIL = 205;
 #endif

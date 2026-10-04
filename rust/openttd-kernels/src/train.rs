@@ -1134,7 +1134,7 @@ impl Game {
             self.op(DEPOT_DIRTY, id);
         }
         if !self.flag(id, 8) {
-            self.action(FREE_RESERVATION, id, 0, 0, 0).await;
+            self.op(FREE_RESERVATION, id);
         }
         let crossing = self.approaching_crossing(id);
         let mut r = self.op(COUNT_CHAIN, id) as i32 - 1;
@@ -1585,14 +1585,13 @@ impl Game {
                         self.tile_op(DIRTY_TILE, new);
                     }
                     if self.read(id).next == INVALID {
-                        self.action(
+                        self.leaf(
                             CLEAR_RESERVATION,
                             id,
                             u64::from(self.read(id).tile),
                             u64::from(self.trackdir(id)),
                             0,
-                        )
-                        .await;
+                        );
                     }
                     self.write(id, W_TILE, u64::from(new));
                     if self.tile_op(TILE_RAIL_TYPE, new) != self.tile_op(TILE_RAIL_TYPE, old) {
@@ -1642,14 +1641,8 @@ impl Game {
             {
                 if self.read(id).front != 0 {
                     self.count(20);
-                    self.action(
-                        RESERVE_TRACK,
-                        id,
-                        u64::from(new),
-                        self.tile_op(TUNNEL_DIR, new) & 1,
-                        1,
-                    )
-                    .await;
+                    self.reserve_track(id, new, self.tile_op(TUNNEL_DIR, new) & 1)
+                        .await;
                     self.action(CHECK_NEXT, id, 0, 0, 0).await;
                 }
                 if old == new {
@@ -1683,13 +1676,7 @@ impl Game {
                     0,
                 ) == 0
                     && self
-                        .action(
-                            RESERVE_TRACK,
-                            id,
-                            u64::from(new),
-                            u64::from(self.track(id).trailing_zeros()),
-                            1,
-                        )
+                        .reserve_track(id, new, u64::from(self.track(id).trailing_zeros()))
                         .await
                         == 0)
                     || self.action(TRY_PATH, id, 0, 0, 0).await == 0
@@ -1759,24 +1746,32 @@ const FIND_DEPOT: u32 = 201;
 
 const RESERVE_TRACK: u32 = 202;
 impl Game {
-    async fn crash(&self, id: u32, flooded: bool) -> u32 {
+    async fn reserve_track(&self, id: u32, tile: u32, track: u64) -> u64 {
+        if self.tile_op(IS_STATION_RAIL, tile) != 0 {
+            // The original station reservation invokes randomisation and animation.
+            self.action(RESERVE_TRACK, id, u64::from(tile), track, 1)
+                .await
+        } else {
+            self.leaf(TRY_RESERVE, id, u64::from(tile), track, 1)
+        }
+    }
+    fn crash(&self, id: u32, flooded: bool) -> u32 {
         let mut victims = 0_u32;
         if self.read(id).front != 0 {
             victims += 2;
             if !self.flag(id, 8) {
-                self.action(FREE_RESERVATION, id, 0, 0, 0).await;
+                self.op(FREE_RESERVATION, id);
             }
             let mut u = id;
             while u != INVALID {
                 let v = self.read(u);
-                self.action(
+                self.leaf(
                     CLEAR_RESERVATION,
                     u,
                     u64::from(v.tile),
                     u64::from(self.trackdir(u)),
                     0,
-                )
-                .await;
+                );
                 if self.tile_op(IS_TUNNELBRIDGE, v.tile) != 0 {
                     self.leaf(SET_TUNNEL_RES, u, self.tile_op(OTHER_END, v.tile), 0, 0);
                 }
@@ -1795,7 +1790,7 @@ impl Game {
     async fn crashed(&self, id: u32) -> u32 {
         let mut victims = 0;
         if self.read(id).status & 128 == 0 {
-            victims = self.crash(id, false).await;
+            victims = self.crash(id, false);
             self.val(CRASH_EVENT, id, u64::from(victims));
         }
         self.action(RESERVE_UNDER, id, 0, 0, 0).await;
@@ -1926,8 +1921,7 @@ impl Game {
             }
             for t in 0..6 {
                 if remaining & (1 << t) != 0 {
-                    self.action(RESERVE_TRACK, INVALID, u64::from(tile), t, 1)
-                        .await;
+                    self.reserve_track(INVALID, tile, t).await;
                 }
             }
         }
@@ -2137,9 +2131,7 @@ impl Game {
             return true;
         }
         let valid_order = v.order != 0 && v.order != 7;
-        if self.action(PROCESS_ORDERS, id, 0, 0, 0).await != 0
-            && self.action(CHECK_REVERSE, id, 0, 0, 0).await != 0
-        {
+        if self.action(PROCESS_ORDERS, id, 0, 0, 0).await != 0 && self.op(CHECK_REVERSE, id) != 0 {
             self.set(id, 2, 0);
             self.write(id, W_SPEED, 0);
             self.write(id, W_SUBSPEED, 0);
@@ -2278,7 +2270,7 @@ impl Game {
         }
         true
     }
-    async fn needs_service(&self, id: u32) {
+    fn needs_service(&self, id: u32) {
         if self.op(SERVINT, id) == 0 || self.op(NEEDS_SERVICE, id) == 0 {
             return;
         }
@@ -2288,7 +2280,7 @@ impl Game {
             return;
         }
         let max = self.op(MAX_DEPOT_PENALTY, id) as u32;
-        let depot = self.action(FIND_DEPOT, id, u64::from(max), 0, 0).await;
+        let depot = self.val(FIND_DEPOT, id, u64::from(max));
         let length = (depot >> 32) as u32;
         if length == u32::MAX || length > max {
             if self.read(id).order == 2 {
@@ -2311,7 +2303,7 @@ impl Game {
         self.write(id, W_DEST, u64::from(tile));
         self.op(START_STOP_DIRTY, id);
     }
-    async fn economy_day(&self, id: u32) {
+    fn economy_day(&self, id: u32) {
         self.op(ECONOMY_AGE, id);
         let day = self.read(id).day.wrapping_add(1);
         self.write(id, W_DAY, u64::from(day));
@@ -2320,7 +2312,7 @@ impl Game {
         }
         if self.read(id).front != 0 {
             self.op(CHECK_BREAKDOWN, id);
-            self.needs_service(id).await;
+            self.needs_service(id);
             self.op(CHECK_ORDERS, id);
             if self.read(id).order == 1 {
                 let tile = self.op(STATION_DEST, id) as u32;
@@ -2467,7 +2459,7 @@ pub unsafe extern "C" fn openttd_rust_train_create(
                 0
             }
             8 => {
-                g.economy_day(id).await;
+                g.economy_day(id);
                 0
             }
             9 => g.running_cost(id) as u64,
@@ -2499,10 +2491,10 @@ pub unsafe extern "C" fn openttd_rust_train_create(
                 0
             }
             19 => u64::from(g.controller(id, a as u32, b != 0).await),
-            20 => u64::from(g.crash(id, a != 0).await),
+            20 => u64::from(g.crash(id, a != 0)),
             21 => u64::from(g.stay_depot(id).await),
             22 => {
-                g.needs_service(id).await;
+                g.needs_service(id);
                 0
             }
             23 => u64::from(g.next_force(id)),
@@ -2540,3 +2532,5 @@ pub unsafe extern "C" fn openttd_rust_train_destroy(task: *mut Task) {
 const IS_STATION_ANY: u32 = 203;
 
 const PROFILE: u32 = 204;
+
+const IS_STATION_RAIL: u32 = 205;
