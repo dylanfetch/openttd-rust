@@ -23,6 +23,7 @@ pub mod services;
 mod station_cargo;
 mod string_validation;
 mod tgp;
+mod town;
 mod townname;
 mod townname_data;
 mod trees;

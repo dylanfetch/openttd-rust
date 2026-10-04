@@ -9,6 +9,9 @@
 
 #include "../stdafx.h"
 #include "../town.h"
+#ifdef WITH_RUST
+#include "../rust/town_save.hpp"
+#endif
 #include "../industry.h"
 #include "../company_func.h"
 #include "../aircraft.h"
@@ -574,11 +577,19 @@ static const OldChunks town_chunk[] = {
 	OCL_NULL( 2 ),         ///< population,        no longer in use
 	OCL_SVAR( OC_UINT16, Town, townnametype ),
 	OCL_SVAR( OC_UINT32, Town, townnameparts ),
+#ifdef WITH_RUST
+	{ OC_FILE_U8 | OC_VAR_U16, 1, nullptr, [] (void *) -> void * { return &TownGrowthSaveScope::current.counter; }, nullptr },
+#else
 	OCL_SVAR(  OC_FILE_U8 | OC_VAR_U16, Town, grow_counter ),
+#endif
 	OCL_NULL( 1 ),         ///< sort_index,        no longer in use
 	OCL_NULL( 4 ),         ///< sign-coordinates,  no longer in use
 	OCL_NULL( 2 ),         ///< namewidth,         no longer in use
+#ifdef WITH_RUST
+	{ OC_FILE_U16 |  OC_VAR_U8, 1, nullptr, [] (void *) -> void * { return &TownGrowthSaveScope::current.flags; }, nullptr },
+#else
 	OCL_SVAR( OC_FILE_U16 |  OC_VAR_U8, Town, flags ),
+#endif
 	OCL_NULL( 10 ),        ///< radius,            no longer in use
 
 	OCL_SVAR( OC_INT16, Town, ratings[0] ),
@@ -594,7 +605,11 @@ static const OldChunks town_chunk[] = {
 	OCL_SVAR( OC_FILE_U32 | OC_VAR_U16, Town, statues ),
 	OCL_NULL( 2 ),         ///< num_houses,        no longer in use
 	OCL_SVAR(  OC_FILE_U8 | OC_VAR_U16, Town, time_until_rebuild ),
+#ifdef WITH_RUST
+	{ OC_FILE_U8 | OC_VAR_U16, 1, nullptr, [] (void *) -> void * { return &TownGrowthSaveScope::current.rate; }, nullptr },
+#else
 	OCL_SVAR(  OC_FILE_U8 | OC_VAR_U16, Town, growth_rate ),
+#endif
 
 	/* Slots 0 and 2 are passengers and mail respectively for old saves. */
 	OCL_VAR( OC_FILE_U16 | OC_VAR_U32, 1, &_old_pass_supplied[THIS_MONTH].production ),
@@ -613,8 +628,16 @@ static const OldChunks town_chunk[] = {
 	OCL_SVAR( OC_TTD | OC_UINT16, Town, received[TAE_FOOD].old_act ),
 	OCL_SVAR( OC_TTD | OC_UINT16, Town, received[TAE_WATER].old_act ),
 
+#ifdef WITH_RUST
+	{ OC_UINT8, 1, nullptr, [] (void *) -> void * { return &TownGrowthSaveScope::current.road; }, nullptr },
+#else
 	OCL_SVAR(  OC_UINT8, Town, road_build_months ),
+#endif
+#ifdef WITH_RUST
+	{ OC_UINT8, 1, nullptr, [] (void *) -> void * { return &TownGrowthSaveScope::current.funding; }, nullptr },
+#else
 	OCL_SVAR(  OC_UINT8, Town, fund_buildings_months ),
+#endif
 
 	OCL_CNULL( OC_TTD, 8 ),         ///< some junk at the end of the record
 
@@ -624,7 +647,12 @@ static const OldChunks town_chunk[] = {
 static bool LoadOldTown(LoadgameState &ls, int num)
 {
 	Town *t = new (TownID(num)) Town();
-	if (!LoadChunk(ls, t, town_chunk)) return false;
+	{
+#ifdef WITH_RUST
+		TownGrowthSaveScope growth_scope(t, true);
+#endif
+		if (!LoadChunk(ls, t, town_chunk)) return false;
+	}
 
 	if (t->xy != 0) {
 		if (_savegame_type == SGT_TTO) {

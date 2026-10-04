@@ -17,6 +17,9 @@
 #include "subsidy_type.h"
 #include "newgrf_storage.h"
 #include "cargotype.h"
+#ifdef WITH_RUST
+#include "rust/town_owner.hpp"
+#endif
 
 template <typename T>
 struct BuildingCounts {
@@ -72,7 +75,12 @@ struct Town : TownPool::PoolItem<&_town_pool> {
 	std::string name{}; ///< Custom town name. If empty, the town was not renamed and uses the generated name.
 	mutable std::string cached_name{}; ///< NOSAVE: Cache of the resolved name of the town, if not using a custom town name
 
+#ifdef WITH_RUST
+	RustTownOwner growth_owner{openttd_rust_town_new()};
+	RustTownFlags<TownFlags, TownFlag> flags{growth_owner.get()};
+#else
 	TownFlags flags{}; ///< See #TownFlags.
+#endif
 
 	uint16_t noise_reached = 0; ///< level of noise that all the airports are generating
 
@@ -141,11 +149,19 @@ struct Town : TownPool::PoolItem<&_town_pool> {
 
 	uint16_t time_until_rebuild = 0; ///< time until we rebuild a house
 
+#ifdef WITH_RUST
+	RustTownScalar<uint16_t, 0> grow_counter{growth_owner.get()};
+	RustTownScalar<uint16_t, 1> growth_rate{growth_owner.get()};
+	RustTownScalar<uint8_t, 2> fund_buildings_months{growth_owner.get()};
+	RustTownScalar<uint8_t, 3> road_build_months{growth_owner.get()};
+#else
 	uint16_t grow_counter = 0; ///< counter to count when to grow, value is smaller than or equal to growth_rate
 	uint16_t growth_rate = 0; ///< town growth rate
 
 	uint8_t fund_buildings_months = 0; ///< fund buildings program in action?
 	uint8_t road_build_months = 0; ///< fund road reconstruction in action?
+
+#endif
 
 	bool larger_town = false; ///< if this is a larger town and should grow more quickly
 	TownLayout layout{}; ///< town specific road layout

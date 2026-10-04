@@ -1142,3 +1142,30 @@ factory tests cover Above/Rel coordinates. Viewport pixels, audible output,
 full legacy fixtures and every caller remain limits. Environmental exceptions
 terminate inside noexcept wrappers; Rust panics/OOM abort.
 RANDOM_DEBUG source locations name the common wrapper.
+
+### Town growth control and private state
+
+Issue #120 moves town tick traversal, complete road walking/build choices,
+bridge/tunnel/terraform retries, house selection/layout/placement and expansion
+retries into Rust. Rust owns each shell's growth counters/rate, action months and
+entire flags byte. Map/pools, specs, caches, house tile simulation, cargo and
+unrelated monthly accounting remain C++; monthly decrements precede statistics
+rotation and growth recomputation follows it. Portable bodies remain compiled
+only without `WITH_RUST`.
+Direct bundled `noexcept` observations and leaves preserve shared RNG and write
+order. Only road/bridge/tunnel/terraform/clear commands and NewGRF allow-construction
+and construction animation yield to C++, with no private/world borrow retained.
+An invocation future owns its candidate probabilities. Shell member RAII releases
+state even during pool-cleanup early returns; task RAII handles command exceptions
+and company restoration. Panics/environmental failures abort. ABI IDs 60/61 cover
+copied actions/leaves. CITY and legacy descriptors keep names/types; scoped staging
+commits partial loads and restores nested staging. GUI/script/NewGRF/road consumers
+read thin scalar/flag accessors over the one owner.
+`python3 tools/migration.py simulate town-growth` compares actual house/road,
+bridge/terrain, growth-state, funding expiry, cargo goals, layouts/climates and
+modern reload; `--self`/`--soak` extend the same component scenarios. Native ABI and
+CTest check console-unreachable expansion modes/retries, first-road command failure,
+callback reentry, sequential multi-tile writes, indexed construction, cleanup/reuse
+and partial legacy staging. A bounded unchanged-reference tunnel comparison checks
+slopes, target/length, commands, RNG and execute effects. Natural tunnel construction,
+real custom NewGRF callbacks and complete historical saves remain evidence limits.

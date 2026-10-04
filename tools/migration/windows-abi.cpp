@@ -12,6 +12,7 @@
 #include "rust/townname_ffi.h"
 #include "rust/effect_ffi.h"
 #include "tests/effect_protocol.hpp"
+#include "tests/town_protocol.hpp"
 #include "rust/ffi.h"
 #include "rust/utf8_ffi.h"
 #include "rust/builder_ffi.h"
@@ -98,6 +99,8 @@ static void Layouts()
 	Layout(37, "OpenTTDLinkGraphShare", {sizeof(OpenTTDLinkGraphShare), alignof(OpenTTDLinkGraphShare), offsetof(OpenTTDLinkGraphShare, node), offsetof(OpenTTDLinkGraphShare, origin), offsetof(OpenTTDLinkGraphShare, via), offsetof(OpenTTDLinkGraphShare, cumulative), offsetof(OpenTTDLinkGraphShare, unrestricted), offsetof(OpenTTDLinkGraphShare, has_share)});
 	Layout(39, "OpenTTDEffectView", {sizeof(OpenTTDEffectView), alignof(OpenTTDEffectView), offsetof(OpenTTDEffectView, x), offsetof(OpenTTDEffectView, y), offsetof(OpenTTDEffectView, z), offsetof(OpenTTDEffectView, sprite), offsetof(OpenTTDEffectView, progress), offsetof(OpenTTDEffectView, spritenum), offsetof(OpenTTDEffectView, subtype), offsetof(OpenTTDEffectView, ambient)});
 	Layout(41, "OpenTTDEffectLeaves", {sizeof(OpenTTDEffectLeaves), alignof(OpenTTDEffectLeaves), offsetof(OpenTTDEffectLeaves, observe), offsetof(OpenTTDEffectLeaves, write), offsetof(OpenTTDEffectLeaves, viewport), offsetof(OpenTTDEffectLeaves, sound), offsetof(OpenTTDEffectLeaves, animated)});
+	Layout(60, "OpenTTDTownAction", {sizeof(OpenTTDTownAction), alignof(OpenTTDTownAction), offsetof(OpenTTDTownAction, kind), offsetof(OpenTTDTownAction, town), offsetof(OpenTTDTownAction, tile), offsetof(OpenTTDTownAction, a), offsetof(OpenTTDTownAction, b), offsetof(OpenTTDTownAction, c), offsetof(OpenTTDTownAction, d), offsetof(OpenTTDTownAction, cost)});
+	Layout(61, "OpenTTDTownLeaves", {sizeof(OpenTTDTownLeaves), alignof(OpenTTDTownLeaves), offsetof(OpenTTDTownLeaves, observe), offsetof(OpenTTDTownLeaves, leaf), offsetof(OpenTTDTownLeaves, state), offsetof(OpenTTDTownLeaves, stations)});
 	CHECK(openttd_rust_abi_layout(255, 0) == SIZE_MAX);
 	CHECK(static_cast<size_t>(PTRDIFF_MAX) == (SIZE_MAX >> 1));
 	std::printf("pointer_bytes %zu sentinel %zu borrow_limit %zu\n", sizeof(void *), SIZE_MAX, static_cast<size_t>(PTRDIFF_MAX));
@@ -108,6 +111,7 @@ static void Layouts()
 
 static void Calls()
 {
+	CheckTownProtocol([](bool condition) { CHECK(condition); });
 	const std::array<uint8_t, 8> bytes{0x10, 0x32, 0x54, 0x76, 0x98, 0xBA, 0xDC, 0xFE};
 	constexpr uint64_t bits = UINT64_C(0xFEDCBA9876543210);
 	auto le = openttd_rust_encode_uint_le(bits);
