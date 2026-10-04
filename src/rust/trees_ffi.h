@@ -15,6 +15,8 @@ struct OpenTTDTreeAction {
 	uint32_t kind, tile, a, b;
 	int64_t cost;
 };
+/* C++-only profiling hook; one batch visits Map::Size()/256 tiles. */
+void ProfileRustTreeTileLoop() noexcept;
 extern "C" {
 /* Entry kinds: 0 generate, 1 scatter, 2 place(tile,r,keep), 3 plant(tile,type,count,growth),
  * 5 tile loop, 6 tick, 8 command(end,start,type,diagonal), 9 clear. Original game
