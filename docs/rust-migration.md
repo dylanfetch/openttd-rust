@@ -1220,6 +1220,7 @@ before tile/depot entry, orders/loading, station callbacks and destruction.
 `OPENTTD_TRAIN_PROFILE=1` writes controller branch counts in `train-profile.json`;
 this includes extension rollback separately from #122's search rollback.
 Validation uses the existing Padhattan manual/cargodist, realistic acceleration,
-90-degree reservation and live reload scenarios. The PR records reproducible
-commands and remaining branch/NewGRF limits; passing these inputs does not prove
+90-degree reservation, live reload and real command-built controller scenarios.
+A narrow unchanged-source comparison covers variable-length curve/reversal inputs
+unavailable in the stock fixture. The PR records commands and branch/NewGRF limits; passing these inputs does not prove
 exhaustive train equivalence.

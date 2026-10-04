@@ -29,3 +29,9 @@ OPENTTD_TRAIN_PROFILE=1 python3 tools/migration.py simulate rail-controller --jo
 The inputs do not witness articulated/unequal-length trains, bridge/tunnel
 reversal, or opposing PBS green-to-red restoration. The supplied save has no
 custom train NewGRFs, and the built opposing PBS signal remains red.
+
+`python3 tools/train-edge-comparison.py` addresses the concrete stock-engine gap
+with 20,000 variable-length curve cases and 20,000 reversal pose/flag cases. It
+extracts unchanged pinned C++ bodies and calls production Rust owner entries.
+World callbacks only record ordering. It does not establish realistic NewGRF
+construction, articulated follower movement, spacing advances, or bridge entry.
