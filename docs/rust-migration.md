@@ -1223,8 +1223,8 @@ sprite updates and destruction; no world reference survives them. Canonical
 state outlives active calls and is released after PreDestructor; panics abort.
 `python3 tools/migration.py simulate roads` witnesses both acceleration models,
 cache consumption/invalidation, blocking escape, overtake initiation/timeout,
-depot service/departure and a reload carrying path/counter state. Existing road,
-multimodal and disaster scenarios compare all saved fields and debug logs.
+depot service/departure and path/counter reload, with loaded link jobs postponed
+32 days in typed inputs. Road/multimodal/disaster cases compare all fields/logs.
 Native fixtures compare all movement/stop data against unchanged C++ tables and
 exercise widths, ordered paths, nested save staging, partial-load unwind, indexed
 pool reuse and reentry. These establish covered behavior; actual legacy saves,
