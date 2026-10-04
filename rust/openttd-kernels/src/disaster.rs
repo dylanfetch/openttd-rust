@@ -47,6 +47,8 @@ static mut DELAY: u16 = 0;
 struct Channel {
     action: Cell<Action>,
     response: Cell<i64>,
+    vehicle: Cell<Option<(u32, [i64; 24])>>,
+    world: Cell<Option<[i64; 24]>>,
 }
 struct Request {
     channel: Rc<Channel>,
@@ -95,10 +97,28 @@ const INVALID: u32 = 1_048_575;
 const INVALID_TILE: u32 = u32::MAX;
 impl World {
     fn read(&self, kind: u32, id: u32, a: i64, b: i64) -> [i64; 24] {
+        // Reuse copied observations only within this poll. No shared service runs
+        // here; canonical leaf writes update/invalidate the copy below. Every
+        // return-to-C++ action discards these observations before the next poll.
+        if kind == 0 && a == 0 {
+            if let Some(record) = self.channel.world.get() {
+                return record;
+            }
+        } else if kind == 1
+            && let Some((cached, record)) = self.channel.vehicle.get()
+            && cached == id
+        {
+            return record;
+        }
         let mut record = [0; 24];
         // SAFETY: Synchronous nonthrowing callback writes 24 copied scalars only.
         unsafe {
             (self.read)(self.context, kind, id, a, b, record.as_mut_ptr());
+        }
+        if kind == 0 && a == 0 {
+            self.channel.world.set(Some(record));
+        } else if kind == 1 {
+            self.channel.vehicle.set(Some((id, record)));
         }
         record
     }
@@ -115,6 +135,20 @@ impl World {
         // SAFETY: Source-valid ID; callback performs one canonical scalar write.
         unsafe {
             (self.write)(self.context, field as u32, id, value);
+        }
+        if let Some((cached, mut record)) = self.channel.vehicle.get()
+            && cached == id
+        {
+            if field == OWNER || field == SUBTYPE {
+                self.channel.vehicle.set(None);
+            } else {
+                record[field] = match field {
+                    X | Y | Z | AGE => i64::from(value as i32),
+                    DIR | TICK | STATUS | BREAKDOWN | BREAK_DELAY => i64::from(value as u8),
+                    _ => i64::from(value as u32),
+                };
+                self.channel.vehicle.set(Some((id, record)));
+            }
         }
     }
     fn increment(&self, id: u32, field: usize) -> i64 {
@@ -304,11 +338,9 @@ impl World {
         self.action(15, subtype, target, x, y, dir, 0).await as u32
     }
     fn link(&self, id: u32, next: u32) {
-        // SAFETY: Scalar next-chain write uses the source's new/live vehicle IDs.
-        unsafe {
-            (self.write)(self.context, NEXT as u32, id, i64::from(next));
-        }
+        self.set(id, NEXT, i64::from(next));
     }
+
     async fn clear(&self, tile: u32) {
         if self.action(16, tile, 0, 0, 0, 0, 0).await != 0 {
             return;
@@ -1035,6 +1067,8 @@ pub unsafe extern "C" fn openttd_rust_disaster_create(
     let channel = Rc::new(Channel {
         action: Cell::new(Action::default()),
         response: Cell::new(0),
+        vehicle: Cell::new(None),
+        world: Cell::new(None),
     });
     let w = World {
         context,
@@ -1056,6 +1090,8 @@ pub unsafe extern "C" fn openttd_rust_disaster_advance(owner: *mut Run, response
     // SAFETY: One invocation exclusively polls its separate continuation allocation.
     let run = unsafe { &mut *owner };
     run.channel.response.set(response);
+    run.channel.vehicle.set(None);
+    run.channel.world.set(None);
     let mut context = PollContext::from_waker(Waker::noop());
     match run.future.as_mut().poll(&mut context) {
         Poll::Pending => run.channel.action.get(),
