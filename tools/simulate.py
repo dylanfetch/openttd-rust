@@ -522,7 +522,11 @@ def save_moment(path):
 
 
 def first_difference(a, b):
-    index = next(i for i, (x, y) in enumerate(zip(a + [None], b + [None])) if x != y)
+    index = next(
+        i
+        for i, (x, y) in enumerate(zip(a + [None], b + [None], strict=False))
+        if x != y
+    )
     return (
         index,
         (a[index] if index < len(a) else None),

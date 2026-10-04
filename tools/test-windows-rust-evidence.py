@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Bounded checks for MSVC role flags and retained Ninja linker response files."""
 
-from pathlib import Path
 import runpy
 import tempfile
 import unittest
+from pathlib import Path
 
 import migration
 

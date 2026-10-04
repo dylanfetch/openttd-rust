@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Compare actual original/Rust X25519 endpoints, wire bytes and state transitions."""
 
-from collections import Counter
 import hashlib
 import json
-from pathlib import Path
 import runpy
 import subprocess
+from collections import Counter
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATION = runpy.run_path(str(ROOT / "tools/migration.py"))

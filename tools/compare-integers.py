@@ -3,11 +3,11 @@
 
 import hashlib
 import json
-from pathlib import Path
 import re
 import runpy
-import subprocess
 import struct
+import subprocess
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATION = runpy.run_path(str(ROOT / "tools/migration.py"))
@@ -131,7 +131,9 @@ def compare_builders(env, binaries):
                 want.decode(),
                 got.decode(),
             )
-            for index, (want, got) in enumerate(zip(expected, streams[name]))
+            for index, (want, got) in enumerate(
+                zip(expected, streams[name], strict=False)
+            )
             if want != got
         ]
         (OUT / f"{name}-builder-failures.json").write_text(
@@ -296,7 +298,7 @@ def compare_generators(env):
             original.replace(b"##id 0x0000", pragma, 1)
         )
         results = []
-        for name, tool_dir in tools.items():
+        for _name, tool_dir in tools.items():
             command = [
                 str(tool_dir / "strgen/strgen"),
                 "-s",
@@ -397,7 +399,7 @@ def main():
     failures = [
         (index, records[index].decode().strip(), expected.decode(), actual.decode())
         for index, (expected, actual) in enumerate(
-            zip(results["reference"], results["candidate"])
+            zip(results["reference"], results["candidate"], strict=False)
         )
         if expected != actual
     ]

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Check shared cache provenance and explicit return to ordinary CMake mode."""
 
-from pathlib import Path
 import shutil
 import tempfile
 import unittest
+from pathlib import Path
 
 import migration
 

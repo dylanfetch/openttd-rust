@@ -3,10 +3,10 @@
 
 import argparse
 import json
-from pathlib import Path
 import re
 import shlex
 import subprocess
+from pathlib import Path
 
 import migration
 

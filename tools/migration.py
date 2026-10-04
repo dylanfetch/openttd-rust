@@ -2,17 +2,17 @@
 """Build the pinned original and migration fork, retaining validation evidence."""
 
 import argparse
-from contextlib import contextmanager, nullcontext
-from datetime import datetime, timezone
 import hashlib
 import json
 import os
 import platform
-from pathlib import Path
 import shutil
 import subprocess
 import sys
 import time
+from contextlib import contextmanager, nullcontext
+from datetime import datetime, timezone
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCAL = ROOT / ".local"

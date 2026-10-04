@@ -3,11 +3,11 @@
 
 import hashlib
 import json
-from pathlib import Path
-import runpy
 import re
+import runpy
 import shlex
 import subprocess
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATION = runpy.run_path(str(ROOT / "tools/migration.py"))

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Compare demonstrated generic-history gaps through unchanged public interfaces."""
 
-from collections import Counter
 import hashlib
 import json
-from pathlib import Path
 import runpy
 import subprocess
+from collections import Counter
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATION = runpy.run_path(str(ROOT / "tools/migration.py"))

@@ -7,12 +7,12 @@ scratch directory under .local/; their logs go to .local/comparison-logs/.
 """
 
 import argparse
-from concurrent.futures import ThreadPoolExecutor
 import os
-from pathlib import Path
 import subprocess
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 LOGS = ROOT / ".local/comparison-logs"

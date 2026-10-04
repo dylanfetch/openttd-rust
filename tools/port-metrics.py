@@ -116,7 +116,7 @@ def added_lines(changes):
 def surviving(changes, length):
     """Map each unchanged old-side line number to its new-side line number."""
     removed, shift, mapping = set(), [], {}
-    for old_start, old_count, new_start, new_count in changes:
+    for old_start, old_count, _new_start, new_count in changes:
         removed.update(range(old_start, old_start + old_count))
         shift.append(
             (

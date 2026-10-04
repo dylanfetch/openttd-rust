@@ -3,9 +3,9 @@
 
 import argparse
 import json
-from pathlib import Path
 import re
 import subprocess
+from pathlib import Path
 
 import migration
 

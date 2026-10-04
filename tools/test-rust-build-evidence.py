@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Check archive evidence parsing for CMake's actual Makefiles path conventions."""
 
-from pathlib import Path
 import json
 import runpy
 import shlex
 import tempfile
 import unittest
+from pathlib import Path
 
 evidence = runpy.run_path(str(Path(__file__).with_name("rust-build-evidence.py")))
 archive_is_linked = evidence["archive_is_linked"]

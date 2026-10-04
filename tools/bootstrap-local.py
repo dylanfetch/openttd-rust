@@ -2,10 +2,10 @@
 """Install isolated Ubuntu build prerequisites without sudo or profile changes."""
 
 import os
-from pathlib import Path
 import subprocess
 import tomllib
 import urllib.request
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCAL = ROOT / ".local"

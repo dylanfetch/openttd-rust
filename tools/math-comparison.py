@@ -5,8 +5,8 @@ import argparse
 import difflib
 import hashlib
 import json
-from pathlib import Path
 import subprocess
+from pathlib import Path
 
 import migration
 

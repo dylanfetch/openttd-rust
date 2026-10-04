@@ -124,6 +124,8 @@ every commit's diff and title: fix style in the introducing commit, and use
 supported prefixes such as `Add:`, `Change:`, `Fix:`, `Doc:`, or `Update:`.
 Use ASCII without tabs in commit messages, including their bodies. Integration
 merge titles also need a supported prefix; `Merge:` is rejected by inherited CI.
+Python tools use `uvx --from ruff==0.16.8 ruff check tools/` and
+`uvx --from ruff==0.16.8 ruff format --check tools/`.
 
 `python3 tools/migration.py verify` builds and tests the pinned original and fork,
 checks that the candidate retains reference test names, and records evidence under
