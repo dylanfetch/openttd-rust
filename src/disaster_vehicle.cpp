@@ -349,7 +349,7 @@ static bool DisasterTick_Ufo(DisasterVehicle *ufo)
 		for (RoadVehicle *u : RoadVehicle::Iterate()) {
 			/* Find (n+1)-th road vehicle. */
 			if (u->IsFrontEngine() && (n-- == 0)) {
-				if (u->crashed_ctr != 0 || u->disaster_vehicle != VehicleID::Invalid()) {
+				if (u->GetCrashedCounter() != 0 || u->disaster_vehicle != VehicleID::Invalid()) {
 					/* Targetted vehicle is crashed or already a target, destroy the UFO. */
 					delete ufo;
 					return false;
@@ -386,7 +386,7 @@ static bool DisasterTick_Ufo(DisasterVehicle *ufo)
 		 * but we'll still explode the surrounding area ;) */
 		if (z <= target->z_pos) {
 			ufo->age++;
-			if (!target->vehstatus.Test(VehState::Hidden) && target->crashed_ctr == 0) {
+			if (!target->vehstatus.Test(VehState::Hidden) && target->GetCrashedCounter() == 0) {
 				uint victims = target->Crash();
 				target->disaster_vehicle = VehicleID::Invalid();
 

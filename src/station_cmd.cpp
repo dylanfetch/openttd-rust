@@ -2263,7 +2263,7 @@ static CommandCost RemoveRoadStop(TileIndex tile, DoCommandFlags flags, int repl
 				 * bits and only when the state was 'in road stop', otherwise
 				 * we'll end up clearing the turn around bits. */
 				RoadVehicle *rv = RoadVehicle::From(v);
-				if (HasBit(rv->state, RVS_IN_DT_ROAD_STOP)) rv->state &= RVSB_ROAD_STOP_TRACKDIR_MASK;
+				if (HasBit(rv->GetState(), RVS_IN_DT_ROAD_STOP)) rv->SetState(rv->GetState() & RVSB_ROAD_STOP_TRACKDIR_MASK);
 			}
 		}
 	} else {
@@ -3873,7 +3873,7 @@ static VehicleEnterTileStates VehicleEnter_Station(Vehicle *v, TileIndex tile, i
 		}
 	} else if (v->type == VEH_ROAD) {
 		RoadVehicle *rv = RoadVehicle::From(v);
-		if (rv->state < RVSB_IN_ROAD_STOP && !IsReversingRoadTrackdir((Trackdir)rv->state) && rv->frame == 0) {
+		if (rv->GetState() < RVSB_IN_ROAD_STOP && !IsReversingRoadTrackdir((Trackdir)rv->GetState()) && rv->GetFrame() == 0) {
 			if (IsStationRoadStop(tile) && rv->IsFrontEngine()) {
 				/* Attempt to allocate a parking bay in a road stop */
 				if (RoadStop::GetByTile(tile, GetRoadStopType(tile))->Enter(rv)) return {};

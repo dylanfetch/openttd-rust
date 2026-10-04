@@ -1,0 +1,183 @@
+/*
+ * This file is part of OpenTTD.
+ * OpenTTD is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, version 2.
+ * OpenTTD is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
+ */
+
+/** @file roadvehicle.cpp Road owner lifetime and serialization-boundary evidence. */
+#include "../stdafx.h"
+#include "../3rdparty/catch2/catch.hpp"
+#include "../roadveh.h"
+#include "../safeguards.h"
+
+#ifdef WITH_RUST
+/* The road corpus has no tram/articulated turning witness. Keep the unchanged
+ * original movement tables solely in this fixture to check every reachable table
+ * entry; this does not establish controller equivalence for those vehicles. */
+namespace {
+struct RoadDriveEntry { uint8_t x, y; };
+#undef WITH_RUST
+#include "../table/roadveh_movement.h"
+#define WITH_RUST
+static const std::pair<const RoadDriveEntry *, size_t> source_rows[] = {
+	{_roadveh_drive_data_0, std::size(_roadveh_drive_data_0)},
+	{_roadveh_drive_data_1, std::size(_roadveh_drive_data_1)},
+	{_roadveh_drive_data_2, std::size(_roadveh_drive_data_2)},
+	{_roadveh_drive_data_3, std::size(_roadveh_drive_data_3)},
+	{_roadveh_drive_data_4, std::size(_roadveh_drive_data_4)},
+	{_roadveh_drive_data_5, std::size(_roadveh_drive_data_5)},
+	{_roadveh_drive_data_6, std::size(_roadveh_drive_data_6)},
+	{_roadveh_drive_data_7, std::size(_roadveh_drive_data_7)},
+	{_roadveh_drive_data_8, std::size(_roadveh_drive_data_8)},
+	{_roadveh_drive_data_9, std::size(_roadveh_drive_data_9)},
+	{_roadveh_drive_data_10, std::size(_roadveh_drive_data_10)},
+	{_roadveh_drive_data_11, std::size(_roadveh_drive_data_11)},
+	{_roadveh_drive_data_12, std::size(_roadveh_drive_data_12)},
+	{_roadveh_drive_data_13, std::size(_roadveh_drive_data_13)},
+	{_roadveh_drive_data_14, std::size(_roadveh_drive_data_14)},
+	{_roadveh_drive_data_15, std::size(_roadveh_drive_data_15)},
+	{_roadveh_drive_data_16, std::size(_roadveh_drive_data_16)},
+	{_roadveh_drive_data_17, std::size(_roadveh_drive_data_17)},
+	{_roadveh_drive_data_18, std::size(_roadveh_drive_data_18)},
+	{_roadveh_drive_data_19, std::size(_roadveh_drive_data_19)},
+	{_roadveh_drive_data_20, std::size(_roadveh_drive_data_20)},
+	{_roadveh_drive_data_21, std::size(_roadveh_drive_data_21)},
+	{_roadveh_drive_data_22, std::size(_roadveh_drive_data_22)},
+	{_roadveh_drive_data_23, std::size(_roadveh_drive_data_23)},
+	{_roadveh_drive_data_24, std::size(_roadveh_drive_data_24)},
+	{_roadveh_drive_data_25, std::size(_roadveh_drive_data_25)},
+	{_roadveh_drive_data_26, std::size(_roadveh_drive_data_26)},
+	{_roadveh_drive_data_27, std::size(_roadveh_drive_data_27)},
+	{_roadveh_drive_data_28, std::size(_roadveh_drive_data_28)},
+	{_roadveh_drive_data_29, std::size(_roadveh_drive_data_29)},
+	{_roadveh_drive_data_30, std::size(_roadveh_drive_data_30)},
+	{_roadveh_drive_data_31, std::size(_roadveh_drive_data_31)},
+	{_rv_station_left_sw_far, std::size(_rv_station_left_sw_far)},
+	{_rv_station_left_nw_far, std::size(_rv_station_left_nw_far)},
+	{_rv_station_left_sw_near, std::size(_rv_station_left_sw_near)},
+	{_rv_station_left_nw_near, std::size(_rv_station_left_nw_near)},
+	{_rv_station_left_ne_far, std::size(_rv_station_left_ne_far)},
+	{_rv_station_left_se_far, std::size(_rv_station_left_se_far)},
+	{_rv_station_left_ne_near, std::size(_rv_station_left_ne_near)},
+	{_rv_station_left_se_near, std::size(_rv_station_left_se_near)},
+	{_rv_station_right_sw_far, std::size(_rv_station_right_sw_far)},
+	{_rv_station_right_nw_far, std::size(_rv_station_right_nw_far)},
+	{_rv_station_right_sw_near, std::size(_rv_station_right_sw_near)},
+	{_rv_station_right_nw_near, std::size(_rv_station_right_nw_near)},
+	{_rv_station_right_ne_far, std::size(_rv_station_right_ne_far)},
+	{_rv_station_right_se_far, std::size(_rv_station_right_se_far)},
+	{_rv_station_right_ne_near, std::size(_rv_station_right_ne_near)},
+	{_rv_station_right_se_near, std::size(_rv_station_right_se_near)},
+	{_roadveh_tram_turn_ne_0, std::size(_roadveh_tram_turn_ne_0)},
+	{_roadveh_tram_turn_ne_1, std::size(_roadveh_tram_turn_ne_1)},
+	{_roadveh_tram_turn_se_0, std::size(_roadveh_tram_turn_se_0)},
+	{_roadveh_tram_turn_se_1, std::size(_roadveh_tram_turn_se_1)},
+	{_roadveh_tram_turn_sw_0, std::size(_roadveh_tram_turn_sw_0)},
+	{_roadveh_tram_turn_sw_1, std::size(_roadveh_tram_turn_sw_1)},
+	{_roadveh_tram_turn_nw_0, std::size(_roadveh_tram_turn_nw_0)},
+	{_roadveh_tram_turn_nw_1, std::size(_roadveh_tram_turn_nw_1)},
+};
+}
+
+TEST_CASE("Road vehicles - original movement and stop tables")
+{
+	for (uint8_t tram = 0; tram < 2; ++tram) {
+		for (size_t state = 0; state < std::size(_road_road_drive_data); ++state) {
+			const RoadDriveEntry *row = _road_drive_data[tram][state];
+			if (row == nullptr) continue;
+			const auto source = std::find_if(std::begin(source_rows), std::end(source_rows), [&](const auto &item) { return item.first == row; });
+			REQUIRE(source != std::end(source_rows));
+			for (uint8_t frame = 0; frame < source->second; ++frame) {
+				const auto entry = row[frame];
+				CHECK(openttd_rust_road_drive_entry(tram, static_cast<uint8_t>(state), frame) == (entry.x | (entry.y << 8)));
+			}
+		}
+	}
+	for (size_t index = 0; index < std::size(_road_stop_stop_frame); ++index) {
+		CHECK(openttd_rust_road_stop_frame(index) == _road_stop_stop_frame[index]);
+	}
+}
+
+TEST_CASE("Road vehicles - canonical path, nested save staging and indexed pool reuse")
+{
+	REQUIRE(Vehicle::CanAllocateItem(2));
+	auto *a = new RoadVehicle();
+	auto *b = new RoadVehicle();
+	const VehicleID reused_index = a->index;
+	CHECK(a->GetState() == 0);
+	CHECK(a->GetFrame() == 0);
+	CHECK(a->GetBlockedCounter() == 0);
+	CHECK(a->GetOvertaking() == 0);
+	CHECK(a->GetOvertakingCounter() == 0);
+	CHECK(a->GetCrashedCounter() == 0);
+	CHECK(a->GetReverseCounter() == 0);
+	CHECK(a->PathSize() == 0);
+	a->SetState(255);
+	a->SetFrame(254);
+	a->SetBlockedCounter(65535);
+	a->SetOvertaking(253);
+	a->SetOvertakingCounter(252);
+	a->SetCrashedCounter(65534);
+	a->SetReverseCounter(251);
+	a->PathPush(TRACKDIR_X_NE, TileIndex(17));
+	a->PathPush(TRACKDIR_Y_SE, TileIndex(23));
+	CHECK(a->PathSize() == 2);
+	CHECK(a->PathBack().tile == TileIndex(23));
+	CHECK(a->PathBack().trackdir == TRACKDIR_Y_SE);
+	auto copy = a->CopyPath();
+	a->PathPop();
+	CHECK(a->PathBack().tile == TileIndex(17));
+	a->ReplacePath(copy);
+	{
+		RoadVehicleStateScope saving(a, false);
+		CHECK(RoadVehicleStateScope::State() == 255);
+		CHECK(RoadVehicleStateScope::Frame() == 254);
+		CHECK(RoadVehicleStateScope::BlockedCounter() == 65535);
+		CHECK(RoadVehicleStateScope::Overtaking() == 253);
+		CHECK(RoadVehicleStateScope::OvertakingCounter() == 252);
+		CHECK(RoadVehicleStateScope::CrashedCounter() == 65534);
+		CHECK(RoadVehicleStateScope::ReverseCounter() == 251);
+		CHECK(RoadVehicleStateScope::Path()[0].tile == TileIndex(17));
+		RoadVehicleStateScope::PathTrackdirs().push_back(TRACKDIR_X_NE);
+		{
+			RoadVehicleStateScope loading(b, true);
+			RoadVehicleStateScope::State() = 7;
+			RoadVehicleStateScope::Frame() = 9;
+			RoadVehicleStateScope::Path().emplace_back(TRACKDIR_Y_SE, TileIndex(31));
+			CHECK(RoadVehicleStateScope::PathTrackdirs().empty());
+			CHECK(b->GetState() == 0);
+			CHECK(b->PathSize() == 0);
+		}
+		CHECK(b->GetState() == 7);
+		CHECK(b->GetFrame() == 9);
+		CHECK(b->PathBack().tile == TileIndex(31));
+		CHECK(RoadVehicleStateScope::State() == 255);
+		CHECK(RoadVehicleStateScope::PathTrackdirs().size() == 1);
+		RoadVehicleStateScope::State() = 1;
+		RoadVehicleStateScope::Path().clear();
+	}
+	CHECK(a->GetState() == 255); // Save/reference fixup does not mutate the owner.
+	CHECK(a->PathSize() == 2);
+	try {
+		RoadVehicleStateScope loading(a, true);
+		RoadVehicleStateScope::CrashedCounter() = 47;
+		RoadVehicleStateScope::Path().pop_back();
+		throw 1;
+	} catch (int) {}
+	CHECK(a->GetCrashedCounter() == 47);
+	CHECK(a->PathSize() == 1); // Partial loads commit when the loader unwinds.
+	CHECK(a->PathBack().tile == TileIndex(17));
+	a->ClearPath();
+	CHECK(a->PathSize() == 0);
+	/* PreDestructor and Vehicle::~Vehicle return early during pool cleanup, but
+	 * the canonical owner's member deleter must still run before ID reuse. */
+	_vehicle_pool.CleanPool();
+	auto *loaded = new (reused_index) RoadVehicle();
+	CHECK(loaded->index == reused_index);
+	CHECK(loaded->GetState() == 0);
+	CHECK(loaded->GetCrashedCounter() == 0);
+	CHECK(loaded->PathSize() == 0);
+	_vehicle_pool.CleanPool();
+}
+#endif

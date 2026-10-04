@@ -18,6 +18,8 @@ mod landscape;
 mod linkgraph;
 mod math;
 mod packet;
+mod road;
+mod road_data;
 mod script_list;
 pub mod services;
 mod station_cargo;

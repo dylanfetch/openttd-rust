@@ -11,6 +11,7 @@
 #include "rust/trees_ffi.h"
 #include "rust/townname_ffi.h"
 #include "rust/effect_ffi.h"
+#include "rust/road_ffi.h"
 #include "tests/effect_protocol.hpp"
 #include "rust/ffi.h"
 #include "rust/utf8_ffi.h"
@@ -98,6 +99,10 @@ static void Layouts()
 	Layout(37, "OpenTTDLinkGraphShare", {sizeof(OpenTTDLinkGraphShare), alignof(OpenTTDLinkGraphShare), offsetof(OpenTTDLinkGraphShare, node), offsetof(OpenTTDLinkGraphShare, origin), offsetof(OpenTTDLinkGraphShare, via), offsetof(OpenTTDLinkGraphShare, cumulative), offsetof(OpenTTDLinkGraphShare, unrestricted), offsetof(OpenTTDLinkGraphShare, has_share)});
 	Layout(39, "OpenTTDEffectView", {sizeof(OpenTTDEffectView), alignof(OpenTTDEffectView), offsetof(OpenTTDEffectView, x), offsetof(OpenTTDEffectView, y), offsetof(OpenTTDEffectView, z), offsetof(OpenTTDEffectView, sprite), offsetof(OpenTTDEffectView, progress), offsetof(OpenTTDEffectView, spritenum), offsetof(OpenTTDEffectView, subtype), offsetof(OpenTTDEffectView, ambient)});
 	Layout(41, "OpenTTDEffectLeaves", {sizeof(OpenTTDEffectLeaves), alignof(OpenTTDEffectLeaves), offsetof(OpenTTDEffectLeaves, observe), offsetof(OpenTTDEffectLeaves, write), offsetof(OpenTTDEffectLeaves, viewport), offsetof(OpenTTDEffectLeaves, sound), offsetof(OpenTTDEffectLeaves, animated)});
+	Layout(80, "OpenTTDRoadPathElement", {sizeof(OpenTTDRoadPathElement), alignof(OpenTTDRoadPathElement), offsetof(OpenTTDRoadPathElement, trackdir), offsetof(OpenTTDRoadPathElement, tile)});
+	Layout(81, "OpenTTDRoadView", {sizeof(OpenTTDRoadView), alignof(OpenTTDRoadView), offsetof(OpenTTDRoadView, type), offsetof(OpenTTDRoadView, first), offsetof(OpenTTDRoadView, next), offsetof(OpenTTDRoadView, previous), offsetof(OpenTTDRoadView, tile), offsetof(OpenTTDRoadView, dest), offsetof(OpenTTDRoadView, x), offsetof(OpenTTDRoadView, y), offsetof(OpenTTDRoadView, z), offsetof(OpenTTDRoadView, direction), offsetof(OpenTTDRoadView, speed), offsetof(OpenTTDRoadView, tick), offsetof(OpenTTDRoadView, running), offsetof(OpenTTDRoadView, day), offsetof(OpenTTDRoadView, order_time), offsetof(OpenTTDRoadView, progress), offsetof(OpenTTDRoadView, status), offsetof(OpenTTDRoadView, owner), offsetof(OpenTTDRoadView, engine), offsetof(OpenTTDRoadView, last_station), offsetof(OpenTTDRoadView, order_destination), offsetof(OpenTTDRoadView, order_type), offsetof(OpenTTDRoadView, order_max_speed), offsetof(OpenTTDRoadView, breakdown), offsetof(OpenTTDRoadView, max_track_speed), offsetof(OpenTTDRoadView, length), offsetof(OpenTTDRoadView, total_length), offsetof(OpenTTDRoadView, roadtype), offsetof(OpenTTDRoadView, front), offsetof(OpenTTDRoadView, articulated), offsetof(OpenTTDRoadView, tram), offsetof(OpenTTDRoadView, bus), offsetof(OpenTTDRoadView, order_nonstop)});
+	Layout(82, "OpenTTDRoadLeaves", {sizeof(OpenTTDRoadLeaves), alignof(OpenTTDRoadLeaves), offsetof(OpenTTDRoadLeaves, observe), offsetof(OpenTTDRoadLeaves, write), offsetof(OpenTTDRoadLeaves, leaf), offsetof(OpenTTDRoadLeaves, owner), offsetof(OpenTTDRoadLeaves, nearby)});
+	Layout(83, "OpenTTDRoadAction", {sizeof(OpenTTDRoadAction), alignof(OpenTTDRoadAction), offsetof(OpenTTDRoadAction, op), offsetof(OpenTTDRoadAction, id), offsetof(OpenTTDRoadAction, a), offsetof(OpenTTDRoadAction, b), offsetof(OpenTTDRoadAction, c)});
 	CHECK(openttd_rust_abi_layout(255, 0) == SIZE_MAX);
 	CHECK(static_cast<size_t>(PTRDIFF_MAX) == (SIZE_MAX >> 1));
 	std::printf("pointer_bytes %zu sentinel %zu borrow_limit %zu\n", sizeof(void *), SIZE_MAX, static_cast<size_t>(PTRDIFF_MAX));
@@ -108,6 +113,24 @@ static void Layouts()
 
 static void Calls()
 {
+	std::unique_ptr<OpenTTDRoadState, decltype(&openttd_rust_road_destroy)> road(openttd_rust_road_new(), openttd_rust_road_destroy);
+	for (uint8_t field = 0; field < 7; ++field) {
+		CHECK(openttd_rust_road_get(road.get(), field) == 0);
+		openttd_rust_road_set(road.get(), field, 65535);
+		CHECK(openttd_rust_road_get(road.get(), field) == (field == 2 || field == 5 ? 65535 : 255));
+	}
+	CHECK(openttd_rust_road_path_size(road.get()) == 0);
+	const OpenTTDRoadPathElement road_path[] = {{255, UINT32_MAX}, {9, 123456}};
+	openttd_rust_road_path_replace(road.get(), road_path, 2);
+	CHECK(openttd_rust_road_path_get(road.get(), 1).tile == 123456);
+	openttd_rust_road_path_push(road.get(), {6, 42});
+	CHECK(openttd_rust_road_path_get(road.get(), 2).trackdir == 6);
+	openttd_rust_road_path_pop(road.get());
+	CHECK(openttd_rust_road_path_size(road.get()) == 2);
+	openttd_rust_road_path_clear(road.get());
+	openttd_rust_road_path_replace(road.get(), nullptr, 0);
+	CHECK(openttd_rust_road_path_size(road.get()) == 0);
+	road.reset();
 	const std::array<uint8_t, 8> bytes{0x10, 0x32, 0x54, 0x76, 0x98, 0xBA, 0xDC, 0xFE};
 	constexpr uint64_t bits = UINT64_C(0xFEDCBA9876543210);
 	auto le = openttd_rust_encode_uint_le(bits);
@@ -656,9 +679,62 @@ static void Trees()
 	std::printf("tree_direct_services_counter_cancel_and_reentry_lifetime passed\n");
 }
 
+/* Complete typed tables exercise road cdecl calls without importing game globals.
+ * These are boundary/lifetime checks, not a second simulation oracle. */
+struct RoadAbiProbe {
+	OpenTTDRoadState *state;
+	OpenTTDRoadView view{};
+	uint32_t leaves = 0;
+};
+static RoadAbiProbe *road_abi_probe;
+static void OPENTTD_ROAD_CALL RoadAbiObserve(uint32_t, OpenTTDRoadView *view) noexcept { *view = road_abi_probe->view; }
+static void OPENTTD_ROAD_CALL RoadAbiWrite(uint32_t, uint32_t field, uint64_t value) noexcept
+{
+	CHECK(field == ROAD_WRITE_TICK);
+	road_abi_probe->view.tick = static_cast<uint8_t>(value);
+}
+static uint64_t OPENTTD_ROAD_CALL RoadAbiLeaf(uint32_t op, uint32_t, uint64_t, uint64_t, uint64_t) noexcept
+{
+	CHECK(op == ROAD_OP_ROADSTOP_LEAVE);
+	++road_abi_probe->leaves;
+	return 0;
+}
+static OpenTTDRoadState *OPENTTD_ROAD_CALL RoadAbiOwner(uint32_t) noexcept { return road_abi_probe->state; }
+static size_t OPENTTD_ROAD_CALL RoadAbiNearby(uint32_t, uint32_t, int32_t, int32_t, uint32_t *, size_t) noexcept { return 0; }
+static void RoadBoundary()
+{
+	RoadAbiProbe probe{openttd_rust_road_new()};
+	road_abi_probe = &probe;
+	probe.view.tick = 255;
+	const OpenTTDRoadLeaves leaves{RoadAbiObserve, RoadAbiWrite, RoadAbiLeaf, RoadAbiOwner, RoadAbiNearby};
+	/* All shared fields are typed functions, even unused fields. */
+	EffectTestWorld world;
+	effect_test_world = &world;
+	const OpenTTDSharedServices services{&world, EffectTestRandom, EffectTestTile, EffectTestMapWrite, EffectTestTrig, EffectTestIndustry};
+	auto create = [&](uint32_t kind) {
+		return std::unique_ptr<void, decltype(&openttd_rust_road_task_destroy)>(openttd_rust_road_create(kind, 17, 0, 0, 0, &leaves, &services), openttd_rust_road_task_destroy);
+	};
+	auto tick = create(0);
+	CHECK(openttd_rust_road_advance(tick.get(), 0).op == 0);
+	CHECK(probe.view.tick == 0 && world.draws == 0);
+	auto crash = create(3);
+	CHECK(openttd_rust_road_advance(crash.get(), 0).op == ROAD_OP_GROUND_CRASH);
+	/* An actual callback may mutate owner state before the continuation resumes. */
+	probe.view.front = 1;
+	openttd_rust_road_set(probe.state, 0, 64);
+	auto done = openttd_rust_road_advance(crash.get(), 7);
+	CHECK(done.op == 0 && done.a == 8 && probe.leaves == 1);
+	CHECK(openttd_rust_road_get(probe.state, 5) == 1);
+	crash.reset();
+	tick.reset();
+	openttd_rust_road_destroy(probe.state);
+	std::printf("road_native_tables_owner_reentry_and_tick_wrap passed\n");
+}
+
 int main()
 {
 	Layouts();
+	RoadBoundary();
 	CheckEffectProtocol([](bool result) { CHECK(result); });
 	LinkGraphJob();
 	Trees();
