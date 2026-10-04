@@ -1297,3 +1297,6 @@ pub unsafe extern "C" fn openttd_rust_inplace_write(
 }
 
 mod water_regions;
+
+#[allow(unsafe_code)]
+mod ship_yapf;

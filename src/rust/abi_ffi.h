@@ -25,6 +25,7 @@ extern "C" {
  * 39 effect view, 40 retired effect cursor, 41 effect map leaves, 42 shared game services.
  * 46 water patch, 47 water diagnostic snapshot, 48 water shared-service leaves.
  * 49 cargo specification, 50 cargo payment saved fields, 51 cargo services.
+ * 52 ship YAPF input, 53 leaves, 54 follower, 55 tile, 56 choice result.
  * Item 0 size, 1 alignment, then every field offset in declaration order.
  * Unknown type/item returns SIZE_MAX. No memory borrow, ownership or callback.
  * Native extern-C convention (cdecl on i686 MSVC); Rust panic never unwinds.
