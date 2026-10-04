@@ -1288,7 +1288,9 @@ impl Engine {
                 continue;
             }
             let random = u32::from(self.services.random() as u8);
-            if h[10] != 0 && self.action(7, town, tile, [house, random, 0, 0]).await.0 == 0 {
+            if self.house(house)[10] != 0
+                && self.action(7, town, tile, [house, random, 0, 0]).await.0 == 0
+            {
                 continue;
             }
             self.flags(town, 0, oneof);
