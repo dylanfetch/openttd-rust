@@ -65,9 +65,9 @@ SNAPSHOT_TICKS = 32 * TICKS_PER_DAY
 
 def scenario_modules():
     """Families in scenario-list order; import after shared core initialization."""
-    from . import economy, effects, generated, play_saves, towns, trees
+    from . import economy, effects, generated, play_saves, rails, towns, trees
 
-    return generated, play_saves, towns, trees, effects, economy
+    return generated, play_saves, towns, trees, effects, rails, economy
 
 
 def scenario_list(soak):

@@ -167,7 +167,9 @@ Any `[desync:` warning (a cache mismatch) and any log or stdout difference fail
   distribution and with cargodist (short link graph intervals). The saves'
   `console` lines go to `scripts/game_start.scr`. `--soak` adds more; `--self`
   compares the reference with itself; names filter. Extend `scenario_list()`
-  for ports. Rail, ship and aircraft scenarios are #86.
+  for ports. The owner-built #86 save exercises signalled trains and a ship
+  (`tools/simulation/rails.py`), requiring movement on every run and carried
+  cargo/delivery revenue at desync checkpoints. Aircraft remain pending in #86.
 - Masks (`MASKS`, with reasons and hit counts in the report): the random save
   id, build revision/NewGRF version, and `round_trip_time`, which the original
   saves uninitialized (#83); ports touching it need their own check.
@@ -1123,7 +1125,7 @@ portable build. Vehicle fields, pools, factories, tick dispatch, bounds,
 transparency, viewport/hash updates and rendering stay canonical C++.
 
 Copied call-scoped observations and immediate scalar writes keep original
-mutation order. Rust calls common Random and effect-specific map, sound,
+mutation order. Rust calls common Random/map and effect-specific sound,
 viewport and animated-tile noexcept wrappers directly; none can reenter Rust.
 Private-owner access scopes end before every service. Expiry returns false
 before C++ deletion, Vehicle::~Vehicle and Pool::FreeItem/PostDestructor.
@@ -1139,6 +1141,7 @@ writes, transient service order, RNG thresholds, state lifetime and save staging
 factory tests cover Above/Rel coordinates. Viewport pixels, audible output,
 full legacy fixtures and every caller remain limits. Environmental exceptions
 terminate inside noexcept wrappers; Rust panics/OOM abort.
+RANDOM_DEBUG source locations name the common wrapper.
 
 ### Cargo payment and delivery
 
@@ -1162,6 +1165,8 @@ followed by stockpile production. `--self` and `--soak` reuse these cases. Exist
 road saves have no station catching two accepting industries; `python3 -m
 tools.simulation.economy` checks ordered multi-destination dedup/flush and income/
 transfer arithmetic against unchanged pinned bodies at this concrete corpus gap.
-Native CTest and Windows ABI evidence check owner settlement/cleanup and layouts.
+The focused cargodist case drains overdue reference jobs, then uses interval 90
+and recalc time 9000; existing play scenarios retain frequent link-graph jobs.
+CTest/Windows ABI evidence checks owner settlement/cleanup and layouts.
 NewGRF resolver execution, legacy CAPY files and every industry layout are not
 exhaustive in the semantic corpus; the narrow fixture supplies callback results.
