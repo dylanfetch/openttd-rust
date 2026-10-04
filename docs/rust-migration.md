@@ -167,7 +167,9 @@ Any `[desync:` warning (a cache mismatch) and any log or stdout difference fail
   distribution and with cargodist (short link graph intervals). The saves'
   `console` lines go to `scripts/game_start.scr`. `--soak` adds more; `--self`
   compares the reference with itself; names filter. Extend `scenario_list()`
-  for ports. Rail, ship and aircraft scenarios are #86.
+  for ports. The owner-built #86 save exercises signalled trains and a ship
+  (`tools/simulation/rails.py`), requiring movement on every run and carried
+  cargo/delivery revenue at desync checkpoints. Aircraft remain pending in #86.
 - Masks (`MASKS`, with reasons and hit counts in the report): the random save
   id, build revision/NewGRF version, and `round_trip_time`, which the original
   saves uninitialized (#83); ports touching it need their own check.
