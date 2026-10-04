@@ -22,6 +22,127 @@
 #include "../core/convertible_through_base.hpp"
 #include "../safeguards.h"
 
+#ifdef WITH_RUST
+#include "../rust/water_regions_ffi.h"
+#include <cstdio>
+#include <cstdlib>
+
+struct WaterProfile {
+	bool enabled = std::getenv("OPENTTD_WATER_PROFILE") != nullptr;
+	uint64_t tracks = 0, follows = 0, aqueducts = 0, rebuilds = 0;
+	~WaterProfile()
+	{
+		if (!this->enabled) return;
+		const char *personal = std::getenv("HOME");
+		if (personal == nullptr) return;
+		if (FILE *file = std::fopen(fmt::format("{}/water-profile.json", personal).c_str(), "w")) {
+			fmt::print(file, "{{\"tracks\":{},\"follows\":{},\"aqueducts\":{},\"rebuilds\":{}}}\n", this->tracks, this->follows, this->aqueducts, this->rebuilds);
+			std::fclose(file);
+		}
+	}
+};
+static WaterProfile _water_profile;
+
+static uint16_t WaterTracks(uint32_t tile) noexcept
+{
+	if (_water_profile.enabled) ++_water_profile.tracks;
+	return TrackBitsToTrackdirBits(TrackStatusToTrackBits(GetTileTrackStatus(TileIndex{tile}, TRANSPORT_WATER, 0)));
+}
+
+static uint32_t WaterFollow(uint32_t tile, uint8_t dir, uint8_t *bridge) noexcept
+{
+	if (_water_profile.enabled) ++_water_profile.follows;
+	CFollowTrackWater ft;
+	if (!ft.Follow(TileIndex{tile}, static_cast<Trackdir>(dir))) return INVALID_TILE.base();
+	*bridge = ft.is_bridge;
+	return ft.new_tile.base();
+}
+
+static uint32_t WaterAqueduct(uint32_t tile) noexcept
+{
+	if (_water_profile.enabled) ++_water_profile.aqueducts;
+	const TileIndex t{tile};
+	return IsBridgeTile(t) && GetTunnelBridgeTransportType(t) == TRANSPORT_WATER ? GetOtherBridgeEnd(t).base() : INVALID_TILE.base();
+}
+
+static void WaterDebug(uint8_t operation, int32_t x, int32_t y) noexcept
+{
+	if (_water_profile.enabled && operation == 0) ++_water_profile.rebuilds;
+	if (operation == 0) Debug(map, 3, "Updating water region ({},{})", x, y);
+	else Debug(map, 3, "Invalidated water region ({},{})", x, y);
+}
+
+static const OpenTTDWaterLeaves _water_leaves{WaterTracks, WaterFollow, WaterAqueduct, WaterDebug};
+using WaterOwner = std::unique_ptr<OpenTTDWaterRegions, decltype(&openttd_rust_water_destroy)>;
+static WaterOwner _water_regions{nullptr, openttd_rust_water_destroy};
+
+int CalculateWaterRegionPatchHash(const WaterRegionPatchDesc &patch)
+{
+	return patch.label.base() | (Map::SizeX() / WATER_REGION_EDGE_LENGTH * patch.y + patch.x) << 8;
+}
+
+TileIndex GetWaterRegionCenterTile(const WaterRegionDesc &region)
+{
+	return TileXY(region.x * WATER_REGION_EDGE_LENGTH + WATER_REGION_EDGE_LENGTH / 2, region.y * WATER_REGION_EDGE_LENGTH + WATER_REGION_EDGE_LENGTH / 2);
+}
+
+WaterRegionDesc GetWaterRegionInfo(TileIndex tile)
+{
+	return WaterRegionDesc{static_cast<int>(TileX(tile) / WATER_REGION_EDGE_LENGTH), static_cast<int>(TileY(tile) / WATER_REGION_EDGE_LENGTH)};
+}
+
+WaterRegionPatchDesc GetWaterRegionPatchInfo(TileIndex tile)
+{
+	const auto region = GetWaterRegionInfo(tile);
+	return WaterRegionPatchDesc{region.x, region.y, WaterRegionPatchLabel{openttd_rust_water_label(_water_regions.get(), &_water_leaves, tile.base())}};
+}
+
+void InvalidateWaterRegion(TileIndex tile)
+{
+	if (!IsValidTile(tile)) return;
+	openttd_rust_water_invalidate(_water_regions.get(), &_water_leaves, tile.base());
+}
+
+void VisitWaterRegionPatchNeighbours(const WaterRegionPatchDesc &patch, VisitWaterRegionPatchCallback &callback)
+{
+	using VisitOwner = std::unique_ptr<OpenTTDWaterVisit, decltype(&openttd_rust_water_visit_destroy)>;
+	VisitOwner visit{openttd_rust_water_visit_new(_water_regions.get(), &_water_leaves, {patch.x, patch.y, patch.label.base()}), openttd_rust_water_visit_destroy};
+	OpenTTDWaterPatch next{};
+	while (openttd_rust_water_visit_next(_water_regions.get(), &_water_leaves, visit.get(), {patch.x, patch.y, patch.label.base()}, &next)) {
+		callback(WaterRegionPatchDesc{next.x, next.y, WaterRegionPatchLabel{next.label}});
+	}
+}
+
+void AllocateWaterRegions()
+{
+	_water_regions.reset(openttd_rust_water_new(Map::SizeX(), Map::SizeY()));
+	Debug(map, 2, "Allocating {} x {} water regions", Map::SizeX() / WATER_REGION_EDGE_LENGTH, Map::SizeY() / WATER_REGION_EDGE_LENGTH);
+}
+
+void PrintWaterRegionDebugInfo(TileIndex tile)
+{
+	OpenTTDWaterSnapshot snapshot{};
+	openttd_rust_water_snapshot(_water_regions.get(), &_water_leaves, tile.base(), &snapshot);
+	const auto region = GetWaterRegionInfo(tile);
+	Debug(map, 9, "Water region {},{} labels and edge traversability = ...", region.x, region.y);
+	const size_t max_element_width = fmt::format("{}", snapshot.patches).size();
+	std::string traversability = fmt::format("{:0{}b}", snapshot.edges[DIAGDIR_NW], WATER_REGION_EDGE_LENGTH);
+	Debug(map, 9, "    {:{}}", fmt::join(traversability, " "), max_element_width);
+	Debug(map, 9, "  +{:->{}}+", "", WATER_REGION_EDGE_LENGTH * (max_element_width + 1) + 1);
+	for (int y = 0; y < WATER_REGION_EDGE_LENGTH; ++y) {
+		std::string line{};
+		for (int x = 0; x < WATER_REGION_EDGE_LENGTH; ++x) {
+			const auto label = snapshot.labels[x + WATER_REGION_EDGE_LENGTH * y];
+			if (label == 0) line = fmt::format("{:{}} {}", ".", max_element_width, line);
+			else line = fmt::format("{:{}} {}", label, max_element_width, line);
+		}
+		Debug(map, 9, "{} | {}| {}", GB(snapshot.edges[DIAGDIR_SW], y, 1), line, GB(snapshot.edges[DIAGDIR_NE], y, 1));
+	}
+	Debug(map, 9, "  +{:->{}}+", "", WATER_REGION_EDGE_LENGTH * (max_element_width + 1) + 1);
+	traversability = fmt::format("{:0{}b}", snapshot.edges[DIAGDIR_SE], WATER_REGION_EDGE_LENGTH);
+	Debug(map, 9, "    {:{}}", fmt::join(traversability, " "), max_element_width);
+}
+#else
 using WaterRegionTraversabilityBits = uint16_t;
 constexpr WaterRegionPatchLabel FIRST_REGION_LABEL{1};
 
@@ -429,3 +550,5 @@ void PrintWaterRegionDebugInfo(TileIndex tile)
 {
 	GetUpdatedWaterRegion(tile).PrintDebugInfo();
 }
+
+#endif /* WITH_RUST */
