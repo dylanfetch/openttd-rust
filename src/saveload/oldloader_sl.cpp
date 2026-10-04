@@ -38,6 +38,7 @@
 #include "../table/townname.h"
 
 #include "../rust/tree_counter.h"
+#include "../rust/disaster_counter.h"
 
 #include "../safeguards.h"
 
@@ -183,12 +184,12 @@ void FixOldVehicles(LoadgameState &ls)
 		/* We haven't used this bit for stations for ages */
 		if (v->type == VEH_ROAD) {
 			RoadVehicle *rv = RoadVehicle::From(v);
-			if (rv->state != RVSB_IN_DEPOT && rv->state != RVSB_WORMHOLE) {
-				ClrBit(rv->state, 2);
+			if (rv->GetState() != RVSB_IN_DEPOT && rv->GetState() != RVSB_WORMHOLE) {
+				rv->SetState(rv->GetState() & ~(1U << 2));
 				Tile tile(rv->tile);
 				if (IsTileType(tile, MP_STATION) && tile.m5() >= 168) {
 					/* Update the vehicle's road state to show we're in a drive through road stop. */
-					SetBit(rv->state, RVS_IN_DT_ROAD_STOP);
+					rv->SetState(rv->GetState() | (1U << RVS_IN_DT_ROAD_STOP));
 				}
 			}
 		}
@@ -1075,6 +1076,15 @@ static const OldChunks vehicle_train_chunk[] = {
 };
 
 static const OldChunks vehicle_road_chunk[] = {
+#ifdef WITH_RUST
+	{ OC_UINT8, 1, nullptr, [] (void *) -> void * { return &RoadVehicleStateScope::State(); }, nullptr },
+	{ OC_UINT8, 1, nullptr, [] (void *) -> void * { return &RoadVehicleStateScope::Frame(); }, nullptr },
+	{ OC_UINT16, 1, nullptr, [] (void *) -> void * { return &RoadVehicleStateScope::BlockedCounter(); }, nullptr },
+	{ OC_UINT8, 1, nullptr, [] (void *) -> void * { return &RoadVehicleStateScope::Overtaking(); }, nullptr },
+	{ OC_UINT8, 1, nullptr, [] (void *) -> void * { return &RoadVehicleStateScope::OvertakingCounter(); }, nullptr },
+	{ OC_UINT16, 1, nullptr, [] (void *) -> void * { return &RoadVehicleStateScope::CrashedCounter(); }, nullptr },
+	{ OC_UINT8, 1, nullptr, [] (void *) -> void * { return &RoadVehicleStateScope::ReverseCounter(); }, nullptr },
+#else
 	OCL_SVAR(  OC_UINT8, RoadVehicle, state ),
 	OCL_SVAR(  OC_UINT8, RoadVehicle, frame ),
 	OCL_SVAR( OC_UINT16, RoadVehicle, blocked_ctr ),
@@ -1082,6 +1092,7 @@ static const OldChunks vehicle_road_chunk[] = {
 	OCL_SVAR(  OC_UINT8, RoadVehicle, overtaking_ctr ),
 	OCL_SVAR( OC_UINT16, RoadVehicle, crashed_ctr ),
 	OCL_SVAR(  OC_UINT8, RoadVehicle, reverse_ctr ),
+#endif
 
 	OCL_NULL( 1 ), ///< Junk
 
@@ -1122,8 +1133,8 @@ static const OldChunks vehicle_effect_chunk[] = {
 };
 
 static const OldChunks vehicle_disaster_chunk[] = {
-	OCL_SVAR( OC_UINT16, DisasterVehicle, image_override ),
-	OCL_SVAR( OC_UINT16, DisasterVehicle, big_ufo_destroyer_target ),
+	OCL_SVAR( OC_UINT16, DisasterVehicle, ImageOverride() ),
+	OCL_SVAR( OC_UINT16, DisasterVehicle, DestroyerTarget() ),
 
 	OCL_NULL( 6 ), ///< Junk
 
@@ -1148,7 +1159,13 @@ static bool LoadOldVehicleUnion(LoadgameState &ls, int)
 		switch (v->type) {
 			default: SlErrorCorrupt("Invalid vehicle type");
 			case VEH_TRAIN   : res = LoadChunk(ls, v, vehicle_train_chunk);    break;
-			case VEH_ROAD    : res = LoadChunk(ls, v, vehicle_road_chunk);     break;
+			case VEH_ROAD: {
+#ifdef WITH_RUST
+				RoadVehicleStateScope scope(RoadVehicle::From(v), true);
+#endif
+				res = LoadChunk(ls, v, vehicle_road_chunk);
+				break;
+			}
 			case VEH_SHIP    : res = LoadChunk(ls, v, vehicle_ship_chunk);     break;
 			case VEH_AIRCRAFT: res = LoadChunk(ls, v, vehicle_air_chunk);      break;
 			case VEH_EFFECT: {
@@ -1388,7 +1405,7 @@ bool LoadOldVehicle(LoadgameState &ls, int num)
 		v->current_order.AssignOrder(UnpackOldOrder(_old_order));
 
 		if (v->type == VEH_DISASTER) {
-			DisasterVehicle::From(v)->state = UnpackOldOrder(_old_order).GetDestination().value;
+			DisasterVehicle::From(v)->State() = UnpackOldOrder(_old_order).GetDestination().value;
 		}
 
 		v->next = (Vehicle *)(size_t)_old_next_ptr;
@@ -1632,7 +1649,6 @@ static bool LoadTTDPatchExtraChunks(LoadgameState &ls, int)
 }
 
 extern TileIndex _cur_tileloop_tile;
-extern uint16_t _disaster_delay;
 extern uint8_t _age_cargo_skip_counter; // From misc_sl.cpp
 extern uint8_t _old_diff_level;
 extern uint8_t _old_units;

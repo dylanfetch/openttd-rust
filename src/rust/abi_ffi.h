@@ -23,6 +23,7 @@ extern "C" {
  * 23 Packet state, 24 Packet framing offsets, 25 X25519 leaves,
  * 26 string-validation step, 27 in-place write result.
  * 39 effect view, 40 retired effect cursor, 41 effect map leaves, 42 shared game services.
+ * 80 road path entry,81 road vehicle view,82 road services,83 road reentry action.
  * 46 water patch, 47 water diagnostic snapshot, 48 water shared-service leaves.
  * Item 0 size, 1 alignment, then every field offset in declaration order.
  * Unknown type/item returns SIZE_MAX. No memory borrow, ownership or callback.

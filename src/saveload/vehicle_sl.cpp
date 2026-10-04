@@ -516,7 +516,7 @@ void AfterLoadVehiclesPhase2(bool part_of_load)
 
 			case VEH_DISASTER: {
 				auto *dv = DisasterVehicle::From(v);
-				if (dv->subtype == ST_SMALL_UFO && dv->state != 0) {
+				if (dv->subtype == ST_SMALL_UFO && dv->State() != 0) {
 					RoadVehicle *u = RoadVehicle::GetIfValid(v->dest_tile.base());
 					if (u != nullptr && u->IsFrontEngine()) {
 						/* Delete UFO targetting a vehicle which is already a target. */
@@ -835,17 +835,40 @@ public:
 	};
 	static inline const SaveLoadCompatTable compat_description = {};
 
-	std::vector<RoadVehPathElement> &GetVector(RoadVehicle *rv) const override { return rv->path; }
+	std::vector<RoadVehPathElement> &GetVector([[maybe_unused]] RoadVehicle *rv) const override
+	{
+#ifdef WITH_RUST
+		return RoadVehicleStateScope::Path();
+#else
+		return rv->path;
+#endif
+	}
 };
 
 class SlVehicleRoadVeh : public DefaultSaveLoadHandler<SlVehicleRoadVeh, Vehicle> {
 public:
-	/* RoadVehicle path is stored in std::pair which cannot be directly saved. */
+	/* Historical saves store trackdirs and tiles in separate vectors. */
+#ifdef WITH_RUST
+	static std::vector<Trackdir> &PathTrackdirs() { return RoadVehicleStateScope::PathTrackdirs(); }
+	static std::vector<TileIndex> &PathTiles() { return RoadVehicleStateScope::PathTiles(); }
+#else
 	static inline std::vector<Trackdir> rv_path_td;
 	static inline std::vector<TileIndex> rv_path_tile;
+	static std::vector<Trackdir> &PathTrackdirs() { return rv_path_td; }
+	static std::vector<TileIndex> &PathTiles() { return rv_path_tile; }
+#endif
 
 	static inline const SaveLoad description[] = {
 		  SLEG_STRUCT("common", SlVehicleCommon),
+#ifdef WITH_RUST
+		     SLEG_VAR("state", RoadVehicleStateScope::State(), SLE_UINT8),
+		     SLEG_VAR("frame", RoadVehicleStateScope::Frame(), SLE_UINT8),
+		     SLEG_VAR("blocked_ctr", RoadVehicleStateScope::BlockedCounter(), SLE_UINT16),
+		     SLEG_VAR("overtaking", RoadVehicleStateScope::Overtaking(), SLE_UINT8),
+		     SLEG_VAR("overtaking_ctr", RoadVehicleStateScope::OvertakingCounter(), SLE_UINT8),
+		     SLEG_VAR("crashed_ctr", RoadVehicleStateScope::CrashedCounter(), SLE_UINT16),
+		     SLEG_VAR("reverse_ctr", RoadVehicleStateScope::ReverseCounter(), SLE_UINT8),
+#else
 		      SLE_VAR(RoadVehicle, state,                SLE_UINT8),
 		      SLE_VAR(RoadVehicle, frame,                SLE_UINT8),
 		      SLE_VAR(RoadVehicle, blocked_ctr,          SLE_UINT16),
@@ -853,8 +876,9 @@ public:
 		      SLE_VAR(RoadVehicle, overtaking_ctr,       SLE_UINT8),
 		      SLE_VAR(RoadVehicle, crashed_ctr,          SLE_UINT16),
 		      SLE_VAR(RoadVehicle, reverse_ctr,          SLE_UINT8),
-		SLEG_CONDVECTOR("path.td",   rv_path_td,         SLE_UINT8,                  SLV_ROADVEH_PATH_CACHE, SLV_PATH_CACHE_FORMAT),
-		SLEG_CONDVECTOR("path.tile", rv_path_tile,       SLE_UINT32,                 SLV_ROADVEH_PATH_CACHE, SLV_PATH_CACHE_FORMAT),
+#endif
+		SLEG_CONDVECTOR("path.td",   PathTrackdirs(),         SLE_UINT8,                  SLV_ROADVEH_PATH_CACHE, SLV_PATH_CACHE_FORMAT),
+		SLEG_CONDVECTOR("path.tile", PathTiles(),       SLE_UINT32,                 SLV_ROADVEH_PATH_CACHE, SLV_PATH_CACHE_FORMAT),
 		SLEG_CONDSTRUCTLIST("path", SlVehicleRoadVehPath, SLV_PATH_CACHE_FORMAT, SL_MAX_VERSION),
 		  SLE_CONDVAR(RoadVehicle, gv_flags,             SLE_UINT16,                 SLV_139, SL_MAX_VERSION),
 	};
@@ -862,6 +886,8 @@ public:
 
 	static void ConvertPathCache(RoadVehicle &rv)
 	{
+		auto &rv_path_td = PathTrackdirs();
+		auto &rv_path_tile = PathTiles();
 		/* The two vectors should be the same size, but if not we can just ignore the cache and not cause more issues. */
 		if (rv_path_td.size() != rv_path_tile.size()) {
 			Debug(sl, 1, "Found RoadVehicle {} with invalid path cache, ignoring.", rv.index);
@@ -870,24 +896,35 @@ public:
 		size_t n = std::min(rv_path_td.size(), rv_path_tile.size());
 		if (n == 0) return;
 
-		rv.path.reserve(n);
+#ifdef WITH_RUST
+		auto &path = RoadVehicleStateScope::Path();
+#else
+		auto &path = rv.path;
+#endif
+		path.reserve(n);
 		for (size_t c = 0; c < n; ++c) {
-			rv.path.emplace_back(rv_path_td[c], rv_path_tile[c]);
+			path.emplace_back(rv_path_td[c], rv_path_tile[c]);
 		}
 
 		/* Path cache is now taken from back instead of front, so needs reversing. */
-		std::reverse(std::begin(rv.path), std::end(rv.path));
+		std::reverse(std::begin(path), std::end(path));
 	}
 
 	void Save(Vehicle *v) const override
 	{
 		if (v->type != VEH_ROAD) return;
+#ifdef WITH_RUST
+		RoadVehicleStateScope scope(RoadVehicle::From(v), false);
+#endif
 		SlObject(v, this->GetDescription());
 	}
 
 	void Load(Vehicle *v) const override
 	{
 		if (v->type != VEH_ROAD) return;
+#ifdef WITH_RUST
+		RoadVehicleStateScope scope(RoadVehicle::From(v), true);
+#endif
 		SlObject(v, this->GetLoadDescription());
 		if (!IsSavegameVersionBefore(SLV_ROADVEH_PATH_CACHE) && IsSavegameVersionBefore(SLV_PATH_CACHE_FORMAT)) {
 			ConvertPathCache(*static_cast<RoadVehicle *>(v));
@@ -897,6 +934,9 @@ public:
 	void FixPointers(Vehicle *v) const override
 	{
 		if (v->type != VEH_ROAD) return;
+#ifdef WITH_RUST
+		RoadVehicleStateScope scope(RoadVehicle::From(v), false);
+#endif
 		SlObject(v, this->GetDescription());
 	}
 };
@@ -1069,20 +1109,20 @@ public:
 
 		    SLE_VAR(Vehicle, owner,                 SLE_UINT8),
 		    SLE_VAR(Vehicle, vehstatus,             SLE_UINT8),
-		SLE_CONDVARNAME(DisasterVehicle, state, "current_order.dest", SLE_FILE_U8 | SLE_VAR_U16, SL_MIN_VERSION,         SLV_5),
-		SLE_CONDVARNAME(DisasterVehicle, state, "current_order.dest", SLE_UINT16,                SLV_5,                  SLV_DISASTER_VEH_STATE),
-		SLE_CONDVAR(DisasterVehicle,     state,                       SLE_UINT16,                SLV_DISASTER_VEH_STATE, SL_MAX_VERSION),
+		SLE_CONDVARNAME(DisasterVehicle, State(), "current_order.dest", SLE_FILE_U8 | SLE_VAR_U16, SL_MIN_VERSION,         SLV_5),
+		SLE_CONDVARNAME(DisasterVehicle, State(), "current_order.dest", SLE_UINT16,                SLV_5,                  SLV_DISASTER_VEH_STATE),
+		SLE_CONDVARNAME(DisasterVehicle, State(), "state",                       SLE_UINT16,                SLV_DISASTER_VEH_STATE, SL_MAX_VERSION),
 
 		    SLE_VAR(Vehicle, sprite_cache.sprite_seq.seq[0].sprite, SLE_FILE_U16 | SLE_VAR_U32),
 		SLE_CONDVAR(Vehicle, age,                   SLE_FILE_U16 | SLE_VAR_I32,   SL_MIN_VERSION,  SLV_31),
 		SLE_CONDVAR(Vehicle, age,                   SLE_INT32,                   SLV_31, SL_MAX_VERSION),
 		    SLE_VAR(Vehicle, tick_counter,          SLE_UINT8),
 
-		SLE_CONDVAR(DisasterVehicle, image_override,            SLE_FILE_U16 | SLE_VAR_U32,   SL_MIN_VERSION, SLV_191),
-		SLE_CONDVAR(DisasterVehicle, image_override,            SLE_UINT32,                 SLV_191, SL_MAX_VERSION),
-		SLE_CONDVAR(DisasterVehicle, big_ufo_destroyer_target,  SLE_FILE_U16 | SLE_VAR_U32,   SL_MIN_VERSION, SLV_191),
-		SLE_CONDVAR(DisasterVehicle, big_ufo_destroyer_target,  SLE_UINT32,                 SLV_191, SL_MAX_VERSION),
-		SLE_CONDVAR(DisasterVehicle, flags,                     SLE_UINT8,                  SLV_194, SL_MAX_VERSION),
+		SLE_CONDVARNAME(DisasterVehicle, ImageOverride(), "image_override",            SLE_FILE_U16 | SLE_VAR_U32,   SL_MIN_VERSION, SLV_191),
+		SLE_CONDVARNAME(DisasterVehicle, ImageOverride(), "image_override",            SLE_UINT32,                 SLV_191, SL_MAX_VERSION),
+		SLE_CONDVARNAME(DisasterVehicle, DestroyerTarget(), "big_ufo_destroyer_target",  SLE_FILE_U16 | SLE_VAR_U32,   SL_MIN_VERSION, SLV_191),
+		SLE_CONDVARNAME(DisasterVehicle, DestroyerTarget(), "big_ufo_destroyer_target",  SLE_UINT32,                 SLV_191, SL_MAX_VERSION),
+		SLE_CONDVARNAME(DisasterVehicle, Flags(), "flags",                     SLE_UINT8,                  SLV_194, SL_MAX_VERSION),
 	};
 
 	static inline const SaveLoadCompatTable compat_description = _vehicle_disaster_sl_compat;

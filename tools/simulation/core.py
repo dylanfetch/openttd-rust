@@ -65,9 +65,19 @@ SNAPSHOT_TICKS = 32 * TICKS_PER_DAY
 
 def scenario_modules():
     """Families in scenario-list order; import after shared core initialization."""
-    from . import effects, generated, play_saves, rails, ships, towns, trees
+    from . import (
+        disasters,
+        effects,
+        generated,
+        play_saves,
+        rails,
+        roads,
+        ships,
+        towns,
+        trees,
+    )
 
-    return generated, play_saves, towns, trees, effects, rails, ships
+    return generated, play_saves, towns, trees, effects, rails, ships, disasters, roads
 
 
 def scenario_list(soak):
@@ -619,7 +629,11 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
                 )
             if mode == "snapshots":
                 result["snapshots"] = len(shorter) + bool(same_end)
-                if len(shorter) < 2 and "effects" not in scenario:
+                if (
+                    len(shorter) < 2
+                    and "effects" not in scenario
+                    and not scenario.get("short_checkpoint")
+                ):
                     result["problems"].append(
                         "fewer than two periodic snapshots were written"
                     )
@@ -685,6 +699,7 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
             or "town_name_input" in result
             or "tree_input" in result
             or "effect_input" in result
+            or "disaster_input" in result
         ):
             for mode in ("snapshots", "plain"):
                 shutil.rmtree(out / name / mode, ignore_errors=True)

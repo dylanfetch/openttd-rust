@@ -83,6 +83,14 @@ pub fn layout(type_id: u8, item: u8) -> usize {
         42 => {
             layout!(crate::services::Services, item; context, random, observe_tile, write_tile, trig, industry)
         }
+        80 => layout!(crate::road::PathElement, item; trackdir, tile),
+        81 => {
+            layout!(crate::road::View, item; r#type, first, next, previous, tile, dest, x, y, z, direction, speed, tick, running, day, order_time, progress, status, owner, engine, last_station, order_destination, order_type, order_max_speed, breakdown, max_track_speed, length, total_length, roadtype, front, articulated, tram, bus, order_nonstop)
+        }
+        82 => layout!(crate::road::Leaves, item; observe, write, leaf, owner, nearby),
+        83 => layout!(crate::road::Action, item; op, id, a, b, c),
+        44 => layout!(crate::disaster::State, item; image_override, target, state, flags),
+        45 => layout!(crate::disaster::Action, item; kind, id, other, a, b, c, d),
         46 => layout!(crate::water_regions::Patch, item; x, y, label),
         47 => layout!(crate::water_regions::Snapshot, item; edges, labels, patches, aqueducts),
         48 => layout!(crate::water_regions::Leaves, item; tracks, follow, aqueduct, debug),

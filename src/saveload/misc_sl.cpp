@@ -25,11 +25,11 @@
 #include "../timer/timer_game_tick.h"
 
 #include "../rust/tree_counter.h"
+#include "../rust/disaster_counter.h"
 
 #include "../safeguards.h"
 
 extern TileIndex _cur_tileloop_tile;
-extern uint16_t _disaster_delay;
 
 /* Keep track of current game position */
 int _saved_scrollpos_x;
