@@ -94,11 +94,10 @@ static void Layouts()
 	Layout(35, "OpenTTDLinkGraphEdge", {sizeof(OpenTTDLinkGraphEdge), alignof(OpenTTDLinkGraphEdge), offsetof(OpenTTDLinkGraphEdge, capacity), offsetof(OpenTTDLinkGraphEdge, travel_time), offsetof(OpenTTDLinkGraphEdge, dest)});
 	Layout(36, "OpenTTDLinkGraphSettings", {sizeof(OpenTTDLinkGraphSettings), alignof(OpenTTDLinkGraphSettings), offsetof(OpenTTDLinkGraphSettings, accuracy), offsetof(OpenTTDLinkGraphSettings, demand_distance), offsetof(OpenTTDLinkGraphSettings, demand_size), offsetof(OpenTTDLinkGraphSettings, saturation), offsetof(OpenTTDLinkGraphSettings, distribution), offsetof(OpenTTDLinkGraphSettings, express), offsetof(OpenTTDLinkGraphSettings, map_max_x), offsetof(OpenTTDLinkGraphSettings, map_max_y), offsetof(OpenTTDLinkGraphSettings, runtime)});
 	Layout(38, "OpenTTDTreeAction", {sizeof(OpenTTDTreeAction), alignof(OpenTTDTreeAction), offsetof(OpenTTDTreeAction, kind), offsetof(OpenTTDTreeAction, tile), offsetof(OpenTTDTreeAction, a), offsetof(OpenTTDTreeAction, b), offsetof(OpenTTDTreeAction, cost)});
-	Layout(42, "OpenTTDSharedServices", {sizeof(OpenTTDSharedServices), alignof(OpenTTDSharedServices), offsetof(OpenTTDSharedServices, context), offsetof(OpenTTDSharedServices, random), offsetof(OpenTTDSharedServices, observe_tile), offsetof(OpenTTDSharedServices, write_tile), offsetof(OpenTTDSharedServices, trig)});
+	Layout(42, "OpenTTDSharedServices", {sizeof(OpenTTDSharedServices), alignof(OpenTTDSharedServices), offsetof(OpenTTDSharedServices, context), offsetof(OpenTTDSharedServices, random), offsetof(OpenTTDSharedServices, observe_tile), offsetof(OpenTTDSharedServices, write_tile), offsetof(OpenTTDSharedServices, trig), offsetof(OpenTTDSharedServices, industry)});
 	Layout(37, "OpenTTDLinkGraphShare", {sizeof(OpenTTDLinkGraphShare), alignof(OpenTTDLinkGraphShare), offsetof(OpenTTDLinkGraphShare, node), offsetof(OpenTTDLinkGraphShare, origin), offsetof(OpenTTDLinkGraphShare, via), offsetof(OpenTTDLinkGraphShare, cumulative), offsetof(OpenTTDLinkGraphShare, unrestricted), offsetof(OpenTTDLinkGraphShare, has_share)});
-	Layout(39, "OpenTTDEffectView", {sizeof(OpenTTDEffectView), alignof(OpenTTDEffectView), offsetof(OpenTTDEffectView, x), offsetof(OpenTTDEffectView, y), offsetof(OpenTTDEffectView, z), offsetof(OpenTTDEffectView, sprite), offsetof(OpenTTDEffectView, progress), offsetof(OpenTTDEffectView, spritenum), offsetof(OpenTTDEffectView, subtype), offsetof(OpenTTDEffectView, ambient), offsetof(OpenTTDEffectView, sprite_write)});
-	Layout(40, "OpenTTDEffectCursor", {sizeof(OpenTTDEffectCursor), alignof(OpenTTDEffectCursor), offsetof(OpenTTDEffectCursor, phase), offsetof(OpenTTDEffectCursor, animation), offsetof(OpenTTDEffectCursor, tile), offsetof(OpenTTDEffectCursor, random)});
-	Layout(41, "OpenTTDEffectLeaves", {sizeof(OpenTTDEffectLeaves), alignof(OpenTTDEffectLeaves), offsetof(OpenTTDEffectLeaves, industry)});
+	Layout(39, "OpenTTDEffectView", {sizeof(OpenTTDEffectView), alignof(OpenTTDEffectView), offsetof(OpenTTDEffectView, x), offsetof(OpenTTDEffectView, y), offsetof(OpenTTDEffectView, z), offsetof(OpenTTDEffectView, sprite), offsetof(OpenTTDEffectView, progress), offsetof(OpenTTDEffectView, spritenum), offsetof(OpenTTDEffectView, subtype), offsetof(OpenTTDEffectView, ambient)});
+	Layout(41, "OpenTTDEffectLeaves", {sizeof(OpenTTDEffectLeaves), alignof(OpenTTDEffectLeaves), offsetof(OpenTTDEffectLeaves, observe), offsetof(OpenTTDEffectLeaves, write), offsetof(OpenTTDEffectLeaves, viewport), offsetof(OpenTTDEffectLeaves, sound), offsetof(OpenTTDEffectLeaves, animated)});
 	CHECK(openttd_rust_abi_layout(255, 0) == SIZE_MAX);
 	CHECK(static_cast<size_t>(PTRDIFF_MAX) == (SIZE_MAX >> 1));
 	std::printf("pointer_bytes %zu sentinel %zu borrow_limit %zu\n", sizeof(void *), SIZE_MAX, static_cast<size_t>(PTRDIFF_MAX));
@@ -624,7 +623,7 @@ static void Trees()
 {
 	using Owner = std::unique_ptr<void, decltype(&openttd_rust_trees_destroy)>;
 	TreeProbe probe;
-	const OpenTTDSharedServices services{&probe, TreeRandom, TreeObserve, TreeWrite, TreeTrig};
+	const OpenTTDSharedServices services{&probe, TreeRandom, TreeObserve, TreeWrite, TreeTrig, EffectTestIndustry};
 	auto make = [&](uint32_t kind, uint32_t a = 0, uint32_t b = 0, uint32_t c = 0) {
 		return Owner(openttd_rust_trees_create(kind, 1, a, b, c, &probe, TreeSettings, &services, TreeLeaf), openttd_rust_trees_destroy);
 	};

@@ -1115,26 +1115,27 @@ traversal, legacy saves and custom NewGRF ambient callbacks remain evidence limi
 
 ### Effect vehicles
 
-Issue #101 moves all twelve effect init/tick controllers, movement tables, sprite
-and expiry decisions, and private animation state/substate into Rust. Each C++
-EffectVehicle shell owns one zero-created opaque state, including indexed loading;
-RAII destroys it even during pool cleanup. Original controllers compile only in
-portable builds. Shared Vehicle fields, pools, tick dispatch, bounds, transparency,
-viewport/hash updates, factories and rendering stay canonical C++ state/services.
+Rust owns all twelve controllers, movement tables and private animation bytes
+(#101/#107). Each C++ EffectVehicle shell
+owns one zero-created opaque state, also on indexed load; RAII destroys it on
+ordinary deletion and pool cleanup. Original controllers compile only in the
+portable build. Vehicle fields, pools, factories, tick dispatch, bounds,
+transparency, viewport/hash updates and rendering stay canonical C++.
 
-ABI IDs 39-41 cover temporary scalar observations, an invocation continuation and
-one nonallocating/nonthrowing/nonreentrant industry-query leaf. RNG, sound, viewport,
-animated-tile insertion and deletion execute after Rust returns, preserving source
-write/action order without outstanding Rust borrows. Explicit byte/word wrapping,
-sprite `!=` termination and bubble RNG short-circuit/rounding retain historical
-behavior. Narrow caller setters and nested stack-only save staging keep private
-bytes out of the C++ shell; modern/FixPointers and ten-byte legacy union layouts
-retain field names, widths, ordering and subtype conversion. Panics/OOM abort.
+Copied call-scoped observations and immediate scalar writes keep original
+mutation order. Rust calls common Random and effect-specific map, sound,
+viewport and animated-tile noexcept wrappers directly; none can reenter Rust.
+Private-owner access scopes end before every service. Expiry returns false
+before C++ deletion, Vehicle::~Vehicle and Pool::FreeItem/PostDestructor.
+SaveOrLoad/AfterLoadGame do not invoke controllers: modern/FixPointers and
+legacy loading call separate get/set exports through existing nested staging,
+which commits partial loads on unwind. No save operation crosses Rust frames.
+Explicit byte/word narrowing/wrapping and RNG short circuit retain source quirks.
 
-Evidence: semantic scenarios compare every save chunk at short, asserted tick
-horizons across all subtypes, expiry, reload, natural creation and actual callers.
-Native ABI/CTest fixtures cover every init, returned service ordering, RNG threshold,
-reentry/throw gaps, owner lifetime and partial/nested staging; factory CTest checks
-Above/Rel coordinates. Viewport pixels and audible output are not compared; full
-legacy-save fixtures, allocator failure timing and all vehicle callers are not
-exhaustive. These effects do not migrate transport/disaster vehicle controllers.
+`python3 tools/migration.py simulate effects` compares every save chunk across
+all subtypes, expiry, reload, natural creation and callers; `--self`/`--soak`
+check reproducibility/longer runs. Native ABI/CTest fixtures cover immediate
+writes, transient service order, RNG thresholds, state lifetime and save staging;
+factory tests cover Above/Rel coordinates. Viewport pixels, audible output,
+full legacy fixtures and every caller remain limits. Environmental exceptions
+terminate inside noexcept wrappers; Rust panics/OOM abort.

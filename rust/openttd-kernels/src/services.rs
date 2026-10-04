@@ -27,6 +27,8 @@ pub struct Services {
     pub write_tile: extern "C" fn(*mut c_void, u32, u32, u32, u32, u32, u32),
     /// Native sinf/cosf used by the original grove construction.
     pub trig: extern "C" fn(u32, f32) -> f32,
+    /// `TileVirtXY` query: 0 not industry, 1 industry, 2 bubble catcher; writes tile.
+    pub industry: extern "C" fn(i32, i32, *mut u32) -> u32,
 }
 impl Services {
     /// Draw one shared random word.
