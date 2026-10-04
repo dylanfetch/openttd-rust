@@ -5,7 +5,7 @@ Root owns this file and updates it when a phase completes or priorities change.
 to work on next. If an issue conflicts with this roadmap, follow the roadmap;
 a subagent stops and reports the conflict in its hand-off to root.
 
-## Where the fork stands (2026-10-03, `rust-migration` at `7a2858c469`)
+## Where the fork stands (2026-10-04, `rust-migration` at `5991a6aacd`)
 
 - Ported: one landscape kernel, StringConsumer/StringBuilder/UTF-8/byte-string
   utilities, history and spiral/alternating iterators, Script Admin JSON
@@ -62,6 +62,12 @@ and verifying all other chunks unchanged. No output masks were added.
 Port differences still require `KNOWN_FAILURES`, never masks. Rail, ship and
 aircraft scenarios (#86) come before ports of those vehicle types.
 
+Selected evidence fix: **#97 freeze simulation runtime/provenance**. Long runs
+currently hash executables and read HEAD at the end; a rebuild can mix candidate
+executions and mislabel evidence. Root owns the isolated runtime and initial
+identity capture; Astra medium reviews it. Run this alongside #96, without
+changing semantic decoding or output masks.
+
 Original scope: run the reference and the candidate headlessly on identical
 scenarios, take periodic uncompressed snapshots using the existing `-d desync=3`
 hook, decode the save chunks, and compare them field by field. The scenarios are
@@ -100,7 +106,7 @@ comparisons, Ruff and the default harness (20/20 scenarios, 401 snapshots, no di
 
 ## Phase 3: selected next task
 
-**#96 Built-in town-name generation** (`src/townname.cpp`) is next. Implementation
+**#96 Built-in town-name generation** (`src/townname.cpp`) is in progress. Implementation
 owner: `/root/town_names` (Sol high); a separate Astra medium agent reviews it.
 Rust will own all 21 generators, seed selection, private output and generator
 constants. C++ keeps NewGRF routing, town-name retry/uniqueness checks and the
