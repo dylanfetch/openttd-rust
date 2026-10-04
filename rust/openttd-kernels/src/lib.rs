@@ -20,6 +20,7 @@ mod landscape;
 mod linkgraph;
 mod math;
 mod packet;
+pub mod rail_yapf;
 mod road;
 mod road_data;
 mod script_list;
