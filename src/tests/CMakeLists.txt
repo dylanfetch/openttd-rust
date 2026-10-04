@@ -25,6 +25,8 @@ add_test_files(
     test_network_crypto.cpp
     test_script_admin.cpp
     test_window_desc.cpp
+    town_growth.cpp
+    town_protocol.hpp
     townname.cpp
     ship_yapf.cpp
     ship_yapf_protocol.hpp

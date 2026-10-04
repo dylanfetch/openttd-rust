@@ -106,6 +106,8 @@ pub fn layout(type_id: u8, item: u8) -> usize {
         54 => layout!(crate::ship_yapf::Follow, item; tile, skipped, dirs, followed),
         55 => layout!(crate::ship_yapf::Tile, item; ships, docking, sea, lock_middle, destination),
         56 => layout!(crate::ship_yapf::Result, item; direction, found, origin, stats),
+        60 => layout!(crate::town::Action, item; kind, town, tile, a, b, c, d, cost),
+        61 => layout!(crate::town::Leaves, item; observe, leaf, state, stations),
         _ => usize::MAX,
     }
 }
