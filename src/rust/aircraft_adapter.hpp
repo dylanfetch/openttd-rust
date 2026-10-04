@@ -11,6 +11,7 @@ static_assert(HRS_ROTOR_STOPPED == 0 && HRS_ROTOR_MOVING_3 == 3);
 static_assert(VehicleID::Invalid().base() == 1048575 && StationID::Invalid().base() == 65535);
 static_assert(EV_BREAKDOWN_SMOKE_AIRCRAFT == 10 && EV_EXPLOSION_LARGE == 5 && EV_EXPLOSION_SMALL == 7);
 static_assert(HVOT_AIRCRAFT == 16);
+static_assert(OWNER_NONE.base() == 16);
 
 /* These callbacks expose records and single shared operations, never FTA policy.
  * Record pointers are opaque, stable airport descriptions; Rust never interprets

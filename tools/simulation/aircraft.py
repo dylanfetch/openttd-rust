@@ -44,12 +44,20 @@ def scenarios(soak):
             "kind": "save",
             "aircraft_control": kind,
             "ticks": (2 if soak else 1) * 365 * TICKS_PER_DAY + SNAPSHOT_TICKS
-            if kind in ("traffic", "closure")
+            if kind in ("traffic", "closure", "ownerless")
             else 6000,
             "short_checkpoint": True,
             "console": ["unpause"],
         }
-        for kind in ("traffic", "closure", "zeppelin", "removal", "crash", "reload")
+        for kind in (
+            "traffic",
+            "closure",
+            "zeppelin",
+            "removal",
+            "crash",
+            "reload",
+            "ownerless",
+        )
     ]
     return cases
 
@@ -67,6 +75,7 @@ def install(scenario, run_dir):
             f"AIRCRAFT_TARGET <- {scenario.get('aircraft_action_target', 0)};\n"
             f"AIRCRAFT_COUNT <- {scenario.get('aircraft_count', 8)};\n"
             f"AIRCRAFT_AIRPORTS <- {json.dumps(scenario.get('aircraft_action_airports', []))};\n"
+            f"AIRCRAFT_OILRIG <- {str(scenario.get('aircraft_oilrig', False)).lower()};\n"
         )
 
 
@@ -293,14 +302,18 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
         return scenario
     with LOCK:
         kind = scenario["aircraft_control"]
-        count = 1 if kind in ("removal", "crash") else 8
-        folder = out / f"aircraft-controller-fixture-{count}"
+        count = 1 if kind in ("removal", "crash", "ownerless") else 8
+        folder = (
+            out
+            / f"aircraft-controller-fixture-{count}{'-oilrig' if kind == 'ownerless' else ''}"
+        )
         source = folder / "save/autosave/exit.sav"
         if not source.exists():
             setup = {
                 "kind": "generate",
                 "aircraft_controller_setup": True,
                 "aircraft_count": count,
+                "aircraft_oilrig": kind == "ownerless",
                 "scenario_ai": scenario["scenario_ai"],
                 "seed": 86,
                 "map_log2": 7,
@@ -324,6 +337,9 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
                     "vehicle": {"plane_crashes": 0},
                 },
             }
+            if kind == "ownerless":
+                setup["settings"]["difficulty"]["quantity_sea_lakes"] = 2
+                setup["settings"]["construction"] = {"raw_industry_construction": 1}
             with core.MACHINE.hold(alone=False):
                 trial = run_game(
                     setup,
@@ -417,9 +433,11 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
         airports = {
             index: row
             for index, row in stations.items()
-            if row.get("normal[0]/airport.type") in (4, 8)
+            if row.get("normal[0]/airport.type") in (4, 8, 9)
         }
-        if len(heads) != 2 * count or len(airports) != 3:
+        if len(heads) != 2 * count or len(airports) != (
+            4 if kind == "ownerless" else 3
+        ):
             raise RuntimeError(
                 "controller reference input lacks all aircraft/airport layouts"
             )
@@ -428,7 +446,7 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
             (
                 index
                 for index in heads
-                if allrows[index]["aircraft[0]/state"] == 14
+                if (kind == "ownerless" or allrows[index]["aircraft[0]/state"] == 14)
                 and allrows[index]["aircraft[0]/common[0]/subtype"] == 2
                 and (
                     kind not in ("removal", "crash")
@@ -540,6 +558,7 @@ def check_control(scenario, run, mode, role, result):
     occupied_wait = 0
     blocked = []
     closed_circling = 0
+    ownerless_landing = 0
     for sample, snapshot in enumerate(observations):
         for head in scenario["aircraft_heads"]:
             if head not in snapshot:
@@ -547,6 +566,14 @@ def check_control(scenario, run, mode, role, result):
             row = snapshot[head]
             state = row["aircraft[0]/state"]
             states.add(state)
+            target = row["aircraft[0]/targetairport"]
+            if (
+                state in (8, 9, 17, 18, 21)
+                and target in stations[sample]
+                and stations[sample][target]["normal[0]/airport.type"] == 9
+                and stations[sample][target]["normal[0]/base[0]/owner"] == 16
+            ):
+                ownerless_landing += 1
             if (
                 scenario["aircraft_control"] == "closure"
                 and head == scenario["aircraft_selected"]
@@ -671,6 +698,8 @@ def check_control(scenario, run, mode, role, result):
         raise RuntimeError("airport closure bit disappeared")
     if kind == "closure" and mode == "snapshots" and closed_circling < 3:
         raise RuntimeError("closed-airport aircraft did not continue circling")
+    if kind == "ownerless" and mode == "snapshots" and not ownerless_landing:
+        raise RuntimeError("helicopter did not land at the real ownerless oilrig")
     if kind == "zeppelin" and not any(mask & (1 << 62) for mask in masks):
         raise RuntimeError("zeppelin reservation bit disappeared")
     result[f"{mode}_{role}_controller"] = {
@@ -681,6 +710,7 @@ def check_control(scenario, run, mode, role, result):
         "occupied_next_block_wait": occupied_wait,
         "waited_block_released": released_wait,
         "closed_airport_circling": closed_circling,
+        "ownerless_oilrig_landing": ownerless_landing,
         "plane_service": plane_service,
         "rotor_states": sorted(rotor_states),
         "shadow_positions": len(shadow_positions),

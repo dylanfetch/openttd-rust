@@ -1213,7 +1213,7 @@ Issue #136 moves both tick passes, movement/speed/flight levels, shadow/rotor,
 all FTA traversal, terminal/group/helipad reservation, service/diversion/range,
 crash cleanup and airport replacement/destruction policies into Rust. Fixed Rust
 allocations own aircraft counters/cache and each station's airport block mask;
-field-sized C++ references retain existing save, legacy load and external-write
+placement-constructed trivial C++ facades retain save, legacy load and external-write
 addresses. Original bodies compile only in portable builds. Shared Vehicle/pools,
 orders/loading, airport geometry/FTA records and rendering remain C++.
 
@@ -1233,4 +1233,5 @@ abort, airborne airport removal, out-of-fuel crash/destruction and live reload. 
 800 finite-range branches against unchanged reference helpers because supplied
 engines have unlimited range. ABI checks cover owner defaults/layout/lifetime.
 Full legacy files, arbitrary NewGRFs/airport rotations and viewport/sound output
-remain evidence limits.
+remain evidence limits. A reference-built ownerless oilrig route checks public
+helicopter landing through the ordinary FTA path.

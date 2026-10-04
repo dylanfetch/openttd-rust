@@ -376,13 +376,16 @@ private:
 #ifdef WITH_RUST
 #include "rust/aircraft_ffi.h"
 static_assert(sizeof(AirportBlocks) == sizeof(uint64_t) && alignof(AirportBlocks) == alignof(uint64_t));
+static_assert(std::is_trivially_destructible_v<AirportBlocks>);
 #endif
 struct Airport : public TileArea {
 	Airport() : TileArea(INVALID_TILE, 0, 0) {}
 
 #ifdef WITH_RUST
 	std::unique_ptr<uint64_t, decltype(&openttd_rust_airport_blocks_destroy)> rust_blocks{openttd_rust_airport_blocks_new(), openttd_rust_airport_blocks_destroy};
-	AirportBlocks &blocks = reinterpret_cast<AirportBlocks &>(*this->rust_blocks);
+	/* Begin the trivial bitset's lifetime in its canonical allocation. Rust reads
+	 * and writes only its raw uint64 representation; allocation release ends it. */
+	AirportBlocks &blocks = *new (this->rust_blocks.get()) AirportBlocks{};
 #else
 	AirportBlocks blocks{}; ///< stores which blocks on the airport are taken. was 16 bit earlier on, then 32
 #endif

@@ -60,6 +60,35 @@ class MigrationAircraftController extends AIController {
 			}
 		}
 		this.Check("three-airports", first != -1 && last != -1 && pad != -1);
+		local rig = -1;
+		if (AIRCRAFT_OILRIG) {
+			foreach (industry, unused in AIIndustryList()) {
+				if (AIIndustry.HasHeliport(industry)) { rig = AIIndustry.GetHeliportLocation(industry); break; }
+			}
+			if (rig == -1) foreach (type, unused in AIIndustryTypeList()) {
+				if (!AIIndustryType.HasHeliport(type) || !AIIndustryType.CanBuildIndustry(type)) continue;
+				for (local y = 16; y < AIMap.GetMapSizeY() - 16 && rig == -1; y++) for (local x = 16; x < AIMap.GetMapSizeX() - 16; x++) {
+					local tile = AIMap.GetTileIndex(x, y);
+					if (!AITile.IsWaterTile(tile)) continue;
+					local possible;
+					{ local test = AITestMode(); possible = AIIndustryType.BuildIndustry(type, tile); }
+					if (!possible) continue;
+					this.Check("oilrig-build", AIIndustryType.BuildIndustry(type, tile));
+					/* Its neutral station appears when the industry finishes construction. */
+					for (local tick = 0; tick < 1500 && rig == -1; tick++) {
+						foreach (industry, unused in AIIndustryList()) {
+							if (AIIndustry.HasHeliport(industry)) { rig = AIIndustry.GetHeliportLocation(industry); break; }
+						}
+						if (rig == -1) this.Sleep(1);
+					}
+					this.Check("oilrig-complete", rig != -1);
+					break;
+				}
+				if (rig != -1) break;
+			}
+			this.Check("oilrig", rig != -1);
+			print("AIRCRAFT-OILRIG " + rig);
+		}
 		local engines = AIEngineList(AIVehicle.VT_AIR);
 		local heads = [];
 		foreach (type in [AIAirport.PT_SMALL_PLANE, AIAirport.PT_HELICOPTER]) {
@@ -72,7 +101,7 @@ class MigrationAircraftController extends AIController {
 				local vehicle = AIVehicle.BuildVehicle(AIAirport.GetHangarOfAirport(first), engine);
 				this.Check("vehicle-" + type, AIVehicle.IsValidVehicle(vehicle));
 				this.Check("order-a", AIOrder.AppendOrder(vehicle, first, AIOrder.OF_NONE));
-				this.Check("order-b", AIOrder.AppendOrder(vehicle, type == AIAirport.PT_HELICOPTER ? pad : last, AIOrder.OF_NONE));
+				this.Check("order-b", AIOrder.AppendOrder(vehicle, type == AIAirport.PT_HELICOPTER ? (AIRCRAFT_OILRIG ? rig : pad) : last, AIOrder.OF_NONE));
 				this.Check("start", AIVehicle.StartStopVehicle(vehicle));
 				heads.append(vehicle);
 			}

@@ -26,8 +26,11 @@ struct OpenTTDAircraftRun;
 /* Both owners use fixed allocations with field-sized raw access on the game
  * thread. C++ references alias only their named scalar. No owner reference may
  * span a callback. Aircraft deletion runs PreDestructor before releasing state;
- * airport ownership lasts through the enclosing Station's destructor. Modern
- * and legacy descriptors take the live scalar address and retain file widths.
+ * airport ownership lasts through the enclosing Station's destructor. All
+ * shells placement-construct trivial StationID/Direction/AircraftCache/bitset
+ * objects with original defaults before publishing typed aliases. Rust accesses
+ * only their raw primitive representations; allocation release ends the lifetimes.
+ * Modern and legacy descriptors take the live scalar address and retain file widths.
  * Leaf callbacks copy records and are noexcept. Named returned services are
  * ProcessOrders, UpdateOrderDest, VehicleEnterDepot, Vehicle::Crash, depot
  * commands and deletion; these finish on the C++ stack before Rust resumes.

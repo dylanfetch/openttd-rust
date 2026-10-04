@@ -109,6 +109,7 @@ const RELIABILITY: usize = 26;
 const CARGO_AGE: usize = 27;
 const INVALID: u32 = 1_048_575;
 const INVALID_STATION: u32 = 65535;
+const OWNER_NONE: i64 = 16;
 const INVALID_TILE: u32 = u32::MAX;
 const HIDDEN: i64 = 1;
 const STOPPED: i64 = 2;
@@ -1182,7 +1183,7 @@ impl World {
                 let station = u32::from(self.target(id));
                 let s = self.station(station);
                 if self.read(18, id, i64::from(station), 0)[0] != 0
-                    && (s[7] == 255 || s[7] == self.v(id, OWNER))
+                    && (s[7] == OWNER_NONE || s[7] == self.v(id, OWNER))
                     && self.blocks(station) & CLOSED == 0
                 {
                     let landing = if self.v(id, SUBTYPE) == 0 {
