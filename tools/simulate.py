@@ -36,8 +36,14 @@ ROOT = Path(__file__).resolve().parents[1]
 MASKS = {
     ("DATE", "id"): "random savegame id generated for every new game",
     ("GLOG", "action/revision/revision.text"): "build revision string of each binary",
-    ("GLOG", "action/revision/revision.modified"): "whether each build tree was modified",
-    ("GLOG", "action/revision/revision.newgrf"): "OpenTTD version each build reports to NewGRFs (from its git revision)",
+    (
+        "GLOG",
+        "action/revision/revision.modified",
+    ): "whether each build tree was modified",
+    (
+        "GLOG",
+        "action/revision/revision.newgrf",
+    ): "OpenTTD version each build reports to NewGRFs (from its git revision)",
     # BaseConsist::round_trip_time has no initializer (base_consist.h:43), so a
     # vehicle built in a reused pool slot saves stale heap bytes until its first
     # measured round trip; the reference differs from itself here (#83).
@@ -58,22 +64,44 @@ SNAPSHOT_TICKS = 32 * TICKS_PER_DAY
 
 # Road networks built by LLM players in OpenTTD 15.1 (migration/saves/README.md),
 # loaded with their scripts dropped. The first two run by default.
-PLAY_SAVES = ("opus-55-167-002", "grok-159-001", "astra-156-003", "opus-55-165-002", "opus-5-133-009", "fable-152-004")
+PLAY_SAVES = (
+    "opus-55-167-002",
+    "grok-159-001",
+    "astra-156-003",
+    "opus-55-165-002",
+    "opus-5-133-009",
+    "fable-152-004",
+)
 # Console commands run from scripts/game_start.scr after loading; the saves were
 # written paused. cargodist uses short link graph intervals so jobs recur often.
 DISTRIBUTIONS = {
     "manual": ["unpause"],
-    "cargodist": ["setting linkgraph.distribution_pax 2", "setting linkgraph.distribution_mail 2",
-                  "setting linkgraph.distribution_default 1", "setting linkgraph.recalc_interval 4",
-                  "setting linkgraph.recalc_time 16", "unpause"],
+    "cargodist": [
+        "setting linkgraph.distribution_pax 2",
+        "setting linkgraph.distribution_mail 2",
+        "setting linkgraph.distribution_default 1",
+        "setting linkgraph.recalc_interval 4",
+        "setting linkgraph.recalc_time 16",
+        "unpause",
+    ],
 }
 
 
 def scenario_list(soak):
     """Data-driven scenario set; extend this for new ports rather than adding tools."""
     scenarios = [
-        {"name": "regression-regression", "kind": "regression", "test": "regression", "ticks": 30000},
-        {"name": "regression-stationlist", "kind": "regression", "test": "stationlist", "ticks": 30000},
+        {
+            "name": "regression-regression",
+            "kind": "regression",
+            "test": "regression",
+            "ticks": 30000,
+        },
+        {
+            "name": "regression-stationlist",
+            "kind": "regression",
+            "test": "stationlist",
+            "ticks": 30000,
+        },
     ]
     seeds = (1, 12345, 777, 31337, 2024, 99) if soak else (1, 12345)
     sizes = (6, 7, 8, 9) if soak else (7, 8)
@@ -81,18 +109,27 @@ def scenario_list(soak):
     for generator, label in ((1, "tgp"), (0, "original")):
         for size in sizes:
             for seed in seeds:
-                scenarios.append({
-                    "name": f"generate-{label}-{1 << size}-{seed}", "kind": "generate", "seed": seed,
-                    "map_log2": size, "land_generator": generator,
-                    "ticks": years * 365 * TICKS_PER_DAY + SNAPSHOT_TICKS,
-                })
+                scenarios.append(
+                    {
+                        "name": f"generate-{label}-{1 << size}-{seed}",
+                        "kind": "generate",
+                        "seed": seed,
+                        "map_log2": size,
+                        "land_generator": generator,
+                        "ticks": years * 365 * TICKS_PER_DAY + SNAPSHOT_TICKS,
+                    }
+                )
     for save in PLAY_SAVES if soak else PLAY_SAVES[:2]:
         for distribution, commands in DISTRIBUTIONS.items():
-            scenarios.append({
-                "name": f"play-{save}-{distribution}", "kind": "save", "console": commands,
-                "save": str(ROOT / "migration/saves" / f"{save}.sav"),
-                "ticks": years * 365 * TICKS_PER_DAY + SNAPSHOT_TICKS,
-            })
+            scenarios.append(
+                {
+                    "name": f"play-{save}-{distribution}",
+                    "kind": "save",
+                    "console": commands,
+                    "save": str(ROOT / "migration/saves" / f"{save}.sav"),
+                    "ticks": years * 365 * TICKS_PER_DAY + SNAPSHOT_TICKS,
+                }
+            )
     return scenarios
 
 
@@ -107,7 +144,7 @@ class Reader:
     def take(self, count):
         if self.pos + count > self.end:
             raise Corrupt("read past end")
-        value = self.data[self.pos:self.pos + count]
+        value = self.data[self.pos : self.pos + count]
         self.pos += count
         return value
 
@@ -131,8 +168,17 @@ class Reader:
 
 
 # SLE_FILE_* types: (struct format, size); 10 is STRING, 11 is STRUCT.
-FILE_TYPES = {1: (">b", 1), 2: (">B", 1), 3: (">h", 2), 4: (">H", 2), 5: (">i", 4),
-              6: (">I", 4), 7: (">q", 8), 8: (">Q", 8), 9: (">H", 2)}
+FILE_TYPES = {
+    1: (">b", 1),
+    2: (">B", 1),
+    3: (">h", 2),
+    4: (">H", 2),
+    5: (">i", 4),
+    6: (">I", 4),
+    7: (">q", 8),
+    8: (">Q", 8),
+    9: (">H", 2),
+}
 FILE_STRING, FILE_STRUCT, HAS_LENGTH = 10, 11, 0x10
 
 
@@ -143,7 +189,12 @@ def read_header(reader):
         kind = reader.byte()
         if kind == 0:
             break
-        fields.append({"type": kind, "key": reader.take(reader.gamma()).decode("utf-8", "surrogateescape")})
+        fields.append(
+            {
+                "type": kind,
+                "key": reader.take(reader.gamma()).decode("utf-8", "surrogateescape"),
+            }
+        )
     for field in fields:
         if field["type"] & 0x0F == FILE_STRUCT:
             field["fields"] = read_header(reader)
@@ -204,7 +255,7 @@ def read_save(path):
                 # SlIterateArray skips empty non-sparse slots; a sparse element
                 # always counts because its length includes the index.
                 if kind in (2, 4) or element.pos < len(element.data):
-                    chunk["elements"].append((index, element.data[element.pos:]))
+                    chunk["elements"].append((index, element.data[element.pos :]))
                 index += 1
         chunks[cid.decode("latin-1")] = chunk
 
@@ -224,7 +275,14 @@ def decode_element(chunk, body):
 def mask_for(cid, path):
     """Return the MASKS pattern covering this field, if any."""
     generic = re.sub(r"\[\d+\]", "", path)
-    return next((pattern for chunk, pattern in MASKS if cid == chunk and fnmatch.fnmatchcase(generic, pattern)), None)
+    return next(
+        (
+            pattern
+            for chunk, pattern in MASKS
+            if cid == chunk and fnmatch.fnmatchcase(generic, pattern)
+        ),
+        None,
+    )
 
 
 def compare_chunk(cid, ref, cand, stats):
@@ -252,7 +310,12 @@ def compare_chunk(cid, ref, cand, stats):
         if a == b:
             continue
         if a is None or b is None:
-            yield (str(index), "element", "present" if a is not None else "absent", "present" if b is not None else "absent")
+            yield (
+                str(index),
+                "element",
+                "present" if a is not None else "absent",
+                "present" if b is not None else "absent",
+            )
             continue
         fields_a, fields_b = decode_element(ref, a), decode_element(cand, b)
         if fields_a is None or fields_b is None:
@@ -267,12 +330,18 @@ def compare_chunk(cid, ref, cand, stats):
             if pattern is None:
                 yield (str(index), path, va, vb)
             else:
-                stats["masked"][f"{cid}:{pattern}"] = stats["masked"].get(f"{cid}:{pattern}", 0) + 1
+                stats["masked"][f"{cid}:{pattern}"] = (
+                    stats["masked"].get(f"{cid}:{pattern}", 0) + 1
+                )
 
 
 def failure_key(scenario, cid, element, field):
     """KNOWN_FAILURES key: the field path without indices, or the element for byte-level differences."""
-    return (scenario, cid, re.sub(r"\[\d+\]", "", field) if field not in ("", "bytes") else element)
+    return (
+        scenario,
+        cid,
+        re.sub(r"\[\d+\]", "", field) if field not in ("", "bytes") else element,
+    )
 
 
 def compare_saves(ref_path, cand_path, scenario, limit, stats):
@@ -286,8 +355,14 @@ def compare_saves(ref_path, cand_path, scenario, limit, stats):
         else:
             diffs = compare_chunk(cid, ref[cid], cand[cid], stats)
         for element, field, ref_value, cand_value in diffs:
-            record = {"snapshot": ref_path.name, "chunk": cid, "element": element, "field": field,
-                      "reference": repr(ref_value), "candidate": repr(cand_value)}
+            record = {
+                "snapshot": ref_path.name,
+                "chunk": cid,
+                "element": element,
+                "field": field,
+                "reference": repr(ref_value),
+                "candidate": repr(cand_value),
+            }
             issue = KNOWN_FAILURES.get(failure_key(scenario, cid, element, field))
             if issue:
                 record["issue"] = issue
@@ -301,7 +376,9 @@ def compare_saves(ref_path, cand_path, scenario, limit, stats):
 
 def set_option(text, section, line):
     """Add a line to an existing cfg section (a repeated section would be ignored)."""
-    text, count = re.subn(rf"^\[{section}\]\s*$", f"[{section}]\n{line}", text, count=1, flags=re.M)
+    text, count = re.subn(
+        rf"^\[{section}\]\s*$", f"[{section}]\n{line}", text, count=1, flags=re.M
+    )
     return text if count else f"{text.rstrip()}\n[{section}]\n{line}\n"
 
 
@@ -316,8 +393,10 @@ def write_config(scenario, build, run_dir):
             "[game_creation]\ntown_name = english\n"
         )
         if scenario["kind"] == "generate":
-            text += (f"map_x = {scenario['map_log2']}\nmap_y = {scenario['map_log2']}\n"
-                     f"land_generator = {scenario['land_generator']}\n")
+            text += (
+                f"map_x = {scenario['map_log2']}\nmap_y = {scenario['map_log2']}\n"
+                f"land_generator = {scenario['land_generator']}\n"
+            )
     text = set_option(text, "misc", "savegame_format = none")
     # The null video driver writes save/autosave/exit.sav when it stops.
     text = set_option(text, "gui", "autosave_on_exit = true")
@@ -335,7 +414,9 @@ def run_game(scenario, binary, build, run_dir, timeout, base_env=None, desync=Tr
     write_config(scenario, build, run_dir)
     if "console" in scenario:
         (run_dir / "scripts").mkdir()
-        (run_dir / "scripts/game_start.scr").write_text("".join(f"{line}\n" for line in scenario["console"]))
+        (run_dir / "scripts/game_start.scr").write_text(
+            "".join(f"{line}\n" for line in scenario["console"])
+        )
     if scenario["kind"] == "save":
         # A saved AI or GameScript missing from the runtime is replaced by the
         # idle dummy AI or dropped; the logs show it in both runs.
@@ -344,29 +425,60 @@ def run_game(scenario, binary, build, run_dir, timeout, base_env=None, desync=Tr
         game = ["-g", f"ai/{scenario['test']}/test.sav", "-d", "script=2", "-Q"]
     else:
         game = ["-g", "-G", str(scenario["seed"])]
-    command = [str(binary), "-x", "-c", str(run_dir / "openttd.cfg"), *game,
-               "-snull", "-mnull", f"-vnull:ticks={scenario['ticks']}", *(["-d", "desync=3"] if desync else [])]
-    env = dict(base_env or os.environ, HOME=str(run_dir), XDG_DATA_HOME=str(run_dir / "xdg-data"),
-               XDG_CONFIG_HOME=str(run_dir / "xdg-config"), XDG_CACHE_HOME=str(run_dir / "xdg-cache"))
+    command = [
+        str(binary),
+        "-x",
+        "-c",
+        str(run_dir / "openttd.cfg"),
+        *game,
+        "-snull",
+        "-mnull",
+        f"-vnull:ticks={scenario['ticks']}",
+        *(["-d", "desync=3"] if desync else []),
+    ]
+    env = dict(
+        base_env or os.environ,
+        HOME=str(run_dir),
+        XDG_DATA_HOME=str(run_dir / "xdg-data"),
+        XDG_CONFIG_HOME=str(run_dir / "xdg-config"),
+        XDG_CACHE_HOME=str(run_dir / "xdg-cache"),
+    )
     started = time.monotonic()
-    with open(run_dir / "stdout.log", "wb") as out, open(run_dir / "stderr.log", "wb") as err:
+    with (
+        open(run_dir / "stdout.log", "wb") as out,
+        open(run_dir / "stderr.log", "wb") as err,
+    ):
         try:
-            code = subprocess.run(command, cwd=build, env=env, stdout=out, stderr=err, timeout=timeout).returncode
+            code = subprocess.run(
+                command, cwd=build, env=env, stdout=out, stderr=err, timeout=timeout
+            ).returncode
         except subprocess.TimeoutExpired:
             code = "timeout"
     autosave = run_dir / "save/autosave"
-    snapshots = sorted(path for path in autosave.glob("dmp_cmds_*.sav")
-                       if not path.name.endswith("_00000000_00000000.sav"))  # title screen
+    snapshots = sorted(
+        path
+        for path in autosave.glob("dmp_cmds_*.sav")
+        if not path.name.endswith("_00000000_00000000.sav")
+    )  # title screen
     if (autosave / "exit.sav").is_file():
         snapshots.append(autosave / "exit.sav")
-    return {"exit": code, "seconds": round(time.monotonic() - started, 1), "snapshots": snapshots,
-            "log": log_lines(run_dir), "stdout": (run_dir / "stdout.log").read_bytes()}
+    return {
+        "exit": code,
+        "seconds": round(time.monotonic() - started, 1),
+        "snapshots": snapshots,
+        "log": log_lines(run_dir),
+        "stdout": (run_dir / "stdout.log").read_bytes(),
+    }
 
 
 def log_lines(run_dir):
     """Debug output (script logs, warnings) without its timestamps."""
-    return [re.sub(r"^\[[^\]]*\] ", "", line)
-            for line in (run_dir / "stderr.log").read_text(errors="surrogateescape").splitlines()]
+    return [
+        re.sub(r"^\[[^\]]*\] ", "", line)
+        for line in (run_dir / "stderr.log")
+        .read_text(errors="surrogateescape")
+        .splitlines()
+    ]
 
 
 class MachineLock:
@@ -410,8 +522,16 @@ def save_moment(path):
 
 
 def first_difference(a, b):
-    index = next(i for i, (x, y) in enumerate(zip(a + [None], b + [None])) if x != y)
-    return index, (a[index] if index < len(a) else None), (b[index] if index < len(b) else None)
+    index = next(
+        i
+        for i, (x, y) in enumerate(zip(a + [None], b + [None], strict=False))
+        if x != y
+    )
+    return (
+        index,
+        (a[index] if index < len(a) else None),
+        (b[index] if index < len(b) else None),
+    )
 
 
 def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
@@ -424,24 +544,53 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
     snapshots and log lines are ignored, and exit saves are compared only when
     both runs stopped at the same moment (the short plain run is retried)."""
     name = scenario["name"]
-    result = {"scenario": name, "differences": [], "known_failures": [], "problems": [], "notes": [],
-              "snapshots": 0, "stats": {"chunks": 0, "elements": 0, "masked": {}}}
+    result = {
+        "scenario": name,
+        "differences": [],
+        "known_failures": [],
+        "problems": [],
+        "notes": [],
+        "snapshots": 0,
+        "stats": {"chunks": 0, "elements": 0, "masked": {}},
+    }
 
     def compare(mode, snapshot):
-        records = compare_saves(out / name / mode / "reference/save/autosave" / snapshot,
-                                out / name / mode / "candidate/save/autosave" / snapshot, name, limit, result["stats"])
+        records = compare_saves(
+            out / name / mode / "reference/save/autosave" / snapshot,
+            out / name / mode / "candidate/save/autosave" / snapshot,
+            name,
+            limit,
+            result["stats"],
+        )
         for record in records:
             record["snapshot"] = f"{mode}/{snapshot}"
-            result["known_failures" if "issue" in record else "differences"].append(record)
+            result["known_failures" if "issue" in record else "differences"].append(
+                record
+            )
 
     try:
         for mode, desync in (("snapshots", True), ("plain", False)):
             for attempt in range(1 if desync else 3):
                 with MACHINE.hold(alone=attempt > 0):
-                    runs = {role: run_game(scenario, binaries[role], builds[role], out / name / mode / role, timeout, env, desync)
-                            for role in ("reference", "candidate")}
-                exits = [runs[role]["snapshots"][-1] if runs[role]["snapshots"] and runs[role]["snapshots"][-1].name == "exit.sav"
-                         else None for role in ("reference", "candidate")]
+                    runs = {
+                        role: run_game(
+                            scenario,
+                            binaries[role],
+                            builds[role],
+                            out / name / mode / role,
+                            timeout,
+                            env,
+                            desync,
+                        )
+                        for role in ("reference", "candidate")
+                    }
+                exits = [
+                    runs[role]["snapshots"][-1]
+                    if runs[role]["snapshots"]
+                    and runs[role]["snapshots"][-1].name == "exit.sav"
+                    else None
+                    for role in ("reference", "candidate")
+                ]
                 # Retry only a clean pair whose end moments differ; a crash, hang
                 # or missing save on any attempt is kept and reported.
                 clean = all(exits) and all(run["exit"] == 0 for run in runs.values())
@@ -451,37 +600,58 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
             for role, run in runs.items():
                 result[f"{mode}_{role}_seconds"] = run["seconds"]
                 if run["exit"] != 0:
-                    result["problems"].append(f"{mode}: {role} exited with {run['exit']}")
+                    result["problems"].append(
+                        f"{mode}: {role} exited with {run['exit']}"
+                    )
                 # Cache-check mismatches are repaired before the next tick, so they
                 # never reach a save; any desync warning fails the scenario.
-                warning = next((line for line in run["log"] if "[desync:" in line), None)
+                warning = next(
+                    (line for line in run["log"] if "[desync:" in line), None
+                )
                 if warning:
                     result["problems"].append(f"{mode}: {role} logged {warning!r}")
             if not all(exits):
                 result["problems"].append(f"{mode}: an exit save is missing")
-            periodic = [[p.name for p in runs[role]["snapshots"] if p.name != "exit.sav"] for role in ("reference", "candidate")]
+            periodic = [
+                [p.name for p in runs[role]["snapshots"] if p.name != "exit.sav"]
+                for role in ("reference", "candidate")
+            ]
             shorter = min(periodic, key=len)
-            if periodic[0][:len(shorter)] != periodic[1][:len(shorter)] or (same_end and periodic[0] != periodic[1]):
-                result["problems"].append(f"{mode}: snapshot dates differ: {first_difference(*periodic)}")
+            if periodic[0][: len(shorter)] != periodic[1][: len(shorter)] or (
+                same_end and periodic[0] != periodic[1]
+            ):
+                result["problems"].append(
+                    f"{mode}: snapshot dates differ: {first_difference(*periodic)}"
+                )
             elif len(periodic[0]) != len(periodic[1]):
-                result["notes"].append(f"{mode}: runs reached different dates ({len(periodic[0])} vs {len(periodic[1])} snapshots)")
+                result["notes"].append(
+                    f"{mode}: runs reached different dates ({len(periodic[0])} vs {len(periodic[1])} snapshots)"
+                )
             if mode == "snapshots":
                 result["snapshots"] = len(shorter) + bool(same_end)
                 if len(shorter) < 2:
-                    result["problems"].append("fewer than two periodic snapshots were written")
+                    result["problems"].append(
+                        "fewer than two periodic snapshots were written"
+                    )
                 # Console output is invisible without a GUI, so confirm each
                 # setting line took effect in the first snapshot of both runs.
                 # Values must be written as PATS stores them (numbers, not
                 # true/false or names), and only saved game settings qualify.
                 for role, run in runs.items():
-                    first = next((p for p in run["snapshots"] if p.name != "exit.sav"), None)
+                    first = next(
+                        (p for p in run["snapshots"] if p.name != "exit.sav"), None
+                    )
                     for line in scenario.get("console", []) if first else []:
                         if line.startswith("setting "):
                             _, key, value = line.split()
                             chunk = read_save(first)["PATS"]
-                            saved = decode_element(chunk, chunk["elements"][0][1]).get(key)
+                            saved = decode_element(chunk, chunk["elements"][0][1]).get(
+                                key
+                            )
                             if str(saved) != value:
-                                result["problems"].append(f"{role}: {key} is {saved}, not {value}, in {first.name}")
+                                result["problems"].append(
+                                    f"{role}: {key} is {saved}, not {value}, in {first.name}"
+                                )
             for snapshot in shorter:
                 compare(mode, snapshot)
                 if result["differences"]:
@@ -489,17 +659,34 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
             if same_end and not result["differences"]:
                 compare(mode, "exit.sav")
             elif not same_end and not desync and all(exits):
-                result["problems"].append(f"plain: runs ended at different moments after {attempt + 1} attempts: "
-                                          f"{save_moment(exits[0])} vs {save_moment(exits[1])}")
+                result["problems"].append(
+                    f"plain: runs ended at different moments after {attempt + 1} attempts: "
+                    f"{save_moment(exits[0])} vs {save_moment(exits[1])}"
+                )
             for label in ("log", "stdout"):
-                a, b = (runs[role][label] if label == "log" else runs[role][label].splitlines() for role in ("reference", "candidate"))
+                a, b = (
+                    runs[role][label]
+                    if label == "log"
+                    else runs[role][label].splitlines()
+                    for role in ("reference", "candidate")
+                )
                 if not same_end:
-                    a, b = a[:min(len(a), len(b))], b[:min(len(a), len(b))]
+                    a, b = a[: min(len(a), len(b))], b[: min(len(a), len(b))]
                 if a != b:
                     index, ref_line, cand_line = first_difference(a, b)
-                    result["differences"].append({"snapshot": f"{mode}/{label}", "chunk": "", "element": str(index + 1),
-                                                  "field": "line", "reference": repr(ref_line), "candidate": repr(cand_line)})
-    except Exception as error:  # Record and continue, so the report covers every scenario.
+                    result["differences"].append(
+                        {
+                            "snapshot": f"{mode}/{label}",
+                            "chunk": "",
+                            "element": str(index + 1),
+                            "field": "line",
+                            "reference": repr(ref_line),
+                            "candidate": repr(cand_line),
+                        }
+                    )
+    except (
+        Exception
+    ) as error:  # Record and continue, so the report covers every scenario.
         result["problems"].append(f"harness error: {type(error).__name__}: {error}")
     result["passed"] = not result["differences"] and not result["problems"]
     if result["passed"]:
@@ -510,32 +697,60 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
 def main():
     sys.path.insert(0, str(ROOT / "tools"))
     import importlib.util
-    spec = importlib.util.spec_from_file_location("migration", ROOT / "tools/migration.py")
+
+    spec = importlib.util.spec_from_file_location(
+        "migration", ROOT / "tools/migration.py"
+    )
     migration = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(migration)
 
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("names", nargs="*", help="run only scenarios whose name contains one of these")
-    parser.add_argument("--soak", action="store_true", help="larger set: more seeds, sizes and years")
-    parser.add_argument("--self", action="store_true", help="compare the reference with itself")
-    parser.add_argument("--candidate", type=Path, help="candidate binary (default: build-rust/openttd-rust)")
-    parser.add_argument("--jobs", type=int, default=max(1, min(4, (os.cpu_count() or 2) // 2)))
-    parser.add_argument("--limit", type=int, default=20, help="differences reported per snapshot")
-    parser.add_argument("--timeout", type=int, default=1200, help="seconds per game run")
+    parser.add_argument(
+        "names", nargs="*", help="run only scenarios whose name contains one of these"
+    )
+    parser.add_argument(
+        "--soak", action="store_true", help="larger set: more seeds, sizes and years"
+    )
+    parser.add_argument(
+        "--self", action="store_true", help="compare the reference with itself"
+    )
+    parser.add_argument(
+        "--candidate",
+        type=Path,
+        help="candidate binary (default: build-rust/openttd-rust)",
+    )
+    parser.add_argument(
+        "--jobs", type=int, default=max(1, min(4, (os.cpu_count() or 2) // 2))
+    )
+    parser.add_argument(
+        "--limit", type=int, default=20, help="differences reported per snapshot"
+    )
+    parser.add_argument(
+        "--timeout", type=int, default=1200, help="seconds per game run"
+    )
     parser.add_argument("--list", action="store_true")
     args = parser.parse_args()
 
     every = scenario_list(args.soak)
     # An exact scenario name selects only that scenario; anything else is a substring filter.
-    scenarios = [s for s in every if not args.names or any(
-        n == s["name"] if any(n == t["name"] for t in every) else n in s["name"] for n in args.names)]
+    scenarios = [
+        s
+        for s in every
+        if not args.names
+        or any(
+            n == s["name"] if any(n == t["name"] for t in every) else n in s["name"]
+            for n in args.names
+        )
+    ]
     if not scenarios:
         parser.error(f"no scenario matches {args.names}; see --list")
     if args.list:
         print("\n".join(s["name"] for s in scenarios))
         return 0
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    out = migration.LOCAL / "simulation" / f"{stamp}-{os.getpid()}"  # concurrent runs never share
+    out = (
+        migration.LOCAL / "simulation" / f"{stamp}-{os.getpid()}"
+    )  # concurrent runs never share
     global MACHINE
     migration.COMMON_LOCAL.mkdir(parents=True, exist_ok=True)
     MACHINE = MachineLock(migration.COMMON_LOCAL / "simulation.lock")
@@ -550,43 +765,74 @@ def main():
         shutil.copy2(shared / "openttd", builds["reference"] / "openttd")
         for name in RUNTIME_DIRECTORIES:
             if (shared / name).is_dir():
-                shutil.copytree(shared / name, builds["reference"] / name, symlinks=True)
+                shutil.copytree(
+                    shared / name, builds["reference"] / name, symlinks=True
+                )
     reference = builds["reference"] / "openttd"
-    binaries = {"reference": reference, "candidate": args.candidate or builds["candidate"] / "openttd-rust"}
+    binaries = {
+        "reference": reference,
+        "candidate": args.candidate or builds["candidate"] / "openttd-rust",
+    }
     if args.self:
         builds["candidate"], binaries["candidate"] = builds["reference"], reference
     for role, binary in binaries.items():
         if not Path(binary).is_file():
-            parser.error(f"{role} binary {binary} is missing; run python3 tools/migration.py build")
+            parser.error(
+                f"{role} binary {binary} is missing; run python3 tools/migration.py build"
+            )
 
     started = time.monotonic()
     results = []
     with concurrent.futures.ThreadPoolExecutor(args.jobs) as pool:
         # The driver's environment supplies bootstrapped runtime libraries locally.
         env = migration.environment()
-        futures = {pool.submit(run_scenario, s, binaries, builds, out, args.limit, args.timeout, env): s for s in scenarios}
+        futures = {
+            pool.submit(
+                run_scenario, s, binaries, builds, out, args.limit, args.timeout, env
+            ): s
+            for s in scenarios
+        }
         for future in concurrent.futures.as_completed(futures):
             result = future.result()
             results.append(result)
             status = "ok  " if result["passed"] else "FAIL"
-            known = f", {len(result['known_failures'])} known" if result["known_failures"] else ""
-            print(f"{status} {result['scenario']}: {result['snapshots']} snapshots, "
-                  f"{result['stats']['chunks']} chunks, {result['stats']['elements']} elements{known}", flush=True)
+            known = (
+                f", {len(result['known_failures'])} known"
+                if result["known_failures"]
+                else ""
+            )
+            print(
+                f"{status} {result['scenario']}: {result['snapshots']} snapshots, "
+                f"{result['stats']['chunks']} chunks, {result['stats']['elements']} elements{known}",
+                flush=True,
+            )
             for problem in result["problems"]:
                 print(f"     {problem}", flush=True)
-            for diff in result["differences"][:args.limit]:
-                print(f"     {diff['snapshot']} {diff['chunk']}/{diff['element']}/{diff['field']}: "
-                      f"{diff['reference']} -> {diff['candidate']}", flush=True)
+            for diff in result["differences"][: args.limit]:
+                print(
+                    f"     {diff['snapshot']} {diff['chunk']}/{diff['element']}/{diff['field']}: "
+                    f"{diff['reference']} -> {diff['candidate']}",
+                    flush=True,
+                )
     results.sort(key=lambda r: r["scenario"])
     report = {
         "mode": "reference-vs-reference" if args.self else "reference-vs-candidate",
         "candidate_commit": migration.git("rev-parse", "HEAD"),
-        "binaries": {role: {"path": str(path), "sha256": hashlib.sha256(Path(path).read_bytes()).hexdigest()}
-                     for role, path in binaries.items()},
+        "binaries": {
+            role: {
+                "path": str(path),
+                "sha256": hashlib.sha256(Path(path).read_bytes()).hexdigest(),
+            }
+            for role, path in binaries.items()
+        },
         "masks": {":".join(key): reason for key, reason in MASKS.items()},
-        "known_failures": {":".join(key): issue for key, issue in KNOWN_FAILURES.items()},
-        "masked_differences": {key: sum(r["stats"]["masked"].get(key, 0) for r in results)
-                               for key in sorted({k for r in results for k in r["stats"]["masked"]})},
+        "known_failures": {
+            ":".join(key): issue for key, issue in KNOWN_FAILURES.items()
+        },
+        "masked_differences": {
+            key: sum(r["stats"]["masked"].get(key, 0) for r in results)
+            for key in sorted({k for r in results for k in r["stats"]["masked"]})
+        },
         "seconds": round(time.monotonic() - started, 1),
         "results": results,
         "passed": all(r["passed"] for r in results),
@@ -594,8 +840,10 @@ def main():
     (out / "report.json").write_text(json.dumps(report, indent=2) + "\n")
     shutil.rmtree(out / "reference-runtime", ignore_errors=True)
     passed = sum(r["passed"] for r in results)
-    print(f"Simulation: {passed}/{len(results)} scenarios equal, "
-          f"{sum(r['snapshots'] for r in results)} snapshots in {report['seconds']} s. Report: {out / 'report.json'}")
+    print(
+        f"Simulation: {passed}/{len(results)} scenarios equal, "
+        f"{sum(r['snapshots'] for r in results)} snapshots in {report['seconds']} s. Report: {out / 'report.json'}"
+    )
     return 0 if report["passed"] else 1
 
 

@@ -2,18 +2,31 @@
 """Install isolated Ubuntu build prerequisites without sudo or profile changes."""
 
 import os
-from pathlib import Path
 import subprocess
 import tomllib
 import urllib.request
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCAL = ROOT / ".local"
 PACKAGES = (
-    "libsdl2-dev", "liblzma-dev", "libpng-dev", "libcurl4-openssl-dev",
-    "libfreetype-dev", "libfontconfig-dev", "libharfbuzz-dev", "libicu-dev",
-    "libicu78", "liblzo2-dev", "pkgconf", "pkgconf-bin", "libpkgconf7",
-    "openttd-opengfx", "ccache", "libfmt10", "libhiredis1.1.0",
+    "libsdl2-dev",
+    "liblzma-dev",
+    "libpng-dev",
+    "libcurl4-openssl-dev",
+    "libfreetype-dev",
+    "libfontconfig-dev",
+    "libharfbuzz-dev",
+    "libicu-dev",
+    "libicu78",
+    "liblzo2-dev",
+    "pkgconf",
+    "pkgconf-bin",
+    "libpkgconf7",
+    "openttd-opengfx",
+    "ccache",
+    "libfmt10",
+    "libhiredis1.1.0",
 )
 
 
@@ -46,16 +59,41 @@ def main():
         installer = downloads / "rustup-init.sh"
         with urllib.request.urlopen("https://sh.rustup.rs", timeout=60) as response:
             installer.write_bytes(response.read())
-        subprocess.run([
-            "sh", str(installer), "-y", "--no-modify-path", "--profile", "minimal",
-            "--default-toolchain", toolchain["channel"],
-            "--component", "rustfmt", "--component", "clippy",
-        ], env=env, check=True)
+        subprocess.run(
+            [
+                "sh",
+                str(installer),
+                "-y",
+                "--no-modify-path",
+                "--profile",
+                "minimal",
+                "--default-toolchain",
+                toolchain["channel"],
+                "--component",
+                "rustfmt",
+                "--component",
+                "clippy",
+            ],
+            env=env,
+            check=True,
+        )
     else:
-        subprocess.run([
-            str(rustup), "toolchain", "install", toolchain["channel"],
-            "--profile", "minimal", "--component", "rustfmt", "--component", "clippy",
-        ], env=env, check=True)
+        subprocess.run(
+            [
+                str(rustup),
+                "toolchain",
+                "install",
+                toolchain["channel"],
+                "--profile",
+                "minimal",
+                "--component",
+                "rustfmt",
+                "--component",
+                "clippy",
+            ],
+            env=env,
+            check=True,
+        )
     print("Local prerequisites ready. Run: python3 tools/migration.py verify")
 
 

@@ -2,17 +2,17 @@
 """Build the pinned original and migration fork, retaining validation evidence."""
 
 import argparse
-from contextlib import contextmanager, nullcontext
-from datetime import datetime, timezone
 import hashlib
 import json
 import os
 import platform
-from pathlib import Path
 import shutil
 import subprocess
 import sys
 import time
+from contextlib import contextmanager, nullcontext
+from datetime import datetime, timezone
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCAL = ROOT / ".local"
@@ -21,8 +21,12 @@ LOCAL = ROOT / ".local"
 def _common_root():
     """The main checkout; linked worktrees share its reference and caches."""
     try:
-        common = subprocess.check_output(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
-                                         cwd=ROOT, text=True, stderr=subprocess.DEVNULL).strip()
+        common = subprocess.check_output(
+            ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            cwd=ROOT,
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
     except (OSError, subprocess.CalledProcessError):
         return ROOT
     return Path(common).parent
@@ -72,48 +76,87 @@ def rust_configuration(build: Path):
             key, value = line.split("=", 1)
             cache[key.split(":", 1)[0]] = value
     target = cache.get("RUST_TARGET")
-    supported = {"x86_64-unknown-linux-gnu": ("Linux", 8), "aarch64-unknown-linux-gnu": ("Linux", 8),
-                 "aarch64-apple-darwin": ("Darwin", 8), "i686-pc-windows-msvc": ("Windows", 4),
-                 "x86_64-pc-windows-msvc": ("Windows", 8)}
+    supported = {
+        "x86_64-unknown-linux-gnu": ("Linux", 8),
+        "aarch64-unknown-linux-gnu": ("Linux", 8),
+        "aarch64-apple-darwin": ("Darwin", 8),
+        "i686-pc-windows-msvc": ("Windows", 4),
+        "x86_64-pc-windows-msvc": ("Windows", 8),
+    }
     if cache.get("OPTION_RUST") != "ON" or target not in supported:
-        raise RuntimeError(f"{build}: Rust must be enabled with a supported validated target")
+        raise RuntimeError(
+            f"{build}: Rust must be enabled with a supported validated target"
+        )
     platform, width = supported[target]
-    if cache.get("RUST_PLATFORM") != platform or cache.get("RUST_POINTER_WIDTH") != str(width):
+    if cache.get("RUST_PLATFORM") != platform or cache.get("RUST_POINTER_WIDTH") != str(
+        width
+    ):
         raise RuntimeError(f"{build}: Rust/C++ target metadata is inconsistent")
-    archive_name = "openttd_kernels.lib" if platform == "Windows" else "libopenttd_kernels.a"
-    if platform == "Windows" and (cache.get("RUST_CRT") != "static-release" or
-                                  cache.get("CMAKE_MSVC_RUNTIME_LIBRARY") != "MultiThreaded" or
-                                  cache.get("CMAKE_BUILD_TYPE") != "RelWithDebInfo" or
-                                  cache.get("OPTION_USE_ASSERTS") != "ON" or
-                                  cache.get("RUST_EFFECTIVE_FLAGS") != "-C;target-feature=+crt-static"):
+    archive_name = (
+        "openttd_kernels.lib" if platform == "Windows" else "libopenttd_kernels.a"
+    )
+    if platform == "Windows" and (
+        cache.get("RUST_CRT") != "static-release"
+        or cache.get("CMAKE_MSVC_RUNTIME_LIBRARY") != "MultiThreaded"
+        or cache.get("CMAKE_BUILD_TYPE") != "RelWithDebInfo"
+        or cache.get("OPTION_USE_ASSERTS") != "ON"
+        or cache.get("RUST_EFFECTIVE_FLAGS") != "-C;target-feature=+crt-static"
+    ):
         raise RuntimeError(f"{build}: Windows target/CRT policy is inconsistent")
     directory = build / "cargo"
     archive = directory / target / "release" / archive_name
-    if Path(cache.get("RUST_TARGET_DIR", "")).resolve() != directory or Path(cache.get("RUST_ARCHIVE", "")).resolve() != archive:
-        raise RuntimeError(f"{build}: unexpected Rust archive layout; reconfigure this build")
-    return {"target": target, "host": cache.get("RUST_HOST", ""), "platform": platform, "pointer_bytes": width,
-            "target_dir": str(directory), "archive": str(archive), "archive_name": archive_name,
-            "crt": cache.get("RUST_CRT", ""), "effective_flags": cache.get("RUST_EFFECTIVE_FLAGS", "").split(";") if cache.get("RUST_EFFECTIVE_FLAGS") else [],
-            "deployment_target": cache.get("CMAKE_OSX_DEPLOYMENT_TARGET", ""),
-            "sdk": cache.get("CMAKE_OSX_SYSROOT", ""),
-            "native_libraries": cache.get("RUST_NATIVE_LIBS", "").split(";"),
-            "build_type": cache.get("CMAKE_BUILD_TYPE", ""),
-            "assertions": cache.get("OPTION_USE_ASSERTS", "")}
+    if (
+        Path(cache.get("RUST_TARGET_DIR", "")).resolve() != directory
+        or Path(cache.get("RUST_ARCHIVE", "")).resolve() != archive
+    ):
+        raise RuntimeError(
+            f"{build}: unexpected Rust archive layout; reconfigure this build"
+        )
+    return {
+        "target": target,
+        "host": cache.get("RUST_HOST", ""),
+        "platform": platform,
+        "pointer_bytes": width,
+        "target_dir": str(directory),
+        "archive": str(archive),
+        "archive_name": archive_name,
+        "crt": cache.get("RUST_CRT", ""),
+        "effective_flags": cache.get("RUST_EFFECTIVE_FLAGS", "").split(";")
+        if cache.get("RUST_EFFECTIVE_FLAGS")
+        else [],
+        "deployment_target": cache.get("CMAKE_OSX_DEPLOYMENT_TARGET", ""),
+        "sdk": cache.get("CMAKE_OSX_SYSROOT", ""),
+        "native_libraries": cache.get("RUST_NATIVE_LIBS", "").split(";"),
+        "build_type": cache.get("CMAKE_BUILD_TYPE", ""),
+        "assertions": cache.get("OPTION_USE_ASSERTS", ""),
+    }
 
 
 def rust_archive(build: Path, *, target_dir: Path | None = None) -> Path:
     """Locate an existing release archive using CMake's validated native target."""
     configuration = rust_configuration(build)
-    directory = Path(configuration["target_dir"]) if target_dir is None else target_dir.resolve()
-    archive = directory / configuration["target"] / "release" / configuration["archive_name"]
+    directory = (
+        Path(configuration["target_dir"])
+        if target_dir is None
+        else target_dir.resolve()
+    )
+    archive = (
+        directory / configuration["target"] / "release" / configuration["archive_name"]
+    )
     if not archive.is_file():
-        raise RuntimeError(f"Rust archive missing: {archive}; build this validated target first")
+        raise RuntimeError(
+            f"Rust archive missing: {archive}; build this validated target first"
+        )
     return archive
 
 
 CCACHE_POLICY = {
-    "compiler_check": "content", "direct_mode": "true", "depend_mode": "false",
-    "sloppiness": "", "hash_dir": "false", "remote_storage": "",
+    "compiler_check": "content",
+    "direct_mode": "true",
+    "depend_mode": "false",
+    "sloppiness": "",
+    "hash_dir": "false",
+    "remote_storage": "",
 }
 
 
@@ -147,7 +190,9 @@ def compiler_cache_settings(executable, env):
     expected_policy = dict(CCACHE_POLICY, base_dir=env.get("CCACHE_BASEDIR", ""))
     for key, expected in expected_policy.items():
         if settings.get(key) != expected:
-            raise RuntimeError(f"Unsafe ccache setting {key}: {settings.get(key)!r}, expected {expected!r}")
+            raise RuntimeError(
+                f"Unsafe ccache setting {key}: {settings.get(key)!r}, expected {expected!r}"
+            )
     expected_disable = "true" if env.get("CCACHE_DISABLE") else "false"
     if settings.get("disable") != expected_disable:
         raise RuntimeError("Unexpected ccache bypass setting")
@@ -156,14 +201,18 @@ def compiler_cache_settings(executable, env):
 
 def compiler_cache_statistics(executable, env):
     output = subprocess.check_output([executable, "--print-stats"], env=env, text=True)
-    return {key: int(value) for key, value in (line.split() for line in output.splitlines())}
+    return {
+        key: int(value) for key, value in (line.split() for line in output.splitlines())
+    }
 
 
 def compiler_cache_options(executable):
     """Clear stale launchers/PCH overrides when returning to ordinary builds."""
-    return [f"-DCMAKE_C_COMPILER_LAUNCHER={executable or ''}",
-            f"-DCMAKE_CXX_COMPILER_LAUNCHER={executable or ''}",
-            f"-DCMAKE_DISABLE_PRECOMPILE_HEADERS={'ON' if executable else 'OFF'}"]
+    return [
+        f"-DCMAKE_C_COMPILER_LAUNCHER={executable or ''}",
+        f"-DCMAKE_CXX_COMPILER_LAUNCHER={executable or ''}",
+        f"-DCMAKE_DISABLE_PRECOMPILE_HEADERS={'ON' if executable else 'OFF'}",
+    ]
 
 
 def cmake_cache(build):
@@ -182,18 +231,28 @@ def configured_as(build, source, command):
     cache = cmake_cache(build)
     if Path(cache.get("CMAKE_HOME_DIRECTORY", "")).resolve() != Path(source).resolve():
         return False
-    requested = dict(argument[2:].split("=", 1) for argument in command if argument.startswith("-D"))
-    return all(cache.get(key.split(":", 1)[0]) == value for key, value in requested.items())
+    requested = dict(
+        argument[2:].split("=", 1) for argument in command if argument.startswith("-D")
+    )
+    return all(
+        cache.get(key.split(":", 1)[0]) == value for key, value in requested.items()
+    )
 
 
 def verify_compiler_cache_options(build, executable):
     cache = cmake_cache(build)
-    expected = {"CMAKE_C_COMPILER_LAUNCHER": executable or "",
-                "CMAKE_CXX_COMPILER_LAUNCHER": executable or "",
-                "CMAKE_DISABLE_PRECOMPILE_HEADERS": "ON" if executable else "OFF"}
+    expected = {
+        "CMAKE_C_COMPILER_LAUNCHER": executable or "",
+        "CMAKE_CXX_COMPILER_LAUNCHER": executable or "",
+        "CMAKE_DISABLE_PRECOMPILE_HEADERS": "ON" if executable else "OFF",
+    }
     if any(cache.get(key) != value for key, value in expected.items()):
-        raise RuntimeError(f"{build}: compiler-cache/PCH mode does not match the requested mode")
-    expected.update({key: cache.get(key) for key in ("CMAKE_C_COMPILER", "CMAKE_CXX_COMPILER")})
+        raise RuntimeError(
+            f"{build}: compiler-cache/PCH mode does not match the requested mode"
+        )
+    expected.update(
+        {key: cache.get(key) for key in ("CMAKE_C_COMPILER", "CMAKE_CXX_COMPILER")}
+    )
     return expected
 
 
@@ -206,11 +265,20 @@ def compiler_cache_compatibility(env=None):
     for name in (env.get("CC", "cc"), env.get("CXX", "c++"), "ccache"):
         tools[name] = subprocess.check_output([name, "--version"], env=env, text=True)
     files = ("migration/ccache.conf",)
-    policy = {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in files}
-    identity = {"os": platform.system(), "architecture": platform.machine(),
-                "baseline": BASELINE["commit"], "policy": policy, "tools": tools}
+    policy = {
+        name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in files
+    }
+    identity = {
+        "os": platform.system(),
+        "architecture": platform.machine(),
+        "baseline": BASELINE["commit"],
+        "policy": policy,
+        "tools": tools,
+    }
     digest = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
-    identity["prefix"] = f"compiler-v1-{identity['os']}-{identity['architecture']}-{BASELINE['commit']}-{digest}"
+    identity["prefix"] = (
+        f"compiler-v1-{identity['os']}-{identity['architecture']}-{BASELINE['commit']}-{digest}"
+    )
     return identity
 
 
@@ -226,7 +294,9 @@ def reference_lock(shared=False):
     overlap each other but never a build."""
     try:
         import fcntl
-    except ImportError:  # Windows CI imports this module but never builds the reference.
+    except (
+        ImportError
+    ):  # Windows CI imports this module but never builds the reference.
         yield
         return
     COMMON_LOCAL.mkdir(parents=True, exist_ok=True)
@@ -241,13 +311,24 @@ def reference_lock(shared=False):
 def ensure_reference():
     if not REFERENCE.exists():
         REFERENCE.parent.mkdir(parents=True, exist_ok=True)
-        subprocess.run([
-            "git", "worktree", "add", "--detach", str(REFERENCE), BASELINE["commit"],
-        ], cwd=ROOT, check=True)
+        subprocess.run(
+            [
+                "git",
+                "worktree",
+                "add",
+                "--detach",
+                str(REFERENCE),
+                BASELINE["commit"],
+            ],
+            cwd=ROOT,
+            check=True,
+        )
     if git("rev-parse", "HEAD", cwd=REFERENCE) != BASELINE["commit"]:
         raise RuntimeError("Reference checkout differs from migration/baseline.json")
     if git("status", "--porcelain", "--untracked-files=all", cwd=REFERENCE):
-        raise RuntimeError("Reference checkout has changes; restore the original before comparison")
+        raise RuntimeError(
+            "Reference checkout has changes; restore the original before comparison"
+        )
 
 
 def supply_graphics(build):
@@ -259,7 +340,9 @@ def supply_graphics(build):
     ]
     source = next((path for path in candidates if path.is_dir()), None)
     if source is None:
-        raise RuntimeError("OpenGFX is needed for regression games; install it or run tools/bootstrap-local.py")
+        raise RuntimeError(
+            "OpenGFX is needed for regression games; install it or run tools/bootstrap-local.py"
+        )
     destination = build / "baseset/opengfx"
     destination.parent.mkdir(parents=True, exist_ok=True)
     if not destination.exists():
@@ -268,11 +351,28 @@ def supply_graphics(build):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("build", "verify", "tools", "simulate"), nargs="?", default="verify")
+    parser.add_argument(
+        "action",
+        choices=("build", "verify", "tools", "simulate"),
+        nargs="?",
+        default="verify",
+    )
     parser.add_argument("--jobs", type=int, default=min(6, os.cpu_count() or 1))
-    parser.add_argument("--ccache", action="store_true", help="Require the shared compiler cache (default: use it when ccache is available)")
-    parser.add_argument("--no-ccache", action="store_true", help="Ordinary builds without the compiler cache (PCH enabled)")
-    parser.add_argument("--ccache-bypass", action="store_true", help="Measure the same no-PCH configuration without cache reuse")
+    parser.add_argument(
+        "--ccache",
+        action="store_true",
+        help="Require the shared compiler cache (default: use it when ccache is available)",
+    )
+    parser.add_argument(
+        "--no-ccache",
+        action="store_true",
+        help="Ordinary builds without the compiler cache (PCH enabled)",
+    )
+    parser.add_argument(
+        "--ccache-bypass",
+        action="store_true",
+        help="Measure the same no-PCH configuration without cache reuse",
+    )
     # simulate forwards any further arguments to tools/simulate.py.
     args, simulate_args = parser.parse_known_args()
     if simulate_args and args.action != "simulate":
@@ -285,7 +385,9 @@ def main():
     with reference_lock():
         ensure_reference()
     env = environment()
-    cache_executable = None if args.no_ccache else shutil.which("ccache", path=env["PATH"])
+    cache_executable = (
+        None if args.no_ccache else shutil.which("ccache", path=env["PATH"])
+    )
     if (args.ccache or args.ccache_bypass) and cache_executable is None:
         parser.error("--ccache requires ccache on PATH")
     args.ccache = cache_executable is not None
@@ -302,9 +404,14 @@ def main():
         "started_at": stamp,
         "commands": [],
         "compiler_cache": {
-            "enabled": args.ccache, "bypassed": args.ccache_bypass,
+            "enabled": args.ccache,
+            "bypassed": args.ccache_bypass,
             "executable": cache_executable,
-            "version": subprocess.check_output([cache_executable, "--version"], env=env, text=True).splitlines()[0] if cache_executable else None,
+            "version": subprocess.check_output(
+                [cache_executable, "--version"], env=env, text=True
+            ).splitlines()[0]
+            if cache_executable
+            else None,
             "roles": {},
         },
         "passed": False,
@@ -312,9 +419,20 @@ def main():
     patch = subprocess.check_output(["git", "diff", "HEAD", "--binary"], cwd=ROOT)
     (evidence / "candidate.patch").write_bytes(patch)
     # Also retain new files so an uncommitted verification run remains inspectable.
-    untracked = subprocess.check_output([
-        "git", "ls-files", "--others", "--exclude-standard", "-z",
-    ], cwd=ROOT).decode().split("\0")
+    untracked = (
+        subprocess.check_output(
+            [
+                "git",
+                "ls-files",
+                "--others",
+                "--exclude-standard",
+                "-z",
+            ],
+            cwd=ROOT,
+        )
+        .decode()
+        .split("\0")
+    )
     for name in filter(None, untracked):
         destination = evidence / "untracked" / name
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -325,12 +443,19 @@ def main():
         log = evidence / f"{name}.log"
         start = time.monotonic()
         with log.open("w") as output:
-            result = subprocess.run(command, cwd=cwd, env=env, stdout=output, stderr=subprocess.STDOUT)
-        report["commands"].append({
-            "name": name, "argv": list(map(str, command)), "cwd": str(cwd),
-            "exit_code": result.returncode, "seconds": round(time.monotonic() - start, 3),
-            "log": str(log.relative_to(ROOT)),
-        })
+            result = subprocess.run(
+                command, cwd=cwd, env=env, stdout=output, stderr=subprocess.STDOUT
+            )
+        report["commands"].append(
+            {
+                "name": name,
+                "argv": list(map(str, command)),
+                "cwd": str(cwd),
+                "exit_code": result.returncode,
+                "seconds": round(time.monotonic() - start, 3),
+                "log": str(log.relative_to(ROOT)),
+            }
+        )
         if result.returncode:
             print(log.read_text(errors="replace")[-16000:], file=sys.stderr)
             raise RuntimeError(f"{name} failed; see {log}")
@@ -342,92 +467,193 @@ def main():
 
     def select_role(role):
         nonlocal env
-        env = compiler_cache_environment(original_environment, role, bypass=args.ccache_bypass) if args.ccache else original_environment.copy()
+        env = (
+            compiler_cache_environment(
+                original_environment, role, bypass=args.ccache_bypass
+            )
+            if args.ccache
+            else original_environment.copy()
+        )
         if cache_executable:
             settings, text = compiler_cache_settings(cache_executable, env)
             (evidence / f"{role}-ccache-config.log").write_text(text)
             cache_before[role] = compiler_cache_statistics(cache_executable, env)
-            report["compiler_cache"]["roles"][role] = {"settings": settings, "before": cache_before[role]}
+            report["compiler_cache"]["roles"][role] = {
+                "settings": settings,
+                "before": cache_before[role],
+            }
 
     try:
         if args.action == "verify":
             for name, command in (
                 ("rust-fmt", ["cargo", "fmt", "--all", "--", "--check"]),
-                ("rust-check", ["cargo", "check", "--workspace", "--all-targets", "--locked"]),
-                ("rust-clippy", ["cargo", "clippy", "--workspace", "--all-targets", "--locked", "--", "-D", "warnings"]),
+                (
+                    "rust-check",
+                    ["cargo", "check", "--workspace", "--all-targets", "--locked"],
+                ),
+                (
+                    "rust-clippy",
+                    [
+                        "cargo",
+                        "clippy",
+                        "--workspace",
+                        "--all-targets",
+                        "--locked",
+                        "--",
+                        "-D",
+                        "warnings",
+                    ],
+                ),
                 ("rust-tests", ["cargo", "test", "--workspace", "--locked"]),
             ):
                 run(name, command)
         common = [
-            "-G", "Ninja", "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
-            "-DOPTION_USE_ASSERTS=ON", "-DOPTION_DEDICATED=OFF",
-            "-DCMAKE_DISABLE_FIND_PACKAGE_Grfcodec=ON", "-DBUILD_TESTING=ON",
+            "-G",
+            "Ninja",
+            "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
+            "-DOPTION_USE_ASSERTS=ON",
+            "-DOPTION_DEDICATED=OFF",
+            "-DCMAKE_DISABLE_FIND_PACKAGE_Grfcodec=ON",
+            "-DBUILD_TESTING=ON",
         ]
         if args.action == "tools":
             builds = {"candidate": LOCAL / "build-tools-rust"}
-            common = ["-G", "Ninja", "-DCMAKE_BUILD_TYPE=RelWithDebInfo", "-DOPTION_USE_ASSERTS=OFF"]
+            common = [
+                "-G",
+                "Ninja",
+                "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
+                "-DOPTION_USE_ASSERTS=OFF",
+            ]
         common.extend(compiler_cache_options(cache_executable))
         for name, build in builds.items():
             with reference_lock() if name == "reference" else nullcontext():
                 select_role(name)
                 source = REFERENCE.resolve() if name == "reference" else ROOT
-                extra = [] if name == "reference" else [
-                    "-DBINARY_NAME=openttd-rust",
-                    "-DOPTION_RUST=ON",
-                ]
+                extra = (
+                    []
+                    if name == "reference"
+                    else [
+                        "-DBINARY_NAME=openttd-rust",
+                        "-DOPTION_RUST=ON",
+                    ]
+                )
                 if args.action == "tools":
                     extra.append("-DOPTION_TOOLS_ONLY=ON")
-                configure = ["cmake", "-S", str(source), "-B", str(build), *common, *extra]
+                configure = [
+                    "cmake",
+                    "-S",
+                    str(source),
+                    "-B",
+                    str(build),
+                    *common,
+                    *extra,
+                ]
                 # Ninja reruns CMake itself when any CMake input changes, so an
                 # explicit configure is only needed when the cache lacks a requested value.
                 if configured_as(build, source, configure):
-                    print(f"{name}-configure: CMakeCache already matches; reusing {build}", flush=True)
+                    print(
+                        f"{name}-configure: CMakeCache already matches; reusing {build}",
+                        flush=True,
+                    )
                 else:
                     run(f"{name}-configure", configure)
-                report[f"{name}_compiler_settings"] = verify_compiler_cache_options(build, cache_executable)
+                report[f"{name}_compiler_settings"] = verify_compiler_cache_options(
+                    build, cache_executable
+                )
                 if name == "candidate":
                     report["rust_configuration"] = rust_configuration(build)
                 if args.action != "tools":
                     supply_graphics(build)
-                run(f"{name}-build", ["cmake", "--build", str(build), "--parallel", str(args.jobs)])
+                run(
+                    f"{name}-build",
+                    ["cmake", "--build", str(build), "--parallel", str(args.jobs)],
+                )
                 if args.action == "tools":
-                    binaries = [build / "src/strgen/strgen", build / "src/settingsgen/settingsgen"]
+                    binaries = [
+                        build / "src/strgen/strgen",
+                        build / "src/settingsgen/settingsgen",
+                    ]
                     report[f"{name}_binary_sha256"] = {
-                        str(binary.relative_to(build)): hashlib.sha256(binary.read_bytes()).hexdigest()
+                        str(binary.relative_to(build)): hashlib.sha256(
+                            binary.read_bytes()
+                        ).hexdigest()
                         for binary in binaries
                     }
                 else:
-                    binary = build / ("openttd" if name == "reference" else "openttd-rust")
-                    report[f"{name}_binary_sha256"] = hashlib.sha256(binary.read_bytes()).hexdigest()
+                    binary = build / (
+                        "openttd" if name == "reference" else "openttd-rust"
+                    )
+                    report[f"{name}_binary_sha256"] = hashlib.sha256(
+                        binary.read_bytes()
+                    ).hexdigest()
 
         if args.action == "verify":
             inventories = {}
             for name, build in builds.items():
                 with reference_lock() if name == "reference" else nullcontext():
-                    log = run(f"{name}-test-inventory", ["ctest", "--show-only=json-v1"], cwd=build)
-                    inventories[name] = {test["name"] for test in json.loads(log.read_text())["tests"]}
+                    log = run(
+                        f"{name}-test-inventory",
+                        ["ctest", "--show-only=json-v1"],
+                        cwd=build,
+                    )
+                    inventories[name] = {
+                        test["name"] for test in json.loads(log.read_text())["tests"]
+                    }
                     report[f"{name}_test_count"] = len(inventories[name])
                     if not inventories[name]:
-                        raise RuntimeError(f"{name.capitalize()} CTest inventory is empty; refusing untested verification")
-                    run(f"{name}-tests", [
-                        "ctest", "--output-on-failure", "--parallel", str(args.jobs),
-                        "--output-junit", str(evidence / f"{name}-tests.xml"),
-                    ], cwd=build)
+                        raise RuntimeError(
+                            f"{name.capitalize()} CTest inventory is empty; refusing untested verification"
+                        )
+                    run(
+                        f"{name}-tests",
+                        [
+                            "ctest",
+                            "--output-on-failure",
+                            "--parallel",
+                            str(args.jobs),
+                            "--output-junit",
+                            str(evidence / f"{name}-tests.xml"),
+                        ],
+                        cwd=build,
+                    )
             missing = inventories["reference"] - inventories["candidate"]
             if missing:
-                raise RuntimeError(f"Candidate removed reference tests: {sorted(missing)}")
+                raise RuntimeError(
+                    f"Candidate removed reference tests: {sorted(missing)}"
+                )
         if args.action == "simulate":
             # --jobs is the driver's; each simulation job runs two game processes.
-            log = run("simulate", [sys.executable, str(ROOT / "tools/simulate.py"),
-                                   "--jobs", str(max(1, args.jobs // 2)), *simulate_args])
+            log = run(
+                "simulate",
+                [
+                    sys.executable,
+                    str(ROOT / "tools/simulate.py"),
+                    "--jobs",
+                    str(max(1, args.jobs // 2)),
+                    *simulate_args,
+                ],
+            )
             print(log.read_text(errors="replace"), end="", flush=True)
         ensure_reference()
         report["passed"] = True
     finally:
         if cache_executable:
             for role, before in cache_before.items():
-                after = compiler_cache_statistics(cache_executable, compiler_cache_environment(original_environment, role, bypass=args.ccache_bypass))
-                report["compiler_cache"]["roles"][role].update({"after": after, "delta": {key: after.get(key, 0) - value for key, value in before.items()}})
+                after = compiler_cache_statistics(
+                    cache_executable,
+                    compiler_cache_environment(
+                        original_environment, role, bypass=args.ccache_bypass
+                    ),
+                )
+                report["compiler_cache"]["roles"][role].update(
+                    {
+                        "after": after,
+                        "delta": {
+                            key: after.get(key, 0) - value
+                            for key, value in before.items()
+                        },
+                    }
+                )
         report["total_seconds"] = round(time.monotonic() - started, 3)
         (evidence / "report.json").write_text(json.dumps(report, indent=2) + "\n")
         print(f"Evidence: {evidence / 'report.json'}", flush=True)

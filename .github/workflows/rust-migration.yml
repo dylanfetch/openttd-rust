@@ -24,6 +24,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Install uv for Ruff
+        uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: "0.12.18"
+      - name: Check Python tools with Ruff
+        run: |
+          uvx --from ruff==0.16.8 ruff check tools/
+          uvx --from ruff==0.16.8 ruff format --check tools/
       - name: Install native dependencies
         run: |
           sudo apt-get update
