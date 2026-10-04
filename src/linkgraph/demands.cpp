@@ -7,6 +7,8 @@
 
 #include "../safeguards.h"
 
+#ifndef WITH_RUST
+
 typedef std::queue<NodeID> NodeList;
 
 /**
@@ -291,3 +293,5 @@ DemandCalculator::DemandCalculator(LinkGraphJob &job) :
 			break;
 	}
 }
+
+#endif /* !WITH_RUST */

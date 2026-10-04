@@ -9,10 +9,13 @@
 
 #include "../stdafx.h"
 #include "linkgraphschedule.h"
+#include "linkgraphjob.h"
+#ifndef WITH_RUST
 #include "init.h"
 #include "demands.h"
 #include "mcf.h"
 #include "flowmapper.h"
+#endif
 #include "../framerate_type.h"
 #include "../command_func.h"
 #include "../network/network.h"
@@ -86,11 +89,17 @@ void LinkGraphSchedule::JoinNext()
  */
 /* static */ void LinkGraphSchedule::Run(LinkGraphJob *job)
 {
+#ifdef WITH_RUST
+	if (job->IsJobAborted()) return;
+	job->RunRust();
+	if (job->IsJobAborted()) return;
+#else
 	for (const auto &handler : instance.handlers) {
 		if (job->IsJobAborted()) return;
 		handler->Run(*job);
 	}
 
+#endif
 	/*
 	 * Readers of this variable in another thread may see an out of date value.
 	 * However this is OK as this will only happen just as a job is completing,
@@ -143,12 +152,14 @@ void LinkGraphSchedule::ShiftDates(TimerGameEconomy::Date interval)
  */
 LinkGraphSchedule::LinkGraphSchedule()
 {
+#ifndef WITH_RUST
 	this->handlers[0] = std::make_unique<InitHandler>();
 	this->handlers[1] = std::make_unique<DemandHandler>();
 	this->handlers[2] = std::make_unique<MCFHandler<MCF1stPass>>();
 	this->handlers[3] = std::make_unique<FlowMapper>(false);
 	this->handlers[4] = std::make_unique<MCFHandler<MCF2ndPass>>();
 	this->handlers[5] = std::make_unique<FlowMapper>(true);
+#endif
 }
 
 /**

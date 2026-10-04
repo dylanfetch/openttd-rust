@@ -15,6 +15,7 @@ mod consumer;
 mod history;
 mod integer;
 mod landscape;
+mod linkgraph;
 mod math;
 mod packet;
 mod script_list;

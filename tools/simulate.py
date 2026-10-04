@@ -211,6 +211,56 @@ def scenario_list(soak):
                     "ticks": years * 365 * TICKS_PER_DAY + SNAPSHOT_TICKS,
                 }
             )
+    # Exercise both scalers for pax/mail/armoured, asymmetric default cargo, and
+    # limits of the demand/distance rules and both MCF passes. Reload reuses an original snapshot containing
+    # outstanding jobs, whose input/settings/join dates are saved in LGRJ.
+    # This temperate save uses cargo IDs 0/2 for passengers/mail.
+    variants = [
+        (
+            "symmetric",
+            2,
+            {
+                "demand_distance": 255,
+                "demand_size": 100,
+                "accuracy": 2,
+                "short_path_saturation": 0,
+            },
+        ),
+        (
+            "asymmetric",
+            1,
+            {
+                "demand_distance": 0,
+                "demand_size": 0,
+                "accuracy": 64,
+                "short_path_saturation": 250,
+            },
+        ),
+    ]
+    for label, distribution, settings in variants:
+        commands = [
+            f"setting linkgraph.distribution_{cargo} {min(distribution, 1) if cargo == 'default' else distribution}"
+            for cargo in ("pax", "mail", "armoured", "default")
+        ]
+        commands += [
+            f"setting linkgraph.{key} {value}" for key, value in settings.items()
+        ]
+        commands += [
+            "setting linkgraph.recalc_interval 4",
+            "setting linkgraph.recalc_time 16",
+            "unpause",
+        ]
+        scenarios.append(
+            {
+                "name": f"play-{PLAY_SAVES[0]}-cargodist-{label}-reload",
+                "kind": "save",
+                "save": str(ROOT / "migration/saves" / f"{PLAY_SAVES[0]}.sav"),
+                "console": commands,
+                "reload_chunk": "LGRJ",
+                "reload_cargos": [0, 2],
+                "ticks": years * 365 * TICKS_PER_DAY + SNAPSHOT_TICKS,
+            }
+        )
     return scenarios
 
 
@@ -312,6 +362,7 @@ def read_save(path):
         raise Corrupt(f"{path.name} is not an uncompressed save")
     reader, chunks = Reader(data, 8), {}
     while True:
+        chunk_start = reader.pos
         cid = reader.take(4)
         if cid == b"\0\0\0\0":
             return chunks
@@ -338,6 +389,7 @@ def read_save(path):
                 if kind in (2, 4) or element.pos < len(element.data):
                     chunk["elements"].append((index, element.data[element.pos :]))
                 index += 1
+        chunk["span"] = (chunk_start, reader.pos)
         chunks[cid.decode("latin-1")] = chunk
 
 
@@ -653,6 +705,74 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
             )
 
     try:
+        if "reload_chunk" in scenario:
+            # The fixture comes from the unchanged reference only. Outstanding
+            # jobs recompute from their saved graph/settings on load in both.
+            setup = dict(scenario, ticks=3 * SNAPSHOT_TICKS)
+            with MACHINE.hold(alone=False):
+                prepared = run_game(
+                    setup,
+                    binaries["reference"],
+                    builds["reference"],
+                    out / name / "prepare",
+                    timeout,
+                    env,
+                    True,
+                )
+            if prepared["exit"] != 0:
+                raise RuntimeError(f"reload preparation exited with {prepared['exit']}")
+            chunk = scenario["reload_chunk"]
+            fixture = None
+            for path in prepared["snapshots"]:
+                saved = read_save(path).get(chunk, {})
+                cargos = {
+                    fields["linkgraph[0]/cargo"]
+                    for _, body in saved.get("elements", [])
+                    if (fields := decode_element(saved, body)) is not None
+                }
+                if (
+                    saved.get("elements")
+                    and set(scenario.get("reload_cargos", [])) <= cargos
+                ):
+                    fixture = path
+                    break
+            if fixture is None:
+                raise RuntimeError(
+                    f"reload preparation saved no outstanding {chunk} records for required cargo IDs"
+                )
+            original = read_save(fixture)
+            result["reload_records"] = len(original[chunk]["elements"])
+            result["reload_cargos"] = sorted(
+                {
+                    fields["linkgraph[0]/cargo"]
+                    for _, body in original[chunk]["elements"]
+                    if (fields := decode_element(original[chunk], body)) is not None
+                }
+            )
+            # A reference-produced revision log makes only the candidate append
+            # a load-revision event. Reset GLOG history only in these newly
+            # prepared road INPUT fixtures (including settings/GRF/cheat history),
+            # so both loaders append one. Output GLOG is still compared normally.
+            data = fixture.read_bytes()
+            begin, end = original["GLOG"]["span"]
+            normalized = fixture.parent / "reload-input.sav"
+            normalized_data = data[:begin] + data[end:]
+            normalized.write_bytes(normalized_data)
+            check = read_save(normalized)
+            if set(check) != set(original) - {"GLOG"} or any(
+                data[slice(*original[cid]["span"])]
+                != normalized_data[slice(*check[cid]["span"])]
+                for cid in check
+            ):
+                raise RuntimeError("reload input changed outside optional GLOG history")
+            result["reload_input"] = {
+                "reference": str(fixture),
+                "normalized": str(normalized),
+                "reference_sha256": hashlib.sha256(data).hexdigest(),
+                "normalized_sha256": hashlib.sha256(normalized_data).hexdigest(),
+                "removed_chunk": "GLOG",
+            }
+            scenario = dict(scenario, save=str(normalized))
         for mode, desync in (("snapshots", True), ("plain", False)):
             for attempt in range(1 if desync else 3):
                 with MACHINE.hold(alone=attempt > 0):
@@ -774,7 +894,11 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
         result["problems"].append(f"harness error: {type(error).__name__}: {error}")
     result["passed"] = not result["differences"] and not result["problems"]
     if result["passed"]:
-        shutil.rmtree(out / name, ignore_errors=True)  # Keep only failing runs.
+        if "reload_input" in result:
+            for mode in ("snapshots", "plain"):
+                shutil.rmtree(out / name / mode, ignore_errors=True)
+        else:
+            shutil.rmtree(out / name, ignore_errors=True)  # Keep only failing runs.
     return result
 
 

@@ -7,6 +7,8 @@
 
 #include "../safeguards.h"
 
+#ifndef WITH_RUST
+
 typedef std::map<NodeID, Path *> PathViaMap;
 
 /**
@@ -621,3 +623,5 @@ bool DistanceAnnotation::Comparator::operator()(const DistanceAnnotation *x,
 	return x != y && !Greater<uint>(x->GetAnnotation(), y->GetAnnotation(),
 			x->GetNode(), y->GetNode());
 }
+
+#endif /* !WITH_RUST */

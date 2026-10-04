@@ -7,6 +7,7 @@
 
 /** @file windows-abi.cpp Bounded first-32-bit layout and real C ABI call checks. */
 #include "rust/abi_ffi.h"
+#include "rust/linkgraph_ffi.h"
 #include "rust/ffi.h"
 #include "rust/utf8_ffi.h"
 #include "rust/builder_ffi.h"
@@ -84,6 +85,10 @@ static void Layouts()
 	Layout(25, "OpenTTDX25519Leaves", {sizeof(OpenTTDX25519Leaves), alignof(OpenTTDX25519Leaves), offsetof(OpenTTDX25519Leaves, wipe), offsetof(OpenTTDX25519Leaves, verify32)});
 	Layout(26, "OpenTTDValidationStep", {sizeof(OpenTTDValidationStep), alignof(OpenTTDValidationStep), offsetof(OpenTTDValidationStep, consumed), offsetof(OpenTTDValidationStep, output), offsetof(OpenTTDValidationStep, stopped)});
 	Layout(27, "OpenTTDInplaceWrite", {sizeof(OpenTTDInplaceWrite), alignof(OpenTTDInplaceWrite), offsetof(OpenTTDInplaceWrite, position), offsetof(OpenTTDInplaceWrite, accepted)});
+	Layout(34, "OpenTTDLinkGraphNode", {sizeof(OpenTTDLinkGraphNode), alignof(OpenTTDLinkGraphNode), offsetof(OpenTTDLinkGraphNode, supply), offsetof(OpenTTDLinkGraphNode, demand), offsetof(OpenTTDLinkGraphNode, station), offsetof(OpenTTDLinkGraphNode, x), offsetof(OpenTTDLinkGraphNode, y), offsetof(OpenTTDLinkGraphNode, edge_begin), offsetof(OpenTTDLinkGraphNode, edge_count)});
+	Layout(35, "OpenTTDLinkGraphEdge", {sizeof(OpenTTDLinkGraphEdge), alignof(OpenTTDLinkGraphEdge), offsetof(OpenTTDLinkGraphEdge, capacity), offsetof(OpenTTDLinkGraphEdge, travel_time), offsetof(OpenTTDLinkGraphEdge, dest)});
+	Layout(36, "OpenTTDLinkGraphSettings", {sizeof(OpenTTDLinkGraphSettings), alignof(OpenTTDLinkGraphSettings), offsetof(OpenTTDLinkGraphSettings, accuracy), offsetof(OpenTTDLinkGraphSettings, demand_distance), offsetof(OpenTTDLinkGraphSettings, demand_size), offsetof(OpenTTDLinkGraphSettings, saturation), offsetof(OpenTTDLinkGraphSettings, distribution), offsetof(OpenTTDLinkGraphSettings, express), offsetof(OpenTTDLinkGraphSettings, map_max_x), offsetof(OpenTTDLinkGraphSettings, map_max_y), offsetof(OpenTTDLinkGraphSettings, runtime)});
+	Layout(37, "OpenTTDLinkGraphShare", {sizeof(OpenTTDLinkGraphShare), alignof(OpenTTDLinkGraphShare), offsetof(OpenTTDLinkGraphShare, node), offsetof(OpenTTDLinkGraphShare, origin), offsetof(OpenTTDLinkGraphShare, via), offsetof(OpenTTDLinkGraphShare, cumulative), offsetof(OpenTTDLinkGraphShare, unrestricted), offsetof(OpenTTDLinkGraphShare, has_share)});
 	CHECK(openttd_rust_abi_layout(255, 0) == SIZE_MAX);
 	CHECK(static_cast<size_t>(PTRDIFF_MAX) == (SIZE_MAX >> 1));
 	std::printf("pointer_bytes %zu sentinel %zu borrow_limit %zu\n", sizeof(void *), SIZE_MAX, static_cast<size_t>(PTRDIFF_MAX));
@@ -556,9 +561,38 @@ static void ScriptListControl()
 	std::printf("script_list control high-bit bool/key, typed filtering and load rejection passed\n");
 }
 
+static uint8_t OPENTTD_LINKGRAPH_CALL LinkGraphAbort(const void *context)
+{
+	auto *state = static_cast<const std::array<uint32_t, 2> *>(context);
+	return (*state)[0];
+}
+
+static void LinkGraphJob()
+{
+	std::array<OpenTTDLinkGraphNode, 2> nodes{{{10, 0, 12, 1, 1, 0, 1}, {0, 1, 24, 4, 1, 1, 0}}};
+	OpenTTDLinkGraphEdge edge{20, 0, 1};
+	OpenTTDLinkGraphSettings settings{2, 100, 100, 80, 1, 1, 127, 127, 30};
+	std::array<uint32_t, 2> context{0, 0};
+	auto *owner = openttd_rust_linkgraph_run(nodes.data(), nodes.size(), &edge, 1, &settings, &context, LinkGraphAbort);
+	size_t count = 0;
+	const auto *shares = openttd_rust_linkgraph_shares(owner, &count);
+	CHECK(count == 2 && shares[0].node == 0 && shares[1].node == 1);
+	CHECK(shares[0].origin == 12 && shares[0].via == 24 && shares[0].cumulative == 10 && shares[0].unrestricted == 10);
+	CHECK(shares[1].origin == 12 && shares[1].via == 24 && shares[1].cumulative == 10 && shares[1].unrestricted == 10);
+	CHECK(openttd_rust_linkgraph_edges(owner)[0] == 10);
+	openttd_rust_linkgraph_destroy(owner);
+	context[0] = 1;
+	owner = openttd_rust_linkgraph_run(nodes.data(), nodes.size(), &edge, 1, &settings, &context, LinkGraphAbort);
+	openttd_rust_linkgraph_shares(owner, &count);
+	CHECK(count == 0 && openttd_rust_linkgraph_edges(owner)[0] == 0);
+	openttd_rust_linkgraph_destroy(owner);
+	std::printf("linkgraph owned snapshot/result and cdecl abort callback passed\n");
+}
+
 int main()
 {
 	Layouts();
+	LinkGraphJob();
 	Calls();
 	Encoded();
 	History();
