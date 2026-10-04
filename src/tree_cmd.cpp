@@ -44,6 +44,7 @@ enum ExtraTreePlacement : uint8_t {
 #ifdef WITH_RUST
 #include "rust/trees_ffi.h"
 #include "rust/services_ffi.h"
+#include "progress.h"
 
 static_assert(MP_CLEAR == 0 && MP_TREES == 4 && MP_WATER == 6);
 static_assert(TREE_CACTUS == 27 && TREE_INVALID == 255 && TREE_COUNT_TEMPERATE == 12);
@@ -86,8 +87,16 @@ static uint64_t RustTreeLeaf(void *opaque, uint32_t op, uint32_t index, uint32_t
 	auto &ctx = *static_cast<RustTreeContext *>(opaque);
 	TileIndex tile{index};
 	switch (op) {
-		case 1: IncreaseGeneratingWorldProgress(GWP_TREE); break;
-		case 2: SetGeneratingWorldProgress(GWP_TREE, a); break;
+		case 1:
+		case 2:
+			/* Keep the original zero-total and no-modal guards before checking
+			 * cancellation. The abort callback and throw run only in C++. */
+			if (op == 2 && a == 0) return 0;
+			if (!HasModalProgress()) return 0;
+			if (IsGeneratingWorldAborted()) return 1;
+			if (op == 1) IncreaseGeneratingWorldProgress(GWP_TREE);
+			else SetGeneratingWorldProgress(GWP_TREE, a);
+			break;
 		case 3: ClearNeighbourNonFloodingStates(tile); break;
 		case 6: {
 			static const SoundID sounds[] = {SND_42_RAINFOREST_1, SND_43_RAINFOREST_2, SND_44_RAINFOREST_3, SND_48_RAINFOREST_4, SND_34_ARCTIC_SNOW_1, SND_39_ARCTIC_SNOW_2};
@@ -126,6 +135,7 @@ static OpenTTDTreeAction RunRustTrees(RustTreeContext &ctx, uint32_t kind, TileI
 			 * arbitrary callback code. No Rust borrow survives these actions. */
 			case 4: TileLoop_Water(current); break;
 			case 5: AmbientSoundEffect(current); break;
+			case 12: HandleGeneratingWorldAbortion(); break;
 			case 10:
 				ctx.nested = Command<CMD_LANDSCAPE_CLEAR>::Do(ctx.flags, current);
 				response = ctx.nested.Failed(); cost = ctx.nested.GetCost(); break;

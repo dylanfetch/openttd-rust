@@ -22,6 +22,8 @@ extern "C" {
  * snowline bits, climate, placer, extra, height limit, editor/ambient/freeform/
  * execute/company-valid bits. Settings and leaf callbacks must be noexcept,
  * nonreentrant and borrow output only for the call. Shared table is copied.
+ * Progress leaves return 1 only for cancellation, before progress effects; Rust
+ * immediately propagates it, with no resumed loop, to action 12.
  * Component leaves: progress(1,2), clear nonflood flags(3), sound(6), square
  * clear(7), town rating(8), iterator start(9), company debit(10), iterator next(11).
  * Original bodies remain the portable fallback; map/pools stay canonical C++.
@@ -31,7 +33,8 @@ void *openttd_rust_trees_create(uint32_t kind, uint32_t tile, uint32_t a, uint32
 	uint64_t (*leaf)(void *, uint32_t, uint32_t, uint32_t, uint32_t) noexcept);
 /* Only actions: 0 done (a result, b error, cost), 4 water flooding (may dispatch
  * nested clears), 5 NewGRF ambient callback (arbitrary code), 10 landscape clear
- * command (may reenter tree code). Actions run after advance returns; fresh
+ * command (may reenter tree code), 12 world-generation abort (callback + throw).
+ * Actions run after advance returns; fresh
  * settings/map reads follow them. Response/cost are nested clear failure/cost. */
 OpenTTDTreeAction openttd_rust_trees_advance(void *, uint64_t response, int64_t cost);
 /* Destroy once, including C++ exception cleanup; no callback/context access. */

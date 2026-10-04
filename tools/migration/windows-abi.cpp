@@ -604,6 +604,7 @@ struct TreeProbe {
 	std::array<uint64_t, 12> settings{0, 15, 35, 4096, 64, 64, 10, 0, 0, 2, 15, 0};
 	std::array<uint32_t, 10> tile{7};
 	uint32_t writes = 0;
+	bool cancel = false;
 };
 static void TreeSettings(void *context, uint64_t *out) noexcept { auto &p = *static_cast<TreeProbe *>(context); std::copy(p.settings.begin(), p.settings.end(), out); }
 static void TreeObserve(void *context, uint32_t, uint32_t *out) noexcept { auto &p = *static_cast<TreeProbe *>(context); std::copy(p.tile.begin(), p.tile.end(), out); }
@@ -615,7 +616,10 @@ static void TreeWrite(void *context, uint32_t op, uint32_t, uint32_t a, uint32_t
 }
 static float TreeTrig(uint32_t, float value) noexcept { return value; }
 static uint32_t TreeRandom(void *) noexcept { return UINT32_MAX; }
-static uint64_t TreeLeaf(void *, uint32_t, uint32_t, uint32_t, uint32_t) noexcept { return 0; }
+static uint64_t TreeLeaf(void *context, uint32_t op, uint32_t, uint32_t, uint32_t) noexcept
+{
+	return (op == 1 || op == 2) && static_cast<TreeProbe *>(context)->cancel;
+}
 static void Trees()
 {
 	using Owner = std::unique_ptr<void, decltype(&openttd_rust_trees_destroy)>;
@@ -645,7 +649,12 @@ static void Trees()
 	CHECK(probe.writes == 1);
 	openttd_rust_trees_initialize();
 	CHECK(*counter == 0 && counter == openttd_rust_tree_counter());
-	std::printf("tree_direct_services_counter_and_reentry_lifetime passed\n");
+	probe.cancel = true; probe.settings[8] = 1;
+	auto generator = make(0);
+	CHECK(openttd_rust_trees_advance(generator.get(), 0, 0).kind == 12);
+	generator.reset(); // Abort callback and throw are handled only after Rust returns.
+	CHECK(probe.writes == 1);
+	std::printf("tree_direct_services_counter_cancel_and_reentry_lifetime passed\n");
 }
 
 int main()

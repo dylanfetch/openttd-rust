@@ -1094,8 +1094,8 @@ calls Rust placement.
 Straight-line Rust calls shared `noexcept` RNG/map/trigonometry leaves and component
 progress, sound, town-rating, iterator and company-debit leaves. Only water flooding
 (nested clears), NewGRF ambient callbacks (arbitrary code) and landscape-clear
-commands (reentry) return to C++; no world borrow survives them. Environmental
-failures terminate; `RANDOM_DEBUG` records the wrapper location. ABI IDs 38/42
+commands (reentry) and progress cancellation (abort callback + throw) return to C++;
+no world borrow survives them. Environmental failures terminate; `RANDOM_DEBUG` records the wrapper location. ABI IDs 38/42
 cover actions and the copied shared-service table; no global registration is needed.
 Save/load reaches only counter-address/reset exports, with no shared callback;
 DATE/TTD/TTO keep the original byte and DATE LoadCheck omission.
@@ -1105,7 +1105,7 @@ extra-placement modes, growth/ground/count states, counter reloads and commands;
 `--self` and `--soak` check reproducibility and longer runs. All saved fields and
 ordered command outcomes compare against the pinned original. Rust/native ABI
 checks cover explicit/editor policy, Money bounds, bitpattern7, table/counter
-lifetime and retained reentry boundaries. Actual editor interaction, diagonal map
+lifetime, cancellation propagation and reentry. Actual editor interaction, diagonal map
 traversal, legacy saves and custom NewGRF ambient callbacks remain evidence limits.
 
 ### Effect vehicles

@@ -340,12 +340,20 @@ impl Engine {
             self.ground(tile, (r >> 28) & 1, 3);
         }
     }
-    fn groves(&self, groups: u32) {
+    // A cancellation status immediately propagates to C++; loops are not resumed.
+    fn progress(&self) -> Result<(), ()> {
+        if self.leaf(1, 0, 0, 0) == 0 {
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
+    fn groves(&self, groups: u32) -> Result<(), ()> {
         for _ in 0..groups {
             let center = self.settings().random_tile(self.services.random());
             let shape = self.shape();
             for _ in 0..1000 {
-                self.leaf(1, 0, 0, 0);
+                self.progress()?;
                 let r = self.services.random();
                 let x = (r & 31) as i32 - 16;
                 let y = ((r >> 8) & 31) as i32 - 16;
@@ -355,6 +363,7 @@ impl Engine {
                 }
             }
         }
+        Ok(())
     }
     fn same_height(&self, tile: u32, height: i32) {
         for _ in 0..1000 {
@@ -373,13 +382,13 @@ impl Engine {
             break;
         }
     }
-    fn scatter(&self) {
+    fn scatter(&self) -> Result<(), ()> {
         let s = self.settings();
         let divisor = if s.editor() { 5 } else { 1 };
         for _ in 0..s.scale(1000) / divisor {
             let r = self.services.random();
             let tile = s.random_tile(r);
-            self.leaf(1, 0, 0, 0);
+            self.progress()?;
             if !self.tile(tile).suitable(true) {
                 continue;
             }
@@ -403,17 +412,18 @@ impl Engine {
             for _ in 0..s.scale(15000) / divisor {
                 let r = self.services.random();
                 let tile = s.random_tile(r);
-                self.leaf(1, 0, 0, 0);
+                self.progress()?;
                 if self.tile(tile).zone() == 2 && self.tile(tile).suitable(false) {
                     self.place(tile, r, false);
                 }
             }
         }
+        Ok(())
     }
-    fn generate(&self) {
+    fn generate(&self) -> Result<(), ()> {
         let s = self.settings();
         if s.placer() == 0 {
-            return;
+            return Ok(());
         }
         let runs = if s.placer() == 1 {
             if s.climate() == 1 { 15 } else { 6 }
@@ -432,13 +442,16 @@ impl Engine {
         } else {
             s.scale((self.services.random() & 31) + 25)
         };
-        self.leaf(2, 0, total.wrapping_add(groups.wrapping_mul(1000)), 0);
+        if self.leaf(2, 0, total.wrapping_add(groups.wrapping_mul(1000)), 0) != 0 {
+            return Err(());
+        }
         if groups != 0 {
-            self.groves(groups);
+            self.groves(groups)?;
         }
         for _ in 0..runs {
-            self.scatter();
+            self.scatter()?;
         }
+        Ok(())
     }
     fn climate(&self, tile: u32) {
         let t = self.tile(tile);
@@ -696,8 +709,16 @@ impl Engine {
         let pending = std::mem::replace(&mut self.pending, Pending::Done);
         match pending {
             Pending::Start(kind, tile, a, b, c) => match kind {
-                0 => self.generate(),
-                1 => self.scatter(),
+                0 | 1 => {
+                    let result = if kind == 0 {
+                        self.generate()
+                    } else {
+                        self.scatter()
+                    };
+                    if result.is_err() {
+                        return Action::new(12, 0, 0, 0);
+                    }
+                }
                 2 => self.place(tile, a, b != 0),
                 3 => self.plant(tile, a, b, c),
                 5 => {
@@ -772,7 +793,7 @@ impl Engine {
 }
 
 /// Create an invocation. Shared and component leaves are synchronous/noexcept;
-/// only returned water/NewGRF/landscape-clear actions may throw or reenter.
+/// only returned water/NewGRF/landscape-clear/progress-abort actions may throw or reenter.
 /// # Safety
 /// Context/callbacks outlive destruction; table points to a readable Services.
 /// Calls are game-thread serialized, output lengths follow the header. No C++
@@ -858,6 +879,9 @@ mod tests {
         iterator: u32,
         length: u32,
         limit: i32,
+        cancel: bool,
+        draws: u32,
+        progress: u32,
     }
     impl Default for World {
         fn default() -> Self {
@@ -868,6 +892,9 @@ mod tests {
                 iterator: 0,
                 length: 1,
                 limit: i32::MAX,
+                cancel: false,
+                draws: 0,
+                progress: 0,
             }
         }
     }
@@ -910,13 +937,21 @@ mod tests {
     extern "C" fn trig(_: u32, value: f32) -> f32 {
         value
     }
-    extern "C" fn random(_: *mut c_void) -> u32 {
+    extern "C" fn random(context: *mut c_void) -> u32 {
+        // SAFETY: Fixture context remains live and exclusively accessed per call.
+        unsafe {
+            (*context.cast::<World>()).draws += 1;
+        }
         0
     }
     extern "C" fn leaf(context: *mut c_void, op: u32, tile: u32, a: u32, b: u32) -> u64 {
         // SAFETY: Test owns the exclusive live context for each callback.
         let w = unsafe { &mut *context.cast::<World>() };
         match op {
+            1 | 2 => {
+                w.progress += 1;
+                u64::from(w.cancel)
+            }
             9 => {
                 w.writes.push((op, tile, a));
                 w.writes.push((99, b, 0));
@@ -958,6 +993,32 @@ mod tests {
     // Script APIs cannot request explicit tree types, diagonal rectangles, or editor
     // planting. These protocol tests cover those source branches and full Money bounds;
     // end-to-end simulation/command evidence remains the unchanged reference harness.
+    // Headless semantic scenarios cannot click Abort during map generation.
+    #[test]
+    fn cancellation_preserves_draw_order_and_stops_before_map_effects() {
+        let mut w = World {
+            cancel: true,
+            ..World::default()
+        };
+        let mut e = engine(&mut w, 1, 0, 0, 0);
+        assert_eq!(e.advance(0, 0).kind, 12);
+        assert_eq!((w.draws, w.progress), (1, 1)); // Scatter draws before progress.
+        assert_eq!(w.writes, [] as [(u32, u32, u32); 0]);
+        w.draws = 0;
+        w.progress = 0;
+        let mut e = engine(&mut w, 0, 0, 0, 0);
+        e.refresh_settings();
+        assert!(e.groves(1).is_err());
+        assert_eq!((w.draws, w.progress), (5, 1)); // Center/phases precede progress, attempt does not.
+        assert_eq!(w.writes, [] as [(u32, u32, u32); 0]);
+        w.draws = 0;
+        w.progress = 0;
+        w.settings[8] = 1;
+        let mut e = engine(&mut w, 0, 0, 0, 0);
+        assert_eq!(e.advance(0, 0).kind, 12);
+        assert_eq!((w.draws, w.progress), (1, 1)); // Group count precedes total-progress cancellation.
+        assert_eq!(w.writes, [] as [(u32, u32, u32); 0]);
+    }
     #[test]
     fn explicit_editor_planting_and_diagonal_iterator_request() {
         let mut w = World::default();
