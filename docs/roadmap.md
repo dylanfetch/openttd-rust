@@ -75,28 +75,32 @@ never in masks.
 
 ## Phase 3: current ownership work, in order
 
-1. **#107 Direct shared-service calls; rewrite trees, then effects.** Runs in
-   parallel with #109. Its services module is the base for #103 and #104.
-2. **#103 Disaster scheduling, vehicles and event control.** Resume from
-   `port-disaster-vehicles` at `ccb9586fe3` (Cargo/verify and two smoke cases pass;
-   not reviewed). Evidence: `evidence-disaster-vehicles` at `a775543162`; drop its
-   borrowed effect-helper commit `73ccd511fb`. Rebase onto #105 and #107, replace
-   async/await draws with direct calls, then turn the reference-built UFO/train and
-   zeppelin/airport experiments into harness witnesses in a disasters module.
-   Then review, comparisons and CI.
-3. **#104 Water-region cache and graph service**, built on #107 from the start
-   (`port-water-regions` has no source changes). Evidence: `evidence-water-regions`
-   at `c752070cde`: two reference-built saves, setup AIs and five scenarios passing
-   reference-self (164 snapshots). Rebase into a ships module after #109 and
-   deduplicate `field_spans` from #105. Still needed: canal/lock/aqueduct, reload,
-   warm-cache mutation, negative probes, soak and candidate evidence. Record
-   crossing counts and timing for #108.
-4. **#108 Map access decision** (Astra high). Measure on trees after #107 and on
-   #104. Root records the decision here before any item in step 6 is selected.
-5. **Economy** (next selection after #103/#104). Root has a fresh Astra high agent
-   compare station rating updates, cargo payment and delivery, and industry
-   production, and selects one whose periodic loop and state Rust can own
-   whole. A formula extracted from a C++ loop is kernel extraction.
+1. **#107 Direct shared-service calls; trees PR #113, effects PR #115.**
+   Integrate separately after final evidence, independent review and CI. Progress
+   cancellation is an ordinary callback/throw boundary, so Rust returns an abort
+   action; ordinary draws and map operations remain direct. #115 adds the existing
+   effect industry query to the common service table; consumers must match ABI 42.
+2. **#103 Disaster scheduling, vehicles and event control.** Complete candidate
+   witnesses and review on the direct-call implementation and disasters module.
+   Actual #109/#113/#115 dependency ancestry is included; retain the real UFO/train,
+   airport, industry, release/reload and submarine lifecycle witnesses.
+3. **#104 Water-region cache and graph service, PR #114.** Resolve the defined
+   visitor alias case: a callback can mutate the caller's patch descriptor, and
+   later sides must observe it while the initial region origin remains fixed.
+   Re-review the fix and final evidence, then green CI and integration. Reuse its
+   ships corpus for full ship YAPF; do not start another ship comparison tool.
+4. **#108 Map access decision** (Astra high). Small opt-in measurement PR #116
+   supplies tree crossing counts, copied bytes and timings; #114 supplies water
+   profiles. Measure on the same scenarios against the unchanged original and
+   distinguish profiler/host overhead. Root records the decision here before any
+   item in step 6 is selected; no map storage transfer is selected yet.
+5. **#117 Cargo payment and delivery ownership.** Selected after a fresh Astra
+   high comparison with station ratings and industry production. Own CargoPayment
+   state and lifetime, delivery acceptance/payment control, destination collection
+   and the complete production-flush loop. Preserve Money saturation, native-width
+   intermediates and CAPY lifecycle. Loading/reservation and shared industry state
+   remain C++; this is not an income-formula extraction. Begin while earlier PRs
+   are in review/CI, using the existing road scenarios and #107/#109 interfaces.
 6. **After #108 and #86:** complete ship YAPF (both levels, after #104), town
    growth, road/rail vehicle controllers, YAPF rail/road.
 
@@ -105,28 +109,34 @@ following `docs/design/world-state.md` as amended by #108.
 
 ## Resume checkpoint (2026-10-04)
 
-Root: `/root` (gpt-6-astra, ultra). Integration base `1a883a37f1`; no integration
+Root: `/root` (gpt-6-astra, ultra). Integration base `ce6ecea068`; no integration
 since the steering review. All rows below are active, not reviewed completion.
 Worktrees are siblings of the main checkout unless a path says otherwise.
 
 | Issue / owner | Branch and checkpoint commit | Worktree | Next step |
 | --- | --- | --- | --- |
-| #109 `/root/harness_modules_109` (Sol medium) | `harness-modules-109` at `1a883a37f1` | `openttd-rust-harness-modules` | Freeze baseline counts, split shared core and component modules, compare before/after, open PR and assign fresh Astra reviewer. |
-| #107 trees `/root/trees_direct_services_107` (Sol high) | `trees-direct-services-107` at `1a883a37f1` | `openttd-rust-trees-direct` | Common direct services and straight-line tree port; communicate API to #103/#104, validate and open first PR. Effects needs a fresh implementer and separate PR next. |
-| #103 `/root/disaster_ownership_103` (Sol high) | `port-disaster-vehicles` at `47ad3c0091` | `openttd-rust-disasters` | Direct-call rewrite, then common #107 services and #109 disasters module; finish train/UFO and airport witnesses, validate and open PR. |
-| #104 `/root/water_regions_104` (Sol high) | `port-water-regions` at `1a883a37f1` | `openttd-rust-water-regions` | Implement complete cache owner; move evidence into ships module, finish mutation/reload/connectivity witnesses and #108 crossing/timing measurements. |
-| #86 `/root/rail_air_scenarios_86` (Sol high) | `harness-multimodal-save` at `4f733cfa8d`, PR #110 | `openttd-rust-saves` | Preserve owner's fixture; input normalization and rail/ship witnesses in #109 modules, then fresh review. Aircraft input decision is #111. |
+| #109 `/root/harness_modules_109` (Sol medium) | `harness-modules-109` at `6617573eca`, PR #112 | `openttd-rust-harness-modules` | CI green; `/root/review_harness_pr112` found no code issues. All four full before/after runs pass 119 scenarios; root is isolating timing-dependent snapshot-count differences, then final evidence review and merge. |
+| #107 trees `/root/trees_direct_services_107` (Sol high) | `trees-direct-services-107` at `cfcc04907b`, PR #113 | `openttd-rust-trees-direct` | `/root/review_trees_pr113` found no blocking code issues; root finishes final paired/soak evidence. All comparisons passed. Await green CI and integration. |
+| #107 effects `/root/effects_direct_services_107` (Sol high) | `effects-direct-services-107` at `ef7187239f`, PR #115 | `openttd-rust-effects-direct` | Finish focused soak, assign fresh reviewer, then CI. Integration docs must name common Random/map services and accepted RANDOM_DEBUG wrapper source locations. |
+| #103 `/root/disaster_ownership_103` (Sol high) | `port-disaster-vehicles` at `5ce6534589` | `openttd-rust-disasters` | Final build/verify and candidate witness matrix, then component PR and fresh reviewer. Includes real #109/#113/#115 ancestry; no duplicate prerequisite patches. |
+| #104 `/root/water_regions_104` (Sol high) | `port-water-regions` at `8281876e72`, PR #114 | `openttd-rust-water-regions` | Owner fixes descriptor alias; `/root/review_water_pr114` re-reviews resulting commit/regression. Existing six-case soak, negative probe and verify pass; update base normally, never force-push. |
+| #86 `/root/rail_air_scenarios_86` (Sol high) | `harness-multimodal-save` at `5a99f2efe6`, PR #110 | `openttd-rust-saves` | `/root/review_rail_pr110` accepts source/evidence (independent 75-snapshot run). Merge after #112 and green CI. Aircraft input decision remains #111. |
+| #108 `/root/map_access_decision_108` (Astra high) | `map-access-measurements-108` at `bdb5313a50`, PR #116 | `openttd-rust-map-access` | Finish isolated timing trials, fresh review/CI of measurement code, and short design recommendation; root accepts decision and selects gated work. |
+| #117 `/root/cargo_payment_delivery` (Sol high) | New branch from current `rust-migration` | New isolated worktree | Start selected complete payment/delivery owner; reuse road evidence, open one component PR. |
 
 Preserved evidence branches: `evidence-disaster-vehicles` at `a775543162`
 (`openttd-rust-disasters-evidence`) and `evidence-water-regions` at `c752070cde`
-(`openttd-rust-water-evidence`). #103 imports only the useful final AI commit,
-omitting borrowed effect helper `73ccd511fb`. Build/test with `--jobs 2` while
-these worktrees run concurrently; the shared reference remains unchanged.
+(`openttd-rust-water-evidence`). Their useful source inputs are incorporated;
+do not reapply borrowed effect helper `73ccd511fb`. Build/test with `--jobs 2`;
+required CI supplies default/all-comparison checks where local component evidence
+already covers the change. Keep long-running checks in an active agent session:
+ending and recycling a task thread has killed unfinished background processes.
 
-Next free capacity goes to fresh per-PR review, the #107 effects rewrite, and an
-Astra high #108 measurement/decision agent as its prerequisites become available.
-Before fewer than two selections remain unstarted, assign a fresh Astra high
-economy planner; root creates issues and records selections here before coding.
+Fresh planner `/root/plan_next_ownership_selections` (Astra high) recommends full
+ship YAPF (both levels and canonical `Ship::path`) after #117, then complete town
+growth. These are not selected before #108; root creates their issues and records
+the accepted access decision before implementation. Their evidence should reuse
+#104 and the existing town corpus. Continue per-PR reviews while CI runs.
 
 ## Choosing the next task
 
