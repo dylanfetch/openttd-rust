@@ -85,7 +85,7 @@ struct OpenTTDStationLinks {
 	void (*edge)(void *, uint16_t, uint32_t, OpenTTDStationEdge *) noexcept;
 	void (*effect)(void *, uint8_t, uint16_t, uint16_t) noexcept;
 	void *(*order_list)(uint32_t) noexcept;
-	uint32_t (*order_read)(void *, uint8_t, uint32_t) noexcept;
+	size_t (*order_read)(void *, uint8_t, size_t) noexcept;
 	void *(*order_vehicle)(void *) noexcept;
 	void *(*next_vehicle)(void *, uint8_t) noexcept;
 	uint32_t (*vehicle_read)(void *, uint8_t) noexcept;

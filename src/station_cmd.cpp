@@ -598,7 +598,7 @@ struct RustStationTruncation {
 static uint32_t RustStationRead(void *handle, uint8_t field, uint32_t arg) noexcept
 {
 	switch (field) {
-		case 0: return BaseStation::GetPoolSize();
+		case 0: return static_cast<uint32_t>(BaseStation::GetPoolSize());
 		case 1: return static_cast<uint32_t>(TimerGameTick::counter);
 		case 21: return TimerGameTick::counter >> 32;
 		case 2: return _game_mode == GM_EDITOR;
@@ -622,7 +622,7 @@ static uint32_t RustStationRead(void *handle, uint8_t field, uint32_t arg) noexc
 		case 12: return Station::From(bst)->goods[arg].AvailableCount();
 		case 13: {
 			GoodsEntry &ge = Station::From(bst)->goods[arg];
-			return ge.HasData() ? ge.GetData().cargo.Packets()->MapSize() : 0;
+			return ge.HasData() ? static_cast<uint32_t>(ge.GetData().cargo.Packets()->MapSize()) : 0;
 		}
 		case 17: return bst->town->exclusive_counter;
 		case 18: return bst->town->exclusivity.base();
@@ -735,7 +735,7 @@ static const OpenTTDStationLinks _rust_station_links = {
 		switch (field) {
 			case 0: return _settings_game.linkgraph.GetDistributionType(a) != DT_MANUAL;
 			case 1: return static_cast<Station *>(handle)->goods[a].node;
-			case 2: return (*static_cast<LinkGraph *>(handle))[a].edges.size();
+			case 2: return static_cast<uint32_t>((*static_cast<LinkGraph *>(handle))[a].edges.size());
 			case 3: return TimerGameEconomy::date.base();
 			case 4: return static_cast<Station *>(handle)->index.base();
 			case 5: return (*static_cast<LinkGraph *>(handle))[a].edges[b].LastUpdate().base();
@@ -770,7 +770,7 @@ static const OpenTTDStationLinks _rust_station_links = {
 		}
 	},
 	[](uint32_t id) noexcept -> void * { return OrderList::GetIfValid(OrderListID(id)); },
-	[](void *handle, uint8_t field, uint32_t arg) noexcept -> uint32_t {
+	[](void *handle, uint8_t field, size_t arg) noexcept -> size_t {
 		if (field == 0) return OrderList::GetPoolSize();
 		OrderList *list = static_cast<OrderList *>(handle);
 		if (field == 1) return list->GetOrders().size();

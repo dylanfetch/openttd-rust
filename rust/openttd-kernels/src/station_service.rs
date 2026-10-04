@@ -679,7 +679,8 @@ pub struct Links {
     pub(crate) edge: extern "C" fn(*mut c_void, u16, u32, *mut Edge),
     pub(crate) effect: extern "C" fn(*mut c_void, u8, u16, u16),
     pub(crate) order_list: extern "C" fn(u32) -> *mut c_void,
-    pub(crate) order_read: extern "C" fn(*mut c_void, u8, u32) -> u32,
+    // The original visits the complete native-sized order span.
+    pub(crate) order_read: extern "C" fn(*mut c_void, u8, usize) -> usize,
     pub(crate) order_vehicle: extern "C" fn(*mut c_void) -> *mut c_void,
     pub(crate) next_vehicle: extern "C" fn(*mut c_void, u8) -> *mut c_void,
     pub(crate) vehicle_read: extern "C" fn(*mut c_void, u8) -> u32,
@@ -739,14 +740,16 @@ unsafe fn stale(from: *mut c_void, w: &World, l: &Links) {
                     let to_id = (l.read)(edge.destination, 4, 0, 0);
                     let order_count = (l.order_read)(std::ptr::null_mut(), 0, 0);
                     for id in 0..order_count {
-                        let list = (l.order_list)(id);
+                        // OrderList pool IDs are bounded by their u16 representation.
+                        let list = (l.order_list)(id as u32);
                         if list.is_null() {
                             continue;
                         }
                         let mut found_from = false;
                         let mut found_to = false;
                         for order in 0..(l.order_read)(list, 1, 0) {
-                            let dest = (l.order_read)(list, 2, order);
+                            // The callback returns a u16 destination or the u32::MAX sentinel.
+                            let dest = (l.order_read)(list, 2, order) as u32;
                             if dest == u32::MAX {
                                 continue;
                             }
