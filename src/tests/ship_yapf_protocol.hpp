@@ -102,7 +102,7 @@ template <typename Check> void Run(Check check)
 	 * The patch query intentionally reports one patch for all graph vertices;
 	 * this is boundary/algorithm evidence, not a reachable-map simulation claim. */
 	snake = true; draws = 0;
-	input = {128, 128, 1 + 128, 1 + 128 * 90, 100, 20, 100, 0, 0, 8, 0, 0, 0};
+	input = {128, 128, 1 + 128, 1 + 128 * 90, 100, 20, 100, 0, 0, 8, 0, 0, 0, 0};
 	destination = input.dest_tile;
 	result = openttd_rust_ship_choose(path.get(), &input, &leaves, &services, nullptr, input.tile, 1 << 8, 0, &destination, 1);
 	check(result.found == 0 && result.stats[3] == 1 && result.stats[2] == 1 && result.stats[7] == 1);
@@ -110,7 +110,7 @@ template <typename Check> void Run(Check check)
 	snake = false;
 	/* Map-derived high-level node limit, with a synthetic one-edge region graph. */
 	region_chain = true; draws = 0;
-	input = {128, 128, 600, 0, 100, 20, 100, 0, 0, 1, 0, 0, 0};
+	input = {128, 128, 600, 0, 100, 20, 100, 0, 0, 1, 0, 0, 0, 0};
 	destination = 0; openttd_rust_ship_path_clear(path.get());
 	result = openttd_rust_ship_choose(path.get(), &input, &leaves, &services, nullptr, input.tile, 1 << 1, 0, &destination, 1);
 	check(result.found == 0 && result.stats[0] == 257 && result.stats[11] == 1 && result.stats[1] == 0);
