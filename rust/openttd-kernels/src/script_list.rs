@@ -8,6 +8,9 @@
 //! Deterministic `ScriptList` storage, ordering, mutation accounting and live cursor.
 //! C++ owns all VM/world/serialization callbacks. Scalar borrows end at each return.
 
+#[path = "script_list_control.rs"]
+pub(crate) mod control;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Bound::{Excluded, Unbounded};
 

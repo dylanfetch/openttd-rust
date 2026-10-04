@@ -142,6 +142,34 @@ def main():
                 command, env=env, stdout=log, stderr=subprocess.STDOUT, check=True
             )
 
+    # The inherited export parser tracks access markers without recognizing an
+    # un-inherited nested helper class. Preserve the actual List API in all modes.
+    exporter = Path("cmake/scripts/SquirrelExport.cmake")
+    if (ROOT / exporter).read_bytes() != (REFERENCE / exporter).read_bytes():
+        raise RuntimeError("Original binding generator changed")
+    binding_hashes = {}
+    for apilc, apiuc in (("ai", "AI"), ("game", "GS"), ("template", "Template")):
+        generated = []
+        for label, source in (("reference", REFERENCE), ("candidate", ROOT)):
+            target = OUT / f"bindings-{label}-{apilc}.sq.hpp"
+            compile(
+                [
+                    "cmake",
+                    f"-DSCRIPT_API_SOURCE_FILE={source / 'src/script/api/squirrel_export.sq.hpp.in'}",
+                    f"-DSCRIPT_API_BINARY_FILE={target}",
+                    f"-DSCRIPT_API_FILE={source / 'src/script/api/script_list.hpp'}",
+                    f"-DAPIUC={apiuc}",
+                    f"-DAPILC={apilc}",
+                    "-P",
+                    str(source / exporter),
+                ],
+                f"bindings-{label}-{apilc}",
+            )
+            generated.append(target.read_bytes())
+        if generated[0] != generated[1]:
+            raise RuntimeError(f"ScriptList {apilc} generated bindings changed")
+        binding_hashes[apilc] = hashlib.sha256(generated[0]).hexdigest()
+
     # VM and allocator are real unchanged code. Each label uses its actual string helpers.
     flags = [
         "g++",
@@ -278,6 +306,7 @@ def main():
         "cargo_original_find_sha256": hashlib.sha256(filtered.encode()).hexdigest(),
         "allocator_body_sha256": hashlib.sha256(allocator_body.encode()).hexdigest(),
         "fixture_sha256": hashlib.sha256(fixture.read_bytes()).hexdigest(),
+        "script_list_binding_sha256": binding_hashes,
         "outputs_sha256": {
             f"{label}-{mode}": hashlib.sha256(output).hexdigest()
             for (label, mode), output in outputs.items()
@@ -287,6 +316,8 @@ def main():
             "Command-disabling scope uses a host bool sentinel; actual VM/allocator/operation limit remain unchanged",
             "Save/clone TileList bodies are extracted unchanged; world population is not simulated",
             "Undefined signed-overflow/evaded invalid-iterator valuation cases excluded",
+            "Load nonnumeric/integer failed-getter and unrepresentable float cases excluded (deferred issue #67)",
+            "VM filter uses four stable typed items, including two live index reads across a real callback; no simulated world",
             "Cargo fixture directly initializes scalar collector without world validation; unchanged stationlist saved-game regression is world/query adapter evidence",
             "Failed station/cargo/company policy and missing HasData supplemental probes are unexecuted; typed validation and goods-guard bodies/order are checked unchanged",
         ],

@@ -18,6 +18,7 @@
 #include "rust/history_ffi.h"
 #include "rust/math_ffi.h"
 #include "rust/station_cargo_ffi.h"
+#include "rust/script_list_ffi.h"
 #include "rust/packet_ffi.h"
 #include "rust/string_validation_ffi.h"
 #include "rust/crypto_primitives_ffi.h"
@@ -86,6 +87,9 @@ static void Layouts()
 	CHECK(openttd_rust_abi_layout(255, 0) == SIZE_MAX);
 	CHECK(static_cast<size_t>(PTRDIFF_MAX) == (SIZE_MAX >> 1));
 	std::printf("pointer_bytes %zu sentinel %zu borrow_limit %zu\n", sizeof(void *), SIZE_MAX, static_cast<size_t>(PTRDIFF_MAX));
+	Layout(29, "OpenTTDListControlInput", {sizeof(OpenTTDListControlInput), alignof(OpenTTDListControlInput), offsetof(OpenTTDListControlInput, a), offsetof(OpenTTDListControlInput, b), offsetof(OpenTTDListControlInput, flag), offsetof(OpenTTDListControlInput, kind)});
+	Layout(30, "OpenTTDListControlAction", {sizeof(OpenTTDListControlAction), alignof(OpenTTDListControlAction), offsetof(OpenTTDListControlAction, a), offsetof(OpenTTDListControlAction, kind)});
+
 }
 
 static void Calls()
@@ -511,6 +515,45 @@ static void StringValidation()
 	std::printf("string_validation historical policy, NUL, surrogate and live in-place copy passed\n");
 }
 
+static void ScriptListControl()
+{
+	auto *list = openttd_rust_list_new();
+	auto *control = openttd_rust_list_control_new(5);
+	OpenTTDListControlInput input{};
+	OpenTTDListControlAction action{};
+	auto step = [&] { openttd_rust_list_control_step(control, list, &input, &action); input = {}; };
+	step(); CHECK(action.kind == LC_TYPE && action.a == 2);
+	input.kind = 0x05000002; step(); CHECK(action.kind == LC_GET_INT);
+	input.a = INT64_MIN; step(); CHECK(action.kind == LC_TYPE && action.a == 3);
+	input.kind = 0x01000008; step(); CHECK(action.kind == LC_GET_BOOL);
+	input.flag = UINT64_MAX; step(); CHECK(action.kind == LC_RETURN && action.a == 0);
+	int64_t value;
+	CHECK(openttd_rust_list_get(list, INT64_MIN, &value) == 1 && value == 1);
+	openttd_rust_list_control_destroy(control);
+	control = openttd_rust_list_control_new(4);
+	step(); CHECK(action.kind == LC_TYPE);
+	input.kind = 0x05000002; step(); CHECK(action.kind == LC_GET_INT);
+	input.a = INT64_MIN; step(); CHECK(action.kind == LC_PUSH_INT && action.a == 1);
+	step(); CHECK(action.kind == LC_RETURN && action.a == 1);
+	openttd_rust_list_control_destroy(control);
+	control = openttd_rust_list_control_new(1);
+	step(); CHECK(action.kind == LC_TOP);
+	input.a = 1; step(); CHECK(action.kind == LC_DISABLE);
+	step(); CHECK(action.kind == LC_ITEM);
+	input.flag = 1; step(); CHECK(action.kind == LC_ITEM);
+	input.flag = 2; step(); CHECK(action.kind == LC_INDEX);
+	input.a = INT64_MAX; step(); CHECK(action.kind == LC_ITEM);
+	step(); CHECK(action.kind == LC_RETURN && action.a == 0);
+	CHECK(openttd_rust_list_get(list, INT64_MAX, &value) == 1 && value == 0);
+	openttd_rust_list_control_destroy(control);
+	control = openttd_rust_list_control_new(3);
+	step(); CHECK(action.kind == LC_TYPE && action.a == -1);
+	input.kind = 0x01000001; step(); CHECK(action.kind == LC_RETURN && action.a == 0);
+	openttd_rust_list_control_destroy(control);
+	openttd_rust_list_destroy(list);
+	std::printf("script_list control high-bit bool/key, typed filtering and load rejection passed\n");
+}
+
 int main()
 {
 	Layouts();
@@ -524,6 +567,7 @@ int main()
 	StationCargo();
 	PacketState();
 	StringValidation();
+	ScriptListControl();
 	Locale();
 	std::printf("ABI audit passed\n");
 }

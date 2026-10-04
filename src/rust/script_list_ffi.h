@@ -53,6 +53,34 @@ void OPENTTD_LIST_CALL openttd_rust_list_combine(struct OpenTTDScriptList *, str
  * Returns absent/present; copies key/value/modification token and retains none.
  * has_after is 0/1. This does not reset or mutate the public live cursor. */
 uint8_t OPENTTD_LIST_CALL openttd_rust_list_read(const struct OpenTTDScriptList *, uint8_t, int64_t, int64_t *, int64_t *, int32_t *);
+/* ScriptList-specific resumable control. Operations: valuation/filter/save/load/
+ * get/set/nexti = 0..6. Controllers own only scalar phase state, and never retain
+ * list/VM/world pointers. Every host operation executes after step returns.
+ * Input/output/control/list allocations are live, aligned and disjoint. Scalar
+ * inputs are initialized, copied synchronously, and SQBool uses its full 64 bits.
+ * Destruction schedules no pending host action and is safe during C++ unwinding.
+ * Controllers add an allocation; resource-exhaustion timing is not reproduced. */
+struct OpenTTDListControl;
+struct OpenTTDListControlInput {
+	int64_t a;
+	int64_t b;
+	uint64_t flag;
+	uint32_t kind;
+};
+struct OpenTTDListControlAction {
+	int64_t a;
+	uint32_t kind;
+};
+enum OpenTTDListControlActionKind {
+	LC_RETURN, LC_TOP, LC_TYPE, LC_GET_INT, LC_GET_BOOL, LC_PUSH,
+	LC_ROOT, LC_PUSH_INT, LC_PUSH_BOOL, LC_PUSH_NULL, LC_TAG,
+	LC_NEW_ARRAY, LC_NEW_TABLE, LC_APPEND, LC_RAW_SET, LC_NEXT,
+	LC_POP, LC_POP_TOP, LC_CALL, LC_CHARGE, LC_DISABLE, LC_LIMIT,
+	LC_ERROR, LC_THROW_RESULT, LC_ITEM, LC_GET_PAIR, LC_LOG_NEXT, LC_LOG_END, LC_THROW_ERROR, LC_INDEX,
+};
+struct OpenTTDListControl *OPENTTD_LIST_CALL openttd_rust_list_control_new(uint8_t operation);
+void OPENTTD_LIST_CALL openttd_rust_list_control_destroy(struct OpenTTDListControl *);
+void OPENTTD_LIST_CALL openttd_rust_list_control_step(struct OpenTTDListControl *, struct OpenTTDScriptList *, const struct OpenTTDListControlInput *, struct OpenTTDListControlAction *);
 #ifdef __cplusplus
 }
 #endif

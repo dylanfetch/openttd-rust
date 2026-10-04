@@ -724,6 +724,34 @@ partial commits, operation charges, List/TileList save/load and clones). It
 substitutes a command-permission bool for the game instance and populates no
 world; it is not VM, savegame or allocation-failure equivalence.
 
+### ScriptList VM control
+
+Issue #65 / PR #70 moves `Valuate`, VM-filtered `FillList`, `SaveObject`,
+`LoadObject`, `_get`, `_set` and `_nexti` control into a scalar Rust controller.
+C++ executes VM actions, live typed pool reads, diagnostics and native command/
+operation-limiter RAII scopes. Non-VM FillList and clone wrappers stay C++.
+Rust borrows end before host operations; no VM/world pointer or exception crosses
+the ABI. Each invocation owns its controller, destroyed by C++ RAII on exit.
+ABI records 29/30 preserve signed values, full SQBool and VM type widths.
+
+Valuation touches before validation, checks type before modification, and commits
+before pop/charge. Filtering keeps function/scope timing, validity-before-callback,
+live index rereads after callbacks, bool-only results and its original throw type.
+Save preserves ascending order without consuming the cursor. Load merges with
+partial commits, checks surplus entries before final Sort, and retains the AND
+type predicate and both ignored-result getters. Metamethods preserve conversion,
+mutation counts, cursor movement, deletion, bool normalization and diagnostics.
+Original failed-getter undefined values (#67), unrepresentable conversions,
+signed overflow and invalidated iterators remain outside defined evidence.
+Added allocations do not preserve resource-exhaustion timing.
+
+Evidence: both unchanged scripted suites and `python3
+tools/script-list-comparison.py`: 990 observations per O0/O2 mode against pinned
+and portable C++, preserving the previous 888-record prefix, plus identical
+generated AI/GameScript/template bindings. The fixture uses four typed items;
+production pool/CPU-limit evidence comes from the game regressions. This closes
+the named list algorithms, not Squirrel or generic world queries.
+
 ### Nested widget descriptor parser
 
 `MakeNWidgets` and `MakeWindowNWidgetTree` use a widget-specific pull parser. Rust
