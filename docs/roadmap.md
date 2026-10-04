@@ -53,8 +53,9 @@ Three habits held back progress. The rules in `AGENTS.md` now prevent them.
 
 Status: the harness is `python3 tools/migration.py simulate` (see
 `docs/rust-migration.md`, "Simulation comparison"); its default set runs in CI.
-Remaining phase 1 work: the transport-network scenario with cargodist (#84),
-which #74 needs before it integrates, and any bugs the harness finds.
+The `play-*` scenarios cover road networks under manual distribution and
+cargodist (#84). Remaining phase 1 work: any bugs the harness finds. Rail, ship
+and aircraft scenarios (#86) come before ports of those vehicle types.
 
 Original scope: run the reference and the candidate headlessly on identical
 scenarios, take periodic uncompressed snapshots using the existing `-d desync=3`

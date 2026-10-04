@@ -14,6 +14,7 @@ check) and `--soak` for the larger scenario set.
 
 import argparse
 import concurrent.futures
+import contextlib
 import fnmatch
 import hashlib
 import json
@@ -55,6 +56,18 @@ RUNTIME_DIRECTORIES = ("lang", "baseset", "ai", "game", "regression")
 TICKS_PER_DAY = 74
 SNAPSHOT_TICKS = 32 * TICKS_PER_DAY
 
+# Road networks built by LLM players in OpenTTD 15.1 (migration/saves/README.md),
+# loaded with their scripts dropped. The first two run by default.
+PLAY_SAVES = ("opus-55-167-002", "grok-159-001", "astra-156-003", "opus-55-165-002", "opus-5-133-009", "fable-152-004")
+# Console commands run from scripts/game_start.scr after loading; the saves were
+# written paused. cargodist uses short link graph intervals so jobs recur often.
+DISTRIBUTIONS = {
+    "manual": ["unpause"],
+    "cargodist": ["setting linkgraph.distribution_pax 2", "setting linkgraph.distribution_mail 2",
+                  "setting linkgraph.distribution_default 1", "setting linkgraph.recalc_interval 4",
+                  "setting linkgraph.recalc_time 16", "unpause"],
+}
+
 
 def scenario_list(soak):
     """Data-driven scenario set; extend this for new ports rather than adding tools."""
@@ -73,6 +86,13 @@ def scenario_list(soak):
                     "map_log2": size, "land_generator": generator,
                     "ticks": years * 365 * TICKS_PER_DAY + SNAPSHOT_TICKS,
                 })
+    for save in PLAY_SAVES if soak else PLAY_SAVES[:2]:
+        for distribution, commands in DISTRIBUTIONS.items():
+            scenarios.append({
+                "name": f"play-{save}-{distribution}", "kind": "save", "console": commands,
+                "save": str(ROOT / "migration/saves" / f"{save}.sav"),
+                "ticks": years * 365 * TICKS_PER_DAY + SNAPSHOT_TICKS,
+            })
     return scenarios
 
 
@@ -294,9 +314,10 @@ def write_config(scenario, build, run_dir):
             "[gui]\nautosave = off\n"
             "[difficulty]\nmax_no_competitors = 0\ndisasters = true\n"
             "[game_creation]\ntown_name = english\n"
-            f"map_x = {scenario['map_log2']}\nmap_y = {scenario['map_log2']}\n"
-            f"land_generator = {scenario['land_generator']}\n"
         )
+        if scenario["kind"] == "generate":
+            text += (f"map_x = {scenario['map_log2']}\nmap_y = {scenario['map_log2']}\n"
+                     f"land_generator = {scenario['land_generator']}\n")
     text = set_option(text, "misc", "savegame_format = none")
     # The null video driver writes save/autosave/exit.sav when it stops.
     text = set_option(text, "gui", "autosave_on_exit = true")
@@ -312,7 +333,14 @@ def run_game(scenario, binary, build, run_dir, timeout, base_env=None, desync=Tr
     shutil.rmtree(run_dir, ignore_errors=True)
     run_dir.mkdir(parents=True)
     write_config(scenario, build, run_dir)
-    if scenario["kind"] == "regression":
+    if "console" in scenario:
+        (run_dir / "scripts").mkdir()
+        (run_dir / "scripts/game_start.scr").write_text("".join(f"{line}\n" for line in scenario["console"]))
+    if scenario["kind"] == "save":
+        # A saved AI or GameScript missing from the runtime is replaced by the
+        # idle dummy AI or dropped; the logs show it in both runs.
+        game = ["-g", scenario["save"], "-d", "script=2"]
+    elif scenario["kind"] == "regression":
         game = ["-g", f"ai/{scenario['test']}/test.sav", "-d", "script=2", "-Q"]
     else:
         game = ["-g", "-G", str(scenario["seed"])]
@@ -339,6 +367,39 @@ def log_lines(run_dir):
     """Debug output (script logs, warnings) without its timestamps."""
     return [re.sub(r"^\[[^\]]*\] ", "", line)
             for line in (run_dir / "stderr.log").read_text(errors="surrogateescape").splitlines()]
+
+
+class MachineLock:
+    """Lets a retried plain pair run with no other harness game on the machine.
+
+    A link graph job that has not finished by its join tick pauses the game, and
+    the null driver keeps counting iterations while paused. The job has only a
+    few milliseconds of wall time, so it misses that window when cores are
+    oversubscribed. Ordinary runs hold `path` shared across every harness
+    process and thread of the clone; a retry holds it exclusively. flock does
+    not favour a waiting exclusive holder, so every run first passes through a
+    gate lock that a retry keeps: once a retry waits, no new run starts and the
+    wait is bounded by the runs already in progress."""
+
+    def __init__(self, path):
+        self.path, self.gate = path, path.with_suffix(".gate")
+
+    @contextlib.contextmanager
+    def hold(self, alone):
+        try:
+            import fcntl
+        except ImportError:  # No flock (Windows): runs are not isolated.
+            yield
+            return
+        with open(self.gate, "w") as gate, open(self.path, "w") as handle:
+            fcntl.flock(gate, fcntl.LOCK_EX)
+            fcntl.flock(handle, fcntl.LOCK_EX if alone else fcntl.LOCK_SH)
+            if not alone:
+                fcntl.flock(gate, fcntl.LOCK_UN)
+            yield
+
+
+MACHINE = None  # MachineLock, set by main()
 
 
 def save_moment(path):
@@ -376,8 +437,9 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
     try:
         for mode, desync in (("snapshots", True), ("plain", False)):
             for attempt in range(1 if desync else 3):
-                runs = {role: run_game(scenario, binaries[role], builds[role], out / name / mode / role, timeout, env, desync)
-                        for role in ("reference", "candidate")}
+                with MACHINE.hold(alone=attempt > 0):
+                    runs = {role: run_game(scenario, binaries[role], builds[role], out / name / mode / role, timeout, env, desync)
+                            for role in ("reference", "candidate")}
                 exits = [runs[role]["snapshots"][-1] if runs[role]["snapshots"] and runs[role]["snapshots"][-1].name == "exit.sav"
                          else None for role in ("reference", "candidate")]
                 # Retry only a clean pair whose end moments differ; a crash, hang
@@ -407,6 +469,19 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
                 result["snapshots"] = len(shorter) + bool(same_end)
                 if len(shorter) < 2:
                     result["problems"].append("fewer than two periodic snapshots were written")
+                # Console output is invisible without a GUI, so confirm each
+                # setting line took effect in the first snapshot of both runs.
+                # Values must be written as PATS stores them (numbers, not
+                # true/false or names), and only saved game settings qualify.
+                for role, run in runs.items():
+                    first = next((p for p in run["snapshots"] if p.name != "exit.sav"), None)
+                    for line in scenario.get("console", []) if first else []:
+                        if line.startswith("setting "):
+                            _, key, value = line.split()
+                            chunk = read_save(first)["PATS"]
+                            saved = decode_element(chunk, chunk["elements"][0][1]).get(key)
+                            if str(saved) != value:
+                                result["problems"].append(f"{role}: {key} is {saved}, not {value}, in {first.name}")
             for snapshot in shorter:
                 compare(mode, snapshot)
                 if result["differences"]:
@@ -460,7 +535,10 @@ def main():
         print("\n".join(s["name"] for s in scenarios))
         return 0
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    out = migration.LOCAL / "simulation" / stamp
+    out = migration.LOCAL / "simulation" / f"{stamp}-{os.getpid()}"  # concurrent runs never share
+    global MACHINE
+    migration.COMMON_LOCAL.mkdir(parents=True, exist_ok=True)
+    MACHINE = MachineLock(migration.COMMON_LOCAL / "simulation.lock")
     out.mkdir(parents=True)
     builds = {"reference": out / "reference-runtime", "candidate": ROOT / "build-rust"}
     # The game finds its data next to the executable, so copy the shared
