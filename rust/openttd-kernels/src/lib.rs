@@ -23,6 +23,7 @@ mod packet;
 mod script_list;
 pub mod services;
 mod station_cargo;
+mod station_service;
 mod string_validation;
 mod tgp;
 mod townname;

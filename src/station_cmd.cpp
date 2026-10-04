@@ -585,6 +585,224 @@ CargoArray GetAcceptanceAroundTiles(TileIndex center_tile, int w, int h, int rad
 	return acceptance;
 }
 
+#ifdef WITH_RUST
+struct RustStationTileCursor {
+	BitmapTileIterator iterator;
+	bool started = false;
+	RustStationTileCursor(Station *st) : iterator(st->catchment_tiles) {}
+};
+struct RustStationTruncation {
+	StationCargoAmountMap amounts;
+	StationCargoAmountMap::iterator iterator;
+};
+static uint32_t RustStationRead(void *handle, uint8_t field, uint32_t arg) noexcept
+{
+	switch (field) {
+		case 0: return BaseStation::GetPoolSize();
+		case 1: return static_cast<uint32_t>(TimerGameTick::counter);
+		case 21: return TimerGameTick::counter >> 32;
+		case 2: return _game_mode == GM_EDITOR;
+		case 10: return _settings_game.order.selectgoods;
+		case 11: return _cheats.station_rating.value;
+		case 14: return CargoSpec::Get(arg)->IsValid();
+		case 15: return CargoSpec::Get(arg)->callback_mask.Test(CargoCallbackMask::StationRatingCalc);
+		case 16: return IsCargoInClass(arg, CargoClass::Passengers);
+		case 19: return CargoPacket::CanAllocateItem();
+		case 20: return IsTileType(TileIndex(arg), MP_HOUSE);
+	}
+	BaseStation *bst = static_cast<BaseStation *>(handle);
+	switch (field) {
+		case 3: return bst->facilities.base();
+		case 4: return bst->IsInUse();
+		case 5: return Station::IsExpected(bst);
+		case 6: return bst->owner.base();
+		case 7: return bst->owner == _local_company;
+		case 8: return bst->rect.IsEmpty();
+		case 9: return Company::IsValidID(bst->owner) && bst->town->statues.Test(bst->owner);
+		case 12: return Station::From(bst)->goods[arg].AvailableCount();
+		case 13: {
+			GoodsEntry &ge = Station::From(bst)->goods[arg];
+			return ge.HasData() ? ge.GetData().cargo.Packets()->MapSize() : 0;
+		}
+		case 17: return bst->town->exclusive_counter;
+		case 18: return bst->town->exclusivity.base();
+	}
+	NOT_REACHED();
+}
+static void RustStationEffect(void *handle, uint8_t effect, uint32_t a, uint32_t b, uint32_t c) noexcept
+{
+	BaseStation *bst = static_cast<BaseStation *>(handle);
+	switch (effect) {
+		case 0:
+			if (a != 0) SetWindowDirty(WC_STATION_VIEW, bst->index);
+			else SetWindowWidgetDirty(WC_STATION_VIEW, bst->index, WID_SV_ACCEPT_RATING_LIST);
+			break;
+		case 1: {
+			GoodsEntry &ge = Station::From(bst)->goods[a];
+			if (LinkGraph::IsValidID(ge.link_graph)) (*LinkGraph::Get(ge.link_graph))[ge.node].SetDemand(b);
+			break;
+		}
+		case 2: ShowRejectOrAcceptNews(Station::From(bst), CargoTypes(a) | CargoTypes(b) << 32, c != 0); break;
+		case 3: SetWindowWidgetDirty(WC_STATION_VIEW, bst->index, WID_SV_ACCEPT_RATING_LIST); break;
+		case 4: delete bst; break;
+		case 5:
+			TriggerStationAnimation(bst, bst->xy, StationAnimationTrigger::AcceptanceTick);
+			TriggerRoadStopAnimation(bst, bst->xy, StationAnimationTrigger::AcceptanceTick);
+			if (Station::IsExpected(bst)) TriggerAirportAnimation(Station::From(bst), AirportAnimationTrigger::AcceptanceTick);
+			break;
+		case 6: TriggerHouseAnimation_WatchedCargoAccepted(TileIndex(a), CargoTypes(b) | CargoTypes(c) << 32); break;
+		case 7: {
+			Station *st = Station::From(bst);
+			GoodsEntry &ge = st->goods[a];
+			StationID next = ge.GetVia(st->index);
+			ge.GetOrCreateData().cargo.Append(new CargoPacket(st->index, b, Source(SourceID(c & 0xFFFF), static_cast<SourceType>(c >> 16))), next);
+			break;
+		}
+		case 8: {
+			Station *st = Station::From(bst);
+			GoodsEntry &ge = st->goods[a];
+			LinkGraph *lg = nullptr;
+			if (ge.link_graph == LinkGraphID::Invalid()) {
+				if (LinkGraph::CanAllocateItem()) {
+					lg = new LinkGraph(a);
+					LinkGraphSchedule::instance.Queue(lg);
+					ge.link_graph = lg->index;
+					ge.node = lg->AddNode(st);
+				} else {
+					Debug(misc, 0, "Can't allocate link graph");
+				}
+			} else {
+				lg = LinkGraph::Get(ge.link_graph);
+			}
+			if (lg != nullptr) (*lg)[ge.node].UpdateSupply(b);
+			break;
+		}
+		case 9: InvalidateWindowData(WC_STATION_LIST, bst->owner); break;
+		case 10: {
+			Station *st = Station::From(bst);
+			TriggerStationRandomisation(st, st->xy, StationRandomTrigger::NewCargo, a);
+			TriggerStationAnimation(st, st->xy, StationAnimationTrigger::NewCargo, a);
+			TriggerAirportAnimation(st, AirportAnimationTrigger::NewCargo, a);
+			TriggerRoadStopRandomisation(st, st->xy, StationRandomTrigger::NewCargo, a);
+			TriggerRoadStopAnimation(st, st->xy, StationAnimationTrigger::NewCargo, a);
+			break;
+		}
+		case 11:
+			SetWindowDirty(WC_STATION_VIEW, bst->index);
+			Station::From(bst)->MarkTilesDirty(true);
+			break;
+		default: NOT_REACHED();
+	}
+}
+static const OpenTTDStationServices _rust_station_services = {
+	[](uint32_t id) noexcept -> void * { return BaseStation::GetIfValid(StationID(id)); },
+	[](void *st) noexcept { return static_cast<BaseStation *>(st)->rust_service.get(); },
+	RustStationRead, RustStationEffect,
+	[](void *, uint8_t cargo, uint32_t var10, uint32_t var18) noexcept { return GetCargoCallback(CBID_CARGO_STATION_RATING_CALC, var10, var18, CargoSpec::Get(cargo)); },
+	[](void *st) noexcept -> void * { return new RustStationTileCursor(Station::From(static_cast<BaseStation *>(st))); },
+	[](void *handle, uint8_t) noexcept {
+		auto *cursor = static_cast<RustStationTileCursor *>(handle);
+		if (cursor->started) ++cursor->iterator;
+		cursor->started = true;
+		return static_cast<TileIndex>(cursor->iterator).base();
+	},
+	[](void *handle) noexcept { delete static_cast<RustStationTileCursor *>(handle); },
+	[](uint32_t tile, uint32_t *amounts, uint64_t *always) noexcept {
+		CargoArray acceptance{};
+		std::copy_n(amounts, NUM_CARGO, acceptance.begin());
+		AddAcceptedCargo(TileIndex(tile), acceptance, always);
+		std::copy(acceptance.begin(), acceptance.end(), amounts);
+	},
+	[](void *handle, uint8_t cargo, uint32_t amount) noexcept -> void * {
+		auto *result = new RustStationTruncation;
+		GoodsEntry &ge = static_cast<Station *>(handle)->goods[cargo];
+		if (ge.HasData()) ge.GetData().cargo.Truncate(amount, &result->amounts);
+		result->iterator = result->amounts.begin();
+		return result;
+	},
+	[](void *handle, uint32_t *amount) noexcept -> uint32_t {
+		auto *result = static_cast<RustStationTruncation *>(handle);
+		if (result->iterator == result->amounts.end()) return UINT32_MAX;
+		*amount = result->iterator->second;
+		return (result->iterator++)->first.base();
+	},
+	[](void *handle) noexcept { delete static_cast<RustStationTruncation *>(handle); },
+	[]() noexcept { return Random(); },
+};
+static const OpenTTDStationLinks _rust_station_links = {
+	[](void *st, uint8_t cargo) noexcept -> void * { return LinkGraph::GetIfValid(static_cast<Station *>(st)->goods[cargo].link_graph); },
+	[](void *handle, uint8_t field, uint32_t a, uint32_t b) noexcept -> uint32_t {
+		switch (field) {
+			case 0: return _settings_game.linkgraph.GetDistributionType(a) != DT_MANUAL;
+			case 1: return static_cast<Station *>(handle)->goods[a].node;
+			case 2: return (*static_cast<LinkGraph *>(handle))[a].edges.size();
+			case 3: return TimerGameEconomy::date.base();
+			case 4: return static_cast<Station *>(handle)->index.base();
+			case 5: return (*static_cast<LinkGraph *>(handle))[a].edges[b].LastUpdate().base();
+			case 6: return static_cast<LinkGraph *>(handle)->LastCompression().base();
+		}
+		NOT_REACHED();
+	},
+	[](void *handle, uint16_t node, uint32_t index, OpenTTDStationEdge *out) noexcept {
+		LinkGraph *graph = static_cast<LinkGraph *>(handle);
+		const Edge &edge = (*graph)[node].edges[index];
+		Station *from = Station::Get((*graph)[node].station);
+		Station *to = Station::Get((*graph)[edge.dest_node].station);
+		*out = {to, edge.LastUpdate().base(), edge.last_unrestricted_update.base(), edge.last_restricted_update.base(), DistanceManhattan(from->xy, to->xy), edge.dest_node};
+	},
+	[](void *handle, uint8_t effect, uint16_t a, uint16_t b) noexcept {
+		switch (effect) {
+			case 0: {
+				GoodsEntry &ge = static_cast<Station *>(handle)->goods[a];
+				if (ge.HasData()) ge.GetData().flows.DeleteFlows(StationID(b));
+				break;
+			}
+			case 1: (*static_cast<LinkGraph *>(handle))[a][b].Restrict(); break;
+			case 2: {
+				GoodsEntry &ge = static_cast<Station *>(handle)->goods[a];
+				if (ge.HasData()) ge.GetData().flows.RestrictFlows(StationID(b));
+				break;
+			}
+			case 3: (*static_cast<LinkGraph *>(handle))[a][b].Release(); break;
+			case 4: (*static_cast<LinkGraph *>(handle))[a].RemoveEdge(b); break;
+			case 5: static_cast<LinkGraph *>(handle)->Compress(); break;
+			default: NOT_REACHED();
+		}
+	},
+	[](uint32_t id) noexcept -> void * { return OrderList::GetIfValid(OrderListID(id)); },
+	[](void *handle, uint8_t field, uint32_t arg) noexcept -> uint32_t {
+		if (field == 0) return OrderList::GetPoolSize();
+		OrderList *list = static_cast<OrderList *>(handle);
+		if (field == 1) return list->GetOrders().size();
+		const Order *order = &list->GetOrders()[arg];
+		return order->IsType(OT_GOTO_STATION) || order->IsType(OT_IMPLICIT) ? order->GetDestination().base() : UINT32_MAX;
+	},
+	[](void *list) noexcept -> void * { return static_cast<OrderList *>(list)->GetFirstSharedVehicle(); },
+	[](void *handle, uint8_t shared) noexcept -> void * { return shared ? static_cast<Vehicle *>(handle)->NextShared() : static_cast<Vehicle *>(handle)->Next(); },
+	[](void *handle, uint8_t field) noexcept -> uint32_t {
+		Vehicle *vehicle = static_cast<Vehicle *>(handle);
+		switch (field) {
+			case 0: return vehicle->IsStoppedInDepot();
+			case 1: return vehicle->date_of_last_service.base();
+			case 2: return vehicle->cargo_type;
+		}
+		NOT_REACHED();
+	},
+	[](void *vehicle) noexcept { LinkRefresher::Run(static_cast<Vehicle *>(vehicle), false); },
+	[](void *handle, void *vehicle, uint8_t cargo, uint16_t avoid, uint16_t avoid2) noexcept {
+		GoodsEntry &ge = static_cast<Station *>(handle)->goods[cargo];
+		if (vehicle == nullptr) {
+			if (ge.HasData()) ge.GetData().cargo.Reroute(UINT_MAX, &ge.GetData().cargo, StationID(avoid), StationID(avoid2), &ge);
+		} else {
+			Vehicle *v = static_cast<Vehicle *>(vehicle);
+			v->cargo.Reroute(UINT_MAX, &v->cargo, StationID(avoid), StationID(avoid2), &ge);
+		}
+	},
+};
+const OpenTTDStationServices &GetRustStationServices() noexcept { return _rust_station_services; }
+#endif
+
+#ifndef WITH_RUST
 /**
  * Get the acceptance of cargoes around the station in.
  * @param st Station to get acceptance of.
@@ -603,6 +821,8 @@ static CargoArray GetAcceptanceAroundStation(const Station *st, CargoTypes *alwa
 	return acceptance;
 }
 
+#endif
+
 /**
  * Update the acceptance for a station.
  * @param st Station to update
@@ -610,6 +830,9 @@ static CargoArray GetAcceptanceAroundStation(const Station *st, CargoTypes *alwa
  */
 void UpdateStationAcceptance(Station *st, bool show_msg)
 {
+#ifdef WITH_RUST
+	openttd_rust_station_acceptance(st, &_rust_station_services, show_msg);
+#else
 	/* old accepted goods types */
 	CargoTypes old_acc = GetAcceptanceMask(st);
 
@@ -654,6 +877,7 @@ void UpdateStationAcceptance(Station *st, bool show_msg)
 
 	/* redraw the station view since acceptance changed */
 	SetWindowWidgetDirty(WC_STATION_VIEW, st->index, WID_SV_ACCEPT_RATING_LIST);
+#endif
 }
 
 static void UpdateStationSignCoord(BaseStation *st)
@@ -3891,6 +4115,9 @@ static VehicleEnterTileStates VehicleEnter_Station(Vehicle *v, TileIndex tile, i
  */
 void TriggerWatchedCargoCallbacks(Station *st)
 {
+#ifdef WITH_RUST
+	openttd_rust_station_watched(st, &_rust_station_services);
+#else
 	/* Collect cargoes accepted since the last big tick. */
 	CargoTypes cargoes = 0;
 	for (CargoType cargo_type = 0; cargo_type < NUM_CARGO; cargo_type++) {
@@ -3907,8 +4134,10 @@ void TriggerWatchedCargoCallbacks(Station *st)
 			TriggerHouseAnimation_WatchedCargoAccepted(tile, cargoes);
 		}
 	}
+#endif
 }
 
+#ifndef WITH_RUST
 /**
  * This function is called for each station once every 250 ticks.
  * Not all stations will get the tick at the same time.
@@ -3966,6 +4195,9 @@ static void TruncateCargo(const CargoSpec *cs, GoodsEntry *ge, uint amount = UIN
 	}
 }
 
+#endif
+
+#ifndef WITH_RUST
 /**
  * Periodic update of a station's rating.
  * @param st The station to update.
@@ -4133,6 +4365,8 @@ static void UpdateStationRating(Station *st)
 	}
 }
 
+#endif
+
 /**
  * Reroute cargo of type c at station st or in any vehicles unloading there.
  * Make sure the cargo's new next hop is neither "avoid" nor "avoid2".
@@ -4143,6 +4377,9 @@ static void UpdateStationRating(Station *st)
  */
 void RerouteCargo(Station *st, CargoType cargo, StationID avoid, StationID avoid2)
 {
+#ifdef WITH_RUST
+	openttd_rust_station_reroute(st, cargo, avoid.base(), avoid2.base(), &_rust_station_services, &_rust_station_links);
+#else
 	GoodsEntry &ge = st->goods[cargo];
 
 	/* Reroute cargo in station. */
@@ -4155,6 +4392,7 @@ void RerouteCargo(Station *st, CargoType cargo, StationID avoid, StationID avoid
 			u->cargo.Reroute(UINT_MAX, &u->cargo, avoid, avoid2, &ge);
 		}
 	}
+#endif
 }
 
 /**
@@ -4167,6 +4405,9 @@ void RerouteCargo(Station *st, CargoType cargo, StationID avoid, StationID avoid
  */
 void DeleteStaleLinks(Station *from)
 {
+#ifdef WITH_RUST
+	openttd_rust_station_stale(from, &_rust_station_services, &_rust_station_links);
+#else
 	for (CargoType cargo = 0; cargo < NUM_CARGO; ++cargo) {
 		const bool auto_distributed = (_settings_game.linkgraph.GetDistributionType(cargo) != DT_MANUAL);
 		GoodsEntry &ge = from->goods[cargo];
@@ -4248,6 +4489,7 @@ void DeleteStaleLinks(Station *from)
 			lg->Compress();
 		}
 	}
+#endif
 }
 
 /**
@@ -4327,6 +4569,7 @@ void IncreaseStats(Station *st, const Vehicle *front, StationID next_station_id,
 	}
 }
 
+#ifndef WITH_RUST
 /* called for every station each tick */
 static void StationHandleSmallTick(BaseStation *st)
 {
@@ -4339,8 +4582,13 @@ static void StationHandleSmallTick(BaseStation *st)
 	if (b == 0) UpdateStationRating(Station::From(st));
 }
 
+#endif
+
 void OnTick_Station()
 {
+#ifdef WITH_RUST
+	openttd_rust_station_tick(&_rust_station_services, &_rust_station_links);
+#else
 	if (_game_mode == GM_EDITOR) return;
 
 	for (BaseStation *st : BaseStation::Iterate()) {
@@ -4364,17 +4612,22 @@ void OnTick_Station()
 			if (Station::IsExpected(st)) TriggerAirportAnimation(Station::From(st), AirportAnimationTrigger::AcceptanceTick);
 		}
 	}
+#endif
 }
 
 /** Economy monthly loop for stations. */
 static const IntervalTimer<TimerGameEconomy> _economy_stations_monthly({TimerGameEconomy::MONTH, TimerGameEconomy::Priority::STATION}, [](auto)
 {
+#ifdef WITH_RUST
+	openttd_rust_station_monthly(&_rust_station_services);
+#else
 	for (Station *st : Station::Iterate()) {
 		for (GoodsEntry &ge : st->goods) {
 			ge.status.Set(GoodsEntry::State::LastMonth, ge.status.Test(GoodsEntry::State::CurrentMonth));
 			ge.status.Reset(GoodsEntry::State::CurrentMonth);
 		}
 	}
+#endif
 });
 
 /**
@@ -4389,15 +4642,20 @@ void ModifyStationRatingAround(TileIndex tile, Owner owner, int amount, uint rad
 {
 	ForAllStationsRadius(tile, radius, [&](Station *st) {
 		if (st->owner == owner && DistanceManhattan(tile, st->xy) <= radius) {
+#ifdef WITH_RUST
+			openttd_rust_station_modify_rating(st->rust_service.get(), amount);
+#else
 			for (GoodsEntry &ge : st->goods) {
 				if (ge.status.Any()) {
 					ge.rating = ClampTo<uint8_t>(ge.rating + amount);
 				}
 			}
+#endif
 		}
 	});
 }
 
+#ifndef WITH_RUST
 static uint UpdateStationWaiting(Station *st, CargoType cargo, uint amount, Source source)
 {
 	/* We can't allocate a CargoPacket? Then don't do anything
@@ -4445,6 +4703,8 @@ static uint UpdateStationWaiting(Station *st, CargoType cargo, uint amount, Sour
 	st->MarkTilesDirty(true);
 	return amount;
 }
+
+#endif
 
 static bool IsUniqueStationName(const std::string &name)
 {
@@ -4575,6 +4835,7 @@ const StationList &StationFinder::GetStations()
 }
 
 
+#ifndef WITH_RUST
 static bool CanMoveGoodsToStation(const Station *st, CargoType cargo)
 {
 	/* Is the station reserved exclusively for somebody else? */
@@ -4596,8 +4857,14 @@ static bool CanMoveGoodsToStation(const Station *st, CargoType cargo)
 	return true;
 }
 
+#endif
+
 uint MoveGoodsToStation(CargoType cargo, uint amount, Source source, const StationList &all_stations, Owner exclusivity)
 {
+#ifdef WITH_RUST
+	std::vector<void *> stations(all_stations.begin(), all_stations.end());
+	return openttd_rust_station_distribute(cargo, amount, source.id | uint32_t(source.type) << 16, stations.data(), stations.size(), exclusivity.base(), &_rust_station_services);
+#else
 	/* Return if nothing to do. Also the rounding below fails for 0. */
 	if (all_stations.empty()) return 0;
 	if (amount == 0) return 0;
@@ -4679,6 +4946,7 @@ uint MoveGoodsToStation(CargoType cargo, uint amount, Source source, const Stati
 	}
 
 	return moved;
+#endif
 }
 
 void UpdateStationDockingTiles(Station *st)

@@ -25,6 +25,8 @@ extern "C" {
  * 39 effect view, 40 retired effect cursor, 41 effect map leaves, 42 shared game services.
  * 46 water patch, 47 water diagnostic snapshot, 48 water shared-service leaves.
  * 49 cargo specification, 50 cargo payment saved fields, 51 cargo services.
+ * 110 station cargo metadata, 111 station scalars, 112 station services,
+ * 113 station edge observations, 114 station links, 115 station loading.
  * Item 0 size, 1 alignment, then every field offset in declaration order.
  * Unknown type/item returns SIZE_MAX. No memory borrow, ownership or callback.
  * Native extern-C convention (cdecl on i686 MSVC); Rust panic never unwinds.
