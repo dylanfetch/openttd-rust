@@ -63,7 +63,7 @@ TEST_CASE("Road YAPF origin masks match shared track constants", "[road][rust]")
 			auto result = openttd_rust_road_yapf_choose(state, &input, &leaves, &tracks, 0, entry, TRACKDIR_BIT_Y_NW, true);
 			bool reachable = (tracks & DiagdirReachesTrackdirs(static_cast<DiagDirection>(entry))) != 0;
 			REQUIRE(result.direction == (reachable ? td : TRACKDIR_Y_NW));
-			REQUIRE(result.found == reachable);
+			REQUIRE(result.found == static_cast<uint8_t>(reachable));
 		}
 	}
 	openttd_rust_road_destroy(state);
@@ -139,7 +139,7 @@ TEST_CASE("Road YAPF low-limit timing and exit-key replacement match reference",
 			OpenTTDRoadYapfInput input{}; input.map_x = input.map_y = 64; input.max_nodes = limit;
 			RoadLimit::trace.clear();
 			auto result = openttd_rust_road_yapf_depot(&input, &leaves, nullptr, max_cost);
-			REQUIRE(result.found == found);
+			REQUIRE(result.found == static_cast<uint8_t>(found));
 			REQUIRE(RoadLimit::trace == expected_trace);
 			REQUIRE(result.tile == (best != nullptr ? best->segment_last_tile.base() : UINT32_MAX));
 			REQUIRE(result.cost == (best != nullptr ? best->cost : 0));
