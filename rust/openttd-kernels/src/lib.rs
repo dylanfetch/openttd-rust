@@ -1292,3 +1292,5 @@ pub unsafe extern "C" fn openttd_rust_inplace_write(
     }
     result
 }
+
+mod water_regions;

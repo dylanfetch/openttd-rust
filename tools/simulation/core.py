@@ -65,9 +65,9 @@ SNAPSHOT_TICKS = 32 * TICKS_PER_DAY
 
 def scenario_modules():
     """Families in scenario-list order; import after shared core initialization."""
-    from . import effects, generated, play_saves, towns, trees
+    from . import effects, generated, play_saves, ships, towns, trees
 
-    return generated, play_saves, towns, trees, effects
+    return generated, play_saves, towns, trees, effects, ships
 
 
 def scenario_list(soak):
@@ -749,6 +749,11 @@ def main():
         "--timeout", type=int, default=1200, help="seconds per game run"
     )
     parser.add_argument("--list", action="store_true")
+    parser.add_argument(
+        "--prepare-water-save",
+        choices=("ferry", "structures"),
+        help="build a committed ship fixture using only the pinned reference",
+    )
     args = parser.parse_args()
 
     every = scenario_list(args.soak)
@@ -775,6 +780,11 @@ def main():
     migration.COMMON_LOCAL.mkdir(parents=True, exist_ok=True)
     MACHINE = MachineLock(migration.COMMON_LOCAL / "simulation.lock")
     out.mkdir(parents=True)
+    if args.prepare_water_save:
+        from .ships import prepare_water_save
+
+        prepare_water_save(args.prepare_water_save, migration, out, args.timeout)
+        return 0
     # This is the checkout at invocation, not proof that an arbitrary --candidate
     # was built from it. The frozen executable's hash identifies what we execute.
     candidate_commit = migration.git("rev-parse", "HEAD")
