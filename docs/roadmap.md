@@ -7,17 +7,25 @@ a subagent stops and reports the conflict in its hand-off to root. Keep this
 file forward-looking: completed work is one table row, and its evidence stays in
 the PR (`AGENTS.md`, "Evidence budget").
 
-## Where the fork stands (2026-10-04, `rust-migration` at `f6a0d66b63`)
+## Where the fork stands (2026-10-04, integration `350aec9e30`)
 
-- Five ownership ports landed after the course correction (table below), retiring
-  about 7,300 C++ lines. That is under 2% of the ~384k non-vendored lines in
-  `src/`; most of the simulation is still C++.
-- Earlier work (utility kernels, string/UTF-8, crypto, Packet, ScriptList, widget
-  parser) predates the course correction and is recorded in
-  `docs/rust-migration.md`.
-- Process works: each port had an issue, an isolated worktree, independent Astra
-  review that caught real defects (#102's RNG exception path), green CI before
-  merge, and no harness masks.
+- Five ownership ports retired 7,323 original C++ lines, under 2% of roughly
+  384k non-vendored `src/` lines. Of that count, 3,848 is the town-name port,
+  mostly data tables; the other four account for 3,475 lines of game components.
+- Four integrations after steering (#112/#113/#115/#110) retire no additional
+  game logic. The harness split adds 190 net tooling lines; trees remove 35 net
+  lines, effects add 65, and rail/ship evidence adds 141 tooling lines. Gross
+  additions count moved code; tree/effect retirement here is old glue.
+- Effects remains the landed overrun: 965 glue/tooling lines for 548 retired.
+  Pending water and disaster ports also exceed retired C++ by 475 and 133 lines,
+  respectively; their PRs explain shared ship fixtures and lifecycle witnesses.
+  Reuse that evidence infrastructure in subsequent ports.
+- Course correction is now active: cargo delivery, full ship search and whole
+  town growth have implementation owners. The direct services are complete and
+  map access is decided; water/disasters are in final integration. Do not expand
+  generic harness tooling or polish evidence already accepted by review. The next
+  selected ports must reuse current fixtures and retire complete game loops.
+- Earlier utility, parser and crypto work is recorded in `docs/rust-migration.md`.
 
 ## Steering review (2026-10-04)
 
@@ -55,6 +63,13 @@ Harness and process: #72 harness (#85), #84 play saves (#87), #97 provenance
 freeze (#100), #88 Ruff (#92), #75 partial-pixel fidelity (#91), #90 world-state
 design (`docs/design/world-state.md`).
 
+| Issue | Completed maintenance | PR | Commit | Metrics (Rust / tooling / glue / retired) |
+| --- | --- | --- | --- | --- |
+| #109 | Component scenario modules | #112 | `9e1e5d175d` | 0 / 2414 / 0 / 0; moved code, net +190 lines |
+| #107 (trees) | Direct shared services | #113 | `c00402350b` | 640 / 22 / 149 / 22; old glue retired, no new game logic |
+| #107 (effects) | Direct shared services | #115 | `e702c4724e` | 241 / 4 / 155 / 86; old glue retired, net +65 lines |
+| #86 (rail/ship slice) | Owner-provided transport save | #110 | `350aec9e30` | 0 / 141 / 0 / 0 |
+
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
 ## Phase 1: harness maintenance
@@ -64,42 +79,76 @@ The harness is `python3 tools/migration.py simulate` (`docs/rust-migration.md`,
 always the first priority. Port differences go in `KNOWN_FAILURES` with an issue,
 never in masks.
 
-- **#109 Split `tools/simulate.py` into per-component scenario modules.**
-  Behavior-preserving. Do it first: all agents are stopped, and the #103/#104
-  evidence branches must rebase anyway, now into their own modules.
 - **#86 Rail and aircraft scenarios** (the ship slice is part of #104). Run on spare
-  capacity starting now; required before any rail, road-vehicle or aircraft
-  controller or YAPF port.
+  capacity starting now; each controller/YAPF port needs evidence for its vehicle
+  type. Rail/ship evidence is integrated in #110; #104 adds ship routing. Aircraft needs
+  an owner-built input unless the owner permits a supplemental setup AI (#111).
 
 ## Phase 3: current ownership work, in order
 
-1. **#107 Direct shared-service calls; rewrite trees, then effects.** Runs in
-   parallel with #109. Its services module is the base for #103 and #104.
-2. **#103 Disaster scheduling, vehicles and event control.** Resume from
-   `port-disaster-vehicles` at `ccb9586fe3` (Cargo/verify and two smoke cases pass;
-   not reviewed). Evidence: `evidence-disaster-vehicles` at `a775543162`; drop its
-   borrowed effect-helper commit `73ccd511fb`. Rebase onto #105 and #107, replace
-   async/await draws with direct calls, then turn the reference-built UFO/train and
-   zeppelin/airport experiments into harness witnesses in a disasters module.
-   Then review, comparisons and CI.
-3. **#104 Water-region cache and graph service**, built on #107 from the start
-   (`port-water-regions` has no source changes). Evidence: `evidence-water-regions`
-   at `c752070cde`: two reference-built saves, setup AIs and five scenarios passing
-   reference-self (164 snapshots). Rebase into a ships module after #109 and
-   deduplicate `field_spans` from #105. Still needed: canal/lock/aqueduct, reload,
-   warm-cache mutation, negative probes, soak and candidate evidence. Record
-   crossing counts and timing for #108.
-4. **#108 Map access decision** (Astra high). Measure on trees after #107 and on
-   #104. Root records the decision here before any item in step 6 is selected.
-5. **Economy** (next selection after #103/#104). Root has a fresh Astra high agent
-   compare station rating updates, cargo payment and delivery, and industry
-   production, and selects one whose periodic loop and state Rust can own
-   whole. A formula extracted from a C++ loop is kernel extraction.
-6. **After #108 and #86:** complete ship YAPF (both levels, after #104), town
-   growth, road/rail vehicle controllers, YAPF rail/road.
+1. **#103 Disaster scheduling, vehicles and event control, PR #118.**
+   Final independent review accepts the owner and evidence; wait required CI.
+   Actual #109/#113/#115 dependency ancestry is included; retain the real UFO/train,
+   airport, industry, release/reload and submarine lifecycle witnesses.
+2. **#104 Water-region cache and graph service, PR #114.** The visitor alias
+   correction is accepted. Update from the integration base, check any source
+   conflict resolution, then green CI and integration. Reuse its
+   ships corpus for full ship YAPF; do not start another ship comparison tool.
+3. **#108 Map access decision accepted; measurement PR #116 remains.**
+   Keep canonical map arrays in C++ and direct bundled `noexcept` services, as
+   recorded in `docs/design/world-state.md`. Counts establish crossing density,
+   not a bottleneck; timings cannot resolve small overhead. No raw shared view or
+   allocation transfer is selected. Integrate reviewed measurement code after
+   its base update and required CI.
+4. **#117 Cargo payment and delivery ownership.** Selected after a fresh Astra
+   high comparison with station ratings and industry production. Own CargoPayment
+   state and lifetime, delivery acceptance/payment control, destination collection
+   and the complete production-flush loop. Preserve Money saturation, native-width
+   intermediates and CAPY lifecycle. Loading/reservation and shared industry state
+   remain C++; this is not an income-formula extraction. Begin while earlier PRs
+   are in review/CI, using the existing road scenarios and #107/#109 interfaces.
+5. **#119 Complete ship YAPF and path cache ownership.** Own both search levels,
+   their queues/arenas/corridor/retries and canonical `Ship::path`, including all
+   controller and save adapters. Reuse #104's corpus; no separate comparison tool.
+   Begin while #104 finishes integration, using its real dependency ancestry.
+6. **#120 Complete town-growth control and private state.** Own tick traversal,
+   growth road walking/build choices, house selection and placement control,
+   growth-rate/funding transitions and canonical counters/flags with CITY and
+   legacy adapters. Keep unrelated town accounting and shared world state in C++.
+   Add actual growth witnesses to the existing towns module.
+7. **Next selections:** road/rail vehicle controllers and YAPF rail/road.
+   Aircraft stays gated on #111 and the remaining #86 fixture.
 
 Storage transfers (map arrays, pools) still require explicit selection here,
 following `docs/design/world-state.md` as amended by #108.
+
+## Resume checkpoint (2026-10-04)
+
+Root: `/root` (gpt-6-astra, ultra). Integration base `350aec9e30`; four
+integrations since steering, stocktake updated. Next stocktake after two more integrations. All rows below are active, not integrated completion.
+Worktrees are siblings of the main checkout unless a path says otherwise.
+
+| Issue / owner | Branch and checkpoint commit | Worktree | Next step |
+| --- | --- | --- | --- |
+| #103 `/root/disaster_ownership_103` (Sol high) | `port-disaster-vehicles` at `9f9c265afc`, PR #118 | `openttd-rust-disasters` | `/root/review_disasters_pr118` (Astra medium) accepts final owner/evidence; required CI running. |
+| #104 `/root/water_regions_104` (Sol high) | `port-water-regions` from reviewed `048502be36`, PR #114 | `openttd-rust-water-regions` | Base merge resolves ABI table adjacency conflicts; owner verifies, same reviewer checks source resolution, then new CI. |
+| #108 `/root/map_access_decision_108` (Astra high) | `map-access-measurements-108` at `3c3ffa09b4`, PR #116 | `openttd-rust-map-access` | Review accepts original code; conflict-free base merge, verify and focused smoke pass. Required CI rerunning; root integrates when green. |
+| #117 `/root/cargo_payment_delivery` (Sol high) | `cargo-payment-delivery-117` from `9f5f580078`, uncommitted owner | `openttd-rust-cargo-payment` | Build and initial road pair pass; payment/reload/acceptance witnesses underway. `/root/cargo_multidestination_scenario` supplies a narrow unchanged-reference ordered flush check for the documented multi-industry corpus gap. ABI 49/50/51 reserved. |
+| #119 `/root/ship_yapf_ownership` (Sol high) | `ship-yapf-ownership-119` from current base, actual #104 dependency | `openttd-rust-ship-yapf` | Implement complete search/cache owner and reuse ship scenarios; coordinate water dependency. ABI IDs start at 52. |
+| #120 `/root/town_growth_ownership` (Sol high) | `town-growth-ownership-120` from current base | `openttd-rust-town-growth` | Implement full growth/house-placement owner and persistent state adapters. ABI IDs start at 60; add actual growth witnesses. |
+
+Preserved evidence branches: `evidence-disaster-vehicles` at `a775543162`
+(`openttd-rust-disasters-evidence`) and `evidence-water-regions` at `c752070cde`
+(`openttd-rust-water-evidence`). Their useful source inputs are incorporated;
+do not reapply borrowed effect helper `73ccd511fb`. Build/test with `--jobs 2`;
+required CI supplies default/all-comparison checks where local component evidence
+already covers the change. Keep long-running checks in an active agent session:
+ending and recycling a task thread has killed unfinished background processes.
+
+Fresh planner `/root/plan_next_ownership_selections` (Astra high) selected the
+cargo/ship sequence. `/root/plan_town_growth_ownership` (Astra high) supplied the
+whole growth-loop and house-placement scope now selected as #120. Continue
+per-PR reviews while CI runs; plan following vehicle owners before this queue runs low.
 
 ## Choosing the next task
 
