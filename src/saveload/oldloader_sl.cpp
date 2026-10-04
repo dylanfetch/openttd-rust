@@ -9,6 +9,9 @@
 
 #include "../stdafx.h"
 #include "../town.h"
+#ifdef WITH_RUST
+#include "../rust/town_save.hpp"
+#endif
 #include "../industry.h"
 #include "../company_func.h"
 #include "../aircraft.h"
@@ -184,12 +187,12 @@ void FixOldVehicles(LoadgameState &ls)
 		/* We haven't used this bit for stations for ages */
 		if (v->type == VEH_ROAD) {
 			RoadVehicle *rv = RoadVehicle::From(v);
-			if (rv->state != RVSB_IN_DEPOT && rv->state != RVSB_WORMHOLE) {
-				ClrBit(rv->state, 2);
+			if (rv->GetState() != RVSB_IN_DEPOT && rv->GetState() != RVSB_WORMHOLE) {
+				rv->SetState(rv->GetState() & ~(1U << 2));
 				Tile tile(rv->tile);
 				if (IsTileType(tile, MP_STATION) && tile.m5() >= 168) {
 					/* Update the vehicle's road state to show we're in a drive through road stop. */
-					SetBit(rv->state, RVS_IN_DT_ROAD_STOP);
+					rv->SetState(rv->GetState() | (1U << RVS_IN_DT_ROAD_STOP));
 				}
 			}
 		}
@@ -452,7 +455,7 @@ static bool FixTTOEngines()
 static void FixTTOCompanies()
 {
 	for (Company *c : Company::Iterate()) {
-		c->cur_economy.company_value = CalculateCompanyValue(c); // company value history is zeroed
+		c->Finances().cur_economy.company_value = CalculateCompanyValue(c); // company value history is zeroed
 	}
 }
 
@@ -575,11 +578,19 @@ static const OldChunks town_chunk[] = {
 	OCL_NULL( 2 ),         ///< population,        no longer in use
 	OCL_SVAR( OC_UINT16, Town, townnametype ),
 	OCL_SVAR( OC_UINT32, Town, townnameparts ),
+#ifdef WITH_RUST
+	{ OC_FILE_U8 | OC_VAR_U16, 1, nullptr, [] (void *) -> void * { return &TownGrowthSaveScope::current.counter; }, nullptr },
+#else
 	OCL_SVAR(  OC_FILE_U8 | OC_VAR_U16, Town, grow_counter ),
+#endif
 	OCL_NULL( 1 ),         ///< sort_index,        no longer in use
 	OCL_NULL( 4 ),         ///< sign-coordinates,  no longer in use
 	OCL_NULL( 2 ),         ///< namewidth,         no longer in use
+#ifdef WITH_RUST
+	{ OC_FILE_U16 |  OC_VAR_U8, 1, nullptr, [] (void *) -> void * { return &TownGrowthSaveScope::current.flags; }, nullptr },
+#else
 	OCL_SVAR( OC_FILE_U16 |  OC_VAR_U8, Town, flags ),
+#endif
 	OCL_NULL( 10 ),        ///< radius,            no longer in use
 
 	OCL_SVAR( OC_INT16, Town, ratings[0] ),
@@ -595,7 +606,11 @@ static const OldChunks town_chunk[] = {
 	OCL_SVAR( OC_FILE_U32 | OC_VAR_U16, Town, statues ),
 	OCL_NULL( 2 ),         ///< num_houses,        no longer in use
 	OCL_SVAR(  OC_FILE_U8 | OC_VAR_U16, Town, time_until_rebuild ),
+#ifdef WITH_RUST
+	{ OC_FILE_U8 | OC_VAR_U16, 1, nullptr, [] (void *) -> void * { return &TownGrowthSaveScope::current.rate; }, nullptr },
+#else
 	OCL_SVAR(  OC_FILE_U8 | OC_VAR_U16, Town, growth_rate ),
+#endif
 
 	/* Slots 0 and 2 are passengers and mail respectively for old saves. */
 	OCL_VAR( OC_FILE_U16 | OC_VAR_U32, 1, &_old_pass_supplied[THIS_MONTH].production ),
@@ -614,8 +629,16 @@ static const OldChunks town_chunk[] = {
 	OCL_SVAR( OC_TTD | OC_UINT16, Town, received[TAE_FOOD].old_act ),
 	OCL_SVAR( OC_TTD | OC_UINT16, Town, received[TAE_WATER].old_act ),
 
+#ifdef WITH_RUST
+	{ OC_UINT8, 1, nullptr, [] (void *) -> void * { return &TownGrowthSaveScope::current.road; }, nullptr },
+#else
 	OCL_SVAR(  OC_UINT8, Town, road_build_months ),
+#endif
+#ifdef WITH_RUST
+	{ OC_UINT8, 1, nullptr, [] (void *) -> void * { return &TownGrowthSaveScope::current.funding; }, nullptr },
+#else
 	OCL_SVAR(  OC_UINT8, Town, fund_buildings_months ),
+#endif
 
 	OCL_CNULL( OC_TTD, 8 ),         ///< some junk at the end of the record
 
@@ -625,7 +648,12 @@ static const OldChunks town_chunk[] = {
 static bool LoadOldTown(LoadgameState &ls, int num)
 {
 	Town *t = new (TownID(num)) Town();
-	if (!LoadChunk(ls, t, town_chunk)) return false;
+	{
+#ifdef WITH_RUST
+		TownGrowthSaveScope growth_scope(t, true);
+#endif
+		if (!LoadChunk(ls, t, town_chunk)) return false;
+	}
 
 	if (t->xy != 0) {
 		if (_savegame_type == SGT_TTO) {
@@ -820,6 +848,9 @@ static bool LoadOldStation(LoadgameState &ls, int num)
 static std::array<Industry::AcceptedCargo, INDUSTRY_ORIGINAL_NUM_INPUTS> _old_accepted{};
 static std::array<Industry::ProducedCargo, INDUSTRY_ORIGINAL_NUM_OUTPUTS> _old_produced{};
 
+#ifdef WITH_RUST
+static OpenTTDIndustryFields _old_industry_fields;
+#endif
 static const OldChunks industry_chunk[] = {
 	OCL_SVAR(   OC_TILE, Industry, location.tile ),
 	OCL_VAR ( OC_UINT32,   1, &_old_town_index ),
@@ -837,7 +868,11 @@ static const OldChunks industry_chunk[] = {
 
 	OCL_NULL( 3 ),  ///< used to be industry's accepts_cargo
 
+#ifdef WITH_RUST
+	OCL_VAR( OC_UINT8, 1, &_old_industry_fields.prod_level ),
+#else
 	OCL_SVAR(  OC_UINT8, Industry, prod_level ),
+#endif
 
 	OCL_VAR( OC_UINT16, 1, &_old_produced[0].history[THIS_MONTH].production ),
 	OCL_VAR( OC_UINT16, 1, &_old_produced[1].history[THIS_MONTH].production ),
@@ -852,12 +887,28 @@ static const OldChunks industry_chunk[] = {
 	OCL_VAR( OC_UINT16, 1, &_old_produced[1].history[LAST_MONTH].transported ),
 
 	OCL_SVAR(  OC_UINT8, Industry, type ),
+#ifdef WITH_RUST
+	OCL_VAR( OC_TTO | OC_FILE_U8 | OC_VAR_U16, 1, &_old_industry_fields.counter ),
+#else
 	OCL_SVAR( OC_TTO | OC_FILE_U8 | OC_VAR_U16, Industry, counter ),
+#endif
 	OCL_SVAR(  OC_UINT8, Industry, owner ),
 	OCL_SVAR(  OC_UINT8, Industry, random_colour ),
+#ifdef WITH_RUST
+	OCL_VAR( OC_TTD | OC_FILE_U8 | OC_VAR_I32, 1, &_old_industry_fields.last_prod_year ),
+#else
 	OCL_SVAR( OC_TTD | OC_FILE_U8 | OC_VAR_I32, Industry, last_prod_year ),
+#endif
+#ifdef WITH_RUST
+	OCL_VAR( OC_TTD | OC_UINT16, 1, &_old_industry_fields.counter ),
+#else
 	OCL_SVAR( OC_TTD | OC_UINT16, Industry, counter ),
+#endif
+#ifdef WITH_RUST
+	OCL_VAR( OC_TTD | OC_UINT8, 1, &_old_industry_fields.was_cargo_delivered ),
+#else
 	OCL_SVAR( OC_TTD | OC_UINT8, Industry, was_cargo_delivered ),
+#endif
 
 	OCL_CNULL( OC_TTD, 9 ), ///< Random junk at the end of this chunk
 
@@ -867,7 +918,14 @@ static const OldChunks industry_chunk[] = {
 static bool LoadOldIndustry(LoadgameState &ls, int num)
 {
 	Industry *i = new (IndustryID(num)) Industry();
+#ifdef WITH_RUST
+	_old_industry_fields = i->ProductionFields();
+	bool loaded = LoadChunk(ls, i, industry_chunk);
+	i->ProductionFields() = _old_industry_fields;
+	if (!loaded) return false;
+#else
 	if (!LoadChunk(ls, i, industry_chunk)) return false;
+#endif
 
 	if (i->location.tile != 0) {
 		/* Copy data from old fixed arrays to industry. */
@@ -913,7 +971,7 @@ static bool LoadOldCompanyYearly(LoadgameState &ls, int num)
 			if (!LoadChunk(ls, nullptr, _company_yearly_chunk)) return false;
 		}
 
-		c->yearly_expenses[num][i] = _old_yearly;
+		c->Finances().yearly_expenses[num][i] = _old_yearly;
 	}
 
 	return true;
@@ -933,17 +991,17 @@ static bool LoadOldCompanyEconomy(LoadgameState &ls, int)
 {
 	Company *c = Company::Get(_current_company_id);
 
-	if (!LoadChunk(ls, &c->cur_economy, _company_economy_chunk)) return false;
+	if (!LoadChunk(ls, &c->Finances().cur_economy, _company_economy_chunk)) return false;
 
 	/* Don't ask, but the number in TTD(Patch) are inverted to OpenTTD */
-	c->cur_economy.income   = -c->cur_economy.income;
-	c->cur_economy.expenses = -c->cur_economy.expenses;
+	c->Finances().cur_economy.income   = -c->Finances().cur_economy.income;
+	c->Finances().cur_economy.expenses = -c->Finances().cur_economy.expenses;
 
 	for (uint i = 0; i < 24; i++) {
-		if (!LoadChunk(ls, &c->old_economy[i], _company_economy_chunk)) return false;
+		if (!LoadChunk(ls, &c->Finances().old_economy[i], _company_economy_chunk)) return false;
 
-		c->old_economy[i].income   = -c->old_economy[i].income;
-		c->old_economy[i].expenses = -c->old_economy[i].expenses;
+		c->Finances().old_economy[i].income   = -c->Finances().old_economy[i].income;
+		c->Finances().old_economy[i].expenses = -c->Finances().old_economy[i].expenses;
 	}
 
 	return true;
@@ -956,15 +1014,15 @@ static const OldChunks _company_chunk[] = {
 	OCL_VAR ( OC_UINT16,   1, &_old_string_id_2 ),
 	OCL_SVAR( OC_UINT32, Company, president_name_2 ),
 
-	OCL_SVAR( OC_FILE_I32 | OC_VAR_I64, Company, money ),
-	OCL_SVAR( OC_FILE_I32 | OC_VAR_I64, Company, current_loan ),
+	OCL_SVAR( OC_FILE_I32 | OC_VAR_I64, Company, Finances().money ),
+	OCL_SVAR( OC_FILE_I32 | OC_VAR_I64, Company, Finances().current_loan ),
 
 	OCL_SVAR(  OC_UINT8, Company, colour ),
-	OCL_SVAR(  OC_UINT8, Company, money_fraction ),
-	OCL_SVAR(  OC_UINT8, Company, months_of_bankruptcy ),
-	OCL_SVAR( OC_FILE_U8  | OC_VAR_U16, Company, bankrupt_asked ),
-	OCL_SVAR( OC_FILE_U32 | OC_VAR_I64, Company, bankrupt_value ),
-	OCL_SVAR( OC_UINT16, Company, bankrupt_timeout ),
+	OCL_SVAR(  OC_UINT8, Company, Finances().money_fraction ),
+	OCL_SVAR(  OC_UINT8, Company, Finances().months_of_bankruptcy ),
+	OCL_SVAR( OC_FILE_U8  | OC_VAR_U16, Company, Finances().bankrupt_asked ),
+	OCL_SVAR( OC_FILE_U32 | OC_VAR_I64, Company, Finances().bankrupt_value ),
+	OCL_SVAR( OC_UINT16, Company, Finances().bankrupt_timeout ),
 
 	OCL_CNULL( OC_TTD, 4 ), // cargo_types
 	OCL_CNULL( OC_TTO, 2 ), // cargo_types
@@ -974,11 +1032,11 @@ static const OldChunks _company_chunk[] = {
 
 	OCL_SVAR( OC_FILE_U16 | OC_VAR_I32, Company, inaugurated_year),
 	OCL_SVAR(                  OC_TILE, Company, last_build_coordinate ),
-	OCL_SVAR(                 OC_UINT8, Company, num_valid_stat_ent ),
+	OCL_SVAR(                 OC_UINT8, Company, Finances().num_valid_stat_ent ),
 
 	OCL_NULL( 230 ),         // Old AI
 
-	OCL_SVAR(  OC_UINT8, Company, block_preview ),
+	OCL_SVAR(  OC_UINT8, Company, Finances().block_preview ),
 	OCL_CNULL( OC_TTD, 1 ),           // Old AI
 	OCL_CNULL( OC_TTD, 1 ), // avail_railtypes
 	OCL_SVAR(   OC_TILE, Company, location_of_HQ ),
@@ -1051,7 +1109,7 @@ static bool LoadOldCompany(LoadgameState &ls, int num)
 		 * but correct for those oldies
 		 * Ps: this also means that if you had exact 893288 pounds, you will go back
 		 * to 100000.. this is a very VERY small chance ;) */
-		if (c->money == 893288) c->money = c->current_loan = 100000;
+		if (c->Finances().money == 893288) c->Finances().money = c->Finances().current_loan = 100000;
 	}
 
 	_company_colours[num] = c->colour;
@@ -1076,6 +1134,15 @@ static const OldChunks vehicle_train_chunk[] = {
 };
 
 static const OldChunks vehicle_road_chunk[] = {
+#ifdef WITH_RUST
+	{ OC_UINT8, 1, nullptr, [] (void *) -> void * { return &RoadVehicleStateScope::State(); }, nullptr },
+	{ OC_UINT8, 1, nullptr, [] (void *) -> void * { return &RoadVehicleStateScope::Frame(); }, nullptr },
+	{ OC_UINT16, 1, nullptr, [] (void *) -> void * { return &RoadVehicleStateScope::BlockedCounter(); }, nullptr },
+	{ OC_UINT8, 1, nullptr, [] (void *) -> void * { return &RoadVehicleStateScope::Overtaking(); }, nullptr },
+	{ OC_UINT8, 1, nullptr, [] (void *) -> void * { return &RoadVehicleStateScope::OvertakingCounter(); }, nullptr },
+	{ OC_UINT16, 1, nullptr, [] (void *) -> void * { return &RoadVehicleStateScope::CrashedCounter(); }, nullptr },
+	{ OC_UINT8, 1, nullptr, [] (void *) -> void * { return &RoadVehicleStateScope::ReverseCounter(); }, nullptr },
+#else
 	OCL_SVAR(  OC_UINT8, RoadVehicle, state ),
 	OCL_SVAR(  OC_UINT8, RoadVehicle, frame ),
 	OCL_SVAR( OC_UINT16, RoadVehicle, blocked_ctr ),
@@ -1083,6 +1150,7 @@ static const OldChunks vehicle_road_chunk[] = {
 	OCL_SVAR(  OC_UINT8, RoadVehicle, overtaking_ctr ),
 	OCL_SVAR( OC_UINT16, RoadVehicle, crashed_ctr ),
 	OCL_SVAR(  OC_UINT8, RoadVehicle, reverse_ctr ),
+#endif
 
 	OCL_NULL( 1 ), ///< Junk
 
@@ -1149,7 +1217,13 @@ static bool LoadOldVehicleUnion(LoadgameState &ls, int)
 		switch (v->type) {
 			default: SlErrorCorrupt("Invalid vehicle type");
 			case VEH_TRAIN   : res = LoadChunk(ls, v, vehicle_train_chunk);    break;
-			case VEH_ROAD    : res = LoadChunk(ls, v, vehicle_road_chunk);     break;
+			case VEH_ROAD: {
+#ifdef WITH_RUST
+				RoadVehicleStateScope scope(RoadVehicle::From(v), true);
+#endif
+				res = LoadChunk(ls, v, vehicle_road_chunk);
+				break;
+			}
 			case VEH_SHIP    : res = LoadChunk(ls, v, vehicle_ship_chunk);     break;
 			case VEH_AIRCRAFT: res = LoadChunk(ls, v, vehicle_air_chunk);      break;
 			case VEH_EFFECT: {

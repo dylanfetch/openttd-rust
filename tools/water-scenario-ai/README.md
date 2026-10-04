@@ -62,4 +62,20 @@ python3 tools/migration.py build --jobs 2
 
 This removes the source fixture's west aqueduct ramp from candidate region
 connectivity. It must break the route witness and/or produce semantic differences.
-Full ship YAPF and #86's rail/aircraft corpus remain separate work.
+Ship YAPF ownership reuses this corpus. Internal branch witnesses:
+
+```sh
+OPENTTD_SHIP_PROFILE=1 python3 tools/migration.py simulate water --soak --jobs 2
+PYTHONPATH=tools python3 -m simulation.ships <report.json>
+```
+
+Ferries require intermediate goals, alternate docking, cache truncation/final
+clearing and reversals; structures require retries and lost/random recovery.
+The 5,120-node track and map-derived region limits are exercised with injected
+native graph leaves and unchanged CYapfBaseT timing checks. These synthetic
+fixtures do not claim reachable-map coverage.
+
+Negative cache probe: temporarily replace Rust's `if path[0] == end` with
+`if !cache.0.is_empty() || path[0] == end`, run the paired ferry scenario and require
+VEHS path differences, then restore and rerun it. The reference and masks remain
+unchanged. #86's remaining aircraft corpus is separate work.

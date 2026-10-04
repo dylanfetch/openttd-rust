@@ -15,6 +15,9 @@
 #include "newgrf_sl.h"
 #include "../newgrf_house.h"
 #include "../town.h"
+#ifdef WITH_RUST
+#include "../rust/town_save.hpp"
+#endif
 #include "../landscape.h"
 #include "../subsidy_func.h"
 #include "../strings_func.h"
@@ -260,7 +263,11 @@ static const SaveLoad _town_desc[] = {
 	    SLE_VAR(Town, townnameparts,         SLE_UINT32),
 	SLE_CONDSSTR(Town, name,                 SLE_STR | SLF_ALLOW_CONTROL, SLV_84, SL_MAX_VERSION),
 
+#ifdef WITH_RUST
+	    SLEG_VAR("flags", TownGrowthSaveScope::current.flags,                 SLE_UINT8),
+#else
 	    SLE_VAR(Town, flags,                 SLE_UINT8),
+#endif
 	SLE_CONDVAR(Town, statues,               SLE_FILE_U8  | SLE_VAR_U16, SL_MIN_VERSION, SLV_104),
 	SLE_CONDVAR(Town, statues,               SLE_UINT16,               SLV_104, SL_MAX_VERSION),
 
@@ -300,14 +307,42 @@ static const SaveLoad _town_desc[] = {
 
 	SLE_CONDVAR(Town, time_until_rebuild,    SLE_FILE_U8 | SLE_VAR_U16,  SL_MIN_VERSION, SLV_54),
 	SLE_CONDVAR(Town, time_until_rebuild,    SLE_UINT16,                SLV_54, SL_MAX_VERSION),
+#ifdef WITH_RUST
+	SLEG_CONDVAR("grow_counter", TownGrowthSaveScope::current.counter,          SLE_FILE_U8 | SLE_VAR_U16,  SL_MIN_VERSION, SLV_54),
+#else
 	SLE_CONDVAR(Town, grow_counter,          SLE_FILE_U8 | SLE_VAR_U16,  SL_MIN_VERSION, SLV_54),
+#endif
+#ifdef WITH_RUST
+	SLEG_CONDVAR("grow_counter", TownGrowthSaveScope::current.counter,          SLE_UINT16,                SLV_54, SL_MAX_VERSION),
+#else
 	SLE_CONDVAR(Town, grow_counter,          SLE_UINT16,                SLV_54, SL_MAX_VERSION),
+#endif
+#ifdef WITH_RUST
+	SLEG_CONDVAR("growth_rate", TownGrowthSaveScope::current.rate,           SLE_FILE_U8 | SLE_VAR_I16,  SL_MIN_VERSION, SLV_54),
+#else
 	SLE_CONDVAR(Town, growth_rate,           SLE_FILE_U8 | SLE_VAR_I16,  SL_MIN_VERSION, SLV_54),
+#endif
+#ifdef WITH_RUST
+	SLEG_CONDVAR("growth_rate", TownGrowthSaveScope::current.rate,           SLE_FILE_I16 | SLE_VAR_U16, SLV_54, SLV_165),
+#else
 	SLE_CONDVAR(Town, growth_rate,           SLE_FILE_I16 | SLE_VAR_U16, SLV_54, SLV_165),
+#endif
+#ifdef WITH_RUST
+	SLEG_CONDVAR("growth_rate", TownGrowthSaveScope::current.rate,           SLE_UINT16,                 SLV_165, SL_MAX_VERSION),
+#else
 	SLE_CONDVAR(Town, growth_rate,           SLE_UINT16,                 SLV_165, SL_MAX_VERSION),
+#endif
 
+#ifdef WITH_RUST
+	    SLEG_VAR("fund_buildings_months", TownGrowthSaveScope::current.funding, SLE_UINT8),
+#else
 	    SLE_VAR(Town, fund_buildings_months, SLE_UINT8),
+#endif
+#ifdef WITH_RUST
+	    SLEG_VAR("road_build_months", TownGrowthSaveScope::current.road,     SLE_UINT8),
+#else
 	    SLE_VAR(Town, road_build_months,     SLE_UINT8),
+#endif
 
 	SLE_CONDVAR(Town, exclusivity,           SLE_UINT8,                  SLV_2, SL_MAX_VERSION),
 	SLE_CONDVAR(Town, exclusive_counter,     SLE_UINT8,                  SLV_2, SL_MAX_VERSION),
@@ -337,6 +372,9 @@ struct CITYChunkHandler : ChunkHandler {
 
 		for (Town *t : Town::Iterate()) {
 			SlSetArrayIndex(t->index);
+#ifdef WITH_RUST
+			TownGrowthSaveScope growth_scope(t, false);
+#endif
 			SlObject(t, _town_desc);
 		}
 	}
@@ -349,7 +387,12 @@ struct CITYChunkHandler : ChunkHandler {
 
 		while ((index = SlIterateArray()) != -1) {
 			Town *t = new (TownID(index)) Town();
-			SlObject(t, slt);
+			{
+#ifdef WITH_RUST
+				TownGrowthSaveScope growth_scope(t, true);
+#endif
+				SlObject(t, slt);
+			}
 
 			if (IsSavegameVersionBefore(SLV_165)) {
 				/* Passengers and mail were always treated as slots 0 and 2 in older saves. */
@@ -376,6 +419,9 @@ struct CITYChunkHandler : ChunkHandler {
 		if (IsSavegameVersionBefore(SLV_161)) return;
 
 		for (Town *t : Town::Iterate()) {
+#ifdef WITH_RUST
+			TownGrowthSaveScope growth_scope(t, false);
+#endif
 			SlObject(t, _town_desc);
 		}
 	}

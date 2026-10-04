@@ -712,7 +712,7 @@ CommandCost CmdLandscapeClear(DoCommandFlags flags, TileIndex tile)
 	}
 
 	Company *c = flags.Any({DoCommandFlag::Auto, DoCommandFlag::Bankrupt}) ? nullptr : Company::GetIfValid(_current_company);
-	if (c != nullptr && (int)GB(c->clear_limit, 16, 16) < 1) {
+	if (c != nullptr && (int)GB(c->Finances().clear_limit, 16, 16) < 1) {
 		return CommandCost(STR_ERROR_CLEARING_LIMIT_REACHED);
 	}
 
@@ -734,7 +734,7 @@ CommandCost CmdLandscapeClear(DoCommandFlags flags, TileIndex tile)
 	}
 
 	if (flags.Test(DoCommandFlag::Execute)) {
-		if (c != nullptr) c->clear_limit -= 1 << 16;
+		if (c != nullptr) c->Finances().clear_limit -= 1 << 16;
 		if (do_clear) {
 			if (IsWaterTile(tile) && IsCanal(tile)) {
 				Owner owner = GetTileOwner(tile);
@@ -768,7 +768,7 @@ std::tuple<CommandCost, Money> CmdClearArea(DoCommandFlags flags, TileIndex tile
 	bool had_success = false;
 
 	const Company *c = flags.Any({DoCommandFlag::Auto, DoCommandFlag::Bankrupt}) ? nullptr : Company::GetIfValid(_current_company);
-	int limit = (c == nullptr ? INT32_MAX : GB(c->clear_limit, 16, 16));
+	int limit = (c == nullptr ? INT32_MAX : GB(c->Finances().clear_limit, 16, 16));
 
 	if (tile != start_tile) flags.Set(DoCommandFlag::ForceClearTile);
 
@@ -780,7 +780,7 @@ std::tuple<CommandCost, Money> CmdClearArea(DoCommandFlags flags, TileIndex tile
 			last_error = std::move(ret);
 
 			/* We may not clear more tiles. */
-			if (c != nullptr && GB(c->clear_limit, 16, 16) < 1) break;
+			if (c != nullptr && GB(c->Finances().clear_limit, 16, 16) < 1) break;
 			continue;
 		}
 

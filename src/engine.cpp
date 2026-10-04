@@ -920,15 +920,15 @@ static CompanyID GetPreviewCompany(Engine *e)
 
 	int32_t best_hist = -1;
 	for (const Company *c : Company::Iterate()) {
-		if (c->block_preview == 0 && !e->preview_asked.Test(c->index) &&
-				c->old_economy[0].performance_history > best_hist) {
+		if (c->Finances().block_preview == 0 && !e->preview_asked.Test(c->index) &&
+				c->Finances().old_economy[0].performance_history > best_hist) {
 
 			/* Check whether the company uses similar vehicles */
 			for (const Vehicle *v : Vehicle::Iterate()) {
 				if (v->owner != c->index || v->type != e->type) continue;
 				if (!v->GetEngine()->CanCarryCargo() || !HasBit(cargomask, v->cargo_type)) continue;
 
-				best_hist = c->old_economy[0].performance_history;
+				best_hist = c->Finances().old_economy[0].performance_history;
 				best_company = c->index;
 				break;
 			}
@@ -1090,7 +1090,7 @@ static void NewVehicleAvailable(Engine *e)
 			 * as those are the only engines that can be given exclusive previews. */
 			if (GetGroupNumEngines(c->index, ALL_GROUP, e->index) == 0) {
 				/* The company did not build this engine during preview. */
-				c->block_preview = 20;
+				c->Finances().block_preview = 20;
 			}
 		}
 	}

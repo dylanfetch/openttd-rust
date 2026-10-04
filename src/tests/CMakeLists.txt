@@ -2,10 +2,14 @@ add_test_files(
     alternating_iterator.cpp
     alternating_iterator_state.cpp
     bitmath_func.cpp
+    company_economy.cpp
+    cargo_payment.cpp
+    cargo_payment_stubs.hpp
     effectvehicle.cpp
     effect_protocol.hpp
     enum_over_optimisation.cpp
     flatset_type.cpp
+    industry.cpp
     history_func.cpp
     landscape_partial_pixel_z.cpp
     math_func.cpp
@@ -13,6 +17,10 @@ add_test_files(
     mock_fontcache.h
     mock_spritecache.cpp
     mock_spritecache.h
+    rail_yapf.cpp
+    rail_yapf_protocol.hpp
+    road_yapf.cpp
+    roadvehicle.cpp
     spiral_iterator_state.cpp
     string_builder.cpp
     string_consumer.cpp
@@ -23,7 +31,11 @@ add_test_files(
     test_network_crypto.cpp
     test_script_admin.cpp
     test_window_desc.cpp
+    town_growth.cpp
+    town_protocol.hpp
     townname.cpp
+    ship_yapf.cpp
+    ship_yapf_protocol.hpp
     water_regions.cpp
     water_regions_protocol.hpp
     tilearea.cpp
