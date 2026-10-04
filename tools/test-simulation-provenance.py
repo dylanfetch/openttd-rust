@@ -12,7 +12,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-import simulate
+from simulation import core as simulate
 
 
 class SimulationProvenanceTests(unittest.TestCase):
