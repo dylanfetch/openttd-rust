@@ -83,6 +83,15 @@ pub fn layout(type_id: u8, item: u8) -> usize {
         42 => {
             layout!(crate::services::Services, item; context, random, observe_tile, write_tile, trig, industry)
         }
+        49 => {
+            layout!(crate::cargo_payment::Spec, item; payment, valid, callback, periods1, periods2)
+        }
+        50 => {
+            layout!(crate::cargo_payment::Fields, item; front, route_profit, visual_profit, visual_transfer)
+        }
+        51 => {
+            layout!(crate::cargo_payment::Services, item; spec, callback, near, station_read, industry_read, industry_write, refuses, accept, statistics, monitor, subsidised, industry_effect, vehicle_read, settle, feeder, setting)
+        }
         _ => usize::MAX,
     }
 }

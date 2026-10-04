@@ -2,6 +2,7 @@ add_test_files(
     alternating_iterator.cpp
     alternating_iterator_state.cpp
     bitmath_func.cpp
+    cargo_payment.cpp
     effectvehicle.cpp
     effect_protocol.hpp
     enum_over_optimisation.cpp

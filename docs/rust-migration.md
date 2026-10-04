@@ -1139,3 +1139,29 @@ writes, transient service order, RNG thresholds, state lifetime and save staging
 factory tests cover Above/Rel coordinates. Viewport pixels, audible output,
 full legacy fixtures and every caller remain limits. Environmental exceptions
 terminate inside noexcept wrappers; Rust panics/OOM abort.
+
+### Cargo payment and delivery
+
+Issue #117 moves CargoPayment state/lifetime, final/transfer payment and settlement,
+industry acceptance, statistics/payment ordering, destination deduplication and the
+complete production flush into Rust. C++ retains pool shells, canonical world and
+packet storage, loading/reservation, subsidy checks, NewGRF resolution and UI.
+Original component bodies compile only in the portable build. CAPY adapters stage
+only call-local fields; Rust owns the front association and three Money values.
+
+ABI IDs 49-51 describe cargo observations, saved fields and synchronous services.
+No world reference survives a leaf. Cargo/refusal/production/randomisation/animation
+and vehicle-sound resolution uses the NewGRF evaluator, without script VM entry or
+payment/destination reentry; wrappers are noexcept. Save/load errors stay in C++.
+Money saturates arithmetic but retains native shifts; callback unsigned products,
+BigMulS narrowing, stockpile limits and ordered randomisation/animation are explicit.
+
+`python3 tools/migration.py simulate economy` compares all semantic chunks during
+real road delivery/transfer, active CAPY reload and a five-unit partial acceptance
+followed by stockpile production. `--self` and `--soak` reuse these cases. Existing
+road saves have no station catching two accepting industries; `python3 -m
+tools.simulation.economy` checks ordered multi-destination dedup/flush and income/
+transfer arithmetic against unchanged pinned bodies at this concrete corpus gap.
+Native CTest and Windows ABI evidence check owner settlement/cleanup and layouts.
+NewGRF resolver execution, legacy CAPY files and every industry layout are not
+exhaustive in the semantic corpus; the narrow fixture supplies callback results.

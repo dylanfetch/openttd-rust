@@ -7,6 +7,7 @@
 
 /** @file windows-abi.cpp Bounded first-32-bit layout and real C ABI call checks. */
 #include "rust/abi_ffi.h"
+#include "rust/cargo_payment_ffi.h"
 #include "rust/linkgraph_ffi.h"
 #include "rust/trees_ffi.h"
 #include "rust/townname_ffi.h"
@@ -98,6 +99,9 @@ static void Layouts()
 	Layout(37, "OpenTTDLinkGraphShare", {sizeof(OpenTTDLinkGraphShare), alignof(OpenTTDLinkGraphShare), offsetof(OpenTTDLinkGraphShare, node), offsetof(OpenTTDLinkGraphShare, origin), offsetof(OpenTTDLinkGraphShare, via), offsetof(OpenTTDLinkGraphShare, cumulative), offsetof(OpenTTDLinkGraphShare, unrestricted), offsetof(OpenTTDLinkGraphShare, has_share)});
 	Layout(39, "OpenTTDEffectView", {sizeof(OpenTTDEffectView), alignof(OpenTTDEffectView), offsetof(OpenTTDEffectView, x), offsetof(OpenTTDEffectView, y), offsetof(OpenTTDEffectView, z), offsetof(OpenTTDEffectView, sprite), offsetof(OpenTTDEffectView, progress), offsetof(OpenTTDEffectView, spritenum), offsetof(OpenTTDEffectView, subtype), offsetof(OpenTTDEffectView, ambient)});
 	Layout(41, "OpenTTDEffectLeaves", {sizeof(OpenTTDEffectLeaves), alignof(OpenTTDEffectLeaves), offsetof(OpenTTDEffectLeaves, observe), offsetof(OpenTTDEffectLeaves, write), offsetof(OpenTTDEffectLeaves, viewport), offsetof(OpenTTDEffectLeaves, sound), offsetof(OpenTTDEffectLeaves, animated)});
+	Layout(49, "OpenTTDCargoSpec", {sizeof(OpenTTDCargoSpec), alignof(OpenTTDCargoSpec), offsetof(OpenTTDCargoSpec, payment), offsetof(OpenTTDCargoSpec, valid), offsetof(OpenTTDCargoSpec, callback), offsetof(OpenTTDCargoSpec, periods1), offsetof(OpenTTDCargoSpec, periods2)});
+	Layout(50, "OpenTTDCargoPaymentFields", {sizeof(OpenTTDCargoPaymentFields), alignof(OpenTTDCargoPaymentFields), offsetof(OpenTTDCargoPaymentFields, front), offsetof(OpenTTDCargoPaymentFields, route_profit), offsetof(OpenTTDCargoPaymentFields, visual_profit), offsetof(OpenTTDCargoPaymentFields, visual_transfer)});
+	Layout(51, "OpenTTDCargoServices", {sizeof(OpenTTDCargoServices), alignof(OpenTTDCargoServices), offsetof(OpenTTDCargoServices, spec), offsetof(OpenTTDCargoServices, callback), offsetof(OpenTTDCargoServices, near), offsetof(OpenTTDCargoServices, station_read), offsetof(OpenTTDCargoServices, industry_read), offsetof(OpenTTDCargoServices, industry_write), offsetof(OpenTTDCargoServices, refuses), offsetof(OpenTTDCargoServices, accept), offsetof(OpenTTDCargoServices, statistics), offsetof(OpenTTDCargoServices, monitor), offsetof(OpenTTDCargoServices, subsidised), offsetof(OpenTTDCargoServices, industry_effect), offsetof(OpenTTDCargoServices, vehicle_read), offsetof(OpenTTDCargoServices, settle), offsetof(OpenTTDCargoServices, feeder), offsetof(OpenTTDCargoServices, setting)});
 	CHECK(openttd_rust_abi_layout(255, 0) == SIZE_MAX);
 	CHECK(static_cast<size_t>(PTRDIFF_MAX) == (SIZE_MAX >> 1));
 	std::printf("pointer_bytes %zu sentinel %zu borrow_limit %zu\n", sizeof(void *), SIZE_MAX, static_cast<size_t>(PTRDIFF_MAX));
