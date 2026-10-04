@@ -127,5 +127,6 @@ as needed. Keep desync snapshots and plain runs: cache rebuilding can conceal
 faults. The existing semantic decoder remains unchanged. Port divergences belong in `KNOWN_FAILURES` with an issue, never new
 `MASKS`; #83's masked `round_trip_time` needs separate evidence if touched. Saves
 do not expose every transient state: add a narrow direct check only for a named
-unreachable gap. Vehicle ports first need applicable #86/#104 evidence; aircraft remains gated
-on its fixture. Retain existing tests.
+unreachable gap. Vehicle ports need applicable #86/#104 evidence; the aircraft fixture is now
+integrated in #132. Each controller still needs its own branch witnesses. Retain
+existing tests.

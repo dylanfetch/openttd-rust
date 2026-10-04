@@ -66,6 +66,7 @@ SNAPSHOT_TICKS = 32 * TICKS_PER_DAY
 def scenario_modules():
     """Families in scenario-list order; import after shared core initialization."""
     from . import (
+        aircraft,
         disasters,
         economy,
         effects,
@@ -86,6 +87,7 @@ def scenario_modules():
         effects,
         rails,
         ships,
+        aircraft,
         disasters,
         economy,
         stations,
@@ -784,6 +786,11 @@ def main():
         choices=("ferry", "structures"),
         help="build a committed ship fixture using only the pinned reference",
     )
+    parser.add_argument(
+        "--prepare-aircraft-save",
+        action="store_true",
+        help="build the supplemental aircraft fixture with the pinned reference",
+    )
     args = parser.parse_args()
 
     every = scenario_list(args.soak)
@@ -814,6 +821,11 @@ def main():
         from .ships import prepare_water_save
 
         prepare_water_save(args.prepare_water_save, migration, out, args.timeout)
+        return 0
+    if args.prepare_aircraft_save:
+        from .aircraft import prepare_aircraft_save
+
+        prepare_aircraft_save(migration, out, args.timeout)
         return 0
     # This is the checkout at invocation, not proof that an arbitrary --candidate
     # was built from it. The frozen executable's hash identifies what we execute.

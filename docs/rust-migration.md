@@ -169,7 +169,11 @@ Any `[desync:` warning (a cache mismatch) and any log or stdout difference fail
   compares the reference with itself; names filter. Extend `scenario_list()`
   for ports. The owner-built #86 save exercises signalled trains and a ship
   (`tools/simulation/rails.py`), requiring movement on every run and carried
-  cargo/delivery revenue at desync checkpoints. Aircraft remain pending in #86.
+  cargo/delivery revenue at desync checkpoints. The supplemental reference-built
+  aircraft fixture (`tools/simulation/aircraft.py`) observes a small plane and
+  helicopter between two airports, requiring movement, loaded cargo, flying
+  state and paid delivery. `tools/aircraft-scenario-ai/README.md` records its
+  setup provenance, reproduction commands and limits.
 - Masks (`MASKS`, with reasons and hit counts in the report): the random save
   id, build revision/NewGRF version, and `round_trip_time`, which the original
   saves uninitialized (#83); ports touching it need their own check.
