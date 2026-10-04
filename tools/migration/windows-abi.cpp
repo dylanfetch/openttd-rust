@@ -39,6 +39,7 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <stdexcept>
 #include <type_traits>
 #include "misc/history_type.hpp"
 
@@ -607,14 +608,13 @@ static uint64_t TreeWrite(void *context, uint32_t op, uint32_t, uint32_t a, uint
 	CHECK(op == 0 && a == 12 && b == 2 && c == 6 && d == (2U << 8));
 	return 0;
 }
-static uint32_t TreeRandom() { return UINT32_MAX; }
 static float TreeTrig(uint32_t, float value) { return value; }
 static void Trees()
 {
 	using Owner = std::unique_ptr<void, decltype(&openttd_rust_trees_destroy)>;
 	TreeProbe probe;
 	auto make = [&](uint32_t kind, uint32_t a = 0, uint32_t b = 0, uint32_t c = 0) {
-		return Owner(openttd_rust_trees_create(kind, 1, a, b, c, &probe, TreeSettings, TreeObserve, TreeWrite, TreeRandom, TreeTrig), openttd_rust_trees_destroy);
+		return Owner(openttd_rust_trees_create(kind, 1, a, b, c, &probe, TreeSettings, TreeObserve, TreeWrite, TreeTrig), openttd_rust_trees_destroy);
 	};
 	uint8_t *counter = openttd_rust_tree_counter();
 	openttd_rust_trees_initialize();
@@ -625,7 +625,8 @@ static void Trees()
 	CHECK(*counter == 36 && counter == openttd_rust_tree_counter());
 	probe.settings[3] = 4096 * 4096; probe.settings[4] = probe.settings[5] = 4096;
 	tick = make(6);
-	CHECK(openttd_rust_trees_advance(tick.get(), 0, 0).kind == 0 && *counter == 36);
+	CHECK(openttd_rust_trees_advance(tick.get(), 0, 0).kind == 11 && *counter == 36);
+	CHECK(openttd_rust_trees_advance(tick.get(), UINT32_MAX, 0).kind == 0);
 	probe.tile = {0, 0, 0, 0, 0, 2};
 	auto plant = make(3, 12, 2, 6);
 	CHECK(openttd_rust_trees_advance(plant.get(), 0, 0).kind == 0 && probe.writes == 1);
@@ -637,7 +638,18 @@ static void Trees()
 	CHECK(probe.writes == 1);
 	openttd_rust_trees_initialize();
 	CHECK(*counter == 0 && counter == openttd_rust_tree_counter());
-	std::printf("tree_owner_callbacks_counter passed\n");
+	// Debug RNG logging can throw before a draw. A suspended action owns no world
+	// borrow; cleanup happens wholly in C++ before any draw-dependent map writes.
+	probe.settings[8] = 1;
+	try {
+		auto generator = make(0);
+		CHECK(openttd_rust_trees_advance(generator.get(), 0, 0).kind == 11);
+		CHECK(probe.writes == 1);
+		throw std::runtime_error("simulated RNG logging failure");
+	} catch (const std::runtime_error &) {
+		CHECK(probe.writes == 1 && *counter == 0);
+	}
+	std::printf("tree_owner_callbacks_counter_rng_suspend passed\n");
 }
 
 int main()

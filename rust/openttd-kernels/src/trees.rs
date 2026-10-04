@@ -245,34 +245,46 @@ fn in_grove(x: i32, y: i32, shape: &[Point; 16]) -> bool {
 // Stack entries are resumable calls, never pointers/references to canonical state.
 enum Task {
     Generate,
+    GenerateDraw(u32, u32),
     Runs(u32),
     Groves(u32),
+    GroveCenter(u32),
+    GrovePhase(u32, u32, usize, [f32; 4]),
     GroveAttempts(u32, u32, Box<[Point; 16]>),
     GroveAfterProgress(u32, u32, Box<[Point; 16]>),
+    GroveDraw(u32, u32, Box<[Point; 16]>),
     ScatterInit,
     ScatterExtra(u32),
     Scatter(u32, bool, u32),
+    ScatterDraw(u32, bool, u32),
     ScatterAfterProgress(u32, u32, bool, u32),
     ScatterAfterPlace(u32, u32),
     HeightAttempts(u32, i32, u32),
+    HeightTry(u32, i32, u32),
+    HeightDraw(u32, i32, u32),
     Place(u32, u32, bool),
     AfterPlace(u32, u32, bool),
     Plant(u32, u32, u32, u32),
     MakeTree(u32, u32, u32, u32, u32, u32),
     Dirty(u32),
     Loop(u32),
+    ClimateSound(u32, bool),
     Ambient(u32),
     Growth(u32),
+    GrownChoice(u32),
+    SpreadDirection(u32, u32),
     Tick,
     RainforestTicks(u32),
     CounterTick,
     RandomTree(bool),
+    RandomTreeDraw(bool),
     CommandInit(u32, u32, u32, bool),
     CommandBegin,
     CommandNext(bool),
     CommandAfterClear(u32, u32),
     CommandRating(u32, u32),
     CommandPlant(u32, u32),
+    CommandRandom(u32),
     CommandFinishTile(u32, u32),
     Clear(u32),
     ClearCount(u32),
@@ -285,7 +297,6 @@ struct Engine {
     settings: ReadSettings,
     observe: Observe,
     write: Write,
-    random: extern "C" fn() -> u32,
     trig: Trig,
     tasks: Vec<Task>,
     cost: i64,
@@ -317,9 +328,7 @@ impl Engine {
     fn ground(&self, tile: u32, ground: u32, density: u32) {
         self.write(1, tile, ground, density, 0, 0);
     }
-    fn shape(&self) -> [Point; 16] {
-        let divisor = (f64::from(i32::MAX) / std::f64::consts::PI * 2.0) as f32;
-        let phases = std::array::from_fn::<_, 4, _>(|_| (self.random)() as f32 / divisor);
+    fn shape(&self, phases: [f32; 4]) -> [Point; 16] {
         let mut shape = [Point::default(); 16];
         let step = (std::f64::consts::PI * 2.0 / 16.0) as f32;
         let mut theta = 0.0_f32;
@@ -334,6 +343,28 @@ impl Engine {
             theta += step;
         }
         shape
+    }
+    fn request_random(&mut self, continuation: Task) -> Action {
+        self.tasks.push(continuation);
+        // Random's debug logging can throw. The draw must execute in C++ after
+        // this engine/world borrow has ended, before any draw-dependent effects.
+        Action::new(11, 0, 0, 0)
+    }
+    fn finish_generation(&mut self, runs: u32, total: u32, groups: u32) -> Action {
+        self.tasks.push(Task::Runs(runs));
+        if groups != 0 {
+            self.tasks.push(Task::Groves(groups));
+        }
+        Action::new(2, 0, total.wrapping_add(groups.wrapping_mul(1000)), 0)
+    }
+    fn command_plant(&mut self, tile: u32, tree: u32) {
+        self.tasks.push(Task::CommandFinishTile(tile, tree));
+        self.tasks.push(Task::Plant(
+            tile,
+            tree,
+            0,
+            if self.settings().editor() { 3 } else { 0 },
+        ));
     }
     fn advance(&mut self, response: u64, nested_cost: i64) -> Action {
         // Leaf callbacks cannot change settings or reenter; copy once per advance.
@@ -358,17 +389,14 @@ impl Engine {
                         total = total.wrapping_add(s.scale(15000));
                     }
                     total = total.wrapping_mul(runs);
-                    let groups = if s.climate() == 3 {
-                        0
-                    } else {
-                        s.scale(((self.random)() & 31) + 25)
-                    };
-                    total = total.wrapping_add(groups.wrapping_mul(1000));
-                    self.tasks.push(Task::Runs(runs));
-                    if groups != 0 {
-                        self.tasks.push(Task::Groves(groups));
+                    if s.climate() == 3 {
+                        return self.finish_generation(runs, total, 0);
                     }
-                    return Action::new(2, 0, total, 0);
+                    return self.request_random(Task::GenerateDraw(runs, total));
+                }
+                Task::GenerateDraw(runs, total) => {
+                    let groups = self.settings().scale(((response as u32) & 31) + 25);
+                    return self.finish_generation(runs, total, groups);
                 }
                 Task::Runs(n) => {
                     if n != 0 {
@@ -377,9 +405,19 @@ impl Engine {
                     }
                 }
                 Task::Groves(n) => {
-                    let s = self.settings();
-                    let tile = s.random_tile((self.random)());
-                    let shape = Box::new(self.shape());
+                    return self.request_random(Task::GroveCenter(n));
+                }
+                Task::GroveCenter(n) => {
+                    let tile = self.settings().random_tile(response as u32);
+                    return self.request_random(Task::GrovePhase(n, tile, 0, [0.0; 4]));
+                }
+                Task::GrovePhase(n, tile, index, mut phases) => {
+                    let divisor = (f64::from(i32::MAX) / std::f64::consts::PI * 2.0) as f32;
+                    phases[index] = (response as u32) as f32 / divisor;
+                    if index != 3 {
+                        return self.request_random(Task::GrovePhase(n, tile, index + 1, phases));
+                    }
+                    let shape = Box::new(self.shape(phases));
                     if n != 1 {
                         self.tasks.push(Task::Groves(n.wrapping_sub(1)));
                     }
@@ -394,7 +432,10 @@ impl Engine {
                     return Action::new(1, 0, 0, 0);
                 }
                 Task::GroveAfterProgress(center, remaining, shape) => {
-                    let r = (self.random)();
+                    return self.request_random(Task::GroveDraw(center, remaining, shape));
+                }
+                Task::GroveDraw(center, remaining, shape) => {
+                    let r = response as u32;
                     let x = (r & 31) as i32 - 16;
                     let y = ((r >> 8) & 31) as i32 - 16;
                     let tile = self.settings().offset(center, x, y);
@@ -423,7 +464,10 @@ impl Engine {
                     if n == 0 {
                         continue;
                     }
-                    let r = (self.random)();
+                    return self.request_random(Task::ScatterDraw(n, rainforest, height));
+                }
+                Task::ScatterDraw(n, rainforest, height) => {
+                    let r = response as u32;
                     let tile = self.settings().random_tile(r);
                     self.tasks.push(Task::Scatter(n - 1, rainforest, height));
                     self.tasks
@@ -461,21 +505,26 @@ impl Engine {
                         continue;
                     }
                     self.tasks.push(Task::HeightAttempts(tile, height, n - 1));
-                    for _ in 0..1000 {
-                        let r = (self.random)();
-                        let x = (r & 31) as i32 - 16;
-                        let y = ((r >> 8) & 31) as i32 - 16;
-                        let current = self.settings().offset(tile, x, y);
-                        if current == INVALID || x.abs() + y.abs() > 16 {
-                            continue;
-                        }
-                        let t = self.tile(current);
-                        if !t.suitable(true) || (t.height() - height).abs() > 2 {
-                            continue;
-                        }
-                        self.tasks.push(Task::Place(current, r, false));
-                        break;
+                    self.tasks.push(Task::HeightTry(tile, height, 1000));
+                }
+                Task::HeightTry(tile, height, attempts) => {
+                    if attempts != 0 {
+                        return self.request_random(Task::HeightDraw(tile, height, attempts));
                     }
+                }
+                Task::HeightDraw(tile, height, attempts) => {
+                    let r = response as u32;
+                    let x = (r & 31) as i32 - 16;
+                    let y = ((r >> 8) & 31) as i32 - 16;
+                    let current = self.settings().offset(tile, x, y);
+                    if current != INVALID && x.abs() + y.abs() <= 16 {
+                        let t = self.tile(current);
+                        if t.suitable(true) && (t.height() - height).abs() <= 2 {
+                            self.tasks.push(Task::Place(current, r, false));
+                            continue;
+                        }
+                    }
+                    self.tasks.push(Task::HeightTry(tile, height, attempts - 1));
                 }
                 Task::Place(tile, r, keep) => {
                     let species = self
@@ -541,11 +590,7 @@ impl Engine {
                                 }
                             }
                             2 => {
-                                let r = (self.random)();
-                                if (((r & 65535) * 200 + 100) >> 16) < 1 && self.settings().flag(1)
-                                {
-                                    return Action::new(6, tile, (r >> 16) & 3, 0);
-                                }
+                                return self.request_random(Task::ClimateSound(tile, false));
                             }
                             _ => (),
                         }
@@ -565,12 +610,7 @@ impl Engine {
                                 self.ground(tile, t.ground(), density);
                             } else {
                                 if density == 3 {
-                                    let r = (self.random)();
-                                    if (((r & 65535) * 200 + 100) >> 16) < 1
-                                        && self.settings().flag(1)
-                                    {
-                                        return Action::new(6, tile, 4 + (r >> 31), 0);
-                                    }
+                                    return self.request_random(Task::ClimateSound(tile, true));
                                 }
                                 continue;
                             }
@@ -578,11 +618,22 @@ impl Engine {
                         self.dirty(tile);
                     }
                 }
+                Task::ClimateSound(tile, arctic) => {
+                    let r = response as u32;
+                    if (((r & 65535) * 200 + 100) >> 16) < 1 && self.settings().flag(1) {
+                        return Action::new(
+                            6,
+                            tile,
+                            if arctic { 4 + (r >> 31) } else { (r >> 16) & 3 },
+                            0,
+                        );
+                    }
+                }
                 Task::Ambient(tile) => {
                     self.tasks.push(Task::Growth(tile));
                     return Action::new(5, tile, 0, 0);
                 }
-                Task::Growth(mut tile) => {
+                Task::Growth(tile) => {
                     let s = self.settings();
                     let cycle = (11 * (tile % s.sx()) + 9 * (tile / s.sx()))
                         .wrapping_add((s.ticks() >> 8) as u32);
@@ -603,50 +654,7 @@ impl Engine {
                             {
                                 self.write(3, tile, 1, 0, 0, 0);
                             } else {
-                                let r = (self.random)() & 7;
-                                match r {
-                                    0 => {
-                                        self.write(3, tile, 1, 0, 0, 0);
-                                    }
-                                    1 if self.tile(tile).count() < 4
-                                        && self.tile(tile).spread(self.settings()) =>
-                                    {
-                                        self.write(2, tile, 1, 0, 0, 0);
-                                        self.write(4, tile, 0, 0, 0, 0);
-                                    }
-                                    1 | 2 => {
-                                        if self.tile(tile).spread(self.settings()) {
-                                            let species = self.tile(tile).species();
-                                            let direction = ((self.random)() % 8) as usize;
-                                            let (x, y) = [
-                                                (-1, -1),
-                                                (-1, 0),
-                                                (-1, 1),
-                                                (0, 1),
-                                                (1, 1),
-                                                (1, 0),
-                                                (1, -1),
-                                                (0, -1),
-                                            ][direction];
-                                            tile = tile.wrapping_add(
-                                                (x + y * self.settings().sx() as i32) as u32,
-                                            );
-                                            let neighbor = self.tile(tile);
-                                            if !neighbor.suitable(false)
-                                                || (neighbor.kind() == CLEAR
-                                                    && neighbor.ground() == 0
-                                                    && !neighbor.snow()
-                                                    && neighbor.density() != 3)
-                                            {
-                                                continue;
-                                            }
-                                            self.tasks.push(Task::Dirty(tile));
-                                            self.tasks.push(Task::Plant(tile, species, 0, 0));
-                                            continue;
-                                        }
-                                    }
-                                    _ => continue,
-                                }
+                                return self.request_random(Task::GrownChoice(tile));
                             }
                         }
                         6 => {
@@ -687,6 +695,52 @@ impl Engine {
                     }
                     self.dirty(tile);
                 }
+                Task::GrownChoice(tile) => {
+                    match (response as u32) & 7 {
+                        0 => {
+                            self.write(3, tile, 1, 0, 0, 0);
+                        }
+                        1 if self.tile(tile).count() < 4
+                            && self.tile(tile).spread(self.settings()) =>
+                        {
+                            self.write(2, tile, 1, 0, 0, 0);
+                            self.write(4, tile, 0, 0, 0, 0);
+                        }
+                        1 | 2 => {
+                            if self.tile(tile).spread(self.settings()) {
+                                let species = self.tile(tile).species();
+                                return self.request_random(Task::SpreadDirection(tile, species));
+                            }
+                        }
+                        _ => continue,
+                    }
+                    self.dirty(tile);
+                }
+                Task::SpreadDirection(tile, species) => {
+                    let direction = ((response as u32) % 8) as usize;
+                    let (x, y) = [
+                        (-1, -1),
+                        (-1, 0),
+                        (-1, 1),
+                        (0, 1),
+                        (1, 1),
+                        (1, 0),
+                        (1, -1),
+                        (0, -1),
+                    ][direction];
+                    let tile = tile.wrapping_add((x + y * self.settings().sx() as i32) as u32);
+                    let neighbor = self.tile(tile);
+                    if !neighbor.suitable(false)
+                        || (neighbor.kind() == CLEAR
+                            && neighbor.ground() == 0
+                            && !neighbor.snow()
+                            && neighbor.density() != 3)
+                    {
+                        continue;
+                    }
+                    self.tasks.push(Task::Dirty(tile));
+                    self.tasks.push(Task::Plant(tile, species, 0, 0));
+                }
                 Task::Tick => {
                     let s = self.settings();
                     if s.extra() == 0 || s.extra() == 3 {
@@ -720,7 +774,10 @@ impl Engine {
                     }
                 }
                 Task::RandomTree(rainforest) => {
-                    let r = (self.random)();
+                    return self.request_random(Task::RandomTreeDraw(rainforest));
+                }
+                Task::RandomTreeDraw(rainforest) => {
+                    let r = response as u32;
                     let s = self.settings();
                     let tile = s.random_tile(r);
                     let t = self.tile(tile);
@@ -837,26 +894,22 @@ impl Engine {
                         return Action::new(8, tile, 1, 0);
                     }
                 }
-                Task::CommandPlant(tile, mut tree) => {
+                Task::CommandPlant(tile, tree) => {
                     if self.settings().execute() {
                         if tree == INVALID_TREE {
-                            let r = (self.random)();
-                            tree = self.tile(tile).random_type(self.settings(), r >> 24);
-                            if tree == INVALID_TREE {
-                                tree = CACTUS;
-                            }
+                            return self.request_random(Task::CommandRandom(tile));
                         }
-                        self.tasks.push(Task::CommandFinishTile(tile, tree));
-                        self.tasks.push(Task::Plant(
-                            tile,
-                            tree,
-                            0,
-                            if self.settings().editor() { 3 } else { 0 },
-                        ));
+                        self.command_plant(tile, tree);
                     } else {
                         self.cost = self.cost.saturating_add(self.settings().build());
                         self.tasks.push(Task::CommandNext(true));
                     }
+                }
+                Task::CommandRandom(tile) => {
+                    let tree = self
+                        .tile(tile)
+                        .random_type(self.settings(), (response as u32) >> 24);
+                    self.command_plant(tile, if tree == INVALID_TREE { CACTUS } else { tree });
                 }
                 Task::CommandFinishTile(tile, tree) => {
                     self.dirty(tile);
@@ -918,7 +971,6 @@ pub unsafe extern "C" fn openttd_rust_trees_create(
     settings: ReadSettings,
     observe: Observe,
     write: Write,
-    random: extern "C" fn() -> u32,
     trig: Trig,
 ) -> *mut c_void {
     let task = match kind {
@@ -938,7 +990,6 @@ pub unsafe extern "C" fn openttd_rust_trees_create(
         settings,
         observe,
         write,
-        random,
         trig,
         tasks: vec![task],
         cost: 0,
@@ -1069,9 +1120,6 @@ mod tests {
         }
         0
     }
-    extern "C" fn random() -> u32 {
-        0
-    }
     extern "C" fn trig(_: u32, value: f32) -> f32 {
         value
     }
@@ -1082,7 +1130,6 @@ mod tests {
             settings,
             observe,
             write,
-            random,
             trig,
             tasks: vec![task],
             cost: 0,
@@ -1172,5 +1219,68 @@ mod tests {
         assert_eq!(e.advance(0, 0).kind, 0);
         assert_eq!(w.writes.iter().map(|x| x.0).collect::<Vec<_>>(), [4, 5]);
         assert_eq!(w.tile[8], 0);
+    }
+    #[test]
+    fn random_scatter_draw_precedes_progress_and_grove_draw_follows_progress() {
+        let mut w = World::default();
+        let mut scatter = engine(&mut w, Task::Scatter(1, false, 15));
+        assert_eq!(scatter.advance(0, 0).kind, 11);
+        assert_eq!(scatter.advance(1, 0).kind, 1);
+        assert_eq!(w.writes, [] as [(u32, u32, u32); 0]);
+        assert_eq!(scatter.advance(0, 0).kind, 0);
+        assert_eq!(w.writes.iter().map(|x| x.0).collect::<Vec<_>>(), [0, 5, 1]);
+        w.writes.clear();
+        let mut grove = engine(
+            &mut w,
+            Task::GroveAttempts(1, 1, Box::new([Point::default(); 16])),
+        );
+        assert_eq!(grove.advance(0, 0).kind, 1);
+        assert_eq!(grove.advance(0, 0).kind, 11);
+        assert_eq!(w.writes, [] as [(u32, u32, u32); 0]);
+    }
+    #[test]
+    fn grove_center_and_each_phase_draw_are_separate_actions() {
+        let mut w = World::default();
+        let mut grove = engine(&mut w, Task::Groves(1));
+        assert_eq!(grove.advance(0, 0).kind, 11); // Center draw.
+        for _ in 0..4 {
+            assert_eq!(grove.advance(1, 0).kind, 11);
+        }
+        assert_eq!(grove.advance(1, 0).kind, 1); // First progress only after all four phase draws.
+        assert_eq!(w.writes, [] as [(u32, u32, u32); 0]);
+    }
+    #[test]
+    fn disabled_ambient_still_requests_draw_before_ambient_service() {
+        let mut w = World::default();
+        w.settings[7] = 2;
+        w.tile = [TREES, 0, 2, 0, 0, 3, 20, 1, 0, 0];
+        let mut e = engine(&mut w, Task::Loop(1));
+        assert_eq!(e.advance(0, 0).kind, 11);
+        assert_eq!(e.advance(0, 0).kind, 5);
+        assert_eq!(w.writes, [] as [(u32, u32, u32); 0]);
+    }
+    #[test]
+    fn random_command_can_be_abandoned_before_any_draw_dependent_write() {
+        let mut w = World::default();
+        let mut e = engine(&mut w, Task::CommandInit(1, 1, INVALID_TREE, false));
+        assert_eq!(e.advance(0, 0).kind, 9);
+        assert_eq!(e.advance(i32::MAX as u64, 0).kind, 11);
+        assert_eq!(w.writes, [] as [(u32, u32, u32); 0]);
+        drop(e); // Equivalent Rust cleanup when C++ Random logging throws.
+        assert_eq!(w.writes, [] as [(u32, u32, u32); 0]);
+    }
+    #[test]
+    fn grown_choice_and_direction_draws_precede_neighbor_writes() {
+        let mut w = World::default();
+        w.settings[0] = 1024;
+        w.tile = [TREES, 0, 0, 0, 0, 3, 0, 1, 3, 0];
+        let mut e = engine(&mut w, Task::Loop(1));
+        assert_eq!(e.advance(0, 0).kind, 5);
+        assert_eq!(e.advance(0, 0).kind, 11); // Grown choice.
+        assert_eq!(e.advance(2, 0).kind, 11); // Neighbor direction.
+        assert_eq!(w.writes, [] as [(u32, u32, u32); 0]);
+        w.tile = [CLEAR, 0, 0, 0, 0, 3, 0, 0, 0, 0];
+        assert_eq!(e.advance(5, 0).kind, 0);
+        assert_eq!(w.writes.iter().map(|x| x.0).collect::<Vec<_>>(), [0, 5]);
     }
 }

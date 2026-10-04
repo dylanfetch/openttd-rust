@@ -1090,8 +1090,9 @@ compile only in portable builds. Canonical map/pools and the editor forest-brush
 loop remain in C++; the brush calls Rust placement. Rendering stays in C++.
 
 Copied observations and leaf writes keep the map canonical. Per-invocation Rust
-continuations return before progress, water, ambient/sound, town-rating, nested
-clear and square-clear services; C++ exception cleanup destroys pending work.
+continuations return before every RNG draw (including debug logging), progress,
+water, ambient/sound, town-rating, nested
+clear and square-clear services; C++ exceptions destroy pending work before resume.
 The process-lifetime Rust byte supplies unchanged DATE/TTD/TTO serialization
 addresses, with no C++ counter mirror; DATE LoadCheck omits it as before.
 

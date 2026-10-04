@@ -29,11 +29,12 @@ extern "C" {
 void *openttd_rust_trees_create(uint32_t kind, uint32_t tile, uint32_t a, uint32_t b, uint32_t c,
 	void *context, void (*settings)(void *, uint64_t *), void (*observe)(void *, uint32_t, uint32_t *),
 	uint64_t (*write)(void *, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t),
-	uint32_t (*random)(), float (*trig)(uint32_t, float));
+	float (*trig)(uint32_t, float));
 /* Actions execute AFTER advance returns: 0 done (a result, b error, cost), 1 progress,
  * 2 set progress(a), 3 clear neighbour nonflood flags, 4 water loop, 5 ambient,
  * 6 sound(a), 7 clear square, 8 town rating(a=up), 9 start iterator(tile,a=start,b=diagonal),
- * 10 landscape clear. Response is iterator limit or clear failure; cost is nested clear cost.
+ * 10 landscape clear, 11 one shared Random draw (including possibly throwing debug logging).
+ * Response is RNG word, iterator limit or clear failure; cost is nested clear cost.
  * A per-invocation owner is exclusive during advance only. Reentrant actions create separate
  * owners; all world reads following actions are fresh. Panic/OOM abort; no unwinding across ABI. */
 OpenTTDTreeAction openttd_rust_trees_advance(void *, uint64_t response, int64_t cost);

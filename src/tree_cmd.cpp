@@ -120,7 +120,7 @@ static float RustTreeTrig(uint32_t kind, float value) { return kind == 0 ? sinf(
 static OpenTTDTreeAction RunRustTrees(RustTreeContext &ctx, uint32_t kind, TileIndex tile = TileIndex{0}, uint32_t a = 0, uint32_t b = 0, uint32_t c = 0)
 {
 	std::unique_ptr<void, decltype(&openttd_rust_trees_destroy)> owner(openttd_rust_trees_create(kind, tile.base(), a, b, c,
-		&ctx, RustTreeSettings, RustTreeObserve, RustTreeWrite, []() { return Random(); }, RustTreeTrig), openttd_rust_trees_destroy);
+		&ctx, RustTreeSettings, RustTreeObserve, RustTreeWrite, RustTreeTrig), openttd_rust_trees_destroy);
 	uint64_t response = 0;
 	int64_t cost = 0;
 	for (;;) {
@@ -153,6 +153,7 @@ static OpenTTDTreeAction RunRustTrees(RustTreeContext &ctx, uint32_t kind, TileI
 			case 10:
 				ctx.nested = Command<CMD_LANDSCAPE_CLEAR>::Do(ctx.flags, current);
 				response = ctx.nested.Failed(); cost = ctx.nested.GetCost(); break;
+			case 11: response = Random(); break;
 		}
 	}
 }
