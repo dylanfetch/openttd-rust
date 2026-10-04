@@ -5,7 +5,7 @@ Root owns this file and updates it when a phase completes or priorities change.
 to work on next. If an issue conflicts with this roadmap, follow the roadmap;
 a subagent stops and reports the conflict in its hand-off to root.
 
-## Where the fork stands (2026-10-04, `rust-migration` at `1fecd819d8`)
+## Where the fork stands (2026-10-04, `rust-migration` at `602b5a60ff`)
 
 - Ported: one landscape kernel, StringConsumer/StringBuilder/UTF-8/byte-string
   utilities, history and spiral/alternating iterators, Script Admin JSON
@@ -13,7 +13,8 @@ a subagent stops and reports the conflict in its hand-off to root.
   parser, authentication contexts, monocypher ChaCha20/Poly1305/AEAD/BLAKE2b/
   X25519, Packet, string validation, and station cargo-list reducers. Rust now
   also owns complete TGP terrain generation (#94), link graph computation (#95)
-  and all 21 built-in town-name generators (#98).
+  and all 21 built-in town-name generators (#98), plus tree generation, tile/tick
+  simulation and planting/clearing commands (#102).
 - Much of the simulation remains in C++. The first ownership ports retired
   2,111 C++ lines with 219 lines of glue and 244 lines of tooling. Continue
   selecting game logic and tracking each port with `tools/port-metrics.py`.
@@ -121,18 +122,21 @@ default harness matched 62/62 scenarios, 562 snapshots in 140.6 seconds; receipt
 are `.local/verification/20261004T050321.116498Z/report.json` and
 `.local/simulation/20261004T050424Z-1034522/report.json`. No new differences or masks.
 
-**#99 Tree generation, simulation and planting commands** is in implementation
-and review. `/root/link_graph` (Sol high) owns implementation and
-`/root/town_name_evidence` (Sol high) owns harness scenarios; Astra medium reviews.
-Rust owns generation/placement, tree tile/tick loops and the private counter,
-plus planting/clearing command control. Apply the world-state design to live map
-reads and reentrant water/NewGRF/command services. The standalone editor forest
-brush (`PlaceTreeGroupAroundTile`, InteractiveRandom and zone sweep) is an explicit
-follow-up; it uses the migrated placement helper. Rendering and GUI stay in C++.
-PR #102 has a reviewed correction: live tree RNG draws return to C++ because
-`RANDOM_DEBUG` logging can throw. Corrected-head local default passed 102/102
-(729 snapshots); tree soak and reference-self soak passed 40/40 each (288 snapshots).
-Required corrected-head CI remains the integration gate.
+**#99 Tree generation, simulation and planting commands is complete** in #102
+(`602b5a60ff`). Rust owns generation/placement, tile/tick loops, the private counter
+and planting/clearing command control. Throwing/reentrant services, including live
+RNG debug logging, run after Rust returns. The final correction passed independent
+Astra medium review and every required CI check. Metrics: Rust 1288, tooling 561,
+glue 247, C++ retired 816. Corrected-head default passed 102/102 (729 snapshots);
+tree soak and reference-self soak passed 40/40 each (288 snapshots).
+The standalone editor forest brush (`PlaceTreeGroupAroundTile`, InteractiveRandom
+and zone sweep) remains an explicit follow-up using the migrated placement helper.
+Rendering/GUI, full legacy saves and custom NewGRF callbacks remain coverage limits.
+
+Root verified combined `602b5a60ff`: Cargo's four checks, 97 reference/112 candidate
+CTests, three provenance tests and Ruff passed. Default simulation matched 102/102,
+723 snapshots in 203.6 seconds. Receipts: `.local/verification/20261004T055433.812150Z/`
+and `.local/simulation/20261004T055516Z-1202665/`. No new differences or masks.
 
 **#101 Effect-vehicle controllers and private state** is selected alongside #99
 review. `/root/town_names` (Sol high) owns implementation; Astra medium reviews.
@@ -185,8 +189,8 @@ constraints; storage transfers still require explicit roadmap selection.
 
 Take the first unblocked item from the earliest phase that has one. Work
 already in CI or review is not blocking: start the next item while it runs.
-Harness regressions remain the first priority; close #102's corrected-head gates
-while #101 proceeds. #103 implementation/evidence are active; use effect handoff
+Harness regressions remain the first priority. #101 is in final review/validation;
+#103 implementation/evidence are active. Use effect handoff
 capacity for #104, with its #86 ship evidence developed in parallel.
 Keep spare capacity on scenarios and independent review. Paused, deferred
 and out-of-scope issues are not fallbacks. Root selects further ownership work
