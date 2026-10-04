@@ -130,6 +130,8 @@ static void Calls()
 	spiral = openttd_rust_spiral_advance(spiral, 32, 32);
 	CHECK(openttd_rust_spiral_end(spiral) == 0);
 	CHECK(openttd_rust_get_partial_pixel_z(3, 12, 0) == 0);
+	CHECK(openttd_rust_get_partial_pixel_z(-2, 0, 0x03) == UINT32_MAX);
+	CHECK(openttd_rust_get_partial_pixel_z(0, 0, 0x10) == UINT64_MAX);
 	std::printf("real_calls high_bits=%llx passed\n", static_cast<unsigned long long>(number.value_bits));
 }
 

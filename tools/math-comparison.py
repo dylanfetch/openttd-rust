@@ -44,16 +44,27 @@ def main():
     report = {"baseline": migration.BASELINE, "candidate_commit": migration.git("rev-parse", "HEAD"),
               "candidate_status": migration.git("status", "--short"), "commands": records,
               "reference_sources": {}, "passed": False}
-    for name in ("src/core/math_func.cpp", "src/core/math_func.hpp", "src/core/overflowsafe_type.hpp", "src/core/strong_typedef_type.hpp"):
+    for name in ("src/core/math_func.cpp", "src/core/math_func.hpp", "src/core/overflowsafe_type.hpp", "src/core/strong_typedef_type.hpp", "src/landscape.cpp", "src/slope_func.h", "src/tile_type.h"):
         report["reference_sources"][name] = hashlib.sha256((reference / name).read_bytes()).hexdigest()
     try:
         for mode in ("asserts", "ndebug"):
             streams = {}
             for label, source in (("reference", reference), ("portable", migration.ROOT), ("candidate", migration.ROOT)):
+                # The simulation harness keeps coordinates inside a tile. Extract
+                # the exact production body to exercise the defined wider domain.
+                landscape = (source / "src/landscape.cpp").read_text()
+                start = landscape.index("uint GetPartialPixelZ(int x, int y, Slope corners)")
+                end = landscape.index("\n}\n", start) + 3
+                landscape_fixture = output / f"landscape-{label}.cpp"
+                landscape_fixture.write_text('#include "stdafx.h"\n#include "landscape.h"\n'
+                                             '#include "slope_func.h"\n'
+                                             '#ifdef WITH_RUST\n#include "rust/ffi.h"\n#endif\n'
+                                             + landscape[start:end])
                 executable = output / f"{label}-{mode}"
                 command = ["c++", "-std=c++20", "-O2", "-ffunction-sections", "-fdata-sections", "-DFMT_HEADER_ONLY",
+                           "-fsanitize=undefined", "-fno-sanitize-recover=undefined",
                            "-I", str(source / "src"), str(fixture),
-                           str(source / "src/core/math_func.cpp"),
+                           str(source / "src/core/math_func.cpp"), str(landscape_fixture),
                            "-Wl,--gc-sections", "-o", str(executable)]
                 if mode == "ndebug":
                     command.append("-DNDEBUG")

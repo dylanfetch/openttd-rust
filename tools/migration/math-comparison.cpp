@@ -11,6 +11,8 @@
 #include "core/math_func.hpp"
 #include "core/strong_typedef_type.hpp"
 #include "core/overflowsafe_type.hpp"
+#include "landscape.h"
+#include "slope_func.h"
 #include <cstdio>
 
 using Tagged = StrongType::Typedef<int64_t, struct MathProbeTag>;
@@ -108,6 +110,74 @@ template <typename T> static void SoftCases()
 	for (T min : bounds) for (T max : bounds) for (T value : bounds) Emit(static_cast<uint64_t>(SoftClamp(value, min, max)));
 }
 
+struct UnsupportedSlope {};
+/* Keep the production fatal dispatch observable without terminating the corpus. */
+[[noreturn]] void NOT_REACHED(const std::source_location)
+{
+	throw UnsupportedSlope{};
+}
+
+static bool FitsInt(int64_t value)
+{
+	return value >= INT32_MIN && value <= INT32_MAX;
+}
+
+/* Exclude only signed overflow in expressions actually evaluated by the source.
+ * TILE_SIZE/TILE_HEIGHT arithmetic is unsigned and needs no such exclusion. */
+static bool DefinedHeightInput(int x, int y, Slope corners)
+{
+	const int64_t sum = int64_t(x) + y;
+	if (IsHalftileSlope(corners)) {
+		switch (GetHalftileSlopeCorner(corners)) {
+			case CORNER_W: if (x > y) return true; break;
+			case CORNER_S: if (!FitsInt(sum)) return false; if (sum >= 16) return true; break;
+			case CORNER_E: if (x <= y) return true; break;
+			case CORNER_N: if (!FitsInt(sum)) return false; if (sum < 16) return true; break;
+			default: return true;
+		}
+	}
+	const auto east = [&] { return FitsInt(1LL + y) && FitsInt(1LL + y - x); };
+	const auto west = [&] { return FitsInt(int64_t(x) - y); };
+	const auto south = [&] { return FitsInt(1LL + x) && FitsInt(1 + sum); };
+	switch (RemoveHalftileSlope(corners)) {
+		case SLOPE_N: case SLOPE_WSE: return FitsInt(sum);
+		case SLOPE_S: case SLOPE_ENW: return FitsInt(sum) && (sum < 16 || south());
+		case SLOPE_NS: return FitsInt(sum) && (sum < 16 || south());
+		case SLOPE_E: return y < x || east();
+		case SLOPE_NWS: return x >= y || east();
+		case SLOPE_W: return x < y || west();
+		case SLOPE_SEN: return y >= x || west();
+		case SLOPE_EW: return x >= y ? west() : east();
+		case SLOPE_SE: return FitsInt(1LL + y);
+		case SLOPE_SW: return FitsInt(1LL + x);
+		case SLOPE_STEEP_S: return south();
+		default: return true;
+	}
+}
+
+static void HeightCase(int x, int y, Slope corners)
+{
+	if (!DefinedHeightInput(x, y, corners)) return;
+	Emit(static_cast<uint32_t>(x)); Emit(static_cast<uint32_t>(y)); Emit(corners);
+	try {
+		Emit(GetPartialPixelZ(x, y, corners));
+	} catch (const UnsupportedSlope &) {
+		Emit(UINT64_MAX);
+	}
+}
+
+static void HeightCases()
+{
+	/* Exhaust all slope bytes, including fatal bases and half-tile early returns,
+	 * over an extended tile grid, then probe full-width arithmetic boundaries. */
+	const int edge[] = {INT32_MIN, INT32_MIN + 1, INT32_MIN + 16, -65536, -17, -2, -1,
+			0, 1, 15, 16, 17, 65536, INT32_MAX - 16, INT32_MAX - 1, INT32_MAX};
+	for (uint corners = 0; corners <= UINT8_MAX; corners++) {
+		for (int x = -32; x <= 32; x++) for (int y = -32; y <= 32; y++) HeightCase(x, y, static_cast<Slope>(corners));
+		for (int x : edge) for (int y : edge) HeightCase(x, y, static_cast<Slope>(corners));
+	}
+}
+
 int main()
 {
 #ifdef MATH_ROUTE_PROBE
@@ -129,6 +199,7 @@ int main()
 	if (clamp_calls != wide_calls_before + 45) return 4;
 #endif
 #endif
+	HeightCases();
 	uint64_t roots = 0;
 	for (uint64_t k = 0; k <= 65535; k++) {
 		const uint64_t square = k * k;
