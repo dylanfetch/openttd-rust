@@ -12,6 +12,10 @@
 #include "../window_func.h"
 #include "linkgraphjob.h"
 #include "linkgraphschedule.h"
+#ifdef WITH_RUST
+#include "../rust/linkgraph_ffi.h"
+#include "../timer/timer_game_tick.h"
+#endif
 
 #include "../safeguards.h"
 
@@ -24,7 +28,9 @@ INSTANTIATE_POOL_METHODS(LinkGraphJob)
  * Note: This instance is created on task start.
  *       Lazy creation on first usage results in a data race between the CDist threads.
  */
+#ifndef WITH_RUST
 /* static */ Path *Path::invalid_path = new Path(INVALID_NODE, true);
+#endif
 
 /**
  * Create a link graph job from a link graph. The link graph will be copied so
@@ -188,6 +194,7 @@ void LinkGraphJob::Init()
 	}
 }
 
+#ifndef WITH_RUST
 /**
  * Add this path as a new child to the given base path, thus making this path
  * a "fork" of the base path.
@@ -253,3 +260,48 @@ Path::Path(NodeID n, bool source) :
 	num_children(0), parent(nullptr)
 {}
 
+
+#endif /* !WITH_RUST */
+
+#ifdef WITH_RUST
+static_assert(DT_MANUAL == 0 && DT_ASYMMETRIC == 1 && DT_SYMMETRIC == 2);
+static_assert(StationID::Invalid().base() == UINT16_MAX);
+static_assert(Ticks::DAY_TICKS == 74);
+
+/** Copy only job-local immutable inputs; Rust owns all algorithm state. */
+void LinkGraphJob::RunRust()
+{
+	this->Init();
+	std::vector<OpenTTDLinkGraphNode> input_nodes;
+	std::vector<OpenTTDLinkGraphEdge> input_edges;
+	input_nodes.reserve(this->Size());
+	for (const auto &node : this->nodes) {
+		input_nodes.push_back({node.base.supply, node.base.demand, node.base.station.base(), TileX(node.base.xy), TileY(node.base.xy), static_cast<uint32_t>(input_edges.size()), static_cast<uint32_t>(node.base.edges.size())});
+		for (const auto &edge : node.base.edges) input_edges.push_back({edge.capacity, edge.TravelTime(), edge.dest_node});
+	}
+	const auto &s = this->settings;
+	auto runtime = this->JoinDate() - s.recalc_time / CalendarTime::SECONDS_PER_DAY - this->LastCompression() + 1;
+	OpenTTDLinkGraphSettings settings{s.accuracy, s.demand_distance, s.demand_size, s.short_path_saturation, static_cast<uint32_t>(s.GetDistributionType(this->Cargo())),
+		IsCargoInClass(this->Cargo(), CargoClass::Passengers) || IsCargoInClass(this->Cargo(), CargoClass::Mail) || IsCargoInClass(this->Cargo(), CargoClass::Express), Map::MaxX(), Map::MaxY(), static_cast<uint32_t>(runtime.base())};
+	auto abort = [](const void *ctx) -> uint8_t { return static_cast<const LinkGraphJob *>(ctx)->IsJobAborted(); };
+	std::unique_ptr<OpenTTDLinkGraphResult, decltype(&openttd_rust_linkgraph_destroy)> result(
+		openttd_rust_linkgraph_run(input_nodes.data(), input_nodes.size(), input_edges.data(), input_edges.size(), &settings, this, abort), &openttd_rust_linkgraph_destroy);
+	if (this->IsJobAborted()) return;
+	size_t count = 0;
+	const auto *shares = openttd_rust_linkgraph_shares(result.get(), &count);
+	for (size_t i = 0; i < count;) {
+		const auto &first = shares[i];
+		FlowStat::SharesMap map;
+		do {
+			if (shares[i].has_share != 0) map.emplace(shares[i].cumulative, StationID(shares[i].via));
+			++i;
+		} while (i < count && shares[i].node == first.node && shares[i].origin == first.origin);
+		this->nodes[first.node].flows.emplace(StationID(first.origin), FlowStat(std::move(map), first.unrestricted));
+	}
+	const auto *flows = openttd_rust_linkgraph_edges(result.get());
+	size_t edge_id = 0;
+	for (auto &node : this->nodes) {
+		for (auto &edge : node.edges) edge.flow = flows[edge_id++];
+	}
+}
+#endif /* WITH_RUST */

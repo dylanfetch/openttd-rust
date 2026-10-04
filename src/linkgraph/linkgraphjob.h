@@ -90,7 +90,11 @@ public:
 		{
 			this->edges.reserve(node.edges.size());
 			for (auto &e : node.edges) this->edges.emplace_back(e);
+#ifndef WITH_RUST
 			this->demands.resize(size);
+#else
+			(void)size;
+#endif
 		}
 
 		/**
@@ -182,6 +186,9 @@ public:
 	~LinkGraphJob();
 
 	void Init();
+#ifdef WITH_RUST
+	void RunRust();
+#endif
 
 	/**
 	 * Check if job has actually finished.
@@ -270,6 +277,7 @@ public:
 /**
  * A leg of a path in the link graph. Paths can form trees by being "forked".
  */
+#ifndef WITH_RUST
 class Path {
 public:
 	static Path *invalid_path;
@@ -360,5 +368,7 @@ protected:
 	uint num_children = 0; ///< Number of child legs that have been forked from this path.
 	Path *parent = nullptr; ///< Parent leg of this one.
 };
+
+#endif /* !WITH_RUST */
 
 #endif /* LINKGRAPHJOB_H */

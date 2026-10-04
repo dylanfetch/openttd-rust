@@ -71,6 +71,11 @@ public:
 		if (!restricted) this->unrestricted += flow;
 	}
 
+#ifdef WITH_RUST
+	/** Materialize already computed job shares without re-running flow mapping. */
+	FlowStat(SharesMap shares, uint unrestricted) : shares(std::move(shares)), unrestricted(unrestricted) {}
+#endif
+
 	uint GetShare(StationID st) const;
 
 	void ChangeShare(StationID st, int flow);

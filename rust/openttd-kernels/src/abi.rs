@@ -62,6 +62,16 @@ pub fn layout(type_id: u8, item: u8) -> usize {
         27 => layout!(crate::string_validation::Write, item; position, accepted),
         29 => layout!(crate::script_list::control::Input, item; a, b, flag, kind),
         30 => layout!(crate::script_list::control::Action, item; a, kind),
+        34 => {
+            layout!(crate::linkgraph::InputNode, item; supply, demand, station, x, y, edge_begin, edge_count)
+        }
+        35 => layout!(crate::linkgraph::InputEdge, item; capacity, travel_time, dest),
+        36 => {
+            layout!(crate::linkgraph::Settings, item; accuracy, demand_distance, demand_size, saturation, distribution, express, map_max_x, map_max_y, runtime)
+        }
+        37 => {
+            layout!(crate::linkgraph::OutputShare, item; node, origin, via, cumulative, unrestricted, has_share)
+        }
         _ => usize::MAX,
     }
 }

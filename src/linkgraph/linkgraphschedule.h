@@ -42,7 +42,9 @@ private:
 	friend SaveLoadTable GetLinkGraphScheduleDesc();
 
 protected:
+#ifndef WITH_RUST
 	std::array<std::unique_ptr<ComponentHandler>, 6> handlers{}; ///< Handlers to be run for each job.
+#endif
 	GraphList schedule;            ///< Queue for new jobs.
 	JobList running;               ///< Currently running jobs.
 

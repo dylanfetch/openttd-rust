@@ -997,3 +997,29 @@ and reentrant validation; native ABI calls check byte flags, surrogate/NUL polic
 and copy state. Evidence: `.local/utf8-comparison/`. Not covered: exhaustive
 malformed sanitation/settings input, every allocator failure, out-of-domain
 overlap or text rendering.
+
+### Link graph job computation
+
+Issue #74 moves demands, both MCF passes, cycle elimination, path lifetime and
+flow mapping into Rust. Rust owns copied graph/settings, private demand/edge
+annotations, a reusable path arena and ordered cumulative-share maps. C++ keeps
+job scheduling/thread/abort flags, LGRP/LGRJ save/load and the existing station
+flow join. The three original algorithm files and Path bodies compile only in
+the portable build; job facades materialize completed shares and edge flows.
+
+ABI IDs 34-37 cover scalar node/edge/settings/share records. Immutable inputs are
+borrowed only while copied; one opaque result owns returned arrays and is destroyed
+by C++ RAII after materialization. Its sole callback reads the job's atomic abort
+flag and cannot throw/reenter. C++ allocations happen outside Rust. Panics abort.
+Unsigned arithmetic, signed-to-unsigned capacity division, queue/comparator ties,
+recursive path/cycle order and cumulative-share update/rounding stay explicit.
+
+Evidence: the unchanged regressions/comparisons and `python3 tools/migration.py
+simulate` with manual/cargodist road saves, symmetric/asymmetric scalers, boundary
+distance/size/accuracy/saturation settings and reload from a reference snapshot
+with outstanding LGRJ records (GLOG history is reset only in prepared road inputs so both
+loaders log their revision). Saves compare STNN/LGRP/LGRJ and all other chunks.
+Native ABI smoke covers snapshot/result/abort ownership; Rust unit cases retain
+negative capacity promotion and wrapped/empty shares. No armoured network is in
+the road corpus. Graphs, allocator failures and abort timing are not exhaustive;
+resource exhaustion timing differs with the allocation strategy.
