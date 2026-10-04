@@ -78,12 +78,14 @@ INSTANTIATE_POOL_METHODS(CargoPayment)
  * @param shift The amount to shift the value to right.
  * @return The shifted result
  */
+#ifndef WITH_RUST
 static inline int32_t BigMulS(const int32_t a, const int32_t b, const uint8_t shift)
 {
 	return (int32_t)((int64_t)a * (int64_t)b >> shift);
 }
 
 typedef std::vector<Industry *> SmallIndustryList;
+#endif
 
 /**
  * Score info, values used for computing the detailed performance rating.
@@ -962,6 +964,141 @@ Money GetPrice(Price index, uint cost_factor, const GRFFile *grf_file, int shift
 	return cost;
 }
 
+#ifdef WITH_RUST
+/* Leaves only read/write canonical world storage or call existing shared services.
+ * NewGRF sprite-group resolution cannot reenter these owners or execute commands.
+ * No exception crosses Rust; allocation/debug/UI failures terminate here. */
+static const OpenTTDCargoServices _cargo_services = {
+	[](uint8_t cargo, OpenTTDCargoSpec *out) noexcept {
+		const CargoSpec *cs = CargoSpec::Get(cargo);
+		*out = {cs->current_payment.base(), uint8_t(cs->IsValid()), uint8_t(cs->callback_mask.Test(CargoCallbackMask::ProfitCalc)), cs->transit_periods[0], cs->transit_periods[1]};
+	},
+	[](uint8_t cargo, uint32_t var18) noexcept { return GetCargoCallback(CBID_CARGO_PROFIT_CALC, 0, var18, CargoSpec::Get(cargo)); },
+	[](uint16_t station, uint32_t index) noexcept -> void * {
+		const auto &near = Station::Get(StationID(station))->industries_near;
+		return index < near.size() ? std::next(near.begin(), index)->industry : nullptr;
+	},
+	[](uint16_t station, uint8_t field, uint8_t cargo) noexcept -> uint32_t {
+		const Station *st = Station::Get(StationID(station));
+		return field == 0 ? st->owner.base() : HasBit(st->always_accepted, cargo);
+	},
+	[](void *handle, uint8_t field, uint32_t slot) noexcept -> uint32_t {
+		const Industry *i = static_cast<Industry *>(handle);
+		switch (field) {
+			case 0: return i->index.base();
+			case 1: {
+				auto it = i->GetCargoAccepted(slot);
+				return it == std::end(i->accepted) ? UINT32_MAX : it - std::begin(i->accepted);
+			}
+			case 2: return i->exclusive_supplier.base();
+			case 3: return i->accepted[slot].waiting;
+			case 4: {
+				auto mask = GetIndustrySpec(i->type)->callback_mask;
+				return uint32_t(mask.Test(IndustryCallbackMask::ProductionCargoArrival)) | (uint32_t(mask.Test(IndustryCallbackMask::Production256Ticks)) << 1);
+			}
+			case 5: return static_cast<uint32_t>(i->accepted.size());
+			case 6: return static_cast<uint32_t>(i->produced.size());
+			case 7: return i->accepted[slot].cargo;
+			case 8: return i->produced[slot].cargo;
+			case 9: return i->produced[slot].waiting;
+			case 10: return GetIndustrySpec(i->type)->input_cargo_multiplier[slot >> 16][slot & 0xFFFF];
+			default: NOT_REACHED();
+		}
+	},
+	[](void *handle, uint8_t field, uint32_t slot, uint32_t value) noexcept {
+		Industry *i = static_cast<Industry *>(handle);
+		if (field == 0) i->produced[slot].waiting = value;
+		else i->accepted[slot].waiting = value;
+	},
+	[](void *handle, uint8_t cargo) noexcept -> uint8_t { return IndustryTemporarilyRefusesCargo(static_cast<Industry *>(handle), cargo); },
+	[](void *handle, uint32_t slot, uint32_t amount) noexcept {
+		auto &accepted = static_cast<Industry *>(handle)->accepted[slot];
+		accepted.waiting += amount;
+		accepted.GetOrCreateHistory()[THIS_MONTH].accepted += amount;
+		accepted.last_accepted = TimerGameEconomy::date;
+	},
+	[](uint16_t station, uint8_t cargo, uint8_t company, uint32_t amount, uint8_t field) noexcept {
+		Station *st = Station::Get(StationID(station));
+		switch (field) {
+			case 0: st->goods[cargo].status.Set({GoodsEntry::State::EverAccepted, GoodsEntry::State::CurrentMonth, GoodsEntry::State::AcceptedBigtick}); break;
+			case 1: Company::Get(CompanyID(company))->cur_economy.delivered_cargo[cargo] += amount; break;
+			case 2: st->town->received[CargoSpec::Get(cargo)->town_acceptance_effect].new_act += amount; break;
+			default: NOT_REACHED();
+		}
+	},
+	[](uint16_t station, uint8_t cargo, uint8_t company, uint32_t amount, uint32_t source, uint16_t industry) noexcept {
+		AddCargoDelivery(cargo, CompanyID(company), amount, Source(uint16_t(source), SourceType(source >> 16)), Station::Get(StationID(station)), IndustryID(industry));
+	},
+	[](uint16_t station, uint8_t cargo, uint8_t company, uint32_t source) noexcept -> uint8_t {
+		return CheckSubsidised(cargo, CompanyID(company), Source(uint16_t(source), SourceType(source >> 16)), Station::Get(StationID(station)));
+	},
+	[](void *handle, uint8_t op) noexcept {
+		Industry *i = static_cast<Industry *>(handle);
+		switch (op) {
+			case 0: i->was_cargo_delivered = true; break;
+			case 1: IndustryProductionCallback(i, 0); break;
+			case 2: SetWindowDirty(WC_INDUSTRY_VIEW, i->index); break;
+			case 3: TriggerIndustryRandomisation(i, IndustryRandomTrigger::CargoReceived); break;
+			case 4: TriggerIndustryAnimation(i, IndustryAnimationTrigger::CargoReceived); break;
+			default: NOT_REACHED();
+		}
+	},
+	[](void *handle, uint8_t field) noexcept -> uint32_t {
+		const Vehicle *v = static_cast<Vehicle *>(handle);
+		return field == 0 ? v->last_station_visited.base() : v->owner.base();
+	},
+	[](void *handle, uint8_t op, int64_t first, int64_t second) noexcept -> uint32_t {
+		Vehicle *v = static_cast<Vehicle *>(handle);
+		switch (op) {
+			case 0: v->cargo_payment = nullptr; break;
+			case 1: { auto previous = _current_company; _current_company = v->owner; return previous.base(); }
+			case 2: SubtractMoneyFromCompany(CommandCost(v->GetExpenseType(true), Money(first))); break;
+			case 3: v->profit_this_year += Money(first); break;
+			case 4: return IsLocalCompany();
+			case 5: ShowFeederIncomeAnimation(v->x_pos, v->y_pos, v->z_pos, Money(first), Money(second)); break;
+			case 6: ShowCostOrIncomeAnimation(v->x_pos, v->y_pos, v->z_pos, Money(second)); break;
+			case 7: _current_company = CompanyID(first); break;
+			case 8: return PlayVehicleSound(v, VSE_LOAD_UNLOAD);
+			case 9: SndPlayVehicleFx(SND_14_CASHTILL, v); break;
+			default: NOT_REACHED();
+		}
+		return 0;
+	},
+	[](const void *packet, uint32_t count) noexcept -> int64_t { return static_cast<const CargoPacket *>(packet)->GetFeederShare(count).base(); },
+	[](uint8_t field) noexcept -> uint32_t { return field == 0 ? _settings_game.difficulty.subsidy_multiplier : _settings_game.economy.feeder_payment_share; },
+};
+
+static OpenTTDCargoDelivery *GetCargoDeliveryState()
+{
+	static const std::unique_ptr<OpenTTDCargoDelivery, decltype(&openttd_rust_cargo_delivery_destroy)> state(openttd_rust_cargo_delivery_new(), openttd_rust_cargo_delivery_destroy);
+	return state.get();
+}
+
+Money GetTransportedGoodsIncome(uint num_pieces, uint dist, uint16_t transit_periods, CargoType cargo_type)
+{
+	return openttd_rust_cargo_income(&_cargo_services, num_pieces, dist, transit_periods, cargo_type);
+}
+
+CargoPayment::CargoPayment() : rust_state(openttd_rust_cargo_payment_new(nullptr, StationID::Invalid().base())) {}
+CargoPayment::CargoPayment(Vehicle *front) : rust_state(openttd_rust_cargo_payment_new(front, front->last_station_visited.base())) {}
+CargoPayment::~CargoPayment() { openttd_rust_cargo_payment_destroy(this->rust_state, &_cargo_services, CleaningPool()); }
+Vehicle *CargoPayment::GetFront() const { return static_cast<Vehicle *>(openttd_rust_cargo_payment_front(this->rust_state)); }
+void CargoPayment::AfterLoad()
+{
+	this->GetFront()->cargo_payment = this;
+	openttd_rust_cargo_payment_afterload(this->rust_state, &_cargo_services);
+}
+void CargoPayment::PayFinalDelivery(CargoType cargo, const CargoPacket *cp, uint count, TileIndex current_tile)
+{
+	assert(int(count) > 0);
+	Source source = cp->GetSource();
+	openttd_rust_cargo_payment_final(this->rust_state, GetCargoDeliveryState(), &_cargo_services, cargo, cp, count, cp->GetDistance(current_tile), cp->GetPeriodsInTransit(), source.id | (uint32_t(source.type) << 16));
+}
+Money CargoPayment::PayTransfer(CargoType cargo, const CargoPacket *cp, uint count, TileIndex current_tile)
+{
+	return openttd_rust_cargo_payment_transfer(this->rust_state, &_cargo_services, cargo, cp, count, cp->GetDistance(current_tile), cp->GetPeriodsInTransit());
+}
+#else
 Money GetTransportedGoodsIncome(uint num_pieces, uint dist, uint16_t transit_periods, CargoType cargo_type)
 {
 	const CargoSpec *cs = CargoSpec::Get(cargo_type);
@@ -1248,12 +1385,227 @@ Money CargoPayment::PayTransfer(CargoType cargo, const CargoPacket *cp, uint cou
 	return profit; // account for the (virtual) profit already made for the cargo packet
 }
 
+void CargoPayment::AfterLoad()
+{
+	this->front->cargo_payment = this;
+	this->current_station = this->front->last_station_visited;
+}
+#endif /* WITH_RUST */
+
+#ifdef WITH_RUST
+static int64_t RustLoadingRead(void *handle, uint8_t field) noexcept
+{
+	switch (field) {
+		case 27: return TimerGameCalendar::year.base();
+		case 46: return _settings_game.order.gradual_loading;
+		case 47: return _settings_game.order.improved_load;
+		case 48: return _settings_game.order.station_length_loading_penalty;
+		case 56: return _current_company.base();
+	}
+	Vehicle *v = static_cast<Vehicle *>(handle);
+	switch (field) {
+		case 0: return v->type;
+		case 1: return v->cargo_type;
+		case 2: return v->cargo_cap;
+		case 3: return v->refit_cap;
+		case 4: return v->cargo.StoredCount();
+		case 5: return v->cargo.RemainingCount();
+		case 6: return v->cargo.ReservedCount();
+		case 7: return v->cargo.UnloadCount();
+		case 8: return v->cargo.ActionCount(VehicleCargoList::MTA_DELIVER);
+		case 9: return v->cargo.ActionCount(VehicleCargoList::MTA_TRANSFER);
+		case 10: return v->cargo.ActionCount(VehicleCargoList::MTA_LOAD);
+		case 11: return v->vehicle_flags.Test(VehicleFlag::CargoUnloading);
+		case 12: return to_underlying(v->current_order.GetUnloadType());
+		case 13: return to_underlying(v->current_order.GetLoadType());
+		case 14: return v->current_order.IsRefit();
+		case 15: return v->current_order.GetRefitCargo();
+		case 17: return v->orders != nullptr;
+		case 18: return v->load_unload_ticks;
+		case 19: return v->vehstatus.Any({VehState::Stopped, VehState::Crashed});
+		case 20: return v->HasArticulatedPart();
+		case 21: return v->IsArticulatedPart();
+		case 22: return Train::From(v)->IsRearDualheaded();
+		case 23: return Aircraft::From(v)->IsNormalAircraft();
+		case 24: return Train::From(v)->IsMultiheaded();
+		case 25: return v->vcache.cached_max_speed;
+		case 26: return v->build_year.base();
+		case 28: return v->GetEngine()->info.load_amount;
+		case 29: return v->GetEngine()->GetGRF() == nullptr ? 0 : v->GetEngine()->GetGRF()->grf_version;
+		case 30: return v->GetEngine()->info.callback_mask.Test(VehicleCallbackMask::LoadAmount);
+		case 31: return v->GetEngine()->info.misc_flags.Test(EngineMiscFlag::NoDefaultCargoMultiplier);
+		case 32: return CargoSpec::Get(v->cargo_type)->multiplier;
+		case 34: return v->GetGroundVehicleCache()->cached_total_length;
+		case 36: return v->current_order.GetTimetabledWait();
+		case 37: return v->current_order_time;
+		case 38: return v->lateness_counter;
+		case 39: return v->current_order.IsFullLoadOrder();
+		case 40: return v->owner.base();
+		case 42: return Aircraft::From(v)->GetSpeedOldUnits();
+		case 44: return IsCargoInClass(v->cargo_type, CargoClass::Passengers);
+		case 51: return static_cast<int64_t>(EngInfo(v->engine_type)->refit_mask);
+		case 54: return v->vehicle_flags.Test(VehicleFlag::StopLoading);
+		case 57: return v->last_station_visited.base();
+		case 58: return v->cargo.TotalCount();
+	}
+	NOT_REACHED();
+}
+static void RustLoadingWrite(void *handle, uint8_t field, int64_t value) noexcept
+{
+	if (field == 11) {
+		_current_company = CompanyID(value);
+		return;
+	}
+	Vehicle *front = static_cast<Vehicle *>(handle);
+	switch (field) {
+		case 0: front->vehicle_flags.Set(VehicleFlag::CargoUnloading, value != 0); break;
+		case 1: front->vehicle_flags.Set(VehicleFlag::LoadingFinished, value != 0); break;
+		case 2: front->vehicle_flags.Set(VehicleFlag::StopLoading, value != 0); break;
+		case 3: front->load_unload_ticks = value; break;
+		case 4: front->cur_speed = value; break;
+		case 5: front->refit_cap = value; break;
+		case 6: front->profit_this_year -= value; break;
+		case 7: ErrorUnknownCallbackResult(front->GetEngine()->GetGRFID(), CBID_VEHICLE_LOAD_AMOUNT, value); break;
+		case 8: LinkRefresher::Run(front, true, true); break;
+		case 9:
+			SetWindowDirty(GetWindowClassForVehicleType(front->type), front->owner);
+			SetWindowDirty(WC_VEHICLE_DETAILS, front->index);
+			front->MarkDirty();
+			break;
+		case 10:
+			if (_game_mode != GM_MENU && (_settings_client.gui.loading_indicators > (uint)(front->owner != _local_company && _local_company != COMPANY_SPECTATOR))) {
+				StringID percent_up_down = STR_NULL;
+				int percent = CalcPercentVehicleFilled(front, &percent_up_down);
+				if (front->fill_percent_te_id == INVALID_TE_ID) {
+					front->fill_percent_te_id = ShowFillingPercent(front->x_pos, front->y_pos, front->z_pos + 20, percent, percent_up_down);
+				} else {
+					UpdateFillingPercent(front->fill_percent_te_id, percent, percent_up_down);
+				}
+			}
+			break;
+		default: NOT_REACHED();
+	}
+}
+static uint32_t RustLoadingCargo(void *station, void *vehicle, uint8_t operation, uint32_t amount, void *next_stations, void *payment) noexcept
+{
+	Station *st = static_cast<Station *>(station);
+	Vehicle *v = static_cast<Vehicle *>(vehicle);
+	std::span<const StationID> next;
+	if (next_stations != nullptr) next = *static_cast<std::vector<StationID> *>(next_stations);
+	if (operation == 7) {
+		GoodsEntry &ge = st->goods[amount];
+		return ge.HasData() && ge.GetData().cargo.HasCargoFor(next);
+	}
+	if (operation == 10) {
+		GoodsEntry &ge = st->goods[amount];
+		return ge.GetData().cargo.TotalCount();
+	}
+	if (operation == 8) return st->GetPlatformLength(v->tile);
+	if (operation == 9) return IsTileType(v->tile, MP_STATION) && GetStationIndex(v->tile) == st->index;
+	GoodsEntry &ge = st->goods[v->cargo_type];
+	switch (operation) {
+		case 0:
+			v->cargo.Stage(ge.status.Test(GoodsEntry::State::Acceptance), st->index, next, static_cast<OrderUnloadType>(amount), &ge, v->cargo_type, static_cast<CargoPayment *>(payment), v->GetCargoTile());
+			break;
+		case 1: v->cargo.Return(amount, &ge.GetOrCreateData().cargo, StationID::Invalid(), v->GetCargoTile()); break;
+		case 2: return v->cargo.Unload(amount, &ge.GetOrCreateData().cargo, v->cargo_type, static_cast<CargoPayment *>(payment), v->GetCargoTile());
+		case 3: return ge.GetOrCreateData().cargo.Load(amount, &v->cargo, next, v->GetCargoTile());
+		case 4: ge.GetOrCreateData().cargo.Reserve(amount, &v->cargo, next, v->GetCargoTile()); break;
+		case 5: v->cargo.Reassign<VehicleCargoList::MTA_DELIVER, VehicleCargoList::MTA_TRANSFER>(amount); break;
+		case 6: v->cargo.Reassign<VehicleCargoList::MTA_DELIVER, VehicleCargoList::MTA_KEEP>(amount); break;
+		default: NOT_REACHED();
+	}
+	return 0;
+}
+static const OpenTTDStationLoading _rust_station_loading = {
+	RustLoadingRead, RustLoadingWrite,
+	[](void *handle, uint8_t field) noexcept -> void * {
+		Vehicle *v = static_cast<Vehicle *>(handle);
+		switch (field) {
+			case 0: return v->Next();
+			case 2: return v->GetNextArticulatedPart();
+			case 3: return Train::From(v)->other_multiheaded_part;
+			case 4: return v->GetFirstEnginePart();
+			case 5: return v->First();
+			case 6: return v->Previous();
+		}
+		NOT_REACHED();
+	},
+	[](void *v) noexcept -> void * {
+		auto *next = new std::vector<StationID>;
+		static_cast<Vehicle *>(v)->GetNextStoppingStation(*next);
+		return next;
+	},
+	[](void *next) noexcept { delete static_cast<std::vector<StationID> *>(next); },
+	RustLoadingCargo,
+	[](void *handle, uint8_t property) noexcept -> uint16_t {
+		Vehicle *v = static_cast<Vehicle *>(handle);
+		return property == 0 ? GetVehicleProperty(v, PROP_VEHICLE_LOAD_AMOUNT, CALLBACK_FAILED) : GetVehicleCallback(CBID_VEHICLE_LOAD_AMOUNT, 0, 0, v->engine_type, v);
+	},
+	[](void *handle, uint8_t action) noexcept -> void * {
+		switch (action) {
+			case 0: return static_cast<Vehicle *>(handle)->cargo_payment;
+			case 1: {
+				Vehicle *v = static_cast<Vehicle *>(handle);
+				assert(v->cargo_payment == nullptr);
+				static_assert(CargoPaymentPool::MAX_SIZE == VehiclePool::MAX_SIZE);
+				assert(CargoPayment::CanAllocateItem());
+				v->cargo_payment = new CargoPayment(v);
+				return v->cargo_payment;
+			}
+			case 2: delete static_cast<CargoPayment *>(handle); break;
+			case 3: openttd_rust_cargo_delivery_flush(GetCargoDeliveryState(), &_cargo_services); break;
+			default: NOT_REACHED();
+		}
+		return nullptr;
+	},
+	[](void *station, void *vehicle, uint8_t effect, uint8_t cargo) noexcept {
+		Station *st = static_cast<Station *>(station);
+		Vehicle *v = static_cast<Vehicle *>(vehicle);
+		switch (effect) {
+			case 0: TriggerVehicleRandomisation(v, VehicleRandomTrigger::NewCargo); break;
+			case 1:
+				TriggerStationRandomisation(st, st->xy, StationRandomTrigger::CargoTaken, cargo);
+				TriggerStationAnimation(st, st->xy, StationAnimationTrigger::CargoTaken, cargo);
+				TriggerAirportAnimation(st, AirportAnimationTrigger::CargoTaken, cargo);
+				TriggerRoadStopRandomisation(st, st->xy, StationRandomTrigger::CargoTaken, cargo);
+				TriggerRoadStopAnimation(st, st->xy, StationAnimationTrigger::CargoTaken, cargo);
+				break;
+			case 2:
+				TriggerStationRandomisation(st, v->tile, StationRandomTrigger::VehicleLoads);
+				TriggerStationAnimation(st, v->tile, StationAnimationTrigger::VehicleLoads);
+				break;
+			case 3:
+				TriggerRoadStopRandomisation(st, v->tile, StationRandomTrigger::VehicleLoads);
+				TriggerRoadStopAnimation(st, v->tile, StationAnimationTrigger::VehicleLoads);
+				break;
+			case 4: TriggerVehicleRandomisation(v, VehicleRandomTrigger::Empty); break;
+			case 5:
+				st->MarkTilesDirty(true);
+				SetWindowDirty(WC_STATION_VIEW, st->index);
+				SetWindowDirty(WC_STATION_LIST, st->owner);
+				break;
+			default: NOT_REACHED();
+		}
+	},
+	[](void *handle, uint8_t cargo, uint8_t execute, int64_t *cost) noexcept -> uint64_t {
+		Vehicle *v = static_cast<Vehicle *>(handle);
+		auto [result, capacity, mail_capacity, cargo_capacities] = Command<CMD_REFIT_VEHICLE>::Do(execute != 0 ? DoCommandFlag::Execute : DoCommandFlag::QueryCost, v->index, cargo, 0xFF, true, false, 1);
+		*cost = result.GetCost();
+		return execute != 0 ? result.Succeeded() : capacity;
+	},
+};
+#endif
+
 /**
  * Prepare the vehicle to be unloaded.
  * @param front_v the vehicle to be unloaded
  */
 void PrepareUnload(Vehicle *front_v)
 {
+#ifdef WITH_RUST
+	openttd_rust_station_prepare(front_v, &GetRustStationServices(), &_rust_station_loading);
+#else
 	Station *curr_station = Station::Get(front_v->last_station_visited);
 	curr_station->loading_vehicles.push_back(front_v);
 
@@ -1287,8 +1639,10 @@ void PrepareUnload(Vehicle *front_v)
 			}
 		}
 	}
+#endif
 }
 
+#ifndef WITH_RUST
 /**
  * Gets the amount of cargo the given vehicle can load in the current tick.
  * This is only about loading speed. The free capacity is ignored.
@@ -1921,6 +2275,8 @@ static void LoadUnloadVehicle(Vehicle *front)
 	}
 }
 
+#endif
+
 /**
  * Load/unload the vehicles in this station according to the order
  * they entered.
@@ -1928,6 +2284,9 @@ static void LoadUnloadVehicle(Vehicle *front)
  */
 void LoadUnloadStation(Station *st)
 {
+#ifdef WITH_RUST
+	openttd_rust_station_load(st, &GetRustStationServices(), &_rust_station_loading);
+#else
 	/* No vehicle is here... */
 	if (st->loading_vehicles.empty()) return;
 
@@ -1956,10 +2315,15 @@ void LoadUnloadStation(Station *st)
 	}
 
 	/* Call the production machinery of industries */
+#ifdef WITH_RUST
+	openttd_rust_cargo_delivery_flush(GetCargoDeliveryState(), &_cargo_services);
+#else
 	for (Industry *iid : _cargo_delivery_destinations) {
 		TriggerIndustryProduction(iid);
 	}
 	_cargo_delivery_destinations.clear();
+#endif /* WITH_RUST */
+#endif
 }
 
 /**

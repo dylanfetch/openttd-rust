@@ -16,6 +16,7 @@
 
 #include "../../safeguards.h"
 
+#ifndef WITH_RUST
 static constexpr int DIRECT_NEIGHBOUR_COST = 100;
 static constexpr int NODES_PER_REGION = 4;
 static constexpr int MAX_NUMBER_OF_NODES = 65536;
@@ -229,3 +230,5 @@ std::vector<WaterRegionPatchDesc> YapfShipFindWaterRegionPath(const Ship *v, Til
 {
 	return YapfShipRegions::FindWaterRegionPath(v, start_tile, max_returned_path_length);
 }
+
+#endif /* WITH_RUST */
