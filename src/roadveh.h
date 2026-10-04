@@ -17,6 +17,9 @@
 #include "road.h"
 #include "road_map.h"
 #include "newgrf_engine.h"
+#ifdef WITH_RUST
+#include "rust/road_ffi.h"
+#endif
 
 struct RoadVehicle;
 
@@ -96,6 +99,11 @@ using RoadVehPathCache = std::vector<RoadVehPathElement>;
  * Buses, trucks and trams belong to this class.
  */
 struct RoadVehicle final : public GroundVehicle<RoadVehicle, VEH_ROAD> {
+#ifdef WITH_RUST
+	/* The shell owns one canonical allocation; members destruct after PreDestructor,
+	 * including its early return during pool cleanup and indexed-load destruction. */
+	std::unique_ptr<OpenTTDRoadState, decltype(&openttd_rust_road_destroy)> rust_state{openttd_rust_road_new(), openttd_rust_road_destroy};
+#else
 	RoadVehPathCache path{};  ///< Cached path.
 	uint8_t state = 0; ///< @see RoadVehicleStates
 	uint8_t frame = 0;
@@ -105,6 +113,8 @@ struct RoadVehicle final : public GroundVehicle<RoadVehicle, VEH_ROAD> {
 	uint16_t crashed_ctr = 0; ///< Animation counter when the vehicle has crashed. @see RoadVehIsCrashed
 	uint8_t reverse_ctr = 0;
 
+#endif
+
 	RoadType roadtype = INVALID_ROADTYPE; ///< NOSAVE: Roadtype of this vehicle.
 	VehicleID disaster_vehicle = VehicleID::Invalid(); ///< NOSAVE: Disaster vehicle targetting this vehicle.
 	RoadTypes compatible_roadtypes{}; ///< NOSAVE: Roadtypes this consist is powered on.
@@ -113,6 +123,198 @@ struct RoadVehicle final : public GroundVehicle<RoadVehicle, VEH_ROAD> {
 	RoadVehicle() : GroundVehicleBase() {}
 	/** We want to 'destruct' the right class. */
 	virtual ~RoadVehicle() { this->PreDestructor(); }
+
+#ifdef WITH_RUST
+	OpenTTDRoadState *GetRustState() const { return this->rust_state.get(); }
+	uint RustDoUpdateSpeed(uint accel, int min_speed, int max_speed) { return this->DoUpdateSpeed(accel, min_speed, max_speed); }
+#endif
+
+	uint8_t GetState() const
+	{
+#ifdef WITH_RUST
+		return static_cast<uint8_t>(openttd_rust_road_get(this->rust_state.get(), 0));
+#else
+		return this->state;
+#endif
+	}
+	void SetState(uint8_t value)
+	{
+#ifdef WITH_RUST
+		openttd_rust_road_set(this->rust_state.get(), 0, value);
+#else
+		this->state = value;
+#endif
+	}
+
+	uint8_t GetFrame() const
+	{
+#ifdef WITH_RUST
+		return static_cast<uint8_t>(openttd_rust_road_get(this->rust_state.get(), 1));
+#else
+		return this->frame;
+#endif
+	}
+	void SetFrame(uint8_t value)
+	{
+#ifdef WITH_RUST
+		openttd_rust_road_set(this->rust_state.get(), 1, value);
+#else
+		this->frame = value;
+#endif
+	}
+
+	uint16_t GetBlockedCounter() const
+	{
+#ifdef WITH_RUST
+		return static_cast<uint16_t>(openttd_rust_road_get(this->rust_state.get(), 2));
+#else
+		return this->blocked_ctr;
+#endif
+	}
+	void SetBlockedCounter(uint16_t value)
+	{
+#ifdef WITH_RUST
+		openttd_rust_road_set(this->rust_state.get(), 2, value);
+#else
+		this->blocked_ctr = value;
+#endif
+	}
+
+	uint8_t GetOvertaking() const
+	{
+#ifdef WITH_RUST
+		return static_cast<uint8_t>(openttd_rust_road_get(this->rust_state.get(), 3));
+#else
+		return this->overtaking;
+#endif
+	}
+	void SetOvertaking(uint8_t value)
+	{
+#ifdef WITH_RUST
+		openttd_rust_road_set(this->rust_state.get(), 3, value);
+#else
+		this->overtaking = value;
+#endif
+	}
+
+	uint8_t GetOvertakingCounter() const
+	{
+#ifdef WITH_RUST
+		return static_cast<uint8_t>(openttd_rust_road_get(this->rust_state.get(), 4));
+#else
+		return this->overtaking_ctr;
+#endif
+	}
+	void SetOvertakingCounter(uint8_t value)
+	{
+#ifdef WITH_RUST
+		openttd_rust_road_set(this->rust_state.get(), 4, value);
+#else
+		this->overtaking_ctr = value;
+#endif
+	}
+
+	uint16_t GetCrashedCounter() const
+	{
+#ifdef WITH_RUST
+		return static_cast<uint16_t>(openttd_rust_road_get(this->rust_state.get(), 5));
+#else
+		return this->crashed_ctr;
+#endif
+	}
+	void SetCrashedCounter(uint16_t value)
+	{
+#ifdef WITH_RUST
+		openttd_rust_road_set(this->rust_state.get(), 5, value);
+#else
+		this->crashed_ctr = value;
+#endif
+	}
+
+	uint8_t GetReverseCounter() const
+	{
+#ifdef WITH_RUST
+		return static_cast<uint8_t>(openttd_rust_road_get(this->rust_state.get(), 6));
+#else
+		return this->reverse_ctr;
+#endif
+	}
+	void SetReverseCounter(uint8_t value)
+	{
+#ifdef WITH_RUST
+		openttd_rust_road_set(this->rust_state.get(), 6, value);
+#else
+		this->reverse_ctr = value;
+#endif
+	}
+
+	RoadVehPathCache CopyPath() const
+	{
+#ifdef WITH_RUST
+		RoadVehPathCache path;
+		const size_t size = this->PathSize();
+		path.reserve(size);
+		for (size_t i = 0; i < size; ++i) {
+			const auto element = openttd_rust_road_path_get(this->rust_state.get(), i);
+			path.emplace_back(static_cast<Trackdir>(element.trackdir), TileIndex(element.tile));
+		}
+		return path;
+#else
+		return this->path;
+#endif
+	}
+	void ReplacePath(const RoadVehPathCache &path)
+	{
+#ifdef WITH_RUST
+		std::vector<OpenTTDRoadPathElement> elements;
+		elements.reserve(path.size());
+		for (const auto &element : path) elements.push_back({static_cast<uint8_t>(element.trackdir), element.tile.base()});
+		openttd_rust_road_path_replace(this->rust_state.get(), elements.data(), elements.size());
+#else
+		this->path = path;
+#endif
+	}
+	void ClearPath()
+	{
+#ifdef WITH_RUST
+		openttd_rust_road_path_clear(this->rust_state.get());
+#else
+		this->path.clear();
+#endif
+	}
+	size_t PathSize() const
+	{
+#ifdef WITH_RUST
+		return openttd_rust_road_path_size(this->rust_state.get());
+#else
+		return this->path.size();
+#endif
+	}
+	RoadVehPathElement PathBack() const
+	{
+#ifdef WITH_RUST
+		const auto element = openttd_rust_road_path_get(this->rust_state.get(), this->PathSize() - 1);
+		return {static_cast<Trackdir>(element.trackdir), TileIndex(element.tile)};
+#else
+		return this->path.back();
+#endif
+	}
+	void PathPush(Trackdir trackdir, TileIndex tile)
+	{
+#ifdef WITH_RUST
+		openttd_rust_road_path_push(this->rust_state.get(), {static_cast<uint8_t>(trackdir), tile.base()});
+#else
+		this->path.emplace_back(trackdir, tile);
+#endif
+	}
+	void PathPop()
+	{
+#ifdef WITH_RUST
+		openttd_rust_road_path_pop(this->rust_state.get());
+#else
+		this->path.pop_back();
+#endif
+	}
 
 	friend struct GroundVehicle<RoadVehicle, VEH_ROAD>; // GroundVehicle needs to use the acceleration functions defined at RoadVehicle.
 
@@ -125,7 +327,7 @@ struct RoadVehicle final : public GroundVehicle<RoadVehicle, VEH_ROAD> {
 	int GetDisplayMaxSpeed() const override { return this->vcache.cached_max_speed / 2; }
 	Money GetRunningCost() const override;
 	int GetDisplayImageWidth(Point *offset = nullptr) const;
-	bool IsInDepot() const override { return this->state == RVSB_IN_DEPOT; }
+	bool IsInDepot() const override { return this->GetState() == RVSB_IN_DEPOT; }
 	bool Tick() override;
 	void OnNewCalendarDay() override;
 	void OnNewEconomyDay() override;
@@ -294,6 +496,9 @@ protected: // These functions should not be called outside acceleration code.
 	 * even if it is not reversing.
 	 * @return are we (possibly) reversing?
 	 */
+#ifdef WITH_RUST
+	bool HasToUseGetSlopePixelZ();
+#else
 	inline bool HasToUseGetSlopePixelZ()
 	{
 		const RoadVehicle *rv = this->First();
@@ -301,7 +506,7 @@ protected: // These functions should not be called outside acceleration code.
 		/* Check if this vehicle is in the same direction as the road under.
 		 * We already know it has either GVF_GOINGUP_BIT or GVF_GOINGDOWN_BIT set. */
 
-		if (rv->state <= RVSB_TRACKDIR_MASK && IsReversingRoadTrackdir((Trackdir)rv->state)) {
+		if (rv->GetState() <= RVSB_TRACKDIR_MASK && IsReversingRoadTrackdir((Trackdir)rv->GetState())) {
 			/* If the first vehicle is reversing, this vehicle may be reversing too
 			 * (especially if this is the first, and maybe the only, vehicle).*/
 			return true;
@@ -316,6 +521,63 @@ protected: // These functions should not be called outside acceleration code.
 
 		return false;
 	}
+#endif
 };
+
+#ifdef WITH_RUST
+/** Call-scoped serialization staging. No Rust frame spans save/load, callbacks or
+ * reference fixups. Nested handlers restore the previous scope; partial loads
+ * commit on unwind, matching direct field/vector mutation in the portable build. */
+class RoadVehicleStateScope {
+	static inline RoadVehicleStateScope *active = nullptr;
+	RoadVehicleStateScope *previous;
+	RoadVehicle *vehicle;
+	bool loading;
+	uint8_t state;
+	uint8_t frame;
+	uint16_t blocked_ctr;
+	uint8_t overtaking;
+	uint8_t overtaking_ctr;
+	uint16_t crashed_ctr;
+	uint8_t reverse_ctr;
+	RoadVehPathCache path;
+	std::vector<Trackdir> path_td;
+	std::vector<TileIndex> path_tile;
+public:
+	RoadVehicleStateScope(RoadVehicle *v, bool loading) : previous(active), vehicle(v), loading(loading),
+		state(v->GetState()),
+		frame(v->GetFrame()),
+		blocked_ctr(v->GetBlockedCounter()),
+		overtaking(v->GetOvertaking()),
+		overtaking_ctr(v->GetOvertakingCounter()),
+		crashed_ctr(v->GetCrashedCounter()),
+		reverse_ctr(v->GetReverseCounter()),
+		path(v->CopyPath()) { active = this; }
+	~RoadVehicleStateScope()
+	{
+		if (this->loading) {
+			this->vehicle->SetState(this->state);
+			this->vehicle->SetFrame(this->frame);
+			this->vehicle->SetBlockedCounter(this->blocked_ctr);
+			this->vehicle->SetOvertaking(this->overtaking);
+			this->vehicle->SetOvertakingCounter(this->overtaking_ctr);
+			this->vehicle->SetCrashedCounter(this->crashed_ctr);
+			this->vehicle->SetReverseCounter(this->reverse_ctr);
+			this->vehicle->ReplacePath(this->path);
+		}
+		active = this->previous;
+	}
+	static uint8_t &State() { return active->state; }
+	static uint8_t &Frame() { return active->frame; }
+	static uint16_t &BlockedCounter() { return active->blocked_ctr; }
+	static uint8_t &Overtaking() { return active->overtaking; }
+	static uint8_t &OvertakingCounter() { return active->overtaking_ctr; }
+	static uint16_t &CrashedCounter() { return active->crashed_ctr; }
+	static uint8_t &ReverseCounter() { return active->reverse_ctr; }
+	static RoadVehPathCache &Path() { return active->path; }
+	static std::vector<Trackdir> &PathTrackdirs() { return active->path_td; }
+	static std::vector<TileIndex> &PathTiles() { return active->path_tile; }
+};
+#endif
 
 #endif /* ROADVEH_H */

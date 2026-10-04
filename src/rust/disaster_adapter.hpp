@@ -41,7 +41,7 @@ static void OPENTTD_DISASTER_CALL DisasterRead(void *, uint32_t kind, uint32_t i
 			out[6] = v->direction; out[7] = v->age.base(); out[8] = v->tick_counter; out[9] = v->owner.base(); out[10] = v->vehstatus.base();
 			out[11] = v->Next() == nullptr ? VehicleID::Invalid().base() : v->Next()->index.base(); out[12] = v->sprite_cache.sprite_seq.seq[0].sprite;
 			out[13] = v->IsFrontEngine(); out[14] = v->IsGroundVehicle(); out[15] = v->type; out[16] = v->breakdown_ctr; out[17] = v->breakdown_delay;
-			if (v->type == VEH_ROAD) { const RoadVehicle *r = RoadVehicle::From(v); out[18] = r->crashed_ctr; out[19] = r->disaster_vehicle.base(); }
+			if (v->type == VEH_ROAD) { const RoadVehicle *r = RoadVehicle::From(v); out[18] = r->GetCrashedCounter(); out[19] = r->disaster_vehicle.base(); }
 			break;
 		}
 		case 2: {

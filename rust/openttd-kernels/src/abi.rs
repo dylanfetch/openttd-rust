@@ -22,6 +22,8 @@ macro_rules! layout {
     };
 }
 
+// Keep ABI IDs in one registry so duplicate match arms remain compiler-checked.
+#[allow(clippy::too_many_lines)]
 pub fn layout(type_id: u8, item: u8) -> usize {
     match type_id {
         0 => {
@@ -83,6 +85,12 @@ pub fn layout(type_id: u8, item: u8) -> usize {
         42 => {
             layout!(crate::services::Services, item; context, random, observe_tile, write_tile, trig, industry)
         }
+        80 => layout!(crate::road::PathElement, item; trackdir, tile),
+        81 => {
+            layout!(crate::road::View, item; r#type, first, next, previous, tile, dest, x, y, z, direction, speed, tick, running, day, order_time, progress, status, owner, engine, last_station, order_destination, order_type, order_max_speed, breakdown, max_track_speed, length, total_length, roadtype, front, articulated, tram, bus, order_nonstop)
+        }
+        82 => layout!(crate::road::Leaves, item; observe, write, leaf, owner, nearby),
+        83 => layout!(crate::road::Action, item; op, id, a, b, c),
         44 => layout!(crate::disaster::State, item; image_override, target, state, flags),
         45 => layout!(crate::disaster::Action, item; kind, id, other, a, b, c, d),
         46 => layout!(crate::water_regions::Patch, item; x, y, label),
@@ -96,6 +104,54 @@ pub fn layout(type_id: u8, item: u8) -> usize {
         }
         51 => {
             layout!(crate::cargo_payment::Services, item; spec, callback, near, station_read, industry_read, industry_write, refuses, accept, statistics, monitor, subsidised, industry_effect, vehicle_read, settle, feeder, setting)
+        }
+        52 => {
+            layout!(crate::ship_yapf::Input, item; map_x, map_y, tile, dest_tile, curve90, curve45, max_speed, dest_dirs, reverse_dirs, trackdir, ocean_frac, canal_frac, station, unit_number)
+        }
+        53 => {
+            layout!(crate::ship_yapf::Leaves, item; destination, follow, tile, patch, visit_new, visit_next, visit_destroy, debug)
+        }
+        54 => layout!(crate::ship_yapf::Follow, item; tile, skipped, dirs, followed),
+        55 => layout!(crate::ship_yapf::Tile, item; ships, docking, sea, lock_middle, destination),
+        56 => layout!(crate::ship_yapf::Result, item; direction, found, origin, stats),
+        60 => layout!(crate::town::Action, item; kind, town, tile, a, b, c, d, cost),
+        61 => layout!(crate::town::Leaves, item; observe, leaf, state, stations),
+        90 => {
+            layout!(crate::rail_yapf::Settings, item; max_nodes, firstred, firstred_exit, lastred, lastred_exit, station, slope, curve45, curve90, depot_reverse, crossing, lookahead, p0, p1, p2, pbs_cross, pbs_station, pbs_back, doubleslip, longer, longer_tile, shorter, shorter_tile, firstred_eol)
+        }
+        91 => {
+            layout!(crate::rail_yapf::Tile, item; flags, other_end, station, railtype, tracks, reserved, station_track, tunnel_dir, uphill, flat_ramp, signal_along, signal_against, signal_green, signal_type, oneway)
+        }
+        92 => {
+            layout!(crate::rail_yapf::Follow, item; tile, skipped, min_speed, max_speed, dirs, followed, error, station)
+        }
+        93 => {
+            layout!(crate::rail_yapf::Leaves, item; train, tile, follow, safe, free, compatible_station, platform_length, closest_station, destination_dirs, origin, write, output, debug)
+        }
+        94 => {
+            layout!(crate::rail_yapf::Input, item; context, settings, map_x, tile, max_cost, desync, kind, td, override_railtype, forbid90, reserve)
+        }
+        95 => {
+            layout!(crate::rail_yapf::Step, item; tile, destination, target_tile, best_length, action, td, found, reverse, value, target_td, target_okay)
+        }
+        97 => {
+            layout!(crate::rail_yapf::Train, item; compatible, all_compatible, tile, rear_tile, virtual_tile, rear_virtual_tile, dest_tile, length, speed, order_destination, td, rear_td, wormhole, rear_wormhole, order, nearest_depot, complex_waypoint)
+        }
+        100 => {
+            layout!(crate::road_yapf::Input, item; map_x, map_y, tile, dest_tile, max_nodes, slope, crossing, stop, occupied, bay, curve, display_speed, order_destination, order_speed, order_type, bus, articulated, trackdir)
+        }
+        101 => {
+            layout!(crate::road_yapf::Tile, item; occupied, length, station, r#type, station_type, depot, depot_dir, crossing, waypoint, drive_through, continuation, busy_bays)
+        }
+        102 => {
+            layout!(crate::road_yapf::Follow, item; tile, skipped, max_speed, min_speed, dirs, followed)
+        }
+        103 => {
+            layout!(crate::road_yapf::Area, item; tile, width, height, valid, stop, drive_through, next)
+        }
+        104 => layout!(crate::road_yapf::Leaves, item; tile, follow, tracks, height, closest, area),
+        105 => {
+            layout!(crate::road_yapf::Result, item; tile, cost, direction, found, rounds, open, closed, calcs, distance)
         }
         110 => {
             layout!(crate::station_service::CargoFields, item; max_waiting_cargo, status, time_since_pickup, rating, last_speed, last_age, amount_fract)
