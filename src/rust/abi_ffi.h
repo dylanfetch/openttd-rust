@@ -29,6 +29,7 @@ extern "C" {
  * 52 ship YAPF input, 53 leaves, 54 follower, 55 tile, 56 choice result.
  * 60 town action, 61 town direct leaves.
  * 130-138 industry storage, observation, world services and production result.
+ * 210 company history entry, 211 finances, 212 economy, 213 action, 214 leaves.
  * Item 0 size, 1 alignment, then every field offset in declaration order.
  * Unknown type/item returns SIZE_MAX. No memory borrow, ownership or callback.
  * Native extern-C convention (cdecl on i686 MSVC); Rust panic never unwinds.

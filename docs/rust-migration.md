@@ -1323,11 +1323,10 @@ traversal into Rust. Rust also owns periodic scheduling, prices/multipliers,
 inflation/recession, score parts and the company tick cursor. Original selected
 bodies compile only in portable builds; identity, settings, network transport,
 UI, AI objects and shared map/pools/group/infrastructure services remain C++.
-One Rust allocation per CompanyProperties holds all finance/history fields;
-C++ starts native field object lifetimes in it and reads/writes stable addresses.
-Property copies own independent allocations; assignment preserves field addresses.
+One Rust allocation per CompanyProperties holds finance/history fields with C++
+field lifetimes and stable addresses. Copies allocate; assignment keeps addresses.
 Modern/legacy descriptors keep names/widths and operate directly on that storage,
-so save errors never cross Rust. Economy/prices/scores have process lifetimes.
+so save errors never cross Rust. Economy/prices/scores have process lifetimes;
 ABI210-214 check layouts. Panics/OOM/environmental failures abort.
 Direct leaves are noexcept; copied IDs/scalars end all field accesses before
 company-control Post, AI start/stop, tile handlers, shared destruction, allocation

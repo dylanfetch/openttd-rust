@@ -319,7 +319,9 @@ OpenTTDCompanyAction RunRustCompany(uint32_t op, uint32_t id, int64_t a, int64_t
 	/* Construct process-lifetime C++ views before Rust accesses their storage. */
 	(void)GetRustEconomy(); (void)GetRustPrices(); (void)GetRustCompanyScores();
 	std::unique_ptr<Backup<CompanyID>> current;
-	if (op == 26) current = std::make_unique<Backup<CompanyID>>(_current_company);
+	/* Transfer can also run inside deletion/acquisition. Match the original
+	 * transfer-local Backup if a returned native action exits exceptionally. */
+	if (op == 26 || op == 27 || (op == 20 && a == CCA_DELETE)) current = std::make_unique<Backup<CompanyID>>(_current_company);
 	std::unique_ptr<OpenTTDCompanyRun, decltype(&openttd_rust_company_destroy)> run(openttd_rust_company_create(op, id, a, b, c, d, &_company_leaves), openttd_rust_company_destroy);
 	int64_t response = 0;
 	for (;;) {
