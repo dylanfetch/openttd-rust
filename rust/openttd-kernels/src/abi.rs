@@ -94,6 +94,22 @@ pub fn layout(type_id: u8, item: u8) -> usize {
         46 => layout!(crate::water_regions::Patch, item; x, y, label),
         47 => layout!(crate::water_regions::Snapshot, item; edges, labels, patches, aqueducts),
         48 => layout!(crate::water_regions::Leaves, item; tracks, follow, aqueduct, debug),
+        100 => {
+            layout!(crate::road_yapf::Input, item; map_x, map_y, tile, dest_tile, max_nodes, slope, crossing, stop, occupied, bay, curve, display_speed, order_destination, order_speed, order_type, bus, articulated, trackdir)
+        }
+        101 => {
+            layout!(crate::road_yapf::Tile, item; occupied, length, station, r#type, station_type, depot, depot_dir, crossing, waypoint, drive_through, continuation, busy_bays)
+        }
+        102 => {
+            layout!(crate::road_yapf::Follow, item; tile, skipped, max_speed, min_speed, dirs, followed)
+        }
+        103 => {
+            layout!(crate::road_yapf::Area, item; tile, width, height, valid, stop, drive_through, next)
+        }
+        104 => layout!(crate::road_yapf::Leaves, item; tile, follow, tracks, height, closest, area),
+        105 => {
+            layout!(crate::road_yapf::Result, item; tile, cost, direction, found, rounds, open, closed, calcs, distance)
+        }
         _ => usize::MAX,
     }
 }

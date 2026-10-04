@@ -195,7 +195,7 @@ static uint64_t RoadAction(const OpenTTDRoadAction &action)
 		case ROAD_OP_GROUND_CRASH: { return v->GroundVehicleBase::Crash(a != 0); }
 		case ROAD_OP_STOP_RANDOM: { TriggerRoadStopRandomisation(Station::Get(StationID(a)), v->tile, StationRandomTrigger::VehicleArrives); break; }
 		case ROAD_OP_STOP_ANIMATION: { TriggerRoadStopAnimation(Station::Get(StationID(a)), v->tile, StationAnimationTrigger::VehicleArrives); break; }
-		case ROAD_OP_YAPF: { RoadVehPathCache path; bool found = true; Trackdir dir = YapfRoadVehicleChooseTrack(v, TileIndex(a), static_cast<DiagDirection>(b), static_cast<TrackdirBits>(c), found, path); v->ReplacePath(path); return dir | (static_cast<uint64_t>(found) << 8); }
+		case ROAD_OP_YAPF: { bool found = true; Trackdir dir = YapfRoadVehicleChooseTrack(v, TileIndex(a), static_cast<DiagDirection>(b), static_cast<TrackdirBits>(c), found); return dir | (static_cast<uint64_t>(found) << 8); }
 		case ROAD_OP_FIND_DEPOT: { FindDepotData result = YapfRoadVehicleFindNearestDepot(v, static_cast<int32_t>(a)); return result.tile.base() | (static_cast<uint64_t>(result.best_length) << 32); }
 		case ROAD_OP_INCLINATION: { return static_cast<uint64_t>(v->UpdateInclination(a != 0, b != 0)); }
 		case ROAD_OP_VIEWPORT: { v->UpdateViewport(a != 0, b != 0); break; }

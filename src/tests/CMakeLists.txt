@@ -13,6 +13,7 @@ add_test_files(
     mock_fontcache.h
     mock_spritecache.cpp
     mock_spritecache.h
+    road_yapf.cpp
     roadvehicle.cpp
     spiral_iterator_state.cpp
     string_builder.cpp

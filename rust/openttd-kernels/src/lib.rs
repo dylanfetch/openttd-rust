@@ -21,6 +21,7 @@ mod math;
 mod packet;
 mod road;
 mod road_data;
+mod road_yapf;
 mod script_list;
 pub mod services;
 mod station_cargo;
