@@ -20,6 +20,7 @@ struct OpenTTDShipYapfInput {
 	uint32_t max_speed;
 	uint16_t dest_dirs, reverse_dirs;
 	uint8_t trackdir, ocean_frac, canal_frac, station;
+	uint32_t unit_number;
 };
 struct OpenTTDShipFollow { uint32_t tile; int32_t skipped; uint16_t dirs; uint8_t followed; };
 struct OpenTTDShipTile { uint32_t ships; uint8_t docking, sea, lock_middle, destination; };
@@ -32,6 +33,7 @@ struct OpenTTDShipYapfLeaves {
 	void *(*visit_new)(OpenTTDWaterPatch) noexcept;
 	uint8_t (*visit_next)(void *, OpenTTDWaterPatch, OpenTTDWaterPatch *) noexcept;
 	void (*visit_destroy)(void *) noexcept;
+	void (*debug)(uint32_t, uint8_t, uint8_t, uint32_t, uint32_t, uint32_t, int32_t, int32_t) noexcept;
 };
 /* Search owns its arena, hashes, heap and copied world observations. The ship
 	* context is opaque and live for the synchronous call. Leaves never reenter this
