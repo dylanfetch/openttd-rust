@@ -24,7 +24,7 @@ macro_rules! layout {
 
 // Keep ABI IDs in one registry so duplicate match arms remain compiler-checked.
 #[allow(clippy::too_many_lines)]
-pub fn layout(type_id: u8, item: u8) -> usize {
+pub fn layout(type_id: u16, item: u8) -> usize {
     match type_id {
         210..=214 => crate::company::abi_layout(type_id, item),
         0 => {
@@ -56,7 +56,7 @@ pub fn layout(type_id: u8, item: u8) -> usize {
         18 => {
             layout!(crate::station_cargo::Collector, item; amount, previous, last_key, other, origin, selector, finalized)
         }
-        19..=21 => crate::crypto_primitives::abi_layout(type_id, item),
+        19..=21 => crate::crypto_primitives::abi_layout(u8::try_from(type_id).unwrap(), item),
         22 => crate::blake2b::abi_layout(item),
         23 => layout!(crate::packet::State, item; limit, position),
         24 => layout!(crate::packet::Frame, item; message, payload),
@@ -216,6 +216,24 @@ pub fn layout(type_id: u8, item: u8) -> usize {
             layout!(crate::aircraft::State, item; cached_max_range_sqr, cached_max_range, cache_padding, crashed_counter, targetairport, pos, previous_pos, state, last_direction, number_consecutive_turns, turn_counter, flags)
         }
         181 => layout!(crate::aircraft::Action, item; kind, id, other, a, b, c, d),
+        280 => {
+            layout!(crate::cargo_storage::Packet, item; feeder_share, source_xy, count, periods_in_transit, first_station, next_hop, source_id, travelled_x, travelled_y, source_type, in_vehicle)
+        }
+        281 => {
+            layout!(crate::cargo_storage::Fields, item; cargo_periods_in_transit, feeder_share, count, reserved_count, action_counts)
+        }
+        282 => {
+            layout!(crate::cargo_storage::Services, item; can_allocate, create, packet, destroy, random, coordinate, flow, pay, origin, flow_owner, random_draw, packet_next)
+        }
+        300 => layout!(crate::cargo_flow::Share, item; cumulative, station, found),
+        301 => layout!(crate::cargo_flow::Origin, item; flow, origin, found),
+        302 => {
+            layout!(crate::cargo_flow::Services, item; context, read, job_flows, live_flows, reroute, finish)
+        }
+        310 => {
+            layout!(crate::cargo_storage::Vehicle, item; list, capacity, cargo, train, articulated)
+        }
+        311 => layout!(crate::cargo_storage::CapacityServices, item; read, pointer, cargo),
         _ => usize::MAX,
     }
 }

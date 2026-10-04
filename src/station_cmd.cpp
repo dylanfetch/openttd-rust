@@ -86,7 +86,9 @@
  * Note: This instance is created on task start.
  *       Lazy creation on first usage results in a data race between the CDist threads.
  */
+#ifndef WITH_RUST
 /* static */ const FlowStat::SharesMap FlowStat::empty_sharesmap;
+#endif
 
 /**
  * Check whether the given tile is a hangar.
@@ -5246,6 +5248,7 @@ static CommandCost TerraformTile_Station(TileIndex tile, DoCommandFlags flags, i
 	return Command<CMD_LANDSCAPE_CLEAR>::Do(flags, tile);
 }
 
+#ifndef WITH_RUST
 /**
  * Get flow for a station.
  * @param st Station to get flow for.
@@ -5630,6 +5633,8 @@ uint FlowStatMap::GetFlowFromVia(StationID from, StationID via) const
 	if (i == this->end()) return 0;
 	return i->second.GetShare(via);
 }
+
+#endif /* !WITH_RUST */
 
 static CommandCost CheckBuildAbove_Station(TileIndex tile, DoCommandFlags, Axis, int height)
 {

@@ -9,6 +9,8 @@
 #include "rust/abi_ffi.h"
 #include "rust/water_regions_ffi.h"
 #include "rust/cargo_payment_ffi.h"
+#include "rust/cargo_storage_ffi.h"
+#include "rust/cargo_flow_ffi.h"
 #include "rust/ship_yapf_ffi.h"
 #include "rust/rail_yapf_ffi.h"
 #include "rust/train_ffi.h"
@@ -60,7 +62,7 @@
 
 #define CHECK(condition) do { if (!(condition)) { std::fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #condition); std::abort(); } } while (0)
 
-static void Layout(uint8_t type, const char *name, std::initializer_list<size_t> values)
+static void Layout(uint16_t type, const char *name, std::initializer_list<size_t> values)
 {
 	uint8_t item = 0;
 	std::printf("layout %s", name);
@@ -142,6 +144,14 @@ static void Layouts()
 	Layout(95, "OpenTTDRailStep", {sizeof(OpenTTDRailStep), alignof(OpenTTDRailStep), offsetof(OpenTTDRailStep, tile), offsetof(OpenTTDRailStep, destination), offsetof(OpenTTDRailStep, target_tile), offsetof(OpenTTDRailStep, best_length), offsetof(OpenTTDRailStep, action), offsetof(OpenTTDRailStep, td), offsetof(OpenTTDRailStep, found), offsetof(OpenTTDRailStep, reverse), offsetof(OpenTTDRailStep, value), offsetof(OpenTTDRailStep, target_td), offsetof(OpenTTDRailStep, target_okay)});
 	Layout(97, "OpenTTDRailTrain", {sizeof(OpenTTDRailTrain), alignof(OpenTTDRailTrain), offsetof(OpenTTDRailTrain, compatible), offsetof(OpenTTDRailTrain, all_compatible), offsetof(OpenTTDRailTrain, tile), offsetof(OpenTTDRailTrain, rear_tile), offsetof(OpenTTDRailTrain, virtual_tile), offsetof(OpenTTDRailTrain, rear_virtual_tile), offsetof(OpenTTDRailTrain, dest_tile), offsetof(OpenTTDRailTrain, length), offsetof(OpenTTDRailTrain, speed), offsetof(OpenTTDRailTrain, order_destination), offsetof(OpenTTDRailTrain, td), offsetof(OpenTTDRailTrain, rear_td), offsetof(OpenTTDRailTrain, wormhole), offsetof(OpenTTDRailTrain, rear_wormhole), offsetof(OpenTTDRailTrain, order), offsetof(OpenTTDRailTrain, nearest_depot), offsetof(OpenTTDRailTrain, complex_waypoint)});
 
+	Layout(280, "OpenTTDCargoPacketFields", {sizeof(OpenTTDCargoPacketFields), alignof(OpenTTDCargoPacketFields), offsetof(OpenTTDCargoPacketFields, feeder_share), offsetof(OpenTTDCargoPacketFields, source_xy), offsetof(OpenTTDCargoPacketFields, count), offsetof(OpenTTDCargoPacketFields, periods_in_transit), offsetof(OpenTTDCargoPacketFields, first_station), offsetof(OpenTTDCargoPacketFields, next_hop), offsetof(OpenTTDCargoPacketFields, source_id), offsetof(OpenTTDCargoPacketFields, travelled_x), offsetof(OpenTTDCargoPacketFields, travelled_y), offsetof(OpenTTDCargoPacketFields, source_type), offsetof(OpenTTDCargoPacketFields, in_vehicle)});
+	Layout(281, "OpenTTDCargoListFields", {sizeof(OpenTTDCargoListFields), alignof(OpenTTDCargoListFields), offsetof(OpenTTDCargoListFields, cargo_periods_in_transit), offsetof(OpenTTDCargoListFields, feeder_share), offsetof(OpenTTDCargoListFields, count), offsetof(OpenTTDCargoListFields, reserved_count), offsetof(OpenTTDCargoListFields, action_counts)});
+	Layout(282, "OpenTTDCargoStorageServices", {sizeof(OpenTTDCargoStorageServices), alignof(OpenTTDCargoStorageServices), offsetof(OpenTTDCargoStorageServices, can_allocate), offsetof(OpenTTDCargoStorageServices, create), offsetof(OpenTTDCargoStorageServices, packet), offsetof(OpenTTDCargoStorageServices, destroy), offsetof(OpenTTDCargoStorageServices, random), offsetof(OpenTTDCargoStorageServices, coordinate), offsetof(OpenTTDCargoStorageServices, flow), offsetof(OpenTTDCargoStorageServices, pay), offsetof(OpenTTDCargoStorageServices, origin), offsetof(OpenTTDCargoStorageServices, flow_owner), offsetof(OpenTTDCargoStorageServices, random_draw), offsetof(OpenTTDCargoStorageServices, packet_next)});
+	Layout(300, "OpenTTDCargoShare", {sizeof(OpenTTDCargoShare), alignof(OpenTTDCargoShare), offsetof(OpenTTDCargoShare, cumulative), offsetof(OpenTTDCargoShare, station), offsetof(OpenTTDCargoShare, found)});
+	Layout(301, "OpenTTDCargoOrigin", {sizeof(OpenTTDCargoOrigin), alignof(OpenTTDCargoOrigin), offsetof(OpenTTDCargoOrigin, flow), offsetof(OpenTTDCargoOrigin, origin), offsetof(OpenTTDCargoOrigin, found)});
+	Layout(302, "OpenTTDCargoFlowServices", {sizeof(OpenTTDCargoFlowServices), alignof(OpenTTDCargoFlowServices), offsetof(OpenTTDCargoFlowServices, context), offsetof(OpenTTDCargoFlowServices, read), offsetof(OpenTTDCargoFlowServices, job_flows), offsetof(OpenTTDCargoFlowServices, live_flows), offsetof(OpenTTDCargoFlowServices, reroute), offsetof(OpenTTDCargoFlowServices, finish)});
+	Layout(310, "OpenTTDCargoCapacityVehicle", {sizeof(OpenTTDCargoCapacityVehicle), alignof(OpenTTDCargoCapacityVehicle), offsetof(OpenTTDCargoCapacityVehicle, list), offsetof(OpenTTDCargoCapacityVehicle, capacity), offsetof(OpenTTDCargoCapacityVehicle, cargo), offsetof(OpenTTDCargoCapacityVehicle, train), offsetof(OpenTTDCargoCapacityVehicle, articulated)});
+	Layout(311, "OpenTTDCargoCapacityServices", {sizeof(OpenTTDCargoCapacityServices), alignof(OpenTTDCargoCapacityServices), offsetof(OpenTTDCargoCapacityServices, read), offsetof(OpenTTDCargoCapacityServices, pointer), offsetof(OpenTTDCargoCapacityServices, cargo)});
 	CHECK(openttd_rust_abi_layout(255, 0) == SIZE_MAX);
 	CHECK(static_cast<size_t>(PTRDIFF_MAX) == (SIZE_MAX >> 1));
 	std::printf("pointer_bytes %zu sentinel %zu borrow_limit %zu\n", sizeof(void *), SIZE_MAX, static_cast<size_t>(PTRDIFF_MAX));

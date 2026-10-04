@@ -152,7 +152,7 @@ void ScriptStationList_Cargo::AddCargo(CargoMode mode, CargoSelector selector, S
 	switch (plan) {
 		case 0: [[fallthrough]];
 		case 1: {
-			const auto *packets = collector.GE()->GetData().cargo.Packets();
+			const auto packets = collector.GE()->GetData().cargo.Packets();
 			const auto range = plan == 1 ? packets->equal_range(other_station) : std::pair{packets->begin(), packets->end()};
 			for (auto iter = range.first; iter != range.second; ++iter) collector.Packet((*iter)->GetFirstStation(), iter.GetKey(), (*iter)->Count());
 			break;
@@ -162,7 +162,7 @@ void ScriptStationList_Cargo::AddCargo(CargoMode mode, CargoSelector selector, S
 			const auto &flows = collector.GE()->GetData().flows;
 			auto feed_origin = [&collector](FlowStatMap::const_iterator iter) {
 				collector.Origin(iter->first);
-				const FlowStat::SharesMap *shares = iter->second.GetShares();
+				const auto *shares = iter->second.GetShares();
 				for (auto share = shares->begin(); share != shares->end(); ++share) collector.Share(share->second, share->first);
 			};
 			if (plan == 3) {
@@ -302,8 +302,9 @@ void ScriptStationList_CargoWaiting::Add(StationID station_id, CargoType cargo, 
 	if (collector.GE() == nullptr) return;
 	if (!collector.GE()->HasData()) return;
 
-	StationCargoList::ConstIterator iter = collector.GE()->GetData().cargo.Packets()->begin();
-	StationCargoList::ConstIterator end = collector.GE()->GetData().cargo.Packets()->end();
+	auto packets = collector.GE()->GetData().cargo.Packets();
+	StationCargoList::ConstIterator iter = packets->begin();
+	StationCargoList::ConstIterator end = packets->end();
 	for (; iter != end; ++iter) {
 		collector.Update<Tselector>((*iter)->GetFirstStation(), iter.GetKey(), (*iter)->Count());
 	}
@@ -320,9 +321,9 @@ void ScriptStationList_CargoPlanned::Add(StationID station_id, CargoType cargo, 
 	FlowStatMap::const_iterator iter = collector.GE()->GetData().flows.begin();
 	FlowStatMap::const_iterator end = collector.GE()->GetData().flows.end();
 	for (; iter != end; ++iter) {
-		const FlowStat::SharesMap *shares = iter->second.GetShares();
+		const auto *shares = iter->second.GetShares();
 		uint prev = 0;
-		for (FlowStat::SharesMap::const_iterator flow_iter = shares->begin();
+		for (auto flow_iter = shares->begin();
 				flow_iter != shares->end(); ++flow_iter) {
 			collector.Update<Tselector>(iter->first, flow_iter->second, flow_iter->first - prev);
 			prev = flow_iter->first;
@@ -343,8 +344,8 @@ ScriptStationList_CargoWaitingViaByFrom::ScriptStationList_CargoWaitingViaByFrom
 	if (collector.GE() == nullptr) return;
 	if (!collector.GE()->HasData()) return;
 
-	std::pair<StationCargoList::ConstIterator, StationCargoList::ConstIterator> range =
-			collector.GE()->GetData().cargo.Packets()->equal_range(via);
+	auto packets = collector.GE()->GetData().cargo.Packets();
+	std::pair<StationCargoList::ConstIterator, StationCargoList::ConstIterator> range = packets->equal_range(via);
 	for (StationCargoList::ConstIterator iter = range.first; iter != range.second; ++iter) {
 		collector.Update<CS_VIA_BY_FROM>((*iter)->GetFirstStation(), iter.GetKey(), (*iter)->Count());
 	}
@@ -392,9 +393,9 @@ ScriptStationList_CargoPlannedFromByVia::ScriptStationList_CargoPlannedFromByVia
 
 	FlowStatMap::const_iterator iter = collector.GE()->GetData().flows.find(from);
 	if (iter == collector.GE()->GetData().flows.end()) return;
-	const FlowStat::SharesMap *shares = iter->second.GetShares();
+	const auto *shares = iter->second.GetShares();
 	uint prev = 0;
-	for (FlowStat::SharesMap::const_iterator flow_iter = shares->begin();
+	for (auto flow_iter = shares->begin();
 			flow_iter != shares->end(); ++flow_iter) {
 		collector.Update<CS_FROM_BY_VIA>(iter->first, flow_iter->second, flow_iter->first - prev);
 		prev = flow_iter->first;

@@ -86,6 +86,58 @@ void LinkGraphJob::JoinThread()
 	}
 }
 
+#ifdef WITH_RUST
+/** Shared graph/station observations; all selection and traversal lives in Rust. */
+static uint32_t ReadCargoFlowJob(void *context, uint8_t op, uint16_t node, uint16_t edge_index) noexcept
+{
+	auto &job = *static_cast<LinkGraphJob *>(context);
+	switch (op) {
+		case 0: return LinkGraph::IsValidID(job.LinkGraphIndex());
+		case 1: return job.Size();
+		case 2: return job[node].base.station.base();
+		case 3: return Station::IsValidID(job[node].base.station);
+		case 4: return static_cast<uint32_t>(job[node].edges.size());
+		case 5: return job[node].edges[edge_index].Flow();
+		case 6: return job[node].edges[edge_index].base.dest_node;
+		case 7: return (*LinkGraph::Get(job.LinkGraphIndex()))[node].HasEdgeTo(edge_index);
+		case 8: return _settings_game.linkgraph.GetDistributionType(job.Cargo()) == DT_MANUAL;
+		case 9: return Station::Get(job[node].base.station)->goods[job.Cargo()].GetData().IsEmpty();
+		case 10: return Station::Get(job[node].base.station)->goods[job.Cargo()].link_graph.base();
+		case 11: return Station::Get(job[node].base.station)->goods[job.Cargo()].node;
+		case 12: return job.LinkGraphIndex().base();
+		case 13: return (*LinkGraph::Get(job.LinkGraphIndex()))[node][edge_index].LastUpdate() != EconomyTime::INVALID_DATE;
+		case 14: return (*LinkGraph::Get(job.LinkGraphIndex()))[node][edge_index].last_unrestricted_update != EconomyTime::INVALID_DATE;
+		default: NOT_REACHED();
+	}
+}
+
+static OpenTTDCargoFlowMap *CargoJobFlows(void *context, uint16_t node) noexcept
+{
+	return (*static_cast<LinkGraphJob *>(context))[node].flows.RustState();
+}
+
+static OpenTTDCargoFlowMap *CargoLiveFlows(void *context, uint16_t node) noexcept
+{
+	auto &job = *static_cast<LinkGraphJob *>(context);
+	return Station::Get(job[node].base.station)->goods[job.Cargo()].GetOrCreateData().flows.RustState();
+}
+
+static void CargoFlowReroute(void *context, uint16_t node, uint16_t via) noexcept
+{
+	auto &job = *static_cast<LinkGraphJob *>(context);
+	Station *st = Station::Get(job[node].base.station);
+	RerouteCargo(st, job.Cargo(), StationID(via), st->index);
+}
+
+static void CargoFlowFinish(void *context, uint16_t node, uint8_t clear) noexcept
+{
+	auto &job = *static_cast<LinkGraphJob *>(context);
+	Station *st = Station::Get(job[node].base.station);
+	if (clear != 0) st->goods[job.Cargo()].ClearData();
+	InvalidateWindowData(WC_STATION_VIEW, st->index, job.Cargo());
+}
+#endif /* WITH_RUST */
+
 /**
  * Join the link graph job and destroy it.
  */
@@ -102,6 +154,10 @@ LinkGraphJob::~LinkGraphJob()
 	 * the only valid job operation is to clear the LinkGraphJob pool. */
 	assert(!this->IsJobAborted());
 
+#ifdef WITH_RUST
+	OpenTTDCargoFlowServices services{this, ReadCargoFlowJob, CargoJobFlows, CargoLiveFlows, CargoFlowReroute, CargoFlowFinish};
+	openttd_rust_flow_apply(&services);
+#else
 	/* Link graph has been merged into another one. */
 	if (!LinkGraph::IsValidID(this->link_graph.index)) return;
 
@@ -178,6 +234,7 @@ LinkGraphJob::~LinkGraphJob()
 		if (ge.GetData().IsEmpty()) ge.ClearData();
 		InvalidateWindowData(WC_STATION_VIEW, st->index, this->Cargo());
 	}
+#endif /* WITH_RUST */
 }
 
 /**

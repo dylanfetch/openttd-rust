@@ -1486,3 +1486,30 @@ engines have unlimited range. ABI checks cover owner defaults/layout/lifetime.
 Full legacy files, arbitrary NewGRFs/airport rotations and viewport/sound output
 remain evidence limits. A reference-built ownerless oilrig route checks public
 helicopter landing through the ordinary FTA path.
+### Cargo storage and movement (#139)
+
+Rust owns packet fields, ordered station destinations and vehicle cargo lists,
+count/age/feeder/action/reservation caches, cumulative flow shares and origin maps.
+It runs split/merge/reduce/aging/invalidation, append/staging/reassignment,
+reservation/load/return/transfer/delivery/shift/truncate/reroute, completed-job
+live-flow reconciliation, capacity redistribution and autoreplace cargo transfer.
+The C++ packet pool retains typed identities, first-free/indexed allocation,
+allocation limits and destruction hooks. Payment/delivery (#117), loading policy
+(#125), link-graph computation (#74), world access and thread join keep their owners.
+
+CAPA, station/vehicle references and flow fields use call-local C++ save/load
+staging; pointer fixups and save errors finish outside Rust. Readers export a
+call-local const container or borrow flow entries through scalar-key iterators.
+No canonical cargo container or field mirror remains in C++. Payment getter
+reentry occurs after packet/list borrows end; ConsistChanged runs after Rust
+returns. Portable builds compile the unchanged original bodies.
+
+Checks: `python3 tools/migration.py verify --jobs 2`,
+`python3 tools/migration.py simulate cargo-storage economy stations play-padhattan aircraft --jobs 1`,
+`python3 tools/migration.py simulate cargo-storage --self --jobs 1`, and
+`python3 tools/migration.py simulate cargo-storage --soak --jobs 1`.
+The cargo scenario module reuses active CAPY fixtures and checks saved packet
+references/actions, aging, feeder credits and forced policies. Rust tests cover
+partial movement, payment getter reentry, same-list rerouting and capacity changes;
+`python3 tools/cargo-storage-comparison.py` checks the named unreachable pool-limit
+Split failure against the unchanged pinned body. Legacy conversions remain adapters.
