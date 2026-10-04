@@ -1978,7 +1978,7 @@ static VehicleEnterTileStates VehicleEnter_TunnelBridge(Vehicle *v, TileIndex ti
 		if (v->type == VEH_TRAIN) {
 			Train *t = Train::From(v);
 
-			if (t->track != TRACK_BIT_WORMHOLE && dir == vdir) {
+			if (t->GetTrack() != TRACK_BIT_WORMHOLE && dir == vdir) {
 				if (t->IsFrontEngine() && frame == TUNNEL_SOUND_FRAME) {
 					if (!PlayVehicleSound(t, VSE_TUNNEL) && RailVehInfo(t->engine_type)->engclass == 0) {
 						SndPlayVehicleFx(SND_05_TRAIN_THROUGH_TUNNEL, v);
@@ -1987,7 +1987,7 @@ static VehicleEnterTileStates VehicleEnter_TunnelBridge(Vehicle *v, TileIndex ti
 				}
 				if (frame == _tunnel_visibility_frame[dir]) {
 					t->tile = tile;
-					t->track = TRACK_BIT_WORMHOLE;
+					t->SetTrack(TRACK_BIT_WORMHOLE);
 					t->vehstatus.Set(VehState::Hidden);
 					return VehicleEnterTileState::EnteredWormhole;
 				}
@@ -1996,8 +1996,8 @@ static VehicleEnterTileStates VehicleEnter_TunnelBridge(Vehicle *v, TileIndex ti
 			if (dir == ReverseDiagDir(vdir) && frame == TILE_SIZE - _tunnel_visibility_frame[dir] && z == 0) {
 				/* We're at the tunnel exit ?? */
 				t->tile = tile;
-				t->track = DiagDirToDiagTrackBits(vdir);
-				assert(t->track);
+				t->SetTrack(DiagDirToDiagTrackBits(vdir));
+				assert(t->GetTrack());
 				t->vehstatus.Reset(VehState::Hidden);
 				return VehicleEnterTileState::EnteredWormhole;
 			}
@@ -2043,7 +2043,7 @@ static VehicleEnterTileStates VehicleEnter_TunnelBridge(Vehicle *v, TileIndex ti
 			switch (v->type) {
 				case VEH_TRAIN: {
 					Train *t = Train::From(v);
-					t->track = TRACK_BIT_WORMHOLE;
+					t->SetTrack(TRACK_BIT_WORMHOLE);
 					PrepareToEnterBridge(t);
 					break;
 				}
@@ -2067,8 +2067,8 @@ static VehicleEnterTileStates VehicleEnter_TunnelBridge(Vehicle *v, TileIndex ti
 			switch (v->type) {
 				case VEH_TRAIN: {
 					Train *t = Train::From(v);
-					if (t->track == TRACK_BIT_WORMHOLE) {
-						t->track = DiagDirToDiagTrackBits(vdir);
+					if (t->GetTrack() == TRACK_BIT_WORMHOLE) {
+						t->SetTrack(DiagDirToDiagTrackBits(vdir));
 						return VehicleEnterTileState::EnteredWormhole;
 					}
 					break;

@@ -1296,7 +1296,7 @@ bool AfterLoadGame()
 				continue;
 			}
 			if (v->type == VEH_TRAIN) {
-				Train::From(v)->track = TRACK_BIT_WORMHOLE;
+				Train::From(v)->SetTrack(TRACK_BIT_WORMHOLE);
 			} else {
 				RoadVehicle::From(v)->state = RVSB_WORMHOLE;
 			}
@@ -1339,7 +1339,7 @@ bool AfterLoadGame()
 		for (Train *v : Train::Iterate()) {
 			RailTypes rts = RailVehInfo(v->engine_type)->railtypes;
 
-			v->railtypes = rts;
+			v->SetRailTypes(rts);
 			if (rts.Test(RAILTYPE_ELECTRIC)) min_rail = RAILTYPE_RAIL;
 		}
 
@@ -2415,8 +2415,8 @@ bool AfterLoadGame()
 	 * it counts signals instead of some random time out. */
 	if (IsSavegameVersionBefore(SLV_131)) {
 		for (Train *t : Train::Iterate()) {
-			if (t->force_proceed != TFP_NONE) {
-				t->force_proceed = TFP_STUCK;
+			if (t->GetForceProceed() != TFP_NONE) {
+				t->SetForceProceed(TFP_STUCK);
 			}
 		}
 	}
@@ -2448,7 +2448,7 @@ bool AfterLoadGame()
 		}
 
 		for (Train *t : Train::Iterate()) {
-			t->wait_counter = t->current_order.IsType(OT_LOADING) ? 0 : t->load_unload_ticks;
+			t->SetWaitCounter(t->current_order.IsType(OT_LOADING) ? 0 : t->load_unload_ticks);
 		}
 	}
 
@@ -2666,7 +2666,7 @@ bool AfterLoadGame()
 				v->vehstatus.Set(VehState::Hidden);
 
 				switch (v->type) {
-					case VEH_TRAIN: Train::From(v)->track       = TRACK_BIT_WORMHOLE; break;
+					case VEH_TRAIN: Train::From(v)->SetTrack(TRACK_BIT_WORMHOLE); break;
 					case VEH_ROAD:  RoadVehicle::From(v)->state = RVSB_WORMHOLE;      break;
 					default: NOT_REACHED();
 				}
@@ -2674,7 +2674,7 @@ bool AfterLoadGame()
 				v->vehstatus.Reset(VehState::Hidden);
 
 				switch (v->type) {
-					case VEH_TRAIN: Train::From(v)->track       = DiagDirToDiagTrackBits(vdir); break;
+					case VEH_TRAIN: Train::From(v)->SetTrack(DiagDirToDiagTrackBits(vdir)); break;
 					case VEH_ROAD:  RoadVehicle::From(v)->state = DiagDirToDiagTrackdir(vdir); RoadVehicle::From(v)->frame = frame; break;
 					default: NOT_REACHED();
 				}
@@ -2699,9 +2699,9 @@ bool AfterLoadGame()
 	if (IsSavegameVersionBefore(SLV_156)) {
 		/* The train's pathfinder lost flag got moved. */
 		for (Train *t : Train::Iterate()) {
-			if (!t->flags.Test(VehicleRailFlag{5})) continue;
+			if (!t->GetTrainFlags().Test(VehicleRailFlag{5})) continue;
 
-			t->flags.Reset(VehicleRailFlag{5});
+			t->ResetTrainFlag(VehicleRailFlag{5});
 			t->vehicle_flags.Set(VehicleFlag::PathfinderLost);
 		}
 
@@ -2740,8 +2740,8 @@ bool AfterLoadGame()
 					 * It was changed in savegame version 139, but savegame
 					 * version 158 doesn't use these bits, so it doesn't hurt
 					 * to clear them unconditionally. */
-					t->flags.Reset(VehicleRailFlag{1});
-					t->flags.Reset(VehicleRailFlag{2});
+					t->ResetTrainFlag(VehicleRailFlag{1});
+					t->ResetTrainFlag(VehicleRailFlag{2});
 
 					/* Clear both bits first. */
 					ClrBit(t->gv_flags, GVF_GOINGUP_BIT);
@@ -2751,7 +2751,7 @@ bool AfterLoadGame()
 					if (t->vehstatus.Test(VehState::Crashed)) break;
 
 					/* Only X/Y tracks can be sloped. */
-					if (t->track != TRACK_BIT_X && t->track != TRACK_BIT_Y) break;
+					if (t->GetTrack() != TRACK_BIT_X && t->GetTrack() != TRACK_BIT_Y) break;
 
 					t->gv_flags |= FixVehicleInclination(t, t->direction);
 					break;
@@ -2805,7 +2805,7 @@ bool AfterLoadGame()
 					 * track == TRACK_BIT_WORMHOLE - this could happen
 					 * when the train was reversed while on the last "tick"
 					 * on the ramp before leaving the ramp to the bridge. */
-					Train::From(v)->track = DiagDirToDiagTrackBits(dir);
+					Train::From(v)->SetTrack(DiagDirToDiagTrackBits(dir));
 				}
 			}
 
