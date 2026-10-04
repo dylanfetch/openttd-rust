@@ -931,13 +931,13 @@ static uint32_t VehicleGetVariable(Vehicle *v, const VehicleScopeResolver *objec
 		case VEH_ROAD: {
 			RoadVehicle *rv = RoadVehicle::From(v);
 			switch (variable - 0x80) {
-				case 0x62: return rv->state;
-				case 0x64: return rv->blocked_ctr;
-				case 0x65: return GB(rv->blocked_ctr, 8, 8);
-				case 0x66: return rv->overtaking;
-				case 0x67: return rv->overtaking_ctr;
-				case 0x68: return rv->crashed_ctr;
-				case 0x69: return GB(rv->crashed_ctr, 8, 8);
+				case 0x62: return rv->GetState();
+				case 0x64: return rv->GetBlockedCounter();
+				case 0x65: return GB(rv->GetBlockedCounter(), 8, 8);
+				case 0x66: return rv->GetOvertaking();
+				case 0x67: return rv->GetOvertakingCounter();
+				case 0x68: return rv->GetCrashedCounter();
+				case 0x69: return GB(rv->GetCrashedCounter(), 8, 8);
 			}
 			break;
 		}

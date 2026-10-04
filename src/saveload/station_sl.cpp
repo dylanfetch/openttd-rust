@@ -19,10 +19,22 @@
 #include "../newgrf_station.h"
 #include "../newgrf_roadstop.h"
 #include "../timer/timer_game_calendar.h"
+#ifdef WITH_RUST
+#include "../rust/station_queue_save.hpp"
+#endif
 
 #include "table/strings.h"
 
 #include "../safeguards.h"
+
+#ifdef WITH_RUST
+static SaveLoad StationLoadingVehicles(SaveLoadVersion from, SaveLoadVersion to)
+{
+	return {"loading_vehicles", SL_REFLIST, REF_VEHICLE, 0, from, to, [](void *object, size_t) -> void * {
+		return RustStationLoadingQueueSaveScope::Address(static_cast<Station *>(object)->loading_vehicles);
+	}, 0, nullptr};
+}
+#endif
 
 /**
  * Update the buoy orders to be waypoint orders.
@@ -493,7 +505,11 @@ static const SaveLoad _old_station_desc[] = {
 	SLE_CONDVARNAME(Station, waiting_random_triggers, "waiting_triggers", SLE_UINT8, SLV_27, SL_MAX_VERSION),
 	SLEG_CONDVAR("num_specs", SlStationSpecList<StationSpec>::last_num_specs, SLE_UINT8, SLV_27, SL_MAX_VERSION),
 
+#ifdef WITH_RUST
+	StationLoadingVehicles(SLV_57, SL_MAX_VERSION),
+#else
 	SLE_CONDREFLIST(Station, loading_vehicles,       REF_VEHICLE,                SLV_57, SL_MAX_VERSION),
+#endif
 
 	SLEG_STRUCTLIST("goods", SlStationGoods),
 	SLEG_CONDSTRUCTLIST("speclist", SlStationSpecList<StationSpec>, SLV_27, SL_MAX_VERSION),
@@ -515,6 +531,9 @@ struct STNSChunkHandler : ChunkHandler {
 			Station *st = new (StationID(index)) Station();
 
 			_waiting_acceptance = 0;
+#ifdef WITH_RUST
+			RustStationLoadingQueueSaveScope loading(&st->loading_vehicles, true);
+#endif
 			SlObject(st, slt);
 		}
 	}
@@ -527,6 +546,9 @@ struct STNSChunkHandler : ChunkHandler {
 		if (!IsSavegameVersionBefore(SLV_123)) return;
 
 		for (Station *st : Station::Iterate()) {
+#ifdef WITH_RUST
+			RustStationLoadingQueueSaveScope loading(&st->loading_vehicles, true);
+#endif
 			SlObject(st, _old_station_desc);
 		}
 	}
@@ -618,7 +640,11 @@ public:
 		    SLE_VAR(Station, time_since_unload,          SLE_UINT8),
 		    SLE_VAR(Station, last_vehicle_type,          SLE_UINT8),
 		    SLE_VAR(Station, had_vehicle_of_type,        SLE_UINT8),
+#ifdef WITH_RUST
+		StationLoadingVehicles(SL_MIN_VERSION, SL_MAX_VERSION),
+#else
 		SLE_REFLIST(Station, loading_vehicles,           REF_VEHICLE),
+#endif
 		SLE_CONDVAR(Station, always_accepted,            SLE_FILE_U32 | SLE_VAR_U64, SLV_127, SLV_EXTEND_CARGOTYPES),
 		SLE_CONDVAR(Station, always_accepted,            SLE_UINT64,                 SLV_EXTEND_CARGOTYPES, SL_MAX_VERSION),
 		SLEG_CONDSTRUCTLIST("speclist", SlRoadStopTileData,                          SLV_NEWGRF_ROAD_STOPS, SLV_ROAD_STOP_TILE_DATA),
@@ -699,6 +725,9 @@ struct STNNChunkHandler : ChunkHandler {
 		/* Write the stations */
 		for (BaseStation *st : BaseStation::Iterate()) {
 			SlSetArrayIndex(st->index);
+#ifdef WITH_RUST
+			RustStationLoadingQueueSaveScope loading(st->facilities.Test(StationFacility::Waypoint) ? nullptr : &static_cast<Station *>(st)->loading_vehicles, false);
+#endif
 			SlObject(st, _station_desc);
 		}
 	}
@@ -715,6 +744,9 @@ struct STNNChunkHandler : ChunkHandler {
 			bool waypoint = static_cast<StationFacilities>(SlReadByte()).Test(StationFacility::Waypoint);
 
 			BaseStation *bst = waypoint ? (BaseStation *)new (StationID(index)) Waypoint() : new (StationID(index)) Station();
+#ifdef WITH_RUST
+			RustStationLoadingQueueSaveScope loading(waypoint ? nullptr : &static_cast<Station *>(bst)->loading_vehicles, true);
+#endif
 			SlObject(bst, slt);
 		}
 	}
@@ -727,6 +759,9 @@ struct STNNChunkHandler : ChunkHandler {
 		if (IsSavegameVersionBefore(SLV_123)) return;
 
 		for (BaseStation *bst : BaseStation::Iterate()) {
+#ifdef WITH_RUST
+			RustStationLoadingQueueSaveScope loading(bst->facilities.Test(StationFacility::Waypoint) ? nullptr : &static_cast<Station *>(bst)->loading_vehicles, true);
+#endif
 			SlObject(bst, _station_desc);
 		}
 	}

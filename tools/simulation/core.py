@@ -68,11 +68,14 @@ def scenario_modules():
     from . import (
         aircraft,
         disasters,
+        economy,
         effects,
         generated,
         play_saves,
         rails,
+        roads,
         ships,
+        stations,
         towns,
         trees,
     )
@@ -87,6 +90,9 @@ def scenario_modules():
         ships,
         aircraft,
         disasters,
+        economy,
+        roads,
+        stations,
     )
 
 
@@ -639,13 +645,14 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
                 )
             if mode == "snapshots":
                 result["snapshots"] = len(shorter) + bool(same_end)
-                if (
-                    len(shorter) < 2
-                    and "effects" not in scenario
-                    and not scenario.get("short_checkpoint")
+                if len(shorter) < scenario.get(
+                    "snapshot_minimum",
+                    0
+                    if "effects" in scenario or scenario.get("short_checkpoint")
+                    else 2,
                 ):
                     result["problems"].append(
-                        "fewer than two periodic snapshots were written"
+                        "fewer than the required periodic snapshots were written"
                     )
                 # Console output is invisible without a GUI, so confirm each
                 # setting line took effect in the first snapshot of both runs.
@@ -709,6 +716,8 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
             or "town_name_input" in result
             or "tree_input" in result
             or "effect_input" in result
+            or "economy_input" in result
+            or "station_input" in result
             or "disaster_input" in result
         ):
             for mode in ("snapshots", "plain"):

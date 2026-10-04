@@ -24,7 +24,47 @@ struct ShipPathElement {
 	constexpr ShipPathElement(Trackdir trackdir) : trackdir(trackdir) {}
 };
 
+#ifdef WITH_RUST
+#include "rust/ship_yapf_ffi.h"
+#include <utility>
+/** Canonical Rust path owner; controller operations return copied elements. */
+class ShipPathCache {
+	OpenTTDShipPath *owner = openttd_rust_ship_path_new();
+public:
+	ShipPathCache() = default;
+	ShipPathCache(const ShipPathCache &other) : owner(openttd_rust_ship_path_clone(other.owner)) {}
+	ShipPathCache(ShipPathCache &&other) noexcept : owner(std::exchange(other.owner, openttd_rust_ship_path_new())) {}
+	ShipPathCache &operator=(const ShipPathCache &other)
+	{
+		if (this != &other) {
+			auto *copy = openttd_rust_ship_path_clone(other.owner);
+			openttd_rust_ship_path_destroy(this->owner);
+			this->owner = copy;
+		}
+		return *this;
+	}
+	ShipPathCache &operator=(ShipPathCache &&other) noexcept
+	{
+		if (this != &other) {
+			openttd_rust_ship_path_destroy(this->owner);
+			this->owner = std::exchange(other.owner, openttd_rust_ship_path_new());
+		}
+		return *this;
+	}
+	~ShipPathCache() { openttd_rust_ship_path_destroy(this->owner); }
+	OpenTTDShipPath *GetOwner() const { return this->owner; }
+	size_t size() const { return openttd_rust_ship_path_size(this->owner); }
+	bool empty() const { return this->size() == 0; }
+	ShipPathElement at(size_t index) const { return static_cast<Trackdir>(openttd_rust_ship_path_get(this->owner, index)); }
+	ShipPathElement back() const { return this->at(this->size() - 1); }
+	void set(size_t index, ShipPathElement element) { openttd_rust_ship_path_set(this->owner, index, element.trackdir); }
+	void push_back(ShipPathElement element) { openttd_rust_ship_path_push(this->owner, element.trackdir); }
+	void pop_back() { openttd_rust_ship_path_pop(this->owner); }
+	void clear() { openttd_rust_ship_path_clear(this->owner); }
+};
+#else
 using ShipPathCache = std::vector<ShipPathElement>;
+#endif
 
 /**
  * All ships have this type.
