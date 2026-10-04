@@ -164,7 +164,15 @@ ancestry; #134 must integrate first, and #140 has its own review and required CI
     group hierarchy/membership/statistics, ordered renewal rules, complete
     replacement transactions/rollback and the ordered tick-end replacement drain.
     Preserve #137 finances, #138 orders and #139 cargo at original mutation points.
-16. **Following selections:** remaining simulation components and commands that
+16. **#148 Complete town lifecycle, authority and house simulation.** Extend
+    #120's sole owner with remaining town state, founding/deletion/authority,
+    monthly histories and house construction/cargo/rebuild/animation loops.
+    Preserve generation cancellation and destructive house callback ordering.
+17. **#150 Complete industry construction and tile lifecycle.** Extend #129's
+    sole owner with construction/prospecting/generation, canonical metadata and
+    ordered registry, destruction and complete tile/animation policy. Preserve
+    oilrig/station/cargo cleanup, flooding rechecks and generation cancellation.
+18. **Following selections:** remaining simulation components and commands that
     change them, guided by canonical state and complete control-loop ownership.
 
 The accepted #108 decision keeps canonical map arrays in C++ with direct bundled
@@ -181,23 +189,25 @@ Worktrees are siblings of the main checkout unless a path says otherwise.
 
 | Issue / owner | Branch and checkpoint commit | Worktree | Next step |
 | --- | --- | --- | --- |
-| #131 `/root` (Astra ultra) | `integrate-reviewed-owners` at `8d34af0093`, PR #134 | `openttd-rust-owner-batch` | Prior aba408d3e8 passes 12/13 required checks; compare fails only stockpile fixture window. Includes already-reviewed f224 input fix through actual cargo ancestry. Focused self/pair and final CI next; previous combined source review remains accepted. |
-| #117 `/root/cargo_payment_delivery` (Sol high), root owns final fix | `cargo-payment-delivery-117` at `f903cb11c7`, PR #123 | `openttd-rust-cargo-payment` | Production 2abf956bdf accepted; stockpile input-only fix copied from reviewed station branch after CI reproduction. Same-PR delta review next; included in #131. ABI 49-51. |
+| #131 `/root` (Astra ultra) | `integrate-reviewed-owners` at `8d34af0093`, PR #134 | `openttd-rust-owner-batch` | Combined source and final stockpile input fix independently accepted. Exact earlier verify97/124 plus unchanged-game stockpile self/pair1/1 pass. Final required CI running after prior fixture-window failure. |
+| #117 `/root/cargo_payment_delivery` (Sol high), root coordinates | `cargo-payment-delivery-117` at `f903cb11c7`, PR #123 | `openttd-rust-cargo-payment` | Same reviewer accepts final input delta; production2abf956bdf remains unchanged. Included in #131. ABI49-51. |
 | #119 `/root/ship_yapf_ownership` (Sol high) | `ship-yapf-ownership-119` at `46aa3efa59`, PR #126 | `openttd-rust-ship-yapf` | Final diagnostic and explicit test-initializer fixes accepted by same reviewer. Exact verify97/118 and diagnostic water6/6 pass; actual head included in both batches. ABI 52-56. |
 | #120 `/root/town_growth_ownership` (Sol high) | `town-growth-ownership-120` at `9fbeaa00d1`, PR #127 | `openttd-rust-town-growth` | Final source/evidence independently accepted; verify and soak10/10 pass. Actual accepted ancestry included in #131. ABI 60/61. |
 | #121 `/root/road_vehicle_ownership` (Sol high) | `road-vehicle-ownership-121` at `682a8151f3`, PR #128 | `openttd-rust-road-vehicles` | Final owner, current-depot shortcut and Windows test conversion accepted. Verify, pair10/10 and soak10/10 pass. Included in #131. ABI 80-83. |
 | #122 `/root/rail_yapf_ownership` (Sol high) | `rail-yapf-ownership-122` at `ef1b981101`, PR #133 | `openttd-rust-rail-yapf` | Verify97/120, six-year soak6/6, independent review and all 13 standalone CI checks pass. Included in #141; combined CI gates integration after #134. ABI 90-95/97. |
-| #124 `/root/road_yapf_ownership` (Sol high), root owns final fix | `road-yapf-ownership-124` at `453f249c5f`, PR #135 | `openttd-rust-road-yapf` | Production ab09ce9306 accepted with pair/self9/9 and soak12/12. Two explicit uint8 test conversions fix Windows annotations reproduced in #141. Same-PR delta review and final combined verify/CI next. ABI 100-109. |
-| #125 `/root/station_service_ownership` (Sol high), root coordinates | `station-service-ownership-125` at `d277a54c10`, PR #142 | `openttd-rust-station-service` | Final source, actual #134/#141 joins and short-input fixes independently accepted. Combined verify97/136; final economy/stations self and pair11/11 pass. Required CI running. ABI 110-129. |
-| #129 `/root/industry_periodic_ownership` (Sol high), root coordinates | `industry-periodic-ownership-129` at `4ff6a1a1ab`, PR #144 | `openttd-rust-industry-periodic` | Final combined owner accepted; introducing-commit preprocessor tab corrected with same-reviewer acceptance. Exact verify passes; unchanged production pair17/17, self17/17, soak17/17 and 4480 native gap cases pass. Required CI running. Component metrics1508/474/676/924 explicitly exceed retirement in glue/tooling. ABI 130-149. |
-| #130 `/root/rail_vehicle_ownership` (Sol high), root coordinates | `rail-vehicle-ownership-130` at `b94694ec9d`, PR #143 | `openttd-rust-rail-vehicles` | Full owner and actual #141 conflict resolutions independently accepted. Exact combined verify97/133 and pair24/24 pass; prior soak and actual collision/crossing/rollback witnesses pass, plus unchanged curve/reversal gap. Required CI running. ABI 150-179. |
-| #136 `/root/aircraft_controller_ownership` (Sol high), root coordinates | `aircraft-controller-ownership-136` at `46220952a0`, PR #145 | `openttd-rust-aircraft-controller` | Same reviewer accepts OWNER_NONE=16 and explicit C++ typed-lifetime fixes. Exact verify and final pair9/9 pass, including reference-built oilrig descent; prior soak8/8 and finite-range native gap pass. Required CI running; join station lifetime carefully when base updates. ABI 180-209. |
-| #137 `/root/company_economy_ownership` (Sol high) | `company-economy-ownership-137` at `c81fe77472`, uncommitted full owner | `openttd-rust-company-economy` | Whole state/loops/commands build; native financial gap passes17640. `/root/company_lifecycle_scenarios` (Sol high) committed twelve real company cases; self12/12 passes, candidate pairs underway. Merge actual accepted #129 for ECMY layout, finish verify and draft PR. ABI 210-239. |
+| #124 `/root/road_yapf_ownership` (Sol high), root coordinates | `road-yapf-ownership-124` at `453f249c5f`, PR #135 | `openttd-rust-road-yapf` | Same reviewer accepts two explicit uint8 test conversions after Windows annotations. Production and prior pair/self/soak unchanged; final combined verify passes. ABI100-109. |
+| #125 `/root/station_service_ownership` (Sol high), root coordinates | `station-service-ownership-125` at `54dabb86d0`, PR #142 | `openttd-rust-station-service` | Final source/input fixes accepted at d277a54c10; clean actual #141 update adds accepted road test conversions. Exact final verify97/136 and prior focused self/pair11/11 pass. Required CI running. ABI110-129. |
+| #129 `/root/industry_periodic_ownership` (Sol high), root coordinates | `industry-periodic-ownership-129` at `eaa7ff26e2`, PR #144 | `openttd-rust-industry-periodic` | Final owner and introducing-commit style correction accepted at4ff6a1a1ab; clean #141 update verified. Pair/self/soak17/17 and native4480 gap cases pass. Metrics1508/474/676/924 record overrun. Required CI running. ABI130-149. |
+| #130 `/root/rail_vehicle_ownership` (Sol high), root coordinates | `rail-vehicle-ownership-130` at `dfd47a51db`, PR #143 | `openttd-rust-rail-vehicles` | Owner and actual #141 conflict resolution accepted at b94694ec9d; final clean dependency fixes pass exact verify97/133. Pair24/24, prior soak and native curve/reversal gap pass. Required CI running. ABI150-179. |
+| #136 `/root/aircraft_controller_ownership` (Sol high), root coordinates | `aircraft-controller-ownership-136` at `1f176deed3`, PR #145 | `openttd-rust-aircraft-controller` | Same reviewer accepts actual #142 join, preserving loading-drain/aircraft-target cleanup order. Exact verify and combined aircraft/economy/stations pair20/20 (150 snapshots) pass. Required CI running; integrate after #142. ABI180-209. |
+| #137 `/root/company_economy_ownership` (Sol high) | `company-economy-ownership-137` at `4165f204be`, draft PR #149 | `openttd-rust-company-economy` | Full owner includes actual #144/#141 dependencies. Verify, company pair/self12/12 and finance soak1/1 pass after original tile-query predicate ordering fix. Native command gaps covered. Fresh independent review next. Component1609/705/1012/1394 records glue/tooling overrun. ABI210-239. |
 | #138 `/root/order_lifecycle_ownership` (Sol high) | `order-lifecycle-ownership-138` at `5ac057aa16`, uncommitted owner | `openttd-rust-order-lifecycle` | Actual #141 dependency included. Canonical vectors/current/shared/backups and full list operations implemented; complete commands/controllers/timetable next. Preserve typed lifetimes and separate unmasked #83 evidence. ABI 240-279. |
-| #139 `/root/cargo_storage_movement_ownership` (Sol high) | `cargo-storage-movement-139` at `22228dd59c`, uncommitted owner | `openttd-rust-cargo-storage` | Actual accepted station dependency included. Implement canonical packets/lists/actions/flows and job application; fresh helper owns flow slice. Coordinate orders/company and widen shared ABI type-id registry consistently to u16 for IDs280-319. |
-| #140 `/root` (Astra ultra) | `integrate-reviewed-pathfinding`, updated from `5457068fc3`, PR #141 | `openttd-rust-pathfinding-batch` | Prior head passes compare and every platform build; annotations fail two road uint8/bool tests. Actual fixes from #134/#135 merged cleanly; final verify running, component delta review then required CI. Integrate after #134. |
-| #146 fresh `/root/ship_controller_ownership` (Sol high) | Not started | To create `openttd-rust-ship-controller` | Selected after cargo; complete private owner/controller/depot BFS, actual #119/#125/#138 dependencies. |
+| #139 `/root/cargo_storage_movement_ownership` (Sol high) | `cargo-storage-movement-139` at `620d17d99e`, uncommitted owner | `openttd-rust-cargo-storage` | Packets/lists/actions and canonical flow/application helper implemented; adapters and complete validation underway. Coordinate shared ABI u16 widening82dca4a9f2 plus crypto-helper narrowing/lint correction. ABI280-319. |
+| #140 `/root` (Astra ultra) | `integrate-reviewed-pathfinding` at `14d7ce95d5`, PR #141 | `openttd-rust-pathfinding-batch` | Actual #134/#135 final fixes merged cleanly; both component deltas independently accepted. Exact verify97/131 and focused stockpile pair pass; prior combined27/27 unchanged production. Required CI running; integrate after #134. |
+| #146 `/root/ship_controller_ownership` (Sol high) | `ship-controller-ownership-146` at `b38b42f09d` | `openttd-rust-ship-controller` | Actual station/path dependency included; implement full private owner/controller/depot BFS and branch witnesses. Coordinate orders/cargo/ABI widening; ABI320-339 reserved. |
 | #147 fresh `/root/fleet_replacement_ownership` (Sol high) | Not started | To create `openttd-rust-fleet-replacement` | Selected after ship; complete groups/rules/transactions/drain with actual company/order/cargo/controller dependencies. |
+| #148 fresh `/root/town_lifecycle_ownership` (Sol high) | Not started | To create `openttd-rust-town-lifecycle` | Selected after fleet; extend canonical town owner with complete remaining town/house lifecycle and authority. |
+| #150 fresh `/root/industry_construction_ownership` (Sol high) | Not started | To create `openttd-rust-industry-construction` | Selected after town; extend industry owner with complete construction/tile/destruction control and canonical metadata. |
 
 Preserved evidence branches: `evidence-disaster-vehicles` at `a775543162`
 (`openttd-rust-disasters-evidence`) and `evidence-water-regions` at `c752070cde`
@@ -206,16 +216,15 @@ do not reapply borrowed effect helper `73ccd511fb`. Build/test with `--jobs 2`;
 required CI supplies default/all-comparison checks where local component evidence
 already covers the change. Keep long-running checks in an active agent session:
 ending and recycling a task thread has killed unfinished background processes.
-Next free review slots: same-PR cargo input and road-search test-width deltas;
-then fresh company review when its final evidence is ready. Source fixes from
+Next free review slot: fresh company PR #149 reviewer. Source fixes from
 shared dependencies must reach later branches before their integration.
 
 Fresh Astra high planning selected the current queue. Latest planner
-`/root/plan_after_orders_and_cargo` supplied #146 then #147; root accepted both.
-Company, orders and cargo are active; ship controller and fleet replacement are
-unstarted. Replenish when fewer than two are ahead of active work. Preserve
-complete owners, native-width behavior and explicit reentry boundaries;
-CI/review runs concurrently with later implementation.
+`/root/plan_after_ship_and_fleet` supplied #148 then #150; root accepted both.
+Company, orders, cargo and ship controller are active; fleet, town lifecycle
+and industry construction are unstarted. Replenish when fewer than two are
+unstarted ahead of active work. Preserve complete owners, native-width behavior
+and explicit reentry boundaries; CI/review runs concurrently with implementation.
 
 ## Choosing the next task
 
