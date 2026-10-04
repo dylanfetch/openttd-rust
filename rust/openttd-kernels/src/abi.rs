@@ -86,6 +86,15 @@ pub fn layout(type_id: u8, item: u8) -> usize {
         46 => layout!(crate::water_regions::Patch, item; x, y, label),
         47 => layout!(crate::water_regions::Snapshot, item; edges, labels, patches, aqueducts),
         48 => layout!(crate::water_regions::Leaves, item; tracks, follow, aqueduct, debug),
+        52 => {
+            layout!(crate::ship_yapf::Input, item; map_x, map_y, tile, dest_tile, curve90, curve45, max_speed, dest_dirs, reverse_dirs, trackdir, ocean_frac, canal_frac, station)
+        }
+        53 => {
+            layout!(crate::ship_yapf::Leaves, item; destination, follow, tile, patch, visit_new, visit_next, visit_destroy)
+        }
+        54 => layout!(crate::ship_yapf::Follow, item; tile, skipped, dirs, followed),
+        55 => layout!(crate::ship_yapf::Tile, item; ships, docking, sea, lock_middle, destination),
+        56 => layout!(crate::ship_yapf::Result, item; direction, found, origin, stats),
         _ => usize::MAX,
     }
 }

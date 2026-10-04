@@ -24,6 +24,8 @@ add_test_files(
     test_script_admin.cpp
     test_window_desc.cpp
     townname.cpp
+    ship_yapf.cpp
+    ship_yapf_protocol.hpp
     water_regions.cpp
     water_regions_protocol.hpp
     tilearea.cpp

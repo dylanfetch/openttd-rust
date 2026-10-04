@@ -210,6 +210,9 @@ def check(scenario, run, mode, role, result):
         profile = run["snapshots"][-1].parents[2] / "water-profile.json"
         if profile.is_file():
             result[f"{mode}_{role}_water_profile"] = json.loads(profile.read_text())
+        profile = run["snapshots"][-1].parents[2] / "ship-yapf-profile.json"
+        if profile.is_file():
+            result[f"{mode}_{role}_ship_yapf_profile"] = json.loads(profile.read_text())
 
 
 def prepare_water_save(layout, migration, out, timeout):

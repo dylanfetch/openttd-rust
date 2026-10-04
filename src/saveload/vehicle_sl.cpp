@@ -901,6 +901,37 @@ public:
 	}
 };
 
+#ifdef WITH_RUST
+class SlVehicleShipPath : public DefaultSaveLoadHandler<SlVehicleShipPath, Ship> {
+public:
+	static inline const SaveLoad description[] = { SLE_VAR(ShipPathElement, trackdir, SLE_UINT8) };
+	static inline const SaveLoadCompatTable compat_description = {};
+	void Save(Ship *s) const override
+	{
+		SlSetStructListLength(s->path.size());
+		for (size_t i = 0; i < s->path.size(); ++i) {
+			auto item = s->path.at(i);
+			SlObject(&item, this->GetDescription());
+		}
+	}
+	void Load(Ship *s) const override
+	{
+		size_t count = SlGetStructListLength(UINT32_MAX);
+		while (count-- > 0) {
+			s->path.push_back(ShipPathElement{});
+			/* Commit the staged byte even if the C++ save loader throws. No
+			 * save operation crosses a Rust frame or retains a Rust vector view. */
+			struct Stage {
+				ShipPathCache &path;
+				size_t index;
+				ShipPathElement item;
+				~Stage() { this->path.set(this->index, this->item); }
+			} stage{s->path, s->path.size() - 1, {}};
+			SlObject(&stage.item, this->GetLoadDescription());
+		}
+	}
+};
+#else
 class SlVehicleShipPath : public VectorSaveLoadHandler<SlVehicleShipPath, Ship, ShipPathElement> {
 public:
 	static inline const SaveLoad description[] = {
@@ -910,6 +941,8 @@ public:
 
 	std::vector<ShipPathElement> &GetVector(Ship *s) const override { return s->path; }
 };
+
+#endif
 
 class SlVehicleShip : public DefaultSaveLoadHandler<SlVehicleShip, Vehicle> {
 public:
@@ -938,7 +971,11 @@ public:
 		if (IsSavegameVersionBefore(SLV_PATH_CACHE_FORMAT)) {
 			/* Path cache is now taken from back instead of front, so needs reversing. */
 			Ship *s = static_cast<Ship *>(v);
+#ifdef WITH_RUST
+			for (auto it = ship_path_td.rbegin(); it != ship_path_td.rend(); ++it) s->path.push_back(*it);
+#else
 			std::transform(std::rbegin(ship_path_td), std::rend(ship_path_td), std::back_inserter(s->path), [](Trackdir trackdir) { return trackdir; });
+#endif
 		}
 	}
 

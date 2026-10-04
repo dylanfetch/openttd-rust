@@ -1167,3 +1167,30 @@ probes cover visitor invalidation and owner replacement that ordinary YAPF
 visitors cannot trigger. `tools/water-scenario-ai/README.md` gives preparation,
 negative-probe and optional crossing/timing measurement commands. Full ship
 YAPF, arbitrary maps/NewGRFs and exhaustive path retry limits remain unported.
+
+
+### Ship YAPF searches and canonical path cache
+
+Rust owns both region and track searches, arena indices/parent chains, open and
+closed membership, the original binary-heap tie/removal rules, destination
+estimates, region corridor, two attempts, random lost paths and cache extraction
+(#119). Each Ship owns one opaque Rust path with copied controller access;
+modern VEHS stages one byte across C++ load errors and commits it on unwind,
+while the pre-struct-list loader retains its reversed path order. Original search
+bodies and vector ownership compile only in portable builds.
+
+C++ keeps ship/world pools, track following, station/dock queries, engine/settings
+observations and canonical map arrays. Direct noexcept leaves return copied
+records; water-neighbour cursors enter the distinct #104 cache owner without
+search reentry. Destination-only reads never query water class on a blocked
+origin. No ordinary throwing/reentrant world callback occurs in this search;
+save errors remain outside Rust frames. Panics/OOM/environmental failures abort.
+ABI IDs 52-56 describe input, leaves, follower/tile records and chosen results.
+
+The existing `python3 tools/migration.py simulate water --jobs 2` corpus compares
+all chunks for ferry manual/cargodist, canal/lock loss and recovery, aqueducts,
+depot reversals and reference-produced live-path reload. Native checks compare
+2,000 heap operations to unchanged CBinaryHeapT and check path copy/lifetime and
+both reversal interfaces. Optional `OPENTTD_SHIP_PROFILE=1` records internal
+branch counters in the same scenario reports. Rare node limits/retries, custom
+NewGRFs and complete legacy-save fixtures are not exhaustively covered.

@@ -18,6 +18,138 @@
 
 #include "../../safeguards.h"
 
+
+#ifdef WITH_RUST
+#include "../../rust/ship_yapf_ffi.h"
+
+/* Optional internal branch witnesses supplement paired saved-state evidence. */
+#include <cstdio>
+#include <cstdlib>
+struct ShipYapfProfile {
+	bool enabled = std::getenv("OPENTTD_SHIP_PROFILE") != nullptr;
+	uint64_t counts[16]{};
+	void Record(const OpenTTDShipYapfResult &result, uint32_t kind)
+	{
+		if (!this->enabled) return;
+		for (uint32_t i = 0; i < 12; ++i) this->counts[i] += result.stats[i];
+		++this->counts[kind];
+		if (kind == 13 && result.found) ++this->counts[15];
+	}
+	~ShipYapfProfile()
+	{
+		if (!this->enabled) return;
+		const char *personal = std::getenv("HOME");
+		if (personal == nullptr) return;
+		if (FILE *file = std::fopen(fmt::format("{}/ship-yapf-profile.json", personal).c_str(), "w")) {
+			constexpr const char *names[] = {"region_nodes", "track_nodes", "retries", "track_limits", "intermediate", "cache_truncations", "final_region_clears", "lost", "random_draws", "reverse_origins", "blocked_fallbacks", "region_limits", "choose_calls", "reverse_calls", "blocked_calls", "reverse_chosen"};
+			fmt::print(file, "{{");
+			for (uint32_t i = 0; i < 16; ++i) fmt::print(file, "{}\"{}\":{}", i == 0 ? "" : ",", names[i], this->counts[i]);
+			fmt::print(file, "}}\n");
+			std::fclose(file);
+		}
+	}
+};
+static ShipYapfProfile _ship_yapf_profile;
+
+static void ShipDestination(const void *context, uint32_t *tile, uint16_t *dirs) noexcept
+{
+	const Ship *v = static_cast<const Ship *>(context);
+	if (v->current_order.IsType(OT_GOTO_STATION)) {
+		*tile = CalcClosestStationTile(v->current_order.GetDestination().ToStationID(), v->tile, StationType::Dock).base();
+		*dirs = INVALID_TRACKDIR_BIT;
+	} else {
+		*tile = v->dest_tile.base();
+		*dirs = TrackStatusToTrackdirBits(GetTileTrackStatus(v->dest_tile, TRANSPORT_WATER, 0));
+	}
+}
+static OpenTTDShipFollow ShipFollow(const void *context, uint32_t tile, uint8_t td) noexcept
+{
+	CFollowTrackWater follower{static_cast<const Ship *>(context)};
+	const bool followed = follower.Follow(TileIndex{tile}, static_cast<Trackdir>(td));
+	return {follower.new_tile.base(), follower.tiles_skipped, static_cast<uint16_t>(follower.new_td_bits), static_cast<uint8_t>(followed)};
+}
+static OpenTTDShipTile ShipTile(const void *context, uint32_t tile, uint8_t cost) noexcept
+{
+	const Ship *v = static_cast<const Ship *>(context);
+	const TileIndex t{tile};
+	const bool docking = IsDockingTile(t);
+	if (cost == 0) return {0, static_cast<uint8_t>(docking), 0, 0,
+		static_cast<uint8_t>(docking && IsShipDestinationTile(t, v->current_order.GetDestination().ToStationID()))};
+	uint count = 0;
+	if (docking) count = std::ranges::count_if(VehiclesOnTile(t), [](const Vehicle *other) { return other->type == VEH_SHIP && !other->vehstatus.Test(VehState::Hidden); });
+	return {count, static_cast<uint8_t>(docking), static_cast<uint8_t>(GetEffectiveWaterClass(t) == WaterClass::Sea),
+		static_cast<uint8_t>(IsTileType(t, MP_WATER) && IsLock(t) && GetLockPart(t) == LockPart::Middle),
+		0};
+}
+static OpenTTDWaterPatch ShipPatch(uint32_t tile) noexcept
+{
+	const auto p = GetWaterRegionPatchInfo(TileIndex{tile});
+	return {p.x, p.y, p.label.base()};
+}
+
+void *ShipWaterVisitNew(OpenTTDWaterPatch) noexcept;
+uint8_t ShipWaterVisitNext(void *, OpenTTDWaterPatch, OpenTTDWaterPatch *) noexcept;
+void ShipWaterVisitDestroy(void *) noexcept;
+static const OpenTTDShipYapfLeaves _ship_yapf_leaves{ShipDestination, ShipFollow, ShipTile, ShipPatch, ShipWaterVisitNew, ShipWaterVisitNext, ShipWaterVisitDestroy};
+
+static OpenTTDShipYapfInput ShipInput(const Ship *v, bool blocked = false)
+{
+	const auto *svi = ShipVehInfo(v->engine_type);
+	const bool station = v->current_order.IsType(OT_GOTO_STATION);
+	TrackdirBits reverse_dirs = TRACKDIR_BIT_NONE;
+	if (blocked) {
+		const DiagDirection entry = ReverseDiagDir(VehicleExitDir(v->direction, v->state));
+		reverse_dirs = DiagdirReachesTrackdirs(entry) & TrackStatusToTrackdirBits(GetTileTrackStatus(v->tile, TRANSPORT_WATER, 0, entry));
+	}
+	return {Map::SizeX(), Map::SizeY(), v->tile.base(), v->dest_tile.base(), static_cast<int32_t>(_settings_game.pf.yapf.ship_curve90_penalty),
+		static_cast<int32_t>(_settings_game.pf.yapf.ship_curve45_penalty), svi->max_speed,
+		0, static_cast<uint16_t>(reverse_dirs), static_cast<uint8_t>(v->GetVehicleTrackdir()), svi->ocean_speed_frac, svi->canal_speed_frac, static_cast<uint8_t>(station)};
+}
+static std::vector<uint32_t> ShipOrigins(const Ship *v)
+{
+	std::vector<uint32_t> tiles;
+	if (v->current_order.IsType(OT_GOTO_STATION)) {
+		StationID station = v->current_order.GetDestination().ToStationID();
+		for (const auto &tile : BaseStation::Get(station)->GetTileArea(StationType::Dock)) {
+			if (IsDockingTile(tile) && IsShipDestinationTile(tile, station)) tiles.push_back(tile.base());
+		}
+	} else {
+		tiles.push_back(v->dest_tile.base());
+	}
+	return tiles;
+}
+Track YapfShipChooseTrack(const Ship *v, TileIndex tile, bool &found, ShipPathCache &cache)
+{
+	const auto input = ShipInput(v);
+	const auto origins = ShipOrigins(v);
+	const auto result = openttd_rust_ship_choose(cache.GetOwner(), &input, &_ship_yapf_leaves, &GetRustSharedServices(), v, tile.base(), TrackdirToTrackdirBits(v->GetVehicleTrackdir()), TRACKDIR_BIT_NONE, origins.data(), origins.size());
+	_ship_yapf_profile.Record(result, 12);
+	found = result.found;
+	return result.direction == INVALID_TRACKDIR ? INVALID_TRACK : TrackdirToTrack(static_cast<Trackdir>(result.direction));
+}
+bool YapfShipCheckReverse(const Ship *v, Trackdir *trackdir)
+{
+	const auto input = ShipInput(v, trackdir != nullptr);
+	const auto origins = ShipOrigins(v);
+	const auto result = openttd_rust_ship_reverse(&input, &_ship_yapf_leaves, &GetRustSharedServices(), v, trackdir != nullptr, origins.data(), origins.size());
+	_ship_yapf_profile.Record(result, trackdir == nullptr ? 13 : 14);
+	if (trackdir != nullptr) *trackdir = static_cast<Trackdir>(result.direction);
+	return result.found;
+}
+std::vector<WaterRegionPatchDesc> YapfShipFindWaterRegionPath(const Ship *v, TileIndex start, int max_length)
+{
+	const auto input = ShipInput(v);
+	const auto origins = ShipOrigins(v);
+	using ResultOwner = std::unique_ptr<OpenTTDShipRegionPath, decltype(&openttd_rust_ship_regions_destroy)>;
+	ResultOwner result{openttd_rust_ship_regions(&input, &_ship_yapf_leaves, start.base(), max_length, origins.data(), origins.size()), openttd_rust_ship_regions_destroy};
+	std::vector<WaterRegionPatchDesc> path;
+	for (size_t i = 0; i < openttd_rust_ship_regions_size(result.get()); ++i) {
+		const auto p = openttd_rust_ship_regions_get(result.get(), i);
+		path.push_back({p.x, p.y, WaterRegionPatchLabel{p.label}});
+	}
+	return path;
+}
+#else
 constexpr int NUMBER_OR_WATER_REGIONS_LOOKAHEAD = 4;
 constexpr int MAX_SHIP_PF_NODES = (NUMBER_OR_WATER_REGIONS_LOOKAHEAD + 1) * WATER_REGION_NUMBER_OF_TILES * 4; // 4 possible exit dirs per tile.
 
@@ -439,3 +571,5 @@ bool YapfShipCheckReverse(const Ship *v, Trackdir *trackdir)
 {
 	return CYapfShip::CheckShipReverse(v, trackdir);
 }
+
+#endif /* WITH_RUST */
