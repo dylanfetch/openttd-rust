@@ -89,7 +89,13 @@ static OpenTTDWaterPatch ShipPatch(uint32_t tile) noexcept
 void *ShipWaterVisitNew(OpenTTDWaterPatch) noexcept;
 uint8_t ShipWaterVisitNext(void *, OpenTTDWaterPatch, OpenTTDWaterPatch *) noexcept;
 void ShipWaterVisitDestroy(void *) noexcept;
-static const OpenTTDShipYapfLeaves _ship_yapf_leaves{ShipDestination, ShipFollow, ShipTile, ShipPatch, ShipWaterVisitNew, ShipWaterVisitNext, ShipWaterVisitDestroy};
+static void ShipDebug(uint32_t unit_number, uint8_t kind, uint8_t found, uint32_t rounds, uint32_t open, uint32_t closed, int32_t cost, int32_t distance) noexcept
+{
+	/* Both original ship searches use CYapfSegmentCostCacheNoneT. */
+	Debug(yapf, 3, "[YAPF{}]{}{:4d} - {} rounds - {} open - {} closed - CHR {:4.1f}% - C {} D {}",
+		kind == 0 ? '^' : 'w', found != 0 ? '-' : '!', unit_number, rounds, open, closed, 0.0f, cost, distance);
+}
+static const OpenTTDShipYapfLeaves _ship_yapf_leaves{ShipDestination, ShipFollow, ShipTile, ShipPatch, ShipWaterVisitNew, ShipWaterVisitNext, ShipWaterVisitDestroy, ShipDebug};
 
 static OpenTTDShipYapfInput ShipInput(const Ship *v, bool blocked = false)
 {
@@ -102,7 +108,7 @@ static OpenTTDShipYapfInput ShipInput(const Ship *v, bool blocked = false)
 	}
 	return {Map::SizeX(), Map::SizeY(), v->tile.base(), v->dest_tile.base(), static_cast<int32_t>(_settings_game.pf.yapf.ship_curve90_penalty),
 		static_cast<int32_t>(_settings_game.pf.yapf.ship_curve45_penalty), svi->max_speed,
-		0, static_cast<uint16_t>(reverse_dirs), static_cast<uint8_t>(v->GetVehicleTrackdir()), svi->ocean_speed_frac, svi->canal_speed_frac, static_cast<uint8_t>(station)};
+		0, static_cast<uint16_t>(reverse_dirs), static_cast<uint8_t>(v->GetVehicleTrackdir()), svi->ocean_speed_frac, svi->canal_speed_frac, static_cast<uint8_t>(station), v->unitnumber};
 }
 static std::vector<uint32_t> ShipOrigins(const Ship *v)
 {

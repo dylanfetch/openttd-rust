@@ -43,6 +43,7 @@ inline uint8_t VisitNext(void *cursor, OpenTTDWaterPatch from, OpenTTDWaterPatch
 	state.used = true; *out = {from.x + 1, 0, 1}; return 1;
 }
 inline void VisitDestroy(void *cursor) noexcept { delete static_cast<Cursor *>(cursor); }
+inline void Report(uint32_t, uint8_t, uint8_t, uint32_t, uint32_t, uint32_t, int32_t, int32_t) noexcept {}
 inline void Observe(void *, uint32_t, uint32_t *) noexcept {}
 inline void Write(void *, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) noexcept {}
 inline float Trig(uint32_t, float) noexcept { return 0; }
@@ -83,8 +84,8 @@ template <typename Check> void Run(Check check)
 	check(openttd_rust_ship_path_size(copy.get()) == 1 && openttd_rust_ship_path_get(copy.get(), 0) == 2);
 	check(openttd_rust_ship_path_size(path.get()) == 2 && openttd_rust_ship_path_get(path.get(), 0) == 255 && openttd_rust_ship_path_get(path.get(), 1) == 13);
 	openttd_rust_ship_path_clear(path.get());
-	OpenTTDShipYapfInput input{32, 32, 10 + 32 * 20, 10 + 32 * 24, 100, 20, 100, 0, 1 << 9, 1, 0, 0, 0};
-	const OpenTTDShipYapfLeaves leaves{Destination, Follow, Tile, Patch, VisitNew, VisitNext, VisitDestroy};
+	OpenTTDShipYapfInput input{32, 32, 10 + 32 * 20, 10 + 32 * 24, 100, 20, 100, 0, 1 << 9, 1, 0, 0, 0, 0};
+	const OpenTTDShipYapfLeaves leaves{Destination, Follow, Tile, Patch, VisitNew, VisitNext, VisitDestroy, Report};
 	const OpenTTDSharedServices services{nullptr, Random, Observe, Write, Trig, Industry};
 	destination = input.dest_tile;
 	auto result = openttd_rust_ship_choose(path.get(), &input, &leaves, &services, nullptr, input.tile, 1 << 1, 0, &destination, 1);
