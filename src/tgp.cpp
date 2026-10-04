@@ -30,8 +30,8 @@ static std::array<uint32_t, 15> TGPSettings()
 		_settings_game.game_creation.map_x, _settings_game.game_creation.map_y};
 }
 
-static uint32_t TGPRandom() { return Random(); }
-static uint32_t TGPRandomRange(uint32_t limit) { return RandomRange(limit); }
+static uint32_t TGPRandom() noexcept { return Random(); }
+static uint32_t TGPRandomRange(uint32_t limit) noexcept { return RandomRange(limit); }
 static void *_tgp_owner = nullptr;
 
 static void TGPFree()

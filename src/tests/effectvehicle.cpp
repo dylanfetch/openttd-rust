@@ -21,7 +21,7 @@
 #include "../safeguards.h"
 
 #ifdef WITH_RUST
-TEST_CASE("Effect vehicles - native action protocol and ownership")
+TEST_CASE("Effect vehicles - native direct services and ownership")
 {
 	CheckEffectProtocol([](bool result) { CHECK(result); });
 }
