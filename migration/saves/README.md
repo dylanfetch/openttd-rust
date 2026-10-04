@@ -2,11 +2,13 @@
 
 Fixed inputs for `tools/simulate.py` (`play-*` scenarios). They are not
 expected results. Each is the final game of one episode in the sibling
-play-openttd project: an LLM player built a road network on the same 64x64
-island through an MCP server, using OpenTTD 15.1. The episode's bridge AI and
-GameScript are missing from the harness runtime, so on load the dummy AI
-replaces the AI and the GameScript is dropped. Every save was written paused;
-the scenario's `console` lines unpause it.
+play-openttd project: an LLM player built a road network on the same 128x128
+map through an MCP server, using OpenTTD 15.1. The player's company is an AI
+company driven by a bridge AI that is missing from the harness runtime, so on
+load the idle dummy AI replaces it; AI-company rather than human-company logic
+is exercised. No save has a GameScript or NewGRFs. Every save was written
+paused; the scenario's `console` lines unpause it, and the harness checks that
+their settings appear in the first snapshot.
 
 | Save | Episode |
 | --- | --- |

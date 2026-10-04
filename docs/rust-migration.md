@@ -169,11 +169,13 @@ Any `[desync:` warning (a cache mismatch) and any log or stdout difference fail
 - Port divergences go in `KNOWN_FAILURES` by first divergence and issue.
 - `-vnull:ticks` counts loop iterations and a late threaded link graph job
   pauses the game, so run length varies with load. Snapshots compare by date;
-  exit saves only when both runs stopped at the same tick (a clean plain pair
-  is retried; a consistently slower link graph job fails on timing, not state).
+  exit saves only when both runs stopped at the same tick. A clean plain pair
+  that stopped at different ticks is retried with no other harness game
+  running (a lock shared by all worktrees); a consistently slower link graph
+  job fails on timing, not state.
   GameScripts run while paused, so scenarios must not use an active one.
 - The reference runtime is copied under a shared lock, so simulations never
-  block other worktrees. Evidence: `.local/simulation/<time>/report.json`.
+  block other worktrees. Evidence: `.local/simulation/<time>-<pid>/report.json`.
 
 ## Native macOS arm64 Rust linkage
 

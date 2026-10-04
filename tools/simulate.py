@@ -14,6 +14,7 @@ check) and `--soak` for the larger scenario set.
 
 import argparse
 import concurrent.futures
+import contextlib
 import fnmatch
 import hashlib
 import json
@@ -23,6 +24,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -368,6 +370,41 @@ def log_lines(run_dir):
             for line in (run_dir / "stderr.log").read_text(errors="surrogateescape").splitlines()]
 
 
+class MachineLock:
+    """Lets a retried plain pair run with no other harness game on the machine.
+
+    A link graph job that has not finished by its join tick pauses the game, and
+    the null driver keeps counting iterations while paused. The job has only a
+    few milliseconds of wall time, so it misses that window when cores are
+    oversubscribed. Ordinary runs hold this lock shared across every harness
+    process of the clone; a retry holds it exclusively, and no new run in this
+    process starts while a retry waits."""
+
+    def __init__(self, path):
+        self.path, self.condition, self.retries = path, threading.Condition(), 0
+
+    @contextlib.contextmanager
+    def hold(self, alone):
+        import fcntl
+        with self.condition:
+            if alone:
+                self.retries += 1
+            else:
+                self.condition.wait_for(lambda: not self.retries)
+        try:
+            with open(self.path, "w") as handle:
+                fcntl.flock(handle, fcntl.LOCK_EX if alone else fcntl.LOCK_SH)
+                yield
+        finally:
+            if alone:
+                with self.condition:
+                    self.retries -= 1
+                    self.condition.notify_all()
+
+
+MACHINE = None  # MachineLock, set by main()
+
+
 def save_moment(path):
     """(date, date_fract, tick_counter) at which a save was written."""
     chunk = read_save(path)["DATE"]
@@ -403,8 +440,9 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
     try:
         for mode, desync in (("snapshots", True), ("plain", False)):
             for attempt in range(1 if desync else 3):
-                runs = {role: run_game(scenario, binaries[role], builds[role], out / name / mode / role, timeout, env, desync)
-                        for role in ("reference", "candidate")}
+                with MACHINE.hold(alone=attempt > 0):
+                    runs = {role: run_game(scenario, binaries[role], builds[role], out / name / mode / role, timeout, env, desync)
+                            for role in ("reference", "candidate")}
                 exits = [runs[role]["snapshots"][-1] if runs[role]["snapshots"] and runs[role]["snapshots"][-1].name == "exit.sav"
                          else None for role in ("reference", "candidate")]
                 # Retry only a clean pair whose end moments differ; a crash, hang
@@ -434,6 +472,17 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
                 result["snapshots"] = len(shorter) + bool(same_end)
                 if len(shorter) < 2:
                     result["problems"].append("fewer than two periodic snapshots were written")
+                # Console output is invisible without a GUI, so confirm each
+                # setting line took effect in the first snapshot of both runs.
+                for role, run in runs.items():
+                    first = next((p for p in run["snapshots"] if p.name != "exit.sav"), None)
+                    for line in scenario.get("console", []) if first else []:
+                        if line.startswith("setting "):
+                            _, key, value = line.split()
+                            chunk = read_save(first)["PATS"]
+                            saved = decode_element(chunk, chunk["elements"][0][1]).get(key)
+                            if str(saved) != value:
+                                result["problems"].append(f"{role}: {key} is {saved}, not {value}, in {first.name}")
             for snapshot in shorter:
                 compare(mode, snapshot)
                 if result["differences"]:
@@ -487,7 +536,10 @@ def main():
         print("\n".join(s["name"] for s in scenarios))
         return 0
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    out = migration.LOCAL / "simulation" / stamp
+    out = migration.LOCAL / "simulation" / f"{stamp}-{os.getpid()}"  # concurrent runs never share
+    global MACHINE
+    migration.COMMON_LOCAL.mkdir(parents=True, exist_ok=True)
+    MACHINE = MachineLock(migration.COMMON_LOCAL / "simulation.lock")
     out.mkdir(parents=True)
     builds = {"reference": out / "reference-runtime", "candidate": ROOT / "build-rust"}
     # The game finds its data next to the executable, so copy the shared
