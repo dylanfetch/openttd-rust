@@ -65,11 +65,13 @@ always the first priority. Port differences go in `KNOWN_FAILURES` with an issue
 never in masks.
 
 - **#109 Split `tools/simulate.py` into per-component scenario modules.**
-  Behavior-preserving. Do it first: all agents are stopped, and the #103/#104
-  evidence branches must rebase anyway, now into their own modules.
+  Behavior-preserving. In progress first; #103/#104 and #86 evidence must use
+  the new component modules before integration.
 - **#86 Rail and aircraft scenarios** (the ship slice is part of #104). Run on spare
   capacity starting now; required before any rail, road-vehicle or aircraft
-  controller or YAPF port.
+  controller or YAPF port. PR #110 supplies the owner's rail/ship save; remove its
+  new GLOG output mask in favor of existing input normalization. Aircraft needs
+  an owner-built input unless the owner permits a supplemental setup AI (#111).
 
 ## Phase 3: current ownership work, in order
 
@@ -100,6 +102,31 @@ never in masks.
 
 Storage transfers (map arrays, pools) still require explicit selection here,
 following `docs/design/world-state.md` as amended by #108.
+
+## Resume checkpoint (2026-10-04)
+
+Root: `/root` (gpt-6-astra, ultra). Integration base `1a883a37f1`; no integration
+since the steering review. All rows below are active, not reviewed completion.
+Worktrees are siblings of the main checkout unless a path says otherwise.
+
+| Issue / owner | Branch and checkpoint commit | Worktree | Next step |
+| --- | --- | --- | --- |
+| #109 `/root/harness_modules_109` (Sol medium) | `harness-modules-109` at `1a883a37f1` | `openttd-rust-harness-modules` | Freeze baseline counts, split shared core and component modules, compare before/after, open PR and assign fresh Astra reviewer. |
+| #107 trees `/root/trees_direct_services_107` (Sol high) | `trees-direct-services-107` at `1a883a37f1` | `openttd-rust-trees-direct` | Common direct services and straight-line tree port; communicate API to #103/#104, validate and open first PR. Effects needs a fresh implementer and separate PR next. |
+| #103 `/root/disaster_ownership_103` (Sol high) | `port-disaster-vehicles` at `47ad3c0091` | `openttd-rust-disasters` | Direct-call rewrite, then common #107 services and #109 disasters module; finish train/UFO and airport witnesses, validate and open PR. |
+| #104 `/root/water_regions_104` (Sol high) | `port-water-regions` at `1a883a37f1` | `openttd-rust-water-regions` | Implement complete cache owner; move evidence into ships module, finish mutation/reload/connectivity witnesses and #108 crossing/timing measurements. |
+| #86 `/root/rail_air_scenarios_86` (Sol high) | `harness-multimodal-save` at `4f733cfa8d`, PR #110 | `openttd-rust-saves` | Preserve owner's fixture; input normalization and rail/ship witnesses in #109 modules, then fresh review. Aircraft input decision is #111. |
+
+Preserved evidence branches: `evidence-disaster-vehicles` at `a775543162`
+(`openttd-rust-disasters-evidence`) and `evidence-water-regions` at `c752070cde`
+(`openttd-rust-water-evidence`). #103 imports only the useful final AI commit,
+omitting borrowed effect helper `73ccd511fb`. Build/test with `--jobs 2` while
+these worktrees run concurrently; the shared reference remains unchanged.
+
+Next free capacity goes to fresh per-PR review, the #107 effects rewrite, and an
+Astra high #108 measurement/decision agent as its prerequisites become available.
+Before fewer than two selections remain unstarted, assign a fresh Astra high
+economy planner; root creates issues and records selections here before coding.
 
 ## Choosing the next task
 
