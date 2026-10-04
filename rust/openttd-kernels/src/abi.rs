@@ -83,6 +83,9 @@ pub fn layout(type_id: u8, item: u8) -> usize {
         42 => {
             layout!(crate::services::Services, item; context, random, observe_tile, write_tile, trig, industry)
         }
+        46 => layout!(crate::water_regions::Patch, item; x, y, label),
+        47 => layout!(crate::water_regions::Snapshot, item; edges, labels, patches, aqueducts),
+        48 => layout!(crate::water_regions::Leaves, item; tracks, follow, aqueduct, debug),
         49 => {
             layout!(crate::cargo_payment::Spec, item; payment, valid, callback, periods1, periods2)
         }
