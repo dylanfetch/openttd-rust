@@ -12,6 +12,7 @@ mod alternating;
 mod auth;
 mod byte_strings;
 mod consumer;
+mod disaster;
 mod history;
 mod integer;
 mod landscape;

@@ -38,6 +38,7 @@
 #include "../table/townname.h"
 
 #include "../rust/tree_counter.h"
+#include "../rust/disaster_counter.h"
 
 #include "../safeguards.h"
 
@@ -1122,8 +1123,8 @@ static const OldChunks vehicle_effect_chunk[] = {
 };
 
 static const OldChunks vehicle_disaster_chunk[] = {
-	OCL_SVAR( OC_UINT16, DisasterVehicle, image_override ),
-	OCL_SVAR( OC_UINT16, DisasterVehicle, big_ufo_destroyer_target ),
+	OCL_SVAR( OC_UINT16, DisasterVehicle, ImageOverride() ),
+	OCL_SVAR( OC_UINT16, DisasterVehicle, DestroyerTarget() ),
 
 	OCL_NULL( 6 ), ///< Junk
 
@@ -1388,7 +1389,7 @@ bool LoadOldVehicle(LoadgameState &ls, int num)
 		v->current_order.AssignOrder(UnpackOldOrder(_old_order));
 
 		if (v->type == VEH_DISASTER) {
-			DisasterVehicle::From(v)->state = UnpackOldOrder(_old_order).GetDestination().value;
+			DisasterVehicle::From(v)->State() = UnpackOldOrder(_old_order).GetDestination().value;
 		}
 
 		v->next = (Vehicle *)(size_t)_old_next_ptr;
@@ -1632,7 +1633,6 @@ static bool LoadTTDPatchExtraChunks(LoadgameState &ls, int)
 }
 
 extern TileIndex _cur_tileloop_tile;
-extern uint16_t _disaster_delay;
 extern uint8_t _age_cargo_skip_counter; // From misc_sl.cpp
 extern uint8_t _old_diff_level;
 extern uint8_t _old_units;

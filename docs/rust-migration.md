@@ -426,8 +426,7 @@ The probe compiles against unchanged pinned sources and the candidate: 8/16-bit
 extrema, modular negative-hex boundaries, recursive/invalid prefixes, empty/NUL
 input, long overflow runs, both clamp settings, peek/read/try/skip and free
 ParseInteger, fatal logging adapters, malformed strgen diagnostics, and fresh
-settings/string headers plus English/French output. Evidence and source hashes:
-`.local/integer-comparison/`.
+settings/string headers plus English/French output.
 
 ### Alternating-iterator traversal
 
@@ -564,8 +563,7 @@ check follows `WITH_ASSERT` alone.
 Evidence: the four unchanged FixSCCEncoded/Negative and ReplaceParam tests, plus
 `python3 tools/encoded-comparison.py` (verbatim pinned functions, Rust and portable
 bodies, four NDEBUG/WITH_ASSERT combinations, ASan/UBSan/LSan on the C++ side; the
-Rust archive is uninstrumented). Evidence: `.local/encoded-comparison/`. No
-generator runtime coverage is claimed.
+Rust archive is uninstrumented). No generator runtime coverage is claimed.
 
 ### Byte-string utilities
 
@@ -595,7 +593,7 @@ Evidence: the twelve unchanged utility tests, plus `python3
 tools/byte-strings-comparison.py` (3,699 records against full pinned string.cpp,
 length-result saturation above INT_MAX via mmap, -funsigned-char builds). Host
 locales are C, C.utf8 and POSIX only, so non-C mappings are untested. ASan/UBSan
-cover the C++ side only. Evidence: `.local/byte-strings-comparison/`.
+cover the C++ side only.
 
 ### UTF-8 codec and byte positions
 
@@ -619,8 +617,8 @@ codepoint/byte conversions are explicitly masked or bounded.
 Evidence: the three unchanged UTF-8 view tests and consumer/builder tests, plus
 `python3 tools/utf8-comparison.py` (assertion and NDEBUG builds; encoding
 boundaries, malformed runs, embedded NUL, empty views, consumer-versus-view
-movement, and the `offset >= size` end branch including SIZE_MAX). Evidence:
-`.local/utf8-comparison/`. Game logging and Unicode rendering are outside it.
+movement, and the `offset >= size` end branch including SIZE_MAX). Game logging
+and Unicode rendering are outside it.
 
 ### Rounded square root and runtime integer saturation
 
@@ -650,8 +648,8 @@ intervals round toward min.
 Evidence: the unchanged IntSqrtTest Zero/FindSqRt, ClampTo and SoftClamp cases,
 plus `python3 tools/math-comparison.py` (every uint32 root square and rounding
 transition, width/signedness extrema, bool and character/size aliases, adapters,
-unsigned 128-bit destinations, SoftClamp intervals, GNU link-wrap call counts;
-`.local/math-comparison/`) and `python3 tools/math-extension-comparison.py` (wide
+unsigned 128-bit destinations, SoftClamp intervals, GNU link-wrap call counts)
+and `python3 tools/math-extension-comparison.py` (wide
 templates on the native library; macOS CI runs it with `--build build`). Neither
 covers all inputs or platform ABIs.
 
@@ -682,7 +680,7 @@ Evidence: the unchanged 288-month test (86 assertions in each standalone run), p
 arbitrary chains, ages, typed operation order, exceptions, aliasing, graph fillers,
 and the three verbatim production reducers; a nested-year fixture yields 0 where a
 flattened reduction yields 1). ASan/UBSan cover the C++ side only. Fatal stubs
-compare dispatch, not game fatal text. Evidence: `.local/history-comparison/`.
+compare dispatch, not game fatal text.
 
 ### Authentication and streaming owners
 
@@ -714,8 +712,7 @@ pinned and candidate session/Packet/vendor sources as separate endpoints, both m
 directions, Rust/Rust and portable C++ against original transcripts (wire bytes,
 derived keys, RNG traces, failure/retry, copies, aliasing, exception cleanup), with
 a C++ sanitizer run that also checks Rust allocator leaks but does not instrument
-Rust memory accesses. Not constant-time or erasure evidence. Evidence:
-`.local/auth-comparison/`.
+Rust memory accesses. Not constant-time or erasure evidence.
 
 ### Paired Script Admin conversion
 
@@ -959,7 +956,7 @@ sources: binary/buffer bytes, suffix identity, copy independence, TCP/UDP framin
 partial/zero/negative/throwing transfers, reentrant live cursor changes, close
 policy, controlled encryption callbacks, selected C++ allocation failures, and the
 original uint16 per-byte wrap with larger native buffers and prefix narrowing);
-native ABI smoke calls exercise the exports. Evidence: `.local/packet-comparison/`.
+native ABI smoke calls exercise the exports.
 Not covered: real socket delivery, all allocator failure modes, full protocol
 equivalence or full Packet ownership migration.
 
@@ -1043,7 +1040,7 @@ bytes, missing terminators, empty/unchanged inputs, copy/assignment/self/rvalue
 copies, live consumer rewinding, defined left overlap and overtake fatal state. A
 fixed observation builder checks consumption before C++ append allocation failure
 and reentrant validation; native ABI calls check byte flags, surrogate/NUL policy
-and copy state. Evidence: `.local/utf8-comparison/`. Not covered: exhaustive
+and copy state. Not covered: exhaustive
 malformed sanitation/settings input, every allocator failure, out-of-domain
 overlap or text rendering.
 
@@ -1178,6 +1175,33 @@ visitors cannot trigger. `tools/water-scenario-ai/README.md` gives preparation,
 negative-probe and optional crossing/timing measurement commands. Arbitrary
 maps/NewGRFs and exhaustive region/path limits remain evidence limits.
 
+### Disaster scheduling and vehicles
+
+Issue #103 moves all fifteen subtype controllers, eight initializers, eligibility,
+countdown/reset, industry construction reset and square-clearing policy, movement,
+shadow/rotor updates and both target-release hooks into Rust. Rust owns each
+shell's state, flags, image override and destroyer target, plus the persisted
+global delay. Original bodies compile only in portable builds. Canonical Vehicle
+fields, pools, map storage, save/load adapters, timer registration and rendering
+remain C++.
+
+Copied observations and direct noexcept shared services preserve original ordering
+and shared RNG draws. Private scalar addresses remain stable through modern and
+legacy save staging; flight helpers borrow only the flags scalar for their call.
+Returned actions are limited to vehicle deletion, RoadVehicle::Crash's window
+invalidation callbacks and landscape-clear command callbacks/nested release
+hooks; no world/private-state reference survives them. Per-call continuations
+hold copied IDs and observations; panics and environmental failures abort.
+
+`python3 tools/migration.py simulate disasters` checks naturally scheduled families,
+countdown boundaries, small/large airport crash/block/clear and queued events,
+real human-train UFO selection/landing/nearby breakdown/area clearing, road UFO
+crash/removal, industry reset/removal, submarine movement/expiry and live-target
+reload. `--self` checks the original against itself; `--soak` extends completion
+runs. Every saved chunk and debug log compares, with declared typed input edits.
+Native ABI/Rust tests exercise stable owners, width/wrap behavior, direct services
+and deletion cancellation. Legacy save fixtures, viewport pixels, sound output,
+allocator failure timing and exhaustive NewGRF combinations remain limits.
 
 ### Ship YAPF searches and canonical path cache
 

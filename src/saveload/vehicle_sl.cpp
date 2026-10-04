@@ -516,7 +516,7 @@ void AfterLoadVehiclesPhase2(bool part_of_load)
 
 			case VEH_DISASTER: {
 				auto *dv = DisasterVehicle::From(v);
-				if (dv->subtype == ST_SMALL_UFO && dv->state != 0) {
+				if (dv->subtype == ST_SMALL_UFO && dv->State() != 0) {
 					RoadVehicle *u = RoadVehicle::GetIfValid(v->dest_tile.base());
 					if (u != nullptr && u->IsFrontEngine()) {
 						/* Delete UFO targetting a vehicle which is already a target. */
@@ -1106,20 +1106,20 @@ public:
 
 		    SLE_VAR(Vehicle, owner,                 SLE_UINT8),
 		    SLE_VAR(Vehicle, vehstatus,             SLE_UINT8),
-		SLE_CONDVARNAME(DisasterVehicle, state, "current_order.dest", SLE_FILE_U8 | SLE_VAR_U16, SL_MIN_VERSION,         SLV_5),
-		SLE_CONDVARNAME(DisasterVehicle, state, "current_order.dest", SLE_UINT16,                SLV_5,                  SLV_DISASTER_VEH_STATE),
-		SLE_CONDVAR(DisasterVehicle,     state,                       SLE_UINT16,                SLV_DISASTER_VEH_STATE, SL_MAX_VERSION),
+		SLE_CONDVARNAME(DisasterVehicle, State(), "current_order.dest", SLE_FILE_U8 | SLE_VAR_U16, SL_MIN_VERSION,         SLV_5),
+		SLE_CONDVARNAME(DisasterVehicle, State(), "current_order.dest", SLE_UINT16,                SLV_5,                  SLV_DISASTER_VEH_STATE),
+		SLE_CONDVARNAME(DisasterVehicle, State(), "state",                       SLE_UINT16,                SLV_DISASTER_VEH_STATE, SL_MAX_VERSION),
 
 		    SLE_VAR(Vehicle, sprite_cache.sprite_seq.seq[0].sprite, SLE_FILE_U16 | SLE_VAR_U32),
 		SLE_CONDVAR(Vehicle, age,                   SLE_FILE_U16 | SLE_VAR_I32,   SL_MIN_VERSION,  SLV_31),
 		SLE_CONDVAR(Vehicle, age,                   SLE_INT32,                   SLV_31, SL_MAX_VERSION),
 		    SLE_VAR(Vehicle, tick_counter,          SLE_UINT8),
 
-		SLE_CONDVAR(DisasterVehicle, image_override,            SLE_FILE_U16 | SLE_VAR_U32,   SL_MIN_VERSION, SLV_191),
-		SLE_CONDVAR(DisasterVehicle, image_override,            SLE_UINT32,                 SLV_191, SL_MAX_VERSION),
-		SLE_CONDVAR(DisasterVehicle, big_ufo_destroyer_target,  SLE_FILE_U16 | SLE_VAR_U32,   SL_MIN_VERSION, SLV_191),
-		SLE_CONDVAR(DisasterVehicle, big_ufo_destroyer_target,  SLE_UINT32,                 SLV_191, SL_MAX_VERSION),
-		SLE_CONDVAR(DisasterVehicle, flags,                     SLE_UINT8,                  SLV_194, SL_MAX_VERSION),
+		SLE_CONDVARNAME(DisasterVehicle, ImageOverride(), "image_override",            SLE_FILE_U16 | SLE_VAR_U32,   SL_MIN_VERSION, SLV_191),
+		SLE_CONDVARNAME(DisasterVehicle, ImageOverride(), "image_override",            SLE_UINT32,                 SLV_191, SL_MAX_VERSION),
+		SLE_CONDVARNAME(DisasterVehicle, DestroyerTarget(), "big_ufo_destroyer_target",  SLE_FILE_U16 | SLE_VAR_U32,   SL_MIN_VERSION, SLV_191),
+		SLE_CONDVARNAME(DisasterVehicle, DestroyerTarget(), "big_ufo_destroyer_target",  SLE_UINT32,                 SLV_191, SL_MAX_VERSION),
+		SLE_CONDVARNAME(DisasterVehicle, Flags(), "flags",                     SLE_UINT8,                  SLV_194, SL_MAX_VERSION),
 	};
 
 	static inline const SaveLoadCompatTable compat_description = _vehicle_disaster_sl_compat;
