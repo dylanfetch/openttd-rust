@@ -67,11 +67,9 @@ never in masks.
 - **#109 Split `tools/simulate.py` into per-component scenario modules.**
   Behavior-preserving. Do it first: all agents are stopped, and the #103/#104
   evidence branches must rebase anyway, now into their own modules.
-- **#86 Rail and aircraft scenarios.** The owner's hand-built save
-  (`play-padhattan-ridge-1996-*`, `migration/saves/README.md`) runs two trains
-  with signals, one ship and road vehicles by default. Aircraft remain open, and
-  #104 still needs its canal/lock/aqueduct ship cases. Required before any rail,
-  road-vehicle or aircraft controller or YAPF port.
+- **#86 Rail and aircraft scenarios** (the ship slice is part of #104). Run on spare
+  capacity starting now; required before any rail, road-vehicle or aircraft
+  controller or YAPF port.
 
 ## Phase 3: current ownership work, in order
 
