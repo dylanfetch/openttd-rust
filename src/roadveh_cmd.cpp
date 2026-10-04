@@ -75,9 +75,11 @@ bool IsValidImageIndex<VEH_ROAD>(uint8_t image_index)
 	return image_index < lengthof(_roadveh_images);
 }
 
+#ifndef WITH_RUST
 static const Trackdir _road_reverse_table[DIAGDIR_END] = {
 	TRACKDIR_RVREV_NE, TRACKDIR_RVREV_SE, TRACKDIR_RVREV_SW, TRACKDIR_RVREV_NW
 };
+#endif
 
 /**
  * Check whether a roadvehicle is a bus
@@ -676,6 +678,7 @@ static void StartRoadVehSound(const RoadVehicle *v)
 #endif
 
 
+#ifndef WITH_RUST
 struct RoadVehFindData {
 	int x;
 	int y;
@@ -684,6 +687,7 @@ struct RoadVehFindData {
 	uint best_diff;
 	Direction dir;
 };
+#endif
 
 #ifndef WITH_RUST
 static void FindClosestBlockingRoadVeh(Vehicle *v, RoadVehFindData *rvf)
@@ -765,6 +769,7 @@ static RoadVehicle *RoadVehFindCloseTo(RoadVehicle *v, int x, int y, Direction d
  * @param v  Road vehicle that arrived.
  * @param st Station where the road vehicle arrived.
  */
+#ifndef WITH_RUST
 static void RoadVehArrivesAt(const RoadVehicle *v, Station *st)
 {
 	if (v->IsBus()) {
@@ -795,6 +800,7 @@ static void RoadVehArrivesAt(const RoadVehicle *v, Station *st)
 		}
 	}
 }
+#endif
 
 /**
  * This function looks at the vehicle and updates its speed (cur_speed
@@ -851,12 +857,14 @@ static Direction RoadVehGetSlidingDirection(const RoadVehicle *v, int x, int y)
 #endif
 
 
+#ifndef WITH_RUST
 struct OvertakeData {
 	const RoadVehicle *u;
 	const RoadVehicle *v;
 	TileIndex tile;
 	Trackdir trackdir;
 };
+#endif
 
 /**
  * Check if overtaking is possible on a piece of track

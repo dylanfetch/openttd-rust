@@ -1205,3 +1205,28 @@ runs. Every saved chunk and debug log compares, with declared typed input edits.
 Native ABI/Rust tests exercise stable owners, width/wrap behavior, direct services
 and deletion cancellation. Legacy save fixtures, viewport pixels, sound output,
 allocator failure timing and exhaustive NewGRF combinations remain limits.
+
+### Road vehicle control and private state
+
+Issue #121 moves road consist/tick/day control, movement, blocking/overtaking,
+reversal, station/depot transitions, crash expiry, service, speed/cache policy and
+turn commands into Rust. Rust owns seven private scalars and the ordered path;
+modern, historical split-vector and TTD/TTO save adapters stage them in C++.
+Original algorithms and road/tram movement data compile only in portable builds.
+Shared Vehicle/GroundVehicle physics, pools, orders/loading, map/road stops,
+construction, rendering and road YAPF remain C++. A temporary YAPF result exists
+only for an empty canonical path and transfers before result handling.
+
+Rust uses copied IDs/observations and direct noexcept services, including shared
+RNG. Actions return to C++ for owner reentry, commands, NewGRF callbacks, viewport
+sprite updates and destruction; no world reference survives them. Canonical
+state outlives active calls and is released after PreDestructor; panics abort.
+`python3 tools/migration.py simulate roads` witnesses both acceleration models,
+cache consumption/invalidation, blocking escape, overtake initiation/timeout,
+depot service/departure and a reload carrying path/counter state. Existing road,
+multimodal and disaster scenarios compare all saved fields and debug logs.
+Native fixtures compare all movement/stop data against unchanged C++ tables and
+exercise widths, ordered paths, nested save staging, partial-load unwind, indexed
+pool reuse and reentry. These establish covered behavior; actual legacy saves,
+NewGRFs, articulated/tram turns, level-crossing collisions, sounds and viewport
+pixels remain unexercised controller domains.

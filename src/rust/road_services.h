@@ -156,8 +156,17 @@ static uint64_t OPENTTD_ROAD_CALL RoadLeaf(uint32_t op, uint32_t id, uint64_t a,
 		case ROAD_OP_IS_ROAD_STOP: return IsStationRoadStop(TileIndex(a));
 		case ROAD_OP_SET_DEST: v->dest_tile = TileIndex(static_cast<uint32_t>(a)); break;
 		case ROAD_OP_CACHE_INVALIDATE: { v->InvalidateNewGRFCacheOfChain(); break; }
-		case ROAD_OP_ARRIVAL: { RoadVehArrivesAt(v, Station::Get(StationID(a))); break; }
+		case ROAD_OP_ARRIVAL: {
+			static const StringID headlines[] = {STR_NEWS_FIRST_BUS_ARRIVAL, STR_NEWS_FIRST_PASSENGER_TRAM_ARRIVAL, STR_NEWS_FIRST_TRUCK_ARRIVAL, STR_NEWS_FIRST_CARGO_TRAM_ARRIVAL};
+			AddVehicleNewsItem(GetEncodedString(headlines[b], StationID(a)), c != 0 ? NewsType::ArrivalCompany : NewsType::ArrivalOther, v->index, StationID(a));
+			AI::NewEvent(v->owner, new ScriptEventStationFirstVehicle(StationID(a), v->index));
+			Game::NewEvent(new ScriptEventStationFirstVehicle(StationID(a), v->index));
+			break;
+		}
 		case ROAD_OP_CRASH_NEWS: { RoadCrashNews(v, static_cast<uint32_t>(a)); break; }
+		case ROAD_OP_STATION_VISITS: return Station::Get(StationID(a))->had_vehicle_of_type;
+		case ROAD_OP_STATION_VISIT_SET: Station::Get(StationID(a))->had_vehicle_of_type |= static_cast<StationHadVehicleOfType>(b); break;
+		case ROAD_OP_LOCAL_COMPANY: return _local_company.base();
 		default: NOT_REACHED();
 	}
 	return 0;

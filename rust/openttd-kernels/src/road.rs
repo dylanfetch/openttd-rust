@@ -1040,7 +1040,20 @@ fn diag(dir: u32) -> u32 {
 }
 impl Game {
     async fn arrive_load(&self, id: u32, station: u32) {
-        self.q(ARRIVAL, id, station, 0);
+        let v = self.read(id);
+        let bit = if v.bus != 0 { 4 } else { 8 };
+        if self.q(STATION_VISITS, id, station, 0) & bit == 0 {
+            self.q(STATION_VISIT_SET, id, station, bit);
+            let headline = if v.bus != 0 { 0 } else { 2 } + u32::from(v.tram());
+            let local = v.owner == self.q0(LOCAL_COMPANY, INVALID);
+            self.leaf(
+                ARRIVAL,
+                id,
+                u64::from(station),
+                u64::from(headline),
+                u64::from(local),
+            );
+        }
         self.action(BEGIN_LOADING, id, 0, 0, 0).await;
         self.action(STOP_RANDOM, id, u64::from(station), 0, 0).await;
         self.action(STOP_ANIMATION, id, u64::from(station), 0, 0)
@@ -1699,3 +1712,7 @@ pub extern "C" fn openttd_rust_road_drive_entry(tram: u8, state: u8, frame: u8) 
     let (x, y) = crate::road_data::entry(tram != 0, state as usize, frame as usize);
     u16::from(x) | (u16::from(y) << 8)
 }
+
+const STATION_VISITS: u32 = 87;
+const STATION_VISIT_SET: u32 = 88;
+const LOCAL_COMPANY: u32 = 89;
