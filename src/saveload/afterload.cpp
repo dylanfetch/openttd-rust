@@ -1297,7 +1297,7 @@ bool AfterLoadGame()
 			if (v->type == VEH_TRAIN) {
 				Train::From(v)->track = TRACK_BIT_WORMHOLE;
 			} else {
-				RoadVehicle::From(v)->state = RVSB_WORMHOLE;
+				RoadVehicle::From(v)->SetState(RVSB_WORMHOLE);
 			}
 		}
 	}
@@ -1726,8 +1726,8 @@ bool AfterLoadGame()
 	if (IsSavegameVersionBefore(SLV_69)) {
 		/* In some old savegames a bit was cleared when it should not be cleared */
 		for (RoadVehicle *rv : RoadVehicle::Iterate()) {
-			if (rv->state == 250 || rv->state == 251) {
-				SetBit(rv->state, 2);
+			if (rv->GetState() == 250 || rv->GetState() == 251) {
+				rv->SetState(rv->GetState() | (1U << 2));
 			}
 		}
 	}
@@ -2666,7 +2666,7 @@ bool AfterLoadGame()
 
 				switch (v->type) {
 					case VEH_TRAIN: Train::From(v)->track       = TRACK_BIT_WORMHOLE; break;
-					case VEH_ROAD:  RoadVehicle::From(v)->state = RVSB_WORMHOLE;      break;
+					case VEH_ROAD:  RoadVehicle::From(v)->SetState(RVSB_WORMHOLE);      break;
 					default: NOT_REACHED();
 				}
 			} else {
@@ -2674,7 +2674,7 @@ bool AfterLoadGame()
 
 				switch (v->type) {
 					case VEH_TRAIN: Train::From(v)->track       = DiagDirToDiagTrackBits(vdir); break;
-					case VEH_ROAD:  RoadVehicle::From(v)->state = DiagDirToDiagTrackdir(vdir); RoadVehicle::From(v)->frame = frame; break;
+					case VEH_ROAD:  RoadVehicle::From(v)->SetState(DiagDirToDiagTrackdir(vdir)); RoadVehicle::From(v)->SetFrame(frame); break;
 					default: NOT_REACHED();
 				}
 			}
@@ -2683,14 +2683,22 @@ bool AfterLoadGame()
 
 	if (IsSavegameVersionBefore(SLV_153)) {
 		for (RoadVehicle *rv : RoadVehicle::Iterate()) {
-			if (rv->state == RVSB_IN_DEPOT || rv->state == RVSB_WORMHOLE) continue;
+			if (rv->GetState() == RVSB_IN_DEPOT || rv->GetState() == RVSB_WORMHOLE) continue;
 
 			bool loading = rv->current_order.IsType(OT_LOADING) || rv->current_order.IsType(OT_LEAVESTATION);
-			if (HasBit(rv->state, RVS_IN_ROAD_STOP)) {
+			if (HasBit(rv->GetState(), RVS_IN_ROAD_STOP)) {
+				uint8_t state = rv->GetState();
+#ifdef WITH_RUST
+				SB(state, RVS_ENTERED_STOP, 1, loading || rv->GetFrame() > openttd_rust_road_stop_frame(rv->GetState() - RVSB_IN_ROAD_STOP + (_settings_game.vehicle.road_side << RVS_DRIVE_SIDE)));
+#else
 				extern const uint8_t _road_stop_stop_frame[];
-				SB(rv->state, RVS_ENTERED_STOP, 1, loading || rv->frame > _road_stop_stop_frame[rv->state - RVSB_IN_ROAD_STOP + (_settings_game.vehicle.road_side << RVS_DRIVE_SIDE)]);
-			} else if (HasBit(rv->state, RVS_IN_DT_ROAD_STOP)) {
-				SB(rv->state, RVS_ENTERED_STOP, 1, loading || rv->frame > RVC_DRIVE_THROUGH_STOP_FRAME);
+				SB(state, RVS_ENTERED_STOP, 1, loading || rv->GetFrame() > _road_stop_stop_frame[rv->GetState() - RVSB_IN_ROAD_STOP + (_settings_game.vehicle.road_side << RVS_DRIVE_SIDE)]);
+#endif
+				rv->SetState(state);
+			} else if (HasBit(rv->GetState(), RVS_IN_DT_ROAD_STOP)) {
+				uint8_t state = rv->GetState();
+				SB(state, RVS_ENTERED_STOP, 1, loading || rv->GetFrame() > RVC_DRIVE_THROUGH_STOP_FRAME);
+				rv->SetState(state);
 			}
 		}
 	}
@@ -2763,7 +2771,7 @@ bool AfterLoadGame()
 					/* Crashed vehicles can't be going up/down. */
 					if (rv->vehstatus.Test(VehState::Crashed)) break;
 
-					if (rv->state == RVSB_IN_DEPOT || rv->state == RVSB_WORMHOLE) break;
+					if (rv->GetState() == RVSB_IN_DEPOT || rv->GetState() == RVSB_WORMHOLE) break;
 
 					TrackStatus ts = GetTileTrackStatus(rv->tile, TRANSPORT_ROAD, GetRoadTramType(rv->roadtype));
 					TrackBits trackbits = TrackStatusToTrackBits(ts);
@@ -3059,20 +3067,20 @@ bool AfterLoadGame()
 				uint &this_skip = skip_frames.emplace_back(prev_tile_skip);
 
 				/* The following 3 curves now take longer than before */
-				switch (u->state) {
+				switch (u->GetState()) {
 					case 2:
 						cur_skip++;
-						if (u->frame <= (roadside ? 9 : 5)) this_skip = cur_skip;
+						if (u->GetFrame() <= (roadside ? 9 : 5)) this_skip = cur_skip;
 						break;
 
 					case 4:
 						cur_skip++;
-						if (u->frame <= (roadside ? 5 : 9)) this_skip = cur_skip;
+						if (u->GetFrame() <= (roadside ? 5 : 9)) this_skip = cur_skip;
 						break;
 
 					case 5:
 						cur_skip++;
-						if (u->frame <= (roadside ? 4 : 2)) this_skip = cur_skip;
+						if (u->GetFrame() <= (roadside ? 4 : 2)) this_skip = cur_skip;
 						break;
 
 					default:
@@ -3299,7 +3307,7 @@ bool AfterLoadGame()
 					u->z_pos = GetSlopePixelZ(x, y, true);
 
 					u->vehstatus.Set(VehState::Hidden);
-					u->state = RVSB_IN_DEPOT;
+					u->SetState(RVSB_IN_DEPOT);
 					u->UpdatePosition();
 				}
 				RoadVehLeaveDepot(rv, false);

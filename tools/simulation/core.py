@@ -72,6 +72,7 @@ def scenario_modules():
         generated,
         play_saves,
         rails,
+        roads,
         ships,
         towns,
         trees,
@@ -87,6 +88,7 @@ def scenario_modules():
         ships,
         disasters,
         economy,
+        roads,
     )
 
 

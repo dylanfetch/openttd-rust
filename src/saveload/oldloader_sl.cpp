@@ -187,12 +187,12 @@ void FixOldVehicles(LoadgameState &ls)
 		/* We haven't used this bit for stations for ages */
 		if (v->type == VEH_ROAD) {
 			RoadVehicle *rv = RoadVehicle::From(v);
-			if (rv->state != RVSB_IN_DEPOT && rv->state != RVSB_WORMHOLE) {
-				ClrBit(rv->state, 2);
+			if (rv->GetState() != RVSB_IN_DEPOT && rv->GetState() != RVSB_WORMHOLE) {
+				rv->SetState(rv->GetState() & ~(1U << 2));
 				Tile tile(rv->tile);
 				if (IsTileType(tile, MP_STATION) && tile.m5() >= 168) {
 					/* Update the vehicle's road state to show we're in a drive through road stop. */
-					SetBit(rv->state, RVS_IN_DT_ROAD_STOP);
+					rv->SetState(rv->GetState() | (1U << RVS_IN_DT_ROAD_STOP));
 				}
 			}
 		}
@@ -1104,6 +1104,15 @@ static const OldChunks vehicle_train_chunk[] = {
 };
 
 static const OldChunks vehicle_road_chunk[] = {
+#ifdef WITH_RUST
+	{ OC_UINT8, 1, nullptr, [] (void *) -> void * { return &RoadVehicleStateScope::State(); }, nullptr },
+	{ OC_UINT8, 1, nullptr, [] (void *) -> void * { return &RoadVehicleStateScope::Frame(); }, nullptr },
+	{ OC_UINT16, 1, nullptr, [] (void *) -> void * { return &RoadVehicleStateScope::BlockedCounter(); }, nullptr },
+	{ OC_UINT8, 1, nullptr, [] (void *) -> void * { return &RoadVehicleStateScope::Overtaking(); }, nullptr },
+	{ OC_UINT8, 1, nullptr, [] (void *) -> void * { return &RoadVehicleStateScope::OvertakingCounter(); }, nullptr },
+	{ OC_UINT16, 1, nullptr, [] (void *) -> void * { return &RoadVehicleStateScope::CrashedCounter(); }, nullptr },
+	{ OC_UINT8, 1, nullptr, [] (void *) -> void * { return &RoadVehicleStateScope::ReverseCounter(); }, nullptr },
+#else
 	OCL_SVAR(  OC_UINT8, RoadVehicle, state ),
 	OCL_SVAR(  OC_UINT8, RoadVehicle, frame ),
 	OCL_SVAR( OC_UINT16, RoadVehicle, blocked_ctr ),
@@ -1111,6 +1120,7 @@ static const OldChunks vehicle_road_chunk[] = {
 	OCL_SVAR(  OC_UINT8, RoadVehicle, overtaking_ctr ),
 	OCL_SVAR( OC_UINT16, RoadVehicle, crashed_ctr ),
 	OCL_SVAR(  OC_UINT8, RoadVehicle, reverse_ctr ),
+#endif
 
 	OCL_NULL( 1 ), ///< Junk
 
@@ -1177,7 +1187,13 @@ static bool LoadOldVehicleUnion(LoadgameState &ls, int)
 		switch (v->type) {
 			default: SlErrorCorrupt("Invalid vehicle type");
 			case VEH_TRAIN   : res = LoadChunk(ls, v, vehicle_train_chunk);    break;
-			case VEH_ROAD    : res = LoadChunk(ls, v, vehicle_road_chunk);     break;
+			case VEH_ROAD: {
+#ifdef WITH_RUST
+				RoadVehicleStateScope scope(RoadVehicle::From(v), true);
+#endif
+				res = LoadChunk(ls, v, vehicle_road_chunk);
+				break;
+			}
 			case VEH_SHIP    : res = LoadChunk(ls, v, vehicle_ship_chunk);     break;
 			case VEH_AIRCRAFT: res = LoadChunk(ls, v, vehicle_air_chunk);      break;
 			case VEH_EFFECT: {

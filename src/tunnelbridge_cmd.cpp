@@ -2005,12 +2005,12 @@ static VehicleEnterTileStates VehicleEnter_TunnelBridge(Vehicle *v, TileIndex ti
 			RoadVehicle *rv = RoadVehicle::From(v);
 
 			/* Enter tunnel? */
-			if (rv->state != RVSB_WORMHOLE && dir == vdir) {
+			if (rv->GetState() != RVSB_WORMHOLE && dir == vdir) {
 				if (frame == _tunnel_visibility_frame[dir]) {
 					/* Frame should be equal to the next frame number in the RV's movement */
-					assert(frame == rv->frame + 1);
+					assert(frame == rv->GetFrame() + 1);
 					rv->tile = tile;
-					rv->state = RVSB_WORMHOLE;
+					rv->SetState(RVSB_WORMHOLE);
 					rv->vehstatus.Set(VehState::Hidden);
 					return VehicleEnterTileState::EnteredWormhole;
 				} else {
@@ -2021,8 +2021,8 @@ static VehicleEnterTileStates VehicleEnter_TunnelBridge(Vehicle *v, TileIndex ti
 			/* We're at the tunnel exit ?? */
 			if (dir == ReverseDiagDir(vdir) && frame == TILE_SIZE - _tunnel_visibility_frame[dir] && z == 0) {
 				rv->tile = tile;
-				rv->state = DiagDirToDiagTrackdir(vdir);
-				rv->frame = frame;
+				rv->SetState(DiagDirToDiagTrackdir(vdir));
+				rv->SetFrame(frame);
 				rv->vehstatus.Reset(VehState::Hidden);
 				return VehicleEnterTileState::EnteredWormhole;
 			}
@@ -2050,7 +2050,7 @@ static VehicleEnterTileStates VehicleEnter_TunnelBridge(Vehicle *v, TileIndex ti
 
 				case VEH_ROAD: {
 					RoadVehicle *rv = RoadVehicle::From(v);
-					rv->state = RVSB_WORMHOLE;
+					rv->SetState(RVSB_WORMHOLE);
 					PrepareToEnterBridge(rv);
 					break;
 				}
@@ -2076,9 +2076,9 @@ static VehicleEnterTileStates VehicleEnter_TunnelBridge(Vehicle *v, TileIndex ti
 
 				case VEH_ROAD: {
 					RoadVehicle *rv = RoadVehicle::From(v);
-					if (rv->state == RVSB_WORMHOLE) {
-						rv->state = DiagDirToDiagTrackdir(vdir);
-						rv->frame = 0;
+					if (rv->GetState() == RVSB_WORMHOLE) {
+						rv->SetState(DiagDirToDiagTrackdir(vdir));
+						rv->SetFrame(0);
 						return VehicleEnterTileState::EnteredWormhole;
 					}
 					break;

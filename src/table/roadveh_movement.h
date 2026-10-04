@@ -7,6 +7,7 @@
 
 /** @file table/roadveh_movement.h Data about how a road vehicle must drive on a tile */
 
+#ifndef WITH_RUST
 static const RoadDriveEntry _roadveh_drive_data_0[] = {
 	{15, 5},
 	{14, 5},
@@ -1482,3 +1483,5 @@ static const RoadDriveEntry * const * const _road_drive_data[2] = {
 	_road_road_drive_data,
 	_road_tram_drive_data,
 };
+
+#endif /* !WITH_RUST */
