@@ -23,6 +23,7 @@ mod packet;
 pub mod rail_yapf;
 mod road;
 mod road_data;
+mod road_yapf;
 mod script_list;
 pub mod services;
 mod station_cargo;

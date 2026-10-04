@@ -50,7 +50,7 @@ pub struct PathElement {
 #[derive(Default)]
 pub struct State {
     scalars: [u16; 7],
-    path: Vec<PathElement>,
+    pub(crate) path: Vec<PathElement>,
 }
 
 #[unsafe(no_mangle)]
