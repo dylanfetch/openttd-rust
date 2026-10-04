@@ -724,6 +724,53 @@ partial commits, operation charges, List/TileList save/load and clones). It
 substitutes a command-permission bool for the game instance and populates no
 world; it is not VM, savegame or allocation-failure equivalence.
 
+### ScriptList VM control
+
+Issue #65 moves operation control for `Valuate`, VM-filtered `FillList`,
+`SaveObject`, `LoadObject`, `_get`, `_set` and `_nexti` into the Rust list owner.
+A scalar-only Rust controller chooses each phase, ascending item read,
+result/type/error branch, stack operation, mutation and operation charge; C++
+dispatches the concrete action after Rust returns, keeping the bundled Squirrel
+VM, script identity, typed live pool range and validity predicates. Typed non-VM
+FillList overloads and List/TileList allocation/clone wrappers stay C++. This
+closes these list VM algorithms, not Squirrel or generic world queries.
+
+C++ owns the stack-resident optional `DisableDoCommandScope` and `SQOpsLimiter`,
+built only at the original phases and destroyed natively in reverse order
+(including nested restoration). Rust never calls an application callback,
+imports Squirrel symbols, or holds a list borrow across a VM/typed operation.
+Each invocation's opaque controller returns to Rust on completion or C++
+unwinding without scheduling pending cleanup. Records carry signed 64-bit values,
+full unsigned 64-bit SQBool results and checked/raw 32-bit VM type encodings; no
+VM object, borrowed string, C++ layout or world pointer crosses. Metadata 29/30
+checks the records; 28 is reserved for the curve owner.
+
+Retained order: valuation touches the modification token before parameter
+validation, checks return type before modification, commits SetValue before
+popping and charging five operations, and keeps success/error pop counts and the
+call-failure convention. Filter validates/pushes the function before disabling
+commands (the no-function path still disables them), runs typed validity first,
+re-requests the live index for a selected AddItem after callback/result-pop
+(never cached across reentry), accepts bool only, throws its original SQInteger
+failure and adds no valuation charge. Save keeps tag/array/sort/table format and
+ascending order without consuming the cursor. Load merges, commits incrementally,
+keeps partial stack/list state on every failure, checks surplus array entries
+after table traversal, sorts only after complete parsing, and keeps the predicate
+`key != INTEGER && value != INTEGER`; `GetPair` runs both ignored-result getters.
+Nonnumeric/integer pairs read an uninitialized upstream local and stay excluded
+(#67). Unrepresentable float conversions, signed overflow and invalidated
+original iterators are outside the defined domain. Metamethods keep missing/
+noninteger rejection, null deletion, bool normalization, AddItem versus SetValue
+mutation counts, ignored `_nexti` input conversions, cursor and diagnostics.
+
+Evidence: both scripted suites (production pool iteration and excessive-CPU),
+plus `python3 tools/script-list-comparison.py`, which keeps its earlier 888
+records and adds the direct VM/control gaps (argument shapes, native/closure
+filters, bool-only rejection, malformed loads with partial commits, mixed numeric
+conversions, metamethod cases, nested scope restoration) against the pinned
+methods and bundled VM at O0/O2, and compares the generated AI/GS/template List
+bindings byte for byte. One four-item typed range; not a simulated game world.
+
 ### Nested widget descriptor parser
 
 `MakeNWidgets` and `MakeWindowNWidgetTree` use a widget-specific pull parser. Rust
