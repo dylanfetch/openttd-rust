@@ -418,7 +418,7 @@ def run_game(scenario, binary, build, run_dir, timeout, base_env=None, desync=Tr
         snapshots.append(autosave / "exit.sav")
     return {
         "exit": code,
-        "seconds": round(time.monotonic() - started, 1),
+        "seconds": round(time.monotonic() - started, 3),
         "snapshots": snapshots,
         "log": log_lines(run_dir),
         "stdout": (run_dir / "stdout.log").read_bytes(),
