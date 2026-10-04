@@ -1085,28 +1085,28 @@ every allocator failure or NewGRF town-name behavior.
 
 ### Tree generation, simulation and planting
 
-Rust owns generation/scattering/grove geometry, placement policy, tile growth and
-climate loops, tick seeding and the private persisted byte counter, plus planting
-and clearing command traversal, limits, costs and errors (#99). Original bodies
-compile only in portable builds. Canonical map/pools and the editor forest-brush
-loop remain in C++; the brush calls Rust placement. Rendering stays in C++.
+Rust owns generation/scattering/grove geometry, placement policy, tile growth,
+climate loops, tick seeding and the persisted byte counter, plus command traversal,
+limits, costs and errors (#99/#107). Original bodies compile only in portable
+builds. Map/pools, rendering and the editor forest-brush loop remain C++; the brush
+calls Rust placement.
 
-Copied observations and leaf writes keep the map canonical. Per-invocation Rust
-continuations return before every RNG draw (including debug logging), progress,
-water, ambient/sound, town-rating, nested
-clear and square-clear services; C++ exceptions destroy pending work before resume.
-The process-lifetime Rust byte supplies unchanged DATE/TTD/TTO serialization
-addresses, with no C++ counter mirror; DATE LoadCheck omits it as before.
+Straight-line Rust calls shared `noexcept` RNG/map/trigonometry leaves and component
+progress, sound, town-rating, iterator and company-debit leaves. Only water flooding
+(nested clears), NewGRF ambient callbacks (arbitrary code) and landscape-clear
+commands (reentry) return to C++; no world borrow survives them. Environmental
+failures terminate; `RANDOM_DEBUG` records the wrapper location. ABI IDs 38/42
+cover actions and the copied shared-service table; no global registration is needed.
+Save/load reaches only counter-address/reset exports, with no shared callback;
+DATE/TTD/TTO keep the original byte and DATE LoadCheck omission.
 
-`python3 tools/migration.py simulate trees` exercises four climates, all tree
-placers/extra-placement modes, prepared growth/count/ground states, counter
-reloads and planting/clearing commands. `--self` checks reference reproducibility;
-`--soak` uses larger maps and longer runs. MAPS/MAP*/DATE and ordered command
-results/costs/errors/balances/ratings compare against the unchanged original.
-Rust protocol tests cover explicit/editor types, diagonal forwarding, Money
-bounds, bitpattern7 and callback resumption; native ABI checks cover owner/counter
-lifetime. Actual editor interactions, diagonal map traversal, legacy save files
-and custom NewGRF ambient callbacks remain source-reviewed evidence limits.
+`python3 tools/migration.py simulate trees` covers four climates, tree placers,
+extra-placement modes, growth/ground/count states, counter reloads and commands;
+`--self` and `--soak` check reproducibility and longer runs. All saved fields and
+ordered command outcomes compare against the pinned original. Rust/native ABI
+checks cover explicit/editor policy, Money bounds, bitpattern7, table/counter
+lifetime and retained reentry boundaries. Actual editor interaction, diagonal map
+traversal, legacy saves and custom NewGRF ambient callbacks remain evidence limits.
 
 ### Effect vehicles
 

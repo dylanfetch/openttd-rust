@@ -94,6 +94,7 @@ static void Layouts()
 	Layout(35, "OpenTTDLinkGraphEdge", {sizeof(OpenTTDLinkGraphEdge), alignof(OpenTTDLinkGraphEdge), offsetof(OpenTTDLinkGraphEdge, capacity), offsetof(OpenTTDLinkGraphEdge, travel_time), offsetof(OpenTTDLinkGraphEdge, dest)});
 	Layout(36, "OpenTTDLinkGraphSettings", {sizeof(OpenTTDLinkGraphSettings), alignof(OpenTTDLinkGraphSettings), offsetof(OpenTTDLinkGraphSettings, accuracy), offsetof(OpenTTDLinkGraphSettings, demand_distance), offsetof(OpenTTDLinkGraphSettings, demand_size), offsetof(OpenTTDLinkGraphSettings, saturation), offsetof(OpenTTDLinkGraphSettings, distribution), offsetof(OpenTTDLinkGraphSettings, express), offsetof(OpenTTDLinkGraphSettings, map_max_x), offsetof(OpenTTDLinkGraphSettings, map_max_y), offsetof(OpenTTDLinkGraphSettings, runtime)});
 	Layout(38, "OpenTTDTreeAction", {sizeof(OpenTTDTreeAction), alignof(OpenTTDTreeAction), offsetof(OpenTTDTreeAction, kind), offsetof(OpenTTDTreeAction, tile), offsetof(OpenTTDTreeAction, a), offsetof(OpenTTDTreeAction, b), offsetof(OpenTTDTreeAction, cost)});
+	Layout(42, "OpenTTDSharedServices", {sizeof(OpenTTDSharedServices), alignof(OpenTTDSharedServices), offsetof(OpenTTDSharedServices, context), offsetof(OpenTTDSharedServices, random), offsetof(OpenTTDSharedServices, observe_tile), offsetof(OpenTTDSharedServices, write_tile), offsetof(OpenTTDSharedServices, trig)});
 	Layout(37, "OpenTTDLinkGraphShare", {sizeof(OpenTTDLinkGraphShare), alignof(OpenTTDLinkGraphShare), offsetof(OpenTTDLinkGraphShare, node), offsetof(OpenTTDLinkGraphShare, origin), offsetof(OpenTTDLinkGraphShare, via), offsetof(OpenTTDLinkGraphShare, cumulative), offsetof(OpenTTDLinkGraphShare, unrestricted), offsetof(OpenTTDLinkGraphShare, has_share)});
 	Layout(39, "OpenTTDEffectView", {sizeof(OpenTTDEffectView), alignof(OpenTTDEffectView), offsetof(OpenTTDEffectView, x), offsetof(OpenTTDEffectView, y), offsetof(OpenTTDEffectView, z), offsetof(OpenTTDEffectView, sprite), offsetof(OpenTTDEffectView, progress), offsetof(OpenTTDEffectView, spritenum), offsetof(OpenTTDEffectView, subtype), offsetof(OpenTTDEffectView, ambient), offsetof(OpenTTDEffectView, sprite_write)});
 	Layout(40, "OpenTTDEffectCursor", {sizeof(OpenTTDEffectCursor), alignof(OpenTTDEffectCursor), offsetof(OpenTTDEffectCursor, phase), offsetof(OpenTTDEffectCursor, animation), offsetof(OpenTTDEffectCursor, tile), offsetof(OpenTTDEffectCursor, random)});
@@ -570,7 +571,7 @@ static void ScriptListControl()
 	std::printf("script_list control high-bit bool/key, typed filtering and load rejection passed\n");
 }
 
-static uint8_t OPENTTD_LINKGRAPH_CALL LinkGraphAbort(const void *context)
+static uint8_t OPENTTD_LINKGRAPH_CALL LinkGraphAbort(const void *context) noexcept
 {
 	auto *state = static_cast<const std::array<uint32_t, 2> *>(context);
 	return (*state)[0];
@@ -604,22 +605,24 @@ struct TreeProbe {
 	std::array<uint32_t, 10> tile{7};
 	uint32_t writes = 0;
 };
-static void TreeSettings(void *context, uint64_t *out) { auto &p = *static_cast<TreeProbe *>(context); std::copy(p.settings.begin(), p.settings.end(), out); }
-static void TreeObserve(void *context, uint32_t, uint32_t *out) { auto &p = *static_cast<TreeProbe *>(context); std::copy(p.tile.begin(), p.tile.end(), out); }
-static uint64_t TreeWrite(void *context, uint32_t op, uint32_t, uint32_t a, uint32_t b, uint32_t c, uint32_t d)
+static void TreeSettings(void *context, uint64_t *out) noexcept { auto &p = *static_cast<TreeProbe *>(context); std::copy(p.settings.begin(), p.settings.end(), out); }
+static void TreeObserve(void *context, uint32_t, uint32_t *out) noexcept { auto &p = *static_cast<TreeProbe *>(context); std::copy(p.tile.begin(), p.tile.end(), out); }
+static void TreeWrite(void *context, uint32_t op, uint32_t, uint32_t a, uint32_t b, uint32_t c, uint32_t d) noexcept
 {
 	auto &p = *static_cast<TreeProbe *>(context);
 	++p.writes;
 	CHECK(op == 0 && a == 12 && b == 2 && c == 6 && d == (2U << 8));
-	return 0;
 }
-static float TreeTrig(uint32_t, float value) { return value; }
+static float TreeTrig(uint32_t, float value) noexcept { return value; }
+static uint32_t TreeRandom(void *) noexcept { return UINT32_MAX; }
+static uint64_t TreeLeaf(void *, uint32_t, uint32_t, uint32_t, uint32_t) noexcept { return 0; }
 static void Trees()
 {
 	using Owner = std::unique_ptr<void, decltype(&openttd_rust_trees_destroy)>;
 	TreeProbe probe;
+	const OpenTTDSharedServices services{&probe, TreeRandom, TreeObserve, TreeWrite, TreeTrig};
 	auto make = [&](uint32_t kind, uint32_t a = 0, uint32_t b = 0, uint32_t c = 0) {
-		return Owner(openttd_rust_trees_create(kind, 1, a, b, c, &probe, TreeSettings, TreeObserve, TreeWrite, TreeTrig), openttd_rust_trees_destroy);
+		return Owner(openttd_rust_trees_create(kind, 1, a, b, c, &probe, TreeSettings, &services, TreeLeaf), openttd_rust_trees_destroy);
 	};
 	uint8_t *counter = openttd_rust_tree_counter();
 	openttd_rust_trees_initialize();
@@ -630,31 +633,19 @@ static void Trees()
 	CHECK(*counter == 36 && counter == openttd_rust_tree_counter());
 	probe.settings[3] = 4096 * 4096; probe.settings[4] = probe.settings[5] = 4096;
 	tick = make(6);
-	CHECK(openttd_rust_trees_advance(tick.get(), 0, 0).kind == 11 && *counter == 36);
-	CHECK(openttd_rust_trees_advance(tick.get(), UINT32_MAX, 0).kind == 0);
+	CHECK(openttd_rust_trees_advance(tick.get(), 0, 0).kind == 0 && *counter == 36);
 	probe.tile = {0, 0, 0, 0, 0, 2};
 	auto plant = make(3, 12, 2, 6);
 	CHECK(openttd_rust_trees_advance(plant.get(), 0, 0).kind == 0 && probe.writes == 1);
 	probe.tile = {4, 0, 0, 0, 3, 3, 12, 1, 3};
 	auto loop = make(5);
 	CHECK(openttd_rust_trees_advance(loop.get(), 0, 0).kind == 4);
-	// Abandon a suspended water action: C++ exception cleanup must not call the world.
+	// Abandon a flooding action: C++ exception cleanup must not call the world.
 	loop.reset();
 	CHECK(probe.writes == 1);
 	openttd_rust_trees_initialize();
 	CHECK(*counter == 0 && counter == openttd_rust_tree_counter());
-	// Debug RNG logging can throw before a draw. A suspended action owns no world
-	// borrow; cleanup happens wholly in C++ before any draw-dependent map writes.
-	probe.settings[8] = 1;
-	try {
-		auto generator = make(0);
-		CHECK(openttd_rust_trees_advance(generator.get(), 0, 0).kind == 11);
-		CHECK(probe.writes == 1);
-		throw std::runtime_error("simulated RNG logging failure");
-	} catch (const std::runtime_error &) {
-		CHECK(probe.writes == 1 && *counter == 0);
-	}
-	std::printf("tree_owner_callbacks_counter_rng_suspend passed\n");
+	std::printf("tree_direct_services_counter_and_reentry_lifetime passed\n");
 }
 
 int main()

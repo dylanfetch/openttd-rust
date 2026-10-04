@@ -78,6 +78,9 @@ pub fn layout(type_id: u8, item: u8) -> usize {
         }
         40 => layout!(crate::effect::Cursor, item; phase, animation, tile, random),
         41 => layout!(crate::effect::Leaves, item; industry),
+        42 => {
+            layout!(crate::services::Services, item; context, random, observe_tile, write_tile, trig)
+        }
         _ => usize::MAX,
     }
 }
