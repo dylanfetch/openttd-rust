@@ -41,7 +41,6 @@ static void OPENTTD_DISASTER_CALL DisasterRead(void *, uint32_t kind, uint32_t i
 			out[11] = v->Next() == nullptr ? VehicleID::Invalid().base() : v->Next()->index.base(); out[12] = v->sprite_cache.sprite_seq.seq[0].sprite;
 			out[13] = v->IsFrontEngine(); out[14] = v->IsGroundVehicle(); out[15] = v->type; out[16] = v->breakdown_ctr; out[17] = v->breakdown_delay;
 			if (v->type == VEH_ROAD) { const RoadVehicle *r = RoadVehicle::From(v); out[18] = r->crashed_ctr; out[19] = r->disaster_vehicle.base(); }
-			out[20] = Company::IsHumanID(v->owner);
 			break;
 		}
 		case 2: {
@@ -55,7 +54,7 @@ static void OPENTTD_DISASTER_CALL DisasterRead(void *, uint32_t kind, uint32_t i
 		case 5: {
 			TileIndex tile{id}; out[0] = IsValidTile(tile); if (!out[0]) break;
 			out[1] = GetTileType(tile);
-			if (out[1] != MP_HOUSE && out[1] != MP_INDUSTRY) { out[2] = GetTileOwner(tile).base(); out[3] = Company::IsHumanID(GetTileOwner(tile)); }
+			if (out[1] == MP_RAILWAY) out[2] = GetTileOwner(tile).base();
 			out[4] = IsTileType(tile, MP_RAILWAY) && IsRailDepot(tile); out[5] = IsAirportTile(tile);
 			if (out[5]) out[6] = GetStationIndex(tile).base();
 			if (IsTileType(tile, MP_INDUSTRY)) out[7] = GetIndustryIndex(tile).base();
@@ -82,6 +81,7 @@ static void OPENTTD_DISASTER_CALL DisasterRead(void *, uint32_t kind, uint32_t i
 		case 12: out[0] = TileAddWrap(TileIndex{id}, a, b).base(); break;
 		case 13: out[0] = TileOffsByDiagDir(static_cast<DiagDirection>(a)); break;
 		case 14: out[0] = DisasterVehicle::GetIfValid(id) != nullptr; break;
+		case 15: out[0] = Company::IsHumanID(CompanyID{static_cast<uint8_t>(id)}); break;
 	}
 }
 

@@ -92,7 +92,6 @@ const BREAKDOWN: usize = 16;
 const BREAK_DELAY: usize = 17;
 const CRASHED: usize = 18;
 const BACKLINK: usize = 19;
-const HUMAN: usize = 20;
 const INVALID: u32 = 1_048_575;
 const INVALID_TILE: u32 = u32::MAX;
 impl World {
@@ -347,7 +346,7 @@ impl World {
         }
         let t = self.tile(tile);
         match t[1] {
-            1 if t[3] != 0 && t[4] == 0 => {
+            1 if self.read(15, t[2] as u32, 0, 0)[0] != 0 && t[4] == 0 => {
                 self.action(17, tile, 0, 0, 0, 0, 0).await;
                 self.action(18, 0, 0, 0, 0, 0, 0).await;
             }
@@ -622,7 +621,10 @@ async fn rotors(w: World, id: u32) -> i64 {
 }
 fn valid_train(w: &World, id: u32) -> bool {
     let t = w.vehicle(id);
-    t[FRONT] != 0 && t[HUMAN] != 0 && w.tile(t[TILE] as u32)[8] != 0 && t[STATUS] & 128 == 0
+    t[FRONT] != 0
+        && w.read(15, t[OWNER] as u32, 0, 0)[0] != 0
+        && w.tile(t[TILE] as u32)[8] != 0
+        && t[STATUS] & 128 == 0
 }
 async fn big_ufo(w: World, id: u32) -> i64 {
     w.increment(id, TICK);
