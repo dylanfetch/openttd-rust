@@ -88,15 +88,15 @@ TEST_CASE("Rail YAPF finite limit and heap ordering against unchanged reference"
 		RailYapfProbe::follows.clear();
 		RailYapfReference::Search reference{limit, goal};
 		const bool found = reference.FindPath(nullptr);
-		CHECK(result.found == found);
+		CHECK(result.found == static_cast<uint8_t>(found));
 		CHECK(result.td == reference.Direction());
 		CHECK(trace == RailYapfProbe::follows);
-		CHECK(RailYapfProbe::stats[0] == reference.num_steps);
-		CHECK(RailYapfProbe::stats[1] == reference.nodes.OpenCount());
-		CHECK(RailYapfProbe::stats[2] == reference.nodes.ClosedCount());
+		CHECK(RailYapfProbe::stats[0] == static_cast<uint32_t>(reference.num_steps));
+		CHECK(RailYapfProbe::stats[1] == static_cast<uint32_t>(reference.nodes.OpenCount()));
+		CHECK(RailYapfProbe::stats[2] == static_cast<uint32_t>(reference.nodes.ClosedCount()));
 		CHECK(RailYapfProbe::stats[4] == reference.Calcs());
-		CHECK(RailYapfProbe::limits == (!found && limit != 0));
-		if (found) CHECK(RailYapfProbe::stats[6] == reference.GetBestNode()->cost);
+		CHECK(RailYapfProbe::limits == static_cast<uint32_t>(!found && limit != 0));
+		if (found) CHECK(RailYapfProbe::stats[6] == static_cast<uint32_t>(reference.GetBestNode()->cost));
 	}
 }
 TEST_CASE("Rail YAPF live global cache invalidation after tile mutation")
@@ -116,7 +116,7 @@ TEST_CASE("Rail YAPF live global cache invalidation after tile mutation")
 	CHECK(RailYapfProbe::stats[4] > 0);
 	RailYapfReference::Search reference{0, 3, 100};
 	CHECK(reference.FindPath(nullptr));
-	CHECK(RailYapfProbe::stats[6] == reference.GetBestNode()->cost);
+	CHECK(RailYapfProbe::stats[6] == static_cast<uint32_t>(reference.GetBestNode()->cost));
 	CHECK(RailYapfProbe::stats[6] == 350);
 	RailYapfProbe::hill = false;
 	openttd_rust_rail_invalidate();
