@@ -458,7 +458,7 @@ def profile_report(path):
                         **row,
                         "map_crossings": row["observe"] + row["write"],
                         "ffi_crossings": crossings,
-                    "copied_record_bytes": 40 * row["observe"]
+                        "copied_record_bytes": 40 * row["observe"]
                         + 96 * row["settings"],
                         "batches": batches,
                         "ffi_per_batch": crossings / batches if batches else None,
