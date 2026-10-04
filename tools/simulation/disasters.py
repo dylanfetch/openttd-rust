@@ -151,7 +151,7 @@ def patch(source, target, changes, ai=None):
         elements = dict(chunk["elements"])
         if ai == "human":
             payload = elements[0]
-            if payload != b"\0":
+            if payload != b"\0\0\xff\xff\xff\xff":
                 raise RuntimeError("company zero is not an empty human AI slot")
         else:
             name = b"MigrationDisasters"
@@ -249,8 +249,9 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
             600,
         )
         kind = scenario["disasters"]
-        station = (
-            kind.startswith(("zeppelin", "train", "road")) or kind == "small-ufo-crash"
+        station = kind.startswith(("zeppelin", "train", "road")) or kind in (
+            "small-ufo-crash",
+            "target-reload",
         )
         if station:
             initial = run(
@@ -274,8 +275,8 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
             )
             base = run("rail", setup, 3000)
             if not (
-                rows(base)[17]["train[0]/tile"] == 10007
-                and rows(base)[17]["train[0]/subtype"] & 1
+                rows(base)[17]["train[0]/common[0]/tile"] == 10007
+                and rows(base)[17]["train[0]/common[0]/subtype"] & 1
             ):
                 raise RuntimeError(
                     "reference rail commands did not park actual front train 17 on plain rail"
@@ -292,7 +293,7 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
                     ),
                     64,
                 )
-                if rows(base, "STNN")[0]["airport[0]/type"] != 1:
+                if rows(base, "STNN")[0]["normal[0]/airport.type"] != 1:
                     raise RuntimeError("actual large-airport construction failed")
         family = scenario.get(
             "family",
@@ -303,7 +304,7 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
             else "small-ufo",
         )
         year, seed, expected = FAMILIES[family]
-        if kind == "small-ufo-crash":
+        if family == "small-ufo" and station:
             year, seed = 1969, 4
         elif kind.startswith("train"):
             year, seed = 2099, None
@@ -315,8 +316,11 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
             "economy_date_fract": 73,
             "next_disaster_start": 0 if kind == "countdown-wrap" else 1,
         }
+        if kind.startswith("train"):
+            date.pop("date_fract")
+            date.pop("economy_date_fract")
         if seed is not None:
-            date["random_state"] = (seed, seed)
+            date["random_state[0]"] = date["random_state[1]"] = seed
         changes = {"DATE": {0: date}}
         if kind.startswith("train"):
             changes["PLYR"] = {1: {"is_ai": 0}}
@@ -342,7 +346,92 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
             console=console,
             expected_subtypes=expected,
         )
-        receipt["moment"] = save_moment(target)
+        extra = kind in (
+            "industry-reset",
+            "industry-release",
+            "road-release",
+            "sub-expiry",
+            "sub-motion",
+            "target-reload",
+        )
+        if extra:
+            natural = run(
+                f"natural-{family}-{'rail' if station else 'world'}", scenario, 1
+            )
+            live = disasters(natural)
+            subtype = expected[0]
+            main = next(
+                index for index, row in live.items() if row["subtype"] == subtype
+            )
+            edits = {"DATE": {0: {"next_disaster_start": 65535}}}
+            params = {}
+            if kind.startswith("industry"):
+                industry = next(
+                    index
+                    for index, row in rows(natural, "INDY").items()
+                    if row["type"] == (4 if family == "airplane" else 6)
+                    and (row["location.tile"] // 256) * 16 + 37 == live[main]["y_pos"]
+                )
+                fields = {
+                    "disaster[0]/state": 1,
+                    "disaster[0]/dest_tile": industry,
+                    "disaster[0]/age": 111 if kind == "industry-reset" else 0,
+                    "disaster[0]/tick_counter": 255,
+                }
+                params["industry"] = industry
+                if kind == "industry-release":
+                    edits["CHTS"] = {0: {"magic_bulldozer.value": 1}}
+                    params.update(
+                        action="industry",
+                        target=rows(natural, "INDY")[industry]["location.tile"],
+                    )
+            elif kind == "road-release":
+                fields = {"disaster[0]/state": 1, "disaster[0]/dest_tile": 12}
+                params.update(action="road-sale", target=12)
+            elif kind == "target-reload":
+                target_road = rows(natural)[21]
+                fields = {
+                    "disaster[0]/state": 1,
+                    "disaster[0]/dest_tile": 21,
+                    "disaster[0]/x_pos": target_road["roadveh[0]/common[0]/x_pos"],
+                    "disaster[0]/y_pos": target_road["roadveh[0]/common[0]/y_pos"],
+                    "disaster[0]/z_pos": 200,
+                }
+            else:
+                fields = (
+                    {"disaster[0]/age": 8880, "disaster[0]/tick_counter": 255}
+                    if kind == "sub-expiry"
+                    else {}
+                )
+            edits["VEHS"] = {main: fields}
+            modified = folder / "live-input.sav"
+            receipt["live_input"] = patch(natural, modified, edits)
+            console = [
+                "setting difficulty.disasters 0",
+                *(
+                    ["start_ai MigrationDisasters"]
+                    if kind == "industry-release"
+                    else []
+                ),
+                "unpause",
+            ]
+            scenario = dict(
+                scenario,
+                save=str(modified),
+                console=console,
+                main=main,
+                before=live[main],
+                **params,
+            )
+            if kind == "target-reload":
+                reload = run("road-live-target", scenario, 16)
+                saved = disasters(reload).get(main)
+                if not saved or saved["state"] != 1 or saved["dest_tile"] != 21:
+                    raise RuntimeError("reload input lacks live UFO/road target")
+                modified = folder / "reload-input.sav"
+                receipt["reload"] = patch(reload, modified, {})
+                scenario = dict(scenario, save=str(modified), before=saved)
+        receipt["moment"] = save_moment(Path(scenario["save"]))
         result["disaster_input"] = receipt
     return scenario
 
@@ -376,7 +465,7 @@ def check(scenario, run, mode, role, result):
     ):
         raise RuntimeError("scheduler delay reset omitted")
     if kind.startswith("zeppelin"):
-        airport = rows(path, "STNN")[0]["airport[0]/flags"]
+        airport = rows(path, "STNN")[0]["normal[0]/airport.flags"]
         if scenario["ticks"] == 5000:
             if (
                 not any(
@@ -398,6 +487,17 @@ def check(scenario, run, mode, role, result):
         for row in live.values()
     ):
         raise RuntimeError("big UFO did not select actual human front train")
+    if kind == "train-landing":
+        train = rows(path)[17]
+        if (
+            not any(row["subtype"] == 9 and row["state"] == 2 for row in live.values())
+            or not any(row["subtype"] == 11 for row in live.values())
+            or train["train[0]/common[0]/breakdown_ctr"] == 0
+            or not 230 <= train["train[0]/common[0]/breakdown_delay"] <= 240
+        ):
+            raise RuntimeError(
+                "big UFO landing did not break down the nearby real train"
+            )
     if kind == "train-clear":
         types = read_save(path)["MAPT"]["raw"]
         if (
@@ -410,6 +510,76 @@ def check(scenario, run, mode, role, result):
             )
     if kind == "train-complete" and live:
         raise RuntimeError("destroyer did not expire")
+    if kind == "init" and scenario["family"] == "coal":
+        before_types = read_save(Path(scenario["save"]))["MAPT"]["raw"]
+        after_types = read_save(path)["MAPT"]["raw"]
+        changed = [
+            tile
+            for tile, (a, b) in enumerate(zip(before_types, after_types, strict=True))
+            if a >> 4 != b >> 4
+        ]
+        if len(changed) != 7 or (
+            len({tile // 256 for tile in changed}) != 1
+            and len({tile % 256 for tile in changed}) != 1
+        ):
+            raise RuntimeError("coal subsidence did not clear the selected tile line")
+    if kind in (
+        "industry-reset",
+        "industry-release",
+        "road-release",
+        "sub-expiry",
+        "sub-motion",
+        "target-reload",
+    ):
+        main, before = scenario["main"], scenario["before"]
+        current = live.get(main)
+        if kind == "sub-expiry" and current:
+            raise RuntimeError("submarine did not expire after age overflow boundary")
+        if kind == "sub-motion" and (
+            not current
+            or all(
+                current[key] == before[key] for key in ("x_pos", "y_pos", "direction")
+            )
+        ):
+            raise RuntimeError("submarine did not move or turn in water")
+        if kind.startswith("industry"):
+            if not current or current["state"] != (
+                2 if kind == "industry-reset" else 3
+            ):
+                raise RuntimeError("industry destruction phase or release hook omitted")
+            if kind == "industry-release" and (
+                scenario["industry"] in rows(path, "INDY")
+                or f"industry-close {scenario['industry']}" not in events
+            ):
+                raise RuntimeError(
+                    "industry removal command or delivered event omitted"
+                )
+            if kind == "industry-reset":
+                chunks = read_save(path)
+                tiles = [
+                    tile
+                    for tile, value in enumerate(chunks["MAPT"]["raw"])
+                    if value >> 4 == 8
+                    and struct.unpack_from(">H", chunks["MAP2"]["raw"], tile * 2)[0]
+                    == scenario["industry"]
+                ]
+                if not tiles or any(
+                    chunks["MAPO"]["raw"][tile] & 0x8F for tile in tiles
+                ):
+                    raise RuntimeError(
+                        "industry tile construction stages were not reset"
+                    )
+        if kind == "road-release" and (
+            12 in rows(path)
+            or not current
+            or current["state"] != 0
+            or "road-sale" not in " ".join(run["log"])
+        ):
+            raise RuntimeError("road vehicle sale did not release UFO")
+        if kind == "target-reload" and (
+            not current or current["state"] != 1 or current["dest_tile"] != 21
+        ):
+            raise RuntimeError("reloaded UFO did not retain its live road target")
     result[f"{mode}_{role}_disasters"] = {
         "elapsed_ticks": elapsed,
         "vehicles": live,
@@ -431,8 +601,28 @@ def scenarios(soak):
     cases += [
         ("small-ufo-crash", "small-ufo-crash", 19000, "small-ufo"),
         ("train-target", "train-target", 12000, "big-ufo"),
-        ("train-clear", "train-clear", 14000, "big-ufo"),
+        ("train-landing", "train-landing", 13564, "big-ufo"),
+        ("train-clear", "train-clear", 14064, "big-ufo"),
         ("train-complete", "train-complete", 20000, "big-ufo"),
+    ]
+    cases += [
+        (
+            f"industry-{family}-{action}",
+            f"industry-{action}",
+            1 if action == "reset" else 64,
+            family,
+        )
+        for family in ("airplane", "helicopter")
+        for action in ("reset", "release")
+    ]
+    cases += [
+        ("road-release", "road-release", 64, "small-ufo"),
+        ("target-reload", "target-reload", 64, "small-ufo"),
+    ]
+    cases += [
+        (f"{family}-{action}", f"sub-{action}", 1 if action == "expiry" else 64, family)
+        for family in ("small-sub", "big-sub")
+        for action in ("expiry", "motion")
     ]
     if soak:
         cases += [
