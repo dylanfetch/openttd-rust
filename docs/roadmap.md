@@ -30,7 +30,30 @@ the PR (`AGENTS.md`, "Evidence budget").
   for each owned component; shared map/pool storage remains deliberate. Utility
   work and already accepted evidence are not substitutes for simulation loops.
 
-## Steering review (2026-10-04)
+## Second steering review (2026-10-04, evening)
+
+A user-directed review (Claude Code, `claude-opus-5-5`, effort high) audited
+road vehicles, town growth, cargo payment and pending rail YAPF #133 line by
+line against the original bodies. All four are real ownership ports, and no
+reachable crash or desync was found. The direction stands; keep porting core
+simulation. The review found four problems to fix first:
+
+1. **`rust-migration` is red** (#154). After #134, `compare` failed on a plain-run
+   end moment. All 25 snapshots matched, but run length depends on wall time
+   through link graph join pauses. Fix this before further integrations.
+2. **The Rust build is 1.4-2.5x slower than the original** (#155). This is
+   unmeasured and unbudgeted, and it compounds with each port. Road still uses
+   the action protocol and per-call allocation for about 24 direct-eligible
+   services, contrary to AGENTS.md.
+3. **The harness reaches the common paths only** (#156). Accepted "evidence
+   limits" pile up untracked. No save has a level crossing. The rail network
+   closes 10 nodes, ship YAPF runs 2-3 ships, and Random-draw branches such as
+   road's no-destination track choice are unreached. Keep one agent on this.
+4. **Too much work in progress** (#157). Thirteen components were in flight,
+   seven PRs conflict, and branches stack on unmerged branches. The cap is six
+   unintegrated branches, and integration comes before new starts.
+
+## First steering review (2026-10-04)
 
 A user-directed review (Claude Code, `claude-opus-5-5`) found the direction right
 and made these changes, now reflected in `AGENTS.md` and the phases below:
@@ -91,11 +114,24 @@ The harness is `python3 tools/migration.py simulate` (`docs/rust-migration.md`,
 always the first priority. Port differences go in `KNOWN_FAILURES` with an issue,
 never in masks.
 
+1. **#154 Deterministic run end moments.** `rust-migration` CI is red until this
+   lands. It goes before any integration.
+2. **#156 Coverage gaps, standing capacity.** One agent closes the tracked
+   unexercised branches, Random-draw and crash branches first. Each port PR
+   appends its gaps there.
+3. **#155 Speed report and budget.** Add the per-scenario ratio and profile, then
+   convert road's direct-eligible services. Port PRs report the play-save ratio.
+
 The #86 rail/aircraft fixture gate is complete. Controller ports still require
 component-specific branch witnesses; extend the existing scenario modules and
 reuse the supplied rail/ship save and authorized aircraft setup AI.
 
 ## Phase 3: current ownership work, in order
+
+On resume: land #154, then drain the reviewed queue (#141, then #142, #143,
+#144, #145, #149), then #155's road conversion. Next finish #151, #152, #153 and
+#147, then start #148 and #150 from integrated `rust-migration`. Never hold more
+than six unintegrated component branches (#157).
 
 Accepted search batch #140 combines component PRs #133/#135 using the actual
 integrated #134 ancestry. It retains the component reviews, independent combined
@@ -229,10 +265,10 @@ whole owners, native-width behavior and explicit ordinary-play reentry boundarie
 ## Choosing the next task
 
 The assignment is paused at the user's request. Once resumed, take the first
-unblocked item above. Work in CI or review is not blocking: start
-the next item while it runs. Keep spare capacity on scenarios (#86) and
-independent review. Paused, deferred and out-of-scope issues are not fallbacks.
-Root selects further ownership work here before implementation starts.
+unblocked item above. Fill idle capacity in this order: integration and review
+of finished work, Phase 1 items, then a new component, but only while fewer
+than six component branches are unintegrated (#157). Paused, deferred and
+out-of-scope issues are not fallbacks. Root selects further ownership work here before implementation starts.
 
 ## Out of scope for the near term
 
