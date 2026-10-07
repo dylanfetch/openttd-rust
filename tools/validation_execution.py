@@ -4,6 +4,7 @@ import codecs
 import errno
 import json
 import os
+import signal
 import socket
 import subprocess
 import time
@@ -34,7 +35,12 @@ def run_logged(
     next_heartbeat = started + heartbeat
     with log.open("w") as output:
         process = subprocess.Popen(
-            command, cwd=cwd, env=env, stdout=output, stderr=subprocess.STDOUT
+            command,
+            cwd=cwd,
+            env=env,
+            stdout=output,
+            stderr=subprocess.STDOUT,
+            start_new_session=os.name == "posix",
         )
         try:
             while True:
@@ -61,11 +67,28 @@ def run_logged(
                     )
                     next_heartbeat = now + heartbeat
         except BaseException:
-            process.terminate()
+            # Build/comparison tools launch children. End the whole POSIX group
+            # before callers release their build locks, even if the parent exits
+            # on TERM while a child ignores it. Windows retains parent cleanup.
+            if os.name == "posix":
+                try:
+                    os.killpg(process.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+            else:
+                process.terminate()
             try:
                 process.wait(timeout=5)
             except subprocess.TimeoutExpired:
-                process.kill()
+                pass
+            finally:
+                if os.name == "posix":
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                elif process.poll() is None:
+                    process.kill()
                 process.wait()
             raise
     print(

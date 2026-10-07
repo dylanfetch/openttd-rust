@@ -6,9 +6,11 @@ import importlib.util
 import io
 import json
 import os
+import signal
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -88,6 +90,50 @@ class ExecutionTests(unittest.TestCase):
                         timeout=0.09,
                     )
             self.assertEqual(log.read_text(), "started\n")
+
+    @unittest.skipUnless(sys.platform == "linux", "Linux descendant process state")
+    def test_timeout_kills_descendant_even_when_parent_exits_on_term(self):
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / "descendant.log"
+            child = (
+                "import os,signal,time; "
+                "signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+                "print(os.getpid(), flush=True); time.sleep(60)"
+            )
+            parent = (
+                "import subprocess,sys,time; "
+                f"subprocess.Popen([sys.executable, '-c', {child!r}]); time.sleep(60)"
+            )
+            descendant = None
+            try:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    with self.assertRaises(subprocess.TimeoutExpired):
+                        run_logged(
+                            [sys.executable, "-c", parent],
+                            cwd=directory,
+                            env=None,
+                            log=log,
+                            phase="descendant",
+                            heartbeat=0.03,
+                            timeout=0.3,
+                        )
+                descendant = int(log.read_text().strip())
+                # An orphan may remain a zombie until the host reaps it; it must
+                # no longer execute or retain the build's file descriptors.
+                state = Path(f"/proc/{descendant}/stat")
+                deadline = time.monotonic() + 1
+                while state.exists():
+                    if state.read_text().split(") ", 1)[1][0] == "Z":
+                        break
+                    if time.monotonic() >= deadline:
+                        self.fail("descendant survived timeout cleanup")
+                    time.sleep(0.01)
+            finally:
+                if descendant is not None:
+                    try:
+                        os.kill(descendant, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
 
     @unittest.skipUnless(os.name == "posix", "POSIX cross-process locks")
     def test_wait_reports_holder_and_releases(self):
