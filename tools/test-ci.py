@@ -95,6 +95,22 @@ class GateTests(unittest.TestCase):
         self.assertEqual(result["statuses"], [])
         self.assertTrue(result["failures"])
 
+    def test_status_writers_share_a_non_cancelling_per_pr_concurrency_group(self):
+        workflow = (ROOT / ".github/workflows/ci-request.yml").read_text()
+        groups = []
+        for job in ("plan", "publish"):
+            section = workflow.split(f"  {job}:\n", 1)[1]
+            section = re.split(r"\n  [a-z_]+:\n", section, maxsplit=1)[0]
+            concurrency = re.search(
+                r"    concurrency:\n      group: (.+)\n      cancel-in-progress: (.+)",
+                section,
+            )
+            self.assertIsNotNone(concurrency)
+            groups.append(concurrency[1])
+            self.assertEqual(concurrency[2], "false")
+        self.assertEqual(groups[0], groups[1])
+        self.assertIn("inputs.pr || github.event.pull_request.number", groups[0])
+
     def test_each_non_success_result_is_rejected(self):
         for job in good_needs():
             for outcome in ("failure", "skipped", "cancelled", "timed_out", ""):
