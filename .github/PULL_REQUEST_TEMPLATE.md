@@ -32,6 +32,6 @@ Agent: <agent path> | Model: <exact model> | Reasoning effort: <effort>
 Review report (reviewer posts it as a separate comment, about 20 lines):
 Agent: <path> | Model: <exact model> | Reasoning effort: <effort>
 Reviewed commit: <sha>
-Findings and dispositions: <list, or "none">
+Findings and fixing commits: <finding -> commit, or why it went to root; or "none">
 Shared credentials require an attributed report, not a GitHub platform approval.
 -->

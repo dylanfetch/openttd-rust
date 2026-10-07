@@ -87,8 +87,9 @@ checks that run; do not restate them in paragraphs.
   not cite `.local/` receipts, which nobody else can check.
 - Harness tooling for a port goes in that component's scenario module. Tooling
   is code to maintain; keep it proportionate to the C++ the port retires.
-- Review report: reviewed commit, findings, and dispositions, plus one line
-  naming the functions or files compared against the original body. Do not
+- Review report: reviewed commit, findings with their fixing commits (or why one
+  went to root), plus one line naming the functions or files compared against
+  the original body. Do not
   narrate further when there are no findings. Branches the harness does not
   reach go in the coverage tracker (#156), not only in the disposition.
 - One PR per component, targeting `rust-migration` directly. Use an integration
@@ -105,12 +106,12 @@ the running host's actual limit; this document cannot raise a session limit.
 
 Every spawn must specify a model and reasoning effort rather than inherit them:
 
-- `gpt-6.1-sol`: most implementation and analysis; high effort by default.
-  Use lower effort only for a clearly bounded task that justifies it.
+- `gpt-6.1-sol`: most implementation and analysis, and all independent review;
+  high effort by default. Use lower effort only for a clearly bounded task that
+  justifies it.
 - `gpt-6-luna`: bounded mechanical work; low or medium effort.
-- `gpt-6-astra`: all delegated planning at high effort and all independent review
-  at medium effort. Root uses xhigh effort so every Astra subagent has strictly
-  lower effort than root.
+- `gpt-6-astra`: all delegated planning at high effort. Root uses xhigh effort
+  so every Astra subagent has strictly lower effort than root.
 
 Every agent-authored GitHub issue, PR, comment, and review report must identify
 the agent, exact model, and reasoning effort, including artifacts authored by root.
@@ -121,7 +122,7 @@ model and states its effort as reported by its host.
 Spawn a fresh agent for each task and name it after that task. Do not reassign a
 finished agent to unrelated work: its name is its attribution, and its context
 carries over. Each PR gets its own reviewer, not one reused from another PR; that
-reviewer re-reviews the same PR's fixes.
+reviewer handles every review round of the same PR.
 
 For substantive changes:
 
@@ -131,10 +132,13 @@ For substantive changes:
    agent opens a draft PR targeting `rust-migration`, linking the issue and
    recording exact validation commands and limitations.
 3. Assign a separate reviewer agent to examine the final commit and check evidence.
-   Resolve findings, then review the resulting commit again before integration.
-   Updating a reviewed PR from its base needs no new review when the update has
-   no conflicts in `src/` or `rust/` and CI passes; otherwise the reviewer checks
-   only the conflict resolution.
+   The reviewer fixes what it finds: it commits each fix to the PR branch, reruns
+   the affected checks, and lists each finding with its fixing commit. Root
+   verifies the reviewer's fix commits before integration. Findings that need a
+   scope or policy decision go to root unfixed. Updating a reviewed PR from its
+   base needs no new review when the update has no conflicts in `src/` or `rust/`
+   and CI passes; otherwise the reviewer checks and fixes only the conflict
+   resolution.
 4. Root integrates after review and required checks, records completion, and
    removes the merged worktree. A red check on `rust-migration` itself is fixed
    before more integrations.

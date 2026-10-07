@@ -25,10 +25,10 @@ checkpoint and work order.
    items, then the next ordered component, only while fewer than six component
    branches are unintegrated. Keep about five subagents busy within that limit.
 2. Follow the full process for every change: issue, isolated worktree, PR,
-   independent attributed review naming what was compared, re-review after
-   fixes, green required CI, integration, worktree removal, then a roadmap update
-   in a single docs-only commit. If a check on rust-migration itself is red, fix
-   it first.
+   independent attributed review naming what was compared, in which the
+   reviewer fixes its findings and you verify its fix commits, green required
+   CI, integration, worktree removal, then a roadmap update in a single
+   docs-only commit. If a check on rust-migration itself is red, fix it first.
 3. When fewer than two unstarted components remain ahead of active work, spawn a
    fresh Astra high planning agent to select the next whole simulation owners,
    guided by the world-state design and the latest speed profile. Never fall back

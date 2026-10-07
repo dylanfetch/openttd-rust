@@ -45,7 +45,9 @@ barrier sound (#169). Corrections:
 5. **The roadmap became a log.** CI run IDs, hashes, seeds and per-PR plans now go
    in PRs and issues.
 
-Phase 1 and Phase 2 below carry the resulting actions in order.
+Phase 1 and Phase 2 below carry the resulting actions in order. Reviews now use
+`gpt-6.1-sol` high, and the reviewer fixes its own findings (`AGENTS.md`). Existing
+acceptances stand; the next review round on each open PR moves to the new rule.
 
 ## Earlier steering (2026-10-04), still in force
 
