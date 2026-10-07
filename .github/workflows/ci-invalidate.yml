@@ -14,6 +14,10 @@ jobs:
   invalidate:
     if: vars.CI_ON_DEMAND == 'true'
     runs-on: ubuntu-latest
+    # Share the plan/publish lock so a delayed read cannot erase a newer request.
+    concurrency:
+      group: validation-status-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
     steps:
     # The protected base defines this job. Never check out the PR here.
     - uses: actions/github-script@v7

@@ -82,6 +82,28 @@ process.env.RESULTS = JSON.stringify(NEEDS);
     )
 
 
+def execute_invalidator(event, pull, latest=None):
+    script = script_for("ci-invalidate.yml", "invalidate")
+    harness = f"""
+const statuses = [];
+const context = {{repo: {{owner: 'example', repo: 'fork'}},
+  payload: {{pull_request: {json.dumps(event)}}}}};
+const github = {{rest: {{
+  pulls: {{get: async () => ({{data: {json.dumps(pull)}}})}},
+  repos: {{
+    getCombinedStatusForRef: async () => ({{data: {{statuses: {json.dumps([latest] if latest else [])}}}}}),
+    createCommitStatus: async value => statuses.push(value)
+  }}
+}}}};
+(async () => {{{script}}})().then(() => console.log(JSON.stringify(statuses))).catch(error => {{console.error(error); process.exit(1);}});
+"""
+    return json.loads(
+        subprocess.run(
+            ["node", "-e", harness], check=True, capture_output=True, text=True
+        ).stdout
+    )
+
+
 class GateTests(unittest.TestCase):
     def test_full_success(self):
         result = execute_publisher(good_needs(), PULL)
@@ -96,9 +118,13 @@ class GateTests(unittest.TestCase):
         self.assertTrue(result["failures"])
 
     def test_status_writers_share_a_non_cancelling_per_pr_concurrency_group(self):
-        workflow = (ROOT / ".github/workflows/ci-request.yml").read_text()
         groups = []
-        for job in ("plan", "publish"):
+        for filename, job in (
+            ("ci-request.yml", "plan"),
+            ("ci-request.yml", "publish"),
+            ("ci-invalidate.yml", "invalidate"),
+        ):
+            workflow = (ROOT / ".github/workflows" / filename).read_text()
             section = workflow.split(f"  {job}:\n", 1)[1]
             section = re.split(r"\n  [a-z_]+:\n", section, maxsplit=1)[0]
             concurrency = re.search(
@@ -106,10 +132,49 @@ class GateTests(unittest.TestCase):
                 section,
             )
             self.assertIsNotNone(concurrency)
-            groups.append(concurrency[1])
             self.assertEqual(concurrency[2], "false")
-        self.assertEqual(groups[0], groups[1])
-        self.assertIn("inputs.pr || github.event.pull_request.number", groups[0])
+            expression = re.fullmatch(r"validation-status-\${{ (.+) }}", concurrency[1])
+            self.assertIsNotNone(expression)
+            # Dispatch inputs are strings; pull_request_target provides a number.
+            for inputs in ({"pr": "170"}, {}):
+                harness = f"""
+                const inputs = {json.dumps(inputs)};
+                const github = {{event: {{pull_request: {{number: 170}}}}}};
+                console.log('validation-status-' + ({expression[1]}));
+                """
+                groups.append(
+                    subprocess.run(
+                        ["node", "-e", harness],
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                    ).stdout.strip()
+                )
+        self.assertEqual(groups, ["validation-status-170"] * 6)
+
+    def test_delayed_invalidation_preserves_current_request(self):
+        event = dict(PULL, number=170, updated_at="2026-10-07T12:00:00Z")
+        for timestamp in (event["updated_at"], "2026-10-07T12:00:01Z"):
+            with self.subTest(timestamp=timestamp):
+                latest = {
+                    "context": ci.CONTEXT,
+                    "updated_at": timestamp,
+                    "target_url": "https://github.com/example/fork/actions/runs/123",
+                }
+                self.assertEqual(execute_invalidator(event, PULL, latest), [])
+
+    def test_invalidation_only_marks_current_unvalidated_head_pending(self):
+        event = dict(PULL, number=170, updated_at="2026-10-07T12:00:00Z")
+        older = {"context": ci.CONTEXT, "updated_at": "2026-10-07T11:59:59Z"}
+        for latest in (None, older):
+            with self.subTest(latest=latest):
+                statuses = execute_invalidator(event, PULL, latest)
+                self.assertEqual(len(statuses), 1)
+                self.assertEqual(statuses[0]["state"], "pending")
+                self.assertEqual(statuses[0]["sha"], HEAD)
+                self.assertEqual(statuses[0]["context"], ci.CONTEXT)
+        pull = dict(PULL, head={"sha": "c" * 40})
+        self.assertEqual(execute_invalidator(event, pull), [])
 
     def test_each_non_success_result_is_rejected(self):
         for job in good_needs():
