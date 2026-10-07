@@ -162,6 +162,44 @@ class GateTests(unittest.TestCase):
 
 
 class PolicyTests(unittest.TestCase):
+    def test_heavy_predicates_bypass_skipped_policy_but_respect_cancellation(self):
+        for filename, jobs in (
+            ("ci-build.yml", ("emscripten", "linux", "macos", "windows")),
+            ("rust-migration.yml", ("compare",)),
+        ):
+            workflow = (ROOT / ".github/workflows" / filename).read_text()
+            for job in jobs:
+                section = workflow.split(f"  {job}:\n", 1)[1]
+                predicate = re.search(r"^    if: (.+)$", section, re.MULTILINE)[1]
+                self.assertNotIn("always()", predicate)
+                self.assertIn("!cancelled()", predicate)
+                expression = predicate.removeprefix("${{ ").removesuffix(" }}")
+                for cancelled, checkout, heavy, profile, expected in (
+                    (False, "head", "", "full", True),
+                    (False, "", "true", "full", True),
+                    (False, "", "false", "full", False),
+                    (True, "head", "true", "full", False),
+                    (True, "", "true", "full", False),
+                ):
+                    inputs = {"checkout-ref": checkout, "profile": profile}
+                    needs = {"policy": {"outputs": {"heavy": heavy}}}
+                    harness = f"""
+                    const cancelled = () => {json.dumps(cancelled)};
+                    const inputs = {json.dumps(inputs)};
+                    const needs = {json.dumps(needs)};
+                    console.log(JSON.stringify({expression.replace("inputs.checkout-ref", 'inputs["checkout-ref"]')}));
+                    """
+                    with self.subTest(filename=filename, job=job, cancelled=cancelled):
+                        result = json.loads(
+                            subprocess.run(
+                                ["node", "-e", harness],
+                                check=True,
+                                capture_output=True,
+                                text=True,
+                            ).stdout
+                        )
+                        self.assertEqual(result, expected)
+
     def test_bootstrap_on_demand_and_docs_classification(self):
         script = script_for("ci-policy.yml", "policy")
         cases = [

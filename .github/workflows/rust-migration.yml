@@ -31,7 +31,7 @@ jobs:
 
   compare:
     needs: policy
-    if: always() && (inputs.checkout-ref != '' || needs.policy.outputs.heavy == 'true')
+    if: ${{ !cancelled() && (inputs.checkout-ref != '' || needs.policy.outputs.heavy == 'true') }}
     outputs:
       validated: ${{ steps.validated.outputs.validated }}
     runs-on: ubuntu-24.04

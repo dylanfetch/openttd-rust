@@ -39,7 +39,7 @@ jobs:
 
   emscripten:
     needs: policy
-    if: always() && (inputs.checkout-ref != '' || needs.policy.outputs.heavy == 'true') && inputs.profile != 'native'
+    if: ${{ !cancelled() && (inputs.checkout-ref != '' || needs.policy.outputs.heavy == 'true') && inputs.profile != 'native' }}
     name: Emscripten
 
     uses: ./.github/workflows/ci-emscripten.yml
@@ -48,7 +48,7 @@ jobs:
 
   linux:
     needs: policy
-    if: always() && (inputs.checkout-ref != '' || needs.policy.outputs.heavy == 'true')
+    if: ${{ !cancelled() && (inputs.checkout-ref != '' || needs.policy.outputs.heavy == 'true') }}
     strategy:
       fail-fast: false
       matrix:
@@ -81,7 +81,7 @@ jobs:
 
   macos:
     needs: policy
-    if: always() && (inputs.checkout-ref != '' || needs.policy.outputs.heavy == 'true') && inputs.profile != 'native'
+    if: ${{ !cancelled() && (inputs.checkout-ref != '' || needs.policy.outputs.heavy == 'true') && inputs.profile != 'native' }}
     strategy:
       fail-fast: false
       matrix:
@@ -108,7 +108,7 @@ jobs:
 
   windows:
     needs: policy
-    if: always() && (inputs.checkout-ref != '' || needs.policy.outputs.heavy == 'true') && inputs.profile != 'native'
+    if: ${{ !cancelled() && (inputs.checkout-ref != '' || needs.policy.outputs.heavy == 'true') && inputs.profile != 'native' }}
     strategy:
       fail-fast: false
       matrix:
