@@ -17,6 +17,7 @@ import migration
 
 HOOKS_REVISION = "eeb3791aadf0aded5a7cd634c80823f17e87af9c"
 HOOKS_URL = "https://github.com/OpenTTD/OpenTTD-git-hooks.git"
+MAX_WARNING_OUTPUT = 10
 WARNING = re.compile(
     r"(?:^warning:|^.+(?::\d+(?::\d+)?|\(\d+(?:,\d+)?\))\s*:\s*warning(?:\s+[A-Z]\d+)?:"
     r"|^(?:cc1(?:plus)?|clang(?:\+\+)?): warning:)",
@@ -151,6 +152,8 @@ def main():
             verification_logs(arguments.verification) if arguments.verification else []
         )
         report["compiler_logs"] = []
+        total_warnings = 0
+        displayed_warnings = 0
         for path in dict.fromkeys(path.resolve() for path in logs):
             found = warnings(path)
             report["compiler_logs"].append(
@@ -160,8 +163,17 @@ def main():
                     "warnings": found,
                 }
             )
-            for item in found:
+            total_warnings += len(found)
+            displayed = found[: MAX_WARNING_OUTPUT - displayed_warnings]
+            for item in displayed:
                 print(f"{path}:{item['line']}: {item['text']}", file=sys.stderr)
+            displayed_warnings += len(displayed)
+        if total_warnings:
+            print(
+                f"Compiler warnings: {total_warnings} found; showing {displayed_warnings}. "
+                f"All warnings retained in {evidence / 'report.json'}",
+                file=sys.stderr,
+            )
         code = int(
             bool(check or any(item["warnings"] for item in report["compiler_logs"]))
         )

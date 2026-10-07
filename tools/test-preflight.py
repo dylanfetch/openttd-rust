@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Check warning recognition, receipt selection and actual checker invocation."""
 
+import contextlib
+import io
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -11,6 +14,34 @@ import preflight
 
 
 class PreflightTests(unittest.TestCase):
+    def test_many_warnings_bound_terminal_output_and_retain_complete_receipt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            log = root / "candidate.log"
+            log.write_text(
+                "".join(
+                    f"src/game.cpp:{line}: warning: example\n" for line in range(25)
+                )
+            )
+            stderr = io.StringIO()
+            with (
+                patch.object(preflight.migration, "LOCAL", root / ".local"),
+                patch.object(preflight, "hooks_checkout", return_value=root),
+                patch.object(preflight, "git", return_value="a" * 40),
+                patch.object(preflight, "run_logged", return_value=0),
+                patch.object(sys, "argv", ["preflight.py", "--build-log", str(log)]),
+                contextlib.redirect_stdout(io.StringIO()),
+                contextlib.redirect_stderr(stderr),
+            ):
+                self.assertEqual(preflight.main(), 1)
+            receipt = json.loads(
+                next((root / ".local/preflight").glob("*/report.json")).read_text()
+            )
+            self.assertEqual(len(receipt["compiler_logs"][0]["warnings"]), 25)
+            self.assertEqual(stderr.getvalue().count("warning: example"), 10)
+            self.assertIn("25 found; showing 10", stderr.getvalue())
+            self.assertIn("report.json", stderr.getvalue())
+
     def test_compiler_warning_formats(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "build.log"
