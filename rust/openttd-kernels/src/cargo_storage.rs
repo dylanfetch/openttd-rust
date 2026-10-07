@@ -19,7 +19,7 @@
     clippy::too_many_arguments,
     clippy::too_many_lines
 )]
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::c_void;
 
 #[repr(C)]
@@ -65,15 +65,29 @@ pub struct Services {
 }
 #[derive(Clone, Copy)]
 struct Node {
-    token: u64,
+    token: usize,
     key: u16,
     shell: *mut c_void,
+    previous: Option<usize>,
+    next: Option<usize>,
+}
+#[derive(Clone, Copy)]
+struct Ends {
+    first: usize,
+    last: usize,
 }
 pub struct List {
     fields: Fields,
-    nodes: Vec<Node>,
+    // Slots never move relative to their indices. Reuse happens only after erase,
+    // when no source iterator can still refer to that node. Traversal follows
+    // links, never arena allocation order; same-list insertion keeps existing
+    // iterators valid even if growing the arena reallocates its backing storage.
+    nodes: Vec<Option<Node>>,
+    free: Vec<usize>,
+    first: Option<usize>,
+    last: Option<usize>,
+    destinations: BTreeMap<u16, Ends>,
     keys: BTreeSet<u16>,
-    serial: u64,
     vehicle: bool,
 }
 const TRANSFER: usize = 0;
@@ -135,51 +149,124 @@ unsafe fn tile(p: *mut Packet, s: Services, at: u32, loading: bool) {
 unsafe fn fields(l: *const List) -> Fields {
     unsafe { (*l).fields }
 }
+#[cfg(test)]
 unsafe fn nodes(l: *const List) -> Vec<Node> {
-    unsafe { (*l).nodes.clone() }
+    let mut result = Vec::new();
+    let mut node = unsafe { first(l) };
+    while let Some(current) = node {
+        result.push(current);
+        node = unsafe { after(l, current.token) };
+    }
+    result
 }
 unsafe fn first(l: *const List) -> Option<Node> {
-    unsafe { (*l).nodes.first().copied() }
+    unsafe { (*l).first.map(|token| (&(*l).nodes)[token].unwrap()) }
 }
-unsafe fn after(l: *const List, token: u64) -> Option<Node> {
+unsafe fn last(l: *const List) -> Option<Node> {
+    unsafe { (*l).last.map(|token| (&(*l).nodes)[token].unwrap()) }
+}
+unsafe fn after(l: *const List, token: usize) -> Option<Node> {
     unsafe {
-        let l = &*l;
-        l.nodes
-            .iter()
-            .position(|n| n.token == token)
-            .and_then(|i| l.nodes.get(i + 1).copied())
+        (&(*l).nodes)[token]
+            .unwrap()
+            .next
+            .map(|token| (&(*l).nodes)[token].unwrap())
     }
 }
-unsafe fn erase(l: *mut List, token: u64) {
+unsafe fn before(l: *const List, token: usize) -> Option<Node> {
+    unsafe {
+        (&(*l).nodes)[token]
+            .unwrap()
+            .previous
+            .map(|token| (&(*l).nodes)[token].unwrap())
+    }
+}
+unsafe fn destination(l: *const List, key: u16, reverse: bool) -> Option<Node> {
+    unsafe {
+        (*l).destinations
+            .get(&key)
+            .map(|ends| (&(*l).nodes)[if reverse { ends.last } else { ends.first }].unwrap())
+    }
+}
+unsafe fn erase(l: *mut List, token: usize) {
     unsafe {
         let l = &mut *l;
-        let i = l.nodes.iter().position(|n| n.token == token).unwrap();
-        let removed = l.nodes.remove(i);
-        if !l.vehicle && !l.nodes.iter().any(|n| n.key == removed.key) {
-            l.keys.remove(&removed.key);
+        let removed = l.nodes[token].take().unwrap();
+        if let Some(previous) = removed.previous {
+            l.nodes[previous].as_mut().unwrap().next = removed.next;
+        } else {
+            l.first = removed.next;
         }
-    }
-}
-unsafe fn insert(l: *mut List, shell: *mut c_void, key: u16, before: Option<u64>, front: bool) {
-    unsafe {
-        let l = &mut *l;
+        if let Some(next) = removed.next {
+            l.nodes[next].as_mut().unwrap().previous = removed.previous;
+        } else {
+            l.last = removed.previous;
+        }
         if !l.vehicle {
-            l.keys.insert(key);
+            let ends = l.destinations.get_mut(&removed.key).unwrap();
+            if ends.first == token && ends.last == token {
+                l.destinations.remove(&removed.key);
+                l.keys.remove(&removed.key);
+            } else {
+                if ends.first == token {
+                    ends.first = removed.next.unwrap();
+                }
+                if ends.last == token {
+                    ends.last = removed.previous.unwrap();
+                }
+            }
         }
-        l.serial = l.serial.wrapping_add(1);
+        l.free.push(token);
+    }
+}
+unsafe fn insert(l: *mut List, shell: *mut c_void, key: u16, before: Option<usize>, front: bool) {
+    unsafe {
+        let l = &mut *l;
+        let next = if before.is_some() {
+            before
+        } else if l.vehicle {
+            if front { l.first } else { None }
+        } else if let Some(ends) = l.destinations.get(&key) {
+            l.nodes[ends.last].unwrap().next
+        } else {
+            l.destinations
+                .range(key..)
+                .next()
+                .map(|(_, ends)| ends.first)
+        };
+        let previous = next.map_or(l.last, |token| l.nodes[token].unwrap().previous);
+        let token = l.free.pop().unwrap_or_else(|| {
+            l.nodes.push(None);
+            l.nodes.len() - 1
+        });
         let n = Node {
-            token: l.serial,
+            token,
             key,
             shell,
+            previous,
+            next,
         };
-        let i = if let Some(token) = before {
-            l.nodes.iter().position(|n| n.token == token).unwrap()
-        } else if l.vehicle {
-            if front { 0 } else { l.nodes.len() }
+        l.nodes[token] = Some(n);
+        if let Some(previous) = previous {
+            l.nodes[previous].as_mut().unwrap().next = Some(token);
         } else {
-            l.nodes.partition_point(|n| n.key <= key)
-        };
-        l.nodes.insert(i, n);
+            l.first = Some(token);
+        }
+        if let Some(next) = next {
+            l.nodes[next].as_mut().unwrap().previous = Some(token);
+        } else {
+            l.last = Some(token);
+        }
+        if !l.vehicle {
+            l.keys.insert(key);
+            l.destinations
+                .entry(key)
+                .and_modify(|ends| ends.last = token)
+                .or_insert(Ends {
+                    first: token,
+                    last: token,
+                });
+        }
     }
 }
 unsafe fn add_cache(l: *mut List, p: Packet, action: Option<usize>) {
@@ -249,10 +336,12 @@ unsafe fn append(l: *mut List, s: Services, shell: *mut c_void, key: u16) {
         return;
     }
     let mut sum = u32::from(p.count);
-    for n in unsafe { nodes(l) }.into_iter().rev() {
-        if !vehicle && n.key != key {
-            continue;
-        }
+    let mut node = if vehicle {
+        unsafe { last(l) }
+    } else {
+        unsafe { destination(l, key, true) }
+    };
+    while let Some(n) = node {
         let existing = unsafe { packet(s, n.shell) };
         if mergeable(existing, p) {
             unsafe {
@@ -265,6 +354,10 @@ unsafe fn append(l: *mut List, s: Services, shell: *mut c_void, key: u16) {
             if sum >= unsafe { fields(l).action_counts[usize::from(key)] } {
                 break;
             }
+        }
+        node = unsafe { before(l, n.token) };
+        if !vehicle && node.is_some_and(|n| n.key != key) {
+            break;
         }
     }
     unsafe {
@@ -472,16 +565,21 @@ pub extern "C" fn openttd_rust_cargo_list_new(vehicle: u8) -> *mut List {
     Box::into_raw(Box::new(List {
         fields: Fields::default(),
         nodes: Vec::new(),
+        free: Vec::new(),
+        first: None,
+        last: None,
+        destinations: BTreeMap::new(),
         keys: BTreeSet::new(),
-        serial: 0,
         vehicle: vehicle != 0,
     }))
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_cargo_list_destroy(l: *mut List, s: *const Services) {
     let s = unsafe { *s };
-    for n in unsafe { nodes(l) } {
-        (s.destroy)(n.shell);
+    let mut node = unsafe { first(l) };
+    while let Some(current) = node {
+        node = unsafe { after(l, current.token) };
+        (s.destroy)(current.shell);
     }
     unsafe {
         drop(Box::from_raw(l));
@@ -491,6 +589,10 @@ pub unsafe extern "C" fn openttd_rust_cargo_list_destroy(l: *mut List, s: *const
 pub unsafe extern "C" fn openttd_rust_cargo_list_clear(l: *mut List) {
     unsafe {
         (*l).nodes.clear();
+        (*l).free.clear();
+        (*l).first = None;
+        (*l).last = None;
+        (*l).destinations.clear();
         (*l).keys.clear();
     }
 }
@@ -516,14 +618,16 @@ pub unsafe extern "C" fn openttd_rust_cargo_list_snapshot(
         (*l).keys
             .iter()
             .copied()
-            .filter(|key| !(*l).nodes.iter().any(|n| n.key == *key))
+            .filter(|key| !(*l).destinations.contains_key(key))
             .collect()
     };
     for key in empty {
         output(context, key, std::ptr::null_mut());
     }
-    for n in unsafe { nodes(l) } {
-        output(context, n.key, n.shell);
+    let mut node = unsafe { first(l) };
+    while let Some(current) = node {
+        node = unsafe { after(l, current.token) };
+        output(context, current.key, current.shell);
     }
 }
 #[unsafe(no_mangle)]
@@ -548,9 +652,11 @@ pub unsafe extern "C" fn openttd_rust_cargo_list_rebuild(l: *mut List, s: *const
         (*l).fields.cargo_periods_in_transit = 0;
         (*l).fields.feeder_share = 0;
     }
-    for n in unsafe { nodes(l) } {
+    let mut node = unsafe { first(l) };
+    while let Some(current) = node {
+        node = unsafe { after(l, current.token) };
         unsafe {
-            add_cache(l, packet(s, n.shell), None);
+            add_cache(l, packet(s, current.shell), None);
         }
     }
 }
@@ -584,17 +690,16 @@ pub unsafe extern "C" fn openttd_rust_cargo_list_has(
     } else {
         unsafe { std::slice::from_raw_parts(next, length) }
     };
-    u8::from(
-        unsafe { &(*l).keys }
-            .iter()
-            .any(|key| *key == INVALID || next.contains(key)),
-    )
+    let keys = unsafe { &(*l).keys };
+    u8::from(next.iter().any(|key| keys.contains(key)) || keys.contains(&INVALID))
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_cargo_list_age(l: *mut List, s: *const Services) {
     let s = unsafe { *s };
-    for n in unsafe { nodes(l) } {
-        let p = (s.packet)(n.shell);
+    let mut node = unsafe { first(l) };
+    while let Some(current) = node {
+        node = unsafe { after(l, current.token) };
+        let p = (s.packet)(current.shell);
         let old = unsafe { read(p) };
         if old.periods_in_transit == u16::MAX {
             continue;
@@ -712,7 +817,7 @@ pub unsafe extern "C" fn openttd_rust_cargo_list_stage(
                     insert(l, current.shell, 0, None, false);
                 }
                 if deliver.is_none() {
-                    deliver = unsafe { (*l).nodes.last().map(|n| n.token) };
+                    deliver = unsafe { last(l).map(|n| n.token) };
                 }
             }
             DELIVER => unsafe {
@@ -913,9 +1018,9 @@ unsafe fn walk(
 ) {
     let reverse = mode == 0 || mode == 3 || mode == 4;
     let mut n = if reverse {
-        unsafe { (*src).nodes.last().copied() }
+        unsafe { last(src) }
     } else if let Some(key) = key {
-        unsafe { (*src).nodes.iter().find(|n| n.key == key).copied() }
+        unsafe { destination(src, key, false) }
     } else {
         unsafe { first(src) }
     };
@@ -927,15 +1032,7 @@ unsafe fn walk(
             break;
         }
         let next = if reverse {
-            unsafe {
-                let list = &*src;
-                let i = list
-                    .nodes
-                    .iter()
-                    .position(|n| n.token == current.token)
-                    .unwrap();
-                i.checked_sub(1).and_then(|i| list.nodes.get(i).copied())
-            }
+            unsafe { before(src, current.token) }
         } else {
             unsafe { after(src, current.token) }
         };

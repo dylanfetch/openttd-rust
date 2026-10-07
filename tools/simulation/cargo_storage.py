@@ -1,7 +1,10 @@
 """Cargo owners: active-list reload, forced staging, aging and packet references."""
 
 import hashlib
+import json
+import runpy
 import struct
+import subprocess
 from pathlib import Path
 
 from . import core, economy
@@ -120,3 +123,44 @@ def check(scenario, run, mode, role, result):
     if kind == "transfer" and not any(row["feeder"] for row in observed):
         result["problems"].append(f"{mode}/{role}: no transfer feeder share")
     result[f"{mode}_{role}_cargo"] = {"actions": action_totals, "state": observed}
+
+
+def scaling_probe():
+    """Witness the large-list gap: saves currently reach at most six packets."""
+    migration = runpy.run_path(str(ROOT / "tools/migration.py"))
+    out = ROOT / ".local/cargo-list-scaling"
+    out.mkdir(parents=True, exist_ok=True)
+    fixture = Path(__file__).with_name("cargo-list-scaling.cpp")
+    command = [
+        "g++",
+        "-std=c++20",
+        "-O2",
+        "-I",
+        str(ROOT / "src"),
+        str(fixture),
+        str(migration["rust_archive"](ROOT / "build-rust")),
+        "-ldl",
+        "-lpthread",
+        "-lm",
+        "-o",
+        str(out / "probe"),
+    ]
+    env = migration["environment"]()
+    subprocess.run(command, env=env, check=True)
+    output = subprocess.check_output([str(out / "probe")], env=env, text=True)
+    report = {
+        "gap": "large cargo queues absent from the committed play corpus",
+        "candidate_commit": migration["git"]("rev-parse", "HEAD"),
+        "candidate_status": migration["git"]("status", "--short"),
+        "fixture_sha256": hashlib.sha256(fixture.read_bytes()).hexdigest(),
+        "commands": [command, [str(out / "probe")]],
+        "measurements": output.splitlines(),
+        "checks": "identity/order/counts; 4 reads per first-hit append and keyed load",
+        "limit": "synthetic operation timings; C++ loop omits packet/services",
+    }
+    (out / "report.json").write_text(json.dumps(report, indent=2) + "\n")
+    print(output, end="")
+
+
+if __name__ == "__main__":
+    scaling_probe()
