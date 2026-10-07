@@ -54,6 +54,6 @@ public:
 	void push_back(T &&value) { this->emplace_back() = std::move(value); }
 	void clear() { this->resize(0); }
 	void shrink_to_fit() { openttd_rust_industry_slots(this->owner, Produced, 4, 0); }
-	iterator erase(iterator first, iterator last) { auto n = first - this->begin(); assert(last == this->end()); this->resize(n); return this->end(); }
+	iterator erase(iterator first, [[maybe_unused]] iterator last) { auto n = first - this->begin(); assert(last == this->end()); this->resize(n); return this->end(); }
 };
 #endif
