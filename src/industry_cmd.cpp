@@ -2936,6 +2936,7 @@ static void ReportNewsProductionChangeIndustry(Industry *ind, CargoType cargo, i
 	);
 }
 
+#ifndef WITH_RUST
 static const uint PERCENT_TRANSPORTED_60 = 153;
 static const uint PERCENT_TRANSPORTED_80 = 204;
 
@@ -2944,7 +2945,6 @@ static const uint PERCENT_TRANSPORTED_80 = 204;
  * @param i Industry for which changes are performed
  * @param monthly true if it's the monthly call, false if it's the random call
  */
-#ifndef WITH_RUST
 static void ChangeIndustryProduction(Industry *i, bool monthly)
 {
 
