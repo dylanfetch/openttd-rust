@@ -129,10 +129,9 @@ never in masks.
    save with trains (PBS junctions, crossings), ships, aircraft and subsidies
    closes many gaps and gives the speed budget a non-road benchmark. Ask the user
    for one through the play-save pipeline before building more per-branch fixtures.
-3. **CI capacity.** About a third of recent runs were cancelled. Push drafts only
-   when CI is needed, batch commits, and avoid merges whose only purpose is to
-   join dependency ancestry. If capacity still blocks integration, propose gating
-   the platform matrix to ready-for-review PRs.
+3. **CI capacity (#170).** Request partial runs during iteration and full validation
+   for the final merge head. Use a concrete integration PR when capacity requires
+   batching; avoid merges whose only purpose is dependency ancestry.
 
 ## Phase 2: current work, in order
 
@@ -182,8 +181,7 @@ Standing #156 work: aircraft landing RNG after #145 (plan in #156), then the
 2026-10-07 audit list there. Preserve the pinned reference, paused curve
 worktrees and evidence branches `evidence-disaster-vehicles` (`a775543162`) and
 `evidence-water-regions` (`c752070cde`); do not reapply effect helper `73ccd511fb`.
-Build and test with `--jobs 2`. The speed tool's clone-wide game lock must also be
-initialized by standalone fixture entry points.
+Build and test with `--jobs 2`; standalone fixture games share the benchmark lock.
 
 ## Choosing the next task
 

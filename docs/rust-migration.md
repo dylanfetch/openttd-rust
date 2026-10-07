@@ -79,8 +79,9 @@ bootstrapped toolchain when present. `tools/run-comparisons.py` then runs every
 reference comparison tool in parallel; CI runs all three steps.
 
 ```sh
-python3 tools/migration.py build --jobs 6
-python3 tools/migration.py verify --jobs 6
+python3 tools/migration.py rust-checks --jobs 2
+python3 tools/migration.py build --jobs 2
+python3 tools/migration.py verify --jobs 2
 python3 tools/migration.py tools
 python3 tools/run-comparisons.py
 ```
@@ -89,6 +90,17 @@ Each driver invocation retains command logs, test reports, executable hashes,
 source revision, and local changes under `.local/verification/<timestamp>/`.
 Passing establishes only covered behavior. The driver does not itself compare
 every game state or prove full game equivalence.
+
+`rust-checks` runs the four Cargo checks without creating or building the
+reference. The default `--jobs 2` also limits Cargo invoked by CMake. Every logged
+command reports its phase, elapsed time and output path, with periodic updates;
+lock waits identify live holders. Reference and candidate configure/build/test
+operations use separate locks, and simulation captures immutable runtime copies
+under those locks. Standalone fixture games share the benchmark coordination lock.
+Successful candidate game builds write a versioned executable identity containing
+source and configuration digests plus the executable hash. Receipts associate
+that identity only with a matching executable and configuration; external or
+otherwise unrecorded builds retain unknown provenance.
 
 The inherited platform CI also remains in place. Windows CI uses Windows 2022 and
 Visual Studio 2022 because the pinned breakpad dependency uses
@@ -335,15 +347,60 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
 ```
 
-Server-side protection on `rust-migration` requires the platform matrix, native
-comparison, commit, and annotation checks, plus resolved conversations. Required
-checks must pass on the PR head; branches need not be up to date with the base.
-Platform CI also runs after each merge into `rust-migration`, and a post-merge
+Server-side protection on `rust-migration` requires `Full validation`, the cheap
+commit/string/script-mode checks, and resolved conversations. Full validation is
+an explicit commit status, published only after the native comparisons, simulation,
+entire platform matrix, quick checks and annotation checks succeed for a captured
+PR head. Skipped or cancelled jobs cannot satisfy it. Workflow dispatch runs the
+controller from protected `rust-migration`; candidate test jobs have read-only
+permissions and the status publishers never execute candidate code.
+
+Ordinary PR pushes run cheap checks. With `gh` authenticated to the fork, use:
+
+```sh
+python3 tools/ci.py request 123 --profile rust
+python3 tools/ci.py request 123 --profile native
+python3 tools/ci.py request 123 --profile platform
+python3 tools/ci.py request 123 --profile full
+python3 tools/ci.py wait .local/ci-requests/REQUEST.json
+```
+
+`rust` runs four Cargo checks; `native` adds the Linux matrix and full migration
+comparison; `platform` runs the platform matrix. All include quick checks.
+Only `full` satisfies the merge gate, and a new PR head needs a new full request.
+The CLI records the SHA and request/run identity and refuses a changed PR head.
+`CI_ON_DEMAND=true` enables this scheduling after root installs and verifies the
+required status. With the variable absent, automatic full CI remains as a safe
+bootstrap; the one-time `ci:full` label path is disabled when it is enabled.
+For capacity batching, test a concrete integration PR and merge it once. A stack
+organizes dependent PRs but does not itself combine validation runs.
+
+Required checks must pass on the PR head; branches need not be up to date with the
+base. Platform CI also runs after code merges into `rust-migration`; markdown-only
+pushes skip heavy builds after complete file classification. A post-merge
 failure is fixed forward first. Force pushes and branch deletion are disallowed,
 including for administrators. The approving-review count is zero because agents
 share credentials; the attributed independent review report is the process gate
 before root integrates. Repository controls are enforced separately from these
 documents.
+
+`python3 tools/preflight.py --base origin/rust-migration --verification REPORT`
+runs the pinned inherited commit checker and checks explicit candidate compiler
+logs. Its first run downloads the pinned hooks into ignored shared storage;
+`--hooks PATH` uses an existing clean pinned checkout offline. Without supplied
+logs it explicitly leaves warnings unchecked. `tools/evidence.py` exports explicit
+verification and optional repeated simulation receipts with committed port metrics
+and agent attribution; unsupported, failed or mismatched receipts fail. Narrow
+checks, legacy receipts, dirty source and unknown provenance remain labelled.
+
+After a clean task head has merged, `tools/worktrees.py plan|archive|resume
+/absolute/task --repo /surviving/clone --expected-head FULL_COMMIT` preserves
+ignored files, checksums and raw symlinks in a versioned journal before removing
+the worktree. `plan` is read-only. `resume` continues the same journal after
+interruption. The helper protects the main/reference/locked worktrees and rejects
+dirty or unmerged heads. It requires POSIX locking and a single filesystem;
+an interrupted removal leaving an unregistered directory needs manual inspection.
+These tools require no T3 Code or host lifecycle API.
 
 Preserve OpenTTD copyright notices, credits, and GPLv2. Agent-generated work is welcome
 in this fork; upstream submission policies govern contributions to OpenTTD itself.

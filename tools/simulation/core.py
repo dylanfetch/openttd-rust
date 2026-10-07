@@ -29,6 +29,9 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from build_identity import IDENTITY_NAME, read_identity
+from validation_execution import file_lock
+
 ROOT = Path(__file__).resolve().parents[2]
 
 # Fields that legitimately differ between two runs or two binaries. Mask nothing
@@ -386,13 +389,14 @@ GAME_LOCK = None  # Set by main to the clone-wide benchmark coordination file.
 @contextlib.contextmanager
 def game_slot(isolate):
     """Ordinary games share the lock; a timed benchmark game holds it alone."""
-    if GAME_LOCK is None:  # Direct callers outside the command-line harness.
-        yield
-        return
-    import fcntl
+    path = GAME_LOCK
+    if path is None:
+        # Fixture entry points also coordinate with benchmark runs, without
+        # requiring main() or mutable global setup.
+        import migration
 
-    with open(GAME_LOCK, "w") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX if isolate else fcntl.LOCK_SH)
+        path = migration.COMMON_LOCAL / "simulation-game.lock"
+    with file_lock(path, shared=not isolate, label="simulation game"):
         yield
 
 
@@ -768,7 +772,24 @@ def run_scenario(
     return result
 
 
-def copy_runtime(build, binary, destination):
+def copy_runtime(build, binary, destination, *, candidate=False):
+    if candidate:
+        with file_lock(
+            Path(build).resolve() / ".migration.lock",
+            shared=True,
+            label="candidate capture",
+        ):
+            executable = _copy_runtime(build, binary, destination)
+            identity = read_identity(build, executable)
+            if identity is not None:
+                (destination / IDENTITY_NAME).write_text(
+                    json.dumps(identity, indent=2) + "\n"
+                )
+            return executable
+    return _copy_runtime(build, binary, destination)
+
+
+def _copy_runtime(build, binary, destination):
     """Freeze the executable and its data, including symlink targets, for one run."""
 
     def missing_links(directory, names):
@@ -842,6 +863,8 @@ def main():
     )
     args = parser.parse_args()
 
+    if args.jobs < 1:
+        parser.error("--jobs must be positive")
     if args.benchmark is not None and args.benchmark < 1:
         parser.error("--benchmark repetitions must be positive")
     if args.benchmark and args.jobs != 1:
@@ -849,6 +872,11 @@ def main():
 
     every = scenario_list(args.soak)
     # An exact scenario name selects only that scenario; anything else is a substring filter.
+    unmatched = [
+        name for name in args.names if not any(name in s["name"] for s in every)
+    ]
+    if unmatched:
+        parser.error(f"no scenario matches selectors {unmatched}; see --list")
     scenarios = [
         s
         for s in every
@@ -905,7 +933,7 @@ def main():
             )
         sources["candidate"] = candidate
         binaries["candidate"] = copy_runtime(
-            candidate.parent, candidate, builds["candidate"]
+            candidate.parent, candidate, builds["candidate"], candidate=True
         )
     binary_evidence = {
         role: {
@@ -915,6 +943,11 @@ def main():
         }
         for role, path in binaries.items()
     }
+
+    if not args.self and (builds["candidate"] / IDENTITY_NAME).is_file():
+        identity = json.loads((builds["candidate"] / IDENTITY_NAME).read_text())
+        if identity["binary_sha256"] == binary_evidence["candidate"]["sha256"]:
+            binary_evidence["candidate"]["build_identity"] = identity
 
     # Freeze the two scenario AIs before workers launch; both roles install the
     # same immutable script bytes while command parameters remain per-run.
@@ -986,6 +1019,7 @@ def main():
                 )
     results.sort(key=lambda r: r["scenario"])
     report = {
+        "schema_version": 1,
         "mode": "reference-vs-reference" if args.self else "reference-vs-candidate",
         "execution": "Linux child RLIMIT_NPROC=0; original synchronous thread-failure fallback",
         "started_at": stamp,
