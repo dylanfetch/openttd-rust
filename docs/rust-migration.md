@@ -193,6 +193,27 @@ Any `[desync:` warning (a cache mismatch) and any log or stdout difference fail
   initial checkout, not proof of an arbitrary binary's source revision (#97).
   Evidence: `.local/simulation/<time>-<pid>/report.json`.
 
+Simulation speed (#155) is reported for every scenario as `plain_speed`:
+paired process wall seconds and candidate/reference ratios, plus their median.
+Ratios are null when exit saves are missing, runs fail, end moments differ, or
+semantic differences remain; timing never changes the pass/fail result. Parallel runs
+are noisy. For a repeatable baseline, use an idle host, profiling counters off,
+and the same build settings and pinned manual-distribution play save:
+
+```sh
+python3 tools/migration.py simulate play-opus-55-167-002-manual --benchmark 3 --jobs 2
+```
+
+The driver builds with two jobs, then runs one scenario worker. Benchmark mode
+runs only plain pairs, serializes each pair against all clone-wide harness games,
+and compares each exit save and full logs. It retains the final pair and frozen
+runtimes; `plain_commands` contains the game arguments for optional `perf record`
+replay. Preserve the run's HOME/XDG directories and runtime libraries when
+profiling; keep profiled runs separate from timing samples. The timings include
+startup, loading and save I/O, and subprocess timeout polling can add about 50 ms.
+The lock excludes harness games, not unrelated host activity. Port PRs record
+before/after ratios and commits; the roadmap sets the regression budget.
+
 Tree map-access measurements (#108) use the same scenarios and comparisons:
 `OPENTTD_TREE_PROFILE=1 python3 tools/migration.py simulate trees --jobs 1`;
 `PYTHONPATH=tools python3 -m simulation.trees <report.json>` summarizes the

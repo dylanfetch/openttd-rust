@@ -16,6 +16,10 @@ Agent: <agent path> | Model: <exact model> | Reasoning effort: <effort>
 
 <!-- Exact commands run, and their results. Harness scenarios that exercise this component. -->
 
+## Simulation speed
+
+<!-- Play-save benchmark before/after candidate/reference median wall ratios, commits and exact command; explain regressions above the roadmap budget. For non-simulation changes, say not applicable. -->
+
 ## Metrics
 
 <!-- Paste the output of: python3 tools/port-metrics.py. If C++ retired is less than glue plus tooling, give the reason. -->

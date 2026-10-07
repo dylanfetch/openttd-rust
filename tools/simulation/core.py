@@ -21,6 +21,7 @@ import json
 import os
 import re
 import shutil
+import statistics
 import struct
 import subprocess
 import sys
@@ -443,6 +444,7 @@ def run_game(scenario, binary, build, run_dir, timeout, base_env=None, desync=Tr
     return {
         "exit": code,
         "seconds": round(time.monotonic() - started, 3),
+        "command": command,
         "snapshots": snapshots,
         "log": log_lines(run_dir),
         "stdout": (run_dir / "stdout.log").read_bytes(),
@@ -537,7 +539,9 @@ def field_spans(body, header):
     return spans
 
 
-def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
+def run_scenario(
+    scenario, binaries, builds, out, limit, timeout, env, benchmark_repetitions=0
+):
     """Run both binaries twice (with and without desync snapshots) and compare.
 
     -vnull:ticks counts loop iterations, and the game pauses for iterations
@@ -549,6 +553,7 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
     name = scenario["name"]
     result = {
         "scenario": name,
+        "plain_speed": {"samples": [], "median_candidate_reference_ratio": None},
         "differences": [],
         "known_failures": [],
         "problems": [],
@@ -580,9 +585,14 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
                 scenario = prepare(
                     scenario, binaries, builds, out, timeout, env, result
                 )
-        for mode, desync in (("snapshots", True), ("plain", False)):
+        modes = (
+            (("plain", False),) * benchmark_repetitions
+            if benchmark_repetitions
+            else (("snapshots", True), ("plain", False))
+        )
+        for mode, desync in modes:
             for attempt in range(1 if desync else 3):
-                with MACHINE.hold(alone=attempt > 0):
+                with MACHINE.hold(alone=bool(benchmark_repetitions) or attempt > 0):
                     runs = {
                         role: run_game(
                             scenario,
@@ -703,12 +713,49 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
                             "candidate": repr(cand_line),
                         }
                     )
+            if mode == "plain":
+                reference_seconds = runs["reference"]["seconds"]
+                candidate_seconds = runs["candidate"]["seconds"]
+                ratio = (
+                    candidate_seconds / reference_seconds
+                    if (
+                        same_end
+                        and not result["differences"]
+                        and not result["known_failures"]
+                        and not result["problems"]
+                        and reference_seconds > 0
+                    )
+                    else None
+                )
+                result["plain_speed"]["samples"].append(
+                    {
+                        "reference_seconds": reference_seconds,
+                        "candidate_seconds": candidate_seconds,
+                        "candidate_reference_ratio": ratio,
+                        "same_end": same_end,
+                    }
+                )
+                if benchmark_repetitions:
+                    result["plain_commands"] = {
+                        role: run["command"] for role, run in runs.items()
+                    }
+            if benchmark_repetitions and (result["differences"] or result["problems"]):
+                break  # Preserve the first failing repetition instead of overwriting it.
     except (
         Exception
     ) as error:  # Record and continue, so the report covers every scenario.
         result["problems"].append(f"harness error: {type(error).__name__}: {error}")
+    ratios = [
+        sample["candidate_reference_ratio"]
+        for sample in result["plain_speed"]["samples"]
+        if sample["candidate_reference_ratio"] is not None
+    ]
+    if ratios:
+        result["plain_speed"]["median_candidate_reference_ratio"] = statistics.median(
+            ratios
+        )
     result["passed"] = not result["differences"] and not result["problems"]
-    if result["passed"]:
+    if result["passed"] and not benchmark_repetitions:
         if (
             "reload_input" in result
             or "town_name_input" in result
@@ -781,6 +828,12 @@ def main():
     )
     parser.add_argument("--list", action="store_true")
     parser.add_argument(
+        "--benchmark",
+        type=int,
+        metavar="REPETITIONS",
+        help="repeat only plain pairs in isolation; retain final runs for profiling",
+    )
+    parser.add_argument(
         "--prepare-water-save",
         choices=("ferry", "structures"),
         help="build a committed ship fixture using only the pinned reference",
@@ -791,6 +844,11 @@ def main():
         help="build the supplemental aircraft fixture with the pinned reference",
     )
     args = parser.parse_args()
+
+    if args.benchmark is not None and args.benchmark < 1:
+        parser.error("--benchmark repetitions must be positive")
+    if args.benchmark and args.jobs != 1:
+        parser.error("--benchmark requires --jobs 1")
 
     every = scenario_list(args.soak)
     # An exact scenario name selects only that scenario; anything else is a substring filter.
@@ -893,7 +951,15 @@ def main():
         env = migration.environment()
         futures = {
             pool.submit(
-                run_scenario, s, binaries, builds, out, args.limit, args.timeout, env
+                run_scenario,
+                s,
+                binaries,
+                builds,
+                out,
+                args.limit,
+                args.timeout,
+                env,
+                args.benchmark or 0,
             ): s
             for s in scenarios
         }
@@ -906,9 +972,11 @@ def main():
                 if result["known_failures"]
                 else ""
             )
+            ratio = result["plain_speed"]["median_candidate_reference_ratio"]
+            speed = f", plain {ratio:.3f}x" if ratio is not None else ""
             print(
                 f"{status} {result['scenario']}: {result['snapshots']} snapshots, "
-                f"{result['stats']['chunks']} chunks, {result['stats']['elements']} elements{known}",
+                f"{result['stats']['chunks']} chunks, {result['stats']['elements']} elements{known}{speed}",
                 flush=True,
             )
             for problem in result["problems"]:
@@ -923,6 +991,8 @@ def main():
     report = {
         "mode": "reference-vs-reference" if args.self else "reference-vs-candidate",
         "started_at": stamp,
+        "benchmark_repetitions": args.benchmark or 0,
+        "jobs": args.jobs,
         "candidate_commit": candidate_commit,
         "candidate_status": candidate_status,
         "binaries": binary_evidence,
@@ -940,8 +1010,9 @@ def main():
         "passed": all(r["passed"] for r in results),
     }
     (out / "report.json").write_text(json.dumps(report, indent=2) + "\n")
-    for build in set(builds.values()):
-        shutil.rmtree(build, ignore_errors=True)
+    if not args.benchmark:
+        for build in set(builds.values()):
+            shutil.rmtree(build, ignore_errors=True)
     passed = sum(r["passed"] for r in results)
     print(
         f"Simulation: {passed}/{len(results)} scenarios equal, "
