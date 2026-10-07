@@ -6,7 +6,6 @@ import lzma
 import re
 from pathlib import Path
 
-from . import core
 from .core import (
     ROOT,
     SNAPSHOT_TICKS,
@@ -101,15 +100,14 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
     scenario = dict(scenario, save=str(normalized))
     if scenario.get("rail_reload"):
         setup = dict(scenario, ticks=8 * SNAPSHOT_TICKS)
-        with core.MACHINE.hold(alone=False):
-            run = run_game(
-                setup,
-                binaries["reference"],
-                builds["reference"],
-                directory / "warm",
-                timeout,
-                env,
-            )
+        run = run_game(
+            setup,
+            binaries["reference"],
+            builds["reference"],
+            directory / "warm",
+            timeout,
+            env,
+        )
         if run["exit"] != 0:
             raise RuntimeError("rail reload preparation failed")
         fixture = next(
