@@ -1,6 +1,7 @@
 # Road controller coverage (#156)
 
 Agent: /root/coverage_gaps_156_resume | Model: gpt-6.1-sol | Reasoning effort: high
+Flooding: /root/road_flooding_coverage_156 | Model: gpt-6.1-sol | Reasoning effort: high
 
 `setup.nut` loads the committed `water-ferry.sav` in an isolated pinned-reference
 runtime and constructs one crossing through `AIRoad.BuildRoad`. The first legal
@@ -32,6 +33,7 @@ Reproduction (retain or move any previous preparation directory first):
 ```sh
 python3 tools/migration.py build --jobs 2
 PYTHONPATH=tools python3 -m simulation.roads --prepare-crossing
+PYTHONPATH=tools python3 -m simulation.roads --prepare-flooding
 python3 tools/migration.py simulate roads-no-destination roads-level-crossing --self --jobs 2
 python3 tools/migration.py simulate roads --jobs 2
 ```
@@ -45,7 +47,25 @@ simulate <scenario> --jobs 2`, require failure, and restore before the next prob
 | `roads-no-destination` | `u64::from(self.random()) * u64::from(tracks.count_ones())` | `u64::from(0_u32) * u64::from(tracks.count_ones())` | track/shared RNG witness; DATE seeds differ |
 | `roads-level-crossing` | `self.tile(IS_CROSSING, uid, u.tile) != 0` | `self.tile(IS_CROSSING, uid, u.tile) == 0` | crossing did not crash the road vehicle |
 | `roads-level-crossing` | `self.q(CRASH_NEWS, id, victims, 0);` | `if victims == u32::MAX { self.q(CRASH_NEWS, id, victims, 0); }` | crash event missing while vehicle still crashes |
+| `roads-flooding` | `if flooded { 2000 } else { 1 }` | `if flooded { 1 } else { 1 }` | flooded crash countdown witness; counter and shared RNG differ |
 
 After restoring, rerun `python3 tools/migration.py simulate roads --jobs 2`.
-This closes two road gaps. Other #156 branches, arbitrary maps/NewGRFs, flooding,
+The flooding fixture uses the same reference constructor and existing bus 21.
+Typed preparation stops the bus to retain its 18 passengers and postpones loaded
+link jobs by 32 days. Fifteen `BuildCanal` commands cover a 5x3 sea rectangle;
+three `RemoveCanal` commands clear its interior before `BuildRoadFull` creates
+road tiles 1200--1202. The twelve remaining passive canals prevent flooding.
+The comparison positions the stopped, visible bus at sea level on tile 1201.
+Its AI removes canal 945 once, then observes events. Ordinary water tile loops
+flood the breach and call `RoadVehicle::Crash(true)`; no crash is directly invoked.
+Both modes require event `21 1201 5 14`, counter 2032 and DATE RNG seeds
+`1209897734, 2054087316` at tick 16080 after 300 ticks. Victims are randomized by
+the unchanged `Vehicle::Crash`; the 18 passengers remain in the saved cargo.
+The countdown mutation saves counter 33 and seeds `1153993592, 739546886`, with
+direction 2 instead of 1, and fails the crash witness. Restore before final checks.
+The crashed bus blocks road clearing at this checkpoint. This covers the flooded
+counter initialization, rather than eventual wreck deletion or natural traffic
+entering a flooding tile. All saved fields/logs compare with the existing masks.
+
+These cases cover three road gaps. Other #156 branches, arbitrary maps/NewGRFs,
 legacy saves, news rendering and audio remain unexercised by these cases.
