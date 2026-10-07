@@ -33,13 +33,26 @@ jobs:
           make
           mingw-w64-${{ inputs.arch }}-cmake
           mingw-w64-${{ inputs.arch }}-gcc
-          mingw-w64-${{ inputs.arch }}-lzo2
           mingw-w64-${{ inputs.arch }}-libpng
-          mingw-w64-${{ inputs.arch }}-lld
           mingw-w64-${{ inputs.arch }}-ninja
           mingw-w64-${{ inputs.arch }}-libogg
           mingw-w64-${{ inputs.arch }}-opus
           mingw-w64-${{ inputs.arch }}-opusfile
+          ${{ inputs.arch != 'i686' && format('mingw-w64-{0}-lzo2 mingw-w64-{0}-lld', inputs.arch) || '' }}
+
+    # These i686 packages left the active MSYS2 index. Keep LZO save support
+    # using its signed archive; GCC's own linker replaces the unavailable LLD.
+    - name: Install archived i686 LZO
+      if: inputs.arch == 'i686'
+      shell: msys2 {0}
+      run: |
+        package=mingw-w64-i686-lzo2-2.10-3-any.pkg.tar.zst
+        cd "$(mktemp -d)"
+        curl --fail --location "https://repo.msys2.org/mingw/mingw32/$package" -o "$package"
+        curl --fail --location "https://repo.msys2.org/mingw/mingw32/$package.sig" -o "$package.sig"
+        echo "8e2a3f224c6396fb333687f266d11d66d0d75a8d66f216633adca8b74e5650fc  $package" | sha256sum --check --strict
+        pacman-key --verify "$package.sig" "$package"
+        pacman --noconfirm -U "$package"
 
     - name: Install OpenGFX
       shell: bash
@@ -71,7 +84,8 @@ jobs:
         echo "::group::CMake"
         cmake .. \
           -GNinja \
-          -DCMAKE_CXX_FLAGS="-fuse-ld=lld" \
+          -DCMAKE_CXX_FLAGS="${{ inputs.arch != 'i686' && '-fuse-ld=lld' || '' }}" \
+          -DCMAKE_REQUIRE_FIND_PACKAGE_LZO=ON \
           # EOF
         echo "::endgroup::"
 
