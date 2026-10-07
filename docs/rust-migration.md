@@ -198,8 +198,8 @@ Simulation speed (#155) is reported for every scenario as `plain_speed`:
 paired process wall seconds and candidate/reference ratios, plus their median.
 Ratios are null when exit saves are missing, runs fail, end moments differ, or
 semantic differences remain; timing never changes the pass/fail result.
-Parallel runs are noisy. For a repeatable baseline, use an idle host, profiling counters off,
-and the same build settings and pinned manual-distribution play save:
+Parallel runs are noisy. Use an idle host, profiling counters off, the same
+build settings and pinned manual-distribution play save:
 
 ```sh
 python3 tools/migration.py simulate play-opus-55-167-002-manual --benchmark 3 --jobs 2
@@ -208,11 +208,13 @@ python3 tools/migration.py simulate play-opus-55-167-002-manual --benchmark 3 --
 The driver builds with two jobs, then runs one scenario worker. Benchmark mode
 runs only plain pairs, isolates each timed game from other clone-wide harness
 games, and compares each exit save and full logs. Both roles use #154's serial
-offline thread-failure fallback, recorded as `execution` in the report. It retains the final pair and frozen
-runtimes; `plain_commands` contains the game arguments for optional `perf record`
+offline thread-failure fallback, recorded as `execution` in the report. These
+are total offline times, not normal threaded frame latency. It retains the final
+pair and runtimes; `plain_commands` supplies arguments for optional `perf record`
 replay through `tools/simulation/game_launcher.py`. Preserve the run's HOME/XDG
-directories and runtime libraries; keep profiling separate from timing samples. The timings include
-startup, loading, serial link-graph work and save I/O, and subprocess timeout polling can add about 50 ms.
+directories and runtime libraries; keep profiling separate from timing samples.
+Timings include startup, loading, serial link-graph work and save I/O; subprocess
+timeout polling can add about 50 ms.
 The lock excludes harness games, not unrelated host activity. Port PRs record
 before/after ratios and commits; the roadmap sets the regression budget.
 
