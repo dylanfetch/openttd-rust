@@ -51,6 +51,8 @@ jobs:
         curl --fail --location "https://repo.msys2.org/mingw/mingw32/$package" -o "$package"
         curl --fail --location "https://repo.msys2.org/mingw/mingw32/$package.sig" -o "$package.sig"
         echo "8e2a3f224c6396fb333687f266d11d66d0d75a8d66f216633adca8b74e5650fc  $package" | sha256sum --check --strict
+        pacman-key --init
+        pacman-key --populate msys2
         pacman-key --verify "$package.sig" "$package"
         pacman --noconfirm -U "$package"
 
