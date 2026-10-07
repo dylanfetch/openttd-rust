@@ -45,6 +45,8 @@ barrier sound (#169). Corrections:
 5. **The roadmap became a log.** CI run IDs, hashes, seeds and per-PR plans now go
    in PRs and issues.
 
+Phase 1 and Phase 2 below carry the resulting actions in order.
+
 ## Earlier steering (2026-10-04), still in force
 
 First review: call shared services directly (#107); measure before map-access

@@ -10,7 +10,7 @@ The user runs Astra (`gpt-6-astra`, Codex) as root for long autonomous sessions,
 and runs this review in Claude Code between them. Your job is to check that
 Astra is still on the path to a game whose simulation runs in Rust, find what it
 cannot see in its own work, and correct the *system*: rules, roadmap order,
-issues and the restart prompt. Astra does the implementation. You edit docs,
+issues and PR comments. Astra does the implementation. You edit docs,
 issues and PR comments, and you leave code changes to Astra's PR process.
 
 User focus for this run, if any: $ARGUMENTS
@@ -107,26 +107,25 @@ a one-off finding. Each correction lands in exactly one authoritative place:
   integration, and what can follow.
 - **New coverage gaps** go in a comment on the coverage tracker (#156).
 - **Roadmap**: rewrite "Where the fork stands" and the work order. Add an "Nth
-  steering review" section with findings and corrections, and fold older steering
-  sections into the compact "still in force" paragraph. Keep the file under the
-  `AGENTS.md` budget. Move per-PR plans out to their PRs or issues first.
+  steering review" section with findings and corrections. `/start-development`
+  tells Astra to apply that section first, so state each action plainly. Fold
+  older steering sections into the compact "still in force" paragraph. Keep the
+  file under the `AGENTS.md` budget, moving per-PR plans to their PRs or issues.
 
-Commit `AGENTS.md`, the roadmap and the refreshed restart prompt (step 5) as one
+Commit `AGENTS.md`, the roadmap and any restart-prompt edit (step 5) as one
 docs-only commit pushed straight to `rust-migration`, with a title like
 `Doc: Steer migration toward <corrections> [skip ci]`. Earlier steering commits
 landed the same way. Confirm `origin/rust-migration` has it.
 
-## 5. Refresh /start-development
+## 5. Check /start-development
 
-Edit `docs/skills/start-development/SKILL.md`, which is Astra's restart prompt.
-Rewrite its "Current steering" section for this review: the steering commit, the
-current retirement percentage, and each correction with its issue number and the
-action it requires. Update the work loop only where this review changed process.
-Keep the prompt open-ended. Finishing listed items triggers planning the next
-work, and only the user ends the assignment. Include it in the step 4 commit.
-
-This skill itself stays as is by default. Edit it only when this review finds
-a concrete improvement to the steering process, and say what changed in the report.
+`docs/skills/start-development/SKILL.md` is Astra's restart prompt. It stays
+unchanged by default: it sends Astra to the roadmap's latest steering review,
+and that section carries this review's corrections. Edit the prompt only when
+this review shows it needs improving, for example because Astra stopped early,
+misread it, or needs a new standing step in its work loop. Keep it open-ended:
+finishing the listed items triggers planning the next work, and only the user
+ends the assignment. Include any edit in the step 4 commit.
 
 ## 6. Report
 
@@ -137,5 +136,5 @@ Tell the user:
 - what you changed, with issue and commit links;
 - anything only the user can supply, such as a new play save or a policy decision.
 
-Finish by telling them to start Astra with `/start-development` in Codex; the
-prompt itself is in the skill now, not in your reply.
+Finish by telling them to start Astra with `/start-development` in Codex, and
+whether this review changed it. The prompt lives in the skill, not in your reply.

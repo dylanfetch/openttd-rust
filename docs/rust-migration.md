@@ -321,9 +321,9 @@ explicit spawn settings select the required role, and a running host may impose 
 lower limit.
 
 `docs/skills/` holds two user-invoked skills: `/steer`, the user's Claude Code
-steering review, and `/start-development`, root's restart prompt. Each steering
-review refreshes `/start-development` and changes `/steer` only to improve the
-review itself; root follows `/start-development` and leaves both unedited.
+steering review, and `/start-development`, root's restart prompt. Steering reviews
+put their corrections in the roadmap and edit `/start-development` only to improve
+it; root follows it and leaves both skills unedited.
 
 The driver and CI enforce native build/tests, nonempty test inventories, reference
 test-name preservation, and these Cargo checks:
