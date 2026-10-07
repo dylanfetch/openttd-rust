@@ -194,6 +194,30 @@ or complete log/stdout difference fails. Both modes compare their exit saves.
   initial checkout, not proof of an arbitrary binary's source revision (#97).
   Evidence: `.local/simulation/<time>-<pid>/report.json`.
 
+Simulation speed (#155) is reported for every scenario as `plain_speed`:
+paired process wall seconds and candidate/reference ratios, plus their median.
+Ratios are null when exit saves are missing, runs fail, end moments differ, or
+semantic differences remain; timing never changes the pass/fail result.
+Parallel runs are noisy. Use an idle host, profiling counters off, the same
+build settings and pinned manual-distribution play save:
+
+```sh
+python3 tools/migration.py simulate play-opus-55-167-002-manual --benchmark 3 --jobs 2
+```
+
+The driver builds with two jobs, then runs one scenario worker. Benchmark mode
+runs only plain pairs, isolates each timed game from other clone-wide harness
+games, and compares each exit save and full logs. Both roles use #154's serial
+offline thread-failure fallback, recorded as `execution` in the report. These
+are total offline times, not normal threaded frame latency. It retains the final
+pair and runtimes; `plain_commands` supplies arguments for optional `perf record`
+replay through `tools/simulation/game_launcher.py`. Preserve the run's HOME/XDG
+directories and runtime libraries; keep profiling separate from timing samples.
+Timings include startup, loading, serial link-graph work and save I/O; subprocess
+timeout polling can add about 50 ms.
+The lock excludes harness games, not unrelated host activity. Port PRs record
+before/after ratios and commits; the roadmap sets the regression budget.
+
 Tree map-access measurements (#108) use the same scenarios and comparisons:
 `OPENTTD_TREE_PROFILE=1 python3 tools/migration.py simulate trees --jobs 1`;
 `PYTHONPATH=tools python3 -m simulation.trees <report.json>` summarizes the
@@ -1322,7 +1346,9 @@ node/segment arenas, exact-order heap, costs, lookahead, limits and reconstructi
 into Rust. Rust owns six specialization-specific cache banks, rail-change
 invalidation, reservation traversal and ordered signal rollback. C++ retains
 the train controller, shared track follower, PBS and canonical world services.
-Station animation/randomisation returns to C++ with affected borrows released.
+Explicit platform/waypoint station triggers return to C++ with borrows released;
+waypoint track reservation also retains the original synchronous PBS station
+triggers while search/reservation borrows remain active, before its second trigger.
 Original search bodies remain portable-only; diagnostic dumps use temporary
 views and the original format, with no canonical C++ search mirror.
 
