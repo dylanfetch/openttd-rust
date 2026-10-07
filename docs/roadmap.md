@@ -103,15 +103,11 @@ design (`docs/design/world-state.md`).
 | #156 (service RNG) | Both road service routing random outcomes | #164 | `ee6fcdd44b` | 0 / 64 / 0 / 0 |
 | #165 | CI-capacity integration of rail/industry owners | #166 | `dace87c9b1` | aggregate 5595 / 1079 / 2336 / 3517; not additional retirement |
 | #156 (expiry) | Ordinary single-head crash cleanup boundary | #167 | `0c2a4bf37e` | 0 / 56 / 0 / 0 |
+| #170 | Explicit CI gate, observable validation, checked evidence and recoverable cleanup | #171 | `f382cccd0e` | 0 / 3267 / 0 / 0; maintenance, no game logic changed |
 
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
 ## Phase 1: harness and speed maintenance
-
-User-selected maintenance #170 precedes the port queue: explicit partial/full CI
-with a final merge gate, observable and bounded local validation, checked evidence
-export and recoverable worktree cleanup. Root integrates this tooling change;
-the six game component branches remain checkpointed and no new port starts.
 
 The harness is `python3 tools/migration.py simulate` (`docs/rust-migration.md`,
 "Simulation comparison"); its default set runs in CI. Harness regressions are
@@ -167,6 +163,9 @@ record-copy costs, not map access; revisit #108 only if a post-#168 profile show
 map or pool crossings dominating.
 
 ## Resume checkpoint
+
+Existing branches must absorb #171 before their next push to inherit on-demand CI.
+The primary checkout's `tools/ci.py` can request CI for any fork PR.
 
 | Issue / PR | Branch (worktree suffix), head | State and next step |
 | --- | --- | --- |

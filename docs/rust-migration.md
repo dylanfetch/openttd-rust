@@ -34,6 +34,10 @@ networking, saves, NewGRF mods, graphics, and shared random-number behavior.
 
 ## Build and verification
 
+The CI-policy regression suite additionally uses Node.js to execute the actual
+workflow scripts; CI requests use an authenticated `gh` CLI. The maintenance
+tools work independently of the Codex host or T3 Code.
+
 The current verification setup targets native Linux and needs a C++20 compiler,
 CMake, Ninja, Python 3.11 or newer, SDL2 development files, and the normal OpenTTD
 libraries described in `COMPILING.md`. OpenGFX supplies free graphics for regression

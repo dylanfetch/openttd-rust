@@ -197,12 +197,16 @@ key covers what determines them; never cache test results.
 Iterate locally and push reviewable batches. Ordinary PR pushes run inexpensive
 checks; request broader CI with `python3 tools/ci.py request PR --profile rust`,
 `native`, `platform`, or `full`. Partial runs are diagnostic. Before merging,
+confirm GitHub's PR head matches the intended local commit after pushing,
 request `full` for the final PR head and wait with `python3 tools/ci.py wait
 RECEIPT`; a later push requires a new full run. The protected `Full validation`
 status requires every full job to succeed at that exact head. Retain post-merge
 code validation and fix a red integration branch before further integrations.
 When batching is necessary, validate and merge a concrete integration PR once;
 stacked PRs alone do not combine their CI runs.
+Existing branches need this workflow update before their next push. Use the
+primary checkout's `tools/ci.py` when a branch lacks it. For code pushes, use
+on-demand scheduling rather than `[skip ci]`, so cheap required checks still run.
 
 Before pushing, run `python3 tools/preflight.py --base origin/rust-migration`
 and supply `--verification REPORT` or explicit `--build-log LOG` paths to check
