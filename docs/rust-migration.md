@@ -1335,9 +1335,11 @@ depot service/departure and path/counter reload, with loaded link jobs postponed
 32 days in typed inputs. Road/multimodal/disaster cases compare all fields/logs.
 Native fixtures compare all movement/stop data against unchanged C++ tables and
 exercise widths, ordered paths, nested save staging, partial-load unwind, indexed
-pool reuse and reentry. These establish covered behavior; actual legacy saves,
-NewGRFs, articulated/tram turns, level-crossing collisions, sounds and viewport
-pixels remain unexercised controller domains.
+pool reuse and reentry. #156 adds no-destination shared-RNG/track/cache witnesses
+and a command-built crossing with collision/counter/AI-event checks in CI. Removing
+the draw, inverting the crossing test or skipping RoadCrashNews must fail; setup and
+probes are in `tools/road-scenario-ai/README.md`. Actual legacy saves, NewGRFs,
+articulated/tram turns, sounds and viewport pixels remain unexercised domains.
 
 ### Rail YAPF search, caches and reservation
 

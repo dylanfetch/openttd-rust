@@ -51,3 +51,11 @@ records source/provenance hashes and generation settings; the linked README
 gives exact reproduction and comparison commands and coverage limits.
 Only optional input GLOG history is removed; every other chunk is unchanged.
 The original owner-built and road saves retain their original bytes.
+
+## Reference-built road crossing (#156)
+
+`road-crossing.sav` adds one level crossing to the existing water-ferry fixture
+through unchanged reference game commands. Its JSON receipt and
+[`tools/road-scenario-ai`](../../tools/road-scenario-ai/README.md) record provenance
+and reproduction. Comparison uses typed vehicle-position inputs and a read-only
+AI crash-event observer; it changes no map bytes and compares every saved chunk.
