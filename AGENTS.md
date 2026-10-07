@@ -79,8 +79,10 @@ checks that run; do not restate them in paragraphs.
   `.local/` receipts, which nobody else can check.
 - Harness tooling for a port goes in that component's scenario module. Tooling
   is code to maintain; keep it proportionate to the C++ the port retires.
-- Review report: reviewed commit, findings, and dispositions. Do not narrate
-  what was verified when there are no findings.
+- Review report: reviewed commit, findings, and dispositions, plus one line
+  naming the functions or files compared against the original body. Do not
+  narrate further when there are no findings. Branches the harness does not
+  reach go in the coverage tracker (#156), not only in the disposition.
 - One PR per component, targeting `rust-migration` directly. Use an integration
   branch only when CI capacity forces batching. Updating a PR branch from its
   base (merge or rebase) is fine; do not add merges whose only purpose is to
@@ -125,7 +127,14 @@ For substantive changes:
    Updating a reviewed PR from its base needs no new review when the update has
    no conflicts in `src/` or `rust/` and CI passes; otherwise the reviewer checks
    only the conflict resolution.
-4. Root integrates after review and required checks, and records completion.
+4. Root integrates after review and required checks, records completion, and
+   removes the merged worktree. A red check on `rust-migration` itself is fixed
+   before more integrations.
+
+Keep at most six unintegrated component branches, counting drafts and WIP
+(#157). Integrating reviewed work comes before starting a new component, and a
+component starts from integrated `rust-migration`, not from an unmerged
+component branch, unless the roadmap names the dependency.
 
 Do not self-approve or imply that agents sharing GitHub credentials are independent
 GitHub accounts. With shared credentials, publish an explicitly attributed review

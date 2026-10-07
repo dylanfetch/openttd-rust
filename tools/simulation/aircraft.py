@@ -120,16 +120,15 @@ def prepare_aircraft_save(migration, out, timeout):
             "economy": {"initial_city_size": 4},
         },
     }
-    with core.MACHINE.hold(alone=False):
-        run = run_game(
-            setup,
-            binary,
-            runtime,
-            out / "built",
-            timeout,
-            migration.environment(),
-            False,
-        )
+    run = run_game(
+        setup,
+        binary,
+        runtime,
+        out / "built",
+        timeout,
+        migration.environment(),
+        False,
+    )
     markers = [
         line.split("AIRCRAFT-SETUP-END ", 1)[1]
         for line in run["log"]
