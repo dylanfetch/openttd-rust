@@ -41,9 +41,15 @@ fork; the remaining upstream documentation explains behavior and architecture.
   failures are not simulation behavior: allocation failure, I/O errors in debug
   or log output, and paths that need developer-only defines such as
   `RANDOM_DEBUG`. An exception escaping a wrapper terminates. Return control to
-  C++ (an action protocol) only where the original throws or reenters during
-  ordinary play: script VMs, save/load errors, or callbacks that can run
-  arbitrary code or mutate state Rust holds borrowed. Name each such service.
+  C++ (an action protocol) only where a C++ exception can unwind through the
+  call during ordinary play (script VMs, save/load errors). Name each such
+  service. Reentry alone is not a reason: end every Rust borrow before a
+  callback that can reenter Rust or mutate its state, then call it directly.
+- Keep the boundary cheap and typed. Entries are plain synchronous calls with
+  no per-call heap allocation and no async, future, task or mailbox machinery.
+  Each service is its own typed `noexcept` function, not an opcode switch or
+  positional array, and hot reads fetch only the fields they use rather than
+  whole-record views. Existing ports convert under #168.
 - Evidence for game-logic ports is the semantic simulation harness (`python3
   tools/migration.py simulate`, #72) plus the existing tests; a new game-logic
   port integrates only after the harness exists and its scenarios exercise the
@@ -74,9 +80,11 @@ checks that run; do not restate them in paragraphs.
   instead of re-describing them. `.github/PULL_REQUEST_TEMPLATE.md` and the
   migration issue form follow this budget.
 - Component entry in `docs/rust-migration.md`: about 25 lines at most.
-- Roadmap: forward-looking. A completed item becomes one table row (issue, PR,
-  commit, metrics); its evidence stays in the PR. Committed docs do not cite
-  `.local/` receipts, which nobody else can check.
+- Roadmap: forward-looking, about 200 lines at most. A completed item becomes
+  one table row (issue, PR, commit, metrics); its evidence stays in the PR. The
+  resume checkpoint is a short status table, not a log: CI run IDs, executable
+  hashes, probe values and per-PR plans go in the PR or issue. Committed docs do
+  not cite `.local/` receipts, which nobody else can check.
 - Harness tooling for a port goes in that component's scenario module. Tooling
   is code to maintain; keep it proportionate to the C++ the port retires.
 - Review report: reviewed commit, findings, and dispositions, plus one line
