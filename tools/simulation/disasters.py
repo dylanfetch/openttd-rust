@@ -236,16 +236,15 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
         cache = out / "disaster-fixtures" / label
         fixture = cache / "save/autosave/exit.sav"
         if not fixture.exists():
-            with core.MACHINE.hold(alone=True):
-                trial = run_game(
-                    dict(setup, ticks=ticks),
-                    binaries["reference"],
-                    builds["reference"],
-                    cache,
-                    timeout,
-                    env,
-                    False,
-                )
+            trial = run_game(
+                dict(setup, ticks=ticks),
+                binaries["reference"],
+                builds["reference"],
+                cache,
+                timeout,
+                env,
+                False,
+            )
             if trial["exit"] or not fixture.exists():
                 raise RuntimeError(f"disaster preparation {label} failed")
             (cache / "provenance.json").write_text(
