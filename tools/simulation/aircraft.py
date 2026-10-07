@@ -339,16 +339,15 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
             if kind == "ownerless":
                 setup["settings"]["difficulty"]["quantity_sea_lakes"] = 2
                 setup["settings"]["construction"] = {"raw_industry_construction": 1}
-            with core.MACHINE.hold(alone=False):
-                trial = run_game(
-                    setup,
-                    binaries["reference"],
-                    builds["reference"],
-                    folder,
-                    timeout,
-                    env,
-                    False,
-                )
+            trial = run_game(
+                setup,
+                binaries["reference"],
+                builds["reference"],
+                folder,
+                timeout,
+                env,
+                False,
+            )
             if trial["exit"] or not any(
                 "AIRCRAFT-CONTROL-END" in line for line in trial["log"]
             ):
@@ -371,21 +370,20 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
                 )
                 if landing is not None:
                     break
-                with core.MACHINE.hold(alone=False):
-                    trial = run_game(
-                        {
-                            "kind": "save",
-                            "save": str(source),
-                            "ticks": 64,
-                            "console": ["unpause"],
-                        },
-                        binaries["reference"],
-                        builds["reference"],
-                        folder / f"landing-{attempt}",
-                        timeout,
-                        env,
-                        False,
-                    )
+                trial = run_game(
+                    {
+                        "kind": "save",
+                        "save": str(source),
+                        "ticks": 64,
+                        "console": ["unpause"],
+                    },
+                    binaries["reference"],
+                    builds["reference"],
+                    folder / f"landing-{attempt}",
+                    timeout,
+                    env,
+                    False,
+                )
                 if trial["exit"]:
                     raise RuntimeError("reference landing preparation failed")
                 source = trial["snapshots"][-1]
@@ -404,21 +402,20 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
                     for row in current.values()
                 ):
                     break
-                with core.MACHINE.hold(alone=False):
-                    trial = run_game(
-                        {
-                            "kind": "save",
-                            "save": str(source),
-                            "ticks": 128,
-                            "console": ["unpause"],
-                        },
-                        binaries["reference"],
-                        builds["reference"],
-                        folder / f"airborne-{attempt}",
-                        timeout,
-                        env,
-                        False,
-                    )
+                trial = run_game(
+                    {
+                        "kind": "save",
+                        "save": str(source),
+                        "ticks": 128,
+                        "console": ["unpause"],
+                    },
+                    binaries["reference"],
+                    builds["reference"],
+                    folder / f"airborne-{attempt}",
+                    timeout,
+                    env,
+                    False,
+                )
                 if trial["exit"]:
                     raise RuntimeError("reference airborne removal preparation failed")
                 source = trial["snapshots"][-1]
@@ -484,21 +481,20 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
             # A second reference run produces a live rotor/FTA reload, rather than
             # changing candidate fields or expectations together.
             resumed = folder / "reload"
-            with core.MACHINE.hold(alone=False):
-                trial = run_game(
-                    {
-                        "kind": "save",
-                        "save": str(source),
-                        "ticks": 411,
-                        "console": ["unpause"],
-                    },
-                    binaries["reference"],
-                    builds["reference"],
-                    resumed,
-                    timeout,
-                    env,
-                    False,
-                )
+            trial = run_game(
+                {
+                    "kind": "save",
+                    "save": str(source),
+                    "ticks": 411,
+                    "console": ["unpause"],
+                },
+                binaries["reference"],
+                builds["reference"],
+                resumed,
+                timeout,
+                env,
+                False,
+            )
             if trial["exit"]:
                 raise RuntimeError("reference live aircraft reload failed")
             source = trial["snapshots"][-1]
