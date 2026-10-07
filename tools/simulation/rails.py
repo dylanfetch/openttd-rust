@@ -1,10 +1,19 @@
 """Owner-built rail fixture; the existing ship route is also observed (#86)."""
 
 import hashlib
+import json
 import lzma
+import re
 from pathlib import Path
 
-from .core import ROOT, SNAPSHOT_TICKS, TICKS_PER_DAY, decode_element, read_save
+from .core import (
+    ROOT,
+    SNAPSHOT_TICKS,
+    TICKS_PER_DAY,
+    decode_element,
+    read_save,
+    run_game,
+)
 from .play_saves import DISTRIBUTIONS
 
 
@@ -27,40 +36,146 @@ def scenarios(soak):
             console=["setting vehicle.train_acceleration_model 1", "unpause"],
         )
     )
+    for forbid90 in (0, 1):
+        cases.append(
+            dict(
+                cases[0],
+                name=f"rail-reservation-90-{forbid90}",
+                console=[
+                    f"setting pf.forbid_90_deg {forbid90}",
+                    "setting pf.reserve_paths 1",
+                    "setting pf.yapf.rail_look_ahead_max_signals 1",
+                    "unpause",
+                ],
+            )
+        )
+    cases.append(dict(cases[-2], name="rail-reservation-reload", rail_reload=True))
     return cases
 
 
-def prepare(scenario, binaries, builds, out, timeout, env, result):
-    if not scenario.get("rail_fixture"):
-        return scenario
-    source = Path(scenario["save"])
+def game_args(scenario):
+    return ["-d", "yapf=3"] if scenario.get("rail_fixture") else []
+
+
+def normalize(source, directory):
+    """Keep every original chunk byte except optional GLOG history."""
     packed = source.read_bytes()
-    # The owner's original XZ save remains committed byte-for-byte. Prepare an
-    # uncompressed INPUT with only optional GLOG history removed, so both builds
-    # append their load revision. Every OUTPUT field still compares normally.
-    data = b"OTTN" + packed[4:8] + lzma.decompress(packed[8:])
-    directory = out / scenario["name"] / "prepare"
+    data = (
+        b"OTTN" + packed[4:8] + lzma.decompress(packed[8:])
+        if packed[:4] == b"OTTX"
+        else packed
+    )
     directory.mkdir(parents=True, exist_ok=True)
     original = directory / "owner-uncompressed.sav"
     original.write_bytes(data)
     chunks = read_save(original)
     begin, end = chunks["GLOG"]["span"]
-    normalized = directory / "rail-input.sav"
     normalized_data = data[:begin] + data[end:]
+    normalized = directory / "rail-input.sav"
     normalized.write_bytes(normalized_data)
     check = read_save(normalized)
-    if set(check) != set(chunks) - {"GLOG"} or any(
+    if set(check) != set(chunks) - {"GLOG"}:
+        raise RuntimeError("rail input changed chunk inventory")
+    if any(
         data[slice(*chunks[cid]["span"])] != normalized_data[slice(*check[cid]["span"])]
         for cid in check
     ):
         raise RuntimeError("rail input changed outside optional GLOG history")
-    result["rail_input"] = {
+    return normalized, {
         "source": str(source),
         "source_sha256": hashlib.sha256(packed).hexdigest(),
         "normalized_sha256": hashlib.sha256(normalized_data).hexdigest(),
         "removed_chunk": "GLOG",
+        "typed_edits": [],
+        "unchanged_chunks": sorted(check),
     }
-    return dict(scenario, save=str(normalized))
+
+
+def prepare(scenario, binaries, builds, out, timeout, env, result):
+    if not scenario.get("rail_fixture"):
+        return scenario
+    directory = out / scenario["name"] / "prepare"
+    normalized, receipt = normalize(Path(scenario["save"]), directory)
+    result["rail_input"] = receipt
+    scenario = dict(scenario, save=str(normalized))
+    if scenario.get("rail_reload"):
+        setup = dict(scenario, ticks=8 * SNAPSHOT_TICKS)
+        run = run_game(
+            setup,
+            binaries["reference"],
+            builds["reference"],
+            directory / "warm",
+            timeout,
+            env,
+        )
+        if run["exit"] != 0:
+            raise RuntimeError("rail reload preparation failed")
+        fixture = next(
+            (
+                p
+                for p in run["snapshots"]
+                if reservation_rows(p)["rail"] and reservation_rows(p)["platforms"]
+            ),
+            None,
+        )
+        if fixture is None:
+            raise RuntimeError("rail reload lacks live track/platform reservations")
+        normalized, receipt = normalize(fixture, directory / "reload")
+        result["rail_reload_input"] = receipt
+        scenario = dict(scenario, save=str(normalized))
+    return scenario
+
+
+def reservation_rows(path):
+    """Read current-save reservation fields; comparator still checks every byte."""
+    chunks = read_save(path)
+    tile_types = chunks["MAPT"]["raw"]
+    m2 = chunks["MAP2"]["raw"]
+    m5, m6 = chunks["MAP5"]["raw"], chunks["MAPE"]["raw"]
+    # rail_map.h: plain railway m5 top bits 00/01, m2 bits8..11.
+    # station_map.h: rail station/waypoint subtype0/7, m6 bit2.
+    rail = [
+        (tile, int.from_bytes(m2[tile * 2 : tile * 2 + 2], "big") >> 8 & 15)
+        for tile, kind in enumerate(tile_types)
+        if kind >> 4 == 1
+        and m5[tile] & 0x80 == 0
+        and int.from_bytes(m2[tile * 2 : tile * 2 + 2], "big") >> 8 & 7
+    ]
+    platforms = [
+        tile
+        for tile, kind in enumerate(tile_types)
+        if kind >> 4 == 5 and m6[tile] >> 3 & 15 in (0, 7) and m6[tile] & 4
+    ]
+    return {"rail": rail, "platforms": platforms}
+
+
+SEARCH = re.compile(
+    r"\[YAPFt\]([!-])\s*(\d+) - (\d+) rounds - (\d+) open - "
+    r"(\d+) closed - CHR\s*([\d.]+)% - C (-?\d+) D (-?\d+)"
+)
+
+
+def search_witnesses(scenario, run, mode):
+    searches = [match.groups() for line in run["log"] if (match := SEARCH.search(line))]
+    if not searches:
+        raise RuntimeError("rail fixture lacks native YAPFt search witnesses")
+    cache_hits = sum(float(row[5]) > 0 for row in searches)
+    if mode == "plain" and "rail-reservation" in scenario["name"] and not cache_hits:
+        raise RuntimeError("plain rail fixture lacks reused cached segment costs")
+    reservations = [
+        reservation_rows(p) for p in [Path(scenario["save"]), *run["snapshots"]]
+    ]
+    if "rail-reservation" in scenario["name"] and not any(
+        row["rail"] and row["platforms"] for row in reservations[1:]
+    ):
+        raise RuntimeError("rail fixture lacks saved track/platform reservations")
+    return {
+        "searches": len(searches),
+        "cache_hit_searches": cache_hits,
+        "failed_searches": sum(row[0] == "!" for row in searches),
+        "max_closed_nodes": max(int(row[4]) for row in searches),
+        "reservations": reservations,
+    }
 
 
 def vehicle_rows(path):
@@ -92,6 +207,10 @@ def vehicle_rows(path):
 def check(scenario, run, mode, role, result):
     if not scenario.get("rail_fixture"):
         return
+    result[f"{mode}_{role}_rail_search"] = search_witnesses(scenario, run, mode)
+    profile = run["snapshots"][-1].parents[2] / "rail-profile.json"
+    if profile.is_file():
+        result[f"{mode}_{role}_rail_profile"] = json.loads(profile.read_text())
     paths = [Path(scenario["save"]), *run["snapshots"]]
     observations = [vehicle_rows(path) for path in paths]
     witnesses = {}

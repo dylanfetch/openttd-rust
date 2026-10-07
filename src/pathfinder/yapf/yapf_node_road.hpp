@@ -10,6 +10,8 @@
 #ifndef YAPF_NODE_ROAD_HPP
 #define YAPF_NODE_ROAD_HPP
 
+#ifndef WITH_RUST
+
 #include "../../tile_type.h"
 #include "../../track_type.h"
 #include "nodelist.hpp"
@@ -31,5 +33,7 @@ struct CYapfRoadNode : CYapfNodeT<CYapfNodeKeyExitDir, CYapfRoadNode> {
 };
 
 typedef NodeList<CYapfRoadNode, 8, 10> CRoadNodeList;
+
+#endif /* !WITH_RUST */
 
 #endif /* YAPF_NODE_ROAD_HPP */
