@@ -7,13 +7,13 @@ a subagent stops and reports the conflict in its hand-off to root. Keep this
 file forward-looking: completed work is one table row, and its evidence stays in
 the PR (`AGENTS.md`, "Evidence budget").
 
-## Where the fork stands (2026-10-04, integration `adbe063372`)
+## Where the fork stands (2026-10-07, integration `e16d01c869`)
 
 - Eleven ownership ports retired 14,049 original C++ lines, about 3.7% of roughly
   384k non-vendored `src/` lines. Town names account for 3,848, mostly data, and
   road movement tables for another 1,475; the remaining retirement is 8,726 lines.
   This is still an early migration, not a mostly Rust simulation.
-- Nine integrations since steering are complete. The latest, #134, integrates
+- Ten integrations since steering are complete. The latest ownership batch, #134, integrates
   cargo payment/delivery, ship YAPF, town growth and road controllers: 5,351
   retired lines against 2,689 glue and 1,780 tooling. Ship, town and road each
   retire more than their glue/tooling. This batch improves on the earlier small
@@ -23,9 +23,22 @@ the PR (`AGENTS.md`, "Evidence budget").
   315. Pending industry periodic adds 1,150 for 924, company/economy 1,717 for
   1,394, and ship control 732 for 721. Each PR must explain its concrete cost;
   do not grow generic tooling to polish evidence or improve a metric.
-- This wind-down stocktake updates the ninth integration. The next scheduled
-  stocktake is after the tenth. Keep comparing whole control/state ownership,
-  retirement excluding data tables, and the cost of glue plus scenario tooling.
+- The tenth integration, #160, repairs deterministic harness endpoints: zero
+  additional C++ retired or glue, 277 tooling lines added and 228 removed.
+  Main post-merge checks are running. The separate nightly repair #159 passes
+  its dispatched three-platform nightly; required PR checks still gate it.
+- The exact serial-policy play-save ratio is 2.398x in reviewed #163; independent
+  repetition gives 2.402x. RoadObserve leads the 3,920-sample profile at 14.11%,
+  followed by the road future at 9.03%. Retain the planned road conversion;
+  no raw map view is selected. Required CI still gates the speed-report tooling.
+- #156 now tracks the synchronous harness's excluded worker/abort interleavings.
+  RNG/crossing/news coverage #161 and flooding #162 are reviewed or in review,
+  not yet integrated. Eleven component branches plus one integration branch
+  remain unintegrated. Start no new component until the cap is restored.
+- Cargo #151 review caught quadratic list operations missed by the tiny packet
+  corpus. Its fix restores near-linear scaling in the bounded probe and has
+  source acceptance; final-base scenarios and CI remain. Drain the reviewed
+  ownership queue after the CI repairs; the next stocktake is integration twelve.
 - Reuse current fixtures and component scenario modules. Preserve one authority
   for each owned component; shared map/pool storage remains deliberate. Utility
   work and already accepted evidence are not substitutes for simulation loops.
@@ -104,6 +117,7 @@ design (`docs/design/world-state.md`).
 | #108 | Map measurements and direct-service decision | #116 | `15bef07bde` | 0 / 65 / 81 / 0 |
 | #86 (aircraft slice) | Authorized reference-built aircraft fixture | #132 | `320711cccd` | 0 / 347 / 0 / 0 |
 | #131 | CI-capacity integration of the four owners above | #134 | `adbe063372` | aggregate 5866 / 1780 / 2689 / 5351; not additional retirement |
+| #154 | Deterministic semantic harness endpoints | #160 | `e16d01c869` | 0 / 277 / 0 / 0; tooling net +49 lines |
 
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -114,20 +128,18 @@ The harness is `python3 tools/migration.py simulate` (`docs/rust-migration.md`,
 always the first priority. Port differences go in `KNOWN_FAILURES` with an issue,
 never in masks.
 
-1. **#154 Deterministic run end moments.** `rust-migration` CI is red until this
-   lands. It goes before any integration.
-2. **#156 Coverage gaps, standing capacity.** One agent closes the tracked
+1. **#156 Coverage gaps, standing capacity.** One agent closes the tracked
    unexercised branches, Random-draw and crash branches first. Each port PR
    appends its gaps there.
-3. **#155 Speed report and budget.** Add the per-scenario ratio and profile, then
+2. **#155 Speed report and budget.** Add the per-scenario ratio and profile, then
    convert road's direct-eligible services. Port PRs report the play-save ratio.
    No individual port may worsen that ratio by more than 10% without a stated
    reason; review the trend at each stocktake. Record execution/thread policy
    with measurements and compare like-for-like before and after runs.
-4. **#158 Existing MinGW i686 nightly repair.** Since steering, nightly main
+3. **#158 Existing MinGW i686 nightly repair.** Since steering, nightly main
    also fails before compilation on unavailable MSYS2 LZO/LLD packages. Restore
    dependencies and retain LZO support and the platform matrix. Land after
-   #154, before component integrations; require a green main nightly run.
+   the integrated #154, before component integrations; require a green main nightly run.
 
 The #86 rail/aircraft fixture gate is complete. Controller ports still require
 component-specific branch witnesses; extend the existing scenario modules and
@@ -135,8 +147,9 @@ reuse the supplied rail/ship save and authorized aircraft setup AI.
 
 ## Phase 3: current ownership work, in order
 
-On resume: land #154 and the additional main-CI repair #158, then drain the reviewed queue (#141, then #142, #143,
-#144, #145, #149), then #155's road conversion. Next finish #151, #152, #153 and
+On resume: finish the additional main-CI repair #158, then drain the
+reviewed queue (#141, then #142, #143, #144, #145, #149), then #155's road
+conversion. Next finish #151, #152, #153 and
 #147, then start #148 and #150 from integrated `rust-migration`. Never hold more
 than six unintegrated component branches (#157).
 
@@ -210,8 +223,8 @@ selection following `docs/design/world-state.md`.
 ## Resume checkpoint (2026-10-07, migration resumed)
 
 Root: `/root` (gpt-6-astra, xhigh). The user resumed continuous migration.
-Main is `26eb6a5a57`, source integration `adbe063372`; nine integrations since
-steering. First repair #154 and newly observed nightly failure #158, then follow
+Latest integration is `e16d01c869` (#160 / #154); ten integrations since
+steering. Finish nightly failure #158, then follow
 the queue below. Eleven unfinished components plus one integration branch were
 inherited; start no further component until the six-branch cap is restored.
 Maintenance work does not retire additional C++ simulation code.
@@ -220,11 +233,15 @@ Active work (all new branches start from integrated main):
 
 | Issue / agent | Branch / worktree | Next step |
 | --- | --- | --- |
-| #154 `/root/deterministic_harness_154` (Sol high) | Agent-owned harness maintenance worktree | Validate deterministic precise-tick execution using unchanged game behavior; separate `/root/review_deterministic_harness_154` (Astra medium) reviews before CI/integration. |
-| #156 `/root/coverage_gaps_156` (Sol high) | Agent-owned coverage maintenance worktree | Road no-destination RNG and real level-crossing crash scenarios, with negative mutation probes. |
-| #155 `/root/speed_report_155` (Sol high) | `speed-report-155`, `openttd-rust-speed-report` | Compact ratio report, benchmark and perf profile; road conversion waits for reviewed queue. |
-| #158 `/root` (Astra xhigh) | To create nightly dependency maintenance worktree | Restore archived i686 LZO and available linker; independent review and nightly CI required. |
-| #140 / #141 preparation | `integrate-reviewed-pathfinding`, local `17c3bae441` | Clean main update plus F1 callback documentation correction; fresh `/root/review_pathfinding_integration_141` (Astra medium) checks delta. Include #154 before one CI push. |
+| #156 first slice | `coverage-gaps-156`, `openttd-rust-coverage-gaps`, PR #161 at `6dc51f18b3` | Accepted RNG/crossing/news coverage, 14/14 and three negative probes. Clean actual #154 update and obsolete preparation API removal; public constructor reproduces save/receipt exactly, final pair 2/2. CI running. |
+| #156 `/root/road_flooding_coverage_156` (Sol high) | `road-flooding-coverage-156`, `openttd-rust-road-flooding`, PR #162 at `226267b976` | Legal canal/road fixture reaches actual flooding crash; initial review has no findings. Actual #154 API update, both constructors reproduce exact saves, final pair/self 2/2. Final independent disposition and CI pending; named maintenance dependency on #161. |
+| #155 `/root/speed_report_155_resume` (Sol high) | `speed-report-155`, `openttd-rust-speed-report`, PR #163 at `f4fedd2ce6` | Independent review accepts benchmark isolation/provenance and #154 reconciliation; 9 tests, normal 25 snapshots and exact three-pair 2.398x report pass. CI pending. Tooling must land before queued ports record final play-save ratios. |
+| #158 `/root` (Astra xhigh) | `fix-mingw-nightly-158`, `openttd-rust-mingw-nightly`, PR #159 at `e10f0e2e63` | Reviewed YAML `c4cee973f1` plus clean actual #160/main update. Nightly run 37570989513 passes all three builds/tests and annotations. Required final-head CI restarted; then integrate and dispatch main nightly. |
+| #140 / #141 preparation | `integrate-reviewed-pathfinding`, pushed `22b2c28482` | Clean main/F1 docs update accepted; actual #154 joined, obsolete rail preparation lock removed. Final verify and reload 1/1 with 25 snapshots pass. Required CI running; record final speed ratio before integration. |
+| #142 `/root/station_integration_142` / #143 root preparation | Station local `f9fc161e80`; rail local `a29a142d22` | Station actual #154 update has no source conflicts; verify and focused pair 12/12 pass, self/push pending. Rail still needs actual #154. Both join integrated #141 and record final ratios before integration. |
+| #144 industry warning repair | Local unpushed `4751809474` in `openttd-rust-industry-periodic` | Independent delta review, exact verify and 4480 native cases pass; join integrated main, focused pair and final CI. Metrics now 1508 / 474 / 678 / 932; eight extra retired lines are declaration/comment scope, not new game logic. |
+| #149 root preparation | Local unpushed `1886b41784` in `openttd-rust-company-economy` | Clean main update plus identical industry warning fix; exact verify and independent delta review pass. Actual #144 ancestry, ratio and final CI remain. |
+| #151 `/root/cargo_list_scaling_151` (Sol high) | `cargo-storage-movement-139`, `openttd-rust-cargo-storage`, local `ff912bcfcb` | F1 fixed and source accepted at `a25a7d41e2`; exact verify/probe pass. Clean actual #154 join plus obsolete rail-preparation lock removal; final verify, pair 20/20, self 5/5, soak 5/5, reload and scaling pass. Pushed; CI running. Same reviewer `/root/review_cargo_storage_151` (Astra medium). |
 
 The component table below preserves the last implementation checkpoints from
 2026-10-04; its next steps remain applicable except where superseded above.
@@ -258,7 +275,7 @@ needs no new review under AGENTS.md, but source conflict resolution or source
 fixes require the same PR reviewer. All required checks must pass on the resulting
 head. Industry warning fixes must reach company and later dependent branches.
 
-Cargo #151 is locally validated but unreviewed. Orders #153 and ship #152 retain
+Cargo #151 has accepted source after the scaling fix and final-base validation; required CI remains. Orders #153 and ship #152 retain
 explicit evidence gaps, and fleet #147 is only a storage checkpoint. No missing
 review or evidence is waived by the wind-down. For ship, the next diagnostic is
 `OPENTTD_SHIP_PROFILE=1 python3 tools/migration.py simulate water-ferry --jobs 2`
@@ -270,7 +287,7 @@ That hook has not been implemented or accepted as evidence.
 The shared ABI registry was widened to u16 in cargo ancestry, with bounded u8
 conversion fixes for crypto and company dispatch. Preserve these fixes when
 joining branches. Build/test with `--jobs 2`; keep processes in an active task
-session until they finish. No local build or simulation is left running.
+session until they finish. Check live task sessions before starting timing runs.
 
 Preserved evidence branches: `evidence-disaster-vehicles` at `a775543162`
 (`openttd-rust-disasters-evidence`) and `evidence-water-regions` at `c752070cde`
