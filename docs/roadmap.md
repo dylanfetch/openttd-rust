@@ -121,6 +121,13 @@ never in masks.
    appends its gaps there.
 3. **#155 Speed report and budget.** Add the per-scenario ratio and profile, then
    convert road's direct-eligible services. Port PRs report the play-save ratio.
+   No individual port may worsen that ratio by more than 10% without a stated
+   reason; review the trend at each stocktake. Record execution/thread policy
+   with measurements and compare like-for-like before and after runs.
+4. **#158 Existing MinGW i686 nightly repair.** Since steering, nightly main
+   also fails before compilation on unavailable MSYS2 LZO/LLD packages. Restore
+   dependencies and retain LZO support and the platform matrix. Land after
+   #154, before component integrations; require a green main nightly run.
 
 The #86 rail/aircraft fixture gate is complete. Controller ports still require
 component-specific branch witnesses; extend the existing scenario modules and
@@ -128,8 +135,9 @@ reuse the supplied rail/ship save and authorized aircraft setup AI.
 
 ## Phase 3: current ownership work, in order
 
-On resume: land #154, then drain the reviewed queue (#141, then #142, #143,
-#144, #145, #149), then #155's road conversion. Next finish #151, #152, #153 and
+On resume: land #154 and the additional main-CI repair #158, then drain the
+reviewed queue (#141, then #142, #143, #144, #145, #149), then #155's road
+conversion. Next finish #151, #152, #153 and
 #147, then start #148 and #150 from integrated `rust-migration`. Never hold more
 than six unintegrated component branches (#157).
 
@@ -200,13 +208,32 @@ The accepted #108 decision keeps canonical map arrays in C++ with direct bundled
 view or allocation transfer is selected. Storage transfers still require explicit
 selection following `docs/design/world-state.md`.
 
-## Resume checkpoint (2026-10-04, user-requested pause)
+## Resume checkpoint (2026-10-07, migration resumed)
 
-Root: `/root` (gpt-6-astra, ultra). Source integration base `adbe063372`; nine
-integrations since steering. The user requested an orderly wind-down: no new
-components, planning or reviews were started. All task agents and local checks
-have finished, and all worktrees below are clean. Branch checkpoints are pushed;
-GitHub CI remains running where incomplete. Resume migration only when requested.
+Root: `/root` (gpt-6-astra, xhigh). The user resumed continuous migration.
+Resume guidance is `9826d089e4`, source integration `adbe063372`; nine integrations since
+steering. First repair #154 and newly observed nightly failure #158, then follow
+the queue below. Eleven unfinished components plus one integration branch were
+inherited; start no further component until the six-branch cap is restored.
+Maintenance work does not retire additional C++ simulation code.
+
+Active work (all new branches start from integrated main):
+
+| Issue / agent | Branch / worktree | Next step |
+| --- | --- | --- |
+| #154 `/root/deterministic_harness_154_resume` (Sol high) | `deterministic-harness-154`, `openttd-rust-deterministic-harness`, PR #160 at `54bbcc3f8d` | Child-only Linux thread denial selects unchanged synchronous fallback. First eight-worker default passes 177/177, 1219 snapshots, all exits compared; second repeat running. `/root/review_deterministic_harness_154_resume` (Astra medium) awaits that evidence; required CI only compare remains pending. |
+| #156 first slice | `coverage-gaps-156`, `openttd-rust-coverage-gaps`, PR #161 at `f9da2921fd` | Independently accepted RNG/crossing/news coverage, 14/14 and three negative probes. CI pending; join actual #154 before integration. |
+| #156 `/root/road_flooding_coverage_156` (Sol high) | `road-flooding-coverage-156`, `openttd-rust-road-flooding` | Legal canal/road reference prototype reproduces flood event and state. Root authorizes maintenance dependency on reviewed #161 to reuse its fixture helpers; no new component. Implement compact flood witnesses and negative probe next. |
+| #155 `/root/speed_report_155_resume` (Sol high) | `speed-report-155`, `openttd-rust-speed-report`, local unpushed `1afd74f92a` | Report/benchmark, six tests, Ruff and exact build pass. Join integrated #154, run exact serial-policy benchmark/profile, then draft PR and fresh review. Preliminary old-policy 2.453x is source-qualified in #155; RoadObserve leads samples at 15.55%, no raw-map bottleneck established. |
+| #158 `/root` (Astra xhigh) | `fix-mingw-nightly-158`, `openttd-rust-mingw-nightly`, PR #159 at `4a6c8fc152` | Reviewed YAML `c4cee973f1` plus clean #160 dependency. Signed archived LZO/full-trust check now installs successfully; nightly run 37570989513 builds/tests continue. Require final-head PR checks, integrate after #160, then green main nightly. |
+| #140 / #141 preparation | `integrate-reviewed-pathfinding`, local unpushed `17c3bae441` | Clean main update/F1 callback docs independently accepted. Include integrated main repairs, then push once for required CI. |
+| #142 / #143 root preparation | Local unpushed `2a1df213c6` / `a29a142d22` in existing worktrees | Clean main updates change only guidance/docs; source acceptance carries forward. Join integrated #141 before final checks/push. |
+| #144 industry warning repair | Local unpushed `4751809474` in `openttd-rust-industry-periodic` | Independent delta review, exact verify and 4480 native cases pass; join integrated main, focused pair and final CI. Metrics now 1508 / 474 / 678 / 932; eight extra retired lines are declaration/comment scope, not new game logic. |
+| #149 root preparation | Local unpushed `1886b41784` in `openttd-rust-company-economy` | Clean main update plus identical industry warning fix; exact verify passes. Company delta review, actual #144 ancestry and final CI remain. |
+| #151 `/root/cargo_list_scaling_151` (Sol high) | Existing `cargo-storage-movement-139`, `openttd-rust-cargo-storage` | Review of `baace0f9a3` requires F1 fix: quadratic Vec list operations/copying; corpus has at most six vehicle packets. Repro in PR review. Restore original scaling and preserve identity/order, then same reviewer `/root/review_cargo_storage_151` (Astra medium), evidence and CI. |
+
+The component table below preserves the last implementation checkpoints from
+2026-10-04; its next steps remain applicable except where superseded above.
 
 Worktrees are siblings of the main checkout. Owner shorthand below: Sol high is
 `gpt-6.1-sol`, reasoning effort high; root is `gpt-6-astra`, ultra. Reviews are
@@ -230,7 +257,7 @@ not a promise that later dependency updates will pass.
 | #148 fresh `/root/town_lifecycle_ownership` (Sol high) | Not started | To create `openttd-rust-town-lifecycle` | Selected after fleet; extend canonical town owner with complete remaining town/house lifecycle and authority. Wait for resume. |
 | #150 fresh `/root/industry_construction_ownership` (Sol high) | Not started | To create `openttd-rust-industry-construction` | Selected after town; extend industry owner with complete construction/tile/destruction control and canonical metadata. Wait for resume. |
 
-Resume integration with #141, then refresh the dependent reviewed branches from
+After main-CI repairs, resume component integration with #141, then refresh the dependent reviewed branches from
 actual main. GitHub currently reports conflicting bases for #142/#143/#144/#145/
 #149/#152/#153; do not bypass CI. A clean base update with no src/rust conflicts
 needs no new review under AGENTS.md, but source conflict resolution or source
@@ -264,7 +291,7 @@ whole owners, native-width behavior and explicit ordinary-play reentry boundarie
 
 ## Choosing the next task
 
-The assignment is paused at the user's request. Once resumed, take the first
+The assignment is active. Take the first
 unblocked item above. Fill idle capacity in this order: integration and review
 of finished work, Phase 1 items, then a new component, but only while fewer
 than six component branches are unintegrated (#157). Paused, deferred and

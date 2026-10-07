@@ -5,6 +5,7 @@ import contextlib
 import hashlib
 import io
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -13,6 +14,84 @@ from pathlib import Path
 from unittest.mock import patch
 
 from simulation import core as simulate
+
+
+class SimulationDeterminismTests(unittest.TestCase):
+    def test_end_mismatch_compares_exits_and_full_logs_without_retry(self):
+        calls, compared = [], []
+
+        def run(scenario, binary, build, folder, *args, **kwargs):
+            calls.append(folder)
+            return {
+                "exit": 0,
+                "seconds": 0,
+                "snapshots": (
+                    [folder / "save/autosave/dmp_cmds_extra.sav"]
+                    if folder.name == "candidate"
+                    else []
+                )
+                + [folder / "save/autosave/exit.sav"],
+                "log": ["same", "extra"] if folder.name == "candidate" else ["same"],
+                "stdout": b"",
+            }
+
+        with (
+            patch.object(simulate, "scenario_modules", return_value=[]),
+            patch.object(simulate, "run_game", side_effect=run),
+            patch.object(
+                simulate,
+                "save_moment",
+                side_effect=lambda p: (1, 0, 2 if "candidate" in p.parts else 1),
+            ),
+            patch.object(
+                simulate,
+                "compare_saves",
+                side_effect=lambda a, b, *args: compared.append(a) or [],
+            ),
+        ):
+            result = simulate.run_scenario(
+                {"name": "strict", "short_checkpoint": True, "ticks": 1},
+                {"reference": None, "candidate": None},
+                {"reference": None, "candidate": None},
+                Path("unused"),
+                20,
+                10,
+                {},
+            )
+        self.assertFalse(result["passed"])
+        self.assertEqual(len(calls), 4)
+        self.assertEqual(len(compared), 2)
+        self.assertEqual(len(result["problems"]), 4)
+        self.assertEqual(
+            [d["snapshot"] for d in result["differences"]],
+            ["snapshots/log", "plain/log"],
+        )
+
+    @unittest.skipUnless(sys.platform == "linux", "Linux child resource policy")
+    def test_launcher_denies_threads_without_changing_parent_limit(self):
+        import resource
+
+        before = resource.getrlimit(resource.RLIMIT_NPROC)
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(simulate.ROOT / "tools/simulation/game_launcher.py"),
+                sys.executable,
+                "-c",
+                "import resource, _thread; print(resource.getrlimit(resource.RLIMIT_NPROC)); "
+                "\ntry: _thread.start_new_thread(lambda: None, ())"
+                "\nexcept RuntimeError: print('denied')",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(resource.getrlimit(resource.RLIMIT_NPROC), before)
+        if os.geteuid() == 0:
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("did not prevent threads", result.stderr)
+        else:
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.splitlines(), ["(0, 0)", "denied"])
 
 
 class SimulationProvenanceTests(unittest.TestCase):
@@ -118,7 +197,6 @@ class SimulationProvenanceTests(unittest.TestCase):
                 argv += ["--candidate", str(originals["candidate"])]
             with (
                 patch.object(simulate, "ROOT", root),
-                patch.object(simulate, "MACHINE"),
                 patch.object(
                     simulate,
                     "scenario_list",
@@ -181,7 +259,6 @@ class SimulationSpeedTests(unittest.TestCase):
             ]
             with (
                 patch.object(simulate, "scenario_modules", return_value=()),
-                patch.object(simulate, "MACHINE") as machine,
                 patch.object(simulate, "run_game", side_effect=runs * 3) as game,
                 patch.object(simulate, "save_moment", return_value=(1, 0, 74)),
                 patch.object(
@@ -200,13 +277,49 @@ class SimulationSpeedTests(unittest.TestCase):
                     {},
                     benchmark_repetitions=3,
                 )
-            return result, game.call_count, machine.hold.call_args_list
+            return result, game.call_count, game.call_args_list
+
+    @unittest.skipUnless(sys.platform == "linux", "Linux benchmark coordination")
+    def test_benchmark_and_ordinary_games_exclude_each_other(self):
+        import select
+
+        with tempfile.TemporaryDirectory() as directory:
+            lock = Path(directory) / "game.lock"
+            for parent_isolate in (False, True):
+                with self.subTest(parent_isolate=parent_isolate):
+                    script = (
+                        "import sys; from pathlib import Path; "
+                        "from simulation import core; "
+                        "core.GAME_LOCK=Path(sys.argv[1]); print('waiting',flush=True); "
+                        "\nwith core.game_slot(sys.argv[2]=='True'): print('entered',flush=True)"
+                    )
+                    with patch.object(simulate, "GAME_LOCK", lock):
+                        with simulate.game_slot(parent_isolate):
+                            child = subprocess.Popen(
+                                [
+                                    sys.executable,
+                                    "-c",
+                                    script,
+                                    str(lock),
+                                    str(not parent_isolate),
+                                ],
+                                cwd=simulate.ROOT / "tools",
+                                stdout=subprocess.PIPE,
+                                text=True,
+                            )
+                            self.assertEqual(child.stdout.readline().strip(), "waiting")
+                            self.assertFalse(
+                                select.select([child.stdout], [], [], 0.05)[0]
+                            )
+                        with child:
+                            self.assertEqual(child.stdout.readline().strip(), "entered")
+                            self.assertEqual(child.wait(timeout=10), 0)
 
     def test_matched_benchmark_repeats_serial_pairs(self):
         result, calls, locks = self.exercise()
         self.assertTrue(result["passed"])
         self.assertEqual(calls, 6)
-        self.assertTrue(all(call.kwargs == {"alone": True} for call in locks))
+        self.assertTrue(all(call.kwargs == {"isolate": True} for call in locks))
         self.assertEqual(len(result["plain_speed"]["samples"]), 3)
         self.assertEqual(result["plain_speed"]["median_candidate_reference_ratio"], 2.0)
 

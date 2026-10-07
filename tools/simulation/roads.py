@@ -4,7 +4,6 @@ import hashlib
 import lzma
 from pathlib import Path
 
-from . import core
 from .core import ROOT, decode_element, read_save, run_game
 from .disasters import patch
 
@@ -103,16 +102,15 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
         console=scenario["console"],
     )
     if operation == "reload":
-        with core.MACHINE.hold(alone=False):
-            run = run_game(
-                dict(scenario, save=str(fixture), ticks=1),
-                binaries["reference"],
-                builds["reference"],
-                folder / "reference",
-                timeout,
-                env,
-                False,
-            )
+        run = run_game(
+            dict(scenario, save=str(fixture), ticks=1),
+            binaries["reference"],
+            builds["reference"],
+            folder / "reference",
+            timeout,
+            env,
+            False,
+        )
         if run["exit"] != 0 or not run["snapshots"]:
             raise RuntimeError("road reload reference preparation failed")
         reference = run["snapshots"][-1]
