@@ -244,4 +244,4 @@ def main() -> int:
 if __name__ == "__main__":
     raise SystemExit(main())
 
-# Temporary live CI gate probe: initial head
+# Temporary live CI gate probe: second head
