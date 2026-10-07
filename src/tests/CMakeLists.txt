@@ -8,6 +8,7 @@ add_test_files(
     effect_protocol.hpp
     enum_over_optimisation.cpp
     flatset_type.cpp
+    industry.cpp
     history_func.cpp
     landscape_partial_pixel_z.cpp
     math_func.cpp

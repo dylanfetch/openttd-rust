@@ -190,6 +190,27 @@ pub fn layout(type_id: u8, item: u8) -> usize {
         }
         152 => layout!(crate::train::Leaves, item; observe,write,leaf,owner,nearby),
         153 => layout!(crate::train::Action, item; op,id,a,b,c),
+        130 => {
+            layout!(crate::industry::Fields, item; valid_history, last_prod_year, counter, prod_level, was_cargo_delivered, ctlflags)
+        }
+        131 => {
+            layout!(crate::industry::BuildFields, item; probability, min_number, target_count, max_wait, wait_count)
+        }
+        132 => {
+            layout!(crate::industry::BuilderFields, item; builddata, wanted_inds, daily_counter, daily_increment, sound_tile, sound_ctr)
+        }
+        133 => layout!(crate::industry::Slots, item; data, size),
+        134 => layout!(crate::industry::Produced, item; cargo, waiting, rate, history),
+        135 => {
+            layout!(crate::industry::Accepted, item; cargo, waiting, accumulated_waiting, last_accepted, history)
+        }
+        136 => {
+            layout!(crate::industry::Observation, item; owner, tile, behaviour, id, width, height, callbacks, sound_count, life, original, minimal_cargo, kind, up_text, down_text, closure_text)
+        }
+        137 => layout!(crate::industry::Services, item; observe, next, setting, world),
+        138 => {
+            layout!(crate::industry::ProductionResult, item; subtract, add, again, cargo_input, cargo_output, version, num_input, num_output, present)
+        }
         _ => usize::MAX,
     }
 }
