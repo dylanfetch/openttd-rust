@@ -82,15 +82,14 @@ TOWN_SEEDS = (
 def prepare_town_names(scenario, binaries, builds, out, timeout, env):
     """Patch only CITY name type/parts in a reference-produced input fixture."""
     setup = {k: v for k, v in scenario.items() if k not in ("town_style", "console")}
-    with core.MACHINE.hold(alone=False):
-        run = run_game(
-            setup,
-            binaries["reference"],
-            builds["reference"],
-            out / scenario["name"] / "prepare",
-            timeout,
-            env,
-        )
+    run = run_game(
+        setup,
+        binaries["reference"],
+        builds["reference"],
+        out / scenario["name"] / "prepare",
+        timeout,
+        env,
+    )
     if run["exit"] != 0 or not run["snapshots"]:
         raise RuntimeError("town-name preparation failed")
     fixture = run["snapshots"][-1]
@@ -309,15 +308,14 @@ def prepare_growth(scenario, binaries, builds, out, timeout, env):
     """Patch only growth inputs in an unchanged-reference-produced modern save."""
     setup = {k: v for k, v in scenario.items() if k != "town_growth"}
     setup["ticks"] = 2 * SNAPSHOT_TICKS + TICKS_PER_DAY
-    with core.MACHINE.hold(alone=False):
-        run = run_game(
-            setup,
-            binaries["reference"],
-            builds["reference"],
-            out / scenario["name"] / "prepare",
-            timeout,
-            env,
-        )
+    run = run_game(
+        setup,
+        binaries["reference"],
+        builds["reference"],
+        out / scenario["name"] / "prepare",
+        timeout,
+        env,
+    )
     if run["exit"] != 0 or not run["snapshots"]:
         raise RuntimeError("town-growth preparation failed")
     fixture = run["snapshots"][-1]

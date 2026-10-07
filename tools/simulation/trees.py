@@ -8,7 +8,6 @@ import struct
 from collections import Counter
 from pathlib import Path
 
-from . import core
 from .core import (
     SNAPSHOT_TICKS,
     TICKS_PER_DAY,
@@ -50,15 +49,14 @@ def tree_coverage(path):
 
 def prepare_trees(scenario, binaries, builds, out, timeout, env):
     setup = {k: v for k, v in scenario.items() if k not in ("trees", "console")}
-    with core.MACHINE.hold(alone=False):
-        run = run_game(
-            setup,
-            binaries["reference"],
-            builds["reference"],
-            out / scenario["name"] / "prepare",
-            timeout,
-            env,
-        )
+    run = run_game(
+        setup,
+        binaries["reference"],
+        builds["reference"],
+        out / scenario["name"] / "prepare",
+        timeout,
+        env,
+    )
     if run["exit"] != 0 or not run["snapshots"]:
         raise RuntimeError("tree input preparation failed")
     fixture = run["snapshots"][-1]
