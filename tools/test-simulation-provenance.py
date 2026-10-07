@@ -5,6 +5,7 @@ import contextlib
 import hashlib
 import io
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -13,6 +14,84 @@ from pathlib import Path
 from unittest.mock import patch
 
 from simulation import core as simulate
+
+
+class SimulationDeterminismTests(unittest.TestCase):
+    def test_end_mismatch_compares_exits_and_full_logs_without_retry(self):
+        calls, compared = [], []
+
+        def run(scenario, binary, build, folder, *args):
+            calls.append(folder)
+            return {
+                "exit": 0,
+                "seconds": 0,
+                "snapshots": (
+                    [folder / "save/autosave/dmp_cmds_extra.sav"]
+                    if folder.name == "candidate"
+                    else []
+                )
+                + [folder / "save/autosave/exit.sav"],
+                "log": ["same", "extra"] if folder.name == "candidate" else ["same"],
+                "stdout": b"",
+            }
+
+        with (
+            patch.object(simulate, "scenario_modules", return_value=[]),
+            patch.object(simulate, "run_game", side_effect=run),
+            patch.object(
+                simulate,
+                "save_moment",
+                side_effect=lambda p: (1, 0, 2 if "candidate" in p.parts else 1),
+            ),
+            patch.object(
+                simulate,
+                "compare_saves",
+                side_effect=lambda a, b, *args: compared.append(a) or [],
+            ),
+        ):
+            result = simulate.run_scenario(
+                {"name": "strict", "short_checkpoint": True, "ticks": 1},
+                {"reference": None, "candidate": None},
+                {"reference": None, "candidate": None},
+                Path("unused"),
+                20,
+                10,
+                {},
+            )
+        self.assertFalse(result["passed"])
+        self.assertEqual(len(calls), 4)
+        self.assertEqual(len(compared), 2)
+        self.assertEqual(len(result["problems"]), 4)
+        self.assertEqual(
+            [d["snapshot"] for d in result["differences"]],
+            ["snapshots/log", "plain/log"],
+        )
+
+    @unittest.skipUnless(sys.platform == "linux", "Linux child resource policy")
+    def test_launcher_denies_threads_without_changing_parent_limit(self):
+        import resource
+
+        before = resource.getrlimit(resource.RLIMIT_NPROC)
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(simulate.ROOT / "tools/simulation/game_launcher.py"),
+                sys.executable,
+                "-c",
+                "import resource, _thread; print(resource.getrlimit(resource.RLIMIT_NPROC)); "
+                "\ntry: _thread.start_new_thread(lambda: None, ())"
+                "\nexcept RuntimeError: print('denied')",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(resource.getrlimit(resource.RLIMIT_NPROC), before)
+        if os.geteuid() == 0:
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("did not prevent threads", result.stderr)
+        else:
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.splitlines(), ["(0, 0)", "denied"])
 
 
 class SimulationProvenanceTests(unittest.TestCase):
@@ -117,7 +196,6 @@ class SimulationProvenanceTests(unittest.TestCase):
                 argv += ["--candidate", str(originals["candidate"])]
             with (
                 patch.object(simulate, "ROOT", root),
-                patch.object(simulate, "MACHINE"),
                 patch.object(
                     simulate,
                     "scenario_list",
