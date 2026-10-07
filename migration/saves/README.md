@@ -85,3 +85,18 @@ scratch change and rerun the pair.
 This covers one stock blocked vehicle, two RNG outcomes and ordinary daily
 service dispatch; unblocked traffic, articulation/trams and the other #156
 coverage domains remain open. It changes no production behavior or reference source.
+
+## Reference-built road crossing (#156)
+
+`road-crossing.sav` adds one level crossing to the existing water-ferry fixture
+through unchanged reference game commands. Its JSON receipt and
+[`tools/road-scenario-ai`](../../tools/road-scenario-ai/README.md) record provenance
+and reproduction. Comparison uses typed vehicle-position inputs and a read-only
+AI crash-event observer; it changes no map bytes and compares every saved chunk.
+
+`road-flooding.sav` uses the same constructor to enclose three sea-level road tiles
+with twelve canals. Its receipt records the source, typed stopped-bus/link-job
+preparation and unchanged-reference commands. During comparison a single legal
+canal removal lets ordinary sea flooding crash the bus; position edits preserve
+its existing 18 passengers. The road scenario README records the fixed event,
+counter/RNG checkpoint and negative probe. No map bytes are patched.

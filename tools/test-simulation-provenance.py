@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise simulation identity and runtime isolation across a concurrent rebuild."""
+"""Exercise simulation runtime provenance and semantic speed-report validity."""
 
 import contextlib
 import hashlib
@@ -20,7 +20,7 @@ class SimulationDeterminismTests(unittest.TestCase):
     def test_end_mismatch_compares_exits_and_full_logs_without_retry(self):
         calls, compared = [], []
 
-        def run(scenario, binary, build, folder, *args):
+        def run(scenario, binary, build, folder, *args, **kwargs):
             calls.append(folder)
             return {
                 "exit": 0,
@@ -181,6 +181,7 @@ class SimulationProvenanceTests(unittest.TestCase):
                     (root / "status").write_text("")
                 return {
                     "scenario": scenario["name"],
+                    "plain_speed": {"median_candidate_reference_ratio": None},
                     "passed": True,
                     "snapshots": 1,
                     "stats": {"chunks": 1, "elements": 1, "masked": {}},
@@ -238,6 +239,101 @@ class SimulationProvenanceTests(unittest.TestCase):
 
     def test_reference_self_needs_no_candidate(self):
         self.exercise(self_compare=True)
+
+
+class SimulationSpeedTests(unittest.TestCase):
+    def exercise(self, *, difference=False, exit_code=0):
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory)
+            scenario = {"name": "speed", "ticks": 74}
+            runs = [
+                {
+                    "exit": exit_code,
+                    "seconds": seconds,
+                    "command": [role],
+                    "snapshots": [out / role / "exit.sav"],
+                    "log": [],
+                    "stdout": b"",
+                }
+                for role, seconds in (("reference", 1.0), ("candidate", 2.0))
+            ]
+            with (
+                patch.object(simulate, "scenario_modules", return_value=()),
+                patch.object(simulate, "run_game", side_effect=runs * 3) as game,
+                patch.object(simulate, "save_moment", return_value=(1, 0, 74)),
+                patch.object(
+                    simulate,
+                    "compare_saves",
+                    return_value=[{"field": "world"}] if difference else [],
+                ),
+            ):
+                result = simulate.run_scenario(
+                    scenario,
+                    {role: role for role in ("reference", "candidate")},
+                    {role: out for role in ("reference", "candidate")},
+                    out,
+                    1,
+                    10,
+                    {},
+                    benchmark_repetitions=3,
+                )
+            return result, game.call_count, game.call_args_list
+
+    @unittest.skipUnless(sys.platform == "linux", "Linux benchmark coordination")
+    def test_benchmark_and_ordinary_games_exclude_each_other(self):
+        import select
+
+        with tempfile.TemporaryDirectory() as directory:
+            lock = Path(directory) / "game.lock"
+            for parent_isolate in (False, True):
+                with self.subTest(parent_isolate=parent_isolate):
+                    script = (
+                        "import sys; from pathlib import Path; "
+                        "from simulation import core; "
+                        "core.GAME_LOCK=Path(sys.argv[1]); print('waiting',flush=True); "
+                        "\nwith core.game_slot(sys.argv[2]=='True'): print('entered',flush=True)"
+                    )
+                    with patch.object(simulate, "GAME_LOCK", lock):
+                        with simulate.game_slot(parent_isolate):
+                            child = subprocess.Popen(
+                                [
+                                    sys.executable,
+                                    "-c",
+                                    script,
+                                    str(lock),
+                                    str(not parent_isolate),
+                                ],
+                                cwd=simulate.ROOT / "tools",
+                                stdout=subprocess.PIPE,
+                                text=True,
+                            )
+                            self.assertEqual(child.stdout.readline().strip(), "waiting")
+                            self.assertFalse(
+                                select.select([child.stdout], [], [], 0.05)[0]
+                            )
+                        with child:
+                            self.assertEqual(child.stdout.readline().strip(), "entered")
+                            self.assertEqual(child.wait(timeout=10), 0)
+
+    def test_matched_benchmark_repeats_serial_pairs(self):
+        result, calls, locks = self.exercise()
+        self.assertTrue(result["passed"])
+        self.assertEqual(calls, 6)
+        self.assertTrue(all(call.kwargs == {"isolate": True} for call in locks))
+        self.assertEqual(len(result["plain_speed"]["samples"]), 3)
+        self.assertEqual(result["plain_speed"]["median_candidate_reference_ratio"], 2.0)
+
+    def test_same_end_with_semantic_difference_has_no_speed_ratio(self):
+        result, calls, _ = self.exercise(difference=True)
+        self.assertFalse(result["passed"])
+        self.assertEqual(calls, 2)  # Preserve the first failing repetition.
+        self.assertIsNone(result["plain_speed"]["median_candidate_reference_ratio"])
+
+    def test_failed_process_with_exit_save_has_no_speed_ratio(self):
+        result, calls, _ = self.exercise(exit_code=1)
+        self.assertFalse(result["passed"])
+        self.assertEqual(calls, 2)
+        self.assertIsNone(result["plain_speed"]["median_candidate_reference_ratio"])
 
 
 if __name__ == "__main__":

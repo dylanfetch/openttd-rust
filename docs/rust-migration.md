@@ -194,6 +194,30 @@ or complete log/stdout difference fails. Both modes compare their exit saves.
   initial checkout, not proof of an arbitrary binary's source revision (#97).
   Evidence: `.local/simulation/<time>-<pid>/report.json`.
 
+Simulation speed (#155) is reported for every scenario as `plain_speed`:
+paired process wall seconds and candidate/reference ratios, plus their median.
+Ratios are null when exit saves are missing, runs fail, end moments differ, or
+semantic differences remain; timing never changes the pass/fail result.
+Parallel runs are noisy. Use an idle host, profiling counters off, the same
+build settings and pinned manual-distribution play save:
+
+```sh
+python3 tools/migration.py simulate play-opus-55-167-002-manual --benchmark 3 --jobs 2
+```
+
+The driver builds with two jobs, then runs one scenario worker. Benchmark mode
+runs only plain pairs, isolates each timed game from other clone-wide harness
+games, and compares each exit save and full logs. Both roles use #154's serial
+offline thread-failure fallback, recorded as `execution` in the report. These
+are total offline times, not normal threaded frame latency. It retains the final
+pair and runtimes; `plain_commands` supplies arguments for optional `perf record`
+replay through `tools/simulation/game_launcher.py`. Preserve the run's HOME/XDG
+directories and runtime libraries; keep profiling separate from timing samples.
+Timings include startup, loading, serial link-graph work and save I/O; subprocess
+timeout polling can add about 50 ms.
+The lock excludes harness games, not unrelated host activity. Port PRs record
+before/after ratios and commits; the roadmap sets the regression budget.
+
 Tree map-access measurements (#108) use the same scenarios and comparisons:
 `OPENTTD_TREE_PROFILE=1 python3 tools/migration.py simulate trees --jobs 1`;
 `PYTHONPATH=tools python3 -m simulation.trees <report.json>` summarizes the
@@ -1298,8 +1322,8 @@ turn commands into Rust. Rust owns seven private scalars and the ordered path;
 modern, historical split-vector and TTD/TTO save adapters stage them in C++.
 Original algorithms and road/tram movement data compile only in portable builds.
 Shared Vehicle/GroundVehicle physics, pools, orders/loading, map/road stops,
-construction, rendering and road YAPF remain C++. A temporary YAPF result exists
-only for an empty canonical path and transfers before result handling.
+construction and rendering remain C++. Road YAPF uses the same canonical path
+through #124; there is no temporary C++ search result cache.
 
 Rust uses copied IDs/observations and direct noexcept services, including shared
 RNG. Actions return to C++ for owner reentry, commands, NewGRF callbacks, viewport
@@ -1311,6 +1335,56 @@ depot service/departure and path/counter reload, with loaded link jobs postponed
 32 days in typed inputs. Road/multimodal/disaster cases compare all fields/logs.
 Native fixtures compare all movement/stop data against unchanged C++ tables and
 exercise widths, ordered paths, nested save staging, partial-load unwind, indexed
-pool reuse and reentry. These establish covered behavior; actual legacy saves,
-NewGRFs, articulated/tram turns, level-crossing collisions, sounds and viewport
-pixels remain unexercised controller domains.
+pool reuse and reentry. #156 adds no-destination shared-RNG/track/cache witnesses
+and command-built crossing/flooding fixtures with collision/counter/AI-event checks
+in CI. Flooding preserves 18 passengers and requires the original victim count,
+2000-based crash countdown and shared RNG. Removing the draw, inverting the crossing
+test, skipping RoadCrashNews or changing the flooded countdown must fail; setup and
+probes are in `tools/road-scenario-ai/README.md`. Actual legacy saves, NewGRFs,
+articulated/tram turns, sounds and viewport pixels remain unexercised domains.
+
+### Rail YAPF search, caches and reservation
+
+[#133](https://github.com/dylanfetch/openttd-rust/pull/133) moves all four searches,
+node/segment arenas, exact-order heap, costs, lookahead, limits and reconstruction
+into Rust. Rust owns six specialization-specific cache banks, rail-change
+invalidation, reservation traversal and ordered signal rollback. C++ retains
+the train controller, shared track follower, PBS and canonical world services.
+Explicit platform/waypoint station triggers return to C++ with borrows released;
+waypoint track reservation also retains the original synchronous PBS station
+triggers while search/reservation borrows remain active, before its second trigger.
+Original search bodies remain portable-only; diagnostic dumps use temporary
+views and the original format, with no canonical C++ search mirror.
+
+`python3 tools/migration.py simulate padhattan rail-reservation` and its self/soak
+variants exercise cache reuse, reversal, depot/safe-tile search, reservation,
+busy targets, rollback and active-state reload under both 90-degree policies.
+Native unchanged-base/heap probes cover finite limits, live cost invalidation
+and ordered opposing PBS signal restoration absent from the supplied network.
+They do not prove full rail-cost semantics for arbitrary maps, NewGRFs, legacy
+saves or every signal family. Controller reservation extension belongs to #130.
+
+### Road YAPF search and path construction
+
+Issue #124 moves both track/depot searches, road exit-direction keys, node arena,
+lookup maps, exact-order heap, segment traversal/cost, heuristic, limits and best
+intermediate fallback into Rust. Reconstruction and station-area trimming write
+#121's sole canonical path directly; cache ownership is not counted twice.
+Original road specialization and node types compile only in portable builds.
+C++ keeps map/pools/settings, closest station-area and road-stop observations,
+and shared `CFollowTrackRoad` behind copied scalar `noexcept` leaves. None runs
+scripts, mutates/reenters the search or canonical road owner, or throws during
+ordinary play. Short owner access ends before leaves. RNG is unchanged (neither
+search draws); integer narrowing/wrapping, exit-key replacement, strict ties and
+follow-before-limit timing retain source behavior. Panics/OOM abort.
+
+`python3 tools/migration.py simulate roads` covers the controller's original eight
+cases, actual station-area prefix trimming and a forced cache miss with competing
+penalties; original road plays and Padhattan traffic run in `--soak`. Paired/self runs
+compare every saved field in plain/desync modes. Native tests compare actual heap
+and origin masks with unchanged C++ and actual depot-search transcript/counters
+with `CYapfBaseT` at node limits 0/1/2/7 and depot cost bounds 0/70/71/100
+(loaded node settings clamp to >=500). Native ABI checks
+cover every field on supported hosts. Arbitrary maps/NewGRFs, articulated/tram,
+road waypoints, exhaustive occupied-stop/loop/segment-length branches and actual
+legacy saves remain limits; shared follower logic is deliberately unported.

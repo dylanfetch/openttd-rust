@@ -127,6 +127,7 @@ struct CYapfRailNode : CYapfNodeT<CYapfNodeKeyTrackDir, CYapfRailNode> {
 	SignalType last_red_signal_type;
 	SignalType last_signal_type;
 
+#ifndef WITH_RUST
 	inline void Set(CYapfRailNode *parent, TileIndex tile, Trackdir td, bool is_choice)
 	{
 		this->base::Set(parent, tile, td, is_choice);
@@ -155,6 +156,8 @@ struct CYapfRailNode : CYapfNodeT<CYapfNodeKeyTrackDir, CYapfRailNode> {
 		this->flags_u.flags_s.choice_seen |= is_choice;
 	}
 
+#endif /* !WITH_RUST */
+
 	inline TileIndex GetLastTile() const
 	{
 		assert(this->segment != nullptr);
@@ -174,6 +177,7 @@ struct CYapfRailNode : CYapfNodeT<CYapfNodeKeyTrackDir, CYapfRailNode> {
 		this->segment->last_td = td;
 	}
 
+#ifndef WITH_RUST
 	template <class Tbase, class Tfunc, class Tpf>
 	bool IterateTiles(const Train *v, Tpf &yapf, Tbase &obj, bool (Tfunc::*func)(TileIndex, Trackdir)) const
 	{
@@ -192,6 +196,8 @@ struct CYapfRailNode : CYapfNodeT<CYapfNodeKeyTrackDir, CYapfRailNode> {
 
 		return (obj.*func)(cur, cur_td);
 	}
+
+#endif /* !WITH_RUST */
 
 	void Dump(DumpTarget &dmp) const
 	{
