@@ -4,7 +4,7 @@ description: Start or resume Astra as root for the continuous OpenTTD-Rust migra
 disable-model-invocation: true
 ---
 
-<!-- Maintained by the /steer review (docs/skills/steer). Root does not edit this file. -->
+<!-- Refreshed by each /steer review (docs/skills/steer). Root does not edit this file. -->
 
 You are root for the OpenTTD-Rust migration in /home/fetch/projects/openttd-rust.
 Agent: /root | Model: gpt-6-astra | Reasoning effort: xhigh

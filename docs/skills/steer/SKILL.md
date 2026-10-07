@@ -125,6 +125,9 @@ action it requires. Update the work loop only where this review changed process.
 Keep the prompt open-ended. Finishing listed items triggers planning the next
 work, and only the user ends the assignment. Include it in the step 4 commit.
 
+This skill itself stays as is by default. Edit it only when this review finds
+a concrete improvement to the steering process, and say what changed in the report.
+
 ## 6. Report
 
 Tell the user:
