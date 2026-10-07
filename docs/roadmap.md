@@ -32,8 +32,8 @@ the PR (`AGENTS.md`, "Evidence budget").
   all required CI, default 212/212 and focused candidate pair/soak 39/39 each.
 - #156 retains worker/abort interleavings and component-specific gaps. Road
   no-destination/service RNG, actual crossing/flooding and early crash draws are
-  covered. Single-head expiry #167 has independent acceptance and all required
-  checks; integrate it next. Articulated cleanup and landing-crash RNG remain
+  covered. Single-head expiry #167 is integrated with independent acceptance and all
+  required checks. Articulated cleanup and landing-crash RNG remain
   open. A bounded original-only plan found a reusable one-tick landing boundary
   in #145's existing setup; it is not candidate coverage yet.
 - Six component branches remain unintegrated, restoring #157's cap. No new
@@ -129,6 +129,7 @@ design (`docs/design/world-state.md`).
 | #156 (flooding) | Ordinary road flooding crash witness | #162 | `0b2503cb30` | 0 / 155 / 0 / 0 |
 | #156 (service RNG) | Both road service routing random outcomes | #164 | `ee6fcdd44b` | 0 / 64 / 0 / 0 |
 | #165 | CI-capacity integration of rail/industry owners | #166 | `dace87c9b1` | aggregate 5595 / 1079 / 2336 / 3517; not additional retirement |
+| #156 (expiry) | Ordinary single-head crash cleanup boundary | #167 | `0c2a4bf37e` | 0 / 56 / 0 / 0 |
 
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -154,7 +155,7 @@ reuse the supplied rail/ship save and authorized aircraft setup AI.
 
 ## Phase 3: current ownership work, in order
 
-On resume: finish coverage #167, integrate #145 and #149, then #155's road
+On resume: integrate #145 and #149, then #155's road
 conversion. Next finish #151, #152, #153 and #147, then start #148 and #150
 from integrated `rust-migration`. Never hold more than six unintegrated component
 branches (#157). Ship #146 names orders #138 as an actual ancestry dependency;
@@ -205,21 +206,23 @@ selection following `docs/design/world-state.md`.
 
 ## Resume checkpoint (2026-10-07, migration active)
 
-Root: `/root` (gpt-6-astra, xhigh). Latest integration is `dace87c9b1` (#166);
-**eighteen integrations since steering**. Main #164 validation 37582451591 and
-platform 37582452027 pass. Watch post-#166 main checks; fix any new failure before
-integration. All merge guards from earlier tasks are finished; do not restart
+Root: `/root` (gpt-6-astra, xhigh). Latest integration is `0c2a4bf37e` (#167);
+**nineteen integrations since steering**. Main #164 validation 37582451591 and
+platform 37582452027 pass. Watch post-#166 main validation 37586974428/platform
+37586975220, then latest #167 validation 37587328665/platform 37587328958; fix any
+new failure before integration. All merge guards from earlier tasks are finished; do not restart
 old monitors. Completed worktrees, including rail, industry and their batch, are
-removed after preserving ignored artifacts and branch references.
+removed after preserving ignored artifacts and branch references. The expiry
+worktree is also removed; all 25 completed-worktree archives remain available.
 
 The user set a weekly usage wind-down threshold of 50%. The latest host reading
-is 48% at 2026-10-07 07:21 UTC. Monitor the active session's seven-day usage
+is 49% at 2026-10-07 07:26 UTC. Monitor the active session's seven-day usage
 window. At 50%, stop starting new work except what is needed for a clean handoff;
 finish active validation, reviews, necessary fixes and cleanup without abruptly
 cancelling jobs, update this checkpoint, then wrap up. Do not mark the migration
 complete.
 
-Integrate reviewed/green #167 next, then refresh #145 and #149 from actual main.
+Refresh #145 and #149 from actual main in that order.
 Follow with #155 road conversion, then finish #151/#152/#153/#147 with the ship
 ancestry dependency above. Six unfinished component branches remain; integrate
 reviewed work before any new component. All worktrees below are siblings of the
@@ -227,9 +230,8 @@ main checkout; source reviews and checkable evidence remain in their PRs.
 
 | Issue / PR | Branch, worktree suffix, current head | Next step |
 | --- | --- | --- |
-| #136 / #145 | `aircraft-controller-ownership-136`, `aircraft-controller`, `dd0f2f0475` | Source accepted; exact verify and clean-head pair/self 21/21 pass. Historical ratio 2.567x. Owner `/root/aircraft_final_integration_145` (Sol high) completed read-only preparation; resume on actual main after #167 for fresh base/final timing, necessary conflict review and final CI. |
+| #136 / #145 | `aircraft-controller-ownership-136`, `aircraft-controller`, `dd0f2f0475` | Source accepted; exact verify and clean-head pair/self 21/21 pass. Historical ratio 2.567x. Owner `/root/aircraft_final_integration_145` (Sol high) completed read-only preparation; resume on actual main `0c2a4bf37e` or its docs-only successor for fresh base/final timing, necessary conflict review and final CI. |
 | #137 / #149 | `company-economy-ownership-137`, `company-economy`, `5b9a005064` | Accepted industry warning delta; exact verify, company/reload 13/13 and changed industry preparation 2/2 pass. Ratio 2.543x. Refresh after #145; final CI remains. |
-| #156 / #167 | `road-crash-expiry-156`, `road-crash-expiry`, `20404d4a30` | Root-authored ordinary collision cleanup endpoints. Exact verify 97/136/Cargo checks, roads 20/20, focused reference self/candidate soak 2/2 and Ruff pass; mutation delaying deletion fails. Independent review and all required CI pass; combined run against #166 binary also passes. Ready for root integration. |
 | #139 / #151 | `cargo-storage-movement-139`, `cargo-storage`, `ff912bcfcb` | F1 quadratic list fix accepted at `a25a7d41e2`; final verify, pair 20/20, self/soak 5/5 each, reload and scaling pass. Ratio 2.588x. Integrate after #155 conversion; same reviewer `/root/review_cargo_storage_151` (Astra medium). |
 | #146 / #152 | `ship-controller-ownership-146`, `ship-controller`, `7ec70a1768` | Full owner checkpoint; verify/Cargo/Ruff and 12 comparisons pass. Old ferry failures matched 40 snapshots but differed at wall-time plain exit: join #154 deterministic launcher before rerunning. Still needs reference self/candidate soak, actual build/sell/ID reuse/water-class witnesses, final company/orders/cargo ancestry, fresh review and CI. |
 | #138 / #153 | `order-lifecycle-ownership-138`, `order-lifecycle`, `ef58c967f7` | Full owner checkpoint; verify 97/134 and paired regression/depot/reload 67 snapshots pass. Prior 101 self/soak snapshots are reference-vs-reference. Add conditional/implicit active reload, native timetable/backup commands, shared-depot unbunching and initialized unmasked #83 evidence, then candidate soak, fresh review and CI. |
@@ -241,10 +243,10 @@ The host limits fresh tasks despite completed agent entries, but an existing
 reviewer can resume concurrently. Continue within actual capacity; preserve
 same-PR reviewers when still live.
 Batch #166 is integrated; owner and reviewer tasks finished. Source joins and
-combined acceptance name final `1230641e58` in #143/#144/#166. PR #167 source
-acceptance names `20404d4a30`; its additional two-case pair against #166's verified
-binary passes both modes. No new base update is needed unless GitHub reports a
-conflict; normal merge must still require its exact accepted head and checks.
+combined acceptance name final `1230641e58` in #143/#144/#166. PR #167 is also integrated after source
+acceptance at `20404d4a30`, all required CI and an additional two-case pair against
+#166's verified binary in both modes. Both PRs merged normally, without bypassing
+required checks.
 
 The corrected #155 plan in its issue converts all 22 road services directly and
 removes the entire Task/Future/Rc/action protocol for all 14 entry kinds. No live
@@ -253,7 +255,7 @@ short borrow scopes and deletion order before implementation. Benchmark a fresh
 post-queue baseline; the historical 2.398x is not that before measurement.
 
 Standing #156 work: the unchanged crossing already covers three crash-rotation
-Random draws, confirmed by a negative probe in both modes. #167 establishes
+Random draws, confirmed by a negative probe in both modes. Integrated #167 establishes
 actual-collision expiry at 2238/2239 ticks against the unchanged reference;
 root owns it and `/root/review_road_crash_expiry_167` (Astra medium) accepts it.
 Articulated deletion,
