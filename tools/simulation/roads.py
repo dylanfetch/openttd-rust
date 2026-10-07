@@ -35,6 +35,8 @@ def scenarios(soak):
             ("overtake-timeout", "grok-159-001", 30, 1),
             ("reload", "grok-159-001", 30, 1),
             ("depot-service", "opus-55-167-002", 12, 1),
+            ("service-retain", "opus-55-167-002", 37, 1),
+            ("service-refresh", "opus-55-167-002", 37, 1),
         )
     ]
 
@@ -87,6 +89,22 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
                 }
             }
         }
+    if operation in ("service-retain", "service-refresh"):
+        # Keep vehicle 37's live blocked pose and empty cache. A prior automatic
+        # service order names real depot 5; its overdue date makes servicing due.
+        changes = {
+            "VEHS": {
+                37: {
+                    COMMON + "current_order.type": 66,
+                    COMMON + "current_order.flags": 1,
+                    COMMON + "current_order.dest": 5,
+                    COMMON + "dest_tile": 3091,
+                    COMMON + "date_of_last_service": 727700,
+                }
+            }
+        }
+        if operation == "service-refresh":
+            changes["DATE"] = {0: {"random_state[0]": 8, "random_state[1]": 8}}
     # Loaded overdue link jobs can spend every null-driver iteration waiting
     # for threads. Keep their relative join order, beyond these transient windows.
     jobs = read_save(unpacked)["LGRJ"]
@@ -156,11 +174,16 @@ def check(scenario, run, mode, role, result):
                 "cur_speed",
                 "breakdown_ctr",
                 "current_order.type",
+                "current_order.flags",
+                "current_order.dest",
+                "dest_tile",
+                "day_counter",
                 "date_of_last_service",
                 "reliability",
                 "breakdowns_since_last_service",
             )
         ]
+        keys.append(ROAD + "gv_flags")
         witnesses[index] = {
             "before": {key.removeprefix(ROAD): before[index][key] for key in keys},
             "after": {key.removeprefix(ROAD): after[index][key] for key in keys},
@@ -182,6 +205,47 @@ def check(scenario, run, mode, role, result):
         model == (0 if operation == "original" else 1), "acceleration setting missing"
     )
     witnesses["acceleration_model"] = model
+
+    if operation in ("service-retain", "service-refresh"):
+        a, b = observe(37)
+        refresh = operation == "service-refresh"
+        require(
+            a[COMMON + "current_order.type"] == b[COMMON + "current_order.type"] == 66
+            and a[COMMON + "current_order.flags"]
+            == b[COMMON + "current_order.flags"]
+            == 1
+            and a[COMMON + "current_order.dest"] == 5
+            and a[COMMON + "dest_tile"] == 3091
+            and a[COMMON + "date_of_last_service"] + a[COMMON + "service_interval"]
+            < 727929
+            and a[COMMON + "day_counter"] == 31
+            and b[COMMON + "day_counter"] == 32
+            and not path_cache(a)
+            and not path_cache(b)
+            and position(a) == position(b)
+            and a[ROAD + "blocked_ctr"] == 185
+            and b[ROAD + "blocked_ctr"] == 222,
+            "overdue non-stop service order or daily blocked-vehicle witness missing",
+        )
+        depot, tile = (2, 6206) if refresh else (5, 3091)
+        depots = chunks["DEPT"]
+        depot_row = decode_element(depots, dict(depots["elements"])[depot])
+        require(
+            depot_row["xy"] == tile
+            and b[COMMON + "current_order.dest"] == depot
+            and b[COMMON + "dest_tile"] == tile
+            and a[ROAD + "gv_flags"] == 0
+            and b[ROAD + "gv_flags"] == (4 if refresh else 0),
+            "service routing decision or implicit-order suppression differs",
+        )
+        date = read_save(final)["DATE"]
+        fields = decode_element(date, date["elements"][0][1])
+        rng = tuple(fields[f"random_state[{i}]"] for i in (0, 1))
+        require(
+            rng == ((2072642750, 3270530758) if refresh else (2876180153, 3044549951)),
+            f"service routing shared RNG differs: {rng}",
+        )
+        witnesses["service_routing"] = {"refresh": refresh, "depot": depot, "rng": rng}
 
     if operation in ("original", "realistic", "invalidate"):
         a, b = observe(3)
