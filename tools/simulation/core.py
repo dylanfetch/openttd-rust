@@ -872,6 +872,11 @@ def main():
 
     every = scenario_list(args.soak)
     # An exact scenario name selects only that scenario; anything else is a substring filter.
+    unmatched = [
+        name for name in args.names if not any(name in s["name"] for s in every)
+    ]
+    if unmatched:
+        parser.error(f"no scenario matches selectors {unmatched}; see --list")
     scenarios = [
         s
         for s in every

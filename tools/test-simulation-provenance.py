@@ -17,6 +17,36 @@ from simulation import core as simulate
 
 
 class SimulationDeterminismTests(unittest.TestCase):
+    def test_each_requested_selector_must_match_before_any_run(self):
+        stderr = io.StringIO()
+        with (
+            patch.object(simulate, "scenario_list", return_value=[{"name": "valid"}]),
+            patch.object(sys, "argv", ["simulate.py", "valid", "misspelled", "--list"]),
+            contextlib.redirect_stderr(stderr),
+        ):
+            with self.assertRaises(SystemExit) as error:
+                simulate.main()
+        self.assertEqual(error.exception.code, 2)
+        self.assertIn("misspelled", stderr.getvalue())
+
+    def test_exact_and_substring_selectors_preserve_selection(self):
+        output = io.StringIO()
+        with (
+            patch.object(
+                simulate,
+                "scenario_list",
+                return_value=[
+                    {"name": "valid"},
+                    {"name": "valid-extended"},
+                    {"name": "other-test"},
+                ],
+            ),
+            patch.object(sys, "argv", ["simulate.py", "valid", "other", "--list"]),
+            contextlib.redirect_stdout(output),
+        ):
+            self.assertEqual(simulate.main(), 0)
+        self.assertEqual(output.getvalue().splitlines(), ["valid", "other-test"])
+
     def test_end_mismatch_compares_exits_and_full_logs_without_retry(self):
         calls, compared = [], []
 
