@@ -1,4 +1,4 @@
-"""Short road-controller branch witnesses from the committed player saves (#121)."""
+"""Road controller and YAPF branch witnesses from the committed player saves (#121)."""
 
 import hashlib
 import json
@@ -43,6 +43,15 @@ def scenarios(soak):
             "save": str(ROOT / "migration/saves" / f"{source}.sav"),
             "console": [
                 f"setting vehicle.roadveh_acceleration_model {model}",
+                *(
+                    [
+                        "setting pf.yapf.road_curve_penalty 800",
+                        "setting pf.yapf.road_slope_penalty 4000",
+                        "setting pf.yapf.road_stop_penalty 1000",
+                    ]
+                    if operation == "yapf-penalties"
+                    else []
+                ),
                 "unpause",
             ],
             "ticks": ticks,
@@ -52,6 +61,7 @@ def scenarios(soak):
             ("realistic", "opus-55-167-002", 30, 1),
             ("invalidate", "opus-55-167-002", 30, 1),
             ("no-destination", "opus-55-167-002", 30, 1),
+            ("yapf-penalties", "opus-55-167-002", 30, 1),
             ("blocking-failsafe", "opus-55-167-002", 100, 1),
             ("overtake-start", "grok-159-001", 1, 1),
             ("overtake-timeout", "grok-159-001", 30, 1),
@@ -151,7 +161,7 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
                     }
                 }
             }
-    elif operation == "invalidate":
+    elif operation in ("invalidate", "yapf-penalties"):
         # At the next junction, the tail now names the wrong tile. The earlier
         # void-tile entry must also disappear, witnessing whole-cache rejection.
         changes = {
@@ -396,6 +406,42 @@ def check(scenario, run, mode, role, result):
                 "cached route was not consumed at its junction",
             )
 
+    if operation == "yapf-penalties":
+        a, b = observe(3)
+        old, new = path_cache(a), path_cache(b)
+        require(old[0][1] == 16383 and old[-1][1] == 10814, "forced cache miss absent")
+        require(
+            new and all(tile not in (16383, 10814) for _, tile in new),
+            "forced miss did not reconstruct",
+        )
+        settings = decode_element(pats, pats["elements"][0][1])
+        require(
+            settings["pf.yapf.road_curve_penalty"] == 800
+            and settings["pf.yapf.road_slope_penalty"] == 4000
+            and settings["pf.yapf.road_stop_penalty"] == 1000,
+            "competing route penalties absent",
+        )
+        witnesses["search"] = {
+            "path": new,
+            "vehicle_flags": b[COMMON + "vehicle_flags"],
+        }
+
+    if operation in ("original", "realistic"):
+        # Disabling trimming retains three near-target choices (5043/5040/5037)
+        # before 3090. The input starts without a cache; this is a fresh search.
+        a, b = observe(64)
+        require(
+            not path_cache(a) and a[COMMON + "current_order.dest"] == 17,
+            "fresh station route absent",
+        )
+        require(map_tile(4787) == (5, 5), "target is not a drive-through road stop")
+        require(
+            path_cache(b) == [(1, 3090), (5, 2706), (8, 2703), (4, 2700)]
+            and not b[COMMON + "vehicle_flags"] & 128,
+            "station-area cache prefix was not trimmed",
+        )
+        witnesses["station_trim"] = {"destination": 4787, "path": path_cache(b)}
+
     if operation in ("original", "realistic", "depot-service"):
         a, b = observe(90)
         tile, roadtype = map_tile(a[COMMON + "tile"])
@@ -572,6 +618,8 @@ if __name__ == "__main__":
 
     import migration
 
+    from . import core
+
     if sys.argv[1:] not in (["--prepare-crossing"], ["--prepare-flooding"]):
         raise SystemExit(
             "usage: PYTHONPATH=tools python3 -m simulation.roads --prepare-{crossing,flooding}"
@@ -581,4 +629,6 @@ if __name__ == "__main__":
     if out.exists():
         raise SystemExit(f"retain or remove previous preparation first: {out}")
     out.mkdir(parents=True)
+    migration.COMMON_LOCAL.mkdir(parents=True, exist_ok=True)
+    core.GAME_LOCK = migration.COMMON_LOCAL / "simulation-game.lock"
     prepare_crossing(migration, out, operation)
