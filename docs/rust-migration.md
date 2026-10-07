@@ -1336,8 +1336,10 @@ depot service/departure and path/counter reload, with loaded link jobs postponed
 Native fixtures compare all movement/stop data against unchanged C++ tables and
 exercise widths, ordered paths, nested save staging, partial-load unwind, indexed
 pool reuse and reentry. #156 adds no-destination shared-RNG/track/cache witnesses
-and a command-built crossing with collision/counter/AI-event checks in CI. Removing
-the draw, inverting the crossing test or skipping RoadCrashNews must fail; setup and
+and command-built crossing/flooding fixtures with collision/counter/AI-event checks
+in CI. Flooding preserves 18 passengers and requires the original victim count,
+2000-based crash countdown and shared RNG. Removing the draw, inverting the crossing
+test, skipping RoadCrashNews or changing the flooded countdown must fail; setup and
 probes are in `tools/road-scenario-ai/README.md`. Actual legacy saves, NewGRFs,
 articulated/tram turns, sounds and viewport pixels remain unexercised domains.
 

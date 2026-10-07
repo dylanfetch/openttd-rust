@@ -1,0 +1,59 @@
+{
+  "source_sha256": "7987bd79dc51e7a9a37947f756d371c1bff9040a9b39c00c5774fd0a57e5625f",
+  "sha256": "6eef4a33b95a7b15355a4f462df0eafd44a929ff3ae429f48d6b6542ee722b31",
+  "assignments": [],
+  "removed_chunk": "GLOG",
+  "raw_sha256": "59464587dd05450c994aa284324d7be22f0c4355004e7ee26d928ca3c3c0d795",
+  "baseline": {
+    "repository": "https://github.com/OpenTTD/OpenTTD.git",
+    "tag": "15.3",
+    "commit": "14ec60f248547d4d062a1160f0fc26d742319888"
+  },
+  "committed_source": "migration/saves/water-ferry.sav",
+  "reference_binary_sha256": "5d22b1015057d280fcd4a81501fb67507b6490be9567222931fd1a32e17dcafe",
+  "setup_files": {
+    "info.nut": "afd1ddae09a2a35bbcd4647d349ae713a8bec3c579f1337303461dd4862f3ece",
+    "main.nut": "121515421ad294f90967f63e8667eb74c642e8be5242db02e5d66e57acbb568d",
+    "setup.nut": "a40247b6b13df4bd1873f46b03b3f240e1a354d9030434d04ddb19cd376d479f"
+  },
+  "setup": {
+    "kind": "save",
+    "ticks": 1000,
+    "road_setup": "flooding",
+    "console": [
+      "unpause"
+    ]
+  },
+  "setup_markers": [
+    "1201"
+  ],
+  "preparation": {
+    "source": "migration/saves/water-ferry.sav",
+    "source_sha256": "7987bd79dc51e7a9a37947f756d371c1bff9040a9b39c00c5774fd0a57e5625f",
+    "sha256": "891b61046d3a8da664ddfa9445a56329e505627ae6196434520b7252944ffaa5",
+    "assignments": [
+      [
+        "VEHS",
+        21,
+        "roadveh[0]/common[0]/vehstatus",
+        8,
+        10
+      ],
+      [
+        "LGRJ",
+        0,
+        "join_date",
+        714192,
+        714224
+      ],
+      [
+        "LGRJ",
+        1,
+        "join_date",
+        714204,
+        714236
+      ]
+    ],
+    "removed_chunk": "GLOG"
+  }
+}

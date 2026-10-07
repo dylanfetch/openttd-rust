@@ -15,13 +15,19 @@ AI_FOLDER = "road-scenario-ai"
 
 
 def uses_ai(scenario):
-    return scenario.get("roads") == "level-crossing" or scenario.get("road_setup")
+    return scenario.get("roads") in ("level-crossing", "flooding") or scenario.get(
+        "road_setup"
+    )
 
 
 def install(scenario, run_dir):
     if uses_ai(scenario):
         ai = run_dir / "ai/road-crossing"
         shutil.copytree(scenario["scenario_ai"], ai)
+        (ai / "parameters.nut").write_text(
+            f'ROAD_SETUP <- "{scenario.get("road_setup", "crossing")}";\n'
+            f"ROAD_FLOOD <- {str(scenario.get('roads') == 'flooding').lower()};\n"
+        )
         if scenario.get("road_setup"):
             shutil.copy2(ai / "setup.nut", ai / "main.nut")
 
@@ -61,6 +67,7 @@ def scenarios(soak):
             ("overtake-timeout", "grok-159-001", 30, 1),
             ("reload", "grok-159-001", 30, 1),
             ("level-crossing", "road-crossing", 30, 1),
+            ("flooding", "road-flooding", 300, 1),
             ("depot-service", "opus-55-167-002", 12, 1),
         )
     ]
@@ -114,10 +121,10 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
                 }
             }
         }
-    elif operation == "level-crossing":
+    elif operation in ("level-crossing", "flooding"):
         frozen = json.loads(source.with_suffix(".json").read_text())
         if hashlib.sha256(packed).hexdigest() != frozen["sha256"]:
-            raise RuntimeError("road crossing differs from preparation receipt")
+            raise RuntimeError("road crash fixture differs from preparation receipt")
         # Position existing vehicles on the command-built crossing. The stopped
         # visible train remains fixed; normal road control detects the collision.
         changes = {
@@ -138,6 +145,22 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
                 },
             }
         }
+        if operation == "flooding":
+            # The canal barrier protects a real command-built sea-level road.
+            # The AI removes one canal; ordinary water tile loops flood this bus.
+            changes = {
+                "VEHS": {
+                    21: {
+                        COMMON + "tile": 1201,
+                        COMMON + "x_pos": 2840,
+                        COMMON + "y_pos": 72,
+                        COMMON + "z_pos": 0,
+                        COMMON + "vehstatus": 10,
+                        COMMON + "direction": 1,
+                        ROAD + "state": 8,
+                    }
+                }
+            }
     elif operation in ("invalidate", "yapf-penalties"):
         # At the next junction, the tail now names the wrong tile. The earlier
         # void-tile entry must also disappear, witnessing whole-cache rejection.
@@ -315,6 +338,48 @@ def check(scenario, run, mode, role, result):
         witnesses["crash_event"] = events[0]
         witnesses["crashed_ctr"] = b[ROAD + "crashed_ctr"]
 
+    if operation == "flooding":
+        a, b = observe(21)
+        require(
+            position(a) == position(b) == (1201, 2840, 72)
+            and a[COMMON + "z_pos"] == b[COMMON + "z_pos"] == 0
+            and a[COMMON + "vehstatus"] == 10
+            and b[COMMON + "vehstatus"] == 138
+            and a[ROAD + "crashed_ctr"] == 0
+            and b[ROAD + "crashed_ctr"] == 2032
+            and a[COMMON + "cargo.action_counts"]
+            == b[COMMON + "cargo.action_counts"]
+            == (0, 0, 18, 0),
+            "sea-level loaded bus did not enter the flooded crash countdown",
+        )
+        require(map_tile(1201) == (2, 10), "input bus is not on a straight road")
+        final_chunks = read_save(final)
+        require(
+            chunks["MAPT"]["raw"][945] >> 4 == 6
+            and chunks["MAPO"]["raw"][945] == 33
+            and final_chunks["MAPT"]["raw"][945] >> 4 == 6
+            and final_chunks["MAPO"]["raw"][945] == 17,
+            "canal breach did not become flooding sea",
+        )
+        events = [
+            line.split("ROAD-FLOOD-EVENT ", 1)[1]
+            for line in run["log"]
+            if "ROAD-FLOOD-EVENT " in line
+        ]
+        require(events == ["21 1201 5 14"], "flooded event/victims missing or repeated")
+        require(
+            sum("ROAD-FLOOD-BREACH true" in line for line in run["log"]) == 1,
+            "ordinary canal-removal command missing",
+        )
+        date = final_chunks["DATE"]
+        fields = decode_element(date, date["elements"][0][1])
+        rng = [fields[f"random_state[{i}]"] for i in range(2)]
+        require(
+            fields["tick_counter"] == 16080 and rng == [1209897734, 2054087316],
+            "flooding checkpoint/shared RNG differs from the original",
+        )
+        witnesses.update(crash_event=events[0], crashed_ctr=2032, shared_rng=rng)
+
     if operation in ("original", "realistic", "invalidate"):
         a, b = observe(3)
         old, new = path_cache(a), path_cache(b)
@@ -466,8 +531,8 @@ def check(scenario, run, mode, role, result):
     result[f"{mode}_{role}_roads"] = witnesses
 
 
-def prepare_crossing(migration, out):
-    """Freeze a command-built crossing; comparison uses only the observer AI."""
+def prepare_crossing(migration, out, operation="crossing"):
+    """Freeze reference-built road crash fixtures through ordinary commands."""
     runtime = out / "reference-runtime"
     with migration.reference_lock(shared=True):
         binary = copy_runtime(
@@ -476,11 +541,32 @@ def prepare_crossing(migration, out):
     scripts = out / AI_FOLDER
     shutil.copytree(ROOT / "tools" / AI_FOLDER, scripts)
     source = ROOT / "migration/saves/water-ferry.sav"
+    preparation = None
+    fixture_source = source
+    if operation == "flooding":
+        # Keep the existing 18 passengers aboard during construction. Postpone
+        # loaded link jobs exactly as the short road-controller scenarios do.
+        chunks = read_save(source)
+        fixture_source = out / "setup-input.sav"
+        preparation = patch(
+            source,
+            fixture_source,
+            {
+                "VEHS": {21: {COMMON + "vehstatus": 10}},
+                "LGRJ": {
+                    index: {
+                        "join_date": decode_element(chunks["LGRJ"], body)["join_date"]
+                        + 32
+                    }
+                    for index, body in chunks["LGRJ"]["elements"]
+                },
+            },
+        )
     scenario = {
         "kind": "save",
-        "save": str(source),
+        "save": str(fixture_source),
         "ticks": 1000,
-        "road_setup": True,
+        "road_setup": operation,
         "scenario_ai": str(scripts),
         "console": ["unpause"],
     }
@@ -493,14 +579,12 @@ def prepare_crossing(migration, out):
         migration.environment(),
         False,
     )
-    markers = [
-        line.split("ROAD-CROSSING-BUILT ", 1)[1]
-        for line in run["log"]
-        if "ROAD-CROSSING-BUILT " in line
-    ]
-    if run["exit"] != 0 or markers != ["10005 1"] or not run["snapshots"]:
-        raise RuntimeError("reference crossing construction failed")
-    destination = ROOT / "migration/saves/road-crossing.sav"
+    marker = "ROAD-FLOOD-BUILT " if operation == "flooding" else "ROAD-CROSSING-BUILT "
+    markers = [line.split(marker, 1)[1] for line in run["log"] if marker in line]
+    expected = ["1201"] if operation == "flooding" else ["10005 1"]
+    if run["exit"] != 0 or markers != expected or not run["snapshots"]:
+        raise RuntimeError("reference road crash construction failed")
+    destination = ROOT / "migration/saves" / f"road-{operation}.sav"
     receipt = patch(run["snapshots"][-1], destination, {})
     if destination.stat().st_size >= 1_000_000:
         raise RuntimeError("road crossing exceeds committed-save budget")
@@ -522,6 +606,9 @@ def prepare_crossing(migration, out):
         setup_markers=markers,
     )
     receipt.pop("source", None)
+    if preparation is not None:
+        preparation["source"] = "migration/saves/water-ferry.sav"
+        receipt["preparation"] = preparation
     destination.with_suffix(".json").write_text(json.dumps(receipt, indent=2) + "\n")
     print(f"Prepared {destination}; construction evidence: {out}")
 
@@ -533,14 +620,15 @@ if __name__ == "__main__":
 
     from . import core
 
-    if sys.argv[1:] != ["--prepare-crossing"]:
+    if sys.argv[1:] not in (["--prepare-crossing"], ["--prepare-flooding"]):
         raise SystemExit(
-            "usage: PYTHONPATH=tools python3 -m simulation.roads --prepare-crossing"
+            "usage: PYTHONPATH=tools python3 -m simulation.roads --prepare-{crossing,flooding}"
         )
-    out = migration.LOCAL / "road-crossing-preparation"
+    operation = sys.argv[1].removeprefix("--prepare-")
+    out = migration.LOCAL / f"road-{operation}-preparation"
     if out.exists():
         raise SystemExit(f"retain or remove previous preparation first: {out}")
     out.mkdir(parents=True)
     migration.COMMON_LOCAL.mkdir(parents=True, exist_ok=True)
     core.GAME_LOCK = migration.COMMON_LOCAL / "simulation-game.lock"
-    prepare_crossing(migration, out)
+    prepare_crossing(migration, out, operation)
