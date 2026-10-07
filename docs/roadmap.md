@@ -204,7 +204,7 @@ The accepted #108 decision keeps canonical map arrays in C++ with direct bundled
 view or allocation transfer is selected. Storage transfers still require explicit
 selection following `docs/design/world-state.md`.
 
-## Resume checkpoint (2026-10-07, migration active)
+## Resume checkpoint (2026-10-07, paused at user weekly-usage threshold)
 
 Root: `/root` (gpt-6-astra, xhigh). Latest integration is `0c2a4bf37e` (#167);
 **nineteen integrations since steering**. Main #164 validation 37582451591 and
@@ -216,11 +216,13 @@ removed after preserving ignored artifacts and branch references. The expiry
 worktree is also removed; all 25 completed-worktree archives remain available.
 
 The user set a weekly usage wind-down threshold of 50%. The latest host reading
-is 49% at 2026-10-07 07:26 UTC. Monitor the active session's seven-day usage
-window. At 50%, stop starting new work except what is needed for a clean handoff;
-finish active validation, reviews, necessary fixes and cleanup without abruptly
-cancelling jobs, update this checkpoint, then wrap up. Do not mark the migration
-complete.
+reached 50% at 2026-10-07 07:31 UTC. The session is winding down under that
+instruction. All implementation/review agents and local commands have finished;
+no pending source edits, active benchmarks or partially applied mutations remain.
+Main is clean, #166/#167 are merged with all required PR checks passing, and
+post-merge CI continues without cancellation. The next session must check the
+main runs above first and repair any failure before further integration. Do not
+mark the migration complete. Resume only when the user resumes the assignment.
 
 Refresh #145 and #149 from actual main in that order.
 Follow with #155 road conversion, then finish #151/#152/#153/#147 with the ship
@@ -297,8 +299,8 @@ use a fresh Astra high planner to replenish whole simulation owners.
 
 ## Choosing the next task
 
-The assignment is active. Take the first
-unblocked item above. Fill idle capacity in this order: integration and review
+The assignment is paused at the user's 50% weekly-usage threshold. On explicit
+resume, take the first unblocked item above. Fill idle capacity in this order: integration and review
 of finished work, Phase 1 items, then a new component, but only while fewer
 than six component branches are unintegrated (#157). Paused, deferred and
 out-of-scope issues are not fallbacks. Root selects further ownership work here before implementation starts.
