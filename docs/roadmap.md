@@ -217,9 +217,13 @@ Root: `/root` (gpt-6-astra, xhigh). Latest integration is `ea80a746a3` (#141);
 **thirteen integrations since steering**. Main nightly 37576549109 and platform
 CI 37576548523 and simulation 37576548217 pass at #159. The #163 platform
 run also passes; its simulation run was superseded by #141. Latest main #141
-validation 37578224139 is running and platform 37578224516 is queued; no new failure. Monitor new main checks and fix any red before more integration.
+validation 37578224139 passes; platform 37578224516 is running with no new failure. Monitor new main checks and fix any red before more integration.
 The #163 guarded monitor was stopped before root integrated it normally; do not
-restart it. Merged #163/#141/#133/#135 worktrees are removed, with ignored artifacts preserved.
+restart it. A guarded root process is watching #142 at `7bc3a38ad5` and may
+merge it when all 13 checks pass, unless any new main failure appears. Check the
+PR state before starting another merge. Then fetch main, remove its merged
+worktree, record integration fourteen and create #165 from that actual main.
+Merged #163/#141/#133/#135 worktrees are removed, with ignored artifacts preserved.
 
 Integrate #142, prepare the ordered #143/#144 batch #165, then #145
 and #149. Follow with #155 road conversion, then finish #151/#152/#153/#147.
@@ -235,8 +239,8 @@ of the main checkout; component source reviews are linked in each PR.
 | #136 / #145 | `aircraft-controller-ownership-136`, `aircraft-controller`, `dd0f2f0475` | Source accepted; exact verify and clean-head pair/self 21/21 pass. Ratio 2.567x. Refresh actual main after #165, review source conflicts, then final CI. |
 | #137 / #149 | `company-economy-ownership-137`, `company-economy`, `5b9a005064` | Accepted industry warning delta; exact verify, company/reload 13/13 and changed industry preparation 2/2 pass. Ratio 2.543x. Refresh after #145; final CI remains. |
 | #156 / #161 | `coverage-gaps-156`, `coverage-gaps`, `678bbe798f` | Root joined actual #163/#141 and initialized standalone GAME_LOCK. Exact save/receipt reproduction, verify, nine provenance tests, paired roads 15/15 (47 snapshots), focused self 3/3 and Ruff pass. Same reviewer accepts the additive scenario conflict resolution; final CI running. Metrics 0 / 306 / 0 / 0. |
-| #156 / #162 | `road-flooding-coverage-156`, `road-flooding`, local `b842a0aa86` | Owner `/root/road_flooding_coverage_156` (Sol high) joined updated #161; no src/rust conflict. Both saves reproduce exactly; flooding receipt is exact, crossing receipt retains its historical #161 setup metadata. Roads pair 16/16 and focused self 2/2 pass; exact verify, same-reviewer conflict check and final CI remain. |
-| #156 / #164 | `road-service-rng-coverage-156`, `road-service-rng`, `838c22f97a` | Both service RNG outcomes and draw-removal sensitivity pass; fresh review accepts and all 13 CI green. Join later road scenario additions before integration. |
+| #156 / #162 | `road-flooding-coverage-156`, `road-flooding`, pushed `b842a0aa86` | Owner `/root/road_flooding_coverage_156` (Sol high) joined updated #161; no src/rust conflict. Both saves reproduce exactly; flooding receipt is exact, crossing receipt retains its historical #161 setup metadata. Roads pair 16/16, focused self 2/2, exact verify and provenance/Ruff pass. Same reviewer accepts all conflict resolutions; final CI running. Own metrics 0 / 155 / 0 / 0. |
+| #156 / #164 | `road-service-rng-coverage-156`, `road-service-rng`, local `c0cc98ec05` | Owner joined updated #162, retaining all 14 road plus four town cases. Delta against #162 remains exactly the accepted service witnesses (+64 tooling, +34 README lines). Ruff/provenance pass; exact verify, full pair and focused self running, then same-reviewer conflict check and final CI. Earlier `838c22f97a` was accepted and green. |
 | #139 / #151 | `cargo-storage-movement-139`, `cargo-storage`, `ff912bcfcb` | F1 quadratic list fix accepted at `a25a7d41e2`; final verify, pair 20/20, self/soak 5/5 each, reload and scaling pass. Ratio 2.588x. Integrate after #155 conversion; same reviewer `/root/review_cargo_storage_151` (Astra medium). |
 | #146 / #152 | `ship-controller-ownership-146`, `ship-controller`, `7ec70a1768` | Full owner checkpoint; verify/Cargo/Ruff and 12 comparisons pass. Old ferry failures matched 40 snapshots but differed at wall-time plain exit: join #154 deterministic launcher before rerunning. Still needs candidate self/soak, actual build/sell/ID reuse/water-class witnesses, final company/orders/cargo ancestry, fresh review and CI. |
 | #138 / #153 | `order-lifecycle-ownership-138`, `order-lifecycle`, `ef58c967f7` | Full owner checkpoint; verify 97/134 and paired regression/depot/reload 67 snapshots pass. Prior 101 self/soak snapshots are reference-vs-reference. Add conditional/implicit active reload, native timetable/backup commands, shared-depot unbunching and initialized unmasked #83 evidence, then candidate soak, fresh review and CI. |
