@@ -6,7 +6,6 @@ import struct
 import threading
 from pathlib import Path
 
-from . import core
 from .core import (
     FILE_TYPES,
     ROOT,
@@ -93,16 +92,15 @@ def prepare_effects(scenario, binaries, builds, out, timeout, env):
             for iterations in (
                 (6000, 12000, 24000) if scenario["effects"] == "breakdown" else (600,)
             ):
-                with core.MACHINE.hold(alone=scenario["effects"] == "breakdown"):
-                    run = run_game(
-                        dict(setup, ticks=iterations),
-                        binaries["reference"],
-                        builds["reference"],
-                        cache,
-                        timeout,
-                        env,
-                        False,
-                    )
+                run = run_game(
+                    dict(setup, ticks=iterations),
+                    binaries["reference"],
+                    builds["reference"],
+                    cache,
+                    timeout,
+                    env,
+                    False,
+                )
                 if run["exit"] != 0 or not fixture.is_file():
                     raise RuntimeError("effect reference preparation failed")
                 prepared = read_save(fixture)
@@ -364,16 +362,15 @@ def prepare_effects(scenario, binaries, builds, out, timeout, env):
     }
     if scenario["effects"] == "reload":
         # Capture still-live private state through the unchanged reference only.
-        with core.MACHINE.hold(alone=False):
-            live = run_game(
-                dict(scenario, kind="save", save=str(normalized), ticks=16),
-                binaries["reference"],
-                builds["reference"],
-                out / scenario["name"] / "reload",
-                timeout,
-                env,
-                False,
-            )
+        live = run_game(
+            dict(scenario, kind="save", save=str(normalized), ticks=16),
+            binaries["reference"],
+            builds["reference"],
+            out / scenario["name"] / "reload",
+            timeout,
+            env,
+            False,
+        )
         fixture = live["snapshots"][-1]
         if save_moment(fixture)[2] - save_moment(normalized)[2] != 16 or not any(
             r["animation_state"] for r in effect_rows(fixture).values()

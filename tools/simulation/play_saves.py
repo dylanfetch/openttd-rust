@@ -2,7 +2,6 @@
 
 import hashlib
 
-from . import core
 from .core import (
     ROOT,
     SNAPSHOT_TICKS,
@@ -109,16 +108,15 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
         # The fixture comes from the unchanged reference only. Outstanding
         # jobs recompute from their saved graph/settings on load in both.
         setup = dict(scenario, ticks=3 * SNAPSHOT_TICKS)
-        with core.MACHINE.hold(alone=False):
-            prepared = run_game(
-                setup,
-                binaries["reference"],
-                builds["reference"],
-                out / scenario["name"] / "prepare",
-                timeout,
-                env,
-                True,
-            )
+        prepared = run_game(
+            setup,
+            binaries["reference"],
+            builds["reference"],
+            out / scenario["name"] / "prepare",
+            timeout,
+            env,
+            True,
+        )
         if prepared["exit"] != 0:
             raise RuntimeError(f"reload preparation exited with {prepared['exit']}")
         chunk = scenario["reload_chunk"]
