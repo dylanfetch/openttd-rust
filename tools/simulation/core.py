@@ -76,6 +76,7 @@ def scenario_modules():
         rails,
         roads,
         ships,
+        stations,
         towns,
         trees,
     )
@@ -92,6 +93,7 @@ def scenario_modules():
         disasters,
         economy,
         roads,
+        stations,
     )
 
 
@@ -754,6 +756,7 @@ def run_scenario(
             or "tree_input" in result
             or "effect_input" in result
             or "economy_input" in result
+            or "station_input" in result
             or "disaster_input" in result
         ):
             for mode in ("snapshots", "plain"):

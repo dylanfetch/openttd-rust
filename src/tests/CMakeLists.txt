@@ -19,6 +19,7 @@ add_test_files(
     rail_yapf_protocol.hpp
     road_yapf.cpp
     roadvehicle.cpp
+    station_service.cpp
     spiral_iterator_state.cpp
     string_builder.cpp
     string_consumer.cpp

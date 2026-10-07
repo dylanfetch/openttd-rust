@@ -19,6 +19,9 @@
 #include "linkgraph/linkgraph_type.h"
 #include "newgrf_storage.h"
 #include "bitmap_type.h"
+#ifdef WITH_RUST
+#include "rust/station_queue.hpp"
+#endif
 
 static const uint8_t INITIAL_STATION_RATING = 175;
 static const uint8_t MAX_STATION_RATING = 255;
@@ -224,9 +227,21 @@ struct GoodsEntry {
 		}
 	};
 
+#ifdef WITH_RUST
+	uint &max_waiting_cargo;
+	States &status;
+	uint8_t &time_since_pickup, &rating, &last_speed, &last_age, &amount_fract;
+	/* Native typed status aliases the Rust-owned byte; start its object lifetime. */
+	GoodsEntry(OpenTTDStationCargo *cargo) : max_waiting_cargo(cargo->max_waiting_cargo),
+		status(*::new (static_cast<void *>(&cargo->status)) States), time_since_pickup(cargo->time_since_pickup),
+		rating(cargo->rating), last_speed(cargo->last_speed), last_age(cargo->last_age), amount_fract(cargo->amount_fract)
+	{
+		static_assert(sizeof(States) == sizeof(uint8_t));
+		static_assert(alignof(States) == alignof(uint8_t));
+		static_assert(std::is_trivially_copyable_v<States>);
+	}
+#else
 	uint max_waiting_cargo = 0; ///< Max cargo from this station waiting at any station.
-	NodeID node = INVALID_NODE; ///< ID of node in link graph referring to this goods entry.
-	LinkGraphID link_graph = LinkGraphID::Invalid(); ///< Link graph this station belongs to.
 
 	States status{}; ///< Status of this cargo, see #State.
 
@@ -257,6 +272,11 @@ struct GoodsEntry {
 	uint8_t last_age = 255;
 
 	uint8_t amount_fract = 0; ///< Fractional part of the amount in the cargo list
+#endif
+
+	NodeID node = INVALID_NODE; ///< ID of node in link graph referring to this goods entry.
+	LinkGraphID link_graph = LinkGraphID::Invalid(); ///< Link graph this station belongs to.
+
 
 	/**
 	 * Reports whether a vehicle has ever tried to load the cargo at this station.
@@ -546,13 +566,27 @@ public:
 
 	StationHadVehicleOfType had_vehicle_of_type{};
 
+#ifdef WITH_RUST
+	RustStationLoadingQueue loading_vehicles{this->rust_service.get()};
+	uint8_t &time_since_load = openttd_rust_station_service_fields(this->rust_service.get())->time_since_load;
+	uint8_t &time_since_unload = openttd_rust_station_service_fields(this->rust_service.get())->time_since_unload;
+	uint8_t &last_vehicle_type = openttd_rust_station_service_fields(this->rust_service.get())->last_vehicle_type;
+	CargoTypes &always_accepted = openttd_rust_station_service_fields(this->rust_service.get())->always_accepted;
+	template <size_t... I> static std::array<GoodsEntry, NUM_CARGO> MakeGoods(OpenTTDStationService *state, std::index_sequence<I...>)
+	{
+		return {{GoodsEntry(openttd_rust_station_service_cargo(state, I))...}};
+	}
+	std::array<GoodsEntry, NUM_CARGO> goods = MakeGoods(this->rust_service.get(), std::make_index_sequence<NUM_CARGO>{});
+#else
+	std::list<Vehicle *> loading_vehicles{};
 	uint8_t time_since_load = 0;
 	uint8_t time_since_unload = 0;
 
 	uint8_t last_vehicle_type = 0;
-	std::list<Vehicle *> loading_vehicles{};
 	std::array<GoodsEntry, NUM_CARGO> goods; ///< Goods at this station
 	CargoTypes always_accepted{}; ///< Bitmask of always accepted cargo types (by houses, HQs, industry tiles when industry doesn't accept cargo)
+
+#endif
 
 	IndustryList industries_near{}; ///< Cached list of industries near the station that can accept cargo, @see DeliverGoodsToIndustry()
 	Industry *industry = nullptr; ///< NOSAVE: Associated industry for neutral stations. (Rebuilt on load from Industry->st)

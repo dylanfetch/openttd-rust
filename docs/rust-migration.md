@@ -1384,3 +1384,30 @@ with `CYapfBaseT` at node limits 0/1/2/7 and depot cost bounds 0/70/71/100
 cover every field on supported hosts. Arbitrary maps/NewGRFs, articulated/tram,
 road waypoints, exhaustive occupied-stop/loop/segment-length branches and actual
 legacy saves remain limits; shared follower logic is deliberately unported.
+
+
+### Station cargo service
+
+Issue #125 moves the ordered loading queue, station service counters, acceptance
+mask and per-cargo rating/pickup/speed/age/waiting/fraction metadata into one
+canonical opaque Rust owner per BaseStation. C++ scalar references and the queue
+facade address that allocation; ordinary/indexed construction, retirement, reuse,
+STNN/STNS and legacy fixups share it without persistent native mirrors. Rust owns
+PrepareUnload, complete station/vehicle loading, refit/reservation/completion,
+acceptance, ratings/truncation, admission/distribution and periodic/stale-link
+control. Packet, flow, link-graph, map and geometry storage remain C++.
+
+ABI IDs 110-115 pin layouts and direct noexcept service tables. Raw field-sized
+access ends before every service; native refit/cache/command-scope GUI readers and
+payment/industry reentry see current canonical state. Stable raw-owned queue nodes
+preserve list iterator identity. Save/fixup errors unwind through a native stack
+scope and retain partial list changes. #117 production flush remains once at the
+original end of LoadUnloadStation. Original bodies remain in portable builds.
+
+`python3 tools/migration.py simulate stations economy` uses the existing road/CAPY
+inputs for loading queues, fractional admission, acceptance loss, full/gradual
+loading, rating expiry/decay/capping, stale-link refresh/removal and active reload.
+`--self` and `--soak` reuse these cases. Native tests cover ABI, stable aliases,
+queue mutation, partial/nested save failure and actual retirement/indexed reuse.
+The corpus is not exhaustive for legacy versions, NewGRF cargo callbacks,
+articulated/multiheaded refits or every transport combination.
