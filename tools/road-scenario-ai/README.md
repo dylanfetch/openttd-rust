@@ -1,0 +1,51 @@
+# Road controller coverage (#156)
+
+Agent: /root/coverage_gaps_156_resume | Model: gpt-6.1-sol | Reasoning effort: high
+
+`setup.nut` loads the committed `water-ferry.sav` in an isolated pinned-reference
+runtime and constructs one crossing through `AIRoad.BuildRoad`. The first legal
+owned, flat, straight rail tile is 10005. The save retains the existing map,
+vehicles and company; only optional input GLOG history is removed. Its JSON
+receipt records the source, reference binary, scripts, construction marker and
+raw/normalized hashes. No map bytes are patched. The scripts retain the source
+AI name `WaterScenes` so the existing company runs them without an AIPL edit.
+
+The comparison installs `main.nut`, a read-only crash-event observer. Typed
+scenario input edits place existing visible stopped train 17 and loaded road
+vehicle 21 on the command-built crossing, with matching XY/Z and normal road
+state. Loaded link jobs are postponed as in the existing road scenarios.
+Both modes require the vehicle to crash, its crash counter to advance and exactly
+one event with vehicle/site/reason/victims `21 10005 1 3`. All saved chunks and logs
+compare. The event witnesses the RoadCrashNews call; viewport/news pixels and
+sound output are not observed.
+
+The existing player save supplies the no-destination case. Clear head 3's orders
+and destination while retaining its cached route. At junction 10815, the original
+chooses road state 10, leaves the cache intact and ends with DATE random seeds
+`15484628, 1889006306`; these frozen results are required in both modes. Removing
+the Rust site's draw instead chooses state 5 and seeds `2227148571, 73632321`.
+The unchanged original advances 280 draws from the input seeds; this mutation
+advances 279. No per-site counter or modified reference is used.
+
+Reproduction (retain or move any previous preparation directory first):
+
+```sh
+python3 tools/migration.py build --jobs 2
+PYTHONPATH=tools python3 -m simulation.roads --prepare-crossing
+python3 tools/migration.py simulate roads-no-destination roads-level-crossing --self --jobs 2
+python3 tools/migration.py simulate roads --jobs 2
+```
+
+Scratch negatives: save `rust/openttd-kernels/src/road.rs`, apply exactly one
+replacement below, run the named scenario with `python3 tools/migration.py
+simulate <scenario> --jobs 2`, require failure, and restore before the next probe:
+
+| Scenario | Original Rust expression | Scratch replacement | Required failure |
+| --- | --- | --- | --- |
+| `roads-no-destination` | `u64::from(self.random()) * u64::from(tracks.count_ones())` | `u64::from(0_u32) * u64::from(tracks.count_ones())` | track/shared RNG witness; DATE seeds differ |
+| `roads-level-crossing` | `self.tile(IS_CROSSING, uid, u.tile) != 0` | `self.tile(IS_CROSSING, uid, u.tile) == 0` | crossing did not crash the road vehicle |
+| `roads-level-crossing` | `self.q(CRASH_NEWS, id, victims, 0);` | `if victims == u32::MAX { self.q(CRASH_NEWS, id, victims, 0); }` | crash event missing while vehicle still crashes |
+
+After restoring, rerun `python3 tools/migration.py simulate roads --jobs 2`.
+This closes two road gaps. Other #156 branches, arbitrary maps/NewGRFs, flooding,
+legacy saves, news rendering and audio remain unexercised by these cases.
