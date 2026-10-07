@@ -2,6 +2,7 @@
 
 Agent: /root/coverage_gaps_156_resume | Model: gpt-6.1-sol | Reasoning effort: high
 Flooding: /root/road_flooding_coverage_156 | Model: gpt-6.1-sol | Reasoning effort: high
+Crash expiry: /root | Model: gpt-6-astra | Reasoning effort: xhigh
 
 `setup.nut` loads the committed `water-ferry.sav` in an isolated pinned-reference
 runtime and constructs one crossing through `AIRoad.BuildRoad`. The first legal
@@ -19,6 +20,16 @@ Both modes require the vehicle to crash, its crash counter to advance and exactl
 one event with vehicle/site/reason/victims `21 10005 1 3`. All saved chunks and logs
 compare. The event witnesses the RoadCrashNews call; viewport/news pixels and
 sound output are not observed.
+
+`roads-crash-before-expiry` and `roads-crash-expiry` reuse that input and observer
+for 2238 and 2239 ticks. The unchanged original retains the single crashed head
+at counter 2239 / vehicle tick 63 (the uint8 tick wraps) at the first endpoint,
+then deletes pool entry 21 on the next tick, a 32-tick boundary. Both modes
+require the original collision event and DATE ticks 18018/18019; no crash counter
+or active-crash flag is seeded. These cases cover single-head wreck deletion;
+articulated tail deletion, surviving-head handling and road-stop cleanup remain
+open in #156. Reproduce with `python3 tools/migration.py simulate roads-crash
+--jobs 2`, adding `--self` for reference determinism.
 
 The existing player save supplies the no-destination case. Clear head 3's orders
 and destination while retaining its cached route. At junction 10815, the original
@@ -48,6 +59,7 @@ simulate <scenario> --jobs 2`, require failure, and restore before the next prob
 | `roads-level-crossing` | `self.tile(IS_CROSSING, uid, u.tile) != 0` | `self.tile(IS_CROSSING, uid, u.tile) == 0` | crossing did not crash the road vehicle |
 | `roads-level-crossing` | `self.q(CRASH_NEWS, id, victims, 0);` | `if victims == u32::MAX { self.q(CRASH_NEWS, id, victims, 0); }` | crash event missing while vehicle still crashes |
 | `roads-flooding` | `if flooded { 2000 } else { 1 }` | `if flooded { 1 } else { 1 }` | flooded crash countdown witness; counter and shared RNG differ |
+| `roads-crash-expiry` | `counter >= 2220 && self.read(id).tick & 31 == 0` | `counter >= 65535 && self.read(id).tick & 31 == 0` | crashed head survived its deletion tick; VEHS differs |
 
 After restoring, rerun `python3 tools/migration.py simulate roads --jobs 2`.
 The flooding fixture uses the same reference constructor and existing bus 21.

@@ -34,7 +34,7 @@ def install(scenario, run_dir):
 
 def scenarios(soak):
     # These transient windows stay short in soak; play saves cover longer runs.
-    return [
+    cases = [
         {
             "name": f"roads-{operation}",
             "kind": "save",
@@ -73,6 +73,12 @@ def scenarios(soak):
             ("service-refresh", "opus-55-167-002", 37, 1),
         )
     ]
+    crossing = next(case for case in cases if case["roads"] == "level-crossing")
+    cases.extend(
+        dict(crossing, name=f"roads-crash-{phase}", ticks=ticks, crash_expiry=phase)
+        for phase, ticks in (("before-expiry", 2238), ("expiry", 2239))
+    )
+    return cases
 
 
 def rows(path):
@@ -368,7 +374,7 @@ def check(scenario, run, mode, role, result):
         )
 
     if operation == "level-crossing":
-        a, b = observe(21)
+        a = before[21]
         tile, roadbits = map_tile(10005)
         require(tile == 2 and roadbits & 192 == 64, "tile is not a level crossing")
         train = next(
@@ -385,10 +391,8 @@ def check(scenario, run, mode, role, result):
             "input lacks visible train within collision distance",
         )
         require(
-            not a[COMMON + "vehstatus"] & 128
-            and b[COMMON + "vehstatus"] & 128
-            and a[ROAD + "crashed_ctr"] == 0 < b[ROAD + "crashed_ctr"],
-            "crossing did not crash the road vehicle",
+            not a[COMMON + "vehstatus"] & 128 and a[ROAD + "crashed_ctr"] == 0,
+            "crossing input already contains a crashed road vehicle",
         )
         events = [
             line.split("ROAD-CROSSING-EVENT ", 1)[1]
@@ -400,7 +404,40 @@ def check(scenario, run, mode, role, result):
             "crossing crash event/victims missing or repeated",
         )
         witnesses["crash_event"] = events[0]
-        witnesses["crashed_ctr"] = b[ROAD + "crashed_ctr"]
+        expiry = scenario.get("crash_expiry")
+        if expiry:
+            final_chunks = read_save(final)
+            date = final_chunks["DATE"]
+            tick = decode_element(date, date["elements"][0][1])["tick_counter"]
+            require(
+                a[COMMON + "next"] == 0
+                and a[COMMON + "tick_counter"] == 129
+                and tick == 15780 + scenario["ticks"],
+                "single-vehicle crash expiry input or endpoint differs",
+            )
+            witnesses["expiry_tick"] = tick
+        if expiry == "expiry":
+            require(
+                21 not in dict(final_chunks["VEHS"]["elements"]),
+                "crashed head survived its deletion tick",
+            )
+            witnesses["deleted_head"] = 21
+        else:
+            a, b = observe(21)
+            require(
+                b[COMMON + "vehstatus"] & 128 and b[ROAD + "crashed_ctr"] > 0,
+                "crossing did not crash the road vehicle",
+            )
+            witnesses["crashed_ctr"] = b[ROAD + "crashed_ctr"]
+            if expiry == "before-expiry":
+                # Frozen unchanged-reference endpoint: the per-vehicle u8 tick
+                # wraps to 63, one tick before the 32-tick deletion boundary.
+                require(
+                    b[ROAD + "crashed_ctr"] == 2239
+                    and b[COMMON + "tick_counter"] == 63
+                    and b[COMMON + "next"] == 0,
+                    "crashed head did not survive until just before deletion",
+                )
 
     if operation == "flooding":
         a, b = observe(21)
