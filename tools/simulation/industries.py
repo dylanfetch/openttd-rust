@@ -3,7 +3,7 @@
 import shutil
 from pathlib import Path
 
-from . import core, disasters, economy
+from . import disasters, economy
 from .core import SNAPSHOT_TICKS, TICKS_PER_DAY, read_save, run_game
 
 AI_FOLDER = "industry-scenario-ai"
@@ -83,15 +83,14 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
             ticks=3 * SNAPSHOT_TICKS,
             console=[*scenario["console"], "start_ai MigrationIndustries"],
         )
-        with core.MACHINE.hold(alone=False):
-            run = run_game(
-                setup,
-                binaries["reference"],
-                builds["reference"],
-                out / scenario["name"] / "input" / "reference",
-                timeout,
-                env,
-            )
+        run = run_game(
+            setup,
+            binaries["reference"],
+            builds["reference"],
+            out / scenario["name"] / "input" / "reference",
+            timeout,
+            env,
+        )
         if run["exit"] or not any(
             "INDUSTRY-LUMBER ready true" in line for line in run["log"]
         ):
@@ -104,15 +103,14 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
         return scenario
     folder = out / scenario["name"] / "input"
     setup = dict(scenario, ticks=2 * SNAPSHOT_TICKS)
-    with core.MACHINE.hold(alone=False):
-        run = run_game(
-            setup,
-            binaries["reference"],
-            builds["reference"],
-            folder / "reference",
-            timeout,
-            env,
-        )
+    run = run_game(
+        setup,
+        binaries["reference"],
+        builds["reference"],
+        folder / "reference",
+        timeout,
+        env,
+    )
     if run["exit"] or not run["snapshots"]:
         raise RuntimeError("industry reference setup failed")
     source = run["snapshots"][-1]

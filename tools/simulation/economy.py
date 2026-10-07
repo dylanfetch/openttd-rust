@@ -56,15 +56,14 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
     setup = dict(scenario, ticks=8 * SNAPSHOT_TICKS)
     if scenario["economy"] == "stockpile":
         setup["console"] = DISTRIBUTIONS["manual"]
-    with core.MACHINE.hold(alone=False):
-        run = run_game(
-            setup,
-            binaries["reference"],
-            builds["reference"],
-            out / scenario["name"] / "prepare",
-            timeout,
-            env,
-        )
+    run = run_game(
+        setup,
+        binaries["reference"],
+        builds["reference"],
+        out / scenario["name"] / "prepare",
+        timeout,
+        env,
+    )
     candidates = [p for p in run["snapshots"] if read_save(p)["CAPY"]["elements"]]
 
     def witness(path):
@@ -88,15 +87,14 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
             c for c in scenario["console"] if "linkgraph.recalc_time " not in c
         ]
         drain["console"] = ["setting linkgraph.recalc_time 9000", *drain["console"]]
-        with core.MACHINE.hold(alone=False):
-            drained = run_game(
-                drain,
-                binaries["reference"],
-                builds["reference"],
-                out / scenario["name"] / "drain",
-                timeout,
-                env,
-            )
+        drained = run_game(
+            drain,
+            binaries["reference"],
+            builds["reference"],
+            out / scenario["name"] / "drain",
+            timeout,
+            env,
+        )
 
         def future_jobs(path):
             chunks = read_save(path)
