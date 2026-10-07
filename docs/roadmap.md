@@ -47,7 +47,8 @@ barrier sound (#169). Corrections:
 
 Phase 1 and Phase 2 below carry the resulting actions in order. Reviews now use
 `gpt-6.1-sol` high, and the reviewer fixes its own findings (`AGENTS.md`). Existing
-acceptances stand; the next review round on each open PR moves to the new rule.
+acceptances stand. Each later round uses a fresh reviewer, and finished agents
+are closed rather than kept open for reuse.
 
 ## Earlier steering (2026-10-04), still in force
 
@@ -167,7 +168,7 @@ map or pool crossings dominating.
 | --- | --- | --- |
 | #136 / #145 | `aircraft-controller-ownership-136` (`aircraft-controller`), `dd0f2f0475` | Source accepted; base conflict in `abi.rs`; Phase 2 item 1. |
 | #137 / #149 | `company-economy-ownership-137` (`company-economy`), `5b9a005064` | Source accepted; two audit fixes need re-review; item 2. |
-| #139 / #151 | `cargo-storage-movement-139` (`cargo-storage`), `ff912bcfcb` | Accepted at `a25a7d41e2` (reviewer `/root/review_cargo_storage_151`); final base and CI after item 3. |
+| #139 / #151 | `cargo-storage-movement-139` (`cargo-storage`), `ff912bcfcb` | Accepted at `a25a7d41e2`; final base and CI after item 3. |
 | #138 / #153 | `order-lifecycle-ownership-138` (`order-lifecycle`), `ef58c967f7` | Draft checkpoint; evidence plan and #168 conversion in PR comments. |
 | #146 / #152 | `ship-controller-ownership-146` (`ship-controller`), `7ec70a1768` | Draft; join #154 launcher, convert per #168, follow #153. |
 | #147 | `fleet-replacement-ownership-147` (`fleet-replacement`), `68d660adc9` | State-only WIP, no PR. |

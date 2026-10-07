@@ -23,7 +23,9 @@ checkpoint and work order.
 1. Take the first unblocked item in the roadmap's current work order. Fill idle
    capacity in this order: review and integration of finished work, the Phase 1
    items, then the next ordered component, only while fewer than six component
-   branches are unintegrated. Keep about five subagents busy within that limit.
+   branches are unintegrated. Keep about five subagents busy within that limit,
+   with a fresh agent per task and review round. Close each agent when it
+   finishes. At the slot limit, do root work until a slot frees.
 2. Follow the full process for every change: issue, isolated worktree, PR,
    independent attributed review naming what was compared, in which the
    reviewer fixes its findings and you verify its fix commits, green required

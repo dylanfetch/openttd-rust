@@ -121,8 +121,13 @@ model and states its effort as reported by its host.
 
 Spawn a fresh agent for each task and name it after that task. Do not reassign a
 finished agent to unrelated work: its name is its attribution, and its context
-carries over. Each PR gets its own reviewer, not one reused from another PR; that
-reviewer handles every review round of the same PR.
+carries over. Each review round, including a re-review, gets a fresh reviewer; it
+reads the PR's earlier attributed review reports for context.
+
+Close each agent when its task ends. When the host's slot limit is reached, root
+works through its own queue (integration, verifying fix commits, roadmap) until a
+slot frees. Root leaves host state alone: no archiving threads or editing host
+databases to free slots.
 
 For substantive changes:
 
@@ -137,7 +142,7 @@ For substantive changes:
    verifies the reviewer's fix commits before integration. Findings that need a
    scope or policy decision go to root unfixed. Updating a reviewed PR from its
    base needs no new review when the update has no conflicts in `src/` or `rust/`
-   and CI passes; otherwise the reviewer checks and fixes only the conflict
+   and CI passes; otherwise a fresh reviewer checks and fixes only the conflict
    resolution.
 4. Root integrates after review and required checks, records completion, and
    removes the merged worktree. A red check on `rust-migration` itself is fixed
