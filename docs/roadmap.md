@@ -108,6 +108,11 @@ Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas
 
 ## Phase 1: harness and speed maintenance
 
+User-selected maintenance #170 precedes the port queue: explicit partial/full CI
+with a final merge gate, observable and bounded local validation, checked evidence
+export and recoverable worktree cleanup. Root integrates this tooling change;
+the six game component branches remain checkpointed and no new port starts.
+
 The harness is `python3 tools/migration.py simulate` (`docs/rust-migration.md`,
 "Simulation comparison"); its default set runs in CI. Harness regressions are
 always the first priority. Port differences go in `KNOWN_FAILURES` with an issue,
