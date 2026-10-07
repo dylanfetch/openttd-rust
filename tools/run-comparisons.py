@@ -7,12 +7,13 @@ scratch directory under .local/; their logs go to .local/comparison-logs/.
 """
 
 import argparse
-import os
 import subprocess
 import sys
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+
+from validation_execution import run_logged
 
 ROOT = Path(__file__).resolve().parents[1]
 LOGS = ROOT / ".local/comparison-logs"
@@ -28,28 +29,31 @@ def discover():
 def run(tool):
     log = LOGS / f"{tool.stem}.log"
     start = time.monotonic()
-    with log.open("w") as output:
-        try:
-            code = subprocess.run(
-                [sys.executable, str(tool)],
-                cwd=ROOT,
-                stdout=output,
-                stderr=subprocess.STDOUT,
-                timeout=TIMEOUT_SECONDS,
-            ).returncode
-        except subprocess.TimeoutExpired:
+    try:
+        code = run_logged(
+            [sys.executable, str(tool)],
+            cwd=ROOT,
+            env=None,
+            log=log,
+            phase=tool.name,
+            timeout=TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired:
+        with log.open("a") as output:
             output.write(f"\nTimed out after {TIMEOUT_SECONDS} seconds\n")
-            code = -1
+        code = -1
     return tool, code, time.monotonic() - start, log
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--jobs", type=int, default=min(6, os.cpu_count() or 1))
+    parser.add_argument("--jobs", type=int, default=2)
     parser.add_argument(
         "names", nargs="*", help="Only run tools whose file name contains one of these"
     )
     args = parser.parse_args()
+    if args.jobs < 1:
+        parser.error("--jobs must be positive")
     tools = [
         tool
         for tool in discover()
@@ -60,7 +64,9 @@ def main():
     LOGS.mkdir(parents=True, exist_ok=True)
     failed = []
     with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
-        for tool, code, seconds, log in pool.map(run, tools):
+        futures = [pool.submit(run, tool) for tool in tools]
+        for future in as_completed(futures):
+            tool, code, seconds, log = future.result()
             print(
                 f"{'ok  ' if code == 0 else 'FAIL'} {seconds:6.1f}s  {tool.name}",
                 flush=True,

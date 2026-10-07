@@ -308,10 +308,16 @@ class SimulationSpeedTests(unittest.TestCase):
                                 text=True,
                             )
                             self.assertEqual(child.stdout.readline().strip(), "waiting")
+                            self.assertIn(
+                                "simulation game: waiting", child.stdout.readline()
+                            )
                             self.assertFalse(
                                 select.select([child.stdout], [], [], 0.05)[0]
                             )
                         with child:
+                            self.assertIn(
+                                "simulation game: acquired", child.stdout.readline()
+                            )
                             self.assertEqual(child.stdout.readline().strip(), "entered")
                             self.assertEqual(child.wait(timeout=10), 0)
 

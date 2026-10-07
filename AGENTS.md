@@ -176,6 +176,10 @@ Python tools use `uvx --from ruff==0.16.8 ruff check tools/` and
 checks that the candidate retains reference test names, and records evidence under
 `.local/`. `python3 tools/migration.py build` builds both without running tests.
 `python3 tools/migration.py tools` builds the native Rust generators.
+`python3 tools/migration.py rust-checks` runs the four Cargo checks without
+preparing the original or a native build. `--jobs` defaults to two and bounds
+both CMake and Cargo. Commands print their phase, log path, elapsed time and
+lock waits; retain the reported receipt paths for review.
 `python3 tools/migration.py simulate [name...] [--soak] [--self]` builds both
 games and compares their simulation state (`tools/simulate.py`).
 `python3 tools/run-comparisons.py [name...]` runs the reference comparison tools
@@ -190,9 +194,25 @@ and per-role ccache stores. ccache is used whenever it is installed (PCH off);
 `--no-ccache` gives an ordinary PCH build. Cache build outputs freely when the
 key covers what determines them; never cache test results.
 
-Iterate locally: incremental builds take seconds to minutes, while every push
-starts roughly 15 minutes of CI. Push when a change is ready for CI or review,
-with its commits batched, and keep working while CI runs.
+Iterate locally and push reviewable batches. Ordinary PR pushes run inexpensive
+checks; request broader CI with `python3 tools/ci.py request PR --profile rust`,
+`native`, `platform`, or `full`. Partial runs are diagnostic. Before merging,
+request `full` for the final PR head and wait with `python3 tools/ci.py wait
+RECEIPT`; a later push requires a new full run. The protected `Full validation`
+status requires every full job to succeed at that exact head. Retain post-merge
+code validation and fix a red integration branch before further integrations.
+When batching is necessary, validate and merge a concrete integration PR once;
+stacked PRs alone do not combine their CI runs.
+
+Before pushing, run `python3 tools/preflight.py --base origin/rust-migration`
+and supply `--verification REPORT` or explicit `--build-log LOG` paths to check
+candidate compiler warnings. It uses the same pinned inherited checker as CI;
+it does not replace full validation. Export explicit receipts with
+`python3 tools/evidence.py --verification REPORT --simulation REPORT --base BASE
+--head HEAD --agent AGENT --model MODEL --effort EFFORT` for compact PR evidence.
+After integration, use `python3 tools/worktrees.py plan`, then `archive` with the
+absolute worktree path and `--expected-head FULL_COMMIT`; use `resume` with the
+same arguments after interruption. These CLI tools work without T3 Code.
 
 Docs-only changes (only `docs/` or `*.md` files, such as roadmap updates) are
 committed directly to `rust-migration` as a single commit, without a PR.
