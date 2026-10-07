@@ -1322,8 +1322,8 @@ turn commands into Rust. Rust owns seven private scalars and the ordered path;
 modern, historical split-vector and TTD/TTO save adapters stage them in C++.
 Original algorithms and road/tram movement data compile only in portable builds.
 Shared Vehicle/GroundVehicle physics, pools, orders/loading, map/road stops,
-construction, rendering and road YAPF remain C++. A temporary YAPF result exists
-only for an empty canonical path and transfers before result handling.
+construction and rendering remain C++. Road YAPF uses the same canonical path
+through #124; there is no temporary C++ search result cache.
 
 Rust uses copied IDs/observations and direct noexcept services, including shared
 RNG. Actions return to C++ for owner reentry, commands, NewGRF callbacks, viewport
@@ -1338,3 +1338,49 @@ exercise widths, ordered paths, nested save staging, partial-load unwind, indexe
 pool reuse and reentry. These establish covered behavior; actual legacy saves,
 NewGRFs, articulated/tram turns, level-crossing collisions, sounds and viewport
 pixels remain unexercised controller domains.
+
+### Rail YAPF search, caches and reservation
+
+[#133](https://github.com/dylanfetch/openttd-rust/pull/133) moves all four searches,
+node/segment arenas, exact-order heap, costs, lookahead, limits and reconstruction
+into Rust. Rust owns six specialization-specific cache banks, rail-change
+invalidation, reservation traversal and ordered signal rollback. C++ retains
+the train controller, shared track follower, PBS and canonical world services.
+Explicit platform/waypoint station triggers return to C++ with borrows released;
+waypoint track reservation also retains the original synchronous PBS station
+triggers while search/reservation borrows remain active, before its second trigger.
+Original search bodies remain portable-only; diagnostic dumps use temporary
+views and the original format, with no canonical C++ search mirror.
+
+`python3 tools/migration.py simulate padhattan rail-reservation` and its self/soak
+variants exercise cache reuse, reversal, depot/safe-tile search, reservation,
+busy targets, rollback and active-state reload under both 90-degree policies.
+Native unchanged-base/heap probes cover finite limits, live cost invalidation
+and ordered opposing PBS signal restoration absent from the supplied network.
+They do not prove full rail-cost semantics for arbitrary maps, NewGRFs, legacy
+saves or every signal family. Controller reservation extension belongs to #130.
+
+### Road YAPF search and path construction
+
+Issue #124 moves both track/depot searches, road exit-direction keys, node arena,
+lookup maps, exact-order heap, segment traversal/cost, heuristic, limits and best
+intermediate fallback into Rust. Reconstruction and station-area trimming write
+#121's sole canonical path directly; cache ownership is not counted twice.
+Original road specialization and node types compile only in portable builds.
+C++ keeps map/pools/settings, closest station-area and road-stop observations,
+and shared `CFollowTrackRoad` behind copied scalar `noexcept` leaves. None runs
+scripts, mutates/reenters the search or canonical road owner, or throws during
+ordinary play. Short owner access ends before leaves. RNG is unchanged (neither
+search draws); integer narrowing/wrapping, exit-key replacement, strict ties and
+follow-before-limit timing retain source behavior. Panics/OOM abort.
+
+`python3 tools/migration.py simulate roads` covers the controller's original eight
+cases, actual station-area prefix trimming and a forced cache miss with competing
+penalties; original road plays and Padhattan traffic run in `--soak`. Paired/self runs
+compare every saved field in plain/desync modes. Native tests compare actual heap
+and origin masks with unchanged C++ and actual depot-search transcript/counters
+with `CYapfBaseT` at node limits 0/1/2/7 and depot cost bounds 0/70/71/100
+(loaded node settings clamp to >=500). Native ABI checks
+cover every field on supported hosts. Arbitrary maps/NewGRFs, articulated/tram,
+road waypoints, exhaustive occupied-stop/loop/segment-length branches and actual
+legacy saves remain limits; shared follower logic is deliberately unported.

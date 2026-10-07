@@ -1,0 +1,49 @@
+/*
+ * This file is part of OpenTTD.
+ * OpenTTD is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, version 2.
+ * OpenTTD is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
+ */
+
+/** @file road_yapf_ffi.h Complete road search and canonical road-cache construction. */
+#ifndef RUST_ROAD_YAPF_FFI_H
+#define RUST_ROAD_YAPF_FFI_H
+#include "road_ffi.h"
+extern "C" {
+struct OpenTTDRoadYapfInput {
+	uint32_t map_x, map_y, tile, dest_tile;
+	int32_t max_nodes, slope, crossing, stop, occupied, bay, curve, display_speed;
+	uint16_t order_destination, order_speed;
+	uint8_t order_type, bus, articulated, trackdir;
+};
+struct OpenTTDRoadYapfTile {
+	uint32_t occupied, length;
+	uint16_t station;
+	uint8_t type, station_type, depot, depot_dir, crossing, waypoint, drive_through, continuation, busy_bays;
+};
+struct OpenTTDRoadYapfFollow { uint32_t tile; int32_t skipped, max_speed, min_speed; uint16_t dirs; uint8_t followed; };
+struct OpenTTDRoadYapfArea { uint32_t tile; uint16_t width, height; uint8_t valid, stop, drive_through, next; };
+struct OpenTTDRoadYapfLeaves {
+	OpenTTDRoadYapfTile (OPENTTD_ROAD_CALL *tile)(const void *, uint32_t, uint8_t) noexcept;
+	OpenTTDRoadYapfFollow (OPENTTD_ROAD_CALL *follow)(const void *, uint32_t, uint8_t) noexcept;
+	uint16_t (OPENTTD_ROAD_CALL *tracks)(const void *, uint32_t, uint8_t) noexcept;
+	int32_t (OPENTTD_ROAD_CALL *height)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *closest)(const void *, uint16_t, uint8_t) noexcept;
+	OpenTTDRoadYapfArea (OPENTTD_ROAD_CALL *area)(const void *, uint16_t) noexcept;
+};
+struct OpenTTDRoadYapfResult { uint32_t tile; int32_t cost; uint8_t direction, found; int32_t rounds, open, closed, calcs, distance; };
+/* Input is copied; the opaque vehicle context stays live through this synchronous
+ * game-thread call. Leaves access only shared map/pool/settings/follower services,
+ * cannot run scripts, throw, or mutate/reenter the Rust search or road owner. No
+ * Rust reference into world or canonical road state survives a leaf. The search
+ * owns arena, lookup maps, exact-order heap and reconstruction. Only brief direct
+ * writes modify #121's canonical path; no second cache or result bridge exists.
+ * Panics/OOM abort; environment failures terminate inside noexcept leaves. */
+OpenTTDRoadYapfResult OPENTTD_ROAD_CALL openttd_rust_road_yapf_choose(OpenTTDRoadState *, const OpenTTDRoadYapfInput *, const OpenTTDRoadYapfLeaves *, const void *, uint32_t, uint8_t, uint16_t, uint8_t);
+OpenTTDRoadYapfResult OPENTTD_ROAD_CALL openttd_rust_road_yapf_depot(const OpenTTDRoadYapfInput *, const OpenTTDRoadYapfLeaves *, const void *, int32_t);
+/* Evidence-only actual-heap probe. Input/Leaves initialized; no leaf is invoked.
+ * costs[nodes], commands[count], values[count] readable and output[count] writable
+ * disjoint spans. Indices/membership satisfy the original heap preconditions. */
+void OPENTTD_ROAD_CALL openttd_rust_road_yapf_heap_probe(const OpenTTDRoadYapfInput *, const OpenTTDRoadYapfLeaves *, const int32_t *, size_t, const uint32_t *, const int32_t *, size_t, uint32_t *);
+}
+#endif
