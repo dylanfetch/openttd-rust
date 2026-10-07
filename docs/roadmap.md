@@ -25,12 +25,15 @@ the PR (`AGENTS.md`, "Evidence budget").
   do not grow generic tooling to polish evidence or improve a metric.
 - The tenth integration, #160, repairs deterministic harness endpoints: zero
   additional C++ retired or glue, 277 tooling lines added and 228 removed.
-  Main post-merge checks are running. The separate nightly repair #159 passes
-  its dispatched three-platform nightly; required PR checks still gate it.
+  Main post-merge checks are green. The separate nightly repair #159 passes
+  its dispatched three-platform nightly; required final-head PR checks still gate it.
 - The exact serial-policy play-save ratio is 2.398x in reviewed #163; independent
   repetition gives 2.402x. RoadObserve leads the 3,920-sample profile at 14.11%,
   followed by the road future at 9.03%. Retain the planned road conversion;
   no raw map view is selected. Required CI still gates the speed-report tooling.
+  The prepared search batch measures 2.599x against a same-window baseline
+  2.429x (+7.0%). Other prepared owners measure 2.503-2.588x; no measured
+  dependency delta exceeds 10%. Recheck combined source after base updates.
 - #156 now tracks the synchronous harness's excluded worker/abort interleavings.
   RNG/crossing/news coverage #161 and flooding #162 are reviewed or in review,
   not yet integrated. Eleven component branches plus one integration branch
@@ -233,15 +236,27 @@ Active work (all new branches start from integrated main):
 
 | Issue / agent | Branch / worktree | Next step |
 | --- | --- | --- |
-| #156 first slice | `coverage-gaps-156`, `openttd-rust-coverage-gaps`, PR #161 at `6dc51f18b3` | Accepted RNG/crossing/news coverage, 14/14 and three negative probes. Clean actual #154 update and obsolete preparation API removal; public constructor reproduces save/receipt exactly, final pair 2/2. CI running. |
-| #156 `/root/road_flooding_coverage_156` (Sol high) | `road-flooding-coverage-156`, `openttd-rust-road-flooding`, PR #162 at `226267b976` | Legal canal/road fixture reaches actual flooding crash; initial review has no findings. Actual #154 API update, both constructors reproduce exact saves, final pair/self 2/2. Final independent disposition and CI pending; named maintenance dependency on #161. |
-| #155 `/root/speed_report_155_resume` (Sol high) | `speed-report-155`, `openttd-rust-speed-report`, PR #163 at `f4fedd2ce6` | Independent review accepts benchmark isolation/provenance and #154 reconciliation; 9 tests, normal 25 snapshots and exact three-pair 2.398x report pass. CI pending. Tooling must land before queued ports record final play-save ratios. |
-| #158 `/root` (Astra xhigh) | `fix-mingw-nightly-158`, `openttd-rust-mingw-nightly`, PR #159 at `e10f0e2e63` | Reviewed YAML `c4cee973f1` plus clean actual #160/main update. Nightly run 37570989513 passes all three builds/tests and annotations. Required final-head CI restarted; then integrate and dispatch main nightly. |
-| #140 / #141 preparation | `integrate-reviewed-pathfinding`, pushed `22b2c28482` | Clean main/F1 docs update accepted; actual #154 joined, obsolete rail preparation lock removed. Final verify and reload 1/1 with 25 snapshots pass. Required CI running; record final speed ratio before integration. |
-| #142 `/root/station_integration_142` / #143 root preparation | Station local `f9fc161e80`; rail local `a29a142d22` | Station actual #154 update has no source conflicts; verify and focused pair 12/12 pass, self/push pending. Rail still needs actual #154. Both join integrated #141 and record final ratios before integration. |
-| #144 industry warning repair | Local unpushed `4751809474` in `openttd-rust-industry-periodic` | Independent delta review, exact verify and 4480 native cases pass; join integrated main, focused pair and final CI. Metrics now 1508 / 474 / 678 / 932; eight extra retired lines are declaration/comment scope, not new game logic. |
-| #149 root preparation | Local unpushed `1886b41784` in `openttd-rust-company-economy` | Clean main update plus identical industry warning fix; exact verify and independent delta review pass. Actual #144 ancestry, ratio and final CI remain. |
-| #151 `/root/cargo_list_scaling_151` (Sol high) | `cargo-storage-movement-139`, `openttd-rust-cargo-storage`, local `ff912bcfcb` | F1 fixed and source accepted at `a25a7d41e2`; exact verify/probe pass. Clean actual #154 join plus obsolete rail-preparation lock removal; final verify, pair 20/20, self 5/5, soak 5/5, reload and scaling pass. Pushed; CI running. Same reviewer `/root/review_cargo_storage_151` (Astra medium). |
+| #156 first slice | `coverage-gaps-156`, `openttd-rust-coverage-gaps`, PR #161 at `6dc51f18b3` | Accepted RNG/crossing/news coverage, 14/14 and three negative probes. Clean actual #154 update and obsolete preparation API removal; public constructor reproduces save/receipt exactly, final pair 2/2. CI running; after #163, initialize the shared game lock in the standalone constructor before integration. |
+| #156 `/root/road_flooding_coverage_156` (Sol high) | `road-flooding-coverage-156`, `openttd-rust-road-flooding`, PR #162 at `226267b976` | Legal canal/road fixture reaches actual flooding crash; initial review has no findings. Actual #154 API update, both constructors reproduce exact saves, final pair/self 2/2. Final independent review accepts; CI pending. Join actual #161/#163 and initialize standalone constructor lock before integration. |
+| #155 `/root/speed_report_155_resume` (Sol high) | `speed-report-155`, `openttd-rust-speed-report`, PR #163 at `f4fedd2ce6` | Independent review accepts benchmark isolation/provenance and #154 reconciliation; 9 tests, normal 25 snapshots and exact three-pair 2.398x report pass. CI compare/platform builds pass; annotations pending. Root measured queued owners with its reviewed candidate override and matched every binary hash to a clean verification receipt. |
+| #156 service RNG | `road-service-rng-coverage-156`, `openttd-rust-road-service-rng`, PR #164 at `838c22f97a` | Both service-routing Random outcomes and negative draw-removal probe pass; fresh independent review accepts. CI pending. No unmerged dependency; join later road scenario additions before integration. |
+| #158 `/root` (Astra xhigh) | `fix-mingw-nightly-158`, `openttd-rust-mingw-nightly`, PR #159 at `e10f0e2e63` | Reviewed YAML `c4cee973f1` plus clean actual #160/main update. Nightly run 37570989513 passes all three builds/tests and annotations. Required final-head CI running. Root has a guarded monitor to merge only after all 13 pass and dispatch main nightly; check GitHub before duplicating actions. Require that main nightly green before components. |
+| #140 / #141 preparation | `integrate-reviewed-pathfinding`, pushed `22b2c28482` | Clean main/F1 docs update accepted; actual #154 joined, obsolete rail preparation lock removed. Final verify and reload 1/1 with 25 snapshots pass. Required CI running; exact play-save ratio 2.599x (+7.0% against same-window 2.429x baseline), all six pairs equal. Integrate first after CI repairs. |
+| #142 station | `station-service-ownership-125`, pushed `f9fc161e80` | Clean #154 update, exact verify and pair/self 12/12 pass. Required CI running. Ratio 2.564x; source acceptance carries. |
+| #143 rail control | `rail-vehicle-ownership-130`, pushed `3038f44a3a` | Clean #154 update, clean-head verify and prepared-tree pair/self 11/11 pass. Ratio on verified final binary 2.503x. Heavy CI deferred until final base. |
+| #144 industry warning repair | Pushed `4e8eb5af83` in `openttd-rust-industry-periodic` | Accepted warning fix plus clean #154 update; exact verify, 4480 native cases and pair 18/18 pass. Ratio 2.524x. Heavy CI deferred until final base. Component metrics 1508 / 474 / 678 / 932; eight extra retired declaration/comment lines, not new game logic. |
+| #145 aircraft | Pushed `dd0f2f0475` in `openttd-rust-aircraft-controller` | Clean #154 update, exact verify and clean-head pair/self 21/21 pass. Ratio 2.567x; heavy CI deferred until final base. |
+| #149 root preparation | Pushed `5b9a005064` in `openttd-rust-company-economy` | Accepted industry warning delta plus clean #154 update; exact verify, company/reload pair 13/13 and changed industry preparation 2/2 pass. Ratio 2.543x. Heavy CI deferred until final base. |
+| #151 `/root/cargo_list_scaling_151` (Sol high) | `cargo-storage-movement-139`, `openttd-rust-cargo-storage`, pushed `ff912bcfcb` | F1 fixed and source accepted at `a25a7d41e2`; exact verify/probe pass. Clean actual #154 join plus obsolete rail-preparation lock removal; final verify, pair 20/20, self 5/5, soak 5/5, reload and scaling pass. Ratio 2.588x; heavy CI deferred until final base. Same reviewer `/root/review_cargo_storage_151` (Astra medium). |
+
+CI scheduling: #143/#144/#145/#149/#151 heavy workflows were deliberately
+cancelled to free runners for #159, #141 and #142; restart on their final
+integration bases. No cancelled check permits integration. A fresh Astra high
+planner is checking whether the permitted CI-capacity batch exception reduces
+repeated builds while preserving the component order and independent reviews.
+#155 has a bounded direct-service plan in its issue; implementation still follows
+the reviewed queue. Standing #156 capacity is examining crash rotation/deletion
+coverage for implementation after the existing fixture PRs integrate.
 
 The component table below preserves the last implementation checkpoints from
 2026-10-04; its next steps remain applicable except where superseded above.
