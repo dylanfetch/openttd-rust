@@ -29,15 +29,15 @@ the PR (`AGENTS.md`, "Evidence budget").
   the batch decision. #163's profile identifies RoadObserve (14.11%) and the
   road future (9.03%) as major costs. Keep the direct conversion after the queue;
   no raw map view is selected.
-- Main's deterministic harness and repaired nightly are green. Post-#141 main
-  platform and semantic checks pass; post-#142 checks are running. Fix any new
+- Main's deterministic harness and repaired nightly are green. Post-#141/#142 main
+  platform and semantic checks pass; post-#164 checks are running. Fix any new
   main failure before another integration.
 - #156 tracks worker/abort interleavings and component coverage gaps. Updated
   RNG/crossing/news #161, flooding #162 and service RNG #164 have independent
   final-source acceptance. Their combined road module retains all 14 road cases,
   including three actual crash-rotation draws, and shared benchmark coordination.
   #161/#162/#164 are integrated with required checks and independent acceptance.
-  Crash expiry is the next selected coverage gap.
+  Crash expiry is implemented in #167 and awaits independent review/CI.
 - Eight component branches plus the #165 integration branch remain unintegrated;
   that batch will reduce the component count to six.
   Start no new component while the inherited excess remains. Cargo #151's
@@ -222,14 +222,14 @@ selection following `docs/design/world-state.md`.
 
 Root: `/root` (gpt-6-astra, xhigh). Latest integration is `ee6fcdd44b` (#164);
 **seventeen integrations since steering**. Main #141 validation 37578224139 and
-platform 37578224516 pass, as does #142 platform 37581165508. Watch #142
-validation 37581165199 and latest #164 validation 37582451591/platform
+platform 37578224516 pass, as do #142 validation 37581165199/platform 37581165508.
+Watch latest #164 validation 37582451591/platform
 37582452027; fix any new main failure before integration. The guarded station
 merge monitor finished successfully; do not restart it. Merged station, speed
 report, search and all three road-coverage worktrees are removed, with ignored artifacts preserved.
 
 The user set a weekly usage wind-down threshold of 50%. The latest host reading
-is 39% at 2026-10-07 06:43 UTC. Monitor the active session's seven-day usage
+is 40% at 2026-10-07 06:47 UTC. Monitor the active session's seven-day usage
 window. At 50%, stop starting new work except what is needed for a clean handoff;
 finish active validation, reviews, necessary fixes and cleanup without abruptly
 cancelling jobs, update this checkpoint, then wrap up. Do not mark the migration
@@ -247,6 +247,7 @@ of the main checkout; component source reviews are linked in each PR.
 | #129 / #144 | `industry-periodic-ownership-129`, `industry-periodic`, `4e8eb5af83` | Warning fix independently accepted; exact verify, 4480 native cases and pair 18/18 pass. Ratio 2.524x. Integrate through #165. Same reviewer `/root/review_industry_integration_144` (Astra medium). |
 | #136 / #145 | `aircraft-controller-ownership-136`, `aircraft-controller`, `dd0f2f0475` | Source accepted; exact verify and clean-head pair/self 21/21 pass. Ratio 2.567x. Refresh actual main after #165, review source conflicts, then final CI. |
 | #137 / #149 | `company-economy-ownership-137`, `company-economy`, `5b9a005064` | Accepted industry warning delta; exact verify, company/reload 13/13 and changed industry preparation 2/2 pass. Ratio 2.543x. Refresh after #145; final CI remains. |
+| #156 / #167 | `road-crash-expiry-156`, `road-crash-expiry`, `20404d4a30` | Root-authored ordinary collision cleanup endpoints. Exact verify 97/136/Cargo checks, roads 20/20, focused reference self/candidate soak 2/2 and Ruff pass; mutation delaying deletion fails. Independent review and required CI remain. |
 | #139 / #151 | `cargo-storage-movement-139`, `cargo-storage`, `ff912bcfcb` | F1 quadratic list fix accepted at `a25a7d41e2`; final verify, pair 20/20, self/soak 5/5 each, reload and scaling pass. Ratio 2.588x. Integrate after #155 conversion; same reviewer `/root/review_cargo_storage_151` (Astra medium). |
 | #146 / #152 | `ship-controller-ownership-146`, `ship-controller`, `7ec70a1768` | Full owner checkpoint; verify/Cargo/Ruff and 12 comparisons pass. Old ferry failures matched 40 snapshots but differed at wall-time plain exit: join #154 deterministic launcher before rerunning. Still needs reference self/candidate soak, actual build/sell/ID reuse/water-class witnesses, final company/orders/cargo ancestry, fresh review and CI. |
 | #138 / #153 | `order-lifecycle-ownership-138`, `order-lifecycle`, `ef58c967f7` | Full owner checkpoint; verify 97/134 and paired regression/depot/reload 67 snapshots pass. Prior 101 self/soak snapshots are reference-vs-reference. Add conditional/implicit active reload, native timetable/backup commands, shared-depot unbunching and initialized unmasked #83 evidence, then candidate soak, fresh review and CI. |
@@ -254,16 +255,21 @@ of the main checkout; component source reviews are linked in each PR.
 
 CI scheduling: #143/#144/#145/#149/#151 heavy workflows were deliberately
 cancelled to free repair/integration runners. No cancelled check permits merging.
-The host currently rejects simultaneous fresh/resumed tasks despite completed
-agent entries. Continue within its actual capacity; preserve same-PR reviewers.
+The host limits fresh tasks despite completed agent entries, but an existing
+reviewer can resume concurrently. Continue within actual capacity; preserve
+same-PR reviewers when still live.
 Owner `/root/rail_industry_batch_165` (Sol high) works in sibling
 `openttd-rust-rail-industry-batch`, started from actual `f8b5034ed3`. Baseline and
 rail-prefix/final timing pass (2.437x, 2.574x and 2.568x). Current checkpoint
 `1230641e58` includes industry, the required rail setup core import and integrated
-#162/#164. Exact verify passes Cargo checks and CTest 97/140; full comparisons
-and semantic suites remain with the owner. Timing windows are complete. Original
-rail/industry reviewers must inspect additive ABI conflicts before fresh combined
-review. No production-body conflict has appeared. Under the CI-capacity exception, merge #143 then #144, retain reviews, re-review
+#162/#164. Draft #166 is pushed with exact verify/Cargo checks/CTest 97/140,
+native generators, all 13 comparisons, 4480 industry cases, Ruff and provenance
+passing. Full default/focused semantic suites remain with the owner; CI runs
+37583617645/37583618029 are active. Timing windows are complete. Industry's
+original reviewer accepts the final ABI joins. The original rail reviewer is no
+longer live; fresh `/root/review_rail_batch_join_143` (Astra medium) checks that
+bounded join, then a fresh combined reviewer must review #166. No production-body
+conflict has appeared. Under the CI-capacity exception, merge #143 then #144, retain reviews, re-review
 source conflicts and assign a fresh combined reviewer. Require combined evidence,
 base/prefix/final speed measurements and all required final-head CI checks.
 
@@ -274,8 +280,11 @@ short borrow scopes and deletion order before implementation. Benchmark a fresh
 post-queue baseline; the historical 2.398x is not that before measurement.
 
 Standing #156 work: the unchanged crossing already covers three crash-rotation
-Random draws, confirmed by a negative probe in both modes. The fixture PRs are now integrated. Next establish actual-collision expiry
-endpoints at 2238/2239 ticks against the reference; articulated deletion and road-stop cleanup remain open.
+Random draws, confirmed by a negative probe in both modes. #167 establishes
+actual-collision expiry at 2238/2239 ticks against the unchanged reference;
+root owns it because a fresh implementation agent could not start. Review it
+with a fresh Astra medium agent when capacity permits. Articulated deletion,
+surviving-head behavior and road-stop cleanup remain open; no next slice has started.
 
 Fresh Astra high planning for #153 found BKOR entries are saved only by a network
 server and cleared on offline/server load. Ordinary reload must witness clearing;
