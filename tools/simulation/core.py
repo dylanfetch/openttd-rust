@@ -14,12 +14,14 @@ check) and `--soak` for the larger scenario set.
 
 import argparse
 import concurrent.futures
+import contextlib
 import fnmatch
 import hashlib
 import json
 import os
 import re
 import shutil
+import statistics
 import struct
 import subprocess
 import sys
@@ -374,7 +376,33 @@ def write_config(scenario, build, run_dir):
     (run_dir / "openttd.cfg").write_text(text)
 
 
-def run_game(scenario, binary, build, run_dir, timeout, base_env=None, desync=True):
+GAME_LOCK = None  # Set by main to the clone-wide benchmark coordination file.
+
+
+@contextlib.contextmanager
+def game_slot(isolate):
+    """Ordinary games share the lock; a timed benchmark game holds it alone."""
+    if GAME_LOCK is None:  # Direct callers outside the command-line harness.
+        yield
+        return
+    import fcntl
+
+    with open(GAME_LOCK, "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX if isolate else fcntl.LOCK_SH)
+        yield
+
+
+def run_game(
+    scenario,
+    binary,
+    build,
+    run_dir,
+    timeout,
+    base_env=None,
+    desync=True,
+    *,
+    isolate=False,
+):
     """Run one binary on one scenario in an isolated personal directory.
 
     desync=3 writes the 32-day snapshots but also checks and rebuilds caches
@@ -420,11 +448,12 @@ def run_game(scenario, binary, build, run_dir, timeout, base_env=None, desync=Tr
         XDG_CONFIG_HOME=str(run_dir / "xdg-config"),
         XDG_CACHE_HOME=str(run_dir / "xdg-cache"),
     )
-    started = time.monotonic()
     with (
+        game_slot(isolate),
         open(run_dir / "stdout.log", "wb") as out,
         open(run_dir / "stderr.log", "wb") as err,
     ):
+        started = time.monotonic()
         try:
             code = subprocess.run(
                 [
@@ -440,6 +469,7 @@ def run_game(scenario, binary, build, run_dir, timeout, base_env=None, desync=Tr
             ).returncode
         except subprocess.TimeoutExpired:
             code = "timeout"
+        seconds = round(time.monotonic() - started, 3)
     autosave = run_dir / "save/autosave"
     snapshots = sorted(
         path
@@ -450,7 +480,8 @@ def run_game(scenario, binary, build, run_dir, timeout, base_env=None, desync=Tr
         snapshots.append(autosave / "exit.sav")
     return {
         "exit": code,
-        "seconds": round(time.monotonic() - started, 3),
+        "seconds": seconds,
+        "command": command,
         "snapshots": snapshots,
         "log": log_lines(run_dir),
         "stdout": (run_dir / "stdout.log").read_bytes(),
@@ -512,7 +543,9 @@ def field_spans(body, header):
     return spans
 
 
-def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
+def run_scenario(
+    scenario, binaries, builds, out, limit, timeout, env, benchmark_repetitions=0
+):
     """Run both binaries twice (with and without desync snapshots) and compare.
 
     The child launcher denies worker threads, selecting the original synchronous
@@ -521,6 +554,7 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
     name = scenario["name"]
     result = {
         "scenario": name,
+        "plain_speed": {"samples": [], "median_candidate_reference_ratio": None},
         "differences": [],
         "known_failures": [],
         "problems": [],
@@ -553,7 +587,12 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
                     scenario, binaries, builds, out, timeout, env, result
                 )
         result["requested_ticks"] = scenario["ticks"]
-        for mode, desync in (("snapshots", True), ("plain", False)):
+        modes = (
+            (("plain", False),) * benchmark_repetitions
+            if benchmark_repetitions
+            else (("snapshots", True), ("plain", False))
+        )
+        for mode, desync in modes:
             runs = {
                 role: run_game(
                     scenario,
@@ -563,6 +602,7 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
                     timeout,
                     env,
                     desync,
+                    isolate=bool(benchmark_repetitions),
                 )
                 for role in ("reference", "candidate")
             }
@@ -665,12 +705,49 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
                             "candidate": repr(cand_line),
                         }
                     )
+            if mode == "plain":
+                reference_seconds = runs["reference"]["seconds"]
+                candidate_seconds = runs["candidate"]["seconds"]
+                ratio = (
+                    candidate_seconds / reference_seconds
+                    if (
+                        same_end
+                        and not result["differences"]
+                        and not result["known_failures"]
+                        and not result["problems"]
+                        and reference_seconds > 0
+                    )
+                    else None
+                )
+                result["plain_speed"]["samples"].append(
+                    {
+                        "reference_seconds": reference_seconds,
+                        "candidate_seconds": candidate_seconds,
+                        "candidate_reference_ratio": ratio,
+                        "same_end": same_end,
+                    }
+                )
+                if benchmark_repetitions:
+                    result["plain_commands"] = {
+                        role: run["command"] for role, run in runs.items()
+                    }
+            if benchmark_repetitions and (result["differences"] or result["problems"]):
+                break  # Preserve the first failing repetition instead of overwriting it.
     except (
         Exception
     ) as error:  # Record and continue, so the report covers every scenario.
         result["problems"].append(f"harness error: {type(error).__name__}: {error}")
+    ratios = [
+        sample["candidate_reference_ratio"]
+        for sample in result["plain_speed"]["samples"]
+        if sample["candidate_reference_ratio"] is not None
+    ]
+    if ratios:
+        result["plain_speed"]["median_candidate_reference_ratio"] = statistics.median(
+            ratios
+        )
     result["passed"] = not result["differences"] and not result["problems"]
-    if result["passed"]:
+    if result["passed"] and not benchmark_repetitions:
         if (
             "reload_input" in result
             or "town_name_input" in result
@@ -743,6 +820,12 @@ def main():
     )
     parser.add_argument("--list", action="store_true")
     parser.add_argument(
+        "--benchmark",
+        type=int,
+        metavar="REPETITIONS",
+        help="repeat only plain pairs in isolation; retain final runs for profiling",
+    )
+    parser.add_argument(
         "--prepare-water-save",
         choices=("ferry", "structures"),
         help="build a committed ship fixture using only the pinned reference",
@@ -753,6 +836,11 @@ def main():
         help="build the supplemental aircraft fixture with the pinned reference",
     )
     args = parser.parse_args()
+
+    if args.benchmark is not None and args.benchmark < 1:
+        parser.error("--benchmark repetitions must be positive")
+    if args.benchmark and args.jobs != 1:
+        parser.error("--benchmark requires --jobs 1")
 
     every = scenario_list(args.soak)
     # An exact scenario name selects only that scenario; anything else is a substring filter.
@@ -775,6 +863,9 @@ def main():
         migration.LOCAL / "simulation" / f"{stamp}-{os.getpid()}"
     )  # concurrent runs never share
     out.mkdir(parents=True)
+    global GAME_LOCK
+    migration.COMMON_LOCAL.mkdir(parents=True, exist_ok=True)
+    GAME_LOCK = migration.COMMON_LOCAL / "simulation-game.lock"
     if args.prepare_water_save:
         from .ships import prepare_water_save
 
@@ -852,7 +943,15 @@ def main():
         env = migration.environment()
         futures = {
             pool.submit(
-                run_scenario, s, binaries, builds, out, args.limit, args.timeout, env
+                run_scenario,
+                s,
+                binaries,
+                builds,
+                out,
+                args.limit,
+                args.timeout,
+                env,
+                args.benchmark or 0,
             ): s
             for s in scenarios
         }
@@ -865,9 +964,11 @@ def main():
                 if result["known_failures"]
                 else ""
             )
+            ratio = result["plain_speed"]["median_candidate_reference_ratio"]
+            speed = f", plain {ratio:.3f}x" if ratio is not None else ""
             print(
                 f"{status} {result['scenario']}: {result['snapshots']} snapshots, "
-                f"{result['stats']['chunks']} chunks, {result['stats']['elements']} elements{known}",
+                f"{result['stats']['chunks']} chunks, {result['stats']['elements']} elements{known}{speed}",
                 flush=True,
             )
             for problem in result["problems"]:
@@ -883,6 +984,8 @@ def main():
         "mode": "reference-vs-reference" if args.self else "reference-vs-candidate",
         "execution": "Linux child RLIMIT_NPROC=0; original synchronous thread-failure fallback",
         "started_at": stamp,
+        "benchmark_repetitions": args.benchmark or 0,
+        "jobs": args.jobs,
         "candidate_commit": candidate_commit,
         "candidate_status": candidate_status,
         "binaries": binary_evidence,
@@ -900,8 +1003,9 @@ def main():
         "passed": all(r["passed"] for r in results),
     }
     (out / "report.json").write_text(json.dumps(report, indent=2) + "\n")
-    for build in set(builds.values()):
-        shutil.rmtree(build, ignore_errors=True)
+    if not args.benchmark:
+        for build in set(builds.values()):
+            shutil.rmtree(build, ignore_errors=True)
     passed = sum(r["passed"] for r in results)
     print(
         f"Simulation: {passed}/{len(results)} scenarios equal, "
