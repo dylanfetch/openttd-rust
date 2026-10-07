@@ -6,7 +6,7 @@ import lzma
 import shutil
 from pathlib import Path
 
-from .core import ROOT, decode_element, read_save, run_game
+from .core import ROOT, copy_runtime, decode_element, read_save, run_game
 from .disasters import patch
 
 ROAD = "roadveh[0]/"
@@ -489,7 +489,7 @@ def prepare_crossing(migration, out, operation="crossing"):
     """Freeze reference-built road crash fixtures through ordinary commands."""
     runtime = out / "reference-runtime"
     with migration.reference_lock(shared=True):
-        binary = core.copy_runtime(
+        binary = copy_runtime(
             migration.REFERENCE_BUILD, migration.REFERENCE_BUILD / "openttd", runtime
         )
     scripts = out / AI_FOLDER
@@ -524,16 +524,15 @@ def prepare_crossing(migration, out, operation="crossing"):
         "scenario_ai": str(scripts),
         "console": ["unpause"],
     }
-    with core.MACHINE.hold(alone=False):
-        run = run_game(
-            scenario,
-            binary,
-            runtime,
-            out / "built",
-            1200,
-            migration.environment(),
-            False,
-        )
+    run = run_game(
+        scenario,
+        binary,
+        runtime,
+        out / "built",
+        1200,
+        migration.environment(),
+        False,
+    )
     marker = "ROAD-FLOOD-BUILT " if operation == "flooding" else "ROAD-CROSSING-BUILT "
     markers = [line.split(marker, 1)[1] for line in run["log"] if marker in line]
     expected = ["1201"] if operation == "flooding" else ["10005 1"]
@@ -582,6 +581,4 @@ if __name__ == "__main__":
     if out.exists():
         raise SystemExit(f"retain or remove previous preparation first: {out}")
     out.mkdir(parents=True)
-    migration.COMMON_LOCAL.mkdir(parents=True, exist_ok=True)
-    core.MACHINE = core.MachineLock(migration.COMMON_LOCAL / "simulation.lock")
     prepare_crossing(migration, out, operation)
