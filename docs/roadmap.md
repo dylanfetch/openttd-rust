@@ -29,8 +29,8 @@ the PR (`AGENTS.md`, "Evidence budget").
   the reviewed queue; no raw map view is selected.
 - #156 tracks uncovered worker/abort interleavings and component branches.
   RNG/crossing/news #161, flooding #162 and service RNG #164 are reviewed and
-  have green required CI. The first two still need standalone constructor lock
-  initialization when joined with #163. The existing crossing also reaches three
+  had green required CI before their current base updates. #161 now has reviewed
+  standalone constructor locking; #162 is validating the same integration. The existing crossing also reaches three
   crash-rotation draws, confirmed by a negative probe without new scenario code.
 - Nine component branches remain unintegrated.
   Start no new component until the six-branch cap is restored. Cargo #151 has
@@ -215,8 +215,9 @@ selection following `docs/design/world-state.md`.
 
 Root: `/root` (gpt-6-astra, xhigh). Latest integration is `ea80a746a3` (#141);
 **thirteen integrations since steering**. Main nightly 37576549109 and platform
-CI 37576548523 pass at #159; simulation rerun 37576548217 remains pending with
-no new failure. Monitor new main checks and fix any red before more integration.
+CI 37576548523 and simulation 37576548217 pass at #159. The #163 platform
+run also passes; its simulation run was superseded by #141. Latest main #141
+validation 37578224139 is running and platform 37578224516 is queued; no new failure. Monitor new main checks and fix any red before more integration.
 The #163 guarded monitor was stopped before root integrated it normally; do not
 restart it. Merged #163/#141/#133/#135 worktrees are removed, with ignored artifacts preserved.
 
@@ -228,13 +229,13 @@ of the main checkout; component source reviews are linked in each PR.
 
 | Issue / PR | Branch, worktree suffix, current head | Next step |
 | --- | --- | --- |
-| #125 / #142 | `station-service-ownership-125`, `station-service`, `f9fc161e80` | All 13 required checks pass; exact verify and pair/self 12/12 pass. Ratio 2.564x. Local merge-tree of actual #141 is clean; wait for GitHub mergeability refresh. Clean source updates need no new review under AGENTS.md. |
+| #125 / #142 | `station-service-ownership-125`, `station-service`, `7bc3a38ad5` | Actual #141/#163 base update is clean; exact verify and pair/self 12/12 (74 snapshots each) pass. Source acceptance carries; pushed head is mergeable, final CI running. Prior equivalent-source ratio 2.564x. Metrics now 1516 / 241 / 1022 / 1332. Owner `/root/station_final_base_142` (Sol high). |
 | #130 / #143 | `rail-vehicle-ownership-130`, `rail-vehicles`, `3038f44a3a` | Source accepted; clean-head verify and prepared-tree pair/self 11/11 pass. Final verified binary ratio 2.503x. Integrate through #165 after #142. |
 | #129 / #144 | `industry-periodic-ownership-129`, `industry-periodic`, `4e8eb5af83` | Warning fix independently accepted; exact verify, 4480 native cases and pair 18/18 pass. Ratio 2.524x. Integrate through #165. Same reviewer `/root/review_industry_integration_144` (Astra medium). |
 | #136 / #145 | `aircraft-controller-ownership-136`, `aircraft-controller`, `dd0f2f0475` | Source accepted; exact verify and clean-head pair/self 21/21 pass. Ratio 2.567x. Refresh actual main after #165, review source conflicts, then final CI. |
 | #137 / #149 | `company-economy-ownership-137`, `company-economy`, `5b9a005064` | Accepted industry warning delta; exact verify, company/reload 13/13 and changed industry preparation 2/2 pass. Ratio 2.543x. Refresh after #145; final CI remains. |
-| #156 / #161 | `coverage-gaps-156`, `coverage-gaps`, `6dc51f18b3` | Accepted RNG/crossing/news, 14/14 plus negative probes; all 13 CI green. Join actual #163 and initialize standalone constructor GAME_LOCK, reproduce exact save/receipt and focused pair, then review delta and final CI. Preflight owner `/root/coverage_constructor_lock_161` (Sol high). |
-| #156 / #162 | `road-flooding-coverage-156`, `road-flooding`, `226267b976` | Final independent review accepts; all 13 CI green. Actual flooding crash and both exact fixture reconstructions pass. Join actual #161/#163 and initialize standalone constructor lock before final CI/integration. |
+| #156 / #161 | `coverage-gaps-156`, `coverage-gaps`, `678bbe798f` | Root joined actual #163/#141 and initialized standalone GAME_LOCK. Exact save/receipt reproduction, verify, nine provenance tests, paired roads 15/15 (47 snapshots), focused self 3/3 and Ruff pass. Same reviewer accepts the additive scenario conflict resolution; final CI running. Metrics 0 / 306 / 0 / 0. |
+| #156 / #162 | `road-flooding-coverage-156`, `road-flooding`, local `b842a0aa86` | Owner `/root/road_flooding_coverage_156` (Sol high) joined updated #161; no src/rust conflict. Both saves reproduce exactly; flooding receipt is exact, crossing receipt retains its historical #161 setup metadata. Roads pair 16/16 and focused self 2/2 pass; exact verify, same-reviewer conflict check and final CI remain. |
 | #156 / #164 | `road-service-rng-coverage-156`, `road-service-rng`, `838c22f97a` | Both service RNG outcomes and draw-removal sensitivity pass; fresh review accepts and all 13 CI green. Join later road scenario additions before integration. |
 | #139 / #151 | `cargo-storage-movement-139`, `cargo-storage`, `ff912bcfcb` | F1 quadratic list fix accepted at `a25a7d41e2`; final verify, pair 20/20, self/soak 5/5 each, reload and scaling pass. Ratio 2.588x. Integrate after #155 conversion; same reviewer `/root/review_cargo_storage_151` (Astra medium). |
 | #146 / #152 | `ship-controller-ownership-146`, `ship-controller`, `7ec70a1768` | Full owner checkpoint; verify/Cargo/Ruff and 12 comparisons pass. Old ferry failures matched 40 snapshots but differed at wall-time plain exit: join #154 deterministic launcher before rerunning. Still needs candidate self/soak, actual build/sell/ID reuse/water-class witnesses, final company/orders/cargo ancestry, fresh review and CI. |
@@ -243,6 +244,8 @@ of the main checkout; component source reviews are linked in each PR.
 
 CI scheduling: #143/#144/#145/#149/#151 heavy workflows were deliberately
 cancelled to free repair/integration runners. No cancelled check permits merging.
+The host currently rejects simultaneous fresh/resumed tasks despite completed
+agent entries. Continue within its actual capacity; preserve same-PR reviewers.
 Root selected #165 under the CI-capacity exception: create its branch only from
 actual integrated #142, merge #143 then #144, retain component reviews, re-review
 source conflicts and assign a fresh combined reviewer. Require combined evidence,
