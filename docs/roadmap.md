@@ -151,14 +151,20 @@ reuse the supplied rail/ship save and authorized aircraft setup AI.
 ## Phase 3: current ownership work, in order
 
 On resume: finish the additional main-CI repair #158, then drain the
-reviewed queue (#141, then #142, #143, #144, #145, #149), then #155's road
-conversion. Next finish #151, #152, #153 and
+reviewed queue (#141, then #142, the ordered #143/#144 CI-capacity batch
+#165, then #145 and #149), then #155's road conversion. Next finish #151, #152, #153 and
 #147, then start #148 and #150 from integrated `rust-migration`. Never hold more
 than six unintegrated component branches (#157).
 
 Accepted search batch #140 combines component PRs #133/#135 using the actual
 integrated #134 ancestry. It retains the component reviews, independent combined
 review and all required CI before integration.
+
+Root selected #165 after measured CI queuing: prepare the contiguous rail-control
+#143 then industry #144 batch only after #142 integrates, from that actual main.
+Keep original component reviews, re-review source conflict resolutions, and use
+a fresh combined reviewer plus final-head CI. This saves one full CI cycle;
+it starts no new component. #145 and #149 remain subsequent individual entries.
 
 1. **#122 Complete rail YAPF search, caches and reservation.** Own all four
    searches, six specialization-specific global cache banks, rail-change
@@ -238,7 +244,7 @@ Active work (all new branches start from integrated main):
 | --- | --- | --- |
 | #156 first slice | `coverage-gaps-156`, `openttd-rust-coverage-gaps`, PR #161 at `6dc51f18b3` | Accepted RNG/crossing/news coverage, 14/14 and three negative probes. Clean actual #154 update and obsolete preparation API removal; public constructor reproduces save/receipt exactly, final pair 2/2. CI running; after #163, initialize the shared game lock in the standalone constructor before integration. |
 | #156 `/root/road_flooding_coverage_156` (Sol high) | `road-flooding-coverage-156`, `openttd-rust-road-flooding`, PR #162 at `226267b976` | Legal canal/road fixture reaches actual flooding crash; initial review has no findings. Actual #154 API update, both constructors reproduce exact saves, final pair/self 2/2. Final independent review accepts; CI pending. Join actual #161/#163 and initialize standalone constructor lock before integration. |
-| #155 `/root/speed_report_155_resume` (Sol high) | `speed-report-155`, `openttd-rust-speed-report`, PR #163 at `f4fedd2ce6` | Independent review accepts benchmark isolation/provenance and #154 reconciliation; 9 tests, normal 25 snapshots and exact three-pair 2.398x report pass. CI compare/platform builds pass; annotations pending. Root measured queued owners with its reviewed candidate override and matched every binary hash to a clean verification receipt. |
+| #155 `/root/speed_report_155_resume` (Sol high) | `speed-report-155`, `openttd-rust-speed-report`, PR #163 at `f4fedd2ce6` | Independent review accepts benchmark isolation/provenance and #154 reconciliation; 9 tests, normal 25 snapshots and exact three-pair 2.398x report pass. All 13 required checks pass; ready for integration after the nightly repair. Root measured queued owners with its reviewed candidate override and matched every binary hash to a clean verification receipt. |
 | #156 service RNG | `road-service-rng-coverage-156`, `openttd-rust-road-service-rng`, PR #164 at `838c22f97a` | Both service-routing Random outcomes and negative draw-removal probe pass; fresh independent review accepts. CI pending. No unmerged dependency; join later road scenario additions before integration. |
 | #158 `/root` (Astra xhigh) | `fix-mingw-nightly-158`, `openttd-rust-mingw-nightly`, PR #159 at `e10f0e2e63` | Reviewed YAML `c4cee973f1` plus clean actual #160/main update. Nightly run 37570989513 passes all three builds/tests and annotations. Required final-head CI running. Root has a guarded monitor to merge only after all 13 pass and dispatch main nightly; check GitHub before duplicating actions. Require that main nightly green before components. |
 | #140 / #141 preparation | `integrate-reviewed-pathfinding`, pushed `22b2c28482` | Clean main/F1 docs update accepted; actual #154 joined, obsolete rail preparation lock removed. Final verify and reload 1/1 with 25 snapshots pass. Required CI running; exact play-save ratio 2.599x (+7.0% against same-window 2.429x baseline), all six pairs equal. Integrate first after CI repairs. |
@@ -251,12 +257,15 @@ Active work (all new branches start from integrated main):
 
 CI scheduling: #143/#144/#145/#149/#151 heavy workflows were deliberately
 cancelled to free runners for #159, #141 and #142; restart on their final
-integration bases. No cancelled check permits integration. A fresh Astra high
-planner is checking whether the permitted CI-capacity batch exception reduces
-repeated builds while preserving the component order and independent reviews.
+integration bases. No cancelled check permits integration. Root accepted the fresh Astra high recommendation in #165: after #141/#142,
+combine #143 then #144 under the CI-capacity exception, with retained component
+reviews, conflict re-reviews and a fresh combined reviewer. Create its branch
+only from actual integrated #142; later #145/#149 remain ordered separately.
 #155 has a bounded direct-service plan in its issue; implementation still follows
-the reviewed queue. Standing #156 capacity is examining crash rotation/deletion
-coverage for implementation after the existing fixture PRs integrate.
+the reviewed queue. Standing #156 capacity found crossing #161 already reaches three crash-rotation
+Random draws; an unchanged-scenario negative probe is in progress, with no new
+tracked code. Plan subsequent actual-collision expiry endpoints at 2238/2239
+ticks only after existing fixture PRs integrate; articulated deletion stays open.
 
 The component table below preserves the last implementation checkpoints from
 2026-10-04; its next steps remain applicable except where superseded above.
