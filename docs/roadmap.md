@@ -7,45 +7,40 @@ a subagent stops and reports the conflict in its hand-off to root. Keep this
 file forward-looking: completed work is one table row, and its evidence stays in
 the PR (`AGENTS.md`, "Evidence budget").
 
-## Where the fork stands (2026-10-07, integration `0b2503cb30`)
+## Where the fork stands (2026-10-07, integration `dace87c9b1`)
 
-- Fourteen ownership ports retire 17,430 original C++ lines, about 4.5% of roughly
+- Sixteen ownership ports retire 20,947 original C++ lines, about 5.5% of roughly
   384k non-vendored `src/` lines. Town names account for 3,848, mostly data, and
-  road movement tables for another 1,475; the remaining retirement is 12,107 lines.
-- Sixteen integrations since steering are complete. The last two ownership
-  integrations, search #141 and station service #142, retire 3,381 lines against
-  1,949 glue and 438 tooling. Station alone retires 1,332 against 1,022 glue and
-  241 tooling. All three owners exceed their glue/tooling cost. Continue the
-  selected rail/industry batch #165, then aircraft and company/economy.
+  road movement tables for another 1,475; the remaining retirement is 15,624 lines.
+- Eighteen integrations since steering are complete. The last two, service RNG
+  #164 and the rail/industry batch #166, retire 3,517 lines against 2,336 glue
+  and 1,143 tooling. Ownership retirement is advancing again; finish aircraft
+  #145 and company/economy #149 before the selected road performance conversion.
 - Landed glue/tooling overruns remain effects 965/548 retired, water 883/407,
-  disasters 1,101/968 and cargo payment 988/315. Maintenance #163 added 212
-  tooling lines and no glue. The last two integrations add 461 tooling lines
-  for road RNG/crossing/flooding coverage, with no new glue or retirement.
-  Keep new evidence in existing component modules while #165 advances ownership.
-- Fresh batch timing at integrated `f8b5034ed3` is 2.437x on the Opus manual
-  play. Rail prefix `7bd73c478f` is 2.574x (+5.61%) and final batch `1230641e58`
-  is 2.568x (+5.38% overall, within the 10% increment budget). All nine plain
-  pairs match semantic state/logs. These same-window measurements supersede older windows for
-  the batch decision. #163's profile identifies RoadObserve (14.11%) and the
-  road future (9.03%) as major costs. Keep the direct conversion after the queue;
+  disasters 1,101/968, cargo payment 988/315 and industry 1,152/932. Industry's
+  canonical views/save adapters span about twenty consumers; its PR records that
+  cost. Keep additional evidence in existing component modules.
+- Fresh same-window Opus manual timing is 2.437x before the batch, 2.574x after
+  rail (+5.61%) and 2.568x after industry (-0.22%; +5.38% overall). All nine plain
+  pairs match state/logs; both increments meet the 10% budget. The absolute cost
+  still calls for #155: RoadObserve (14.11% of samples) and the road future
+  (9.03%) are major costs. Keep direct conversion after the reviewed queue;
   no raw map view is selected.
-- Main's deterministic harness and repaired nightly are green. Post-#141/#142 main
-  platform and semantic checks pass; post-#164 checks are running. Fix any new
-  main failure before another integration.
-- #156 tracks worker/abort interleavings and component coverage gaps. Updated
-  RNG/crossing/news #161, flooding #162 and service RNG #164 have independent
-  final-source acceptance. Their combined road module retains all 14 road cases,
-  including three actual crash-rotation draws, and shared benchmark coordination.
-  #161/#162/#164 are integrated with required checks and independent acceptance.
-  Crash expiry is implemented in #167 and awaits independent review/CI.
-- Eight component branches plus the #165 integration branch remain unintegrated;
-  that batch will reduce the component count to six.
-  Start no new component while the inherited excess remains. Cargo #151's
-  quadratic-list fix is accepted; it still needs its final base and CI after
-  road conversion. The next stocktake is integration eighteen.
-- Keep one canonical owner per component, direct shared services and checkable
-  PR evidence. Completed worktrees are removed after preserving their ignored
-  artifacts and branch references; source checkpoints remain in Git.
+- Main's deterministic harness and repaired nightly are green. Post-#164 main
+  platform and semantic checks pass; watch post-#166 checks and fix any new
+  main failure before another integration. #166 has independent final acceptance,
+  all required CI, default 212/212 and focused candidate pair/soak 39/39 each.
+- #156 retains worker/abort interleavings and component-specific gaps. Road
+  no-destination/service RNG, actual crossing/flooding and early crash draws are
+  covered. Single-head expiry #167 has independent acceptance and all required
+  checks; integrate it next. Articulated cleanup and landing-crash RNG remain
+  open. A bounded original-only plan found a reusable one-tick landing boundary
+  in #145's existing setup; it is not candidate coverage yet.
+- Six component branches remain unintegrated, restoring #157's cap. No new
+  component starts ahead of this reviewed queue. Cargo #151's quadratic-list fix
+  is accepted; final base/CI follow road conversion. Next stocktake: integration
+  twenty. Merged rail, industry and batch worktrees are removed with ignored
+  evidence preserved, alongside earlier completed worktrees.
 
 ## Second steering review (2026-10-04, evening)
 
@@ -110,6 +105,8 @@ Metrics are `tools/port-metrics.py`: Rust / tooling / C++ glue / C++ retired.
 | #122 | Rail YAPF search, cache and reservation | #133 via #141 | `ea80a746a3` | 1704 / 144 / 595 / 1517 |
 | #124 | Road YAPF search and path construction | #135 via #141 | `ea80a746a3` | 663 / 55 / 329 / 532 |
 | #125 | Station cargo-service control and state | #142 | `ba920555ca` | 1516 / 241 / 1022 / 1332 |
+| #130 | Rail controller, reservation and private state | #143 via #166 | `dace87c9b1` | 4087 / 613 / 1660 / 2585 |
+| #129 | Industry production, histories and builder state | #144 via #166 | `dace87c9b1` | 1508 / 474 / 678 / 932 |
 
 Harness and process: #72 harness (#85), #84 play saves (#87), #97 provenance
 freeze (#100), #88 Ruff (#92), #75 partial-pixel fidelity (#91), #90 world-state
@@ -131,6 +128,7 @@ design (`docs/design/world-state.md`).
 | #156 (routing/crash) | Road RNG, crossing crash and event witnesses | #161 | `f8b5034ed3` | 0 / 306 / 0 / 0 |
 | #156 (flooding) | Ordinary road flooding crash witness | #162 | `0b2503cb30` | 0 / 155 / 0 / 0 |
 | #156 (service RNG) | Both road service routing random outcomes | #164 | `ee6fcdd44b` | 0 / 64 / 0 / 0 |
+| #165 | CI-capacity integration of rail/industry owners | #166 | `dace87c9b1` | aggregate 5595 / 1079 / 2336 / 3517; not additional retirement |
 
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -156,61 +154,48 @@ reuse the supplied rail/ship save and authorized aircraft setup AI.
 
 ## Phase 3: current ownership work, in order
 
-On resume: prepare the ordered #143/#144 CI-capacity batch #165, then integrate
-#145 and #149, then #155's road conversion. Next finish #151, #152, #153 and
-#147, then start #148 and #150 from integrated `rust-migration`. Never hold more
-than six unintegrated component branches (#157).
+On resume: finish coverage #167, integrate #145 and #149, then #155's road
+conversion. Next finish #151, #152, #153 and #147, then start #148 and #150
+from integrated `rust-migration`. Never hold more than six unintegrated component
+branches (#157). Ship #146 names orders #138 as an actual ancestry dependency;
+prepare ship evidence in the listed phase, but its final integration must follow
+completed #153. No unreviewed orders checkpoint substitutes for that dependency.
 
-Root selected #165 after measured CI queuing: prepare the contiguous rail-control
-#143 then industry #144 batch from actual main after integrated #142.
-Keep original component reviews, re-review source conflict resolutions, and use
-a fresh combined reviewer plus final-head CI. This saves one full CI cycle;
-it starts no new component. #145 and #149 remain subsequent individual entries.
-
-1. **#129 Complete industry periodic production and builder ownership.** Own
-   canonical cargo slots/histories, production and transport control, daily/monthly
-   closure, farm/lumber loops, NewGRF production repeat/apply policy and weighted
-   builder targets/retries/backoff. Reuse #117 and #125 boundaries and fixtures.
-2. **#130 Complete rail vehicle control and private state.** Own consist/tick
-   movement, reversal/crossings/crash, speed/service/day loops and controller
-   reservation extension/rollback, with canonical train-private state and adapters.
-   #122 search reservation does not cover controller rollback. Establish missing
-   collision/crossing/reversal witnesses as part of the port before integration.
-3. **#136 Complete aircraft control and airport movement ownership.** Own both
+1. **#136 Complete aircraft control and airport movement ownership.** Own both
     controller passes, FTA traversal, terminal/helipad/block allocation, private
     aircraft state and canonical station airport masks, plus service/diversion/
     crash and save adapters. Reuse #132; add actual contention, dedicated helipad,
     closure/removal and crash witnesses. Coordinate #125's station lifetime.
-4. **#137 Complete company financial and economy lifecycle ownership.** Own
+2. **#137 Complete company financial and economy lifecycle ownership.** Own
     canonical finances/histories, bankruptcy/offer/acquisition/deletion control,
     world ownership-transfer traversal, periodic economy/prices and financial
     commands. Preserve real VM/deletion reentry and #129 ECMY fields. Require
     multiple-company recovery/transfer/deletion evidence, not only profitable play.
-5. **#138 Complete orders, shared lists, backups and timetable ownership.** Own
+3. **#138 Complete orders, shared lists, backups and timetable ownership.** Own
     canonical vectors/current orders/shared links/backups, editing/validation/
     execution/destination resolution, timetable and depot-unbunching control.
     Preserve controller reentry, save formats and #83 unmasked timing evidence.
-6. **#139 Complete cargo packet, list, flow and movement ownership.** Own packet
+4. **#139 Complete cargo packet, list, flow and movement ownership.** Own packet
     contents, ordered station/vehicle containers, actions/caches/flows and the
     completed-link-job live-flow application. Preserve #117/#125/#74 policy
     boundaries, stable identity/iteration and shared pool-shell allocation.
-7. **#146 Complete ship control and private-state ownership.** Own movement,
+5. **#146 Complete ship control and private-state ownership.** Own movement,
     locks, rotation/reversal, day/service/build policy and nearest-depot regional
     BFS with canonical state/rotation coordinates. Preserve #119's path owner;
     adapt every save/external writer and reuse the water corpus for real witnesses.
-8. **#147 Complete fleet grouping and replacement lifecycle ownership.** Own
+6. **#147 Complete fleet grouping and replacement lifecycle ownership.** Own
     group hierarchy/membership/statistics, ordered renewal rules, complete
     replacement transactions/rollback and the ordered tick-end replacement drain.
     Preserve #137 finances, #138 orders and #139 cargo at original mutation points.
-9. **#148 Complete town lifecycle, authority and house simulation.** Extend
+7. **#148 Complete town lifecycle, authority and house simulation.** Extend
     #120's sole owner with remaining town state, founding/deletion/authority,
     monthly histories and house construction/cargo/rebuild/animation loops.
     Preserve generation cancellation and destructive house callback ordering.
-10. **#150 Complete industry construction and tile lifecycle.** Extend #129's
+8. **#150 Complete industry construction and tile lifecycle.** Extend #129's
     sole owner with construction/prospecting/generation, canonical metadata and
     ordered registry, destruction and complete tile/animation policy. Preserve
     oilrig/station/cargo cleanup, flooding rechecks and generation cancellation.
-11. **Following selections:** remaining simulation components and commands that
+9. **Following selections:** remaining simulation components and commands that
     change them, guided by canonical state and complete control-loop ownership.
 
 The accepted #108 decision keeps canonical map arrays in C++ with direct bundled
@@ -220,34 +205,31 @@ selection following `docs/design/world-state.md`.
 
 ## Resume checkpoint (2026-10-07, migration active)
 
-Root: `/root` (gpt-6-astra, xhigh). Latest integration is `ee6fcdd44b` (#164);
-**seventeen integrations since steering**. Main #141 validation 37578224139 and
-platform 37578224516 pass, as do #142 validation 37581165199/platform 37581165508.
-Watch latest #164 validation 37582451591/platform
-37582452027; fix any new main failure before integration. The guarded station
-merge monitor finished successfully; do not restart it. Merged station, speed
-report, search and all three road-coverage worktrees are removed, with ignored artifacts preserved.
+Root: `/root` (gpt-6-astra, xhigh). Latest integration is `dace87c9b1` (#166);
+**eighteen integrations since steering**. Main #164 validation 37582451591 and
+platform 37582452027 pass. Watch post-#166 main checks; fix any new failure before
+integration. All merge guards from earlier tasks are finished; do not restart
+old monitors. Completed worktrees, including rail, industry and their batch, are
+removed after preserving ignored artifacts and branch references.
 
 The user set a weekly usage wind-down threshold of 50%. The latest host reading
-is 40% at 2026-10-07 06:47 UTC. Monitor the active session's seven-day usage
+is 48% at 2026-10-07 07:21 UTC. Monitor the active session's seven-day usage
 window. At 50%, stop starting new work except what is needed for a clean handoff;
 finish active validation, reviews, necessary fixes and cleanup without abruptly
 cancelling jobs, update this checkpoint, then wrap up. Do not mark the migration
 complete.
 
-Prepare the ordered #143/#144 batch #165, then #145
-and #149. Follow with #155 road conversion, then finish #151/#152/#153/#147.
-Eight unfinished component branches plus one integration branch remain; no new
-component may start until the cap is restored. All worktrees below are siblings
-of the main checkout; component source reviews are linked in each PR.
+Integrate reviewed/green #167 next, then refresh #145 and #149 from actual main.
+Follow with #155 road conversion, then finish #151/#152/#153/#147 with the ship
+ancestry dependency above. Six unfinished component branches remain; integrate
+reviewed work before any new component. All worktrees below are siblings of the
+main checkout; source reviews and checkable evidence remain in their PRs.
 
 | Issue / PR | Branch, worktree suffix, current head | Next step |
 | --- | --- | --- |
-| #130 / #143 | `rail-vehicle-ownership-130`, `rail-vehicles`, `3038f44a3a` | Source accepted; clean-head verify and prepared-tree pair/self 11/11 pass. Final verified binary ratio 2.503x. Integrate through #165 after #142. |
-| #129 / #144 | `industry-periodic-ownership-129`, `industry-periodic`, `4e8eb5af83` | Warning fix independently accepted; exact verify, 4480 native cases and pair 18/18 pass. Ratio 2.524x. Integrate through #165. Same reviewer `/root/review_industry_integration_144` (Astra medium). |
-| #136 / #145 | `aircraft-controller-ownership-136`, `aircraft-controller`, `dd0f2f0475` | Source accepted; exact verify and clean-head pair/self 21/21 pass. Ratio 2.567x. Refresh actual main after #165, review source conflicts, then final CI. |
+| #136 / #145 | `aircraft-controller-ownership-136`, `aircraft-controller`, `dd0f2f0475` | Source accepted; exact verify and clean-head pair/self 21/21 pass. Historical ratio 2.567x. Owner `/root/aircraft_final_integration_145` (Sol high) completed read-only preparation; resume on actual main after #167 for fresh base/final timing, necessary conflict review and final CI. |
 | #137 / #149 | `company-economy-ownership-137`, `company-economy`, `5b9a005064` | Accepted industry warning delta; exact verify, company/reload 13/13 and changed industry preparation 2/2 pass. Ratio 2.543x. Refresh after #145; final CI remains. |
-| #156 / #167 | `road-crash-expiry-156`, `road-crash-expiry`, `20404d4a30` | Root-authored ordinary collision cleanup endpoints. Exact verify 97/136/Cargo checks, roads 20/20, focused reference self/candidate soak 2/2 and Ruff pass; mutation delaying deletion fails. Independent review and required CI remain. |
+| #156 / #167 | `road-crash-expiry-156`, `road-crash-expiry`, `20404d4a30` | Root-authored ordinary collision cleanup endpoints. Exact verify 97/136/Cargo checks, roads 20/20, focused reference self/candidate soak 2/2 and Ruff pass; mutation delaying deletion fails. Independent review and all required CI pass; combined run against #166 binary also passes. Ready for root integration. |
 | #139 / #151 | `cargo-storage-movement-139`, `cargo-storage`, `ff912bcfcb` | F1 quadratic list fix accepted at `a25a7d41e2`; final verify, pair 20/20, self/soak 5/5 each, reload and scaling pass. Ratio 2.588x. Integrate after #155 conversion; same reviewer `/root/review_cargo_storage_151` (Astra medium). |
 | #146 / #152 | `ship-controller-ownership-146`, `ship-controller`, `7ec70a1768` | Full owner checkpoint; verify/Cargo/Ruff and 12 comparisons pass. Old ferry failures matched 40 snapshots but differed at wall-time plain exit: join #154 deterministic launcher before rerunning. Still needs reference self/candidate soak, actual build/sell/ID reuse/water-class witnesses, final company/orders/cargo ancestry, fresh review and CI. |
 | #138 / #153 | `order-lifecycle-ownership-138`, `order-lifecycle`, `ef58c967f7` | Full owner checkpoint; verify 97/134 and paired regression/depot/reload 67 snapshots pass. Prior 101 self/soak snapshots are reference-vs-reference. Add conditional/implicit active reload, native timetable/backup commands, shared-depot unbunching and initialized unmasked #83 evidence, then candidate soak, fresh review and CI. |
@@ -258,20 +240,11 @@ cancelled to free repair/integration runners. No cancelled check permits merging
 The host limits fresh tasks despite completed agent entries, but an existing
 reviewer can resume concurrently. Continue within actual capacity; preserve
 same-PR reviewers when still live.
-Owner `/root/rail_industry_batch_165` (Sol high) works in sibling
-`openttd-rust-rail-industry-batch`, started from actual `f8b5034ed3`. Baseline and
-rail-prefix/final timing pass (2.437x, 2.574x and 2.568x). Current checkpoint
-`1230641e58` includes industry, the required rail setup core import and integrated
-#162/#164. Draft #166 is pushed with exact verify/Cargo checks/CTest 97/140,
-native generators, all 13 comparisons, 4480 industry cases, Ruff and provenance
-passing. Full default/focused semantic suites remain with the owner; CI runs
-37583617645/37583618029 are active. Timing windows are complete. Industry's
-original reviewer accepts the final ABI joins. The original rail reviewer is no
-longer live; fresh `/root/review_rail_batch_join_143` (Astra medium) checks that
-bounded join, then a fresh combined reviewer must review #166. No production-body
-conflict has appeared. Under the CI-capacity exception, merge #143 then #144, retain reviews, re-review
-source conflicts and assign a fresh combined reviewer. Require combined evidence,
-base/prefix/final speed measurements and all required final-head CI checks.
+Batch #166 is integrated; owner and reviewer tasks finished. Source joins and
+combined acceptance name final `1230641e58` in #143/#144/#166. PR #167 source
+acceptance names `20404d4a30`; its additional two-case pair against #166's verified
+binary passes both modes. No new base update is needed unless GitHub reports a
+conflict; normal merge must still require its exact accepted head and checks.
 
 The corrected #155 plan in its issue converts all 22 road services directly and
 removes the entire Task/Future/Rc/action protocol for all 14 entry kinds. No live
@@ -282,9 +255,19 @@ post-queue baseline; the historical 2.398x is not that before measurement.
 Standing #156 work: the unchanged crossing already covers three crash-rotation
 Random draws, confirmed by a negative probe in both modes. #167 establishes
 actual-collision expiry at 2238/2239 ticks against the unchanged reference;
-root owns it because a fresh implementation agent could not start. Review it
-with a fresh Astra medium agent when capacity permits. Articulated deletion,
-surviving-head behavior and road-stop cleanup remain open; no next slice has started.
+root owns it and `/root/review_road_crash_expiry_167` (Astra medium) accepts it.
+Articulated deletion,
+surviving-head behavior and road-stop cleanup remain open. Next selected RNG slice
+is aircraft landing after integrated #145, reusing its eight-plane 411-tick reload
+setup. Original-only probes found plane 2 at state 16/pos 34, speed 293, target 0.
+At setting 1 the third draw's low 22 bits equal 21 (crash) or 22 (survival);
+DATE seeds `(2443390976,1012692424)` / `(2443382784,1011643848)` exercise these.
+Disabled setting 0 draws twice less; `(2443390968,1012691400)` tests high-bit
+masking. One tick witnesses cargo removal/counter 3; a passive 16-tick observer
+sees landing event `2 10064 3 10`. Active station ratings end at 0 after surrounding
+penalties, not 1. Preserve fresh preparation/typed-edit provenance; do not commit
+scratch saves. Candidate mutations, event desync mode and required PR process
+remain; no implementation branch exists. Short-strip jets/cheat/setting 2 remain gaps.
 
 Fresh Astra high planning for #153 found BKOR entries are saved only by a network
 server and cleared on offline/server load. Ordinary reload must witness clearing;
