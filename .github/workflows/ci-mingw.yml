@@ -53,7 +53,10 @@ jobs:
         echo "8e2a3f224c6396fb333687f266d11d66d0d75a8d66f216633adca8b74e5650fc  $package" | sha256sum --check --strict
         pacman-key --init
         pacman-key --populate msys2
-        pacman-key --verify "$package.sig" "$package"
+        # pacman-key's read-only wrapper requires lock-never, which its init
+        # does not set. Use the same signature and full-trust check directly.
+        gpg --homedir /etc/pacman.d/gnupg --batch --status-fd 1 --verify "$package.sig" "$package" |
+          grep -E '^\[GNUPG:\] TRUST_(FULLY|ULTIMATE) '
         pacman --noconfirm -U "$package"
 
     - name: Install OpenGFX
