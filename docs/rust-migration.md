@@ -1321,7 +1321,9 @@ node/segment arenas, exact-order heap, costs, lookahead, limits and reconstructi
 into Rust. Rust owns six specialization-specific cache banks, rail-change
 invalidation, reservation traversal and ordered signal rollback. C++ retains
 the train controller, shared track follower, PBS and canonical world services.
-Station animation/randomisation returns to C++ with affected borrows released.
+Explicit platform/waypoint station triggers return to C++ with borrows released;
+waypoint track reservation also retains the original synchronous PBS station
+triggers while search/reservation borrows remain active, before its second trigger.
 Original search bodies remain portable-only; diagnostic dumps use temporary
 views and the original format, with no canonical C++ search mirror.
 
