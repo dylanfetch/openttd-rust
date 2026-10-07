@@ -63,8 +63,13 @@ INSTANTIATE_POOL_METHODS(Industry)
 void ShowIndustryViewWindow(IndustryID industry);
 void BuildOilRig(TileIndex tile);
 
+#ifdef WITH_RUST
+#	define _industry_sound_ctr _industry_builder.sound_ctr
+#	define _industry_sound_tile reinterpret_cast<TileIndex &>(_industry_builder.sound_tile)
+#else
 static uint8_t _industry_sound_ctr;
 static TileIndex _industry_sound_tile;
+#endif
 
 std::array<FlatSet<IndustryID>, NUM_INDUSTRYTYPES> Industry::industries;
 
@@ -524,6 +529,9 @@ static CommandCost ClearTile_Industry(TileIndex tile, DoCommandFlags flags)
  */
 static bool TransportIndustryGoods(TileIndex tile)
 {
+#ifdef WITH_RUST
+	return openttd_rust_industry_transport(Industry::GetByTile(tile), &GetIndustryRustServices()) != 0;
+#else
 	Industry *i = Industry::GetByTile(tile);
 	const IndustrySpec *indspec = GetIndustrySpec(i->type);
 	bool moved_cargo = false;
@@ -546,6 +554,7 @@ static bool TransportIndustryGoods(TileIndex tile)
 	}
 
 	return moved_cargo;
+#endif
 }
 
 static void AnimateSugarSieve(TileIndex tile)
@@ -989,6 +998,7 @@ bool IsTileForestIndustry(TileIndex tile)
 	return std::any_of(std::begin(ind->produced), std::end(ind->produced), [](const auto &p) { return IsValidCargoType(p.cargo) && CargoSpec::Get(p.cargo)->label == CT_WOOD; });
 }
 
+#ifndef WITH_RUST
 static const uint8_t _plantfarmfield_type[] = {1, 1, 1, 1, 1, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6};
 
 /**
@@ -1096,20 +1106,27 @@ static void PlantFarmField(TileIndex tile, IndustryID industry)
 	SetupFarmFieldFence(ta.tile + TileDiffXY(0, ta.h - 1), ta.w, type, DIAGDIR_SE);
 }
 
+#endif
+
 void PlantRandomFarmField(const Industry *i)
 {
+#ifdef WITH_RUST
+	openttd_rust_industry_farm(const_cast<Industry *>(i), &GetIndustryRustServices());
+#else
 	int x = i->location.w / 2 + Random() % 31 - 16;
 	int y = i->location.h / 2 + Random() % 31 - 16;
 
 	TileIndex tile = TileAddWrap(i->location.tile, x, y);
 
 	if (tile != INVALID_TILE) PlantFarmField(tile, i->index);
+#endif
 }
 
 /**
  * Perform a circular search around the Lumber Mill in order to find trees to cut
  * @param i industry
  */
+#ifndef WITH_RUST
 static void ChopLumberMillTrees(Industry *i)
 {
 	/* Don't process lumber mill if cargo is not set up correctly. */
@@ -1230,8 +1247,13 @@ static void ProduceIndustryGoods(Industry *i)
 	}
 }
 
+#endif
+
 void OnTick_Industry()
 {
+#ifdef WITH_RUST
+	openttd_rust_industry_tick(_industry_builder.owner.get(), &GetIndustryRustServices());
+#else
 	if (_industry_sound_ctr != 0) {
 		_industry_sound_ctr++;
 
@@ -1252,6 +1274,7 @@ void OnTick_Industry()
 			for (auto &a : i->accepted) a.accumulated_waiting += a.waiting;
 		}
 	}
+#endif
 }
 
 /**
@@ -2155,6 +2178,9 @@ CommandCost CmdBuildIndustry(DoCommandFlags flags, TileIndex tile, IndustryType 
  */
 CommandCost CmdIndustrySetFlags(DoCommandFlags flags, IndustryID ind_id, IndustryControlFlags ctlflags)
 {
+#ifdef WITH_RUST
+	return openttd_rust_industry_command(ind_id.base(), 0, flags.Test(DoCommandFlag::Execute), ctlflags.base(), &GetIndustryRustServices()) != 0 ? CommandCost() : CMD_ERROR;
+#else
 	if (_current_company != OWNER_DEITY) return CMD_ERROR;
 
 	Industry *ind = Industry::GetIfValid(ind_id);
@@ -2164,6 +2190,7 @@ CommandCost CmdIndustrySetFlags(DoCommandFlags flags, IndustryID ind_id, Industr
 	if (flags.Test(DoCommandFlag::Execute)) ind->ctlflags = ctlflags;
 
 	return CommandCost();
+#endif
 }
 
 /**
@@ -2177,6 +2204,11 @@ CommandCost CmdIndustrySetFlags(DoCommandFlags flags, IndustryID ind_id, Industr
  */
 CommandCost CmdIndustrySetProduction(DoCommandFlags flags, IndustryID ind_id, uint8_t prod_level, bool show_news, const EncodedString &custom_news)
 {
+#ifdef WITH_RUST
+	(void)show_news;
+	(void)custom_news; // The original post-assignment news test is always false.
+	return openttd_rust_industry_command(ind_id.base(), 1, flags.Test(DoCommandFlag::Execute), prod_level, &GetIndustryRustServices()) != 0 ? CommandCost() : CMD_ERROR;
+#else
 	if (_current_company != OWNER_DEITY) return CMD_ERROR;
 	if (prod_level < PRODLEVEL_MINIMUM || prod_level > PRODLEVEL_MAXIMUM) return CMD_ERROR;
 
@@ -2219,6 +2251,7 @@ CommandCost CmdIndustrySetProduction(DoCommandFlags flags, IndustryID ind_id, ui
 	}
 
 	return CommandCost();
+#endif
 }
 
 /**
@@ -2330,6 +2363,7 @@ static uint32_t GetScaledIndustryGenerationProbability(IndustryType it, std::opt
  * @param[out] min_number Minimal number of industries that should exist at the map.
  * @return Relative probability for the industry to appear.
  */
+#ifndef WITH_RUST
 static uint16_t GetIndustryGamePlayProbability(IndustryType it, uint8_t *min_number)
 {
 	if (_settings_game.difficulty.industry_density == ID_FUND_ONLY) {
@@ -2354,6 +2388,8 @@ static uint16_t GetIndustryGamePlayProbability(IndustryType it, uint8_t *min_num
  * Get wanted number of industries on the map.
  * @return Wanted number of industries at the map.
  */
+#endif
+
 static uint GetNumberOfIndustries()
 {
 	/* Number of industries on a 256x256 map. */
@@ -2385,12 +2421,16 @@ static uint GetNumberOfIndustries()
  */
 static Industry *PlaceIndustry(IndustryType type, IndustryAvailabilityCallType creation_type, bool try_hard)
 {
+#ifdef WITH_RUST
+	return static_cast<Industry *>(openttd_rust_industry_place(type, creation_type, try_hard, &GetIndustryRustServices()));
+#else
 	uint tries = try_hard ? 10000u : 2000u;
 	for (; tries > 0; tries--) {
 		Industry *ind = CreateNewIndustry(RandomTile(), type, creation_type);
 		if (ind != nullptr) return ind;
 	}
 	return nullptr;
+#endif
 }
 
 /**
@@ -2425,26 +2465,37 @@ static uint GetCurrentTotalNumberOfIndustries()
 /** Reset the entry. */
 void IndustryTypeBuildData::Reset()
 {
+#ifdef WITH_RUST
+	openttd_rust_industry_build_type_reset(reinterpret_cast<OpenTTDIndustryBuildFields *>(this));
+#else
 	this->probability  = 0;
 	this->min_number   = 0;
 	this->target_count = 0;
 	this->max_wait     = 1;
 	this->wait_count   = 0;
+#endif
 }
 
 /** Completely reset the industry build data. */
 void IndustryBuildData::Reset()
 {
+#ifdef WITH_RUST
+	openttd_rust_industry_build_reset(this->owner.get(), &GetIndustryRustServices());
+#else
 	this->wanted_inds = GetCurrentTotalNumberOfIndustries() << 16;
 
 	for (IndustryType it = 0; it < NUM_INDUSTRYTYPES; it++) {
 		this->builddata[it].Reset();
 	}
+#endif
 }
 
 /** Monthly update of industry build data. */
 void IndustryBuildData::EconomyMonthlyLoop()
 {
+#ifdef WITH_RUST
+	openttd_rust_industry_build_monthly(this->owner.get(), &GetIndustryRustServices());
+#else
 	static const int NEWINDS_PER_MONTH = 0x38000 / (10 * 12); // lower 16 bits is a float fraction, 3.5 industries per decade, divided by 10 * 12 months.
 	if (_settings_game.difficulty.industry_density == ID_FUND_ONLY) return; // 'no industries' setting.
 
@@ -2454,6 +2505,7 @@ void IndustryBuildData::EconomyMonthlyLoop()
 	if (GetCurrentTotalNumberOfIndustries() + max_behind >= (this->wanted_inds >> 16)) {
 		this->wanted_inds += Map::ScaleBySize(NEWINDS_PER_MONTH);
 	}
+#endif
 }
 
 struct IndustryGenerationProbabilities {
@@ -2563,6 +2615,7 @@ Industry::AcceptedHistory SumHistory(std::span<const Industry::AcceptedHistory> 
  * Monthly update of industry statistics.
  * @param i Industry to update.
  */
+#ifndef WITH_RUST
 static void UpdateIndustryStatistics(Industry *i)
 {
 	auto month = TimerGameEconomy::month;
@@ -2589,8 +2642,14 @@ static void UpdateIndustryStatistics(Industry *i)
  * Recompute #production_rate for current #prod_level.
  * This function is only valid when not using smooth economy.
  */
+#endif
+
 void Industry::RecomputeProductionMultipliers()
 {
+#ifdef WITH_RUST
+	assert(GetIndustrySpec(this->type)->UsesOriginalEconomy());
+	openttd_rust_industry_recompute(this, &GetIndustryRustServices());
+#else
 	const IndustrySpec *indspec = GetIndustrySpec(this->type);
 	assert(indspec->UsesOriginalEconomy());
 
@@ -2598,6 +2657,7 @@ void Industry::RecomputeProductionMultipliers()
 	for (auto &p : this->produced) {
 		p.rate = ClampTo<uint8_t>(CeilDiv(indspec->production_rate[&p - this->produced.data()] * this->prod_level, PRODLEVEL_DEFAULT));
 	}
+#endif
 }
 
 void Industry::FillCachedName() const
@@ -2620,17 +2680,24 @@ void ClearAllIndustryCachedNames()
  */
 bool IndustryTypeBuildData::GetIndustryTypeData(IndustryType it)
 {
+#ifdef WITH_RUST
+	return openttd_rust_industry_build_type(reinterpret_cast<OpenTTDIndustryBuildFields *>(this), it, &GetIndustryRustServices()) != 0;
+#else
 	uint8_t min_number;
 	uint32_t probability = GetIndustryGamePlayProbability(it, &min_number);
 	bool changed = min_number != this->min_number || probability != this->probability;
 	this->min_number = min_number;
 	this->probability = probability;
 	return changed;
+#endif
 }
 
 /** Decide how many industries of each type are needed. */
 void IndustryBuildData::SetupTargetCount()
 {
+#ifdef WITH_RUST
+	openttd_rust_industry_build_targets(this->owner.get(), &GetIndustryRustServices());
+#else
 	bool changed = false;
 	uint num_planned = 0; // Number of industries planned in the industry build data.
 	for (IndustryType it = 0; it < NUM_INDUSTRYTYPES; it++) {
@@ -2669,6 +2736,7 @@ void IndustryBuildData::SetupTargetCount()
 		this->builddata[it].target_count++;
 		total_amount--;
 	}
+#endif
 }
 
 /**
@@ -2676,6 +2744,9 @@ void IndustryBuildData::SetupTargetCount()
  */
 void IndustryBuildData::TryBuildNewIndustry()
 {
+#ifdef WITH_RUST
+	openttd_rust_industry_build_try(this->owner.get(), &GetIndustryRustServices());
+#else
 	this->SetupTargetCount();
 
 	int missing = 0;       // Number of industries that need to be build.
@@ -2737,6 +2808,7 @@ void IndustryBuildData::TryBuildNewIndustry()
 	for (IndustryType it = 0; it < NUM_INDUSTRYTYPES; it++) {
 		if (this->builddata[it].wait_count > 0) this->builddata[it].wait_count--;
 	}
+#endif
 }
 
 /**
@@ -2747,6 +2819,7 @@ void IndustryBuildData::TryBuildNewIndustry()
  * @param type IndustryType been queried
  * @result true if protection is on, false otherwise (except for oil wells)
  */
+#ifndef WITH_RUST
 static bool CheckIndustryCloseDownProtection(IndustryType type)
 {
 	const IndustrySpec *indspec = GetIndustrySpec(type);
@@ -2765,6 +2838,8 @@ static bool CheckIndustryCloseDownProtection(IndustryType type)
  * @return: \c *c_accepts is set when industry accepts the cargo type,
  *          \c *c_produces is set when the industry produces the cargo type
  */
+#endif
+
 static void CanCargoServiceIndustry(CargoType cargo, Industry *ind, bool *c_accepts, bool *c_produces)
 {
 	if (!IsValidCargoType(cargo)) return;
@@ -2861,6 +2936,7 @@ static void ReportNewsProductionChangeIndustry(Industry *ind, CargoType cargo, i
 	);
 }
 
+#ifndef WITH_RUST
 static const uint PERCENT_TRANSPORTED_60 = 153;
 static const uint PERCENT_TRANSPORTED_80 = 204;
 
@@ -2871,6 +2947,7 @@ static const uint PERCENT_TRANSPORTED_80 = 204;
  */
 static void ChangeIndustryProduction(Industry *i, bool monthly)
 {
+
 	StringID str = STR_NULL;
 	bool closeit = false;
 	const IndustrySpec *indspec = GetIndustrySpec(i->type);
@@ -3075,6 +3152,7 @@ static void ChangeIndustryProduction(Industry *i, bool monthly)
 		}
 	}
 }
+#endif
 
 /**
  * Every economy day handler for the industry changes
@@ -3085,15 +3163,21 @@ static void ChangeIndustryProduction(Industry *i, bool monthly)
  */
 static const IntervalTimer<TimerGameEconomy> _economy_industries_daily({TimerGameEconomy::DAY, TimerGameEconomy::Priority::INDUSTRY}, [](auto)
 {
+#ifdef WITH_RUST
+	openttd_rust_industry_daily(_industry_builder.owner.get(), &GetIndustryRustServices());
+#else
 	_economy.industry_daily_change_counter += _economy.industry_daily_increment;
+
 
 	/* Bits 16-31 of industry_construction_counter contain the number of industries to change/create today,
 	 * the lower 16 bit are a fractional part that might accumulate over several days until it
 	 * is sufficient for an industry. */
 	uint16_t change_loop = _economy.industry_daily_change_counter >> 16;
 
+
 	/* Reset the active part of the counter, just keeping the "fractional part" */
 	_economy.industry_daily_change_counter &= 0xFFFF;
+
 
 	if (change_loop == 0) {
 		return;  // Nothing to do? get out
@@ -3123,10 +3207,14 @@ static const IntervalTimer<TimerGameEconomy> _economy_industries_daily({TimerGam
 
 	/* production-change */
 	InvalidateWindowData(WC_INDUSTRY_DIRECTORY, 0, IDIWD_PRODUCTION_CHANGE);
+#endif
 });
 
 static const IntervalTimer<TimerGameEconomy> _economy_industries_monthly({TimerGameEconomy::MONTH, TimerGameEconomy::Priority::INDUSTRY}, [](auto)
 {
+#ifdef WITH_RUST
+	openttd_rust_industry_monthly(_industry_builder.owner.get(), &GetIndustryRustServices());
+#else
 	Backup<CompanyID> cur_company(_current_company, OWNER_NONE);
 
 	_industry_builder.EconomyMonthlyLoop();
@@ -3145,6 +3233,7 @@ static const IntervalTimer<TimerGameEconomy> _economy_industries_monthly({TimerG
 
 	/* production-change */
 	InvalidateWindowData(WC_INDUSTRY_DIRECTORY, 0, IDIWD_PRODUCTION_CHANGE);
+#endif
 });
 
 
@@ -3292,6 +3381,9 @@ bool IndustryCompare::operator() (const IndustryListEntry &lhs, const IndustryLi
  */
 void TrimIndustryAcceptedProduced(Industry *ind)
 {
+#ifdef WITH_RUST
+	openttd_rust_industry_trim(ind->production_owner.get());
+#else
 	auto ita = std::find_if(std::rbegin(ind->accepted), std::rend(ind->accepted), [](const auto &a) { return IsValidCargoType(a.cargo); });
 	ind->accepted.erase(ita.base(), std::end(ind->accepted));
 	ind->accepted.shrink_to_fit();
@@ -3299,4 +3391,157 @@ void TrimIndustryAcceptedProduced(Industry *ind)
 	auto itp = std::find_if(std::rbegin(ind->produced), std::rend(ind->produced), [](const auto &p) { return IsValidCargoType(p.cargo); });
 	ind->produced.erase(itp.base(), std::end(ind->produced));
 	ind->produced.shrink_to_fit();
+#endif
 }
+
+#ifdef WITH_RUST
+/** Native world services preserve immediate effects. NewGRF resolver calls are
+	* bounded and cannot run script VMs. Script event services enqueue events only.
+	* Construction, landscape clearing, and industry destruction can reenter migrated
+	* accessors; Rust ends all owner borrows before calling these named services.
+	* Their CommandCost failures are handled by the unchanged native transactions.
+	* Allocation and UI/debug I/O failures terminate inside these noexcept leaves. */
+static void RustIndustryNews(Industry *i, StringID str, bool close) noexcept
+{
+	NewsType nt;
+	/* Compute news category */
+	if (close) {
+		nt = NewsType::IndustryClose;
+		AI::BroadcastNewEvent(new ScriptEventIndustryClose(i->index));
+		Game::NewEvent(new ScriptEventIndustryClose(i->index));
+	} else {
+		switch (WhoCanServiceIndustry(i)) {
+			case 0: nt = NewsType::IndustryNobody;  break;
+			case 1: nt = NewsType::IndustryOther;   break;
+			case 2: nt = NewsType::IndustryCompany; break;
+			default: NOT_REACHED();
+		}
+	}
+	/* Set parameters of news string */
+	EncodedString headline;
+	if (str > STR_LAST_STRINGID) {
+		headline = GetEncodedString(str, STR_TOWN_NAME, i->town->index, GetIndustrySpec(i->type)->name);
+	} else if (close) {
+		headline = GetEncodedString(str, STR_FORMAT_INDUSTRY_NAME, i->town->index, GetIndustrySpec(i->type)->name);
+	} else {
+		headline = GetEncodedString(str, i->index);
+	}
+	/* and report the news to the user */
+	if (close) {
+		AddTileNewsItem(std::move(headline), nt, i->location.tile + TileDiffXY(1, 1));
+	} else {
+		AddIndustryNewsItem(std::move(headline), nt, i->index);
+	}
+}
+
+static const OpenTTDIndustryServices _industry_services = {
+	[](void *handle, OpenTTDIndustryObservation *out) noexcept {
+		Industry *i = static_cast<Industry *>(handle);
+		const IndustrySpec *spec = GetIndustrySpec(i->type);
+		*out = {i->production_owner.get(), i->location.tile.base(), spec->behaviour.base(), i->index.base(), i->location.w, i->location.h,
+			spec->callback_mask.base(), static_cast<uint16_t>(spec->random_sounds.size()), spec->life_type.base(), uint8_t(spec->UsesOriginalEconomy()), spec->minimal_cargo, i->type,
+			spec->production_up_text, spec->production_down_text, spec->closure_text};
+	},
+	[](uint32_t from) noexcept -> void * { auto range = Industry::Iterate(from); return range.empty() ? nullptr : *range.begin(); },
+	[](uint8_t field) noexcept -> uint32_t {
+		switch (field) {
+			case 0: return _settings_client.sound.ambient;
+			case 1: return _game_mode == GM_EDITOR;
+			case 3: return EconomyIsInRecession();
+			case 4: return TimerGameEconomy::month;
+			case 5: return TimerGameEconomy::year.base();
+			case 6: return TimerGameEconomy::days_since_last_month;
+			case 7: return to_underlying(_settings_game.game_creation.landscape);
+			case 8: return _settings_game.economy.type;
+			case 9: return GetCargoTypeByLabel(CT_PASSENGERS);
+			case 10: return _settings_game.difficulty.industry_density == ID_FUND_ONLY;
+			case 11: return TimerGameCalendar::year.base();
+			case 13: return Map::SizeX();
+			case 14: return Map::SizeY();
+			case 15: return GetSnowLine();
+			case 16: return _current_company == OWNER_DEITY;
+			default: NOT_REACHED();
+		}
+	},
+	[](uint8_t operation, void *handle, uint32_t a, uint32_t b, uint32_t c) noexcept -> uint64_t {
+		Industry *i = static_cast<Industry *>(handle);
+		switch (operation) {
+			case 0: return Random();
+			case 1: return RandomRange(a);
+			case 2: return ScaleByCargoScale(a, false);
+			case 3: return ScaleByInverseCargoScale(a, false);
+			case 4: {
+				SoundFx sound = a == 0 ? static_cast<SoundFx>(GetIndustrySpec(i->type)->random_sounds[b]) : a == 1 ? SND_37_LUMBER_MILL_2 : SND_36_LUMBER_MILL_3;
+				SndPlayTileFx(sound, TileIndex(c));
+				break;
+			}
+			case 5: {
+				uint16_t result = GetIndustryCallback(CBID_INDUSTRY_SPECIAL_EFFECT, a, b, i, i->type, i->location.tile);
+				return result == CALLBACK_FAILED ? CALLBACK_FAILED : ConvertBooleanCallback(GetIndustrySpec(i->type)->grf_prop.grffile, CBID_INDUSTRY_SPECIAL_EFFECT, result);
+			}
+			case 6: TriggerIndustryRandomisation(i, IndustryRandomTrigger::IndustryTick); TriggerIndustryAnimation(i, IndustryAnimationTrigger::IndustryTick); break;
+			case 7: IndustryProductionCallback(i, a); break;
+			case 8: return MoveGoodsToStation(i->produced[a].cargo, b, {i->index, SourceType::Industry}, i->stations_near, i->exclusive_consumer);
+			case 9: return GetIndustrySpec(i->type)->production_rate[a];
+			case 11: return Industry::GetIndustryTypeCount(a);
+			case 12: return GetCurrentTotalNumberOfIndustries();
+			case 13: return Map::ScaleBySize(a);
+			case 14: return reinterpret_cast<uintptr_t>(CreateNewIndustry(RandomTile(), a, static_cast<IndustryAvailabilityCallType>(b)));
+			case 15: AdvertiseIndustryOpening(i); break;
+			case 16: return reinterpret_cast<uintptr_t>(Industry::GetRandom());
+			case 17: delete i; break;
+			case 18: SetWindowDirty(WC_INDUSTRY_VIEW, i->index); break;
+			case 19: InvalidateWindowData(WC_INDUSTRY_DIRECTORY, 0, IDIWD_PRODUCTION_CHANGE); break;
+			case 20: if (a == 0) { auto old = _current_company; _current_company = OWNER_NONE; return old.base(); } _current_company = CompanyID(b); break;
+			case 21: {
+				std::array<int32_t, 1> reg{};
+				auto result = GetIndustryCallback(a != 0 ? CBID_INDUSTRY_MONTHLYPROD_CHANGE : CBID_INDUSTRY_PRODUCTION_CHANGE, 0, b, i, i->type, i->location.tile, reg);
+				return uint64_t(result) | (uint64_t(uint32_t(reg[0])) << 16);
+			}
+			case 22: return MapGRFStringID(GetIndustrySpec(i->type)->grf_prop.grfid, GRFStringID(a));
+			case 23: RustIndustryNews(i, a, b != 0); break;
+			case 24: ReportNewsProductionChangeIndustry(i, a, static_cast<int32_t>(b)); break;
+			case 25: {
+				if (i != nullptr) return TileAddWrap(TileIndex(a), static_cast<int32_t>(b), static_cast<int32_t>(c)).base();
+				TileIndex tile(a);
+				uint32_t info = GetTileType(tile) | (GetTileZ(tile) << 16);
+				if (IsTileType(tile, MP_CLEAR)) info |= uint32_t(IsSnowTile(tile)) << 4 | GetClearGround(tile) << 8;
+				if (IsTileType(tile, MP_TREES)) info |= uint32_t(GetTreeGrowth(tile) >= TreeGrowthStage::Grown) << 5 | GetTreeGround(tile) << 8;
+				return info;
+			}
+			case 26: MakeField(TileIndex(a), GB(b, 0, 8), IndustryID(c)); SetClearCounter(TileIndex(a), GB(b, 8, 8)); MarkTileDirtyByTile(TileIndex(a)); break;
+			case 27: {
+				TileIndex tile(a); auto side = static_cast<DiagDirection>(b);
+				if (c != 0) { SetFence(tile, side, c); break; }
+				if (!IsTileType(tile, MP_CLEAR) || !IsClearGround(tile, CLEAR_FIELDS)) return 0;
+				TileIndex neighbour = tile + TileOffsByDiagDir(side);
+				return !IsTileType(neighbour, MP_CLEAR) || !IsClearGround(neighbour, CLEAR_FIELDS) || GetFence(neighbour, ReverseDiagDir(side)) == 0;
+			}
+			case 28: return !i->TileBelongsToIndustry(TileIndex(a)) || IsIndustryCompleted(TileIndex(a));
+			case 29: {
+				if (_settings_client.sound.ambient) SndPlayTileFx(SND_38_LUMBER_MILL_1, TileIndex(a));
+				AutoRestoreBackup<CompanyID> current(_current_company, OWNER_NONE);
+				Command<CMD_LANDSCAPE_CLEAR>::Do(DoCommandFlag::Execute, TileIndex(a));
+				break;
+			}
+			case 30: {
+				const IndustrySpec *spec = GetIndustrySpec(i->type);
+				auto detail = a == 0 ? GetEncodedString(STR_NEWGRF_BUGGY_ENDLESS_PRODUCTION_CALLBACK, std::monostate{}, spec->name)
+					: GetEncodedString(STR_NEWGRF_BUGGY_INVALID_CARGO_PRODUCTION_CALLBACK, std::monostate{}, spec->name, i->location.tile);
+				ShowErrorMessage(GetEncodedString(STR_NEWGRF_BUGGY, spec->grf_prop.grffile->filename), std::move(detail), WL_WARNING);
+				break;
+			}
+			case 31: {
+				const IndustrySpec *spec = GetIndustrySpec(a);
+				return uint64_t(spec->enabled) | uint64_t(!spec->layouts.empty()) << 1 | uint64_t(spec->appear_ingame[to_underlying(_settings_game.game_creation.landscape)]) << 8 | uint64_t(spec->behaviour.base()) << 32;
+			}
+			case 32: return GetIndustryProbabilityCallback(a, IACT_RANDOMCREATION, b);
+			case 33: return TimerGameTick::counter;
+			case 34: return reinterpret_cast<uintptr_t>(Industry::GetIfValid(IndustryID(a)));
+			default: NOT_REACHED();
+		}
+		return 0;
+	},
+};
+const OpenTTDIndustryServices &GetIndustryRustServices() { return _industry_services; }
+#endif

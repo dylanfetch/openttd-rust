@@ -4,8 +4,11 @@ import hashlib
 import json
 import lzma
 import re
+import shutil
+import struct
 from pathlib import Path
 
+from . import core
 from .core import (
     ROOT,
     SNAPSHOT_TICKS,
@@ -15,6 +18,21 @@ from .core import (
     run_game,
 )
 from .play_saves import DISTRIBUTIONS
+
+AI_FOLDER = "rail-scenario-ai"
+
+
+def uses_ai(scenario):
+    return "rail_control" in scenario
+
+
+def install(scenario, run_dir):
+    if uses_ai(scenario):
+        ai = run_dir / "ai/rails"
+        shutil.copytree(scenario["scenario_ai"], ai)
+        (ai / "parameters.nut").write_text(
+            f'RAIL_ACTION <- "{scenario["rail_control"]}";\n'
+        )
 
 
 def scenarios(soak):
@@ -50,6 +68,20 @@ def scenarios(soak):
             )
         )
     cases.append(dict(cases[-2], name="rail-reservation-reload", rail_reload=True))
+    for action in ("reverse", "service", "crossing", "collision", "reservation"):
+        cases.append(
+            dict(
+                cases[0],
+                name=f"rail-controller-{action}",
+                rail_control=action,
+                ticks=(60000 if soak else 18000) + SNAPSHOT_TICKS,
+                console=[
+                    "setting difficulty.disasters 0",
+                    "setting pf.reserve_paths 1",
+                    "unpause",
+                ],
+            )
+        )
     return cases
 
 
@@ -98,6 +130,10 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
     normalized, receipt = normalize(Path(scenario["save"]), directory)
     result["rail_input"] = receipt
     scenario = dict(scenario, save=str(normalized))
+    if "rail_control" in scenario:
+        normalized, receipt = controller_input(normalized, directory, scenario)
+        result["rail_controller_input"] = receipt
+        scenario = dict(scenario, save=str(normalized))
     if scenario.get("rail_reload"):
         setup = dict(scenario, ticks=8 * SNAPSHOT_TICKS)
         run = run_game(
@@ -124,6 +160,103 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
         result["rail_reload_input"] = receipt
         scenario = dict(scenario, save=str(normalized))
     return scenario
+
+
+def controller_input(source, directory, scenario):
+    """Declare company/AI inputs and source-derived placement; no expected edits."""
+    from .disasters import gamma, patch, rows
+
+    changes = {"PLYR": {0: {"is_ai": 1}}}
+    if scenario["rail_control"] == "collision":
+        vehicles = rows(source)
+        common = "train[0]/common[0]/"
+        changes["VEHS"] = {}
+        # Place the opposing source consist on the first consist's occupied
+        # track. Coordinates/track are copied from actual reference vehicles;
+        # no crash state or expected output is injected.
+        for moving, occupied in ((14, 8), (15, 9), (16, 10)):
+            changes["VEHS"][moving] = {
+                common + key: vehicles[occupied][common + key]
+                for key in ("tile", "x_pos", "y_pos", "z_pos", "direction")
+            }
+            changes["VEHS"][moving]["train[0]/track"] = vehicles[occupied][
+                "train[0]/track"
+            ]
+    if scenario["rail_control"] == "reservation":
+        vehicles = rows(source)
+        common = "train[0]/common[0]/"
+        changes["VEHS"] = {}
+        # Translate the real second consist along its existing straight line,
+        # then park it. All parts retain their relative geometry and direction.
+        for index in (14, 15, 16):
+            original = vehicles[index]
+            changes["VEHS"][index] = {
+                common + "tile": original[common + "tile"] - 29 * 128,
+                common + "y_pos": original[common + "y_pos"] - 29 * 16,
+            }
+        changes["VEHS"][14][common + "vehstatus"] = (
+            vehicles[14][common + "vehstatus"] | 2
+        )
+        # The first consist starts past the depot junction so controller
+        # extension itself reaches the parked train, without delegating at the
+        # earlier choice to YAPF's distinct reservation search/rollback.
+        for index, model in ((8, 14), (9, 15), (10, 16)):
+            original = vehicles[model]
+            changes["VEHS"][index] = {
+                common + "tile": original[common + "tile"] - 44 * 128,
+                common + "y_pos": original[common + "y_pos"] - 44 * 16,
+                common + "direction": original[common + "direction"],
+            }
+    target = directory / "controller-input.sav"
+    receipt = patch(source, target, changes)
+    if scenario["rail_control"] == "reservation":
+        data, chunks = target.read_bytes(), read_save(target)
+        work, allowed = bytearray(data), set()
+        # rail_map.h reservation bits8..11; copy TRACK_Y's real reservation
+        # from the owner's already reserved approach tile onto occupied tiles.
+        reserved = (
+            int.from_bytes(chunks["MAP2"]["raw"][2007 * 2 : 2007 * 2 + 2], "big")
+            & 0xF00
+        )
+        begin = chunks["MAP2"]["span"][0] + 8
+        for tile in (3415, 3543, 5207, 5335, 5463):
+            before = int.from_bytes(
+                chunks["MAP2"]["raw"][tile * 2 : tile * 2 + 2], "big"
+            )
+            struct.pack_into(">H", work, begin + tile * 2, (before & ~0xF00) | reserved)
+            allowed.update((begin + tile * 2, begin + tile * 2 + 1))
+            receipt["assignments"].append(
+                ["MAP2", tile, "reserved_track", before, (before & ~0xF00) | reserved]
+            )
+        if any(
+            a != b and index not in allowed
+            for index, (a, b) in enumerate(zip(data, work, strict=True))
+        ):
+            raise RuntimeError("rail reservations changed undeclared input bytes")
+        target.write_bytes(work)
+    data, chunks = target.read_bytes(), read_save(target)
+    chunk = chunks["AIPL"]
+    elements = dict(chunk["elements"])
+    if elements[0] != b"\0\0\xff\xff\xff\xff":
+        raise RuntimeError("rail controller source company already has an AI")
+    name = b"MigrationRails"
+    config = gamma(len(name)) + name + b"\0" + struct.pack(">I", 1)
+    elements[0] = config * 2 + b"\0"
+    reader = core.Reader(data, chunk["span"][0] + 5)
+    reader.take(reader.gamma() - 1)
+    begin, end = reader.pos, chunk["span"][1]
+    body = (
+        b"".join(gamma(len(value) + 1) + value for value in elements.values()) + b"\0"
+    )
+    prepared = data[:begin] + body + data[end:]
+    target.write_bytes(prepared)
+    after = read_save(target)
+    for cid in set(chunks) - {"AIPL"}:
+        if data[slice(*chunks[cid]["span"])] != prepared[slice(*after[cid]["span"])]:
+            raise RuntimeError(f"rail AI configuration changed unrelated {cid}")
+    receipt["assignments"].append(["AIPL", 0, "configuration", "MigrationRails"])
+    receipt["sha256"] = hashlib.sha256(prepared).hexdigest()
+    return target, receipt
 
 
 def reservation_rows(path):
@@ -204,8 +337,113 @@ def vehicle_rows(path):
     return rows
 
 
+def controller_witnesses(scenario, run, mode):
+    from .disasters import rows
+
+    if run["exit"] != 0 or not run["snapshots"]:
+        raise RuntimeError("rail controller game failed or omitted checkpoints")
+    common = "train[0]/common[0]/"
+    observations = [rows(path) for path in [Path(scenario["save"]), *run["snapshots"]]]
+    heads = {
+        head: [
+            {
+                key: snapshot[head][common + key]
+                for key in ("tile", "direction", "vehstatus", "date_of_last_service")
+            }
+            if head in snapshot and snapshot[head]["type"] == 0
+            else None
+            for snapshot in observations
+        ]
+        for head in (8, 14)
+    }
+    profile = run["snapshots"][-1].parents[2] / "train-profile.json"
+    crossings = [
+        {
+            "crossing": chunks["MAPT"]["raw"][4183] >> 4 == 2
+            and chunks["MAP5"]["raw"][4183] >> 6 == 1,
+            "barred": bool(chunks["MAP5"]["raw"][4183] & 32),
+        }
+        for path in [Path(scenario["save"]), *run["snapshots"]]
+        for chunks in [read_save(path)]
+    ]
+    events = [line for line in run["log"] if "RAIL-" in line]
+    action = scenario["rail_control"]
+    counts = json.loads(profile.read_text()) if profile.is_file() else {}
+    required = {
+        "reverse": ("reversal",),
+        "service": ("depot_start",),
+        "crossing": ("cross_bar", "cross_unbar"),
+        "collision": ("collision", "crash_delete"),
+        "reservation": ("extension_fail", "extension_rollback"),
+    }
+    if counts and any(not counts[name] for name in required[action]):
+        raise RuntimeError(f"rail controller lacks profiled {action} branches")
+    if action == "collision":
+        for head in (8, 14):
+            if (
+                not any(f"RAIL-CRASH {head} 0 " in line for line in events)
+                or heads[head][-1] is not None
+            ):
+                raise RuntimeError("rail collision lacks actual crash and deletion")
+            if mode == "snapshots" and not any(
+                row and row["vehstatus"] & 128 for row in heads[head][1:]
+            ):
+                raise RuntimeError("rail collision lacks saved crashed train")
+    elif action == "reservation":
+        if not all(
+            any(f"RAIL-COMMAND {command}=true" in line for line in events)
+            for command in ("skip", "remove-signal", "pbs", "opposing-pbs")
+        ):
+            raise RuntimeError("rail reservation setup command failed")
+        if (
+            not observations[-1][8]["train[0]/flags"] & 256
+            or heads[8][-1]["tile"] != heads[8][0]["tile"]
+        ):
+            raise RuntimeError(
+                "rail controller did not stop before occupied reservation"
+            )
+        for path in run["snapshots"]:
+            reserved = dict(reservation_rows(path)["rail"])
+            if any(tile in reserved for tile in range(3671, 5207, 128)):
+                raise RuntimeError(
+                    "rail controller retained partially extended reservation"
+                )
+    else:
+        if not any(f"RAIL-COMMAND {action}=true" in line for line in events):
+            raise RuntimeError(f"rail controller {action} command failed")
+        if action == "service" and not (
+            any("RAIL-DEPOT occupied=true" in line for line in events)
+            and any("RAIL-DEPOT occupied=false" in line for line in events)
+            and heads[8][-1]["date_of_last_service"]
+            > heads[8][0]["date_of_last_service"]
+        ):
+            raise RuntimeError("rail servicing lacks depot entry, exit and service")
+        if action == "crossing":
+            if not all(
+                any(f"RAIL-CROSSING occupied={occupied}" in line for line in events)
+                for occupied in ("true", "false")
+            ):
+                raise RuntimeError("rail crossing lacks actual train entry and exit")
+            if mode == "snapshots" and {
+                row["barred"] for row in crossings if row["crossing"]
+            } != {True, False}:
+                raise RuntimeError("rail crossing lacks saved bar and release")
+    return {
+        "heads": heads,
+        "events": events,
+        "profile": counts,
+        "crossings": crossings,
+    }
+
+
 def check(scenario, run, mode, role, result):
     if not scenario.get("rail_fixture"):
+        return
+    if "rail_control" in scenario:
+        # Controller cases can intentionally stop or delete the original heads.
+        result[f"{mode}_{role}_rail_control"] = controller_witnesses(
+            scenario, run, mode
+        )
         return
     result[f"{mode}_{role}_rail_search"] = search_witnesses(scenario, run, mode)
     profile = run["snapshots"][-1].parents[2] / "rail-profile.json"
