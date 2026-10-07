@@ -7,56 +7,64 @@ a subagent stops and reports the conflict in its hand-off to root. Keep this
 file forward-looking and under about 200 lines: completed work is one table
 row, and its evidence stays in the PR (`AGENTS.md`, "Evidence budget").
 
-## Where the fork stands (2026-10-07, `e9cdc2842c`)
+## Where the fork stands (2026-10-07, `be87a84a78`)
 
 - Sixteen ownership ports retire 20,947 original C++ lines, about 5.5% of roughly
   384k non-vendored `src/` lines (15,624 excluding town-name and road-movement
-  data). Main CI is green.
+  data). No game logic moved since the third review. Main CI is green.
 - The play saves run **2.54x** slower than the original (play-opus-55-167-002
   2.54x, play-grok-159-001 2.55x, padhattan 2.17x, generate-tgp-256-1 1.41x).
   Road is 87% of the gap, and most of it is boundary overhead, not game logic
   (#155, #168).
+- CI is on demand (#171). An ordinary PR push costs about 2 job-minutes instead
+  of 80. A full run costs about 104 job-minutes and 30 minutes wall time, once per
+  final head.
 - Six component branches are unintegrated (#157 cap): #145, #149, #151, #152,
-  #153, #147.
+  #153, #147. All six conflict with the base (pre-existing conflicts, none from
+  #171). Merging the base brings in #171's workflows.
 
-## Third steering review (2026-10-07)
+## Fourth steering review (2026-10-07)
 
-A user-directed review (Claude Code, `claude-opus-5-5`) independently audited
-aircraft #145, company #149, the integrated train controller #143, station #142
-and industry #144 line by line against the original bodies, and profiled the
-current build. Astra's work since the second review is on track. #154 is fixed,
-19 integrations landed with green CI, and all five ports are faithful: Random
-order, widths and saturation match. Reachable divergences are small: company
-posts client ID `u32::MAX` instead of 0 (#149), and train crossings drop the
-barrier sound (#169). Corrections:
+A user-directed review (Claude Code, `claude-opus-5-5`) audited #170/#171, which
+a user-directed `gpt-6.1-sol` root session selected and integrated. Independent
+audits covered the CI workflows and local tools. There were no port audits and
+no profile, because no game code or branch head changed since the third review.
 
-1. **The boundary template is the speed problem** (#168). Road, train, town,
-   disaster, aircraft, company, ship and orders allocate a task, future and `Rc`
-   on every entry. They route non-throwing services through the action protocol,
-   dispatch numbered opcodes and copy whole-record views on single-field reads.
-   Station and cargo storage show the direct form works. `AGENTS.md` now forbids
-   the template for new work, and reentry alone no longer justifies the protocol.
-2. **The road plan missed its largest cost.** RoadObserve is the biggest single
-   self cost (0.68 s with IsBus). The #155 conversion now includes narrowing it.
-3. **The speed budget compounds.** "+10% per port" is replaced by a ratchet (Phase 1).
-4. **The benchmark sees only road vehicles.** Both main play saves have no trains,
-   ships or aircraft, so those ports' overhead is invisible. Train is 4.0x on
-   padhattan, and its consist walk is O(n^2) per read.
-5. **The roadmap became a log.** CI run IDs, hashes, seeds and per-PR plans now go
-   in PRs and issues.
+The CI change is sound and stays. Its gate refuses partial, skipped, cancelled
+and stale runs, and the harness and benchmark timing are unchanged. But #171 is
+the fork's largest tooling addition (0 / 3267 / 0 / 0), and #173 now tracks its
+gaps: full validation tests the head, not the merge; a docs-only push can cancel
+a merged PR's post-merge run; dispatched `full` has never run live; preflight
+fails every full build (the original alone gives 124 GCC 15 warnings); a killed
+driver orphans its builds; and archives hold 103 GB. Actions:
 
-Phase 1 and Phase 2 below carry the resulting actions in order. Reviews now use
-`gpt-6.1-sol` high, and the reviewer fixes its own findings (`AGENTS.md`). Existing
-acceptances stand. Each later round uses a fresh reviewer, and finished agents
-are closed rather than kept open for reuse.
+1. **Resume Phase 2 at item 1 (#145).** The CI maintenance is finished. More
+   process tooling is not a fallback; only #173 is selected.
+2. **#173 runs alongside, with one agent and net non-positive lines** in `tools/`
+   and `.github/`. Until its merge-ref fix lands, merge the base into a branch
+   immediately before requesting that branch's final full run.
+3. **The first dispatched `full` run is a live test.** If it fails for a workflow
+   reason, fix that under #173 before other integrations. A workflow-changing PR
+   may unset `CI_ON_DEMAND` to use the `ci:full` label path. Restore it to `true`
+   after merge and record both changes in the PR. Never use `--admin`.
+4. **Until #173 lands**, use preflight for the commit checker only, without
+   cleaning up the pre-existing warnings. After a killed or timed-out driver,
+   stop leftover cmake, cargo or openttd processes in that worktree before
+   rebuilding.
 
-## Earlier steering (2026-10-04), still in force
+## Earlier steering, still in force
 
-First review: call shared services directly (#107); measure before map-access
-decisions (#108); keep tooling proportionate (#109); prioritize core simulation;
-use fresh agents per task and per PR review. Second review: harness end moments
-independent of wall time (#154, done); speed report (#155); track coverage gaps
-(#156); cap work in progress at six branches (#157).
+First review (10-04): call shared services directly (#107); measure before map
+decisions (#108); keep tooling proportionate (#109); prioritize core simulation.
+Second (10-04): harness end moments (#154, done); speed report (#155); coverage
+gaps (#156); WIP cap of six branches (#157). Third (10-07):
+- per-call task/future/`Rc` boundaries, opcode dispatch and whole-record reads
+  are the speed problem; convert to direct typed calls (#168);
+- the road conversion narrows RoadObserve (#155);
+- the speed budget is a ratchet;
+- the benchmark needs a non-road save (#156);
+- reviews use `gpt-6.1-sol` high, with a fresh reviewer each round that fixes its
+  own findings; close finished agents.
 
 ## Completed ownership ports
 
@@ -85,25 +93,12 @@ Harness and process: #72 harness (#85), #84 play saves (#87), #97 provenance
 freeze (#100), #88 Ruff (#92), #75 partial-pixel fidelity (#91), #90 world-state
 design (`docs/design/world-state.md`).
 
-| Issue | Completed maintenance | PR | Commit | Metrics (Rust / tooling / glue / retired) |
-| --- | --- | --- | --- | --- |
-| #109 | Component scenario modules | #112 | `9e1e5d175d` | 0 / 2414 / 0 / 0; moved code, net +190 lines |
-| #107 (trees) | Direct shared services | #113 | `c00402350b` | 640 / 22 / 149 / 22; old glue retired, no new game logic |
-| #107 (effects) | Direct shared services | #115 | `e702c4724e` | 241 / 4 / 155 / 86; old glue retired, net +65 lines |
-| #86 (rail/ship slice) | Owner-provided transport save | #110 | `350aec9e30` | 0 / 141 / 0 / 0 |
-| #108 | Map measurements and direct-service decision | #116 | `15bef07bde` | 0 / 65 / 81 / 0 |
-| #86 (aircraft slice) | Authorized reference-built aircraft fixture | #132 | `320711cccd` | 0 / 347 / 0 / 0 |
-| #131 | CI-capacity integration of the four owners above | #134 | `adbe063372` | aggregate 5866 / 1780 / 2689 / 5351; not additional retirement |
-| #154 | Deterministic semantic harness endpoints | #160 | `e16d01c869` | 0 / 277 / 0 / 0; tooling net +49 lines |
-| #158 | Restore existing MinGW i686 nightly dependencies | #159 | `55ad3a84ad` | 0 / 0 / 0 / 0; workflow-only |
-| #155 (measurement) | Semantic-valid speed report and benchmark isolation | #163 | `7fc597da60` | 0 / 212 / 0 / 0; road conversion remains open |
-| #140 | CI-capacity integration of rail/road search owners | #141 | `ea80a746a3` | aggregate 2369 / 197 / 927 / 2049; not additional retirement |
-| #156 (routing/crash) | Road RNG, crossing crash and event witnesses | #161 | `f8b5034ed3` | 0 / 306 / 0 / 0 |
-| #156 (flooding) | Ordinary road flooding crash witness | #162 | `0b2503cb30` | 0 / 155 / 0 / 0 |
-| #156 (service RNG) | Both road service routing random outcomes | #164 | `ee6fcdd44b` | 0 / 64 / 0 / 0 |
-| #165 | CI-capacity integration of rail/industry owners | #166 | `dace87c9b1` | aggregate 5595 / 1079 / 2336 / 3517; not additional retirement |
-| #156 (expiry) | Ordinary single-head crash cleanup boundary | #167 | `0c2a4bf37e` | 0 / 56 / 0 / 0 |
-| #170 | Explicit CI gate, observable validation, checked evidence and recoverable cleanup | #171 | `f382cccd0e` | 0 / 3267 / 0 / 0; maintenance, no game logic changed |
+Maintenance (issue, PR, tooling lines): #109 scenario modules #112 (2414, moved
+code); #107 direct services #113, #115; #86 transport save #110 (141) and
+aircraft fixture #132 (347); #108 map decision #116; #154 harness endpoints #160
+(277); #158 MinGW nightly #159; #155 speed report #163 (212); #156 road witnesses
+#161, #162, #164, #167 (581); #170 on-demand CI and validation tools #171 (3267,
+no game logic). CI-capacity batches #134, #141 and #166 integrated owners above.
 
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -125,9 +120,8 @@ never in masks.
    save with trains (PBS junctions, crossings), ships, aircraft and subsidies
    closes many gaps and gives the speed budget a non-road benchmark. Ask the user
    for one through the play-save pipeline before building more per-branch fixtures.
-3. **CI capacity (#170).** Request partial runs during iteration and full validation
-   for the final merge head. Use a concrete integration PR when capacity requires
-   batching; avoid merges whose only purpose is dependency ancestry.
+3. **Validation gaps (#173).** Bounded fixes to #171 only; see the fourth steering
+   review. Avoid merges whose only purpose is dependency ancestry.
 
 ## Phase 2: current work, in order
 
@@ -164,8 +158,8 @@ map or pool crossings dominating.
 
 ## Resume checkpoint
 
-Existing branches must absorb #171 before their next push to inherit on-demand CI.
-The primary checkout's `tools/ci.py` can request CI for any fork PR.
+Every branch below must merge the base before its next push; the primary
+checkout's `tools/ci.py` can request CI for any fork PR.
 
 | Issue / PR | Branch (worktree suffix), head | State and next step |
 | --- | --- | --- |
