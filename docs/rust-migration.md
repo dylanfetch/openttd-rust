@@ -158,8 +158,8 @@ and plainly, because desync mode also rebuilds caches every tick and takes
 YAPF's uncached rail path. Both write an exit save. Every chunk is decoded
 (tables field by field from the stored header, other chunks byte by byte) and
 the first differences are reported as `chunk/element/field: ref -> cand`.
-Any `[desync:` warning (a cache mismatch) and any log or stdout difference fail
-(cut to the shorter run when end moments differ; the plain run is always full).
+Any `[desync:` warning (a cache mismatch), snapshot-list/end-moment mismatch,
+or complete log/stdout difference fails. Both modes compare their exit saves.
 
 - Scenarios: both regression saves with their AIs; generated maps (TGP and
   original, sizes, seeds, disasters on); and `play-*`, road networks built by
@@ -178,13 +178,14 @@ Any `[desync:` warning (a cache mismatch) and any log or stdout difference fail
   id, build revision/NewGRF version, and `round_trip_time`, which the original
   saves uninitialized (#83); ports touching it need their own check.
 - Port divergences go in `KNOWN_FAILURES` by first divergence and issue.
-- `-vnull:ticks` counts loop iterations and a late threaded link graph job
-  pauses the game, so run length varies with load. Snapshots compare by date;
-  exit saves only when both runs stopped at the same tick. A clean plain pair
-  that stopped at different ticks is retried with no other harness game
-  running (a lock shared by all worktrees); a consistently slower link graph
-  job fails on timing, not state.
-  GameScripts run while paused, so scenarios must not use an active one.
+- Games launch on Linux as an unprivileged user with child-only
+  `RLIMIT_NPROC=0`. The original `StartNewThread` failure paths compute link
+  graphs and write saves synchronously; graph scheduling, join dates and loaded
+  LGRJ jobs remain unchanged. This prevents late workers from consuming null
+  driver iterations while the simulation is paused. A thread-creation probe
+  rejects hosts where privileges bypass the limit. Other platforms are not
+  supported by this offline comparison policy. There are no timing retries or
+  truncated logs. Active GameScripts remain outside the corpus.
 - Both executable/runtime trees are copied before scenarios, dereferencing data
   symlinks; the reference copy holds its shared build lock. Keep the candidate
   build idle during its initial copy; later builds cannot change the test run.

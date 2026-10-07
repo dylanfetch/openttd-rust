@@ -6,7 +6,6 @@ import shutil
 import struct
 from pathlib import Path
 
-from . import core
 from .core import (
     FILE_TYPES,
     ROOT,
@@ -159,15 +158,14 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
     if scenario.get("water_operation") != "reload":
         return scenario
     setup = dict(scenario, water_operation="route", ticks=3 * SNAPSHOT_TICKS)
-    with core.MACHINE.hold(alone=False):
-        run = run_game(
-            setup,
-            binaries["reference"],
-            builds["reference"],
-            out / scenario["name"] / "prepare",
-            timeout,
-            env,
-        )
+    run = run_game(
+        setup,
+        binaries["reference"],
+        builds["reference"],
+        out / scenario["name"] / "prepare",
+        timeout,
+        env,
+    )
     if run["exit"] != 0:
         raise RuntimeError("ship reload preparation failed")
     ship = json.loads(Path(scenario["save"]).with_suffix(".json").read_text())["ship"]
@@ -249,16 +247,15 @@ def prepare_water_save(layout, migration, out, timeout):
         "ticks": 1,
         "console": ["unpause"],
     }
-    with core.MACHINE.hold(alone=False):
-        initial = run_game(
-            scenario,
-            binary,
-            runtime,
-            out / "initial",
-            timeout,
-            migration.environment(),
-            False,
-        )
+    initial = run_game(
+        scenario,
+        binary,
+        runtime,
+        out / "initial",
+        timeout,
+        migration.environment(),
+        False,
+    )
     if initial["exit"] != 0 or not initial["snapshots"]:
         raise RuntimeError("water preparation could not emit the original save")
     emitted = initial["snapshots"][-1]
@@ -314,16 +311,15 @@ def prepare_water_save(layout, migration, out, timeout):
         f'WATER_SETUP <- "{layout}";\n'
     )
     scenario.update(save=str(funded), ticks=6000)
-    with core.MACHINE.hold(alone=False):
-        built = run_game(
-            scenario,
-            binary,
-            runtime,
-            out / "built",
-            timeout,
-            migration.environment(),
-            False,
-        )
+    built = run_game(
+        scenario,
+        binary,
+        runtime,
+        out / "built",
+        timeout,
+        migration.environment(),
+        False,
+    )
     markers = [
         line.split("WATER-SETUP-END ", 1)[1]
         for line in built["log"]
