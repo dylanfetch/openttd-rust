@@ -270,7 +270,7 @@ static void CheckTrainsOnTrack(FindTrainOnTrackInfo &info, TileIndex tile)
 		if (v->type != VEH_TRAIN || v->vehstatus.Test(VehState::Crashed)) continue;
 
 		Train *t = Train::From(v);
-		if (t->track == TRACK_BIT_WORMHOLE || HasBit(static_cast<TrackBits>(t->track), TrackdirToTrack(info.res.trackdir))) {
+		if (t->GetTrack() == TRACK_BIT_WORMHOLE || HasBit(static_cast<TrackBits>(t->GetTrack()), TrackdirToTrack(info.res.trackdir))) {
 			t = t->First();
 
 			/* ALWAYS return the lowest ID (anti-desync!) */
@@ -296,7 +296,7 @@ PBSTileInfo FollowTrainReservation(const Train *v, Vehicle **train_on_res)
 	if (IsRailDepotTile(tile) && !GetDepotReservationTrackBits(tile)) return PBSTileInfo(tile, trackdir, false);
 
 	FindTrainOnTrackInfo ftoti;
-	ftoti.res = FollowReservation(v->owner, GetAllCompatibleRailTypes(v->railtypes), tile, trackdir);
+	ftoti.res = FollowReservation(v->owner, GetAllCompatibleRailTypes(v->GetRailTypes()), tile, trackdir);
 	ftoti.res.okay = IsSafeWaitingPosition(v, ftoti.res.tile, ftoti.res.trackdir, true, _settings_game.pf.forbid_90_deg);
 	if (train_on_res != nullptr) {
 		CheckTrainsOnTrack(ftoti, ftoti.res.tile);
@@ -388,7 +388,7 @@ bool IsSafeWaitingPosition(const Train *v, TileIndex tile, Trackdir trackdir, bo
 	}
 
 	/* Check next tile. For performance reasons, we check for 90 degree turns ourself. */
-	CFollowTrackRail ft(v, GetAllCompatibleRailTypes(v->railtypes));
+	CFollowTrackRail ft(v, GetAllCompatibleRailTypes(v->GetRailTypes()));
 
 	/* End of track? */
 	if (!ft.Follow(tile, trackdir)) {

@@ -594,13 +594,13 @@ void UpdateDisableElrailSettingState(bool disable, bool update_vehicles)
 	 *  normal rail too */
 	if (disable) {
 		for (Train *t : Train::Iterate()) {
-			if (t->railtypes.Test(RAILTYPE_ELECTRIC)) {
+			if (t->GetRailTypes().Test(RAILTYPE_ELECTRIC)) {
 				/* this railroad vehicle is now compatible only with elrail,
 				 *  so add there also normal rail compatibility */
-				t->compatible_railtypes.Set(RAILTYPE_RAIL);
-				t->railtypes.Reset(RAILTYPE_ELECTRIC);
-				t->railtypes.Set(RAILTYPE_RAIL);
-				t->flags.Set(VehicleRailFlag::AllowedOnNormalRail);
+				t->SetCompatibleRailTypes(t->GetCompatibleRailTypes().Set(RAILTYPE_RAIL));
+				t->SetRailTypes(t->GetRailTypes().Reset(RAILTYPE_ELECTRIC));
+				t->SetRailTypes(t->GetRailTypes().Set(RAILTYPE_RAIL));
+				t->SetTrainFlag(VehicleRailFlag::AllowedOnNormalRail);
 			}
 		}
 	}

@@ -850,7 +850,7 @@ std::tuple<CommandCost, VehicleID> CmdCloneVehicle(DoCommandFlags flags, TileInd
 	if (ret.Failed()) return { ret, VehicleID::Invalid() };
 
 	/* Crashed trains can only be cloned before cleanup begins. */
-	if (v->type == VEH_TRAIN && (!v->IsFrontEngine() || Train::From(v)->crash_anim_pos >= 4400)) return { CommandCost(STR_ERROR_VEHICLE_IS_DESTROYED), VehicleID::Invalid() };
+	if (v->type == VEH_TRAIN && (!v->IsFrontEngine() || Train::From(v)->GetCrashAnimPos() >= 4400)) return { CommandCost(STR_ERROR_VEHICLE_IS_DESTROYED), VehicleID::Invalid() };
 
 	/* check that we can allocate enough vehicles */
 	if (!flags.Test(DoCommandFlag::Execute)) {
@@ -896,11 +896,11 @@ std::tuple<CommandCost, VehicleID> CmdCloneVehicle(DoCommandFlags flags, TileInd
 		if (flags.Test(DoCommandFlag::Execute)) {
 			w = Vehicle::Get(new_veh_id);
 
-			if (v->type == VEH_TRAIN && Train::From(v)->flags.Test(VehicleRailFlag::Flipped)) {
+			if (v->type == VEH_TRAIN && Train::From(v)->GetTrainFlags().Test(VehicleRailFlag::Flipped)) {
 				/* Only copy the reverse state if neither old or new vehicle implements reverse-on-build probability callback. */
 				if (!TestVehicleBuildProbability(v, v->engine_type, BuildProbabilityType::Reversed).has_value() &&
 					!TestVehicleBuildProbability(w, w->engine_type, BuildProbabilityType::Reversed).has_value()) {
-					Train::From(w)->flags.Set(VehicleRailFlag::Flipped);
+					Train::From(w)->SetTrainFlag(VehicleRailFlag::Flipped);
 				}
 			}
 

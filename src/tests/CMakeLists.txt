@@ -16,6 +16,8 @@ add_test_files(
     mock_spritecache.cpp
     mock_spritecache.h
     rail_yapf.cpp
+    train_reservation.cpp
+    train.cpp
     rail_yapf_protocol.hpp
     road_yapf.cpp
     roadvehicle.cpp

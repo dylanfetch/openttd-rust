@@ -1413,3 +1413,25 @@ loading, rating expiry/decay/capping, stale-link refresh/removal and active relo
 queue mutation, partial/nested save failure and actual retirement/indexed reuse.
 The corpus is not exhaustive for legacy versions, NewGRF cargo callbacks,
 articulated/multiheaded refits or every transport combination.
+
+### Rail vehicles and controller state (#130)
+
+Rust owns train consist/cache/curve/speed policy, both tick passes and movement,
+reversal, crossing control, crash/deletion, servicing and day handling. It also
+owns controller reservation extension/rollback, freeing, track choice and temporary
+order lookahead/restoration; #122 retains complete YAPF search ownership.
+Each C++ train shell owns one Rust allocation for flags, track, force-proceed,
+wait/crash counters, railtype masks and scalar TrainCache fields. Shared Vehicle/
+GroundVehicle fields, pools/links, sprite override references, rendering,
+construction/arrangement and generic orders/loading stay in C++. External writes,
+modern VEHS staging, legacy loading and afterload use canonical scalar adapters.
+Original selected bodies compile only in portable builds. Copied noexcept world
+services preserve immediate reads/writes; named callback tasks release borrows
+before tile/depot entry, orders/loading, station callbacks and destruction.
+`OPENTTD_TRAIN_PROFILE=1` writes controller branch counts in `train-profile.json`;
+this includes extension rollback separately from #122's search rollback.
+Validation uses the existing Padhattan manual/cargodist, realistic acceleration,
+90-degree reservation, live reload and real command-built controller scenarios.
+A narrow unchanged-source comparison covers variable-length curve/reversal inputs
+unavailable in the stock fixture. The PR records commands and branch/NewGRF limits; passing these inputs does not prove
+exhaustive train equivalence.
