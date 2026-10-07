@@ -7,13 +7,13 @@ a subagent stops and reports the conflict in its hand-off to root. Keep this
 file forward-looking: completed work is one table row, and its evidence stays in
 the PR (`AGENTS.md`, "Evidence budget").
 
-## Where the fork stands (2026-10-07, integration `e16d01c869`)
+## Where the fork stands (2026-10-07, integration `55ad3a84ad`)
 
 - Eleven ownership ports retired 14,049 original C++ lines, about 3.7% of roughly
   384k non-vendored `src/` lines. Town names account for 3,848, mostly data, and
   road movement tables for another 1,475; the remaining retirement is 8,726 lines.
   This is still an early migration, not a mostly Rust simulation.
-- Ten integrations since steering are complete. The latest ownership batch, #134, integrates
+- Eleven integrations since steering are complete. The latest ownership batch, #134, integrates
   cargo payment/delivery, ship YAPF, town growth and road controllers: 5,351
   retired lines against 2,689 glue and 1,780 tooling. Ship, town and road each
   retire more than their glue/tooling. This batch improves on the earlier small
@@ -25,8 +25,11 @@ the PR (`AGENTS.md`, "Evidence budget").
   do not grow generic tooling to polish evidence or improve a metric.
 - The tenth integration, #160, repairs deterministic harness endpoints: zero
   additional C++ retired or glue, 277 tooling lines added and 228 removed.
-  Main post-merge checks are green. The separate nightly repair #159 passes
-  its dispatched three-platform nightly; required final-head PR checks still gate it.
+  Main post-merge checks are green. The eleventh integration, #159, restores
+  nightly MinGW i686 dependencies without changing simulation code; all 13
+  required checks and its branch nightly pass. Main nightly run 37576549109
+  and post-merge checks are running at `55ad3a84ad`; require green main nightly
+  before component integration.
 - The exact serial-policy play-save ratio is 2.398x in reviewed #163; independent
   repetition gives 2.402x. RoadObserve leads the 3,920-sample profile at 14.11%,
   followed by the road future at 9.03%. Retain the planned road conversion;
@@ -35,7 +38,7 @@ the PR (`AGENTS.md`, "Evidence budget").
   2.429x (+7.0%). Other prepared owners measure 2.503-2.588x; no measured
   dependency delta exceeds 10%. Recheck combined source after base updates.
 - #156 now tracks the synchronous harness's excluded worker/abort interleavings.
-  RNG/crossing/news coverage #161 and flooding #162 are reviewed or in review,
+  RNG/crossing/news coverage #161, flooding #162 and service RNG #164 are reviewed,
   not yet integrated. Eleven component branches plus one integration branch
   remain unintegrated. Start no new component until the cap is restored.
 - Cargo #151 review caught quadratic list operations missed by the tiny packet
@@ -121,6 +124,7 @@ design (`docs/design/world-state.md`).
 | #86 (aircraft slice) | Authorized reference-built aircraft fixture | #132 | `320711cccd` | 0 / 347 / 0 / 0 |
 | #131 | CI-capacity integration of the four owners above | #134 | `adbe063372` | aggregate 5866 / 1780 / 2689 / 5351; not additional retirement |
 | #154 | Deterministic semantic harness endpoints | #160 | `e16d01c869` | 0 / 277 / 0 / 0; tooling net +49 lines |
+| #158 | Restore existing MinGW i686 nightly dependencies | #159 | `55ad3a84ad` | 0 / 0 / 0 / 0; workflow-only |
 
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -139,10 +143,9 @@ never in masks.
    No individual port may worsen that ratio by more than 10% without a stated
    reason; review the trend at each stocktake. Record execution/thread policy
    with measurements and compare like-for-like before and after runs.
-3. **#158 Existing MinGW i686 nightly repair.** Since steering, nightly main
-   also fails before compilation on unavailable MSYS2 LZO/LLD packages. Restore
-   dependencies and retain LZO support and the platform matrix. Land after
-   the integrated #154, before component integrations; require a green main nightly run.
+3. **#158 Main-nightly verification gate.** The repair is integrated as #159,
+   retaining LZO and the original matrix. Require main nightly run 37576549109
+   to pass before component integration; fix any failure first.
 
 The #86 rail/aircraft fixture gate is complete. Controller ports still require
 component-specific branch witnesses; extend the existing scenario modules and
@@ -150,7 +153,8 @@ reuse the supplied rail/ship save and authorized aircraft setup AI.
 
 ## Phase 3: current ownership work, in order
 
-On resume: finish the additional main-CI repair #158, then drain the
+On resume: require green main nightly after #158 and integrate the reviewed
+#155 speed-report tooling #163, then drain the
 reviewed queue (#141, then #142, the ordered #143/#144 CI-capacity batch
 #165, then #145 and #149), then #155's road conversion. Next finish #151, #152, #153 and
 #147, then start #148 and #150 from integrated `rust-migration`. Never hold more
@@ -232,8 +236,9 @@ selection following `docs/design/world-state.md`.
 ## Resume checkpoint (2026-10-07, migration resumed)
 
 Root: `/root` (gpt-6-astra, xhigh). The user resumed continuous migration.
-Latest integration is `e16d01c869` (#160 / #154); ten integrations since
-steering. Finish nightly failure #158, then follow
+Latest integration is `55ad3a84ad` (#159 / #158); eleven integrations since
+steering. Wait for green main nightly 37576549109 and fix any new main red check;
+then integrate ready #163 and follow
 the queue below. Eleven unfinished components plus one integration branch were
 inherited; start no further component until the six-branch cap is restored.
 Maintenance work does not retire additional C++ simulation code.
@@ -246,9 +251,9 @@ Active work (all new branches start from integrated main):
 | #156 `/root/road_flooding_coverage_156` (Sol high) | `road-flooding-coverage-156`, `openttd-rust-road-flooding`, PR #162 at `226267b976` | Legal canal/road fixture reaches actual flooding crash; initial review has no findings. Actual #154 API update, both constructors reproduce exact saves, final pair/self 2/2. Final independent review accepts; CI pending. Join actual #161/#163 and initialize standalone constructor lock before integration. |
 | #155 `/root/speed_report_155_resume` (Sol high) | `speed-report-155`, `openttd-rust-speed-report`, PR #163 at `f4fedd2ce6` | Independent review accepts benchmark isolation/provenance and #154 reconciliation; 9 tests, normal 25 snapshots and exact three-pair 2.398x report pass. All 13 required checks pass; ready for integration after the nightly repair. Root measured queued owners with its reviewed candidate override and matched every binary hash to a clean verification receipt. |
 | #156 service RNG | `road-service-rng-coverage-156`, `openttd-rust-road-service-rng`, PR #164 at `838c22f97a` | Both service-routing Random outcomes and negative draw-removal probe pass; fresh independent review accepts. CI pending. No unmerged dependency; join later road scenario additions before integration. |
-| #158 `/root` (Astra xhigh) | `fix-mingw-nightly-158`, `openttd-rust-mingw-nightly`, PR #159 at `e10f0e2e63` | Reviewed YAML `c4cee973f1` plus clean actual #160/main update. Nightly run 37570989513 passes all three builds/tests and annotations. Required final-head CI running. Root has a guarded monitor to merge only after all 13 pass and dispatch main nightly; check GitHub before duplicating actions. Require that main nightly green before components. |
-| #140 / #141 preparation | `integrate-reviewed-pathfinding`, pushed `22b2c28482` | Clean main/F1 docs update accepted; actual #154 joined, obsolete rail preparation lock removed. Final verify and reload 1/1 with 25 snapshots pass. Required CI running; exact play-save ratio 2.599x (+7.0% against same-window 2.429x baseline), all six pairs equal. Integrate first after CI repairs. |
-| #142 station | `station-service-ownership-125`, pushed `f9fc161e80` | Clean #154 update, exact verify and pair/self 12/12 pass. Required CI running. Ratio 2.564x; source acceptance carries. |
+| #158 main verification | Integrated `55ad3a84ad`; merged worktree removed | Monitor main nightly 37576549109, migration validation 37576548217 and CI Build 37576548523. The guarded merge monitor finished successfully; do not restart it. |
+| #140 / #141 preparation | `integrate-reviewed-pathfinding`, pushed `22b2c28482` | Clean main/F1 docs update accepted; actual #154 joined, obsolete rail preparation lock removed. Final verify and reload 1/1 with 25 snapshots pass. All 13 required checks pass; exact play-save ratio 2.599x (+7.0% against same-window 2.429x baseline), all six pairs equal. Integrate first after CI repairs. |
+| #142 station | `station-service-ownership-125`, pushed `f9fc161e80` | Clean #154 update, exact verify and pair/self 12/12 pass. All 13 required checks pass. Ratio 2.564x; source acceptance carries. |
 | #143 rail control | `rail-vehicle-ownership-130`, pushed `3038f44a3a` | Clean #154 update, clean-head verify and prepared-tree pair/self 11/11 pass. Ratio on verified final binary 2.503x. Heavy CI deferred until final base. |
 | #144 industry warning repair | Pushed `4e8eb5af83` in `openttd-rust-industry-periodic` | Accepted warning fix plus clean #154 update; exact verify, 4480 native cases and pair 18/18 pass. Ratio 2.524x. Heavy CI deferred until final base. Component metrics 1508 / 474 / 678 / 932; eight extra retired declaration/comment lines, not new game logic. |
 | #145 aircraft | Pushed `dd0f2f0475` in `openttd-rust-aircraft-controller` | Clean #154 update, exact verify and clean-head pair/self 21/21 pass. Ratio 2.567x; heavy CI deferred until final base. |
@@ -261,10 +266,11 @@ integration bases. No cancelled check permits integration. Root accepted the fre
 combine #143 then #144 under the CI-capacity exception, with retained component
 reviews, conflict re-reviews and a fresh combined reviewer. Create its branch
 only from actual integrated #142; later #145/#149 remain ordered separately.
-#155 has a bounded direct-service plan in its issue; implementation still follows
-the reviewed queue. Standing #156 capacity found crossing #161 already reaches three crash-rotation
-Random draws; an unchanged-scenario negative probe is in progress, with no new
-tracked code. Plan subsequent actual-collision expiry endpoints at 2238/2239
+#155 has a corrected direct-service plan in its issue: all 22 road services can
+be direct, removing the complete Task/Future/Rc protocol. Recheck final integrated
+callees and preserve short borrows/deletion order; implement after the queue. Standing #156 capacity found crossing #161 already reaches three crash-rotation
+Random draws; the unchanged-scenario negative probe detects RNG/direction divergence in both
+modes and the restored build passes, with no new tracked code. Plan subsequent actual-collision expiry endpoints at 2238/2239
 ticks only after existing fixture PRs integrate; articulated deletion stays open.
 
 The component table below preserves the last implementation checkpoints from
