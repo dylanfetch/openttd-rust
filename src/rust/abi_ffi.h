@@ -35,7 +35,7 @@ extern "C" {
  * Unknown type/item returns SIZE_MAX. No memory borrow, ownership or callback.
  * Native extern-C convention (cdecl on i686 MSVC); Rust panic never unwinds.
  */
-size_t openttd_rust_abi_layout(uint8_t type_id, uint8_t item);
+size_t openttd_rust_abi_layout(uint16_t type_id, uint8_t item);
 #ifdef __cplusplus
 }
 #endif

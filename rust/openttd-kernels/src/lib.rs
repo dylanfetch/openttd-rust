@@ -768,7 +768,7 @@ mod abi;
 /// Scalar metadata only: no allocation, pointers, ownership or callbacks.
 #[allow(unsafe_code)] // Exported scalar C symbol, like the existing kernel entry points.
 #[unsafe(no_mangle)]
-pub extern "C" fn openttd_rust_abi_layout(type_id: u8, item: u8) -> usize {
+pub extern "C" fn openttd_rust_abi_layout(type_id: u16, item: u8) -> usize {
     abi::layout(type_id, item)
 }
 
@@ -1308,6 +1308,7 @@ mod industry;
 #[allow(unsafe_code)]
 mod ship_yapf;
 
+mod orders;
 mod train;
 mod train_state;
 

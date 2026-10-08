@@ -24,7 +24,7 @@ macro_rules! layout {
 
 // Keep ABI IDs in one registry so duplicate match arms remain compiler-checked.
 #[allow(clippy::too_many_lines)]
-pub fn layout(type_id: u8, item: u8) -> usize {
+pub fn layout(type_id: u16, item: u8) -> usize {
     match type_id {
         0 => {
             layout!(crate::IntegerResult, item; value_bits, length, error_offset, error_length, error_kind)
@@ -55,7 +55,7 @@ pub fn layout(type_id: u8, item: u8) -> usize {
         18 => {
             layout!(crate::station_cargo::Collector, item; amount, previous, last_key, other, origin, selector, finalized)
         }
-        19..=21 => crate::crypto_primitives::abi_layout(type_id, item),
+        19..=21 => crate::crypto_primitives::abi_layout(u8::try_from(type_id).unwrap(), item),
         22 => crate::blake2b::abi_layout(item),
         23 => layout!(crate::packet::State, item; limit, position),
         24 => layout!(crate::packet::Frame, item; message, payload),
@@ -153,6 +153,20 @@ pub fn layout(type_id: u8, item: u8) -> usize {
         105 => {
             layout!(crate::road_yapf::Result, item; tile, cost, direction, found, rounds, open, closed, calcs, distance)
         }
+        240 => {
+            layout!(crate::orders::Order, item; kind, flags, destination, refit, wait, travel, speed)
+        }
+        241 => {
+            layout!(crate::orders::Consist, item; time, lateness, start, last_departure, next_departure, round_trip, real, implicit, flags)
+        }
+        242 => layout!(crate::orders::VehicleOrders, item; current, orders, next, previous),
+        243 => layout!(crate::orders::List, item; manual, vehicles, first, timetable, total),
+        244 => layout!(crate::orders::Backup, item; user, tile, group, clone),
+        245 => {
+            layout!(crate::orders::Leaves, item; vehicle, consist, list, vector, backup, backup_vector, backup_consist, query, write)
+        }
+        246 => layout!(crate::orders::Action, item; operation, context, a, b, c),
+        247 => layout!(crate::orders::Closest, item; tile, destination, reverse, found),
         110 => {
             layout!(crate::station_service::CargoFields, item; max_waiting_cargo, status, time_since_pickup, rating, last_speed, last_age, amount_fract)
         }
