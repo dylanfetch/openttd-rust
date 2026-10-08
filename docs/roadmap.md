@@ -4,12 +4,13 @@ Root owns selection here; `AGENTS.md` and `docs/rust-migration.md` define proces
 If an issue conflicts, follow this roadmap and report it to root. Keep this
 forward-looking, about 200 lines; completed work is one row, with evidence in PRs.
 
-## Where the fork stands (2026-10-08, `cd0297938c`)
+## Where the fork stands (2026-10-08, `dbce82a309`)
 
-- Seventeen ownership ports retire 22,827 original C++ lines, about 5.9% of roughly
-  384k non-vendored `src/` lines (17,504 excluding town-name and road-movement
-  data). These two integrations retire 1,880 lines for 380 glue + 764 tooling;
-  #173's maintenance is net -2 tooling lines. Post-merge native CI is running.
+- Eighteen ownership ports retire 24,221 original C++ lines, about 6.3% of roughly
+  384k non-vendored `src/` lines (18,898 excluding town-name and road-movement
+  data). The last two integrations retire 1,394 lines for 1,052 glue + 700 net
+  tooling. Company's canonical save/writer adapters explain the cost; its
+  allocating boundary still needs #168. Post-merge CI is running.
 - Latest aircraft-base play-opus is **2.626x**; company is 2.624x on the same host.
   Generation is 1.411x / 1.552x; root accepts company's temporary allocating
   boundary cost, with 50 ms process-wait resolution limiting attribution (#149).
@@ -20,9 +21,9 @@ forward-looking, about 200 lines; completed work is one row, with evidence in PR
 - CI is on demand (#171). An ordinary PR push costs about 2 job-minutes instead
   of 80. A full run costs about 104 job-minutes and 30 minutes wall time, once per
   final head.
-- Six component branches are unintegrated (#157 cap): #149, #151, #152,
-  #176, #147 and the selected #155 conversion. #176 replaces closed #153.
-  Company, orders and ship have joined aircraft; cargo and fleet need an update.
+- Five component branches are unintegrated (#157 cap): #151, #152, #176, #147
+  and #178's road conversion. #176 replaces closed #153. Orders and ship have
+  joined aircraft; road is joining company; cargo and fleet need an update.
 
 ## Fourth steering review (2026-10-07)
 
@@ -90,6 +91,7 @@ Metrics are `tools/port-metrics.py`: Rust / tooling / C++ glue / C++ retired.
 | #130 | Rail controller, reservation and private state | #143 via #166 | `dace87c9b1` | 4087 / 613 / 1660 / 2585 |
 | #129 | Industry production, histories and builder state | #144 via #166 | `dace87c9b1` | 1508 / 474 / 678 / 932 |
 | #136 | Aircraft controller and airport blocks | #145 | `f0e0b3d712` | 1773 / 764 / 380 / 1880 |
+| #137 | Company finance, economy and lifecycle | #149 | `dbce82a309` | 1607 / 702 / 1052 / 1394 |
 
 Harness and process: #72 harness (#85), #84 play saves (#87), #97 provenance
 freeze (#100), #88 Ruff (#92), #75 partial-pixel fidelity (#91), #90 world-state
@@ -122,9 +124,12 @@ never in masks.
 2. **#156 coverage, standing capacity.** Random and crash branches first. A mixed
    save with trains (PBS junctions, crossings), ships, aircraft and subsidies
    closes many gaps and gives the speed budget a non-road benchmark. The user
-   expects to supply one in a few hours; continue existing fixtures until then.
-3. **Validation gaps (#173).** Bounded fixes to #171 only; see the fourth steering
-   review. Avoid merges whose only purpose is dependency ancestry.
+   supplied the later Padhattan save (#179/#180); defaults and six-year soaks
+   pass. Establish its idle three-pair baseline without raising old budgets.
+3. **Reviewed maintenance batch (#175/#177/#180).** One concrete integration PR
+   validates crossing sound, landing RNG evidence and the later save together:
+   about 104 rather than 312 full-CI job-minutes. Independent component reviews
+   remain the source gate; no individual PR bypasses CI.
 
 ## Phase 2: current work, in order
 
@@ -132,22 +137,20 @@ Integration of reviewed work comes before new starts. Never hold more than six
 unintegrated component branches (#157). Independent items (#169, #156 slices)
 may run in parallel with this list.
 
-1. **Integrate #149 company.** Reviewed client ID/shift fixes and the conflict-free
-   aircraft refresh await final evidence and full CI. Root accepted temporary
-   allocation/settings overhead; the best-known speed budgets do not increase.
-2. **#155 road conversion.** Remove the Task/Future/Rc protocol for all 22
+1. **#155 road conversion (#178).** Remove the Task/Future/Rc protocol for all 22
    services and 14 entries, and narrow RoadObserve: field getters or a hot
    record, no `IsBus` in the view, type-filter in `close`, single-pass `nearby`,
    owner resolved once per entry, and nested `GetCurrentMaxSpeed`. Add the ratchet.
-   Start local work on integrated aircraft while company awaits CI; join integrated
-   company before final evidence. The expected result is about 1.7-1.9x.
-3. **Integrate #151 cargo storage** (already direct) on the fresh baseline.
+   Join integrated company before final evidence. The expected result is about
+   1.7-1.9x; use the later-save benchmark once its baseline is established.
+2. **Integrate #151 cargo storage** (already direct) on the fresh baseline.
+3. **Integrate reviewed #176 orders, then #152 ship.** Both are direct; ship
+   names orders as an ancestry dependency. Finish their final-base checks before
+   starting another component. Then finish #147 fleet replacement.
 4. **#168 train and train-reservation conversion**, including the O(n^2) consist
    walk and the per-step `nearby` Vec; then aircraft and company; then trees,
    town and disaster. One PR per component.
-5. **Finish #176 orders, then #152 ship, in the direct form before review.** Ship
-   names orders as an ancestry dependency. Then #147 fleet replacement.
-6. **New components** (#148 town lifecycle, then #150 industry construction)
+5. **New components** (#148 town lifecycle, then #150 industry construction)
    start only once the road play saves are at or below 2.0x and #168's train
    slice is integrated. When fewer than two unstarted selections remain, a fresh
    Astra high planner replenishes whole simulation owners, which are planned in
@@ -164,16 +167,16 @@ checkout's `tools/ci.py` can request CI for any fork PR.
 
 | Issue / PR | Branch (worktree suffix), head | State and next step |
 | --- | --- | --- |
-| #137 / #149 | `company-economy-ownership-137` (`company-economy`), `d994ddcce3` | Reviewed, local evidence/timing and old-base full pass; refresh onto #174 and run full on its actual merge before integration. |
-| #155 | `road-direct-155` (`road-direct-155`) | Direct typed conversion and narrowed reads plus speed ratchet selected; final baseline follows #149. |
+| #155 / #178 | `road-direct-155` (`road-direct-155`), `624ff3d704` | Direct conversion and ratchet published; join company, resolve ABI test-ID overlap, finish final checks, review and idle timing. |
 | #139 / #151 | `cargo-storage-movement-139` (`cargo-storage`), `ff912bcfcb` | Accepted at `a25a7d41e2`; final base and CI after item 2. |
-| #138 / #176 | `orders-direct-138` (`order-lifecycle`), `6999b1dff4` local | Fresh reviewer fixed cyclic implicit deletion, conditional distance and depot argument packing; final checks/base/push/report running. |
-| #146 / #152 | `ship-controller-ownership-146` (`ship-controller`), `50266fd1df` local | Direct form passes native/water pair+soak; join orders review fixes, publish and assign fresh review. |
+| #138 / #176 | `orders-direct-138` (`order-lifecycle`), `3ef37bc4fc` | Reviewed fixes verified by root; final native/pair/self pass; refresh and full CI remain. |
+| #146 / #152 | `ship-controller-ownership-146` (`ship-controller`), `df7a1d4d2e` | Joins accepted orders; fresh reviewer found no issue so far, final checks running. |
 | #147 | `fleet-replacement-ownership-147` (`fleet-replacement`), `68d660adc9` | State-only WIP, no PR. |
-| #169 / #175 | `crossing-sound-169` (`crossing-sound-169`), `5370d49886` local | Reviewed; native/Cargo and default 214 scenarios pass; refresh onto #174, publish and request full. |
-| #156 | `aircraft-landing-rng-156` (`aircraft-landing-156`), `47cb78d223` local | Landing equality/mask/disabled/event checks and both sensitivity mutations pass; draft awaits push release/review. |
+| #169 / #175 | `crossing-sound-169` (`crossing-sound-169`), `9b20e639d8` local | Reviewed; native/Cargo and default 214 pass; selected maintenance batch. |
+| #156 / #177 | `aircraft-landing-rng-156` (`aircraft-landing-156`), `bc07a5c7dc` | Reviewed RNG wording fix verified; paired/self landing 5/5 pass; selected maintenance batch. |
+| #179 / #180 | `padhattan-2000-179` (`padhattan-2000-179`), `51d3541f86` | Reviewed unchanged user save; native/default/soak/old rails pass; batch plus new idle benchmark remain. |
 
-The first live dispatched full (#145) and #174's merge-validation bootstrap passed.
+The first live dispatched full (#145), #174 bootstrap and #149 actual merge passed.
 `CI_ON_DEMAND=true` is restored; both local timing and remote push holds are released.
 Standing #156 work: aircraft landing RNG (plan in #156), then the
 2026-10-07 audit list there. Preserve the pinned reference, paused curve
