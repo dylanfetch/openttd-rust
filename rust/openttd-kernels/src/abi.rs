@@ -171,6 +171,47 @@ pub fn layout(type_id: u8, item: u8) -> usize {
         115 => {
             layout!(crate::station_service::Loading, item; read, write, next, next_stations, next_stations_destroy, cargo, load_callback, payment, effect, refit)
         }
+
+        160 => {
+            layout!(crate::train_reservation::View, item; tile, dest, next, destination, last_station, direction, order, num_orders, order_index, suppress, nearest)
+        }
+        161 => {
+            layout!(crate::train_reservation::Follow, item; old_tile, new_tile, skipped, dirs, old_td, exitdir, tunnel, bridge, station, error)
+        }
+        162 => layout!(crate::train_reservation::Pbs, item; tile, other, td, okay),
+        163 => {
+            layout!(crate::train_reservation::Step, item; value, action, id, tile, final_dest, td, dir, tracks, reserve, found, got, okay)
+        }
+        164 => {
+            layout!(crate::train_reservation::Leaves, item; observe, leaf, owner, follow, origin)
+        }
+        151 => {
+            layout!(crate::train::View, item; id,first,next,previous,next_unit,last,tile,dest,x,y,z,order_time,power,weight,length,total_length,max_speed,max_track_speed,speed,gv_flags,cargo_cap,refit_cap,engine,first_engine,order_destination,last_station,direction,status,tick,running,day,progress,subspeed,acceleration,order,nonstop,breakdown,front,free_wagon,articulated,engine_part,multiheaded,owner,vis_effect)
+        }
+        152 => layout!(crate::train::Leaves, item; observe,write,leaf,owner,nearby),
+        153 => layout!(crate::train::Action, item; op,id,a,b,c),
+        130 => {
+            layout!(crate::industry::Fields, item; valid_history, last_prod_year, counter, prod_level, was_cargo_delivered, ctlflags)
+        }
+        131 => {
+            layout!(crate::industry::BuildFields, item; probability, min_number, target_count, max_wait, wait_count)
+        }
+        132 => {
+            layout!(crate::industry::BuilderFields, item; builddata, wanted_inds, daily_counter, daily_increment, sound_tile, sound_ctr)
+        }
+        133 => layout!(crate::industry::Slots, item; data, size),
+        134 => layout!(crate::industry::Produced, item; cargo, waiting, rate, history),
+        135 => {
+            layout!(crate::industry::Accepted, item; cargo, waiting, accumulated_waiting, last_accepted, history)
+        }
+        136 => {
+            layout!(crate::industry::Observation, item; owner, tile, behaviour, id, width, height, callbacks, sound_count, life, original, minimal_cargo, kind, up_text, down_text, closure_text)
+        }
+        137 => layout!(crate::industry::Services, item; observe, next, setting, world),
+        138 => {
+            layout!(crate::industry::ProductionResult, item; subtract, add, again, cargo_input, cargo_output, version, num_input, num_output, present)
+        }
+
         180 => {
             layout!(crate::aircraft::State, item; cached_max_range_sqr, cached_max_range, cache_padding, crashed_counter, targetairport, pos, previous_pos, state, last_direction, number_consecutive_turns, turn_counter, flags)
         }

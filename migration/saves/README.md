@@ -51,3 +51,52 @@ records source/provenance hashes and generation settings; the linked README
 gives exact reproduction and comparison commands and coverage limits.
 Only optional input GLOG history is removed; every other chunk is unchanged.
 The original owner-built and road saves retain their original bytes.
+
+## Road service-routing RNG witness (#156)
+
+`roads-service-retain` and `roads-service-refresh` reuse `opus-55-167-002.sav`.
+The existing blocked vehicle 37 keeps its pose, speed and empty path cache.
+Declared typed edits set its current order to automatic non-stop service
+(type 66, flags 1), depot 5 / tile 3091, and last service date 727700.
+The refresh case sets both DATE RNG words to 8; retain keeps the original RNG.
+As in the other short road windows, link-job join dates move forward 32 days;
+only optional input GLOG history is removed. The receipt lists every assignment.
+
+At 37 ticks the unchanged original's `CheckIfRoadVehNeedsService` has run once:
+day counter 31 becomes 32 and blocked counter 185 becomes 222. The order stays
+at depot 5 with ground flags 0 on retention, or changes to closest depot 2 /
+tile 6206 with implicit-order suppression flag 4 on refresh. DATE RNG words are
+respectively `(2876180153, 3044549951)` and `(2072642750, 3270530758)`.
+Both plain/desync modes require these states and compare all semantic chunks.
+
+```sh
+python3 tools/migration.py simulate roads-service --jobs 2
+python3 tools/migration.py simulate roads-service --self --jobs 2
+python3 tools/migration.py verify --jobs 2
+uvx --from ruff==0.16.8 ruff check tools/
+uvx --from ruff==0.16.8 ruff format --check tools/
+```
+
+Negative probe: replace only `self.random()` in `service()`'s
+`chance16_i(1, 20, self.random())` with `0`, then run the focused pair above.
+The probe changes retain to depot 2 / tile 6206 / ground flags 4; refresh RNG
+becomes `(3680812379, 2696267631)`. Both fail their witnesses. Restore that
+scratch change and rerun the pair.
+This covers one stock blocked vehicle, two RNG outcomes and ordinary daily
+service dispatch; unblocked traffic, articulation/trams and the other #156
+coverage domains remain open. It changes no production behavior or reference source.
+
+## Reference-built road crossing (#156)
+
+`road-crossing.sav` adds one level crossing to the existing water-ferry fixture
+through unchanged reference game commands. Its JSON receipt and
+[`tools/road-scenario-ai`](../../tools/road-scenario-ai/README.md) record provenance
+and reproduction. Comparison uses typed vehicle-position inputs and a read-only
+AI crash-event observer; it changes no map bytes and compares every saved chunk.
+
+`road-flooding.sav` uses the same constructor to enclose three sea-level road tiles
+with twelve canals. Its receipt records the source, typed stopped-bus/link-job
+preparation and unchanged-reference commands. During comparison a single legal
+canal removal lets ordinary sea flooding crash the bus; position edits preserve
+its existing 18 passengers. The road scenario README records the fixed event,
+counter/RNG checkpoint and negative probe. No map bytes are patched.

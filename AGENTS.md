@@ -41,9 +41,15 @@ fork; the remaining upstream documentation explains behavior and architecture.
   failures are not simulation behavior: allocation failure, I/O errors in debug
   or log output, and paths that need developer-only defines such as
   `RANDOM_DEBUG`. An exception escaping a wrapper terminates. Return control to
-  C++ (an action protocol) only where the original throws or reenters during
-  ordinary play: script VMs, save/load errors, or callbacks that can run
-  arbitrary code or mutate state Rust holds borrowed. Name each such service.
+  C++ (an action protocol) only where a C++ exception can unwind through the
+  call during ordinary play (script VMs, save/load errors). Name each such
+  service. Reentry alone is not a reason: end every Rust borrow before a
+  callback that can reenter Rust or mutate its state, then call it directly.
+- Keep the boundary cheap and typed. Entries are plain synchronous calls with
+  no per-call heap allocation and no async, future, task or mailbox machinery.
+  Each service is its own typed `noexcept` function, not an opcode switch or
+  positional array, and hot reads fetch only the fields they use rather than
+  whole-record views. Existing ports convert under #168.
 - Evidence for game-logic ports is the semantic simulation harness (`python3
   tools/migration.py simulate`, #72) plus the existing tests; a new game-logic
   port integrates only after the harness exists and its scenarios exercise the
@@ -74,13 +80,16 @@ checks that run; do not restate them in paragraphs.
   instead of re-describing them. `.github/PULL_REQUEST_TEMPLATE.md` and the
   migration issue form follow this budget.
 - Component entry in `docs/rust-migration.md`: about 25 lines at most.
-- Roadmap: forward-looking. A completed item becomes one table row (issue, PR,
-  commit, metrics); its evidence stays in the PR. Committed docs do not cite
-  `.local/` receipts, which nobody else can check.
+- Roadmap: forward-looking, about 200 lines at most. A completed item becomes
+  one table row (issue, PR, commit, metrics); its evidence stays in the PR. The
+  resume checkpoint is a short status table, not a log: CI run IDs, executable
+  hashes, probe values and per-PR plans go in the PR or issue. Committed docs do
+  not cite `.local/` receipts, which nobody else can check.
 - Harness tooling for a port goes in that component's scenario module. Tooling
   is code to maintain; keep it proportionate to the C++ the port retires.
-- Review report: reviewed commit, findings, and dispositions, plus one line
-  naming the functions or files compared against the original body. Do not
+- Review report: reviewed commit, findings with their fixing commits (or why one
+  went to root), plus one line naming the functions or files compared against
+  the original body. Do not
   narrate further when there are no findings. Branches the harness does not
   reach go in the coverage tracker (#156), not only in the disposition.
 - One PR per component, targeting `rust-migration` directly. Use an integration
@@ -97,12 +106,12 @@ the running host's actual limit; this document cannot raise a session limit.
 
 Every spawn must specify a model and reasoning effort rather than inherit them:
 
-- `gpt-6.1-sol`: most implementation and analysis; high effort by default.
-  Use lower effort only for a clearly bounded task that justifies it.
+- `gpt-6.1-sol`: most implementation and analysis, and all independent review;
+  high effort by default. Use lower effort only for a clearly bounded task that
+  justifies it.
 - `gpt-6-luna`: bounded mechanical work; low or medium effort.
-- `gpt-6-astra`: all delegated planning at high effort and all independent review
-  at medium effort. Root uses xhigh effort so every Astra subagent has strictly
-  lower effort than root.
+- `gpt-6-astra`: all delegated planning at high effort. Root uses xhigh effort
+  so every Astra subagent has strictly lower effort than root.
 
 Every agent-authored GitHub issue, PR, comment, and review report must identify
 the agent, exact model, and reasoning effort, including artifacts authored by root.
@@ -112,8 +121,13 @@ model and states its effort as reported by its host.
 
 Spawn a fresh agent for each task and name it after that task. Do not reassign a
 finished agent to unrelated work: its name is its attribution, and its context
-carries over. Each PR gets its own reviewer, not one reused from another PR; that
-reviewer re-reviews the same PR's fixes.
+carries over. Each review round, including a re-review, gets a fresh reviewer; it
+reads the PR's earlier attributed review reports for context.
+
+Close each agent when its task ends. When the host's slot limit is reached, root
+works through its own queue (integration, verifying fix commits, roadmap) until a
+slot frees. Root leaves host state alone: no archiving threads or editing host
+databases to free slots.
 
 For substantive changes:
 
@@ -123,10 +137,13 @@ For substantive changes:
    agent opens a draft PR targeting `rust-migration`, linking the issue and
    recording exact validation commands and limitations.
 3. Assign a separate reviewer agent to examine the final commit and check evidence.
-   Resolve findings, then review the resulting commit again before integration.
-   Updating a reviewed PR from its base needs no new review when the update has
-   no conflicts in `src/` or `rust/` and CI passes; otherwise the reviewer checks
-   only the conflict resolution.
+   The reviewer fixes what it finds: it commits each fix to the PR branch, reruns
+   the affected checks, and lists each finding with its fixing commit. Root
+   verifies the reviewer's fix commits before integration. Findings that need a
+   scope or policy decision go to root unfixed. Updating a reviewed PR from its
+   base needs no new review when the update has no conflicts in `src/` or `rust/`
+   and CI passes; otherwise a fresh reviewer checks and fixes only the conflict
+   resolution.
 4. Root integrates after review and required checks, records completion, and
    removes the merged worktree. A red check on `rust-migration` itself is fixed
    before more integrations.
@@ -159,6 +176,8 @@ Python tools use `uvx --from ruff==0.16.8 ruff check tools/` and
 checks that the candidate retains reference test names, and records evidence under
 `.local/`. `python3 tools/migration.py build` builds both without running tests.
 `python3 tools/migration.py tools` builds the native Rust generators.
+`python3 tools/migration.py rust-checks` runs only the four Cargo checks.
+`--jobs` defaults to two and bounds both CMake and Cargo.
 `python3 tools/migration.py simulate [name...] [--soak] [--self]` builds both
 games and compares their simulation state (`tools/simulate.py`).
 `python3 tools/run-comparisons.py [name...]` runs the reference comparison tools
@@ -173,9 +192,20 @@ and per-role ccache stores. ccache is used whenever it is installed (PCH off);
 `--no-ccache` gives an ordinary PCH build. Cache build outputs freely when the
 key covers what determines them; never cache test results.
 
-Iterate locally: incremental builds take seconds to minutes, while every push
-starts roughly 15 minutes of CI. Push when a change is ready for CI or review,
-with its commits batched, and keep working while CI runs.
+Iterate locally and push reviewable batches. Ordinary PR pushes run only cheap
+checks, so code pushes do not use `[skip ci]`. `python3 tools/ci.py request PR
+--profile rust|native|platform` runs diagnostic subsets. Before merging, request
+`--profile full` for the final PR head and wait for it. Only a successful full
+run at that exact head publishes the required `Full validation` status, and any
+later push needs a new one. When capacity forces batching, validate one concrete
+integration PR. `docs/rust-migration.md` (team process section) has the flags
+and limits.
+
+Before pushing, run `python3 tools/preflight.py --base origin/rust-migration` for
+the inherited commit checker. Check receipts with `tools/evidence.py` rather than
+a hand-written script, and remove merged worktrees with `tools/worktrees.py`
+(`plan`, then `archive`). Until #173 baselines preflight's warning scan, compare
+its warnings against the reference build log instead of cleaning them up.
 
 Docs-only changes (only `docs/` or `*.md` files, such as roadmap updates) are
 committed directly to `rust-migration` as a single commit, without a PR.

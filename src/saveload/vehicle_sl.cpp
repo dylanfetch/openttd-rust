@@ -561,7 +561,7 @@ void FixupTrainLengths()
 			 * so we need to move all vehicles forward to cover the difference to the
 			 * old center, otherwise wagon spacing in trains would be broken upon load. */
 			for (Train *u = Train::From(v); u != nullptr; u = u->Next()) {
-				if (u->track == TRACK_BIT_DEPOT || u->vehstatus.Test(VehState::Crashed)) continue;
+				if (u->GetTrack() == TRACK_BIT_DEPOT || u->vehstatus.Test(VehState::Crashed)) continue;
 
 				Train *next = u->Next();
 
@@ -578,8 +578,8 @@ void FixupTrainLengths()
 					 * space backwards and re-do the fix up of the front vehicle. */
 
 					/* Ignore any signals when backtracking. */
-					TrainForceProceeding old_tfp = u->force_proceed;
-					u->force_proceed = TFP_SIGNAL;
+					TrainForceProceeding old_tfp = u->GetForceProceed();
+					u->SetForceProceed(TFP_SIGNAL);
 
 					/* Swap start<>end, start+1<>end-1, ... */
 					int r = CountVehiclesInChain(u) - 1; // number of vehicles - 1
@@ -603,7 +603,7 @@ void FixupTrainLengths()
 					l = 0;
 					do ReverseTrainSwapVeh(u, l++, r--); while (l <= r);
 
-					u->force_proceed = old_tfp;
+					u->SetForceProceed(old_tfp);
 
 					/* Tracks are too short to fix the train length. The player has to fix the
 					 * train in a depot. Bail out so we don't damage the vehicle chain any more. */
@@ -618,12 +618,12 @@ void FixupTrainLengths()
 				}
 
 				/* If the next wagon is still in a depot, check if it shouldn't be outside already. */
-				if (next != nullptr && next->track == TRACK_BIT_DEPOT) {
+				if (next != nullptr && next->GetTrack() == TRACK_BIT_DEPOT) {
 					int d = TicksToLeaveDepot(u);
 					if (d <= 0) {
 						/* Next vehicle should have left the depot already, show it and pull forward. */
 						next->vehstatus.Reset(VehState::Hidden);
-						next->track = TrackToTrackBits(GetRailDepotTrack(next->tile));
+						next->SetTrack(TrackToTrackBits(GetRailDepotTrack(next->tile)));
 						for (int i = 0; i >= d; i--) TrainController(next, nullptr);
 					}
 				}
@@ -797,6 +797,15 @@ class SlVehicleTrain : public DefaultSaveLoadHandler<SlVehicleTrain, Vehicle> {
 public:
 	static inline const SaveLoad description[] = {
 		 SLEG_STRUCT("common", SlVehicleCommon),
+#ifdef WITH_RUST
+		     SLEG_VAR("crash_anim_pos", TrainStateScope::CrashAnimPos(), SLE_UINT16),
+		     SLEG_VAR("force_proceed", TrainStateScope::ForceProceed(), SLE_UINT8),
+		     SLEG_VAR("track", TrainStateScope::Track(), SLE_UINT8),
+
+		 SLEG_CONDVAR("flags", TrainStateScope::Flags(), SLE_FILE_U8  | SLE_VAR_U16,   SLV_2,  SLV_100),
+		 SLEG_CONDVAR("flags", TrainStateScope::Flags(), SLE_UINT16,                 SLV_100, SL_MAX_VERSION),
+		 SLEG_CONDVAR("wait_counter", TrainStateScope::WaitCounter(), SLE_UINT16,                 SLV_136, SL_MAX_VERSION),
+#else
 		     SLE_VAR(Train, crash_anim_pos,      SLE_UINT16),
 		     SLE_VAR(Train, force_proceed,       SLE_UINT8),
 		     SLE_VAR(Train, track,               SLE_UINT8),
@@ -804,6 +813,7 @@ public:
 		 SLE_CONDVAR(Train, flags,               SLE_FILE_U8  | SLE_VAR_U16,   SLV_2,  SLV_100),
 		 SLE_CONDVAR(Train, flags,               SLE_UINT16,                 SLV_100, SL_MAX_VERSION),
 		 SLE_CONDVAR(Train, wait_counter,        SLE_UINT16,                 SLV_136, SL_MAX_VERSION),
+#endif
 		 SLE_CONDVAR(Train, gv_flags,            SLE_UINT16,                 SLV_139, SL_MAX_VERSION),
 	};
 	static inline const SaveLoadCompatTable compat_description = _vehicle_train_sl_compat;
@@ -811,18 +821,27 @@ public:
 	void Save(Vehicle *v) const override
 	{
 		if (v->type != VEH_TRAIN) return;
+#ifdef WITH_RUST
+		TrainStateScope scope(Train::From(v), false);
+#endif
 		SlObject(v, this->GetDescription());
 	}
 
 	void Load(Vehicle *v) const override
 	{
 		if (v->type != VEH_TRAIN) return;
+#ifdef WITH_RUST
+		TrainStateScope scope(Train::From(v), true);
+#endif
 		SlObject(v, this->GetLoadDescription());
 	}
 
 	void FixPointers(Vehicle *v) const override
 	{
 		if (v->type != VEH_TRAIN) return;
+#ifdef WITH_RUST
+		TrainStateScope scope(Train::From(v), false);
+#endif
 		SlObject(v, this->GetDescription());
 	}
 };

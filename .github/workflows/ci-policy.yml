@@ -1,0 +1,47 @@
+name: CI scheduling policy
+
+on:
+  workflow_call:
+    outputs:
+      heavy:
+        description: Whether automatic native and platform validation should run
+        value: ${{ jobs.policy.outputs.heavy }}
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  policy:
+    runs-on: ubuntu-latest
+    outputs:
+      heavy: ${{ steps.policy.outputs.heavy }}
+    steps:
+    - id: policy
+      uses: actions/github-script@v7
+      env:
+        CI_ON_DEMAND: ${{ vars.CI_ON_DEMAND }}
+      with:
+        script: |
+          // Keep the old required contexts until root installs the merge gate.
+          if (process.env.CI_ON_DEMAND !== 'true') {
+            core.setOutput('heavy', 'true');
+            return;
+          }
+          if (context.eventName === 'pull_request') {
+            core.setOutput('heavy', String(context.payload.pull_request.base.ref !== 'rust-migration'));
+            return;
+          }
+          if (context.eventName !== 'push' || /^0+$/.test(context.payload.before)) {
+            core.setOutput('heavy', 'true');
+            return;
+          }
+          const comparison = await github.rest.repos.compareCommitsWithBasehead({
+            ...context.repo, basehead: `${context.payload.before}...${context.sha}`
+          });
+          // GitHub caps comparison files at 300: fail closed if the list may be truncated.
+          const files = comparison.data.files || [];
+          const docsOnly = files.length > 0 && files.length < 300 && files.every(file =>
+            file.filename.endsWith('.md') && (!file.previous_filename || file.previous_filename.endsWith('.md')));
+          core.info(docsOnly ? 'Markdown-only push: skip native/platform builds' : 'Code push: retain post-merge validation');
+          core.setOutput('heavy', String(!docsOnly));

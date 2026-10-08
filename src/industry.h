@@ -20,6 +20,9 @@
 #include "station_base.h"
 #include "timer/timer_game_calendar.h"
 #include "timer/timer_game_economy.h"
+#ifdef WITH_RUST
+#	include "rust/industry_adapter.hpp"
+#endif
 
 
 typedef Pool<Industry, IndustryID, 64> IndustryPool;
@@ -87,7 +90,12 @@ struct Industry : IndustryPool::PoolItem<&_industry_pool> {
 		uint16_t waiting = 0; ///< Amount of cargo waiting to processed
 		uint32_t accumulated_waiting = 0; ///< Accumulated waiting total over the last month, used to calculate average.
 		TimerGameEconomy::Date last_accepted{}; ///< Last day cargo was accepted by this industry
-		std::unique_ptr<HistoryData<AcceptedHistory>> history{}; ///< History of accepted and waiting cargo.
+#ifdef WITH_RUST
+		RustIndustryHistory<HistoryData<AcceptedHistory>> history{};
+#else
+		std::unique_ptr<HistoryData<AcceptedHistory>> history{};
+#endif
+		///< History of accepted and waiting cargo.
 
 		/**
 		 * Get history data, creating it if necessary.
@@ -95,29 +103,72 @@ struct Industry : IndustryPool::PoolItem<&_industry_pool> {
 		 */
 		inline HistoryData<AcceptedHistory> &GetOrCreateHistory()
 		{
+#ifdef WITH_RUST
+			openttd_rust_industry_history(this);
+#else
 			if (this->history == nullptr) this->history = std::make_unique<HistoryData<AcceptedHistory>>();
+#endif
 			return *this->history;
 		}
 	};
 
+#ifdef WITH_RUST
+	using ProducedCargoes = RustIndustryVector<ProducedCargo, true>;
+	using AcceptedCargoes = RustIndustryVector<AcceptedCargo, false>;
+	RustIndustryOwner production_owner{openttd_rust_industry_new(), openttd_rust_industry_destroy};
+	OpenTTDIndustryFields &ProductionFields() const { return *openttd_rust_industry_fields(this->production_owner.get()); }
+#else
 	using ProducedCargoes = std::vector<ProducedCargo>;
 	using AcceptedCargoes = std::vector<AcceptedCargo>;
+#endif
 
 	TileArea location{INVALID_TILE, 0, 0}; ///< Location of the industry
 	Town *town = nullptr; ///< Nearest town
 	Station *neutral_station = nullptr; ///< Associated neutral station
-	ValidHistoryMask valid_history = 0; ///< Mask of valid history records.
-	ProducedCargoes produced{}; ///< produced cargo slots
-	AcceptedCargoes accepted{}; ///< accepted cargo slots
-	uint8_t prod_level = 0; ///< general production level
-	uint16_t counter = 0; ///< used for animation and/or production (if available cargo)
+#ifdef WITH_RUST
+	ValidHistoryMask &valid_history = *reinterpret_cast<ValidHistoryMask *>(&this->ProductionFields().valid_history);
+#else
+	ValidHistoryMask valid_history = 0;
+#endif ///< Mask of valid history records.
+#ifdef WITH_RUST
+	ProducedCargoes produced{this->production_owner.get()};
+#else
+	ProducedCargoes produced{};
+#endif ///< produced cargo slots
+#ifdef WITH_RUST
+	AcceptedCargoes accepted{this->production_owner.get()};
+#else
+	AcceptedCargoes accepted{};
+#endif ///< accepted cargo slots
+#ifdef WITH_RUST
+	uint8_t &prod_level = this->ProductionFields().prod_level;
+#else
+	uint8_t prod_level = 0;
+#endif ///< general production level
+#ifdef WITH_RUST
+	uint16_t &counter = this->ProductionFields().counter;
+#else
+	uint16_t counter = 0;
+#endif ///< used for animation and/or production (if available cargo)
 
 	IndustryType type = 0; ///< type of industry.
 	Owner owner = INVALID_OWNER; ///< owner of the industry.  Which SHOULD always be (imho) OWNER_NONE
 	Colours random_colour = COLOUR_BEGIN; ///< randomized colour of the industry, for display purpose
-	TimerGameEconomy::Year last_prod_year{}; ///< last economy year of production
-	uint8_t was_cargo_delivered = 0; ///< flag that indicate this has been the closest industry chosen for cargo delivery by a station. see DeliverGoodsToIndustry
-	IndustryControlFlags ctlflags{}; ///< flags overriding standard behaviours
+#ifdef WITH_RUST
+	TimerGameEconomy::Year &last_prod_year = *reinterpret_cast<TimerGameEconomy::Year *>(&this->ProductionFields().last_prod_year);
+#else
+	TimerGameEconomy::Year last_prod_year{};
+#endif ///< last economy year of production
+#ifdef WITH_RUST
+	uint8_t &was_cargo_delivered = this->ProductionFields().was_cargo_delivered;
+#else
+	uint8_t was_cargo_delivered = 0;
+#endif ///< flag that indicate this has been the closest industry chosen for cargo delivery by a station. see DeliverGoodsToIndustry
+#ifdef WITH_RUST
+	IndustryControlFlags &ctlflags = *reinterpret_cast<IndustryControlFlags *>(&this->ProductionFields().ctlflags);
+#else
+	IndustryControlFlags ctlflags{};
+#endif ///< flags overriding standard behaviours
 
 	PartsOfSubsidy part_of_subsidy{}; ///< NOSAVE: is this industry a source/destination of a subsidy?
 	StationList stations_near{}; ///< NOSAVE: List of nearby stations.
@@ -304,8 +355,19 @@ struct IndustryTypeBuildData {
  * Data for managing the number and type of industries in the game.
  */
 struct IndustryBuildData {
+#ifdef WITH_RUST
+	RustIndustryBuilderOwner owner{openttd_rust_industry_builder_new(), openttd_rust_industry_builder_destroy};
+	OpenTTDIndustryBuilderFields &Fields() const { return *openttd_rust_industry_builder_fields(this->owner.get()); }
+	IndustryTypeBuildData *builddata = reinterpret_cast<IndustryTypeBuildData *>(this->Fields().builddata);
+	uint32_t &wanted_inds = this->Fields().wanted_inds;
+	uint32_t &daily_counter = this->Fields().daily_counter;
+	uint32_t &daily_increment = this->Fields().daily_increment;
+	uint32_t &sound_tile = this->Fields().sound_tile;
+	uint8_t &sound_ctr = this->Fields().sound_ctr;
+#else
 	IndustryTypeBuildData builddata[NUM_INDUSTRYTYPES]; ///< Industry build data for every industry type.
 	uint32_t wanted_inds; ///< Number of wanted industries (bits 31-16), and a fraction (bits 15-0).
+#endif
 
 	void Reset();
 
@@ -326,5 +388,8 @@ enum IndustryDirectoryInvalidateWindowData : uint8_t {
 };
 
 void TrimIndustryAcceptedProduced(Industry *ind);
+#ifdef WITH_RUST
+const OpenTTDIndustryServices &GetIndustryRustServices();
+#endif
 
 #endif /* INDUSTRY_H */

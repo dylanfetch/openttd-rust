@@ -1,0 +1,6 @@
+interface:
+  display_name: "Steer"
+  short_description: "Steering review of Astra's migration work"
+  default_prompt: "Use $steer to review Astra's work since the last steering commit."
+policy:
+  allow_implicit_invocation: false

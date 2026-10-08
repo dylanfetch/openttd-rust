@@ -582,7 +582,7 @@ CommandCost EnsureNoTrainOnTrackBits(TileIndex tile, TrackBits track_bits)
 		if (v->type != VEH_TRAIN) continue;
 
 		const Train *t = Train::From(v);
-		if ((t->track != track_bits) && !TracksOverlap(t->track | track_bits)) continue;
+		if ((t->GetTrack() != track_bits) && !TracksOverlap(t->GetTrack() | track_bits)) continue;
 
 		return CommandCost(STR_ERROR_TRAIN_IN_THE_WAY + v->type);
 	}
@@ -1535,9 +1535,9 @@ void VehicleEnterDepot(Vehicle *v)
 			if (_settings_client.gui.show_track_reservation) MarkTileDirtyByTile(t->tile);
 
 			UpdateSignalsOnSegment(t->tile, INVALID_DIAGDIR, t->owner);
-			t->wait_counter = 0;
-			t->force_proceed = TFP_NONE;
-			t->flags.Reset(VehicleRailFlag::Reversed);
+			t->SetWaitCounter(0);
+			t->SetForceProceed(TFP_NONE);
+			t->ResetTrainFlag(VehicleRailFlag::Reversed);
 			t->ConsistChanged(CCF_ARRANGE);
 			break;
 		}
@@ -2372,7 +2372,7 @@ void Vehicle::LeaveStation()
 			TriggerStationAnimation(st, this->tile, StationAnimationTrigger::VehicleDeparts);
 		}
 
-		Train::From(this)->flags.Set(VehicleRailFlag::LeavingStation);
+		Train::From(this)->SetTrainFlag(VehicleRailFlag::LeavingStation);
 	}
 	if (this->type == VEH_ROAD && !this->vehstatus.Test(VehState::Crashed)) {
 		/* Trigger road stop animation */
@@ -2616,7 +2616,7 @@ CommandCost Vehicle::SendToDepot(DoCommandFlags flags, DepotCommandFlags command
 		SetWindowWidgetDirty(WC_VEHICLE_VIEW, this->index, WID_VV_START_STOP);
 
 		/* If there is no depot in front and the train is not already reversing, reverse automatically (trains only) */
-		if (this->type == VEH_TRAIN && (closest_depot.reverse ^ Train::From(this)->flags.Test(VehicleRailFlag::Reversing))) {
+		if (this->type == VEH_TRAIN && (closest_depot.reverse ^ Train::From(this)->GetTrainFlags().Test(VehicleRailFlag::Reversing))) {
 			Command<CMD_REVERSE_TRAIN_DIRECTION>::Do(DoCommandFlag::Execute, this->index, false);
 		}
 
@@ -2726,7 +2726,7 @@ static void SpawnAdvancedVisualEffect(const Vehicle *v)
 	}
 
 	Direction l_dir = v->direction;
-	if (v->type == VEH_TRAIN && Train::From(v)->flags.Test(VehicleRailFlag::Flipped)) l_dir = ReverseDir(l_dir);
+	if (v->type == VEH_TRAIN && Train::From(v)->GetTrainFlags().Test(VehicleRailFlag::Flipped)) l_dir = ReverseDir(l_dir);
 	Direction t_dir = ChangeDir(l_dir, DIRDIFF_90RIGHT);
 
 	int8_t x_center = _vehicle_smoke_pos[l_dir] * l_center;
@@ -2803,7 +2803,7 @@ void Vehicle::ShowVisualEffect() const
 		 * - the train is reversing
 		 * - is entering a station with an order to stop there and its speed is equal to maximum station entering speed
 		 */
-		if (t->flags.Test(VehicleRailFlag::Reversing) ||
+		if (t->GetTrainFlags().Test(VehicleRailFlag::Reversing) ||
 				(IsRailStationTile(t->tile) && t->IsFrontEngine() && t->current_order.ShouldStopAtStation(t, GetStationIndex(t->tile)) &&
 				t->cur_speed >= max_speed)) {
 			return;
@@ -2841,7 +2841,7 @@ void Vehicle::ShowVisualEffect() const
 				IsDepotTile(v->tile) ||
 				IsTunnelTile(v->tile) ||
 				(v->type == VEH_TRAIN &&
-				!HasPowerOnRail(Train::From(v)->railtypes, GetTileRailType(v->tile)))) {
+				!HasPowerOnRail(Train::From(v)->GetRailTypes(), GetTileRailType(v->tile)))) {
 			continue;
 		}
 
@@ -2912,7 +2912,7 @@ void Vehicle::ShowVisualEffect() const
 			int x = _vehicle_smoke_pos[v->direction] * effect_offset;
 			int y = _vehicle_smoke_pos[(v->direction + 2) % 8] * effect_offset;
 
-			if (v->type == VEH_TRAIN && Train::From(v)->flags.Test(VehicleRailFlag::Flipped)) {
+			if (v->type == VEH_TRAIN && Train::From(v)->GetTrainFlags().Test(VehicleRailFlag::Flipped)) {
 				x = -x;
 				y = -y;
 			}

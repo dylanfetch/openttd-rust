@@ -34,6 +34,10 @@ networking, saves, NewGRF mods, graphics, and shared random-number behavior.
 
 ## Build and verification
 
+The CI-policy regression suite additionally uses Node.js to execute the actual
+workflow scripts; CI requests use an authenticated `gh` CLI. The maintenance
+tools work independently of the Codex host or T3 Code.
+
 The current verification setup targets native Linux and needs a C++20 compiler,
 CMake, Ninja, Python 3.11 or newer, SDL2 development files, and the normal OpenTTD
 libraries described in `COMPILING.md`. OpenGFX supplies free graphics for regression
@@ -79,8 +83,9 @@ bootstrapped toolchain when present. `tools/run-comparisons.py` then runs every
 reference comparison tool in parallel; CI runs all three steps.
 
 ```sh
-python3 tools/migration.py build --jobs 6
-python3 tools/migration.py verify --jobs 6
+python3 tools/migration.py rust-checks --jobs 2
+python3 tools/migration.py build --jobs 2
+python3 tools/migration.py verify --jobs 2
 python3 tools/migration.py tools
 python3 tools/run-comparisons.py
 ```
@@ -89,6 +94,17 @@ Each driver invocation retains command logs, test reports, executable hashes,
 source revision, and local changes under `.local/verification/<timestamp>/`.
 Passing establishes only covered behavior. The driver does not itself compare
 every game state or prove full game equivalence.
+
+`rust-checks` runs the four Cargo checks without creating or building the
+reference. The default `--jobs 2` also limits Cargo invoked by CMake. Every logged
+command reports its phase, elapsed time and output path, with periodic updates;
+lock waits identify live holders. Reference and candidate configure/build/test
+operations use separate locks, and simulation captures immutable runtime copies
+under those locks. Standalone fixture games share the benchmark coordination lock.
+Successful candidate game builds write a versioned executable identity containing
+source and configuration digests plus the executable hash. Receipts associate
+that identity only with a matching executable and configuration; external or
+otherwise unrecorded builds retain unknown provenance.
 
 The inherited platform CI also remains in place. Windows CI uses Windows 2022 and
 Visual Studio 2022 because the pinned breakpad dependency uses
@@ -194,6 +210,30 @@ or complete log/stdout difference fails. Both modes compare their exit saves.
   initial checkout, not proof of an arbitrary binary's source revision (#97).
   Evidence: `.local/simulation/<time>-<pid>/report.json`.
 
+Simulation speed (#155) is reported for every scenario as `plain_speed`:
+paired process wall seconds and candidate/reference ratios, plus their median.
+Ratios are null when exit saves are missing, runs fail, end moments differ, or
+semantic differences remain; timing never changes the pass/fail result.
+Parallel runs are noisy. Use an idle host, profiling counters off, the same
+build settings and pinned manual-distribution play save:
+
+```sh
+python3 tools/migration.py simulate play-opus-55-167-002-manual --benchmark 3 --jobs 2
+```
+
+The driver builds with two jobs, then runs one scenario worker. Benchmark mode
+runs only plain pairs, isolates each timed game from other clone-wide harness
+games, and compares each exit save and full logs. Both roles use #154's serial
+offline thread-failure fallback, recorded as `execution` in the report. These
+are total offline times, not normal threaded frame latency. It retains the final
+pair and runtimes; `plain_commands` supplies arguments for optional `perf record`
+replay through `tools/simulation/game_launcher.py`. Preserve the run's HOME/XDG
+directories and runtime libraries; keep profiling separate from timing samples.
+Timings include startup, loading, serial link-graph work and save I/O; subprocess
+timeout polling can add about 50 ms.
+The lock excludes harness games, not unrelated host activity. Port PRs record
+before/after ratios and commits; the roadmap sets the regression budget.
+
 Tree map-access measurements (#108) use the same scenarios and comparisons:
 `OPENTTD_TREE_PROFILE=1 python3 tools/migration.py simulate trees --jobs 1`;
 `PYTHONPATH=tools python3 -m simulation.trees <report.json>` summarizes the
@@ -296,6 +336,11 @@ spawned agents to `gpt-6.1-sol` high by default, with at most five spawned threa
 explicit spawn settings select the required role, and a running host may impose a
 lower limit.
 
+`docs/skills/` holds two user-invoked skills: `/steer`, the user's Claude Code
+steering review, and `/start-development`, root's restart prompt. Steering reviews
+put their corrections in the roadmap and edit `/start-development` only to improve
+it; root follows it and leaves both skills unedited.
+
 The driver and CI enforce native build/tests, nonempty test inventories, reference
 test-name preservation, and these Cargo checks:
 
@@ -306,15 +351,60 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
 ```
 
-Server-side protection on `rust-migration` requires the platform matrix, native
-comparison, commit, and annotation checks, plus resolved conversations. Required
-checks must pass on the PR head; branches need not be up to date with the base.
-Platform CI also runs after each merge into `rust-migration`, and a post-merge
+Server-side protection on `rust-migration` requires `Full validation`, the cheap
+commit/string/script-mode checks, and resolved conversations. Full validation is
+an explicit commit status, published only after the native comparisons, simulation,
+entire platform matrix, quick checks and annotation checks succeed for a captured
+PR head. Skipped or cancelled jobs cannot satisfy it. Workflow dispatch runs the
+controller from protected `rust-migration`; candidate test jobs have read-only
+permissions and the status publishers never execute candidate code.
+
+Ordinary PR pushes run cheap checks. With `gh` authenticated to the fork, use:
+
+```sh
+python3 tools/ci.py request 123 --profile rust
+python3 tools/ci.py request 123 --profile native
+python3 tools/ci.py request 123 --profile platform
+python3 tools/ci.py request 123 --profile full
+python3 tools/ci.py wait .local/ci-requests/REQUEST.json
+```
+
+`rust` runs four Cargo checks; `native` adds the Linux matrix and full migration
+comparison; `platform` runs the platform matrix. All include quick checks.
+Only `full` satisfies the merge gate, and a new PR head needs a new full request.
+The CLI records the SHA and request/run identity and refuses a changed PR head.
+`CI_ON_DEMAND=true` enables this scheduling after root installs and verifies the
+required status. With the variable absent, automatic full CI remains as a safe
+bootstrap; the one-time `ci:full` label path is disabled when it is enabled.
+For capacity batching, test a concrete integration PR and merge it once. A stack
+organizes dependent PRs but does not itself combine validation runs.
+
+Required checks must pass on the PR head; branches need not be up to date with the
+base. Platform CI also runs after code merges into `rust-migration`; markdown-only
+pushes skip heavy builds after complete file classification. A post-merge
 failure is fixed forward first. Force pushes and branch deletion are disallowed,
 including for administrators. The approving-review count is zero because agents
 share credentials; the attributed independent review report is the process gate
 before root integrates. Repository controls are enforced separately from these
 documents.
+
+`python3 tools/preflight.py --base origin/rust-migration --verification REPORT`
+runs the pinned inherited commit checker and checks explicit candidate compiler
+logs. Its first run downloads the pinned hooks into ignored shared storage;
+`--hooks PATH` uses an existing clean pinned checkout offline. Without supplied
+logs it explicitly leaves warnings unchecked. `tools/evidence.py` exports explicit
+verification and optional repeated simulation receipts with committed port metrics
+and agent attribution; unsupported, failed or mismatched receipts fail. Narrow
+checks, legacy receipts, dirty source and unknown provenance remain labelled.
+
+After a clean task head has merged, `tools/worktrees.py plan|archive|resume
+/absolute/task --repo /surviving/clone --expected-head FULL_COMMIT` preserves
+ignored files, checksums and raw symlinks in a versioned journal before removing
+the worktree. `plan` is read-only. `resume` continues the same journal after
+interruption. The helper protects the main/reference/locked worktrees and rejects
+dirty or unmerged heads. It requires POSIX locking and a single filesystem;
+an interrupted removal leaving an unregistered directory needs manual inspection.
+These tools require no T3 Code or host lifecycle API.
 
 Preserve OpenTTD copyright notices, credits, and GPLv2. Agent-generated work is welcome
 in this fork; upstream submission policies govern contributions to OpenTTD itself.
@@ -1311,9 +1401,13 @@ depot service/departure and path/counter reload, with loaded link jobs postponed
 32 days in typed inputs. Road/multimodal/disaster cases compare all fields/logs.
 Native fixtures compare all movement/stop data against unchanged C++ tables and
 exercise widths, ordered paths, nested save staging, partial-load unwind, indexed
-pool reuse and reentry. These establish covered behavior; actual legacy saves,
-NewGRFs, articulated/tram turns, level-crossing collisions, sounds and viewport
-pixels remain unexercised controller domains.
+pool reuse and reentry. #156 adds no-destination shared-RNG/track/cache witnesses
+and command-built crossing/flooding fixtures with collision/counter/AI-event checks
+in CI. Flooding preserves 18 passengers and requires the original victim count,
+2000-based crash countdown and shared RNG. Removing the draw, inverting the crossing
+test, skipping RoadCrashNews or changing the flooded countdown must fail; setup and
+probes are in `tools/road-scenario-ai/README.md`. Actual legacy saves, NewGRFs,
+articulated/tram turns, sounds and viewport pixels remain unexercised domains.
 
 ### Rail YAPF search, caches and reservation
 
@@ -1322,7 +1416,9 @@ node/segment arenas, exact-order heap, costs, lookahead, limits and reconstructi
 into Rust. Rust owns six specialization-specific cache banks, rail-change
 invalidation, reservation traversal and ordered signal rollback. C++ retains
 the train controller, shared track follower, PBS and canonical world services.
-Station animation/randomisation returns to C++ with affected borrows released.
+Explicit platform/waypoint station triggers return to C++ with borrows released;
+waypoint track reservation also retains the original synchronous PBS station
+triggers while search/reservation borrows remain active, before its second trigger.
 Original search bodies remain portable-only; diagnostic dumps use temporary
 views and the original format, with no canonical C++ search mirror.
 
@@ -1385,6 +1481,55 @@ loading, rating expiry/decay/capping, stale-link refresh/removal and active relo
 queue mutation, partial/nested save failure and actual retirement/indexed reuse.
 The corpus is not exhaustive for legacy versions, NewGRF cargo callbacks,
 articulated/multiheaded refits or every transport combination.
+
+### Rail vehicles and controller state (#130)
+
+Rust owns train consist/cache/curve/speed policy, both tick passes and movement,
+reversal, crossing control, crash/deletion, servicing and day handling. It also
+owns controller reservation extension/rollback, freeing, track choice and temporary
+order lookahead/restoration; #122 retains complete YAPF search ownership.
+Each C++ train shell owns one Rust allocation for flags, track, force-proceed,
+wait/crash counters, railtype masks and scalar TrainCache fields. Shared Vehicle/
+GroundVehicle fields, pools/links, sprite override references, rendering,
+construction/arrangement and generic orders/loading stay in C++. External writes,
+modern VEHS staging, legacy loading and afterload use canonical scalar adapters.
+Original selected bodies compile only in portable builds. Copied noexcept world
+services preserve immediate reads/writes; named callback tasks release borrows
+before tile/depot entry, orders/loading, station callbacks and destruction.
+`OPENTTD_TRAIN_PROFILE=1` writes controller branch counts in `train-profile.json`;
+this includes extension rollback separately from #122's search rollback.
+Validation uses the existing Padhattan manual/cargodist, realistic acceleration,
+90-degree reservation, live reload and real command-built controller scenarios.
+A narrow unchanged-source comparison covers variable-length curve/reversal inputs
+unavailable in the stock fixture. The PR records commands and branch/NewGRF limits; passing these inputs does not prove
+exhaustive train equivalence.
+
+### Industry periodic production and builder ownership (#129)
+
+Rust owns the produced/accepted slots, optional accepted histories, production
+fields, sound countdown and industry-builder records. C++ industry shells expose
+nonowning views of these allocations; INDY, IBLD, ITBL, ECMY and TTO/TTD load
+adapters preserve the original names, widths, version gates and ordering.
+Rust controls production/transport ticks, farm fields/fences, lumber harvesting,
+NewGRF production repeats/application, production commands and trimming,
+monthly statistics/change/closure, daily changes and builder targets/retries.
+The original selected bodies remain in the portable C++ path.
+
+Pool/map/spec storage, construction and landscape-clear transactions, presentation
+and bounded NewGRF resolution remain direct `noexcept` world services. Construction,
+clearing, cargo distribution and destruction can reenter industry accessors;
+Rust retains no owner reference across them. Script events only enqueue; save/load
+errors remain native. CargoPayment delivery and its original-end flush remain #117.
+ABI IDs 130–138 cover canonical records and synchronous services.
+
+`python3 tools/migration.py simulate industry-` reuses real cargo saves, generated
+climates/economies and disaster reset/release, with explicit production-control,
+closure and builder inputs. A committed reference setup AI funds a tropical lumber
+mill; checks witness harvesting, farm growth, history and builder backoff. `--self`
+and `--soak` add determinism and yearly history evidence. `python3 -m
+tools.simulation.industries` checks absent NewGRF versions/repeat/arithmetic against
+the unchanged pinned callback body. The corpus does not exhaust legacy saves,
+NewGRF resolver programs or every industry layout; native tests check ABI/lifetimes.
 
 ### Aircraft controllers and airport movement
 
