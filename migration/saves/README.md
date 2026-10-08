@@ -76,8 +76,8 @@ Normalization decompresses OTTX to OTTN and removes only GLOG, byte-checking
 all 61 remaining chunks; this original and both earlier owner saves stay unchanged.
 
 Inventory is separate from use: 27 road vehicles, four trains (14 parts), four
-ships, seven aircraft (19 parts), 42 plain monorail tiles, two monorail tunnels,
-five road bridges, one clear canal tile and two locks (six parts). There is no
+ships, seven aircraft (19 parts), 42 monorail railway tiles (41 plain, one depot),
+two monorail tunnels, five road bridges, one clear canal tile and two locks (six parts). There is no
 rail bridge or aqueduct. The two older passenger trains remain stationary in the
 reference run; the default movement/cargo/delivery checks select active trains
 37/43, road vehicle 45, all four ships and all seven aircraft instead.
