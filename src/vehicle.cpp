@@ -820,11 +820,15 @@ void Vehicle::PreDestructor()
 
 	if (this->type == VEH_AIRCRAFT && this->IsPrimaryVehicle()) {
 		Aircraft *a = Aircraft::From(this);
+#ifdef WITH_RUST
+		ReleaseAircraftAirportBlocks(a);
+#else
 		Station *st = GetTargetAirportIfValid(a);
 		if (st != nullptr) {
 			const auto &layout = st->airport.GetFTA()->layout;
 			st->airport.blocks.Reset(layout[a->previous_pos].blocks | layout[a->pos].blocks);
 		}
+#endif
 	}
 
 
