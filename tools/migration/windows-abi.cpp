@@ -992,8 +992,8 @@ static void ShipBoundary()
 		ShipProbeUnused<uint32_t, uint32_t>, ShipProbeUnused<uint32_t, uint32_t>, ShipProbeUnused<uint32_t, uint32_t>,
 		ShipProbeUnused<uint32_t, uint32_t>, ShipProbeUnused<uint32_t, uint32_t>, ShipProbeUnused<uint32_t, uint32_t>,
 		ShipProbeUnused<uint32_t, uint32_t>, ShipProbeUnused<uint32_t, uint32_t>, ShipProbeUnused<uint32_t, uint32_t>,
-		ShipProbeUnused<uint32_t, uint32_t>, ShipProbeUnused<uint32_t, uint32_t>, ShipProbeUnused<OpenTTDWaterPatch, uint32_t>,
-		ShipProbeUnused<size_t, OpenTTDWaterPatch, OpenTTDWaterPatch *>, ShipProbeUnused<bool, uint32_t, OpenTTDShipDepot *>
+		ShipProbeUnused<uint32_t, uint32_t>, ShipProbeUnused<uint32_t, uint32_t>, ShipProbeUnused<OpenTTDShipState *, uint32_t>,
+		ShipProbeUnused<OpenTTDWaterPatch, uint32_t>, ShipProbeUnused<size_t, OpenTTDWaterPatch, OpenTTDWaterPatch *>, ShipProbeUnused<bool, uint32_t, OpenTTDShipDepot *>
 	};
 	ship_probe = {};
 	ship_probe.owner = state.get();
