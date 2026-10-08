@@ -4,26 +4,26 @@ Root owns selection here; `AGENTS.md` and `docs/rust-migration.md` define proces
 If an issue conflicts, follow this roadmap and report it to root. Keep this
 forward-looking, about 200 lines; completed work is one row, with evidence in PRs.
 
-## Where the fork stands (2026-10-08, `dbce82a309`)
+## Where the fork stands (2026-10-08, `f604e30d50`)
 
 - Eighteen ownership ports retire 24,221 original C++ lines, about 6.3% of roughly
   384k non-vendored `src/` lines (18,898 excluding town-name and road-movement
   data). The last two integrations retire 1,394 lines for 1,052 glue + 700 net
   tooling. Company's canonical save/writer adapters explain the cost; its
-  allocating boundary still needs #168. Post-merge CI is running.
-- Latest aircraft-base play-opus is **2.626x**; company is 2.624x on the same host.
-  Generation is 1.411x / 1.552x; root accepts company's temporary allocating
-  boundary cost, with 50 ms process-wait resolution limiting attribution (#149).
-  Best-known budgets remain play-opus-55-167-002 2.54x,
-  play-grok-159-001 2.55x, padhattan 2.17x, generate-tgp-256-1 1.41x.
-  Road is 87% of the gap, and most of it is boundary overhead, not game logic
-  (#155, #168).
+  allocating boundary still needs #168. Company's post-merge checks passed.
+- Reviewed road conversion lowers idle play-opus from **2.601x to 1.415x**, Grok
+  2.503x to 1.405x, Padhattan 1996 2.264x to 1.678x, and mixed 2000 2.401x to
+  1.911x. Ratchet caps are 1.415444x, 1.405295x, 1.678295x and 1.910615x.
+  Generation remains about 1.55x; its cap stays **1.41x**. Root accepts only
+  company's temporary allocating-boundary exception (#149/#168), with 50 ms
+  process-wait resolution limiting attribution. The separate road profile
+  identifies remaining pathfinding, typed service and original clock costs.
 - CI is on demand (#171). An ordinary PR push costs about 2 job-minutes instead
   of 80. A full run costs about 104 job-minutes and 30 minutes wall time, once per
   final head.
 - Five component branches are unintegrated (#157 cap): #151, #152, #176, #147
-  and #178's road conversion. #176 replaces closed #153. Orders and ship have
-  joined aircraft; road is joining company; cargo and fleet need an update.
+  and #178's road conversion. #176 replaces closed #153. Road, cargo, orders and
+  ship have accepted source reviews; #182 selects their capacity integration.
 
 ## Fourth steering review (2026-10-07)
 
@@ -32,27 +32,12 @@ a user-directed `gpt-6.1-sol` root session selected and integrated. Independent
 audits covered the CI workflows and local tools. There were no port audits and
 no profile, because no game code or branch head changed since the third review.
 
-The CI change is sound and stays. Its gate refuses partial, skipped, cancelled
-and stale runs, and the harness and benchmark timing are unchanged. But #171 is
-the fork's largest tooling addition (0 / 3267 / 0 / 0), and #173 now tracks its
-gaps: full validation tests the head, not the merge; a docs-only push can cancel
-a merged PR's post-merge run; dispatched `full` has never run live; preflight
-fails every full build (the original alone gives 124 GCC 15 warnings); a killed
-driver orphans its builds; and archives hold 103 GB. Actions:
-
-1. **Resume Phase 2 at item 1 (#145).** The CI maintenance is finished. More
-   process tooling is not a fallback; only #173 is selected.
-2. **#173 runs alongside, with one agent and net non-positive lines** in `tools/`
-   and `.github/`. Until its merge-ref fix lands, merge the base into a branch
-   immediately before requesting that branch's final full run.
-3. **The first dispatched `full` run is a live test.** If it fails for a workflow
-   reason, fix that under #173 before other integrations. A workflow-changing PR
-   may unset `CI_ON_DEMAND` to use the `ci:full` label path. Restore it to `true`
-   after merge and record both changes in the PR. Never use `--admin`.
-4. **Until #173 lands**, use preflight for the commit checker only, without
-   cleaning up the pre-existing warnings. After a killed or timed-out driver,
-   stop leftover cmake, cargo or openttd processes in that worktree before
-   rebuilding.
+The CI change stays; harness and benchmark timing are unchanged. #173/#174
+repaired actual-merge validation, protected-push cancellation, warning baselines,
+orphaned builds and future archive exclusions with net non-positive tooling.
+Live full requests passed. Keep `CI_ON_DEMAND=true`, enforce exact-head full
+validation, and never merge with `--admin`. More process tooling is not a
+fallback; resume the selected simulation queue. Earlier 103 GB archives remain.
 
 ## Earlier steering, still in force
 
@@ -103,6 +88,10 @@ aircraft fixture #132 (347); #108 map decision #116; #154 harness endpoints #160
 (277); #158 MinGW nightly #159; #155 speed report #163 (212); #156 road witnesses
 #161, #162, #164, #167 (581); #170 on-demand CI and validation tools #171 (3267,
 no game logic); #173 validation repairs #174 (`cd0297938c`, net tooling -2).
+| Issues | Maintenance PRs | Integration | Commit | Metrics |
+| --- | --- | --- | --- | --- |
+| #169, #156, #179 | #175, #177, #180 | #181 | `f604e30d50` | 4 / 193 / 0 / 0 |
+
 CI-capacity batches #134, #141 and #166 integrated owners above.
 
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
@@ -116,7 +105,7 @@ never in masks.
 
 1. **Speed ratchet (#155).** Commit a per-scenario budget of best-known
    candidate/reference ratios, with today's figures above as the starting values.
-   Benchmark both road play saves, padhattan and generate-tgp-256-1 with
+   Benchmark both road play saves, both Padhattan saves and generate-tgp-256-1 with
    `simulate <name> --benchmark 3 --jobs 2` on an idle host. A PR may not exceed
    the budget by more than 3% without a stated reason accepted by root, and
    improvements lower the budget. Targets: <=1.9x on the road play saves after
@@ -124,12 +113,10 @@ never in masks.
 2. **#156 coverage, standing capacity.** Random and crash branches first. A mixed
    save with trains (PBS junctions, crossings), ships, aircraft and subsidies
    closes many gaps and gives the speed budget a non-road benchmark. The user
-   supplied the later Padhattan save (#179/#180); defaults and six-year soaks
-   pass. Establish its idle three-pair baseline without raising old budgets.
-3. **Reviewed maintenance batch (#175/#177/#180).** One concrete integration PR
-   validates crossing sound, landing RNG evidence and the later save together:
-   about 104 rather than 312 full-CI job-minutes. Independent component reviews
-   remain the source gate; no individual PR bypasses CI.
+   supplied the later Padhattan save (#179/#180), integrated via #181. Defaults,
+   six-year soaks and idle three-pair comparisons pass. Presence of PBS signals,
+   buoys and subsidies does not establish every route, traversal or multiplier;
+   remaining branches stay in #156.
 
 ## Phase 2: current work, in order
 
@@ -141,12 +128,20 @@ may run in parallel with this list.
    services and 14 entries, and narrow RoadObserve: field getters or a hot
    record, no `IsBus` in the view, type-filter in `close`, single-pass `nearby`,
    owner resolved once per entry, and nested `GetCurrentMaxSpeed`. Add the ratchet.
-   Join integrated company before final evidence. The expected result is about
-   1.7-1.9x; use the later-save benchmark once its baseline is established.
+   Accepted source and final native checks pass; whole harness 233/233, road
+   soaks 58/58 and five idle benchmarks pass. Ratchet is committed in #178.
 2. **Integrate #151 cargo storage** (already direct) on the fresh baseline.
 3. **Integrate reviewed #176 orders, then #152 ship.** Both are direct; ship
    names orders as an ancestry dependency. Finish their final-base checks before
    starting another component. Then finish #147 fleet replacement.
+   **Selected capacity batch (#182):** join #178, #151, #176 and #152 in that
+   order from integrated #181. One concrete integration PR costs about 104
+   rather than 416 full-CI job-minutes. Preserve each component's source review;
+   a fresh Sol high reviewer fixes ABI/module conflict resolutions. Widened audit
+   selectors retain company registrations and orders move to free IDs 260-266.
+   Run combined native/Cargo, default, affected soaks/comparisons and five idle
+   three-pair benchmarks before full CI. Bisect retained joins on regressions;
+   component metrics use successive joins, road retirement is old boundary glue.
 4. **#168 train and train-reservation conversion**, including the O(n^2) consist
    walk and the per-step `nearby` Vec; then aircraft and company; then trees,
    town and disaster. One PR per component.
@@ -162,24 +157,22 @@ the current profile instead identifies entry and record-copy overhead.
 
 ## Resume checkpoint
 
-Every branch below must merge the base before its next push; the primary
-checkout's `tools/ci.py` can request CI for any fork PR.
+The #182 integration owner refreshes accepted heads in the selected batch;
+component branches stay unchanged. The primary checkout can request fork CI.
 
 | Issue / PR | Branch (worktree suffix), head | State and next step |
 | --- | --- | --- |
-| #155 / #178 | `road-direct-155` (`road-direct-155`), `624ff3d704` | Direct conversion and ratchet published; join company, resolve ABI test-ID overlap, finish final checks, review and idle timing. |
-| #139 / #151 | `cargo-storage-movement-139` (`cargo-storage`), `ff912bcfcb` | Accepted at `a25a7d41e2`; final base and CI after item 2. |
-| #138 / #176 | `orders-direct-138` (`order-lifecycle`), `3ef37bc4fc` | Reviewed fixes verified by root; final native/pair/self pass; refresh and full CI remain. |
-| #146 / #152 | `ship-controller-ownership-146` (`ship-controller`), `df7a1d4d2e` | Joins accepted orders; fresh reviewer found no issue so far, final checks running. |
+| #155 / #178 | `road-direct-155` (`road-direct-155`), `636be8104f` | Source `4a28628dd2` reviewed; current native and exact-source semantic/timing evidence accepted. Selected #182. |
+| #139 / #151 | `cargo-storage-movement-139` (`cargo-storage`), `ff912bcfcb` | Accepted at `a25a7d41e2`; game source unchanged. Selected #182. |
+| #138 / #176 | `orders-direct-138` (`order-lifecycle`), `3ef37bc4fc` | Reviewed fixes verified; native/pair/self-soak pass. Selected #182. |
+| #146 / #152 | `ship-controller-ownership-146` (`ship-controller`), `df7a1d4d2e` | Joins accepted orders; fresh review and native/pair/self/soak pass. Selected #182. |
 | #147 | `fleet-replacement-ownership-147` (`fleet-replacement`), `68d660adc9` | State-only WIP, no PR. |
-| #169 / #175 | `crossing-sound-169` (`crossing-sound-169`), `9b20e639d8` local | Reviewed; native/Cargo and default 214 pass; selected maintenance batch. |
-| #156 / #177 | `aircraft-landing-rng-156` (`aircraft-landing-156`), `bc07a5c7dc` | Reviewed RNG wording fix verified; paired/self landing 5/5 pass; selected maintenance batch. |
-| #179 / #180 | `padhattan-2000-179` (`padhattan-2000-179`), `51d3541f86` | Reviewed unchanged user save; native/default/soak/old rails pass; batch plus new idle benchmark remain. |
+| #182 | Owner integration (branch pending) | Root selects road/cargo/orders/ship batch; ABI repair and fresh resolution review before full CI. |
 
-The first live dispatched full (#145), #174 bootstrap and #149 actual merge passed.
+The first dispatched full (#145), #174 bootstrap, #149 and #181 actual merges passed.
 `CI_ON_DEMAND=true` is restored; both local timing and remote push holds are released.
-Standing #156 work: aircraft landing RNG (plan in #156), then the
-2026-10-07 audit list there. Preserve the pinned reference, paused curve
+Standing #156 work follows the remaining 2026-10-07 audit list there; landing
+RNG and the mixed save are integrated. Preserve the pinned reference, paused curve
 worktrees and evidence branches `evidence-disaster-vehicles` (`a775543162`) and
 `evidence-water-regions` (`c752070cde`); do not reapply effect helper `73ccd511fb`.
 Build and test with `--jobs 2`; standalone fixture games share the benchmark lock.
