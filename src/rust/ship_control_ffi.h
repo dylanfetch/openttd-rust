@@ -13,159 +13,158 @@
 #include <cstdint>
 #include <cstddef>
 struct OpenTTDShipState;
-enum ShipOperation : uint32_t {
-	SHIP_OP_DEPOT_DIR = 1,
-	SHIP_OP_DEPOT_AXIS = 2,
-	SHIP_OP_IS_DEPOT = 3,
-	SHIP_OP_DEPOT_INDEX = 4,
-	SHIP_OP_WAIT_UNBUNCH = 5,
-	SHIP_OP_CHAIN_DEPOT = 6,
-	SHIP_OP_SERVINT = 7,
-	SHIP_OP_NEEDS_SERVICE = 8,
-	SHIP_OP_MAX_DISTANCE = 9,
-	SHIP_OP_TILE_VALID = 10,
-	SHIP_OP_TILE_TYPE = 11,
-	SHIP_OP_WATER_CLASS = 12,
-	SHIP_OP_LOCK_MIDDLE = 13,
-	SHIP_OP_LOCK_DIR = 14,
-	SHIP_OP_TILE_MIN_Z = 15,
-	SHIP_OP_TILE_MAX_Z = 16,
-	SHIP_OP_TRACK_STATUS = 17,
-	SHIP_OP_OFFSET = 18,
-	SHIP_OP_DIAG_BETWEEN = 19,
-	SHIP_OP_DIST_SQUARE = 20,
-	SHIP_OP_DIST_MANHATTAN = 21,
-	SHIP_OP_DOCKING = 22,
-	SHIP_OP_DOCK = 23,
-	SHIP_OP_DOCK_WATER = 24,
-	SHIP_OP_STATION = 25,
-	SHIP_OP_INDUSTRY_STATION = 26,
-	SHIP_OP_OILRIG = 27,
-	SHIP_OP_STATION_USE = 28,
-	SHIP_OP_STATION_XY = 29,
-	SHIP_OP_STATION_CONTAINS = 30,
-	SHIP_OP_STATION_DOCK = 31,
-	SHIP_OP_STATION_VISITS = 32,
-	SHIP_OP_VISIT_SET = 33,
-	SHIP_OP_ARRIVAL = 34,
-	SHIP_OP_SERVICE = 35,
-	SHIP_OP_LEAVE_UNBUNCH = 36,
-	SHIP_OP_PATH_RESULT = 37,
-	SHIP_OP_ORDER_FREE = 38,
-	SHIP_OP_ORDER_DUMMY = 39,
-	SHIP_OP_ORDER_DEPOT = 40,
-	SHIP_OP_ORDER_LEAVE = 41,
-	SHIP_OP_ORDER_INCREMENT = 42,
-	SHIP_OP_TIMETABLE = 43,
-	SHIP_OP_POSITION = 44,
-	SHIP_OP_START_DIRTY = 45,
-	SHIP_OP_DEPOT_DIRTY = 46,
-	SHIP_OP_DEPOT_INVALIDATE = 47,
-	SHIP_OP_SHIPS_DIRTY = 48,
-	SHIP_OP_DETAILS_DIRTY = 49,
-	SHIP_OP_AGE = 50,
-	SHIP_OP_ECONOMY_AGE = 51,
-	SHIP_OP_DECREASE_VALUE = 52,
-	SHIP_OP_CHECK_BREAKDOWN = 53,
-	SHIP_OP_CHECK_ORDERS = 54,
-	SHIP_OP_RUNNING_COST = 55,
-	SHIP_OP_COST_DIVISOR = 56,
-	SHIP_OP_PAY_RUNNING = 57,
-	SHIP_OP_SPEED_DEFAULT = 58,
-	SHIP_OP_AGE_DEFAULT = 59,
-	SHIP_OP_SPEED_FRAC = 60,
-	SHIP_OP_PROPERTY = 61,
-	SHIP_OP_UPDATE_VISUAL = 62,
-	SHIP_OP_CACHE_INVALIDATE = 63,
-	SHIP_OP_CAPACITY = 64,
-	SHIP_OP_BUILD_SHARED = 65,
-	SHIP_OP_SPRITE_DIRECTION = 66,
-	SHIP_OP_ADVANCE = 67,
-	SHIP_OP_NEW_POSITION = 68,
-	SHIP_OP_VIRT_TILE = 69,
-	SHIP_OP_EXIT_DIR = 70,
-	SHIP_OP_TRACK_DIRECTION = 71,
-	SHIP_OP_TRACKS_REACH = 72,
-	SHIP_OP_BUSY_TILE = 73,
-	SHIP_OP_PATH_SIZE = 74,
-	SHIP_OP_PATH_BACK = 75,
-	SHIP_OP_PATH_POP = 76,
-	SHIP_OP_PATH_CLEAR = 77,
-	SHIP_OP_ENTER_TILE = 128,
-	SHIP_OP_ENTER_DEPOT = 129,
-	SHIP_OP_PROCESS_ORDERS = 130,
-	SHIP_OP_LOADING = 131,
-	SHIP_OP_BEGIN_LOADING = 132,
-	SHIP_OP_BREAKDOWN = 133,
-	SHIP_OP_VIEWPORT = 134,
-	SHIP_OP_BASE_VIEWPORT = 135,
-	SHIP_OP_VISUAL = 136,
-	SHIP_OP_CACHE = 137,
-	SHIP_OP_PLAY_SOUND = 138,
-	SHIP_OP_YAPF_REVERSE = 139,
-	SHIP_OP_YAPF_CHOOSE = 140,
-	SHIP_OP_UPDATE_DELTA = 141,
-	SHIP_OP_TILE_X = 90,
-	SHIP_OP_TILE_Y = 91,
-	SHIP_OP_BUILD_FLAG = 92,
-	SHIP_OP_BUILD_RANDOM = 93,
-};
-enum ShipField : uint32_t {
-	SHIP_WRITE_TILE = 0,
-	SHIP_WRITE_X = 1,
-	SHIP_WRITE_Y = 2,
-	SHIP_WRITE_Z = 3,
-	SHIP_WRITE_DIRECTION = 4,
-	SHIP_WRITE_SPEED = 5,
-	SHIP_WRITE_TICK = 6,
-	SHIP_WRITE_RUNNING = 7,
-	SHIP_WRITE_DAY = 8,
-	SHIP_WRITE_ORDER_TIME = 9,
-	SHIP_WRITE_PROGRESS = 10,
-	SHIP_WRITE_LAST_STATION = 11,
-	SHIP_WRITE_HIDDEN = 12,
-	SHIP_WRITE_MAX_SPEED = 13,
-	SHIP_WRITE_CARGO_AGE = 14,
-	SHIP_WRITE_DEST = 15,
-};
-struct OpenTTDShipView {
-	uint32_t tile;
-	uint32_t dest;
-	uint32_t x;
-	uint32_t y;
-	uint32_t z;
-	uint32_t direction;
-	uint32_t speed;
-	uint32_t tick;
-	uint32_t running;
-	uint32_t day;
-	uint32_t order_time;
-	uint32_t progress;
-	uint32_t status;
-	uint32_t owner;
-	uint32_t engine;
-	uint32_t last_station;
-	uint32_t order_destination;
-	uint32_t order_type;
-	uint32_t order_max_speed;
-	uint32_t acceleration;
-	uint32_t max_speed;
-};
-struct OpenTTDShipAction { uint32_t op, id; uint64_t a, b, c; };
 struct OpenTTDShipDepot { uint32_t id, tile, owner, ship; };
+struct OpenTTDShipPosition { int32_t x, y; uint32_t old_tile, new_tile; };
+struct OpenTTDShipReverseResult { bool reverse; uint8_t trackdir; };
+struct OpenTTDShipTrackResult { uint8_t track; bool found; };
+struct OpenTTDShipDepotResult { uint32_t tile; uint16_t id; bool valid; };
 struct OpenTTDShipLeaves {
-	void (*observe)(uint32_t, OpenTTDShipView *) noexcept;
-	void (*write)(uint32_t, uint32_t, uint64_t) noexcept;
-	uint64_t (*leaf)(uint32_t, uint32_t, uint64_t, uint64_t, uint64_t) noexcept;
-	OpenTTDShipState *(*owner)(uint32_t) noexcept;
+	uint32_t (*depot_dir)(uint32_t) noexcept;
+	uint32_t (*depot_axis)(uint32_t) noexcept;
+	bool (*is_depot)(uint32_t) noexcept;
+	uint32_t (*depot_index)(uint32_t) noexcept;
+	bool (*wait_unbunch)(uint32_t) noexcept;
+	bool (*chain_depot)(uint32_t) noexcept;
+	uint32_t (*servint)(uint32_t) noexcept;
+	bool (*needs_service)(uint32_t) noexcept;
+	uint32_t (*max_distance)() noexcept;
+	bool (*tile_valid)(uint32_t) noexcept;
+	uint32_t (*tile_type)(uint32_t) noexcept;
+	uint32_t (*water_class)(uint32_t) noexcept;
+	bool (*lock_middle)(uint32_t) noexcept;
+	uint32_t (*lock_dir)(uint32_t) noexcept;
+	uint32_t (*tile_min_z)(uint32_t) noexcept;
+	uint32_t (*tile_max_z)(uint32_t) noexcept;
+	uint32_t (*track_status)(uint32_t, uint32_t) noexcept;
+	uint32_t (*offset)(uint32_t) noexcept;
+	uint32_t (*diag_between)(uint32_t, uint32_t) noexcept;
+	uint32_t (*dist_square)(uint32_t, uint32_t) noexcept;
+	uint32_t (*dist_manhattan)(uint32_t, uint32_t) noexcept;
+	bool (*docking)(uint32_t) noexcept;
+	bool (*dock)(uint32_t) noexcept;
+	bool (*dock_water)(uint32_t) noexcept;
+	uint32_t (*station)(uint32_t) noexcept;
+	uint32_t (*industry_station)(uint32_t) noexcept;
+	bool (*oilrig)(uint32_t) noexcept;
+	bool (*station_use)(uint32_t, uint32_t) noexcept;
+	uint32_t (*station_xy)(uint32_t) noexcept;
+	bool (*station_contains)(uint32_t, uint32_t) noexcept;
+	bool (*station_dock)(uint32_t) noexcept;
+	uint32_t (*station_visits)(uint32_t) noexcept;
+	void (*visit_set)(uint32_t, uint32_t) noexcept;
+	void (*arrival)(uint32_t, uint32_t) noexcept;
+	void (*service)(uint32_t) noexcept;
+	void (*leave_unbunch)(uint32_t) noexcept;
+	void (*path_result)(uint32_t, bool) noexcept;
+	void (*order_free)(uint32_t) noexcept;
+	void (*order_dummy)(uint32_t) noexcept;
+	void (*order_depot)(uint32_t, uint32_t) noexcept;
+	void (*order_leave)(uint32_t) noexcept;
+	void (*order_increment)(uint32_t) noexcept;
+	void (*timetable)(uint32_t) noexcept;
+	void (*position)(uint32_t) noexcept;
+	void (*start_dirty)(uint32_t) noexcept;
+	void (*depot_dirty)(uint32_t) noexcept;
+	void (*depot_invalidate)(uint32_t) noexcept;
+	void (*ships_dirty)() noexcept;
+	void (*details_dirty)(uint32_t) noexcept;
+	void (*age)(uint32_t) noexcept;
+	void (*economy_age)(uint32_t) noexcept;
+	void (*decrease_value)(uint32_t) noexcept;
+	void (*check_breakdown)(uint32_t) noexcept;
+	void (*check_orders)(uint32_t) noexcept;
+	int64_t (*running_cost)(uint32_t) noexcept;
+	uint32_t (*cost_divisor)() noexcept;
+	void (*pay_running)(uint32_t, int64_t) noexcept;
+	uint32_t (*speed_default)(uint32_t) noexcept;
+	uint32_t (*age_default)(uint32_t) noexcept;
+	uint32_t (*speed_frac)(uint32_t, bool) noexcept;
+	uint32_t (*speed_property)(uint32_t, uint32_t) noexcept;
+	uint32_t (*age_property)(uint32_t, uint32_t) noexcept;
+	void (*update_visual)(uint32_t) noexcept;
+	void (*cache_invalidate)(uint32_t) noexcept;
+	uint32_t (*capacity)(uint32_t) noexcept;
+	void (*sprite_direction)(uint32_t) noexcept;
+	uint32_t (*tile_x)(uint32_t) noexcept;
+	uint32_t (*tile_y)(uint32_t) noexcept;
+	bool (*build_flag)(uint32_t) noexcept;
+	void (*build_random)(uint32_t, uint32_t) noexcept;
+	OpenTTDShipPosition (*new_position)(uint32_t) noexcept;
+	uint32_t (*exit_dir)(uint32_t, uint32_t) noexcept;
+	uint32_t (*track_direction)(uint32_t, uint32_t) noexcept;
+	uint32_t (*tracks_reach)(uint32_t) noexcept;
+	bool (*busy_tile)(uint32_t) noexcept;
+	size_t (*path_size)(uint32_t) noexcept;
+	uint32_t (*path_back)(uint32_t) noexcept;
+	void (*path_pop)(uint32_t) noexcept;
+	void (*path_clear)(uint32_t) noexcept;
+	uint32_t (*enter_tile)(uint32_t, uint32_t, uint32_t, uint32_t) noexcept;
+	void (*enter_depot)(uint32_t) noexcept;
+	bool (*process_orders)(uint32_t) noexcept;
+	void (*loading)(uint32_t) noexcept;
+	void (*begin_loading)(uint32_t) noexcept;
+	bool (*breakdown)(uint32_t) noexcept;
+	void (*viewport)(uint32_t, bool, bool) noexcept;
+	void (*base_viewport)(uint32_t) noexcept;
+	void (*visual)(uint32_t) noexcept;
+	void (*cache)(uint32_t) noexcept;
+	void (*play_sound)(uint32_t) noexcept;
+	OpenTTDShipReverseResult (*yapf_reverse)(uint32_t, bool) noexcept;
+	OpenTTDShipTrackResult (*yapf_choose)(uint32_t, uint32_t) noexcept;
+	void (*update_delta)(uint32_t) noexcept;
+	void (*build_owner)(uint32_t) noexcept;
+	void (*build_z)(uint32_t) noexcept;
+	void (*build_properties)(uint32_t, uint32_t) noexcept;
+	void (*build_dates)(uint32_t) noexcept;
+	void (*build_acceleration)(uint32_t, uint32_t) noexcept;
+	void (*build_prototype)(uint32_t) noexcept;
+	void (*build_interval_percent)(uint32_t) noexcept;
+	void (*build_capacity)(uint32_t, uint32_t) noexcept;
+	void (*set_tile)(uint32_t, uint32_t) noexcept;
+	void (*set_x)(uint32_t, int32_t) noexcept;
+	void (*set_y)(uint32_t, int32_t) noexcept;
+	void (*set_z)(uint32_t, int32_t) noexcept;
+	void (*set_direction)(uint32_t, uint8_t) noexcept;
+	void (*set_speed)(uint32_t, uint16_t) noexcept;
+	void (*set_tick)(uint32_t, uint8_t) noexcept;
+	void (*set_running)(uint32_t, uint8_t) noexcept;
+	void (*set_day)(uint32_t, uint8_t) noexcept;
+	void (*set_order_time)(uint32_t, int32_t) noexcept;
+	void (*set_progress)(uint32_t, uint8_t) noexcept;
+	void (*set_last_station)(uint32_t, uint16_t) noexcept;
+	void (*set_hidden)(uint32_t, bool) noexcept;
+	void (*set_max_speed)(uint32_t, uint16_t) noexcept;
+	void (*set_cargo_age)(uint32_t, uint16_t) noexcept;
+	void (*set_dest)(uint32_t, uint32_t) noexcept;
+	uint32_t (*tile)(uint32_t) noexcept;
+	uint32_t (*dest)(uint32_t) noexcept;
+	uint32_t (*x)(uint32_t) noexcept;
+	uint32_t (*y)(uint32_t) noexcept;
+	uint32_t (*z)(uint32_t) noexcept;
+	uint32_t (*direction)(uint32_t) noexcept;
+	uint32_t (*speed)(uint32_t) noexcept;
+	uint32_t (*tick)(uint32_t) noexcept;
+	uint32_t (*running)(uint32_t) noexcept;
+	uint32_t (*day)(uint32_t) noexcept;
+	uint32_t (*order_time)(uint32_t) noexcept;
+	uint32_t (*progress)(uint32_t) noexcept;
+	uint32_t (*status)(uint32_t) noexcept;
+	uint32_t (*owner)(uint32_t) noexcept;
+	uint32_t (*last_station)(uint32_t) noexcept;
+	uint32_t (*order_destination)(uint32_t) noexcept;
+	uint32_t (*order_type)(uint32_t) noexcept;
+	uint32_t (*order_max_speed)(uint32_t) noexcept;
+	uint32_t (*acceleration)(uint32_t) noexcept;
+	uint32_t (*max_speed)(uint32_t) noexcept;
+	OpenTTDShipState *(*state_owner)(uint32_t) noexcept;
 	OpenTTDWaterPatch (*patch)(uint32_t) noexcept;
 	size_t (*neighbours)(OpenTTDWaterPatch, OpenTTDWaterPatch *) noexcept;
-	size_t (*depots)(OpenTTDShipDepot *, size_t) noexcept;
+	bool (*next_depot)(uint32_t, OpenTTDShipDepot *) noexcept;
 };
 extern "C" {
 /* Game-thread shell ownership; new zeroes state/coordinates and sets INVALID_DIR.
- * Scalars 0..3 are state:u8, rotation:u8, rotation-x:i16, rotation-y:i16.
- * Accessors retain no borrow; setters narrow exactly like C++.
+ * Typed fields are state:u8, rotation:u8, rotation-x:i16, rotation-y:i16.
+ * Accessors retain no borrow; callers narrow exactly like C++.
  * Modern/legacy staging commits partial loads on unwind outside Rust frames.
  * Panics/OOM abort. One destruction follows PreDestructor, including pool cleanup. */
 void openttd_rust_ship_control_profile_enable();
@@ -173,16 +172,27 @@ uint64_t openttd_rust_ship_control_profile(uint8_t);
 void openttd_rust_ship_control_reload_rotation();
 OpenTTDShipState *openttd_rust_ship_state_new();
 void openttd_rust_ship_state_destroy(OpenTTDShipState *);
-uint16_t openttd_rust_ship_state_get(const OpenTTDShipState *, uint8_t);
-void openttd_rust_ship_state_set(OpenTTDShipState *, uint8_t, uint16_t);
-/* Tables are copied. Leaves are synchronous noexcept shared operations; only
- * actual owner reentry (tile/depot/order/loading/viewport/YAPF) returns an action.
- * No world or owner borrow spans any service; invocation destruction touches no
- * world. Depot/neighbor callbacks copy original traversal order only.
- * Neighbour output spans 320 entries (256 aqueducts + 4*16 border neighbours).
- * C++ exceptions unwind solely through its task RAII. */
-void *openttd_rust_ship_control_create(uint32_t, uint32_t, uint64_t, uint64_t, uint64_t, const OpenTTDShipLeaves *, const OpenTTDSharedServices *);
-OpenTTDShipAction openttd_rust_ship_control_advance(void *, uint64_t);
-void openttd_rust_ship_control_destroy(void *);
+uint8_t openttd_rust_ship_get_state(const OpenTTDShipState *);
+void openttd_rust_ship_set_state(OpenTTDShipState *, uint8_t);
+uint8_t openttd_rust_ship_get_rotation(const OpenTTDShipState *);
+void openttd_rust_ship_set_rotation(OpenTTDShipState *, uint8_t);
+int16_t openttd_rust_ship_get_rotation_x(const OpenTTDShipState *);
+void openttd_rust_ship_set_rotation_x(OpenTTDShipState *, int16_t);
+int16_t openttd_rust_ship_get_rotation_y(const OpenTTDShipState *);
+void openttd_rust_ship_set_rotation_y(OpenTTDShipState *, int16_t);
+/* Plain synchronous calls. No entry task allocation or retained world/owner borrow.
+ * Every service is noexcept; unexpected environmental exceptions terminate.
+ * The selected services do not unwind through script VMs or save/load during play.
+ * Depot search owns its inherent BFS scratch; neighbour output spans 320 entries. */
+bool openttd_rust_ship_tick(uint32_t, const OpenTTDShipLeaves *, const OpenTTDSharedServices *);
+void openttd_rust_ship_calendar_day(uint32_t, const OpenTTDShipLeaves *, const OpenTTDSharedServices *);
+void openttd_rust_ship_economy_day(uint32_t, const OpenTTDShipLeaves *, const OpenTTDSharedServices *);
+void openttd_rust_ship_cache(uint32_t, const OpenTTDShipLeaves *, const OpenTTDSharedServices *);
+void openttd_rust_ship_destination(uint32_t, uint32_t, const OpenTTDShipLeaves *, const OpenTTDSharedServices *);
+OpenTTDShipDepotResult openttd_rust_ship_find_depot(uint32_t, uint32_t, const OpenTTDShipLeaves *, const OpenTTDSharedServices *);
+bool openttd_rust_ship_is_destination(uint32_t, uint32_t, const OpenTTDShipLeaves *, const OpenTTDSharedServices *);
+uint32_t openttd_rust_ship_station_destination(uint32_t, uint32_t, const OpenTTDShipLeaves *, const OpenTTDSharedServices *);
+uint8_t openttd_rust_ship_trackdir(uint32_t, const OpenTTDShipLeaves *, const OpenTTDSharedServices *);
+void openttd_rust_ship_build(uint32_t, uint32_t, const OpenTTDShipLeaves *, const OpenTTDSharedServices *);
 }
 #endif

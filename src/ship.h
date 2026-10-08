@@ -84,7 +84,7 @@ struct Ship final : public SpecializedVehicle<Ship, VEH_SHIP> {
 	TrackBits GetState() const
 	{
 #ifdef WITH_RUST
-		return static_cast<TrackBits>(openttd_rust_ship_state_get(this->GetRustState(), 0));
+		return static_cast<TrackBits>(openttd_rust_ship_get_state(this->GetRustState()));
 #else
 		return this->state;
 #endif
@@ -92,7 +92,7 @@ struct Ship final : public SpecializedVehicle<Ship, VEH_SHIP> {
 	void SetState(TrackBits value)
 	{
 #ifdef WITH_RUST
-		openttd_rust_ship_state_set(this->GetRustState(), 0, value);
+		openttd_rust_ship_set_state(this->GetRustState(), value);
 #else
 		this->state = value;
 #endif
@@ -100,7 +100,7 @@ struct Ship final : public SpecializedVehicle<Ship, VEH_SHIP> {
 	Direction GetRotation() const
 	{
 #ifdef WITH_RUST
-		return static_cast<Direction>(openttd_rust_ship_state_get(this->GetRustState(), 1));
+		return static_cast<Direction>(openttd_rust_ship_get_rotation(this->GetRustState()));
 #else
 		return this->rotation;
 #endif
@@ -108,7 +108,7 @@ struct Ship final : public SpecializedVehicle<Ship, VEH_SHIP> {
 	void SetRotation(Direction value)
 	{
 #ifdef WITH_RUST
-		openttd_rust_ship_state_set(this->GetRustState(), 1, static_cast<uint16_t>(value));
+		openttd_rust_ship_set_rotation(this->GetRustState(), value);
 #else
 		this->rotation = value;
 #endif
@@ -116,7 +116,7 @@ struct Ship final : public SpecializedVehicle<Ship, VEH_SHIP> {
 	int16_t GetRotationX() const
 	{
 #ifdef WITH_RUST
-		return static_cast<int16_t>(openttd_rust_ship_state_get(this->GetRustState(), 2));
+		return static_cast<int16_t>(openttd_rust_ship_get_rotation_x(this->GetRustState()));
 #else
 		return this->rotation_x_pos;
 #endif
@@ -124,7 +124,7 @@ struct Ship final : public SpecializedVehicle<Ship, VEH_SHIP> {
 	void SetRotationX(int16_t value)
 	{
 #ifdef WITH_RUST
-		openttd_rust_ship_state_set(this->GetRustState(), 2, static_cast<uint16_t>(value));
+		openttd_rust_ship_set_rotation_x(this->GetRustState(), value);
 #else
 		this->rotation_x_pos = value;
 #endif
@@ -132,7 +132,7 @@ struct Ship final : public SpecializedVehicle<Ship, VEH_SHIP> {
 	int16_t GetRotationY() const
 	{
 #ifdef WITH_RUST
-		return static_cast<int16_t>(openttd_rust_ship_state_get(this->GetRustState(), 3));
+		return static_cast<int16_t>(openttd_rust_ship_get_rotation_y(this->GetRustState()));
 #else
 		return this->rotation_y_pos;
 #endif
@@ -140,7 +140,7 @@ struct Ship final : public SpecializedVehicle<Ship, VEH_SHIP> {
 	void SetRotationY(int16_t value)
 	{
 #ifdef WITH_RUST
-		openttd_rust_ship_state_set(this->GetRustState(), 3, static_cast<uint16_t>(value));
+		openttd_rust_ship_set_rotation_y(this->GetRustState(), value);
 #else
 		this->rotation_y_pos = value;
 #endif

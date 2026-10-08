@@ -31,6 +31,8 @@ extern "C" {
  * 110 station cargo metadata, 111 station scalars, 112 station services,
  * 113 station edge observations, 114 station links, 115 station loading.
  * 130-138 industry storage, observation, world services and production result.
+ * 320 ship position, 321 typed ship services, 322 reverse result, 323 depot,
+ * 324 ship track-choice result, 325 ship depot result.
  * Item 0 size, 1 alignment, then every field offset in declaration order.
  * Unknown type/item returns SIZE_MAX. No memory borrow, ownership or callback.
  * Native extern-C convention (cdecl on i686 MSVC); Rust panic never unwinds.

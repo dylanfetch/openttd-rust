@@ -42,7 +42,7 @@
 
 #ifdef WITH_RUST
 #include "rust/services_ffi.h"
-static uint64_t RunRustShip(uint32_t kind, const Ship *v, uint64_t a = 0, uint64_t b = 0, uint64_t c = 0);
+static const OpenTTDShipLeaves &GetShipServices();
 #endif
 #include "safeguards.h"
 
@@ -238,7 +238,7 @@ static void CheckIfShipNeedsService(Vehicle *v)
 void Ship::UpdateCache()
 {
 #ifdef WITH_RUST
-	RunRustShip(3, this);
+	openttd_rust_ship_cache(this->index.base(), &GetShipServices(), &GetRustSharedServices());
 #else
 	const ShipVehicleInfo *svi = ShipVehInfo(this->engine_type);
 
@@ -265,7 +265,7 @@ Money Ship::GetRunningCost() const
 void Ship::OnNewCalendarDay()
 {
 #ifdef WITH_RUST
-	RunRustShip(1, this);
+	openttd_rust_ship_calendar_day(this->index.base(), &GetShipServices(), &GetRustSharedServices());
 #else
 	AgeVehicle(this);
 #endif
@@ -275,7 +275,7 @@ void Ship::OnNewCalendarDay()
 void Ship::OnNewEconomyDay()
 {
 #ifdef WITH_RUST
-	RunRustShip(2, this);
+	openttd_rust_ship_economy_day(this->index.base(), &GetShipServices(), &GetRustSharedServices());
 #else
 	EconomyAgeVehicle(this);
 
@@ -306,7 +306,7 @@ void Ship::OnNewEconomyDay()
 Trackdir Ship::GetVehicleTrackdir() const
 {
 #ifdef WITH_RUST
-	return static_cast<Trackdir>(RunRustShip(8, this));
+	return static_cast<Trackdir>(openttd_rust_ship_trackdir(this->index.base(), &GetShipServices(), &GetRustSharedServices()));
 #else
 	if (this->vehstatus.Test(VehState::Crashed)) return INVALID_TRACKDIR;
 
@@ -340,7 +340,7 @@ void Ship::PlayLeaveStationSound(bool force) const
 TileIndex Ship::GetOrderStationLocation(StationID station)
 {
 #ifdef WITH_RUST
-	return TileIndex(static_cast<uint32_t>(RunRustShip(7, this, station.base())));
+	return TileIndex(static_cast<uint32_t>(openttd_rust_ship_station_destination(this->index.base(), station.base(), &GetShipServices(), &GetRustSharedServices())));
 #else
 	if (station == this->last_station_visited) this->last_station_visited = StationID::Invalid();
 
@@ -867,14 +867,14 @@ static void ShipController(Ship *v)
 #endif
 
 #ifdef WITH_RUST
-bool IsShipDestinationTile(TileIndex tile, StationID station) { return RunRustShip(6, nullptr, tile.base(), station.base()) != 0; }
+bool IsShipDestinationTile(TileIndex tile, StationID station) { return openttd_rust_ship_is_destination( tile.base(), station.base(), &GetShipServices(), &GetRustSharedServices()); }
 #endif
 
 bool Ship::Tick()
 {
 #ifdef WITH_RUST
 	PerformanceAccumulator framerate(PFE_GL_SHIPS);
-	return RunRustShip(0, this) != 0;
+	return openttd_rust_ship_tick(this->index.base(), &GetShipServices(), &GetRustSharedServices());
 #else
 	PerformanceAccumulator framerate(PFE_GL_SHIPS);
 
@@ -889,7 +889,7 @@ bool Ship::Tick()
 void Ship::SetDestTile(TileIndex tile)
 {
 #ifdef WITH_RUST
-	RunRustShip(4, this, tile.base());
+	openttd_rust_ship_destination(this->index.base(), tile.base(), &GetShipServices(), &GetRustSharedServices());
 #else
 	if (tile == this->dest_tile) return;
 	this->path.clear();
@@ -913,7 +913,7 @@ CommandCost CmdBuildShip(DoCommandFlags flags, TileIndex tile, const Engine *e, 
 		Ship *v = new Ship();
 		*ret = v;
 		v->tile = tile;
-		RunRustShip(9, v, e->index.base());
+		openttd_rust_ship_build(v->index.base(), e->index.base(), &GetShipServices(), &GetRustSharedServices());
 	}
 	return CommandCost();
 #else
@@ -988,8 +988,8 @@ CommandCost CmdBuildShip(DoCommandFlags flags, TileIndex tile, const Engine *e, 
 ClosestDepot Ship::FindClosestDepot()
 {
 #ifdef WITH_RUST
-	uint64_t depot = RunRustShip(5, this, MAX_SHIP_DEPOT_SEARCH_DISTANCE);
-	return depot == UINT64_MAX ? ClosestDepot() : ClosestDepot(TileIndex(static_cast<uint32_t>(depot)), DepotID(static_cast<uint16_t>(depot >> 32)));
+	auto depot = openttd_rust_ship_find_depot(this->index.base(), MAX_SHIP_DEPOT_SEARCH_DISTANCE, &GetShipServices(), &GetRustSharedServices());
+	return depot.valid ? ClosestDepot(TileIndex(depot.tile), DepotID(depot.id)) : ClosestDepot();
 #else
 	const Depot *depot = FindClosestShipDepot(this, MAX_SHIP_DEPOT_SEARCH_DISTANCE);
 	if (depot == nullptr) return ClosestDepot();
