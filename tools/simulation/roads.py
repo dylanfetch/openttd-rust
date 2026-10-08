@@ -13,6 +13,27 @@ ROAD = "roadveh[0]/"
 COMMON = ROAD + "common[0]/"
 AI_FOLDER = "road-scenario-ai"
 
+# Best-known idle-host medians from three semantic-equal pairs (#155).
+# Lower these only after coordinated measurements; never raise them for a port.
+SPEED_BUDGETS = {
+    "play-opus-55-167-002-manual": 2.54,
+    "play-grok-159-001-manual": 2.55,
+    "play-padhattan-ridge-1996-manual": 2.17,
+    "generate-tgp-256-1": 1.41,
+}
+
+
+def speed_budget(name, ratio):
+    """Report the ratchet without making noisy timings a semantic CI failure."""
+    budget = SPEED_BUDGETS.get(name)
+    if budget is None or ratio is None:
+        return None
+    return {
+        "best_known_ratio": budget,
+        "change_percent": (ratio / budget - 1) * 100,
+        "within_three_percent": ratio <= budget * 1.03,
+    }
+
 
 def uses_ai(scenario):
     return scenario.get("roads") in ("level-crossing", "flooding") or scenario.get(

@@ -24,12 +24,7 @@
     clippy::if_not_else
 )]
 use crate::services::Services;
-use std::cell::Cell;
 use std::ffi::c_void;
-use std::future::Future;
-use std::pin::Pin;
-use std::rc::Rc;
-use std::task::{Context, Poll, Waker};
 
 const INVALID: u32 = u32::MAX;
 const DEPOT: u16 = 254;
@@ -129,76 +124,750 @@ pub unsafe extern "C" fn openttd_rust_road_path_pop(state: *mut State) {
     }
 }
 
-/// Only actual reentry boundaries suspend execution; RNG and world leaves are direct.
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
-pub struct Action {
-    pub op: u32,
-    pub id: u32,
-    pub a: u64,
-    pub b: u64,
-    pub c: u64,
+pub struct SpeedLimits {
+    pub max_track_speed: u32,
+    pub order_max_speed: u32,
 }
-#[derive(Default)]
-struct Mailbox {
-    action: Cell<Action>,
-    response: Cell<u64>,
-}
-struct Reentry {
-    mailbox: Rc<Mailbox>,
-    action: Action,
-    yielded: bool,
-}
-impl Future for Reentry {
-    type Output = u64;
-    fn poll(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<u64> {
-        if self.yielded {
-            Poll::Ready(self.mailbox.response.get())
-        } else {
-            self.mailbox.action.set(self.action);
-            self.yielded = true;
-            Poll::Pending
-        }
-    }
-}
-/// Synchronous copied game services. Leaves cannot reenter or destroy owners.
+
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
+pub struct ConsistSpeed {
+    pub direction: u32,
+    pub next: u32,
+    pub status: u32,
+    pub tile: u32,
+}
+impl ConsistSpeed {
+    fn hidden(self) -> bool {
+        self.status & 1 != 0
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct CloseOrigin {
+    pub first: u32,
+    pub z: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct CloseCandidate {
+    pub direction: u32,
+    pub first: u32,
+    pub x: u32,
+    pub y: u32,
+    pub z: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct OvertakeOrigin {
+    pub articulated: u32,
+    pub direction: u32,
+    pub tile: u32,
+    pub tram: u32,
+}
+impl OvertakeOrigin {
+    fn tram(self) -> bool {
+        self.tram != 0
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct OvertakeSpeed {
+    pub direction: u32,
+    pub speed: u32,
+    pub status: u32,
+    pub tile: u32,
+}
+impl OvertakeSpeed {
+    fn stopped(self) -> bool {
+        self.status & 2 != 0
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct SlidingPosition {
+    pub direction: u32,
+    pub x: u32,
+    pub y: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct HeightSpeed {
+    pub max_track_speed: u32,
+    pub speed: u32,
+    pub z: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct CollisionPart {
+    pub next: u32,
+    pub tile: u32,
+    pub z: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct CollisionOrigin {
+    pub x: u32,
+    pub y: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct CrashDirection {
+    pub direction: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct PathVehicle {
+    pub articulated: u32,
+    pub owner: u32,
+    pub tile: u32,
+    pub tram: u32,
+}
+impl PathVehicle {
+    fn tram(self) -> bool {
+        self.tram != 0
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct DepotPart {
+    pub next: u32,
+    pub tile: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct DepotOrders {
+    pub dest: u32,
+    pub order_type: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct VehicleTile {
+    pub tile: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct ArrivalVehicle {
+    pub owner: u32,
+    pub tram: u32,
+}
+impl ArrivalVehicle {
+    fn tram(self) -> bool {
+        self.tram != 0
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct TunnelVehicle {
+    pub direction: u32,
+    pub front: u32,
+}
+impl TunnelVehicle {
+    fn front(self) -> bool {
+        self.front != 0
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct MoveVehicle {
+    pub front: u32,
+    pub tile: u32,
+    pub tram: u32,
+}
+impl MoveVehicle {
+    fn front(self) -> bool {
+        self.front != 0
+    }
+    fn tram(self) -> bool {
+        self.tram != 0
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct MoveTransition {
+    pub length: u32,
+    pub next: u32,
+    pub tile: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct MovePosition {
+    pub order_type: u32,
+    pub owner: u32,
+    pub speed: u32,
+    pub tile: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct BlockVehicle {
+    pub direction: u32,
+    pub front: u32,
+    pub owner: u32,
+    pub tile: u32,
+}
+impl BlockVehicle {
+    fn front(self) -> bool {
+        self.front != 0
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct StopOrder {
+    pub order_destination: u32,
+    pub order_type: u32,
+    pub tile: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct MoveStop {
+    pub order_type: u32,
+    pub tile: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct OrderClock {
+    pub order_time: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct ControllerPart {
+    pub next: u32,
+    pub status: u32,
+}
+impl ControllerPart {
+    fn hidden(self) -> bool {
+        self.status & 1 != 0
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct ServiceOrigin {
+    pub first: u32,
+    pub speed: u32,
+    pub tile: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct ServiceOrder {
+    pub order_nonstop: u32,
+    pub order_type: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct TrackDirection {
+    pub direction: u32,
+    pub status: u32,
+    pub tile: u32,
+}
+impl TrackDirection {
+    fn crashed(self) -> bool {
+        self.status & 128 != 0
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct SlopeOrigin {
+    pub direction: u32,
+    pub first: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct SlopePart {
+    pub direction: u32,
+    pub next: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct TurnVehicle {
+    pub breakdown: u32,
+    pub direction: u32,
+    pub order_type: u32,
+    pub status: u32,
+    pub tile: u32,
+}
+impl TurnVehicle {
+    fn crashed(self) -> bool {
+        self.status & 128 != 0
+    }
+    fn stopped(self) -> bool {
+        self.status & 2 != 0
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct Position {
+    pub x: i32,
+    pub y: i32,
+}
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct TrackChoice {
+    pub trackdir: u8,
+    pub found: bool,
+}
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct DepotResult {
+    pub tile: u32,
+    pub length: u32,
+}
+pub type Visitor = extern "C" fn(*mut c_void, u32) -> bool;
+#[repr(C)]
 pub struct Leaves {
-    pub observe: extern "C" fn(u32, *mut View),
-    pub write: extern "C" fn(u32, u32, u64),
-    pub leaf: extern "C" fn(u32, u32, u64, u64, u64) -> u64,
+    pub read_z: extern "C" fn(u32) -> u32,
+    pub read_type: extern "C" fn(u32) -> u32,
+    pub op_acc_model: extern "C" fn() -> u32,
+    pub op_road_side: extern "C" fn() -> u32,
+    pub op_tile_type: extern "C" fn(u32) -> u32,
+    pub op_has_road: extern "C" fn(u32, u32) -> u32,
+    pub op_track_status: extern "C" fn(u32, u32) -> u32,
+    pub op_tile_owner: extern "C" fn(u32) -> u32,
+    pub op_depot_dir: extern "C" fn(u32) -> u32,
+    pub op_bay_dir: extern "C" fn(u32) -> u32,
+    pub op_is_depot: extern "C" fn(u32) -> u32,
+    pub op_normal_road: extern "C" fn(u32) -> u32,
+    pub op_road_works: extern "C" fn(u32) -> u32,
+    pub op_disallowed: extern "C" fn(u32) -> u32,
+    pub op_bay_stop: extern "C" fn(u32) -> u32,
+    pub op_is_dt_stop: extern "C" fn(u32) -> u32,
+    pub op_stop_type: extern "C" fn(u32) -> u32,
+    pub op_free_bay: extern "C" fn(u32) -> u32,
+    pub op_any_road_bits: extern "C" fn(u32, u32, bool) -> u32,
+    pub op_road_bits: extern "C" fn(u32, u32) -> u32,
+    pub op_offset: extern "C" fn(u8) -> u32,
+    pub op_tile_x: extern "C" fn(u32) -> u32,
+    pub op_tile_y: extern "C" fn(u32) -> u32,
+    pub op_station: extern "C" fn(u32) -> u32,
+    pub op_continuation: extern "C" fn(u32, u32) -> u32,
+    pub op_bridge_speed: extern "C" fn(u32) -> u32,
+    pub op_max_penalty: extern "C" fn() -> u32,
+    pub op_servint: extern "C" fn(u32) -> u32,
+    pub op_needs_service: extern "C" fn(u32) -> u32,
+    pub op_wait_unbunch: extern "C" fn(u32) -> u32,
+    pub op_order_stop: extern "C" fn(u32, u32) -> u32,
+    pub op_road_type: extern "C" fn(u32, u32) -> u32,
+    pub op_queue: extern "C" fn() -> u32,
+    pub op_tunnel_dir: extern "C" fn(u32) -> u32,
+    pub op_acceleration: extern "C" fn(u32) -> i32,
+    pub op_update_speed: extern "C" fn(u32, u32, i32, i32) -> i32,
+    pub op_advance: extern "C" fn(u32) -> u32,
+    pub op_position: extern "C" fn(u32) -> (),
+    pub op_base_viewport: extern "C" fn(u32) -> (),
+    pub op_last_speed: extern "C" fn(u32) -> (),
+    pub op_roadstop_leave: extern "C" fn(u32) -> (),
+    pub op_entrance_set: extern "C" fn(u32, bool) -> (),
+    pub op_entrance_busy: extern "C" fn(u32) -> u32,
+    pub op_order_free: extern "C" fn(u32) -> (),
+    pub op_set_next: extern "C" fn(u32, u32) -> (),
+    pub op_start_stop_dirty: extern "C" fn(u32) -> (),
+    pub op_depot_dirty: extern "C" fn(u32) -> (),
+    pub op_details_dirty: extern "C" fn(u32) -> (),
+    pub op_service: extern "C" fn(u32) -> (),
+    pub op_leave_unbunch: extern "C" fn(u32) -> (),
+    pub op_reset_unbunch: extern "C" fn(u32) -> (),
+    pub op_path_result: extern "C" fn(u32, bool) -> (),
+    pub op_order_dummy: extern "C" fn(u32) -> (),
+    pub op_order_depot: extern "C" fn(u32, u16) -> (),
+    pub op_depot_index: extern "C" fn(u32) -> u32,
+    pub op_decrease_value: extern "C" fn(u32) -> (),
+    pub op_age: extern "C" fn(u32) -> (),
+    pub op_economy_age: extern "C" fn(u32) -> (),
+    pub op_check_breakdown: extern "C" fn(u32) -> (),
+    pub op_check_orders: extern "C" fn(u32) -> (),
+    pub op_pay_running: extern "C" fn(u32, i64) -> (),
+    pub op_cost_class: extern "C" fn(u32) -> u32,
+    pub op_cost_factor: extern "C" fn(u32) -> u32,
+    pub op_get_price: extern "C" fn(u32, u64) -> i64,
+    pub op_grf_version: extern "C" fn(u32) -> u32,
+    pub op_length_default: extern "C" fn(u32) -> u32,
+    pub op_age_default: extern "C" fn(u32) -> u32,
+    pub op_speed_default: extern "C" fn(u32) -> u32,
+    pub op_length_error: extern "C" fn(u32, u32) -> (),
+    pub op_disconnect: extern "C" fn() -> (),
+    pub op_explosion: extern "C" fn(u32) -> (),
+    pub op_sound_default: extern "C" fn(u32) -> u32,
+    pub op_sound: extern "C" fn(u32, u16) -> (),
+    pub op_sound_old1: extern "C" fn() -> u32,
+    pub op_sound_old2: extern "C" fn() -> u32,
+    pub op_engine_invalid: extern "C" fn() -> u32,
+    pub op_invalid_price: extern "C" fn() -> u32,
+    pub op_cost_divisor: extern "C" fn() -> u32,
+    pub op_is_crossing: extern "C" fn(u32) -> u32,
+    pub op_new_position: extern "C" fn(u32) -> Position,
+    pub op_virt_tile: extern "C" fn(i32, i32) -> u32,
+    pub op_is_road_stop: extern "C" fn(u32) -> u32,
+    pub op_set_dest: extern "C" fn(u32, u32) -> (),
+    pub op_cache_invalidate: extern "C" fn(u32) -> (),
+    pub op_arrival: extern "C" fn(u32, u16, u32, bool) -> (),
+    pub op_crash_news: extern "C" fn(u32, u32) -> (),
+    pub op_station_visits: extern "C" fn(u16) -> u32,
+    pub op_station_visit_set: extern "C" fn(u16, u32) -> (),
+    pub op_local_company: extern "C" fn() -> u32,
+    pub op_enter_tile: extern "C" fn(u32, u32, i32, i32) -> u32,
+    pub op_enter_depot: extern "C" fn(u32) -> (),
+    pub op_process_orders: extern "C" fn(u32) -> (),
+    pub op_loading: extern "C" fn(u32) -> (),
+    pub op_begin_loading: extern "C" fn(u32) -> (),
+    pub op_tram_probe: extern "C" fn(u32, u32, u8) -> u32,
+    pub op_property: extern "C" fn(u32, u8, u32) -> u32,
+    pub op_length_callback: extern "C" fn(u32) -> u32,
+    pub op_play_sound: extern "C" fn(u32) -> u32,
+    pub op_visual: extern "C" fn(u32) -> (),
+    pub op_update_visual: extern "C" fn(u32) -> (),
+    pub op_cargo_changed: extern "C" fn(u32) -> (),
+    pub op_length_changed: extern "C" fn(u32) -> (),
+    pub op_breakdown: extern "C" fn(u32) -> u32,
+    pub op_delete: extern "C" fn(u32) -> (),
+    pub op_ground_crash: extern "C" fn(u32, bool) -> u32,
+    pub op_stop_random: extern "C" fn(u32, u16) -> (),
+    pub op_stop_animation: extern "C" fn(u32, u16) -> (),
+    pub op_yapf: extern "C" fn(u32, u32, u8, u16) -> TrackChoice,
+    pub op_find_depot: extern "C" fn(u32, i32) -> DepotResult,
+    pub op_inclination: extern "C" fn(u32, bool, bool) -> i32,
+    pub op_viewport: extern "C" fn(u32, bool, bool) -> (),
+    pub set_tile: extern "C" fn(u32, u32) -> (),
+    pub set_x: extern "C" fn(u32, i32) -> (),
+    pub set_y: extern "C" fn(u32, i32) -> (),
+    pub set_direction: extern "C" fn(u32, u8) -> (),
+    pub set_speed: extern "C" fn(u32, u16) -> (),
+    pub set_tick: extern "C" fn(u32, u8) -> (),
+    pub set_running: extern "C" fn(u32, u8) -> (),
+    pub set_day: extern "C" fn(u32, u8) -> (),
+    pub set_order_time: extern "C" fn(u32, i32) -> (),
+    pub set_progress: extern "C" fn(u32, u8) -> (),
+    pub set_last_station: extern "C" fn(u32, u16) -> (),
+    pub set_hidden: extern "C" fn(u32, bool) -> (),
+    pub set_first_engine: extern "C" fn(u32, u16) -> (),
+    pub set_length: extern "C" fn(u32, u8) -> (),
+    pub set_total_length: extern "C" fn(u32, u16) -> (),
+    pub set_cargo_age: extern "C" fn(u32, u16) -> (),
+    pub set_max_speed: extern "C" fn(u32, u16) -> (),
+    pub set_suppress_implicit: extern "C" fn(u32) -> (),
+    pub read_day: extern "C" fn(u32) -> u32,
+    pub read_dest: extern "C" fn(u32) -> u32,
+    pub read_direction: extern "C" fn(u32) -> u32,
+    pub read_engine: extern "C" fn(u32) -> u32,
+    pub read_first: extern "C" fn(u32) -> u32,
+    pub read_front: extern "C" fn(u32) -> u32,
+    pub read_last_station: extern "C" fn(u32) -> u32,
+    pub read_length: extern "C" fn(u32) -> u32,
+    pub read_next: extern "C" fn(u32) -> u32,
+    pub read_order_type: extern "C" fn(u32) -> u32,
+    pub read_previous: extern "C" fn(u32) -> u32,
+    pub read_progress: extern "C" fn(u32) -> u32,
+    pub read_running: extern "C" fn(u32) -> u32,
+    pub read_speed: extern "C" fn(u32) -> u32,
+    pub read_status: extern "C" fn(u32) -> u32,
+    pub read_tick: extern "C" fn(u32) -> u32,
+    pub read_tile: extern "C" fn(u32) -> u32,
+    pub read_total_length: extern "C" fn(u32) -> u32,
+    pub read_tram: extern "C" fn(u32) -> u32,
+    pub speed_limits: extern "C" fn(u32, *mut SpeedLimits) -> (),
+    pub consist_speed: extern "C" fn(u32, *mut ConsistSpeed) -> (),
+    pub close_origin: extern "C" fn(u32, *mut CloseOrigin) -> (),
+    pub close_candidate: extern "C" fn(u32, *mut CloseCandidate) -> (),
+    pub overtake_origin: extern "C" fn(u32, *mut OvertakeOrigin) -> (),
+    pub overtake_speed: extern "C" fn(u32, *mut OvertakeSpeed) -> (),
+    pub sliding_position: extern "C" fn(u32, *mut SlidingPosition) -> (),
+    pub height_speed: extern "C" fn(u32, *mut HeightSpeed) -> (),
+    pub collision_part: extern "C" fn(u32, *mut CollisionPart) -> (),
+    pub collision_origin: extern "C" fn(u32, *mut CollisionOrigin) -> (),
+    pub crash_direction: extern "C" fn(u32, *mut CrashDirection) -> (),
+    pub path_vehicle: extern "C" fn(u32, *mut PathVehicle) -> (),
+    pub depot_part: extern "C" fn(u32, *mut DepotPart) -> (),
+    pub depot_orders: extern "C" fn(u32, *mut DepotOrders) -> (),
+    pub vehicle_tile: extern "C" fn(u32, *mut VehicleTile) -> (),
+    pub arrival_vehicle: extern "C" fn(u32, *mut ArrivalVehicle) -> (),
+    pub tunnel_vehicle: extern "C" fn(u32, *mut TunnelVehicle) -> (),
+    pub move_vehicle: extern "C" fn(u32, *mut MoveVehicle) -> (),
+    pub move_transition: extern "C" fn(u32, *mut MoveTransition) -> (),
+    pub move_position: extern "C" fn(u32, *mut MovePosition) -> (),
+    pub block_vehicle: extern "C" fn(u32, *mut BlockVehicle) -> (),
+    pub stop_order: extern "C" fn(u32, *mut StopOrder) -> (),
+    pub move_stop: extern "C" fn(u32, *mut MoveStop) -> (),
+    pub order_clock: extern "C" fn(u32, *mut OrderClock) -> (),
+    pub controller_part: extern "C" fn(u32, *mut ControllerPart) -> (),
+    pub service_origin: extern "C" fn(u32, *mut ServiceOrigin) -> (),
+    pub service_order: extern "C" fn(u32, *mut ServiceOrder) -> (),
+    pub track_direction: extern "C" fn(u32, *mut TrackDirection) -> (),
+    pub slope_origin: extern "C" fn(u32, *mut SlopeOrigin) -> (),
+    pub slope_part: extern "C" fn(u32, *mut SlopePart) -> (),
+    pub turn_vehicle: extern "C" fn(u32, *mut TurnVehicle) -> (),
     pub owner: extern "C" fn(u32) -> *mut State,
-    pub nearby: extern "C" fn(u32, u32, i32, i32, *mut u32, usize) -> usize,
+    pub visit_close: extern "C" fn(u32, i32, i32, Visitor, *mut c_void),
+    pub visit_tunnel: extern "C" fn(u32, i32, i32, Visitor, *mut c_void),
+    pub visit_tile: extern "C" fn(u32, i32, i32, Visitor, *mut c_void),
+    pub visit_train: extern "C" fn(u32, i32, i32, Visitor, *mut c_void),
+    pub read_bus: extern "C" fn(u32) -> u32,
 }
-#[derive(Clone)]
-struct Game {
-    leaves: Leaves,
-    services: Services,
-    mailbox: Rc<Mailbox>,
+struct Game<'a> {
+    id: u32,
+    state: *mut State,
+    leaves: &'a Leaves,
+    services: &'a Services,
 }
-impl Game {
-    fn read(&self, id: u32) -> View {
-        let mut v = View::default();
-        (self.leaves.observe)(id, &raw mut v);
-        v
+impl Game<'_> {
+    fn read_day(&self, id: u32) -> u32 {
+        (self.leaves.read_day)(id)
     }
-    fn write(&self, id: u32, field: u32, value: u64) {
-        (self.leaves.write)(id, field, value);
+    fn read_dest(&self, id: u32) -> u32 {
+        (self.leaves.read_dest)(id)
     }
-    fn leaf(&self, op: u32, id: u32, a: u64, b: u64, c: u64) -> u64 {
-        (self.leaves.leaf)(op, id, a, b, c)
+    fn read_direction(&self, id: u32) -> u32 {
+        (self.leaves.read_direction)(id)
     }
-    async fn action(&self, op: u32, id: u32, a: u64, b: u64, c: u64) -> u64 {
-        Reentry {
-            mailbox: self.mailbox.clone(),
-            action: Action { op, id, a, b, c },
-            yielded: false,
-        }
-        .await
+    fn read_engine(&self, id: u32) -> u32 {
+        (self.leaves.read_engine)(id)
+    }
+    fn read_first(&self, id: u32) -> u32 {
+        (self.leaves.read_first)(id)
+    }
+    fn read_front(&self, id: u32) -> u32 {
+        (self.leaves.read_front)(id)
+    }
+    fn read_last_station(&self, id: u32) -> u32 {
+        (self.leaves.read_last_station)(id)
+    }
+    fn read_length(&self, id: u32) -> u32 {
+        (self.leaves.read_length)(id)
+    }
+    fn read_next(&self, id: u32) -> u32 {
+        (self.leaves.read_next)(id)
+    }
+    fn read_order_type(&self, id: u32) -> u32 {
+        (self.leaves.read_order_type)(id)
+    }
+    fn read_previous(&self, id: u32) -> u32 {
+        (self.leaves.read_previous)(id)
+    }
+    fn read_progress(&self, id: u32) -> u32 {
+        (self.leaves.read_progress)(id)
+    }
+    fn read_running(&self, id: u32) -> u32 {
+        (self.leaves.read_running)(id)
+    }
+    fn read_speed(&self, id: u32) -> u32 {
+        (self.leaves.read_speed)(id)
+    }
+    fn read_status(&self, id: u32) -> u32 {
+        (self.leaves.read_status)(id)
+    }
+    fn read_tick(&self, id: u32) -> u32 {
+        (self.leaves.read_tick)(id)
+    }
+    fn read_tile(&self, id: u32) -> u32 {
+        (self.leaves.read_tile)(id)
+    }
+    fn read_total_length(&self, id: u32) -> u32 {
+        (self.leaves.read_total_length)(id)
+    }
+    fn read_tram(&self, id: u32) -> u32 {
+        (self.leaves.read_tram)(id)
+    }
+    fn read_stopped(&self, id: u32) -> bool {
+        self.read_status(id) & 2 != 0
+    }
+    fn read_crashed(&self, id: u32) -> bool {
+        self.read_status(id) & 128 != 0
+    }
+    fn read_hidden(&self, id: u32) -> bool {
+        self.read_status(id) & 1 != 0
+    }
+    fn speed_limits(&self, id: u32) -> SpeedLimits {
+        let mut out = SpeedLimits::default();
+        (self.leaves.speed_limits)(id, &raw mut out);
+        out
+    }
+    fn consist_speed(&self, id: u32) -> ConsistSpeed {
+        let mut out = ConsistSpeed::default();
+        (self.leaves.consist_speed)(id, &raw mut out);
+        out
+    }
+    fn close_origin(&self, id: u32) -> CloseOrigin {
+        let mut out = CloseOrigin::default();
+        (self.leaves.close_origin)(id, &raw mut out);
+        out
+    }
+    fn close_candidate(&self, id: u32) -> CloseCandidate {
+        let mut out = CloseCandidate::default();
+        (self.leaves.close_candidate)(id, &raw mut out);
+        out
+    }
+
+    fn overtake_origin(&self, id: u32) -> OvertakeOrigin {
+        let mut out = OvertakeOrigin::default();
+        (self.leaves.overtake_origin)(id, &raw mut out);
+        out
+    }
+    fn overtake_speed(&self, id: u32) -> OvertakeSpeed {
+        let mut out = OvertakeSpeed::default();
+        (self.leaves.overtake_speed)(id, &raw mut out);
+        out
+    }
+    fn sliding_position(&self, id: u32) -> SlidingPosition {
+        let mut out = SlidingPosition::default();
+        (self.leaves.sliding_position)(id, &raw mut out);
+        out
+    }
+    fn observe_height_speed(&self, id: u32) -> HeightSpeed {
+        let mut out = HeightSpeed::default();
+        (self.leaves.height_speed)(id, &raw mut out);
+        out
+    }
+    fn collision_part(&self, id: u32) -> CollisionPart {
+        let mut out = CollisionPart::default();
+        (self.leaves.collision_part)(id, &raw mut out);
+        out
+    }
+    fn collision_origin(&self, id: u32) -> CollisionOrigin {
+        let mut out = CollisionOrigin::default();
+        (self.leaves.collision_origin)(id, &raw mut out);
+        out
+    }
+
+    fn crash_direction(&self, id: u32) -> CrashDirection {
+        let mut out = CrashDirection::default();
+        (self.leaves.crash_direction)(id, &raw mut out);
+        out
+    }
+    fn path_vehicle(&self, id: u32) -> PathVehicle {
+        let mut out = PathVehicle::default();
+        (self.leaves.path_vehicle)(id, &raw mut out);
+        out
+    }
+    fn depot_part(&self, id: u32) -> DepotPart {
+        let mut out = DepotPart::default();
+        (self.leaves.depot_part)(id, &raw mut out);
+        out
+    }
+    fn depot_orders(&self, id: u32) -> DepotOrders {
+        let mut out = DepotOrders::default();
+        (self.leaves.depot_orders)(id, &raw mut out);
+        out
+    }
+    fn vehicle_tile(&self, id: u32) -> VehicleTile {
+        let mut out = VehicleTile::default();
+        (self.leaves.vehicle_tile)(id, &raw mut out);
+        out
+    }
+    fn arrival_vehicle(&self, id: u32) -> ArrivalVehicle {
+        let mut out = ArrivalVehicle::default();
+        (self.leaves.arrival_vehicle)(id, &raw mut out);
+        out
+    }
+    fn tunnel_vehicle(&self, id: u32) -> TunnelVehicle {
+        let mut out = TunnelVehicle::default();
+        (self.leaves.tunnel_vehicle)(id, &raw mut out);
+        out
+    }
+    fn move_vehicle(&self, id: u32) -> MoveVehicle {
+        let mut out = MoveVehicle::default();
+        (self.leaves.move_vehicle)(id, &raw mut out);
+        out
+    }
+    fn move_transition(&self, id: u32) -> MoveTransition {
+        let mut out = MoveTransition::default();
+        (self.leaves.move_transition)(id, &raw mut out);
+        out
+    }
+    fn move_position(&self, id: u32) -> MovePosition {
+        let mut out = MovePosition::default();
+        (self.leaves.move_position)(id, &raw mut out);
+        out
+    }
+    fn block_vehicle(&self, id: u32) -> BlockVehicle {
+        let mut out = BlockVehicle::default();
+        (self.leaves.block_vehicle)(id, &raw mut out);
+        out
+    }
+    fn stop_order(&self, id: u32) -> StopOrder {
+        let mut out = StopOrder::default();
+        (self.leaves.stop_order)(id, &raw mut out);
+        out
+    }
+    fn move_stop(&self, id: u32) -> MoveStop {
+        let mut out = MoveStop::default();
+        (self.leaves.move_stop)(id, &raw mut out);
+        out
+    }
+    fn order_clock(&self, id: u32) -> OrderClock {
+        let mut out = OrderClock::default();
+        (self.leaves.order_clock)(id, &raw mut out);
+        out
+    }
+    fn controller_part(&self, id: u32) -> ControllerPart {
+        let mut out = ControllerPart::default();
+        (self.leaves.controller_part)(id, &raw mut out);
+        out
+    }
+    fn service_origin(&self, id: u32) -> ServiceOrigin {
+        let mut out = ServiceOrigin::default();
+        (self.leaves.service_origin)(id, &raw mut out);
+        out
+    }
+    fn service_order(&self, id: u32) -> ServiceOrder {
+        let mut out = ServiceOrder::default();
+        (self.leaves.service_order)(id, &raw mut out);
+        out
+    }
+    fn track_direction(&self, id: u32) -> TrackDirection {
+        let mut out = TrackDirection::default();
+        (self.leaves.track_direction)(id, &raw mut out);
+        out
+    }
+    fn slope_origin(&self, id: u32) -> SlopeOrigin {
+        let mut out = SlopeOrigin::default();
+        (self.leaves.slope_origin)(id, &raw mut out);
+        out
+    }
+    fn slope_part(&self, id: u32) -> SlopePart {
+        let mut out = SlopePart::default();
+        (self.leaves.slope_part)(id, &raw mut out);
+        out
+    }
+    fn turn_vehicle(&self, id: u32) -> TurnVehicle {
+        let mut out = TurnVehicle::default();
+        (self.leaves.turn_vehicle)(id, &raw mut out);
+        out
     }
     fn owner(&self, id: u32) -> *mut State {
-        (self.leaves.owner)(id)
+        if id == self.id {
+            self.state
+        } else {
+            (self.leaves.owner)(id)
+        }
     }
     fn get(&self, id: u32, field: u8) -> u16 {
         // SAFETY: Resolve the live shell each time; borrow ends within the accessor.
@@ -243,270 +912,36 @@ impl Game {
             openttd_rust_road_path_pop(self.owner(id));
         }
     }
-    fn nearby(&self, id: u32, kind: u32, x: i32, y: i32) -> Vec<u32> {
-        let n = (self.leaves.nearby)(id, kind, x, y, std::ptr::null_mut(), 0);
-        let mut result = vec![0; n];
-        (self.leaves.nearby)(id, kind, x, y, result.as_mut_ptr(), n);
-        result
+    fn visit<F: FnMut(u32) -> bool>(
+        callback: extern "C" fn(u32, i32, i32, Visitor, *mut c_void),
+        id: u32,
+        x: i32,
+        y: i32,
+        mut visitor: F,
+    ) {
+        extern "C" fn dispatch<F: FnMut(u32) -> bool>(context: *mut c_void, id: u32) -> bool {
+            // SAFETY: Native traversal calls synchronously, once at a time, and retains no context.
+            unsafe { (&mut *context.cast::<F>())(id) }
+        }
+        callback(id, x, y, dispatch::<F>, (&raw mut visitor).cast());
     }
     fn random(&self) -> u32 {
         (self.services.random)(self.services.context)
     }
 }
-struct Task {
-    future: Pin<Box<dyn Future<Output = u64>>>,
-    mailbox: Rc<Mailbox>,
-}
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_road_create(
-    kind: u32,
-    id: u32,
-    a: u64,
-    b: u64,
-    c: u64,
-    leaves: *const Leaves,
-    services: *const Services,
-) -> *mut c_void {
-    // SAFETY: Caller supplies live immutable tables; copy them before first service.
-    let mailbox = Rc::new(Mailbox::default());
-    let game = unsafe {
-        Game {
-            leaves: leaves.read(),
-            services: services.read(),
-            mailbox: mailbox.clone(),
-        }
-    };
-    Box::into_raw(Box::new(Task {
-        future: Box::pin(run(game, kind, id, a, b, c)),
-        mailbox,
-    }))
-    .cast()
-}
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_road_advance(task: *mut c_void, response: u64) -> Action {
-    // SAFETY: C++ owns the live invocation; nested road calls use distinct tasks.
-    let task = unsafe { &mut *task.cast::<Task>() };
-    task.mailbox.response.set(response);
-    let mut context = Context::from_waker(Waker::noop());
-    match task.future.as_mut().poll(&mut context) {
-        Poll::Ready(result) => Action {
-            op: 0,
-            a: result,
-            ..Action::default()
-        },
-        Poll::Pending => task.mailbox.action.get(),
-    }
-}
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_road_task_destroy(task: *mut c_void) {
-    // SAFETY: Single RAII cleanup including C++ exception paths; drop touches no world.
-    unsafe {
-        drop(Box::from_raw(task.cast::<Task>()));
-    }
-}
-/// Copied shared vehicle observation, refreshed at each original observation point.
-#[repr(C)]
-#[derive(Clone, Copy, Default)]
-pub struct View {
-    pub r#type: u32,
-    pub first: u32,
-    pub next: u32,
-    pub previous: u32,
-    pub tile: u32,
-    pub dest: u32,
-    pub x: u32,
-    pub y: u32,
-    pub z: u32,
-    pub direction: u32,
-    pub speed: u32,
-    pub tick: u32,
-    pub running: u32,
-    pub day: u32,
-    pub order_time: u32,
-    pub progress: u32,
-    pub status: u32,
-    pub owner: u32,
-    pub engine: u32,
-    pub last_station: u32,
-    pub order_destination: u32,
-    pub order_type: u32,
-    pub order_max_speed: u32,
-    pub breakdown: u32,
-    pub max_track_speed: u32,
-    pub length: u32,
-    pub total_length: u32,
-    pub roadtype: u32,
-    pub front: u32,
-    pub articulated: u32,
-    pub tram: u32,
-    pub bus: u32,
-    pub order_nonstop: u32,
-}
-const WRITE_TILE: u32 = 0;
-const WRITE_X: u32 = 1;
-const WRITE_Y: u32 = 2;
-const WRITE_DIRECTION: u32 = 3;
-const WRITE_SPEED: u32 = 4;
-const WRITE_TICK: u32 = 5;
-const WRITE_RUNNING: u32 = 6;
-const WRITE_DAY: u32 = 7;
-const WRITE_ORDER_TIME: u32 = 8;
-const WRITE_PROGRESS: u32 = 9;
-const WRITE_LAST_STATION: u32 = 10;
-const WRITE_HIDDEN: u32 = 11;
-const WRITE_FIRST_ENGINE: u32 = 12;
-const WRITE_LENGTH: u32 = 13;
-const WRITE_TOTAL_LENGTH: u32 = 14;
-const WRITE_CARGO_AGE: u32 = 15;
-const WRITE_MAX_SPEED: u32 = 16;
-const WRITE_SUPPRESS_IMPLICIT: u32 = 17;
-
-const ACC_MODEL: u32 = 1;
-const ROAD_SIDE: u32 = 2;
-const TILE_TYPE: u32 = 3;
-const HAS_ROAD: u32 = 4;
-const TRACK_STATUS: u32 = 5;
-const TILE_OWNER: u32 = 6;
-const DEPOT_DIR: u32 = 7;
-const BAY_DIR: u32 = 8;
-const IS_DEPOT: u32 = 9;
-const NORMAL_ROAD: u32 = 10;
-const ROAD_WORKS: u32 = 11;
-const DISALLOWED: u32 = 12;
-const BAY_STOP: u32 = 13;
-const IS_DT_STOP: u32 = 14;
-const STOP_TYPE: u32 = 15;
-const FREE_BAY: u32 = 16;
-const ANY_ROAD_BITS: u32 = 17;
-const ROAD_BITS: u32 = 18;
-
-const OFFSET: u32 = 20;
-const TILE_X: u32 = 21;
-const TILE_Y: u32 = 22;
-const STATION: u32 = 23;
-const CONTINUATION: u32 = 24;
-const BRIDGE_SPEED: u32 = 25;
-const MAX_PENALTY: u32 = 26;
-const SERVINT: u32 = 27;
-const NEEDS_SERVICE: u32 = 28;
-
-const WAIT_UNBUNCH: u32 = 30;
-const ORDER_STOP: u32 = 31;
-const ROAD_TYPE: u32 = 32;
-const QUEUE: u32 = 33;
-const TUNNEL_DIR: u32 = 34;
-const ACCELERATION: u32 = 35;
-const UPDATE_SPEED: u32 = 36;
-const ADVANCE: u32 = 37;
-const INCLINATION: u32 = 151;
-const POSITION: u32 = 39;
-const VIEWPORT: u32 = 152;
-const BASE_VIEWPORT: u32 = 41;
-const LAST_SPEED: u32 = 42;
-const ROADSTOP_LEAVE: u32 = 43;
-const ENTRANCE_SET: u32 = 44;
-const ENTRANCE_BUSY: u32 = 45;
-const ORDER_FREE: u32 = 46;
-const SET_NEXT: u32 = 47;
-const START_STOP_DIRTY: u32 = 48;
-const DEPOT_DIRTY: u32 = 49;
-const DETAILS_DIRTY: u32 = 50;
-const SERVICE: u32 = 51;
-const LEAVE_UNBUNCH: u32 = 52;
-const RESET_UNBUNCH: u32 = 53;
-const PATH_RESULT: u32 = 54;
-const ORDER_DUMMY: u32 = 55;
-const ORDER_DEPOT: u32 = 56;
-const DEPOT_INDEX: u32 = 57;
-const DECREASE_VALUE: u32 = 58;
-const AGE: u32 = 59;
-const ECONOMY_AGE: u32 = 60;
-const CHECK_BREAKDOWN: u32 = 61;
-const CHECK_ORDERS: u32 = 62;
-const PAY_RUNNING: u32 = 63;
-const COST_CLASS: u32 = 64;
-const COST_FACTOR: u32 = 65;
-const GET_PRICE: u32 = 66;
-const GRF_VERSION: u32 = 67;
-const LENGTH_DEFAULT: u32 = 68;
-const AGE_DEFAULT: u32 = 69;
-const SPEED_DEFAULT: u32 = 70;
-const LENGTH_ERROR: u32 = 71;
-const DISCONNECT: u32 = 72;
-const EXPLOSION: u32 = 73;
-const SOUND_DEFAULT: u32 = 74;
-const SOUND: u32 = 75;
-const SOUND_OLD1: u32 = 76;
-const SOUND_OLD2: u32 = 77;
-
-const ENGINE_INVALID: u32 = 79;
-const INVALID_PRICE: u32 = 80;
-const COST_DIVISOR: u32 = 81;
-const ENTER_TILE: u32 = 128;
-const ENTER_DEPOT: u32 = 129;
-const PROCESS_ORDERS: u32 = 130;
-const LOADING: u32 = 131;
-const BEGIN_LOADING: u32 = 132;
-const TRAM_PROBE: u32 = 133;
-const PROPERTY: u32 = 134;
-const LENGTH_CALLBACK: u32 = 135;
-const PLAY_SOUND: u32 = 136;
-const VISUAL: u32 = 137;
-const UPDATE_VISUAL: u32 = 138;
-const CARGO_CHANGED: u32 = 139;
-const CACHE_INVALIDATE: u32 = 140;
-const LENGTH_CHANGED: u32 = 141;
-const BREAKDOWN: u32 = 142;
-const DELETE: u32 = 143;
-const GROUND_CRASH: u32 = 144;
-const ARRIVAL: u32 = 145;
-const STOP_RANDOM: u32 = 146;
-const STOP_ANIMATION: u32 = 147;
-const CRASH_NEWS: u32 = 148;
-const YAPF: u32 = 149;
-const FIND_DEPOT: u32 = 150;
-impl View {
-    fn stopped(self) -> bool {
-        self.status & 2 != 0
-    }
-    fn crashed(self) -> bool {
-        self.status & 128 != 0
-    }
-    fn hidden(self) -> bool {
-        self.status & 1 != 0
-    }
-    fn front(self) -> bool {
-        self.front != 0
-    }
-    fn tram(self) -> bool {
-        self.tram != 0
-    }
-}
-impl Game {
-    fn q(&self, op: u32, id: u32, a: u32, b: u32) -> u32 {
-        self.leaf(op, id, u64::from(a), u64::from(b), 0) as u32
-    }
-    fn q0(&self, op: u32, id: u32) -> u32 {
-        self.q(op, id, 0, 0)
-    }
-    fn tile(&self, op: u32, id: u32, tile: u32) -> u32 {
-        self.q(op, id, tile, 0)
-    }
-    fn effect(&self, op: u32, id: u32) {
-        self.q0(op, id);
-    }
+impl Game<'_> {
     fn realistic(&self) -> bool {
-        self.q0(ACC_MODEL, INVALID) == 1
+        ((self.leaves.op_acc_model)()) == 1
     }
     fn side(&self) -> usize {
-        (self.q0(ROAD_SIDE, INVALID) as usize) << 4
+        (((self.leaves.op_road_side)()) as usize) << 4
     }
     fn max_speed(&self, id: u32) -> i32 {
-        let v = self.read(id);
+        let v = self.speed_limits(id);
         let mut speed = v.max_track_speed as i32;
         let mut uid = id;
         while uid != INVALID {
-            let u = self.read(uid);
+            let u = self.consist_speed(uid);
             if self.realistic() {
                 let state = self.get(id, 0);
                 if state <= 15 && reversing(state as u8) {
@@ -518,7 +953,7 @@ impl Game {
                 }
             }
             if self.get(uid, 0) == WORMHOLE && !u.hidden() {
-                speed = speed.min((self.tile(BRIDGE_SPEED, uid, u.tile) * 2) as i32);
+                speed = speed.min((((self.leaves.op_bridge_speed)(u.tile)) * 2) as i32);
             }
             uid = u.next;
         }
@@ -528,22 +963,20 @@ impl Game {
         let over = self.get(id, 3) != 0;
         let (accel, min) = if self.realistic() {
             (
-                (self.q0(ACCELERATION, id) as i32).wrapping_add(if over { 256 } else { 0 }) as u32,
-                if self.read(id).stopped() { 0 } else { 4 },
+                ((((self.leaves.op_acceleration)(id)) as u32) as i32).wrapping_add(if over {
+                    256
+                } else {
+                    0
+                }) as u32,
+                if self.read_stopped(id) { 0 } else { 4 },
             )
         } else {
             (if over { 512 } else { 256 }, 0)
         };
-        self.leaf(
-            UPDATE_SPEED,
-            id,
-            u64::from(accel),
-            min,
-            self.max_speed(id) as u64,
-        ) as i32
+        (self.leaves.op_update_speed)(id, accel, min, (self.max_speed(id) as u64) as i32)
     }
     fn close(&self, id: u32, x: i32, y: i32, dir: u32, update: bool) -> u32 {
-        let v = self.read(id);
+        let v = self.close_origin(id);
         let front = v.first;
         if self.get(front, 6) != 0 {
             return INVALID;
@@ -551,19 +984,27 @@ impl Game {
         let mut best = INVALID;
         let mut best_diff = u32::MAX;
         let kind = u32::from(self.get(front, 0) == WORMHOLE);
-        for uid in self.nearby(id, kind, x, y) {
-            let u = self.read(uid);
+        let callback = if kind == 0 {
+            self.leaves.visit_close
+        } else {
+            self.leaves.visit_tunnel
+        };
+        Self::visit(callback, id, x, y, |uid| {
+            if (self.leaves.read_type)(uid) != 1 {
+                return true;
+            }
+            let u = self.close_candidate(uid);
             let xd = u.x as i32 - x;
             let yd = u.y as i32 - y;
-            if u.r#type != 1 || self.get(uid, 0) == DEPOT || v.first == u.first {
-                continue;
+            if self.get(uid, 0) == DEPOT || v.first == u.first {
+                return true;
             }
             if (u.z as i32 - v.z as i32).abs() >= 6 || u.direction != dir {
-                continue;
+                return true;
             }
             let diff = xd.unsigned_abs() + yd.unsigned_abs();
             if diff > best_diff || (diff == best_diff && uid > best) {
-                continue;
+                return true;
             }
             const DX: [i32; 8] = [-4, -8, -4, -1, 4, 8, 4, 1];
             const DY: [i32; 8] = [-4, -1, 4, 8, 4, 1, -4, -8];
@@ -578,7 +1019,8 @@ impl Game {
                 best = uid;
                 best_diff = diff;
             }
-        }
+            true
+        });
         if best_diff == u32::MAX {
             self.set(front, 2, 0);
             return INVALID;
@@ -593,27 +1035,32 @@ impl Game {
         best
     }
     fn overtake_blocked(&self, id: u32, other: u32, tile: u32, dir: u8) -> bool {
-        if self.tile(HAS_ROAD, id, tile) == 0 {
+        if ((self.leaves.op_has_road)(id, tile)) == 0 {
             return true;
         }
-        let status = self.tile(TRACK_STATUS, id, tile);
+        let status = (self.leaves.op_track_status)(id, tile);
         let tracks = status & 0x3f3f;
         let red = (status >> 16) & 0x3f3f;
         let bits = ((tracks | (tracks >> 8)) & 63) as u8;
         if tracks & (1 << dir) == 0 || bits & !3 != 0 || red != 0 {
             return true;
         }
-        self.nearby(id, 2, tile as i32, 0).into_iter().any(|uid| {
-            let u = self.read(uid);
-            u.r#type == 1 && u.first == uid && uid != id && uid != other
-        })
+        let mut blocked = false;
+        Self::visit(self.leaves.visit_tile, id, tile as i32, 0, |uid| {
+            blocked = (self.leaves.read_type)(uid) == 1
+                && self.read_first(uid) == uid
+                && uid != id
+                && uid != other;
+            !blocked
+        });
+        blocked
     }
     fn overtake(&self, id: u32, other: u32) {
-        let v = self.read(id);
-        let u = self.read(other);
+        let v = self.overtake_origin(id);
+        let u = self.overtake_speed(other);
         if v.tram()
-            || self.tile(TILE_TYPE, id, v.tile) == 5
-            || self.tile(TILE_TYPE, id, u.tile) == 5
+            || ((self.leaves.op_tile_type)(v.tile)) == 5
+            || ((self.leaves.op_tile_type)(u.tile)) == 5
             || v.articulated != 0
         {
             return;
@@ -625,11 +1072,12 @@ impl Game {
         if state >= STOP || !straight((state & 15) as u8) {
             return;
         }
-        let uspeed = if !self.realistic() || (self.q0(ACCELERATION, other) as i32) > 0 {
-            self.max_speed(other)
-        } else {
-            u.speed as i32
-        };
+        let uspeed =
+            if !self.realistic() || ((((self.leaves.op_acceleration)(other)) as u32) as i32) > 0 {
+                self.max_speed(other)
+            } else {
+                u.speed as i32
+            };
         if uspeed >= self.max_speed(id) && !u.stopped() && u.speed != 0 {
             return;
         }
@@ -639,7 +1087,7 @@ impl Game {
         }
         let tile = v
             .tile
-            .wrapping_add(self.q(OFFSET, id, diag(v.direction), 0));
+            .wrapping_add((self.leaves.op_offset)(diag(v.direction) as u8));
         if self.overtake_blocked(id, other, tile, dir) {
             return;
         }
@@ -647,7 +1095,7 @@ impl Game {
         self.set(id, 3, 16);
     }
     fn sliding(&self, id: u32, x: i32, y: i32) -> u32 {
-        let v = self.read(id);
+        let v = self.sliding_position(id);
         let xd = x - v.x as i32 + 1;
         let yd = y - v.y as i32 + 1;
         let new = if xd as u32 > 2 || yd as u32 > 2 {
@@ -667,75 +1115,70 @@ impl Game {
             & 7
     }
     fn height_speed(&self, id: u32, old: i32) {
-        let v = self.read(id);
+        let v = self.observe_height_speed(id);
         if old == v.z as i32 || self.realistic() {
             return;
         }
         if old < (v.z as i32) {
-            self.write(id, WRITE_SPEED, u64::from(v.speed * 232 / 256));
+            (self.leaves.set_speed)(id, (v.speed * 232 / 256) as u16);
         } else {
             let speed = v.speed.wrapping_add(2) as u16;
             if u32::from(speed) <= v.max_track_speed {
-                self.write(id, WRITE_SPEED, u64::from(speed));
+                (self.leaves.set_speed)(id, speed);
             }
         }
     }
-    async fn position(&self, id: u32, x: i32, y: i32, new_tile: bool, delta: bool) {
-        self.write(id, WRITE_X, x as u64);
-        self.write(id, WRITE_Y, y as u64);
-        self.effect(POSITION, id);
-        let old = self
-            .action(INCLINATION, id, u64::from(new_tile), u64::from(delta), 0)
-            .await as i32;
+    fn position(&self, id: u32, x: i32, y: i32, new_tile: bool, delta: bool) {
+        (self.leaves.set_x)(id, x);
+        (self.leaves.set_y)(id, y);
+        (self.leaves.op_position)(id);
+        let old = (self.leaves.op_inclination)(id, new_tile, delta);
         self.height_speed(id, old);
     }
     fn direction(&self, id: u32, dir: u32) {
-        if dir != self.read(id).direction {
-            self.write(id, WRITE_DIRECTION, u64::from(dir));
+        if dir != self.read_direction(id) {
+            (self.leaves.set_direction)(id, dir as u8);
             if !self.realistic() {
-                let speed = self.read(id).speed;
-                self.write(id, WRITE_SPEED, u64::from(speed - (speed >> 2)));
+                let speed = self.read_speed(id);
+                (self.leaves.set_speed)(id, (speed - (speed >> 2)) as u16);
             }
         }
     }
-    async fn sound(&self, id: u32) {
-        if self.action(PLAY_SOUND, id, 0, 0, 0).await == 0 {
-            let mut sound = self.q0(SOUND_DEFAULT, id);
-            if sound == self.q0(SOUND_OLD1, id) && self.read(id).tick & 3 == 0 {
-                sound = self.q0(SOUND_OLD2, id);
+    fn sound(&self, id: u32) {
+        if ((self.leaves.op_play_sound)(id)) == 0 {
+            let mut sound = (self.leaves.op_sound_default)(id);
+            if sound == ((self.leaves.op_sound_old1)()) && self.read_tick(id) & 3 == 0 {
+                sound = (self.leaves.op_sound_old2)();
             }
-            self.q(SOUND, id, sound, 0);
+            (self.leaves.op_sound)(id, sound as u16);
         }
     }
-    async fn crash(&self, id: u32, flooded: bool) -> u32 {
-        let mut victims = self
-            .action(GROUND_CRASH, id, u64::from(flooded), 0, 0)
-            .await as u32;
-        if self.read(id).front() {
+    fn crash(&self, id: u32, flooded: bool) -> u32 {
+        let mut victims = (self.leaves.op_ground_crash)(id, flooded);
+        if self.read_front(id) != 0 {
             victims = victims.wrapping_add(1);
             if in_range(self.get(id, 0), DT_STOP, DT_STOP + 16) {
-                self.effect(ROADSTOP_LEAVE, id);
+                (self.leaves.op_roadstop_leave)(id);
             }
         }
         self.set(id, 5, if flooded { 2000 } else { 1 });
         victims
     }
-    async fn train_crash(&self, id: u32) -> bool {
+    fn train_crash(&self, id: u32) -> bool {
         let mut uid = id;
         while uid != INVALID {
-            let u = self.read(uid);
-            if self.get(uid, 0) != WORMHOLE && self.tile(IS_CROSSING, uid, u.tile) != 0 {
-                let v = self.read(id);
-                if self
-                    .nearby(id, 3, v.x as i32, v.y as i32)
-                    .into_iter()
-                    .any(|tid| {
-                        let t = self.read(tid);
-                        t.r#type == 0 && (t.z as i32 - u.z as i32).abs() <= 6
-                    })
-                {
-                    let victims = self.crash(id, false).await;
-                    self.q(CRASH_NEWS, id, victims, 0);
+            let u = self.collision_part(uid);
+            if self.get(uid, 0) != WORMHOLE && ((self.leaves.op_is_crossing)(u.tile)) != 0 {
+                let v = self.collision_origin(id);
+                let mut collision = false;
+                Self::visit(self.leaves.visit_train, id, v.x as i32, v.y as i32, |tid| {
+                    collision = (self.leaves.read_type)(tid) == 0
+                        && ((self.leaves.read_z)(tid) as i32 - u.z as i32).abs() <= 6;
+                    !collision
+                });
+                if collision {
+                    let victims = self.crash(id, false);
+                    (self.leaves.op_crash_news)(id, victims);
                     return true;
                 }
             }
@@ -743,127 +1186,117 @@ impl Game {
         }
         false
     }
-    async fn crashed(&self, id: u32) -> bool {
+    fn crashed(&self, id: u32) -> bool {
         let counter = self.get(id, 5).wrapping_add(1);
         self.set(id, 5, counter);
         if counter == 2 {
-            self.effect(EXPLOSION, id);
+            (self.leaves.op_explosion)(id);
         } else if counter <= 45 {
-            if self.read(id).tick & 7 == 0 {
+            if self.read_tick(id) & 7 == 0 {
                 let mut uid = id;
                 while uid != INVALID {
                     let random = self.random();
-                    let u = self.read(uid);
+                    let u = self.crash_direction(uid);
                     let delta = [7, 0, 0, 1][(random & 3) as usize];
-                    self.write(uid, WRITE_DIRECTION, u64::from((u.direction + delta) & 7));
-                    self.action(VIEWPORT, uid, 1, 1, 0).await;
-                    uid = self.read(uid).next;
+                    (self.leaves.set_direction)(uid, ((u.direction + delta) & 7) as u8);
+                    (self.leaves.op_viewport)(uid, true, true);
+                    uid = self.read_next(uid);
                 }
             }
-        } else if counter >= 2220 && self.read(id).tick & 31 == 0 {
-            let front = self.read(id).first;
-            let alive = self.read(id).next != INVALID;
+        } else if counter >= 2220 && self.read_tick(id) & 31 == 0 {
+            let front = self.read_first(id);
+            let alive = self.read_next(id) != INVALID;
             let mut previous = id;
             let mut last = id;
-            while self.read(last).next != INVALID {
+            while self.read_next(last) != INVALID {
                 previous = last;
-                last = self.read(last).next;
+                last = self.read_next(last);
             }
-            self.q(SET_NEXT, previous, INVALID, 0);
-            self.write(
-                last,
-                WRITE_LAST_STATION,
-                u64::from(self.read(front).last_station),
-            );
+            (self.leaves.op_set_next)(previous, INVALID);
+            (self.leaves.set_last_station)(last, self.read_last_station(front) as u16);
             if in_range(self.get(last, 0), STOP, STOP + 16) {
-                self.effect(ROADSTOP_LEAVE, last);
+                (self.leaves.op_roadstop_leave)(last);
             }
-            self.action(DELETE, last, 0, 0, 0).await;
+            (self.leaves.op_delete)(last);
             return alive;
         }
         true
     }
-    async fn update_cache(&self, id: u32, same: bool) {
-        self.effect(CACHE_INVALIDATE, id);
-        self.write(id, WRITE_TOTAL_LENGTH, 0);
+    fn update_cache(&self, id: u32, same: bool) {
+        (self.leaves.op_cache_invalidate)(id);
+        (self.leaves.set_total_length)(id, 0_u16);
         let mut uid = id;
         while uid != INVALID {
             let engine = if uid == id {
-                self.q0(ENGINE_INVALID, id)
+                (self.leaves.op_engine_invalid)()
             } else {
-                self.read(id).engine
+                self.read_engine(id)
             };
-            self.write(uid, WRITE_FIRST_ENGINE, u64::from(engine));
+            (self.leaves.set_first_engine)(uid, engine as u16);
             let mut length = 8;
-            let factor = if self.q0(GRF_VERSION, uid) >= 8 {
-                let value = u32::from(self.action(PROPERTY, uid, 0x23, 65535, 0).await as u16);
+            let factor = if ((self.leaves.op_grf_version)(uid)) >= 8 {
+                let value = u32::from(((self.leaves.op_property)(uid, 0x23_u8, 65535_u32)) as u16);
                 if value != 65535 && value >= 8 {
-                    self.q(LENGTH_ERROR, uid, value, 0);
+                    (self.leaves.op_length_error)(uid, value);
                 }
                 value
             } else {
-                u32::from(self.action(LENGTH_CALLBACK, uid, 0, 0, 0).await as u16)
+                u32::from(((self.leaves.op_length_callback)(uid)) as u16)
             };
             let factor = if factor == 65535 {
-                self.q0(LENGTH_DEFAULT, uid)
+                (self.leaves.op_length_default)(uid)
             } else {
                 factor
             };
             if factor != 0 {
                 length -= factor.min(7);
             }
-            if same && length != self.read(uid).length {
-                self.action(LENGTH_CHANGED, uid, 0, 0, 0).await;
+            if same && length != self.read_length(uid) {
+                (self.leaves.op_length_changed)(uid);
             }
-            self.write(uid, WRITE_LENGTH, u64::from(length));
-            self.write(
+            (self.leaves.set_length)(uid, length as u8);
+            (self.leaves.set_total_length)(
                 id,
-                WRITE_TOTAL_LENGTH,
-                u64::from(
-                    self.read(id)
-                        .total_length
-                        .wrapping_add(self.read(uid).length),
-                ),
+                self.read_total_length(id)
+                    .wrapping_add(self.read_length(uid)) as u16,
             );
-            self.action(UPDATE_VISUAL, uid, 0, 0, 0).await;
-            let age = self
-                .action(PROPERTY, uid, 0x22, u64::from(self.q0(AGE_DEFAULT, uid)), 0)
-                .await;
-            self.write(uid, WRITE_CARGO_AGE, age);
-            uid = self.read(uid).next;
+            (self.leaves.op_update_visual)(uid);
+            let age = (self.leaves.op_property)(uid, 0x22_u8, (self.leaves.op_age_default)(uid));
+            (self.leaves.set_cargo_age)(uid, (age) as u16);
+            uid = self.read_next(uid);
         }
-        let speed = self.action(PROPERTY, id, 0x15, 0, 0).await as u32;
-        self.write(
+        let speed = (self.leaves.op_property)(id, 0x15_u8, 0_u32);
+        (self.leaves.set_max_speed)(
             id,
-            WRITE_MAX_SPEED,
-            u64::from(if speed != 0 {
+            if speed != 0 {
                 speed.wrapping_mul(4)
             } else {
-                self.q0(SPEED_DEFAULT, id)
-            }),
+                (self.leaves.op_speed_default)(id)
+            } as u16,
         );
     }
-    async fn path(&self, id: u32, tile: u32, entry: u8) -> u8 {
-        let status = self.tile(TRACK_STATUS, id, tile);
+    fn path(&self, id: u32, tile: u32, entry: u8) -> u8 {
+        let status = (self.leaves.op_track_status)(id, tile);
         let red = (status >> 16) & 0x3f3f;
         let mut tracks = status & 0x3f3f;
-        let v = self.read(id);
-        let kind = self.tile(TILE_TYPE, id, tile);
+        let v = self.path_vehicle(id);
+        let kind = (self.leaves.op_tile_type)(tile);
         if kind == 2 {
-            if self.tile(IS_DEPOT, id, tile) != 0
-                && (self.tile(TILE_OWNER, id, tile) != v.owner
-                    || self.tile(DEPOT_DIR, id, tile) == u32::from(entry))
+            if ((self.leaves.op_is_depot)(tile)) != 0
+                && (((self.leaves.op_tile_owner)(tile)) != v.owner
+                    || ((self.leaves.op_depot_dir)(tile)) == u32::from(entry))
             {
                 tracks = 0;
             }
-        } else if kind == 5 && self.tile(BAY_STOP, id, tile) != 0 {
-            if self.tile(TILE_OWNER, id, tile) != v.owner
-                || self.tile(BAY_DIR, id, tile) == u32::from(entry)
+        } else if kind == 5 && ((self.leaves.op_bay_stop)(tile)) != 0 {
+            if ((self.leaves.op_tile_owner)(tile)) != v.owner
+                || ((self.leaves.op_bay_dir)(tile)) == u32::from(entry)
                 || v.articulated != 0
             {
                 tracks = 0;
-            } else if self.tile(STOP_TYPE, id, tile) != u32::from(v.bus == 0)
-                || (self.q0(QUEUE, id) == 0 && self.tile(FREE_BAY, id, tile) == 0)
+            } else if ((self.leaves.op_stop_type)(tile))
+                != u32::from((self.leaves.read_bus)(id) == 0)
+                || (((self.leaves.op_queue)()) == 0 && ((self.leaves.op_free_bay)(tile)) == 0)
             {
                 tracks = 0;
             }
@@ -880,7 +1313,7 @@ impl Game {
             if self.get(id, 6) != 0 {
                 let mut reverse = true;
                 if v.tram() {
-                    let bits = self.tile(ANY_ROAD_BITS, id, tile);
+                    let bits = (self.leaves.op_any_road_bits)(id, tile, false);
                     let straight = if entry & 1 == 0 { 10 } else { 5 };
                     reverse = (bits & straight) == straight || bits == (8 >> entry);
                 }
@@ -893,7 +1326,7 @@ impl Game {
             }
             best = if let Some(dir) = forced {
                 dir
-            } else if self.read(id).dest == 0 {
+            } else if self.read_dest(id) == 0 {
                 let mut n =
                     ((u64::from(self.random()) * u64::from(tracks.count_ones())) >> 32) as u32;
                 let mut bits = tracks;
@@ -928,75 +1361,67 @@ impl Game {
                 if let Some(dir) = cached {
                     dir
                 } else {
-                    let result = self
-                        .action(
-                            YAPF,
-                            id,
-                            u64::from(tile),
-                            u64::from(entry),
-                            u64::from(tracks),
-                        )
-                        .await;
-                    self.q(PATH_RESULT, id, (result >> 8) as u32, 0);
-                    result as u8
+                    let result = (self.leaves.op_yapf)(id, tile, entry, tracks as u16);
+                    (self.leaves.op_path_result)(id, result.found);
+                    result.trackdir
                 }
             };
         }
         if red & (1 << best) != 0 { 255 } else { best }
     }
-    async fn leave_depot(&self, id: u32, first: bool) -> bool {
-        let tile = self.read(id).tile;
+    fn leave_depot(&self, id: u32, first: bool) -> bool {
+        let tile = self.read_tile(id);
         let mut uid = id;
         while uid != INVALID {
-            let u = self.read(uid);
+            let u = self.depot_part(uid);
             if self.get(uid, 0) != DEPOT || u.tile != tile {
                 return false;
             }
             uid = u.next;
         }
-        let dir = self.tile(DEPOT_DIR, id, tile);
-        self.write(id, WRITE_DIRECTION, u64::from(dir * 2 + 1));
+        let dir = (self.leaves.op_depot_dir)(tile);
+        (self.leaves.set_direction)(id, (dir * 2 + 1) as u8);
         let tdir = DIAG_TRACK[dir as usize];
-        let rd = crate::road_data::entry(self.read(id).tram(), self.side() + tdir as usize, 6);
-        let x = (self.tile(TILE_X, id, tile) * 16 + u32::from(rd.0 & 15)) as i32;
-        let y = (self.tile(TILE_Y, id, tile) * 16 + u32::from(rd.1 & 15)) as i32;
+        let rd = crate::road_data::entry(self.read_tram(id) != 0, self.side() + tdir as usize, 6);
+        let x = (((self.leaves.op_tile_x)(tile)) * 16 + u32::from(rd.0 & 15)) as i32;
+        let y = (((self.leaves.op_tile_y)(tile)) * 16 + u32::from(rd.1 & 15)) as i32;
         if first {
-            let v = self.read(id);
+            let v = self.depot_orders(id);
             if v.order_type == 2 && tile == v.dest {
-                self.action(ENTER_DEPOT, id, 0, 0, 0).await;
+                (self.leaves.op_enter_depot)(id);
                 return true;
             }
-            if self.close(id, x, y, self.read(id).direction, false) != INVALID {
+            if self.close(id, x, y, self.read_direction(id), false) != INVALID {
                 return true;
             }
-            self.effect(SERVICE, id);
-            self.effect(LEAVE_UNBUNCH, id);
-            self.sound(id).await;
-            self.write(id, WRITE_SPEED, 0);
+            (self.leaves.op_service)(id);
+            (self.leaves.op_leave_unbunch)(id);
+            self.sound(id);
+            (self.leaves.set_speed)(id, 0_u16);
         }
-        self.write(id, WRITE_HIDDEN, 0);
+        (self.leaves.set_hidden)(id, false);
         self.set(id, 0, u16::from(tdir));
         self.set(id, 1, 6);
-        self.write(id, WRITE_X, x as u64);
-        self.write(id, WRITE_Y, y as u64);
-        self.effect(POSITION, id);
-        self.action(INCLINATION, id, 1, 1, 0).await;
-        self.effect(DEPOT_DIRTY, id);
+        (self.leaves.set_x)(id, x);
+        (self.leaves.set_y)(id, y);
+        (self.leaves.op_position)(id);
+        (self.leaves.op_inclination)(id, true, true);
+        (self.leaves.op_depot_dirty)(id);
         true
     }
     fn follow(&self, id: u32, previous: u32, tile: u32, entry: u8, reversed: bool) -> u8 {
-        let v = self.read(id);
-        let prev = self.read(previous);
+        let v = self.vehicle_tile(id);
+        let prev = self.vehicle_tile(previous);
         if prev.tile == v.tile && !reversed {
             return REVERSE[entry as usize];
         }
         let state = self.get(previous, 0);
         let dir;
         if state == WORMHOLE || state == DEPOT {
-            let diagonal = if self.tile(TILE_TYPE, id, tile) == 9 {
-                self.tile(TUNNEL_DIR, id, tile)
-            } else if self.tile(IS_DEPOT, id, tile) != 0 {
-                self.tile(DEPOT_DIR, id, tile) ^ 2
+            let diagonal = if ((self.leaves.op_tile_type)(tile)) == 9 {
+                (self.leaves.op_tunnel_dir)(tile)
+            } else if ((self.leaves.op_is_depot)(tile)) != 0 {
+                ((self.leaves.op_depot_dir)(tile)) ^ 2
             } else {
                 255
             };
@@ -1019,7 +1444,7 @@ impl Game {
             return 255;
         }
         let required = [10, 5, 9, 6, 3, 12, 10, 5][(dir & 7) as usize];
-        if required & self.q(ANY_ROAD_BITS, id, tile, 1) == 0 {
+        if required & ((self.leaves.op_any_road_bits)(id, tile, true)) == 0 {
             255
         } else {
             dir
@@ -1038,30 +1463,24 @@ fn straight(dir: u8) -> bool {
 fn diag(dir: u32) -> u32 {
     (dir >> 1) & 3
 }
-impl Game {
-    async fn arrive_load(&self, id: u32, station: u32) {
-        let v = self.read(id);
-        let bit = if v.bus != 0 { 4 } else { 8 };
-        if self.q(STATION_VISITS, id, station, 0) & bit == 0 {
-            self.q(STATION_VISIT_SET, id, station, bit);
-            let headline = if v.bus != 0 { 0 } else { 2 } + u32::from(v.tram());
-            let local = v.owner == self.q0(LOCAL_COMPANY, INVALID);
-            self.leaf(
-                ARRIVAL,
-                id,
-                u64::from(station),
-                u64::from(headline),
-                u64::from(local),
-            );
+impl Game<'_> {
+    fn arrive_load(&self, id: u32, station: u32) {
+        let v = self.arrival_vehicle(id);
+        let bus = (self.leaves.read_bus)(id);
+        let bit = if bus != 0 { 4 } else { 8 };
+        if ((self.leaves.op_station_visits)(station as u16)) & bit == 0 {
+            (self.leaves.op_station_visit_set)(station as u16, bit);
+            let headline = if bus != 0 { 0 } else { 2 } + u32::from(v.tram());
+            let local = v.owner == ((self.leaves.op_local_company)());
+            (self.leaves.op_arrival)(id, station as u16, headline, local);
         }
-        self.action(BEGIN_LOADING, id, 0, 0, 0).await;
-        self.action(STOP_RANDOM, id, u64::from(station), 0, 0).await;
-        self.action(STOP_ANIMATION, id, u64::from(station), 0, 0)
-            .await;
+        (self.leaves.op_begin_loading)(id);
+        (self.leaves.op_stop_random)(id, station as u16);
+        (self.leaves.op_stop_animation)(id, station as u16);
     }
-    async fn individual(&self, id: u32, previous: u32) -> bool {
+    fn individual(&self, id: u32, previous: u32) -> bool {
         if self.get(id, 3) != 0 {
-            if self.tile(TILE_TYPE, id, self.read(id).tile) == 5 {
+            if ((self.leaves.op_tile_type)(self.read_tile(id))) == 5 {
                 self.set(id, 3, 0);
             } else {
                 let counter = self.get(id, 4).wrapping_add(1) as u8;
@@ -1075,44 +1494,36 @@ impl Game {
             return true;
         }
         if self.get(id, 0) == WORMHOLE {
-            let v = self.read(id);
-            let packed = self.leaf(NEW_POSITION, id, 0, 0, 0);
-            let x = packed as u32 as i32;
-            let y = (packed >> 32) as u32 as i32;
-            let new_tile = self.q(VIRT_TILE, id, x as u32, y as u32);
+            let v = self.tunnel_vehicle(id);
+            let position = (self.leaves.op_new_position)(id);
+            let x = position.x;
+            let y = position.y;
+            let new_tile = (self.leaves.op_virt_tile)(x as u32 as i32, y as u32 as i32);
             if v.front() {
                 let blocking = self.close(id, x, y, v.direction, true);
                 if blocking != INVALID {
-                    self.write(
-                        id,
-                        WRITE_SPEED,
-                        u64::from(self.read(self.read(blocking).first).speed),
-                    );
+                    (self.leaves.set_speed)(id, self.read_speed(self.read_first(blocking)) as u16);
                     return false;
                 }
             }
-            if self.tile(TILE_TYPE, id, new_tile) == 9
-                && self
-                    .action(ENTER_TILE, id, u64::from(new_tile), x as u64, y as u64)
-                    .await
-                    & 2
-                    != 0
+            if ((self.leaves.op_tile_type)(new_tile)) == 9
+                && ((self.leaves.op_enter_tile)(id, new_tile, x, y)) & 2 != 0
             {
-                self.write(id, WRITE_X, x as u64);
-                self.write(id, WRITE_Y, y as u64);
-                self.effect(POSITION, id);
-                self.action(INCLINATION, id, 1, 1, 0).await;
+                (self.leaves.set_x)(id, x);
+                (self.leaves.set_y)(id, y);
+                (self.leaves.op_position)(id);
+                (self.leaves.op_inclination)(id, true, true);
                 return true;
             }
-            self.write(id, WRITE_X, x as u64);
-            self.write(id, WRITE_Y, y as u64);
-            self.effect(POSITION, id);
-            if !self.read(id).hidden() {
-                self.effect(BASE_VIEWPORT, id);
+            (self.leaves.set_x)(id, x);
+            (self.leaves.set_y)(id, y);
+            (self.leaves.op_position)(id);
+            if !self.read_hidden(id) {
+                (self.leaves.op_base_viewport)(id);
             }
             return true;
         }
-        let v = self.read(id);
+        let v = self.move_vehicle(id);
         let state = self.get(id, 0);
         let movement = if state & 64 != 0 { state & 9 } else { state };
         let rd = crate::road_data::entry(
@@ -1123,10 +1534,10 @@ impl Game {
         if rd.0 & 128 != 0 {
             let mut tile = v
                 .tile
-                .wrapping_add(self.q(OFFSET, id, u32::from(rd.0 & 3), 0));
+                .wrapping_add((self.leaves.op_offset)(u32::from(rd.0 & 3) as u8));
             let mut dir = if v.front() {
-                if self.tile(HAS_ROAD, id, tile) != 0 {
-                    self.path(id, tile, rd.0 & 3).await
+                if ((self.leaves.op_has_road)(id, tile)) != 0 {
+                    self.path(id, tile, rd.0 & 3)
                 } else {
                     REVERSE[(rd.0 & 3) as usize]
                 }
@@ -1135,16 +1546,16 @@ impl Game {
             };
             if dir == 255 {
                 if !v.front() {
-                    self.effect(DISCONNECT, id);
+                    (self.leaves.op_disconnect)();
                 }
-                self.write(id, WRITE_SPEED, 0);
+                (self.leaves.set_speed)(id, 0_u16);
                 return false;
             }
             loop {
                 let mut frame = 0;
                 if reversing(dir) {
                     self.set(id, 3, 0);
-                    if self.read(id).tram() {
+                    if self.read_tram(id) != 0 {
                         let needed = [2, 1, 8, 4][match dir {
                             6 => 0,
                             7 => 1,
@@ -1152,199 +1563,192 @@ impl Game {
                             15 => 3,
                             _ => unreachable!(),
                         }];
-                        let previous_id = self.read(id).previous;
-                        let big = (previous_id != INVALID && self.read(previous_id).tile == tile)
-                            || (self.read(id).front()
-                                && self.tile(NORMAL_ROAD, id, tile) != 0
-                                && self.tile(ROAD_WORKS, id, tile) == 0
-                                && self.tile(HAS_ROAD, id, tile) != 0
-                                && needed & self.tile(ROAD_BITS, id, tile) != 0);
+                        let previous_id = self.read_previous(id);
+                        let big = (previous_id != INVALID && self.read_tile(previous_id) == tile)
+                            || ((self.read_front(id) != 0)
+                                && ((self.leaves.op_normal_road)(tile)) != 0
+                                && ((self.leaves.op_road_works)(tile)) == 0
+                                && ((self.leaves.op_has_road)(id, tile)) != 0
+                                && needed & ((self.leaves.op_road_bits)(id, tile)) != 0);
                         if !big {
-                            if !self.read(id).front()
-                                || self
-                                    .action(TRAM_PROBE, id, u64::from(tile), u64::from(needed), 0)
-                                    .await
+                            if (self.read_front(id) == 0)
+                                || ((self.leaves.op_tram_probe)(id, tile, needed as u8)) == 0
+                                || (!needed
+                                    & ((self.leaves.op_any_road_bits)(
+                                        id,
+                                        self.read_tile(id),
+                                        false,
+                                    )))
                                     == 0
-                                || (!needed & self.tile(ANY_ROAD_BITS, id, self.read(id).tile)) == 0
                             {
-                                tile = self.read(id).tile;
+                                tile = self.read_tile(id);
                                 frame = 16;
                             } else {
-                                self.write(id, WRITE_SPEED, 0);
+                                (self.leaves.set_speed)(id, 0_u16);
                                 return false;
                             }
                         }
-                    } else if self.tile(NORMAL_ROAD, id, self.read(id).tile) != 0
-                        && self.tile(DISALLOWED, id, self.read(id).tile) != 0
+                    } else if ((self.leaves.op_normal_road)(self.read_tile(id))) != 0
+                        && ((self.leaves.op_disallowed)(self.read_tile(id))) != 0
                     {
-                        self.write(id, WRITE_SPEED, 0);
+                        (self.leaves.set_speed)(id, 0_u16);
                         return false;
                     } else {
-                        tile = self.read(id).tile;
+                        tile = self.read_tile(id);
                     }
                 }
                 let pos = crate::road_data::entry(
-                    self.read(id).tram(),
+                    self.read_tram(id) != 0,
                     (dir as usize + self.side()) ^ self.get(id, 3) as usize,
                     frame,
                 );
-                let x = (self.tile(TILE_X, id, tile) * 16 + u32::from(pos.0)) as i32;
-                let y = (self.tile(TILE_Y, id, tile) * 16 + u32::from(pos.1)) as i32;
+                let x = (((self.leaves.op_tile_x)(tile)) * 16 + u32::from(pos.0)) as i32;
+                let y = (((self.leaves.op_tile_y)(tile)) * 16 + u32::from(pos.1)) as i32;
                 let new_dir = self.sliding(id, x, y);
-                if self.read(id).front() {
+                if self.read_front(id) != 0 {
                     let blocking = self.close(id, x, y, new_dir, true);
                     if blocking != INVALID {
-                        self.write(
+                        (self.leaves.set_speed)(
                             id,
-                            WRITE_SPEED,
-                            u64::from(self.read(self.read(blocking).first).speed),
+                            self.read_speed(self.read_first(blocking)) as u16,
                         );
                         self.path_push(id, dir, tile);
                         return false;
                     }
                 }
-                let enter = self
-                    .action(ENTER_TILE, id, u64::from(tile), x as u64, y as u64)
-                    .await;
+                let enter = (self.leaves.op_enter_tile)(id, tile, x, y);
                 if enter & 4 != 0 {
-                    if self.tile(TILE_TYPE, id, tile) != 9 {
-                        self.write(id, WRITE_SPEED, 0);
+                    if ((self.leaves.op_tile_type)(tile)) != 9 {
+                        (self.leaves.set_speed)(id, 0_u16);
                         return false;
                     }
                     dir = REVERSE[(rd.0 & 3) as usize];
                     continue;
                 }
-                let v = self.read(id);
+                let v = self.vehicle_tile(id);
                 if in_range(self.get(id, 0), STOP, DT_STOP + 16)
-                    && self.tile(TILE_TYPE, id, v.tile) == 5
+                    && ((self.leaves.op_tile_type)(v.tile)) == 5
                 {
                     if reversing(dir) && in_range(self.get(id, 0), STOP, STOP + 16) {
-                        self.write(id, WRITE_SPEED, 0);
+                        (self.leaves.set_speed)(id, 0_u16);
                         return false;
                     }
-                    if self.tile(IS_DT_STOP, id, v.tile) != 0
-                        && self.q(CONTINUATION, id, v.tile, tile) != 0
+                    if ((self.leaves.op_is_dt_stop)(v.tile)) != 0
+                        && ((self.leaves.op_continuation)(v.tile, tile)) != 0
                         && v.tile != tile
                     {
                         dir = self.get(id, 0) as u8;
-                    } else if self.tile(IS_ROAD_STOP, id, v.tile) != 0 {
-                        self.effect(ROADSTOP_LEAVE, id);
+                    } else if ((self.leaves.op_is_road_stop)(v.tile)) != 0 {
+                        (self.leaves.op_roadstop_leave)(id);
                     }
                 }
                 if enter & 2 == 0 {
-                    let old_tile = self.read(id).tile;
-                    self.write(id, WRITE_TILE, u64::from(tile));
+                    let old_tile = self.read_tile(id);
+                    (self.leaves.set_tile)(id, tile);
                     self.set(id, 0, u16::from(dir));
                     self.set(id, 1, frame as u16);
-                    if self.tile(ROAD_TYPE, id, old_tile) != self.tile(ROAD_TYPE, id, tile) {
-                        if self.read(id).front() {
-                            self.update_cache(id, false).await;
+                    if ((self.leaves.op_road_type)(id, old_tile))
+                        != ((self.leaves.op_road_type)(id, tile))
+                    {
+                        if self.read_front(id) != 0 {
+                            self.update_cache(id, false);
                         }
-                        self.action(CARGO_CHANGED, self.read(id).first, 0, 0, 0)
-                            .await;
+                        (self.leaves.op_cargo_changed)(self.read_first(id));
                     }
                 }
                 self.direction(id, new_dir);
-                self.position(id, x, y, true, true).await;
+                self.position(id, x, y, true, true);
                 return true;
             }
         }
         if rd.0 & 64 != 0 {
             let mut frame = 1;
-            let v = self.read(id);
-            let bits = self.q(ANY_ROAD_BITS, id, v.tile, 1);
+            let v = self.move_vehicle(id);
+            let bits = (self.leaves.op_any_road_bits)(id, v.tile, true);
             let dir = if v.tram()
-                && self.tile(IS_DEPOT, id, v.tile) == 0
+                && ((self.leaves.op_is_depot)(v.tile)) == 0
                 && bits != 0
                 && bits & (bits - 1) == 0
             {
                 frame = 21;
                 [14, 15, 6, 7][(rd.0 & 3) as usize]
             } else if v.front() {
-                self.path(id, v.tile, rd.0 & 3).await
+                self.path(id, v.tile, rd.0 & 3)
             } else {
                 self.follow(id, previous, v.tile, rd.0 & 3, true)
             };
             if dir == 255 {
-                self.write(id, WRITE_SPEED, 0);
+                (self.leaves.set_speed)(id, 0_u16);
                 return false;
             }
             let pos =
-                crate::road_data::entry(self.read(id).tram(), self.side() + dir as usize, frame);
-            let tile = self.read(id).tile;
-            let x = (self.tile(TILE_X, id, tile) * 16 + u32::from(pos.0)) as i32;
-            let y = (self.tile(TILE_Y, id, tile) * 16 + u32::from(pos.1)) as i32;
+                crate::road_data::entry(self.read_tram(id) != 0, self.side() + dir as usize, frame);
+            let tile = self.read_tile(id);
+            let x = (((self.leaves.op_tile_x)(tile)) * 16 + u32::from(pos.0)) as i32;
+            let y = (((self.leaves.op_tile_y)(tile)) * 16 + u32::from(pos.1)) as i32;
             let new_dir = self.sliding(id, x, y);
-            if self.read(id).front() {
+            if self.read_front(id) != 0 {
                 let blocking = self.close(id, x, y, new_dir, true);
                 if blocking != INVALID {
-                    self.write(
-                        id,
-                        WRITE_SPEED,
-                        u64::from(self.read(self.read(blocking).first).speed),
-                    );
+                    (self.leaves.set_speed)(id, self.read_speed(self.read_first(blocking)) as u16);
                     self.path_push(id, dir, tile);
                     return false;
                 }
             }
-            if self
-                .action(ENTER_TILE, id, u64::from(tile), x as u64, y as u64)
-                .await
-                & 4
-                != 0
-            {
-                self.write(id, WRITE_SPEED, 0);
+            if ((self.leaves.op_enter_tile)(id, tile, x, y)) & 4 != 0 {
+                (self.leaves.set_speed)(id, 0_u16);
                 return false;
             }
             self.set(id, 0, u16::from(dir));
             self.set(id, 1, frame as u16);
             self.direction(id, new_dir);
-            self.position(id, x, y, true, true).await;
+            self.position(id, x, y, true, true);
             return true;
         }
-        let v = self.read(id);
+        let v = self.move_transition(id);
         if v.next != INVALID
-            && self.tile(IS_DEPOT, id, v.tile) != 0
+            && ((self.leaves.op_is_depot)(v.tile)) != 0
             && u32::from(self.get(id, 1)) == v.length + 6
         {
-            self.leave_depot(v.next, false).await;
+            self.leave_depot(v.next, false);
         }
-        let v = self.read(id);
+        let v = self.collision_origin(id);
         let x = (v.x as i32 & !15) + i32::from(rd.0 & 15);
         let y = (v.y as i32 & !15) + i32::from(rd.1 & 15);
         let new_dir = self.sliding(id, x, y);
-        if self.read(id).front() && !in_range(self.get(id, 0), STOP, STOP + 16) {
+        if (self.read_front(id) != 0) && !in_range(self.get(id, 0), STOP, STOP + 16) {
             let mut blocking = self.close(id, x, y, new_dir, true);
             if blocking != INVALID {
-                blocking = self.read(blocking).first;
+                blocking = self.read_first(blocking);
                 if self.get(id, 3) == 0 {
                     self.overtake(id, blocking);
                 }
                 if self.get(id, 3) == 0 {
-                    self.write(id, WRITE_SPEED, u64::from(self.read(blocking).speed));
+                    (self.leaves.set_speed)(id, self.read_speed(blocking) as u16);
                 }
-                let v = self.read(id);
+                let v = self.move_position(id);
                 if v.speed == 0
                     && in_range(self.get(id, 0), DT_STOP, DT_STOP + 16)
-                    && self.tile(ORDER_STOP, id, v.tile) != 0
-                    && v.owner == self.tile(TILE_OWNER, id, v.tile)
+                    && ((self.leaves.op_order_stop)(id, v.tile)) != 0
+                    && v.owner == ((self.leaves.op_tile_owner)(v.tile))
                     && v.order_type != 4
-                    && self.tile(STOP_TYPE, id, v.tile) == u32::from(v.bus == 0)
+                    && ((self.leaves.op_stop_type)(v.tile))
+                        == u32::from((self.leaves.read_bus)(id) == 0)
                 {
-                    let station = self.tile(STATION, id, v.tile);
-                    self.write(id, WRITE_LAST_STATION, u64::from(station));
-                    self.arrive_load(id, station).await;
+                    let station = (self.leaves.op_station)(v.tile);
+                    (self.leaves.set_last_station)(id, station as u16);
+                    self.arrive_load(id, station);
                 }
                 return false;
             }
         }
-        let old_dir = self.read(id).direction;
+        let old_dir = self.read_direction(id);
         if new_dir != old_dir {
             self.direction(id, new_dir);
-            self.action(VIEWPORT, id, 1, 1, 0).await;
+            (self.leaves.op_viewport)(id, true, true);
             return true;
         }
-        let v = self.read(id);
+        let v = self.block_vehicle(id);
         let state = self.get(id, 0);
         let frame = self.get(id, 1);
         if v.front()
@@ -1352,173 +1756,165 @@ impl Game {
                 && crate::road_data::_ROAD_STOP_STOP_FRAME[state as usize - 32 + self.side()]
                     == frame as u8)
                 || (in_range(state, DT_STOP, DT_STOP + 16)
-                    && self.tile(ORDER_STOP, id, v.tile) != 0
-                    && v.owner == self.tile(TILE_OWNER, id, v.tile)
-                    && self.tile(STOP_TYPE, id, v.tile) == u32::from(v.bus == 0)
+                    && ((self.leaves.op_order_stop)(id, v.tile)) != 0
+                    && v.owner == ((self.leaves.op_tile_owner)(v.tile))
+                    && ((self.leaves.op_stop_type)(v.tile))
+                        == u32::from((self.leaves.read_bus)(id) == 0)
                     && frame == 11))
         {
-            let station = self.tile(STATION, id, v.tile);
+            let station = (self.leaves.op_station)(v.tile);
             if state & 4 == 0 {
-                if self.tile(IS_DT_STOP, id, v.tile) != 0 {
+                if ((self.leaves.op_is_dt_stop)(v.tile)) != 0 {
                     let next = v
                         .tile
-                        .wrapping_add(self.q(OFFSET, id, diag(v.direction), 0));
-                    if self.q(CONTINUATION, id, v.tile, next) != 0
-                        && self.tile(HAS_ROAD, id, next) != 0
+                        .wrapping_add((self.leaves.op_offset)(diag(v.direction) as u8));
+                    if ((self.leaves.op_continuation)(v.tile, next)) != 0
+                        && ((self.leaves.op_has_road)(id, next)) != 0
                     {
                         self.set(id, 1, self.get(id, 1).wrapping_add(1));
-                        self.position(id, x, y, true, false).await;
+                        self.position(id, x, y, true, false);
                         return true;
                     }
                 }
-                self.q(ENTRANCE_SET, id, 0, 0);
+                (self.leaves.op_entrance_set)(id, false);
                 self.set(id, 0, self.get(id, 0) | 4);
-                self.write(id, WRITE_LAST_STATION, u64::from(station));
-                let v = self.read(id);
-                if self.tile(IS_DT_STOP, id, v.tile) != 0
+                (self.leaves.set_last_station)(id, station as u16);
+                let v = self.stop_order(id);
+                if ((self.leaves.op_is_dt_stop)(v.tile)) != 0
                     || (v.order_type == 1 && v.order_destination == station)
                 {
-                    self.arrive_load(id, station).await;
+                    self.arrive_load(id, station);
                     return false;
                 }
             } else {
-                if self.q0(ENTRANCE_BUSY, id) != 0 {
-                    self.write(id, WRITE_SPEED, 0);
+                if ((self.leaves.op_entrance_busy)(id)) != 0 {
+                    (self.leaves.set_speed)(id, 0_u16);
                     return false;
                 }
-                if self.read(id).order_type == 4 {
-                    self.effect(ORDER_FREE, id);
+                if self.read_order_type(id) == 4 {
+                    (self.leaves.op_order_free)(id);
                 }
             }
-            if self.tile(BAY_STOP, id, self.read(id).tile) != 0 {
-                self.q(ENTRANCE_SET, id, 1, 0);
+            if ((self.leaves.op_bay_stop)(self.read_tile(id))) != 0 {
+                (self.leaves.op_entrance_set)(id, true);
             }
-            self.sound(id).await;
-            self.effect(START_STOP_DIRTY, id);
+            self.sound(id);
+            (self.leaves.op_start_stop_dirty)(id);
         }
-        let tile = self.read(id).tile;
-        let enter = self
-            .action(ENTER_TILE, id, u64::from(tile), x as u64, y as u64)
-            .await;
+        let tile = self.read_tile(id);
+        let enter = (self.leaves.op_enter_tile)(id, tile, x, y);
         if enter & 4 != 0 {
-            self.write(id, WRITE_SPEED, 0);
+            (self.leaves.set_speed)(id, 0_u16);
             return false;
         }
-        let v = self.read(id);
-        if v.order_type == 4 && self.tile(IS_DT_STOP, id, v.tile) != 0 {
-            self.effect(ORDER_FREE, id);
+        let v = self.move_stop(id);
+        if v.order_type == 4 && ((self.leaves.op_is_dt_stop)(v.tile)) != 0 {
+            (self.leaves.op_order_free)(id);
         }
         if enter & 2 == 0 {
             self.set(id, 1, self.get(id, 1).wrapping_add(1));
         }
-        self.position(id, x, y, false, true).await;
+        self.position(id, x, y, false, true);
         true
     }
-    async fn controller(&self, id: u32) -> bool {
-        let v = self.read(id);
-        self.write(
-            id,
-            WRITE_ORDER_TIME,
-            u64::from(v.order_time.wrapping_add(1)),
-        );
+    fn controller(&self, id: u32) -> bool {
+        let v = self.order_clock(id);
+        (self.leaves.set_order_time)(id, v.order_time.wrapping_add(1) as i32);
         let reverse = self.get(id, 6);
         if reverse != 0 {
             self.set(id, 6, reverse - 1);
         }
-        if self.read(id).crashed() || self.train_crash(id).await {
-            return self.crashed(id).await;
+        if self.read_crashed(id) || self.train_crash(id) {
+            return self.crashed(id);
         }
-        if self.action(BREAKDOWN, id, 0, 0, 0).await != 0 {
+        if ((self.leaves.op_breakdown)(id)) != 0 {
             return true;
         }
-        if self.read(id).stopped() {
-            self.effect(LAST_SPEED, id);
+        if self.read_stopped(id) {
+            (self.leaves.op_last_speed)(id);
             return true;
         }
-        self.action(PROCESS_ORDERS, id, 0, 0, 0).await;
-        self.action(LOADING, id, 0, 0, 0).await;
-        if self.read(id).order_type == 3 {
+        (self.leaves.op_process_orders)(id);
+        (self.leaves.op_loading)(id);
+        if self.read_order_type(id) == 3 {
             return true;
         }
         if self.get(id, 0) == DEPOT {
-            if self.q0(WAIT_UNBUNCH, id) != 0 {
+            if ((self.leaves.op_wait_unbunch)(id)) != 0 {
                 return true;
             }
-            if self.leave_depot(id, true).await {
+            if self.leave_depot(id, true) {
                 return true;
             }
         }
-        self.action(VISUAL, id, 0, 0, 0).await;
+        (self.leaves.op_visual)(id);
         let mut distance = self.update_speed(id);
-        let mut advance = self.q0(ADVANCE, id) as i32;
+        let mut advance = ((self.leaves.op_advance)(id)) as i32;
         let mut blocked = false;
         while distance >= advance {
             distance -= advance;
             let mut uid = id;
             let mut prev = INVALID;
             while uid != INVALID {
-                if !self.individual(uid, prev).await {
+                if !self.individual(uid, prev) {
                     blocked = true;
                     break;
                 }
                 prev = uid;
-                uid = self.read(uid).next;
+                uid = self.read_next(uid);
             }
             if blocked {
                 break;
             }
-            advance = self.q0(ADVANCE, id) as i32;
-            if distance >= advance && self.train_crash(id).await {
+            advance = ((self.leaves.op_advance)(id)) as i32;
+            if distance >= advance && self.train_crash(id) {
                 break;
             }
         }
-        self.effect(LAST_SPEED, id);
+        (self.leaves.op_last_speed)(id);
         let mut uid = id;
         while uid != INVALID {
-            let u = self.read(uid);
+            let u = self.controller_part(uid);
             if !u.hidden() {
-                self.action(VIEWPORT, uid, 0, 0, 0).await;
+                (self.leaves.op_viewport)(uid, false, false);
             }
             uid = u.next;
         }
-        if self.read(id).progress == 0 {
-            self.write(
+        if self.read_progress(id) == 0 {
+            (self.leaves.set_progress)(
                 id,
-                WRITE_PROGRESS,
-                if blocked { advance - 1 } else { distance } as u64,
+                (if blocked { advance - 1 } else { distance } as u64) as u8,
             );
         }
         true
     }
     fn set_dest(&self, id: u32, tile: u32) {
-        if tile == self.read(id).dest {
+        if tile == self.read_dest(id) {
             return;
         }
         self.path_clear(id);
-        self.q(SET_DEST, id, tile, 0);
+        (self.leaves.op_set_dest)(id, tile);
     }
-    async fn running_cost(&self, id: u32) -> i64 {
-        if self.q0(COST_CLASS, id) == self.q0(INVALID_PRICE, id) {
+    fn running_cost(&self, id: u32) -> i64 {
+        if ((self.leaves.op_cost_class)(id)) == ((self.leaves.op_invalid_price)()) {
             return 0;
         }
-        let factor = self
-            .action(PROPERTY, id, 9, u64::from(self.q0(COST_FACTOR, id)), 0)
-            .await;
+        let factor = (self.leaves.op_property)(id, 9_u8, (self.leaves.op_cost_factor)(id));
         if factor == 0 {
             return 0;
         }
-        self.leaf(GET_PRICE, id, factor, 0, 0) as i64
+        (self.leaves.op_get_price)(id, u64::from(factor))
     }
-    async fn service(&self, id: u32) {
-        if self.q0(SERVINT, id) == 0 || self.q0(NEEDS_SERVICE, id) == 0 {
+    fn service(&self, id: u32) {
+        if ((self.leaves.op_servint)(id)) == 0 || ((self.leaves.op_needs_service)(id)) == 0 {
             return;
         }
-        let v = self.read(id);
-        let mut all_in_depot = self.tile(IS_DEPOT, id, v.tile) != 0 && v.speed == 0;
+        let v = self.service_origin(id);
+        let mut all_in_depot = ((self.leaves.op_is_depot)(v.tile)) != 0 && v.speed == 0;
         let mut uid = v.first;
         if all_in_depot {
             while uid != INVALID {
-                let u = self.read(uid);
+                let u = self.depot_part(uid);
                 if self.get(uid, 0) != DEPOT || u.tile != v.tile {
                     all_in_depot = false;
                     break;
@@ -1527,79 +1923,81 @@ impl Game {
             }
         }
         if all_in_depot {
-            self.effect(SERVICE, id);
+            (self.leaves.op_service)(id);
             return;
         }
-        let penalty = self.q0(MAX_PENALTY, id);
+        let penalty = (self.leaves.op_max_penalty)();
         // FindClosestRoadDepot returns this tile at distance zero even while
         // moving or when only part of the consist has entered the depot.
-        let depot = if self.tile(IS_DEPOT, id, v.tile) != 0 {
-            u64::from(v.tile)
+        let depot = if ((self.leaves.op_is_depot)(v.tile)) != 0 {
+            DepotResult {
+                tile: v.tile,
+                length: 0,
+            }
         } else {
-            self.action(FIND_DEPOT, id, u64::from(penalty), 0, 0).await
+            (self.leaves.op_find_depot)(id, penalty as i32)
         };
-        let tile = depot as u32;
-        let length = (depot >> 32) as u32;
+        let tile = depot.tile;
+        let length = depot.length;
         if length == u32::MAX || length > penalty {
-            if self.read(id).order_type == 2 {
-                self.effect(ORDER_DUMMY, id);
-                self.effect(START_STOP_DIRTY, id);
+            if self.read_order_type(id) == 2 {
+                (self.leaves.op_order_dummy)(id);
+                (self.leaves.op_start_stop_dirty)(id);
             }
             return;
         }
-        let depot = self.tile(DEPOT_INDEX, id, tile);
-        let v = self.read(id);
+        let depot = (self.leaves.op_depot_index)(tile);
+        let v = self.service_order(id);
         if v.order_type == 2
             && v.order_nonstop & 1 != 0
             && !crate::services::chance16_i(1, 20, self.random())
         {
             return;
         }
-        self.write(id, WRITE_SUPPRESS_IMPLICIT, 0);
-        self.q(ORDER_DEPOT, id, depot, 0);
+        (self.leaves.set_suppress_implicit)(id);
+        (self.leaves.op_order_depot)(id, depot as u16);
         self.set_dest(id, tile);
-        self.effect(START_STOP_DIRTY, id);
+        (self.leaves.op_start_stop_dirty)(id);
     }
-    async fn day(&self, id: u32, calendar: bool) {
-        if !self.read(id).front() {
+    fn day(&self, id: u32, calendar: bool) {
+        if self.read_front(id) == 0 {
             return;
         }
         if calendar {
-            self.effect(AGE, id);
+            (self.leaves.op_age)(id);
             return;
         }
-        self.effect(ECONOMY_AGE, id);
-        let day = self.read(id).day.wrapping_add(1) as u8;
-        self.write(id, WRITE_DAY, u64::from(day));
+        (self.leaves.op_economy_age)(id);
+        let day = self.read_day(id).wrapping_add(1) as u8;
+        (self.leaves.set_day)(id, day);
         if day & 7 == 0 {
-            self.effect(DECREASE_VALUE, id);
+            (self.leaves.op_decrease_value)(id);
         }
         if self.get(id, 2) == 0 {
-            self.effect(CHECK_BREAKDOWN, id);
+            (self.leaves.op_check_breakdown)(id);
         }
-        self.service(id).await;
-        self.effect(CHECK_ORDERS, id);
-        if self.read(id).running == 0 {
+        self.service(id);
+        (self.leaves.op_check_orders)(id);
+        if self.read_running(id) == 0 {
             return;
         }
         let cost = self
             .running_cost(id)
-            .await
-            .saturating_mul(i64::from(self.read(id).running))
-            / i64::from(self.q0(COST_DIVISOR, id));
-        self.leaf(PAY_RUNNING, id, cost as u64, 0, 0);
-        self.effect(DETAILS_DIRTY, id);
+            .saturating_mul(i64::from(self.read_running(id)))
+            / i64::from((self.leaves.op_cost_divisor)());
+        (self.leaves.op_pay_running)(id, cost);
+        (self.leaves.op_details_dirty)(id);
     }
     fn trackdir(&self, id: u32) -> u8 {
-        let v = self.read(id);
+        let v = self.track_direction(id);
         if v.crashed() {
             return 255;
         }
         if self.get(id, 0) == DEPOT {
-            return DIAG_TRACK[self.tile(DEPOT_DIR, id, v.tile) as usize];
+            return DIAG_TRACK[((self.leaves.op_depot_dir)(v.tile)) as usize];
         }
-        if self.tile(BAY_STOP, id, v.tile) != 0 {
-            return DIAG_TRACK[self.tile(BAY_DIR, id, v.tile) as usize];
+        if ((self.leaves.op_bay_stop)(v.tile)) != 0 {
+            return DIAG_TRACK[((self.leaves.op_bay_dir)(v.tile)) as usize];
         }
         let state = self.get(id, 0);
         if state > 15 {
@@ -1612,14 +2010,14 @@ impl Game {
         }
     }
     fn slope_pixel(&self, id: u32) -> bool {
-        let v = self.read(id);
+        let v = self.slope_origin(id);
         let mut uid = v.first;
         let state = self.get(uid, 0);
         if state <= 15 && reversing(state as u8) {
             return true;
         }
         while uid != id {
-            let u = self.read(uid);
+            let u = self.slope_part(uid);
             if v.direction != u.direction {
                 return true;
             }
@@ -1628,7 +2026,7 @@ impl Game {
         false
     }
     fn turn(&self, id: u32, execute: bool) -> bool {
-        let v = self.read(id);
+        let v = self.turn_vehicle(id);
         if v.stopped()
             || v.crashed()
             || v.breakdown != 0
@@ -1639,66 +2037,304 @@ impl Game {
         {
             return false;
         }
-        if self.tile(NORMAL_ROAD, id, v.tile) != 0 && self.tile(DISALLOWED, id, v.tile) != 0 {
+        if ((self.leaves.op_normal_road)(v.tile)) != 0 && ((self.leaves.op_disallowed)(v.tile)) != 0
+        {
             return false;
         }
-        if self.tile(TILE_TYPE, id, v.tile) == 9
-            && diag(v.direction) == self.tile(TUNNEL_DIR, id, v.tile)
+        if ((self.leaves.op_tile_type)(v.tile)) == 9
+            && diag(v.direction) == ((self.leaves.op_tunnel_dir)(v.tile))
         {
             return false;
         }
         if execute {
             self.set(id, 6, 180);
-            self.effect(RESET_UNBUNCH, id);
+            (self.leaves.op_reset_unbunch)(id);
         }
         true
     }
-}
-async fn run(g: Game, kind: u32, id: u32, a: u64, _b: u64, _c: u64) -> u64 {
-    match kind {
-        0 => {
-            let v = g.read(id);
-            g.write(id, WRITE_TICK, u64::from(v.tick.wrapping_add(1)));
-            if v.front() {
-                if !g.read(id).stopped() {
-                    g.write(
-                        id,
-                        WRITE_RUNNING,
-                        u64::from(g.read(id).running.wrapping_add(1)),
-                    );
-                }
-                u64::from(g.controller(id).await)
-            } else {
-                1
+    fn tick(&self, id: u32) -> bool {
+        (self.leaves.set_tick)(id, self.read_tick(id).wrapping_add(1) as u8);
+        if self.read_front(id) != 0 {
+            if !self.read_stopped(id) {
+                (self.leaves.set_running)(id, self.read_running(id).wrapping_add(1) as u8);
             }
+            self.controller(id)
+        } else {
+            true
         }
-        1 => u64::from(g.individual(id, a as u32).await),
-        2 => u64::from(g.leave_depot(id, a != 0).await),
-        3 => u64::from(g.crash(id, a != 0).await),
-        4 => {
-            g.update_cache(id, a != 0).await;
-            0
-        }
-        5 => {
-            g.day(id, true).await;
-            0
-        }
-        6 => {
-            g.day(id, false).await;
-            0
-        }
-        7 => g.running_cost(id).await as u64,
-        8 => g.max_speed(id) as u64,
-        9 => g.update_speed(id) as u64,
-        10 => {
-            g.set_dest(id, a as u32);
-            0
-        }
-        11 => u64::from(g.turn(id, a != 0)),
-        12 => u64::from(g.trackdir(id)),
-        13 => u64::from(g.slope_pixel(id)),
-        _ => unreachable!(),
     }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_road_tick(
+    id: u32,
+    state: *mut State,
+    leaves: *const Leaves,
+    services: *const Services,
+) -> bool {
+    // SAFETY: Immutable tables outlive this synchronous call and nested entries.
+    // Only raw owner pointers survive callbacks; every scalar/path borrow ends first.
+    let g = unsafe {
+        Game {
+            id,
+            state,
+            leaves: &*leaves,
+            services: &*services,
+        }
+    };
+    g.tick(id)
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_road_individual(
+    id: u32,
+    state: *mut State,
+    previous: u32,
+    leaves: *const Leaves,
+    services: *const Services,
+) -> bool {
+    // SAFETY: Immutable tables outlive this synchronous call and nested entries.
+    // Only raw owner pointers survive callbacks; every scalar/path borrow ends first.
+    let g = unsafe {
+        Game {
+            id,
+            state,
+            leaves: &*leaves,
+            services: &*services,
+        }
+    };
+    g.individual(id, previous)
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_road_leave_depot(
+    id: u32,
+    state: *mut State,
+    first: bool,
+    leaves: *const Leaves,
+    services: *const Services,
+) -> bool {
+    // SAFETY: Immutable tables outlive this synchronous call and nested entries.
+    // Only raw owner pointers survive callbacks; every scalar/path borrow ends first.
+    let g = unsafe {
+        Game {
+            id,
+            state,
+            leaves: &*leaves,
+            services: &*services,
+        }
+    };
+    g.leave_depot(id, first)
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_road_crash(
+    id: u32,
+    state: *mut State,
+    flooded: bool,
+    leaves: *const Leaves,
+    services: *const Services,
+) -> u32 {
+    // SAFETY: Immutable tables outlive this synchronous call and nested entries.
+    // Only raw owner pointers survive callbacks; every scalar/path borrow ends first.
+    let g = unsafe {
+        Game {
+            id,
+            state,
+            leaves: &*leaves,
+            services: &*services,
+        }
+    };
+    g.crash(id, flooded)
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_road_update_cache(
+    id: u32,
+    state: *mut State,
+    same_length: bool,
+    leaves: *const Leaves,
+    services: *const Services,
+) {
+    // SAFETY: Immutable tables outlive this synchronous call and nested entries.
+    // Only raw owner pointers survive callbacks; every scalar/path borrow ends first.
+    let g = unsafe {
+        Game {
+            id,
+            state,
+            leaves: &*leaves,
+            services: &*services,
+        }
+    };
+    g.update_cache(id, same_length);
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_road_calendar_day(
+    id: u32,
+    state: *mut State,
+    leaves: *const Leaves,
+    services: *const Services,
+) {
+    // SAFETY: Immutable tables outlive this synchronous call and nested entries.
+    // Only raw owner pointers survive callbacks; every scalar/path borrow ends first.
+    let g = unsafe {
+        Game {
+            id,
+            state,
+            leaves: &*leaves,
+            services: &*services,
+        }
+    };
+    g.day(id, true);
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_road_economy_day(
+    id: u32,
+    state: *mut State,
+    leaves: *const Leaves,
+    services: *const Services,
+) {
+    // SAFETY: Immutable tables outlive this synchronous call and nested entries.
+    // Only raw owner pointers survive callbacks; every scalar/path borrow ends first.
+    let g = unsafe {
+        Game {
+            id,
+            state,
+            leaves: &*leaves,
+            services: &*services,
+        }
+    };
+    g.day(id, false);
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_road_running_cost(
+    id: u32,
+    state: *mut State,
+    leaves: *const Leaves,
+    services: *const Services,
+) -> i64 {
+    // SAFETY: Immutable tables outlive this synchronous call and nested entries.
+    // Only raw owner pointers survive callbacks; every scalar/path borrow ends first.
+    let g = unsafe {
+        Game {
+            id,
+            state,
+            leaves: &*leaves,
+            services: &*services,
+        }
+    };
+    g.running_cost(id)
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_road_max_speed(
+    id: u32,
+    state: *mut State,
+    leaves: *const Leaves,
+    services: *const Services,
+) -> i32 {
+    // SAFETY: Immutable tables outlive this synchronous call and nested entries.
+    // Only raw owner pointers survive callbacks; every scalar/path borrow ends first.
+    let g = unsafe {
+        Game {
+            id,
+            state,
+            leaves: &*leaves,
+            services: &*services,
+        }
+    };
+    g.max_speed(id)
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_road_update_speed(
+    id: u32,
+    state: *mut State,
+    leaves: *const Leaves,
+    services: *const Services,
+) -> i32 {
+    // SAFETY: Immutable tables outlive this synchronous call and nested entries.
+    // Only raw owner pointers survive callbacks; every scalar/path borrow ends first.
+    let g = unsafe {
+        Game {
+            id,
+            state,
+            leaves: &*leaves,
+            services: &*services,
+        }
+    };
+    g.update_speed(id)
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_road_set_dest(
+    id: u32,
+    state: *mut State,
+    tile: u32,
+    leaves: *const Leaves,
+    services: *const Services,
+) {
+    // SAFETY: Immutable tables outlive this synchronous call and nested entries.
+    // Only raw owner pointers survive callbacks; every scalar/path borrow ends first.
+    let g = unsafe {
+        Game {
+            id,
+            state,
+            leaves: &*leaves,
+            services: &*services,
+        }
+    };
+    g.set_dest(id, tile);
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_road_turn(
+    id: u32,
+    state: *mut State,
+    execute: bool,
+    leaves: *const Leaves,
+    services: *const Services,
+) -> bool {
+    // SAFETY: Immutable tables outlive this synchronous call and nested entries.
+    // Only raw owner pointers survive callbacks; every scalar/path borrow ends first.
+    let g = unsafe {
+        Game {
+            id,
+            state,
+            leaves: &*leaves,
+            services: &*services,
+        }
+    };
+    g.turn(id, execute)
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_road_trackdir(
+    id: u32,
+    state: *mut State,
+    leaves: *const Leaves,
+    services: *const Services,
+) -> u8 {
+    // SAFETY: Immutable tables outlive this synchronous call and nested entries.
+    // Only raw owner pointers survive callbacks; every scalar/path borrow ends first.
+    let g = unsafe {
+        Game {
+            id,
+            state,
+            leaves: &*leaves,
+            services: &*services,
+        }
+    };
+    g.trackdir(id)
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_road_slope_pixel(
+    id: u32,
+    state: *mut State,
+    leaves: *const Leaves,
+    services: *const Services,
+) -> bool {
+    // SAFETY: Immutable tables outlive this synchronous call and nested entries.
+    // Only raw owner pointers survive callbacks; every scalar/path borrow ends first.
+    let g = unsafe {
+        Game {
+            id,
+            state,
+            leaves: &*leaves,
+            services: &*services,
+        }
+    };
+    g.slope_pixel(id)
 }
 /// Shared modern/legacy afterload road-stop frame query, retaining original indexes.
 #[unsafe(no_mangle)]
@@ -1706,19 +2342,9 @@ pub extern "C" fn openttd_rust_road_stop_frame(index: u32) -> u8 {
     crate::road_data::_ROAD_STOP_STOP_FRAME[index as usize]
 }
 
-const IS_CROSSING: u32 = 82;
-const NEW_POSITION: u32 = 83;
-const VIRT_TILE: u32 = 84;
-const IS_ROAD_STOP: u32 = 85;
-const SET_DEST: u32 = 86;
-
 /// Narrow unchanged-reference table comparison for the corpus's tram-table gap.
 #[unsafe(no_mangle)]
 pub extern "C" fn openttd_rust_road_drive_entry(tram: u8, state: u8, frame: u8) -> u16 {
     let (x, y) = crate::road_data::entry(tram != 0, state as usize, frame as usize);
     u16::from(x) | (u16::from(y) << 8)
 }
-
-const STATION_VISITS: u32 = 87;
-const STATION_VISIT_SET: u32 = 88;
-const LOCAL_COMPANY: u32 = 89;

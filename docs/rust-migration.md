@@ -1382,32 +1382,32 @@ real custom NewGRF callbacks and complete historical saves remain evidence limit
 
 ### Road vehicle control and private state
 
-Issue #121 moves road consist/tick/day control, movement, blocking/overtaking,
-reversal, station/depot transitions, crash expiry, service, speed/cache policy and
-turn commands into Rust. Rust owns seven private scalars and the ordered path;
-modern, historical split-vector and TTD/TTO save adapters stage them in C++.
-Original algorithms and road/tram movement data compile only in portable builds.
-Shared Vehicle/GroundVehicle physics, pools, orders/loading, map/road stops,
-construction and rendering remain C++. Road YAPF uses the same canonical path
-through #124; there is no temporary C++ search result cache.
+Issue #121 moves consist/tick/day control, movement, blocking/overtaking, reversal,
+station/depot transitions, crash expiry, service, speed/cache policy and turns
+into Rust. Each shell owns seven private scalars and the canonical ordered path;
+modern, historical split-vector and TTD/TTO adapters stage them in C++.
+Original algorithms and movement data compile only in portable builds. Shared
+Vehicle/GroundVehicle physics, pools, orders/loading, map/road stops, construction
+and rendering remain C++; #124 YAPF writes the same canonical path.
 
-Rust uses copied IDs/observations and direct noexcept services, including shared
-RNG. Actions return to C++ for owner reentry, commands, NewGRF callbacks, viewport
-sprite updates and destruction; no world reference survives them. Canonical
-state outlives active calls and is released after PreDestructor; panics abort.
-`python3 tools/migration.py simulate roads` witnesses both acceleration models,
-cache consumption/invalidation, blocking escape, overtake initiation/timeout,
-depot service/departure and path/counter reload, with loaded link jobs postponed
-32 days in typed inputs. Road/multimodal/disaster cases compare all fields/logs.
-Native fixtures compare all movement/stop data against unchanged C++ tables and
-exercise widths, ordered paths, nested save staging, partial-load unwind, indexed
-pool reuse and reentry. #156 adds no-destination shared-RNG/track/cache witnesses
-and command-built crossing/flooding fixtures with collision/counter/AI-event checks
-in CI. Flooding preserves 18 passengers and requires the original victim count,
-2000-based crash countdown and shared RNG. Removing the draw, inverting the crossing
-test, skipping RoadCrashNews or changing the flooded countdown must fail; setup and
-probes are in `tools/road-scenario-ai/README.md`. Actual legacy saves, NewGRFs,
-articulated/tram turns, sounds and viewport pixels remain unexercised domains.
+#155 replaces all fourteen allocated invocation kinds and twenty-two actions
+with typed synchronous entries/services. Immutable native tables are borrowed;
+reads copy consumed fields only, and nearby visitors traverse once without an ID
+vector. Bus classification runs only where needed. The primary owner is resolved
+once per entry. No owner/path/world borrow spans a callback, including nested
+cache/destination/speed/slope/trackdir calls and deletion. Destruction follows
+PreDestructor; its continuation returns a copied result. Native commands return
+CommandCost, NewGRF resolution is bounded, and AI/Game events enqueue. All world
+wrappers are noexcept; panic and environmental failures abort.
+
+`python3 tools/migration.py simulate roads` and self/soak variants compare all
+saved fields/logs for acceleration, service, blocking, overtaking, canonical path,
+RNG, crossing collision, flooding, crash expiry and reload. Native checks cover
+typed ABI, nested getter/cache/destination/path mutation, owner destruction,
+movement/stop data, widths and save staging. Four existing benchmark scenarios
+report a committed best-known ratio ratchet without failing CI on timing noise.
+Actual legacy saves, NewGRFs, articulated/tram turns, sounds and viewport pixels
+remain unexercised domains tracked by #156.
 
 ### Rail YAPF search, caches and reservation
 

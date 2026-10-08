@@ -754,6 +754,13 @@ def run_scenario(
         result["plain_speed"]["median_candidate_reference_ratio"] = statistics.median(
             ratios
         )
+    if benchmark_repetitions:
+        from .roads import speed_budget
+
+        result["plain_speed"]["budget"] = speed_budget(
+            scenario["name"],
+            result["plain_speed"]["median_candidate_reference_ratio"],
+        )
     result["passed"] = not result["differences"] and not result["problems"]
     if result["passed"] and not benchmark_repetitions:
         if (
@@ -1004,6 +1011,12 @@ def main():
             )
             ratio = result["plain_speed"]["median_candidate_reference_ratio"]
             speed = f", plain {ratio:.3f}x" if ratio is not None else ""
+            budget = result["plain_speed"].get("budget")
+            if budget is not None:
+                speed += (
+                    f", best {budget['best_known_ratio']:.3f}x "
+                    f"({budget['change_percent']:+.1f}%)"
+                )
             print(
                 f"{status} {result['scenario']}: {result['snapshots']} snapshots, "
                 f"{result['stats']['chunks']} chunks, {result['stats']['elements']} elements{known}{speed}",
