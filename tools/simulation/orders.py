@@ -6,7 +6,7 @@ import shlex
 import subprocess
 from pathlib import Path
 
-from .core import RUNTIME_DIRECTORIES, ROOT, decode_element, read_save, run_game
+from .core import ROOT, RUNTIME_DIRECTORIES, decode_element, read_save, run_game
 
 ADAPTER = ROOT / "tools/simulation/orders-console.cpp"
 COMMON = "roadveh[0]/common[0]/"
@@ -163,6 +163,13 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
             line.startswith("ORDERS state conditional-active ") for line in run["log"]
         ):
             raise RuntimeError("reference did not execute the active conditional order")
+        if "ORDERS active 7 8 1" not in run["log"] or not any(
+            line.startswith("ORDERS state conditional-active 126 4 2 3 3 ")
+            for line in run["log"]
+        ):
+            raise RuntimeError(
+                "reference has no resolved conditional/implicit active state"
+            )
         backup = run["snapshots"][-1]
         result["orders_active"] = {
             "input_sha256": hashlib.sha256(backup.read_bytes()).hexdigest(),
@@ -217,5 +224,13 @@ def check(scenario, run, mode, role, result):
         result[key] = trips
     elif result[key] != trips:
         result["problems"].append(f"{mode}: unmasked initialized-peer trip mismatch")
-    if operation not in ("active-reload", "client-restore") and trips[126] != 3000:
+    if operation in ("client-restore", "client-shared-restore") and trips[126] != 0:
+        result["problems"].append(
+            f"{mode}/{role}: restoration did not reset unbunching"
+        )
+    if operation in ("commands", "offline-reload") and trips[127] != 6000:
+        result["problems"].append(
+            f"{mode}/{role}: lost initialized 6000-tick peer sample"
+        )
+    if operation in ("commands", "offline-reload") and trips[126] != 3000:
         result["problems"].append(f"{mode}/{role}: no 3000-tick depot trip measurement")

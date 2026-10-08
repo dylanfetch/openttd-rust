@@ -132,7 +132,7 @@ static bool OrdersScenario(std::span<std::string_view> args)
 	} else if (args[1] == "active") {
 		CheckCommand("remove-unbunch", Command<CMD_DELETE_ORDER>::Do(DoCommandFlag::Execute, v->index, 2));
 		Order conditional;
-		conditional.MakeConditional(2);
+		conditional.MakeConditional(1);
 		conditional.SetConditionVariable(OrderConditionVariable::Unconditionally);
 		CheckCommand("conditional", Command<CMD_INSERT_ORDER>::Do(DoCommandFlag::Execute, v->index, 0, conditional));
 		Order implicit;
