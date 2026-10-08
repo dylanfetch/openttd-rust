@@ -1258,7 +1258,8 @@ async fn buy(w: &World, id: u32, mut hostile: bool, execute: bool) -> Action {
         return result(1, 0, 255, 0);
     }
     let current = w.read(0, 0, 0)[5] as u32;
-    let asked = get!(p, asked) & (1 << current) != 0;
+    // Special owners lie outside the 16-bit CompanyMask and have no offer.
+    let asked = get!(p, asked) & 1_u16.checked_shl(current).unwrap_or(0) != 0;
     if hostile && asked {
         hostile = false;
     }

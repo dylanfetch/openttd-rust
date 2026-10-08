@@ -119,4 +119,27 @@ TEST_CASE("Company economy - competitor posts retain invalid client ID")
 	}
 	company_competitor = false;
 }
+/* AI command APIs cannot select deity/non-company owners. The original wider
+ * CompanyMask test is defined through bit 63; compare those special owners and
+ * also check the inactive/new/spectator sentinels without an oversized shift. */
+TEST_CASE("Company economy - special owners have no bankruptcy takeover offer")
+{
+	OpenTTDCompanyLeaves leaves{CompanyGapNext, CompanyGapRead, CompanyGapOwner, CompanyGapService};
+	company_networking = true; company_competitor = false;
+	network_companies[1] = std::make_unique<CompanyProperties>();
+	for (uint16_t mask : {uint16_t{0}, uint16_t{UINT16_MAX}}) {
+		network_companies[1]->Finances().bankrupt_asked = CompanyMask{};
+		if (mask != 0) network_companies[1]->Finances().bankrupt_asked.Set();
+		for (uint32_t current = 16; current <= UINT8_MAX; current++) {
+			company_current = static_cast<uint8_t>(current);
+			if (current < 64) CHECK_FALSE(network_companies[1]->Finances().bankrupt_asked.Test(CompanyID(static_cast<uint8_t>(current))));
+			for (bool hostile : {false, true}) {
+				std::unique_ptr<OpenTTDCompanyRun, decltype(&openttd_rust_company_destroy)> run(openttd_rust_company_create(27, 1, hostile, 0, 0, 0, &leaves), openttd_rust_company_destroy);
+				auto action = openttd_rust_company_advance(run.get(), 0);
+				CHECK(action.kind == 0); CHECK(action.a == 1);
+			}
+		}
+	}
+	network_companies[1].reset();
+}
 #endif /* WITH_RUST */
