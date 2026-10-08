@@ -8,6 +8,7 @@ import shutil
 import struct
 from pathlib import Path
 
+from . import core
 from .core import (
     ROOT,
     SNAPSHOT_TICKS,
