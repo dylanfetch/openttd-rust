@@ -35,6 +35,8 @@ extern "C" {
  * 215-244 narrow road reads, 245 position, 246 track choice, 247 depot result.
  * 260 order fields, 261 consist, 262 vehicle orders, 263 order list,
  * 264 order backup, 265 typed order services, 266 closest-depot result.
+ * 320 ship position, 321 typed ship services, 322 reverse result, 323 depot,
+ * 324 ship track-choice result, 325 ship depot result.
  * Item 0 size, 1 alignment, then every field offset in declaration order.
  * Unknown type/item returns SIZE_MAX. No memory borrow, ownership or callback.
  * Native extern-C convention (cdecl on i686 MSVC); Rust panic never unwinds.

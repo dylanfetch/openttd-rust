@@ -26,6 +26,7 @@ struct ShipPathElement {
 
 #ifdef WITH_RUST
 #include "rust/ship_yapf_ffi.h"
+#include "rust/ship_control_ffi.h"
 #include <utility>
 /** Canonical Rust path owner; controller operations return copied elements. */
 class ShipPathCache {
@@ -71,10 +72,80 @@ using ShipPathCache = std::vector<ShipPathElement>;
  */
 struct Ship final : public SpecializedVehicle<Ship, VEH_SHIP> {
 	ShipPathCache path{}; ///< Cached path.
+#ifdef WITH_RUST
+	std::unique_ptr<OpenTTDShipState, decltype(&openttd_rust_ship_state_destroy)> rust_state{openttd_rust_ship_state_new(), openttd_rust_ship_state_destroy};
+	OpenTTDShipState *GetRustState() const { return this->rust_state.get(); }
+#else
 	TrackBits state{}; ///< The "track" the ship is following.
 	Direction rotation = INVALID_DIR; ///< Visible direction.
 	int16_t rotation_x_pos = 0; ///< NOSAVE: X Position before rotation.
 	int16_t rotation_y_pos = 0; ///< NOSAVE: Y Position before rotation.
+#endif
+	TrackBits GetState() const
+	{
+#ifdef WITH_RUST
+		return static_cast<TrackBits>(openttd_rust_ship_get_state(this->GetRustState()));
+#else
+		return this->state;
+#endif
+	}
+	void SetState(TrackBits value)
+	{
+#ifdef WITH_RUST
+		openttd_rust_ship_set_state(this->GetRustState(), value);
+#else
+		this->state = value;
+#endif
+	}
+	Direction GetRotation() const
+	{
+#ifdef WITH_RUST
+		return static_cast<Direction>(openttd_rust_ship_get_rotation(this->GetRustState()));
+#else
+		return this->rotation;
+#endif
+	}
+	void SetRotation(Direction value)
+	{
+#ifdef WITH_RUST
+		openttd_rust_ship_set_rotation(this->GetRustState(), value);
+#else
+		this->rotation = value;
+#endif
+	}
+	int16_t GetRotationX() const
+	{
+#ifdef WITH_RUST
+		return static_cast<int16_t>(openttd_rust_ship_get_rotation_x(this->GetRustState()));
+#else
+		return this->rotation_x_pos;
+#endif
+	}
+	void SetRotationX(int16_t value)
+	{
+#ifdef WITH_RUST
+		openttd_rust_ship_set_rotation_x(this->GetRustState(), value);
+#else
+		this->rotation_x_pos = value;
+#endif
+	}
+	int16_t GetRotationY() const
+	{
+#ifdef WITH_RUST
+		return static_cast<int16_t>(openttd_rust_ship_get_rotation_y(this->GetRustState()));
+#else
+		return this->rotation_y_pos;
+#endif
+	}
+	void SetRotationY(int16_t value)
+	{
+#ifdef WITH_RUST
+		openttd_rust_ship_set_rotation_y(this->GetRustState(), value);
+#else
+		this->rotation_y_pos = value;
+#endif
+	}
+
 
 	/** We don't want GCC to zero our struct! It already is zeroed and has an index! */
 	Ship() : SpecializedVehicleBase() {}
@@ -91,7 +162,7 @@ struct Ship final : public SpecializedVehicle<Ship, VEH_SHIP> {
 	int GetDisplayMaxSpeed() const override { return this->vcache.cached_max_speed / 2; }
 	int GetCurrentMaxSpeed() const override { return std::min<int>(this->vcache.cached_max_speed, this->current_order.GetMaxSpeed() * 2); }
 	Money GetRunningCost() const override;
-	bool IsInDepot() const override { return this->state == TRACK_BIT_DEPOT; }
+	bool IsInDepot() const override { return this->GetState() == TRACK_BIT_DEPOT; }
 	bool Tick() override;
 	void OnNewCalendarDay() override;
 	void OnNewEconomyDay() override;
@@ -104,4 +175,23 @@ struct Ship final : public SpecializedVehicle<Ship, VEH_SHIP> {
 
 bool IsShipDestinationTile(TileIndex tile, StationID station);
 
+#ifdef WITH_RUST
+/** Nested save staging exists only during save/load; no persistent state mirror. */
+class ShipStateScope {
+	static inline ShipStateScope *active = nullptr;
+	ShipStateScope *previous;
+	Ship *ship;
+	bool loading;
+	uint8_t state, rotation;
+public:
+	ShipStateScope(Ship *s, bool loading) : previous(active), ship(s), loading(loading), state(s->GetState()), rotation(s->GetRotation()) { active = this; }
+	~ShipStateScope()
+	{
+		if (this->loading) { this->ship->SetState(static_cast<TrackBits>(state)); this->ship->SetRotation(static_cast<Direction>(rotation)); }
+		active = this->previous;
+	}
+	static uint8_t &State() { return active->state; }
+	static uint8_t &Rotation() { return active->rotation; }
+};
+#endif
 #endif /* SHIP_H */

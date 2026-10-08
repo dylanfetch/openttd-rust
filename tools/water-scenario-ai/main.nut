@@ -26,7 +26,19 @@ class WaterScenes extends AIController {
 		this.WaitRight(); this.Mark("warm-right");
 		this.WaitLeft(); this.Mark("warm-left");
 		this.WaitRight();
-		if (WATER_MODE == "depot") {
+		if (WATER_MODE == "lifecycle") {
+			local depot = AIMap.GetTileIndex(154, 190);
+			local built = AIVehicle.BuildVehicle(depot, 206);
+			this.Check("build " + built, AIVehicle.IsValidVehicle(built));
+			this.Check("sell " + built, AIVehicle.SellVehicle(built));
+			local reused = AIVehicle.BuildVehicle(depot, 206);
+			this.Check("reuse " + reused, AIVehicle.IsValidVehicle(reused) && reused == built);
+			this.Check("reuse-order-a", AIOrder.AppendOrder(reused, AIMap.GetTileIndex(158, 190), AIOrder.OF_NONE));
+			this.Check("reuse-order-b", AIOrder.AppendOrder(reused, AIMap.GetTileIndex(192, 190), AIOrder.OF_NONE));
+			this.Check("reuse-start", AIVehicle.StartStopVehicle(reused));
+			while (AIVehicle.GetLocation(reused) == depot || AIVehicle.GetLocation(reused) == depot + 1) this.Sleep(1);
+			this.Mark("reuse-moved " + reused);
+		} else if (WATER_MODE == "depot") {
 			this.Check("send-depot", AIVehicle.SendVehicleToDepot(WATER_SHIP));
 			while (!AIVehicle.IsStoppedInDepot(WATER_SHIP)) this.Sleep(1);
 			this.Mark("depot-arrival");

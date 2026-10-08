@@ -29,6 +29,7 @@ mod road_data;
 mod road_yapf;
 mod script_list;
 pub mod services;
+mod ship_control;
 mod station_cargo;
 mod station_service;
 mod string_validation;

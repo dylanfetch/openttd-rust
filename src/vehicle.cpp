@@ -1549,7 +1549,7 @@ void VehicleEnterDepot(Vehicle *v)
 		case VEH_SHIP: {
 			SetWindowClassesDirty(WC_SHIPS_LIST);
 			Ship *ship = Ship::From(v);
-			ship->state = TRACK_BIT_DEPOT;
+			ship->SetState(TRACK_BIT_DEPOT);
 			ship->UpdateCache();
 			ship->UpdateViewport(true, true);
 			SetWindowDirty(WC_VEHICLE_DEPOT, v->tile);

@@ -1546,6 +1546,35 @@ queue mutation, partial/nested save failure and actual retirement/indexed reuse.
 The corpus is not exhaustive for legacy versions, NewGRF cargo callbacks,
 articulated/multiheaded refits or every transport combination.
 
+### Ship controller and private state (#146)
+
+Rust owns the complete ship tick/movement, locks, acceleration, rotation/reversal,
+track/depot/destination policy, economy-day/service/cache/build initialization,
+and nearest-depot region BFS with ordered pool selection. Four canonical scalars
+belong to each Rust ship owner; #119 remains the sole path/search owner. Original
+selected bodies compile only portably. C++ keeps shared Vehicle/map/pool storage,
+renderer bounds/sprites, allocation, Money accounting and modern/legacy save staging.
+NOSAVE signed-16-bit rotation coordinates reconstruct at the original afterload phase.
+
+Entries are synchronous typed calls without task/future/mailbox allocation or
+operation dispatch. Services are individually named `noexcept` functions; narrow
+getters fetch only used fields, typed results carry positions and search choices,
+and one reusable game-thread Rust set/deque owns depot scratch. Rust resolves its
+raw scalar owner once per entry and ends every borrow before callbacks. Tile/depot,
+orders/loading, viewport, breakdown, effect/sound, cache/YAPF and NewGRF callbacks
+remain direct: none can unwind a script VM or save/load error during ordinary play.
+Unexpected environmental exceptions terminate inside their wrappers; Rust panics abort.
+
+`python3 tools/migration.py verify --jobs 2` includes the four Cargo checks and
+native ABI checks for scalar widths, native C++ transient coordinate narrowing,
+direct callback order and nested owner mutation. `OPENTTD_SHIP_PROFILE=1 python3
+tools/migration.py simulate water --jobs 2` (also `--self`/`--soak`) reuses the water
+corpus for locks, aqueducts, rotation/reload, service, buoy/loading, depot restart,
+and moving build/sell/ID-reuse owners. The class case changes one existing clear
+canal input byte to `MakeRiver` class/owner encoding for both games and requires an
+actual cache-update branch. Legacy save versions, viewport pixels and arbitrary
+custom NewGRF combinations remain coverage limits; final independent review and CI gate integration.
+
 ### Rail vehicles and controller state (#130)
 
 Rust owns train consist/cache/curve/speed policy, both tick passes and movement,

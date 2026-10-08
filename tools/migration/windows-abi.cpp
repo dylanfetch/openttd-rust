@@ -22,6 +22,7 @@
 #include "rust/townname_ffi.h"
 #include "rust/effect_ffi.h"
 #include "rust/road_ffi.h"
+#include "rust/ship_control_ffi.h"
 #include "rust/orders_ffi.h"
 #include "rust/road_yapf_ffi.h"
 #include "tests/effect_protocol.hpp"
@@ -78,6 +79,12 @@ static void Layout(uint16_t type, const char *name, std::initializer_list<size_t
 
 static void Layouts()
 {
+	Layout(320, "OpenTTDShipPosition", {sizeof(OpenTTDShipPosition), alignof(OpenTTDShipPosition), offsetof(OpenTTDShipPosition, x), offsetof(OpenTTDShipPosition, y), offsetof(OpenTTDShipPosition, old_tile), offsetof(OpenTTDShipPosition, new_tile)});
+	Layout(321, "OpenTTDShipLeaves", {sizeof(OpenTTDShipLeaves), alignof(OpenTTDShipLeaves), offsetof(OpenTTDShipLeaves, depot_dir), offsetof(OpenTTDShipLeaves, depot_axis), offsetof(OpenTTDShipLeaves, is_depot), offsetof(OpenTTDShipLeaves, depot_index), offsetof(OpenTTDShipLeaves, wait_unbunch), offsetof(OpenTTDShipLeaves, chain_depot), offsetof(OpenTTDShipLeaves, servint), offsetof(OpenTTDShipLeaves, needs_service), offsetof(OpenTTDShipLeaves, max_distance), offsetof(OpenTTDShipLeaves, tile_valid), offsetof(OpenTTDShipLeaves, tile_type), offsetof(OpenTTDShipLeaves, water_class), offsetof(OpenTTDShipLeaves, lock_middle), offsetof(OpenTTDShipLeaves, lock_dir), offsetof(OpenTTDShipLeaves, tile_min_z), offsetof(OpenTTDShipLeaves, tile_max_z), offsetof(OpenTTDShipLeaves, track_status), offsetof(OpenTTDShipLeaves, offset), offsetof(OpenTTDShipLeaves, diag_between), offsetof(OpenTTDShipLeaves, dist_square), offsetof(OpenTTDShipLeaves, dist_manhattan), offsetof(OpenTTDShipLeaves, docking), offsetof(OpenTTDShipLeaves, dock), offsetof(OpenTTDShipLeaves, dock_water), offsetof(OpenTTDShipLeaves, station), offsetof(OpenTTDShipLeaves, industry_station), offsetof(OpenTTDShipLeaves, oilrig), offsetof(OpenTTDShipLeaves, station_use), offsetof(OpenTTDShipLeaves, station_xy), offsetof(OpenTTDShipLeaves, station_contains), offsetof(OpenTTDShipLeaves, station_dock), offsetof(OpenTTDShipLeaves, station_visits), offsetof(OpenTTDShipLeaves, visit_set), offsetof(OpenTTDShipLeaves, arrival), offsetof(OpenTTDShipLeaves, service), offsetof(OpenTTDShipLeaves, leave_unbunch), offsetof(OpenTTDShipLeaves, path_result), offsetof(OpenTTDShipLeaves, order_free), offsetof(OpenTTDShipLeaves, order_dummy), offsetof(OpenTTDShipLeaves, order_depot), offsetof(OpenTTDShipLeaves, order_leave), offsetof(OpenTTDShipLeaves, order_increment), offsetof(OpenTTDShipLeaves, timetable), offsetof(OpenTTDShipLeaves, position), offsetof(OpenTTDShipLeaves, start_dirty), offsetof(OpenTTDShipLeaves, depot_dirty), offsetof(OpenTTDShipLeaves, depot_invalidate), offsetof(OpenTTDShipLeaves, ships_dirty), offsetof(OpenTTDShipLeaves, details_dirty), offsetof(OpenTTDShipLeaves, age), offsetof(OpenTTDShipLeaves, economy_age), offsetof(OpenTTDShipLeaves, decrease_value), offsetof(OpenTTDShipLeaves, check_breakdown), offsetof(OpenTTDShipLeaves, check_orders), offsetof(OpenTTDShipLeaves, running_cost), offsetof(OpenTTDShipLeaves, cost_divisor), offsetof(OpenTTDShipLeaves, pay_running), offsetof(OpenTTDShipLeaves, speed_default), offsetof(OpenTTDShipLeaves, age_default), offsetof(OpenTTDShipLeaves, speed_frac), offsetof(OpenTTDShipLeaves, speed_property), offsetof(OpenTTDShipLeaves, age_property), offsetof(OpenTTDShipLeaves, update_visual), offsetof(OpenTTDShipLeaves, cache_invalidate), offsetof(OpenTTDShipLeaves, capacity), offsetof(OpenTTDShipLeaves, sprite_direction), offsetof(OpenTTDShipLeaves, tile_x), offsetof(OpenTTDShipLeaves, tile_y), offsetof(OpenTTDShipLeaves, build_flag), offsetof(OpenTTDShipLeaves, build_random), offsetof(OpenTTDShipLeaves, new_position), offsetof(OpenTTDShipLeaves, exit_dir), offsetof(OpenTTDShipLeaves, track_direction), offsetof(OpenTTDShipLeaves, tracks_reach), offsetof(OpenTTDShipLeaves, busy_tile), offsetof(OpenTTDShipLeaves, path_size), offsetof(OpenTTDShipLeaves, path_back), offsetof(OpenTTDShipLeaves, path_pop), offsetof(OpenTTDShipLeaves, path_clear), offsetof(OpenTTDShipLeaves, enter_tile), offsetof(OpenTTDShipLeaves, enter_depot), offsetof(OpenTTDShipLeaves, process_orders), offsetof(OpenTTDShipLeaves, loading), offsetof(OpenTTDShipLeaves, begin_loading), offsetof(OpenTTDShipLeaves, breakdown), offsetof(OpenTTDShipLeaves, viewport), offsetof(OpenTTDShipLeaves, base_viewport), offsetof(OpenTTDShipLeaves, visual), offsetof(OpenTTDShipLeaves, cache), offsetof(OpenTTDShipLeaves, play_sound), offsetof(OpenTTDShipLeaves, yapf_reverse), offsetof(OpenTTDShipLeaves, yapf_choose), offsetof(OpenTTDShipLeaves, update_delta), offsetof(OpenTTDShipLeaves, build_owner), offsetof(OpenTTDShipLeaves, build_z), offsetof(OpenTTDShipLeaves, build_properties), offsetof(OpenTTDShipLeaves, build_dates), offsetof(OpenTTDShipLeaves, build_acceleration), offsetof(OpenTTDShipLeaves, build_prototype), offsetof(OpenTTDShipLeaves, build_interval_percent), offsetof(OpenTTDShipLeaves, build_capacity), offsetof(OpenTTDShipLeaves, set_tile), offsetof(OpenTTDShipLeaves, set_x), offsetof(OpenTTDShipLeaves, set_y), offsetof(OpenTTDShipLeaves, set_z), offsetof(OpenTTDShipLeaves, set_direction), offsetof(OpenTTDShipLeaves, set_speed), offsetof(OpenTTDShipLeaves, set_tick), offsetof(OpenTTDShipLeaves, set_running), offsetof(OpenTTDShipLeaves, set_day), offsetof(OpenTTDShipLeaves, set_order_time), offsetof(OpenTTDShipLeaves, set_progress), offsetof(OpenTTDShipLeaves, set_last_station), offsetof(OpenTTDShipLeaves, set_hidden), offsetof(OpenTTDShipLeaves, set_max_speed), offsetof(OpenTTDShipLeaves, set_cargo_age), offsetof(OpenTTDShipLeaves, set_dest), offsetof(OpenTTDShipLeaves, tile), offsetof(OpenTTDShipLeaves, dest), offsetof(OpenTTDShipLeaves, x), offsetof(OpenTTDShipLeaves, y), offsetof(OpenTTDShipLeaves, z), offsetof(OpenTTDShipLeaves, direction), offsetof(OpenTTDShipLeaves, speed), offsetof(OpenTTDShipLeaves, tick), offsetof(OpenTTDShipLeaves, running), offsetof(OpenTTDShipLeaves, day), offsetof(OpenTTDShipLeaves, order_time), offsetof(OpenTTDShipLeaves, progress), offsetof(OpenTTDShipLeaves, status), offsetof(OpenTTDShipLeaves, owner), offsetof(OpenTTDShipLeaves, last_station), offsetof(OpenTTDShipLeaves, order_destination), offsetof(OpenTTDShipLeaves, order_type), offsetof(OpenTTDShipLeaves, order_max_speed), offsetof(OpenTTDShipLeaves, acceleration), offsetof(OpenTTDShipLeaves, max_speed), offsetof(OpenTTDShipLeaves, state_owner), offsetof(OpenTTDShipLeaves, patch), offsetof(OpenTTDShipLeaves, neighbours), offsetof(OpenTTDShipLeaves, next_depot)});
+	Layout(322, "OpenTTDShipReverseResult", {sizeof(OpenTTDShipReverseResult), alignof(OpenTTDShipReverseResult), offsetof(OpenTTDShipReverseResult, reverse), offsetof(OpenTTDShipReverseResult, trackdir)});
+	Layout(323, "OpenTTDShipDepot", {sizeof(OpenTTDShipDepot), alignof(OpenTTDShipDepot), offsetof(OpenTTDShipDepot, id), offsetof(OpenTTDShipDepot, tile), offsetof(OpenTTDShipDepot, owner), offsetof(OpenTTDShipDepot, ship)});
+	Layout(324, "OpenTTDShipTrackResult", {sizeof(OpenTTDShipTrackResult), alignof(OpenTTDShipTrackResult), offsetof(OpenTTDShipTrackResult, track), offsetof(OpenTTDShipTrackResult, found)});
+	Layout(325, "OpenTTDShipDepotResult", {sizeof(OpenTTDShipDepotResult), alignof(OpenTTDShipDepotResult), offsetof(OpenTTDShipDepotResult, tile), offsetof(OpenTTDShipDepotResult, id), offsetof(OpenTTDShipDepotResult, valid)});
 	Layout(0, "OpenTTDRustIntegerResult", {sizeof(OpenTTDRustIntegerResult), alignof(OpenTTDRustIntegerResult), offsetof(OpenTTDRustIntegerResult, value_bits), offsetof(OpenTTDRustIntegerResult, length), offsetof(OpenTTDRustIntegerResult, error_offset), offsetof(OpenTTDRustIntegerResult, error_length), offsetof(OpenTTDRustIntegerResult, error_kind)});
 	Layout(1, "OpenTTDRustUtf8Encoded", {sizeof(OpenTTDRustUtf8Encoded), alignof(OpenTTDRustUtf8Encoded), offsetof(OpenTTDRustUtf8Encoded, bytes), offsetof(OpenTTDRustUtf8Encoded, length)});
 	Layout(2, "OpenTTDRustUtf8Decoded", {sizeof(OpenTTDRustUtf8Decoded), alignof(OpenTTDRustUtf8Decoded), offsetof(OpenTTDRustUtf8Decoded, length), offsetof(OpenTTDRustUtf8Decoded, codepoint)});
@@ -1198,6 +1205,175 @@ static void Disasters()
 	std::printf("disaster_private_counter_direct_rng_delete_cancel passed\n");
 }
 
+
+/* Saves cannot observe NOSAVE rotation coordinates. Compare their full bit domain
+ * with native C++ narrowing, and exercise real nested owner mutation in a callback. */
+struct ShipProbe {
+	uint32_t x = 32768, y = static_cast<uint32_t>(-32769), dest = 0;
+	uint32_t order_time = UINT32_MAX;
+	uint8_t tick = 255, running = 255, direction = 1;
+	uint16_t speed = 33;
+	uint32_t stage = 0, paths = 0, positions = 0;
+	OpenTTDShipState *owner = nullptr;
+	const OpenTTDShipLeaves *leaves = nullptr;
+	OpenTTDSharedServices services{};
+};
+static ShipProbe ship_probe;
+template <typename Result, typename... Args>
+static Result ShipProbeUnused(Args...) noexcept
+{
+	if constexpr (!std::is_void_v<Result>) return {};
+}
+static void ShipBoundary()
+{
+	using Owner = std::unique_ptr<OpenTTDShipState, decltype(&openttd_rust_ship_state_destroy)>;
+	Owner state(openttd_rust_ship_state_new(), openttd_rust_ship_state_destroy);
+	CHECK(openttd_rust_ship_get_state(state.get()) == 0 && openttd_rust_ship_get_rotation(state.get()) == 255);
+	for (uint32_t value = 0; value <= UINT16_MAX; ++value) {
+		openttd_rust_ship_set_state(state.get(), static_cast<uint8_t>(value));
+		openttd_rust_ship_set_rotation(state.get(), static_cast<uint8_t>(value));
+		openttd_rust_ship_set_rotation_x(state.get(), static_cast<int16_t>(value));
+		openttd_rust_ship_set_rotation_y(state.get(), static_cast<int16_t>(value));
+		CHECK(openttd_rust_ship_get_state(state.get()) == static_cast<uint8_t>(value));
+		CHECK(openttd_rust_ship_get_rotation(state.get()) == static_cast<uint8_t>(value));
+		CHECK(openttd_rust_ship_get_rotation_x(state.get()) == static_cast<int16_t>(value));
+		CHECK(openttd_rust_ship_get_rotation_y(state.get()) == static_cast<int16_t>(value));
+	}
+	/* Initialize every function pointer, including paths unused in this concrete gap. */
+	OpenTTDShipLeaves leaves{
+		.depot_dir = ShipProbeUnused<uint32_t, uint32_t>, .depot_axis = ShipProbeUnused<uint32_t, uint32_t>,
+		.is_depot = ShipProbeUnused<bool, uint32_t>, .depot_index = ShipProbeUnused<uint32_t, uint32_t>,
+		.wait_unbunch = ShipProbeUnused<bool, uint32_t>, .chain_depot = ShipProbeUnused<bool, uint32_t>,
+		.servint = ShipProbeUnused<uint32_t, uint32_t>, .needs_service = ShipProbeUnused<bool, uint32_t>,
+		.max_distance = ShipProbeUnused<uint32_t>, .tile_valid = ShipProbeUnused<bool, uint32_t>,
+		.tile_type = ShipProbeUnused<uint32_t, uint32_t>, .water_class = ShipProbeUnused<uint32_t, uint32_t>,
+		.lock_middle = ShipProbeUnused<bool, uint32_t>, .lock_dir = ShipProbeUnused<uint32_t, uint32_t>,
+		.tile_min_z = ShipProbeUnused<uint32_t, uint32_t>, .tile_max_z = ShipProbeUnused<uint32_t, uint32_t>,
+		.track_status = ShipProbeUnused<uint32_t, uint32_t, uint32_t>, .offset = ShipProbeUnused<uint32_t, uint32_t>,
+		.diag_between = ShipProbeUnused<uint32_t, uint32_t, uint32_t>, .dist_square = ShipProbeUnused<uint32_t, uint32_t, uint32_t>,
+		.dist_manhattan = ShipProbeUnused<uint32_t, uint32_t, uint32_t>, .docking = ShipProbeUnused<bool, uint32_t>,
+		.dock = ShipProbeUnused<bool, uint32_t>, .dock_water = ShipProbeUnused<bool, uint32_t>,
+		.station = ShipProbeUnused<uint32_t, uint32_t>, .industry_station = ShipProbeUnused<uint32_t, uint32_t>,
+		.oilrig = ShipProbeUnused<bool, uint32_t>, .station_use = ShipProbeUnused<bool, uint32_t, uint32_t>,
+		.station_xy = ShipProbeUnused<uint32_t, uint32_t>, .station_contains = ShipProbeUnused<bool, uint32_t, uint32_t>,
+		.station_dock = ShipProbeUnused<bool, uint32_t>, .station_visits = ShipProbeUnused<uint32_t, uint32_t>,
+		.visit_set = ShipProbeUnused<void, uint32_t, uint32_t>, .arrival = ShipProbeUnused<void, uint32_t, uint32_t>,
+		.service = ShipProbeUnused<void, uint32_t>, .leave_unbunch = ShipProbeUnused<void, uint32_t>,
+		.path_result = ShipProbeUnused<void, uint32_t, bool>, .order_free = ShipProbeUnused<void, uint32_t>,
+		.order_dummy = ShipProbeUnused<void, uint32_t>, .order_depot = ShipProbeUnused<void, uint32_t, uint32_t>,
+		.order_leave = ShipProbeUnused<void, uint32_t>, .order_increment = ShipProbeUnused<void, uint32_t>,
+		.timetable = ShipProbeUnused<void, uint32_t>, .position = ShipProbeUnused<void, uint32_t>,
+		.start_dirty = ShipProbeUnused<void, uint32_t>, .depot_dirty = ShipProbeUnused<void, uint32_t>,
+		.depot_invalidate = ShipProbeUnused<void, uint32_t>, .ships_dirty = ShipProbeUnused<void>,
+		.details_dirty = ShipProbeUnused<void, uint32_t>, .age = ShipProbeUnused<void, uint32_t>,
+		.economy_age = ShipProbeUnused<void, uint32_t>, .decrease_value = ShipProbeUnused<void, uint32_t>,
+		.check_breakdown = ShipProbeUnused<void, uint32_t>, .check_orders = ShipProbeUnused<void, uint32_t>,
+		.running_cost = ShipProbeUnused<int64_t, uint32_t>, .cost_divisor = ShipProbeUnused<uint32_t>,
+		.pay_running = ShipProbeUnused<void, uint32_t, int64_t>, .speed_default = ShipProbeUnused<uint32_t, uint32_t>,
+		.age_default = ShipProbeUnused<uint32_t, uint32_t>, .speed_frac = ShipProbeUnused<uint32_t, uint32_t, bool>,
+		.speed_property = ShipProbeUnused<uint32_t, uint32_t, uint32_t>, .age_property = ShipProbeUnused<uint32_t, uint32_t, uint32_t>,
+		.update_visual = ShipProbeUnused<void, uint32_t>, .cache_invalidate = ShipProbeUnused<void, uint32_t>,
+		.capacity = ShipProbeUnused<uint32_t, uint32_t>, .sprite_direction = ShipProbeUnused<void, uint32_t>,
+		.tile_x = ShipProbeUnused<uint32_t, uint32_t>, .tile_y = ShipProbeUnused<uint32_t, uint32_t>,
+		.build_flag = ShipProbeUnused<bool, uint32_t>, .build_random = ShipProbeUnused<void, uint32_t, uint16_t>,
+		.new_position = ShipProbeUnused<OpenTTDShipPosition, uint32_t>, .exit_dir = ShipProbeUnused<uint32_t, uint32_t, uint32_t>,
+		.track_direction = ShipProbeUnused<uint32_t, uint32_t, uint32_t>, .tracks_reach = ShipProbeUnused<uint32_t, uint32_t>,
+		.busy_tile = ShipProbeUnused<bool, uint32_t>, .path_size = ShipProbeUnused<size_t, uint32_t>,
+		.path_back = ShipProbeUnused<uint32_t, uint32_t>, .path_pop = ShipProbeUnused<void, uint32_t>,
+		.path_clear = ShipProbeUnused<void, uint32_t>, .enter_tile = ShipProbeUnused<uint32_t, uint32_t, uint32_t, uint32_t, uint32_t>,
+		.enter_depot = ShipProbeUnused<void, uint32_t>, .process_orders = ShipProbeUnused<bool, uint32_t>,
+		.loading = ShipProbeUnused<void, uint32_t>, .begin_loading = ShipProbeUnused<void, uint32_t>,
+		.breakdown = ShipProbeUnused<bool, uint32_t>, .viewport = ShipProbeUnused<void, uint32_t, bool, bool>,
+		.base_viewport = ShipProbeUnused<void, uint32_t>, .visual = ShipProbeUnused<void, uint32_t>,
+		.cache = ShipProbeUnused<void, uint32_t>, .play_sound = ShipProbeUnused<void, uint32_t>,
+		.yapf_reverse = ShipProbeUnused<OpenTTDShipReverseResult, uint32_t, bool>, .yapf_choose = ShipProbeUnused<OpenTTDShipTrackResult, uint32_t, uint32_t>,
+		.update_delta = ShipProbeUnused<void, uint32_t>, .build_owner = ShipProbeUnused<void, uint32_t>,
+		.build_z = ShipProbeUnused<void, uint32_t>, .build_properties = ShipProbeUnused<void, uint32_t, uint32_t>,
+		.build_dates = ShipProbeUnused<void, uint32_t>, .build_acceleration = ShipProbeUnused<void, uint32_t, uint32_t>,
+		.build_prototype = ShipProbeUnused<void, uint32_t>, .build_interval_percent = ShipProbeUnused<void, uint32_t>,
+		.build_capacity = ShipProbeUnused<void, uint32_t, uint32_t>, .set_tile = ShipProbeUnused<void, uint32_t, uint32_t>,
+		.set_x = ShipProbeUnused<void, uint32_t, int32_t>, .set_y = ShipProbeUnused<void, uint32_t, int32_t>,
+		.set_z = ShipProbeUnused<void, uint32_t, int32_t>, .set_direction = ShipProbeUnused<void, uint32_t, uint8_t>,
+		.set_speed = ShipProbeUnused<void, uint32_t, uint16_t>, .set_tick = ShipProbeUnused<void, uint32_t, uint8_t>,
+		.set_running = ShipProbeUnused<void, uint32_t, uint8_t>, .set_day = ShipProbeUnused<void, uint32_t, uint8_t>,
+		.set_order_time = ShipProbeUnused<void, uint32_t, int32_t>, .set_progress = ShipProbeUnused<void, uint32_t, uint8_t>,
+		.set_last_station = ShipProbeUnused<void, uint32_t, uint16_t>, .set_hidden = ShipProbeUnused<void, uint32_t, bool>,
+		.set_max_speed = ShipProbeUnused<void, uint32_t, uint16_t>, .set_cargo_age = ShipProbeUnused<void, uint32_t, uint16_t>,
+		.set_dest = ShipProbeUnused<void, uint32_t, uint32_t>, .tile = ShipProbeUnused<uint32_t, uint32_t>,
+		.dest = ShipProbeUnused<uint32_t, uint32_t>, .x = ShipProbeUnused<uint32_t, uint32_t>,
+		.y = ShipProbeUnused<uint32_t, uint32_t>, .z = ShipProbeUnused<uint32_t, uint32_t>,
+		.direction = ShipProbeUnused<uint32_t, uint32_t>, .speed = ShipProbeUnused<uint32_t, uint32_t>,
+		.tick = ShipProbeUnused<uint32_t, uint32_t>, .running = ShipProbeUnused<uint32_t, uint32_t>,
+		.day = ShipProbeUnused<uint32_t, uint32_t>, .order_time = ShipProbeUnused<uint32_t, uint32_t>,
+		.progress = ShipProbeUnused<uint32_t, uint32_t>, .status = ShipProbeUnused<uint32_t, uint32_t>,
+		.owner = ShipProbeUnused<uint32_t, uint32_t>, .last_station = ShipProbeUnused<uint32_t, uint32_t>,
+		.order_destination = ShipProbeUnused<uint32_t, uint32_t>, .order_type = ShipProbeUnused<uint32_t, uint32_t>,
+		.order_max_speed = ShipProbeUnused<uint32_t, uint32_t>, .acceleration = ShipProbeUnused<uint32_t, uint32_t>,
+		.max_speed = ShipProbeUnused<uint32_t, uint32_t>, .state_owner = ShipProbeUnused<OpenTTDShipState *, uint32_t>,
+		.patch = ShipProbeUnused<OpenTTDWaterPatch, uint32_t>, .neighbours = ShipProbeUnused<size_t, OpenTTDWaterPatch, OpenTTDWaterPatch *>,
+		.next_depot = ShipProbeUnused<bool, uint32_t, OpenTTDShipDepot *>
+	};
+	ship_probe = {};
+	ship_probe.owner = state.get();
+	ship_probe.leaves = &leaves;
+	ship_probe.services = {
+		nullptr, ShipProbeUnused<uint32_t, void *>, ShipProbeUnused<void, void *, uint32_t, uint32_t *>,
+		ShipProbeUnused<void, void *, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t>,
+		ShipProbeUnused<float, uint32_t, float>, ShipProbeUnused<uint32_t, int32_t, int32_t, uint32_t *>,
+	};
+	leaves.state_owner = [](uint32_t) noexcept { return ship_probe.owner; };
+	leaves.x = [](uint32_t) noexcept { return static_cast<uint32_t>(ship_probe.x); };
+	leaves.y = [](uint32_t) noexcept { return static_cast<uint32_t>(ship_probe.y); };
+	leaves.dest = [](uint32_t) noexcept { return static_cast<uint32_t>(ship_probe.dest); };
+	leaves.order_time = [](uint32_t) noexcept { return static_cast<uint32_t>(ship_probe.order_time); };
+	leaves.tick = [](uint32_t) noexcept { return static_cast<uint32_t>(ship_probe.tick); };
+	leaves.running = [](uint32_t) noexcept { return static_cast<uint32_t>(ship_probe.running); };
+	leaves.direction = [](uint32_t) noexcept { return static_cast<uint32_t>(ship_probe.direction); };
+	leaves.speed = [](uint32_t) noexcept { return static_cast<uint32_t>(ship_probe.speed); };
+	leaves.set_tick = [](uint32_t, uint8_t value) noexcept { ship_probe.tick = value; };
+	leaves.set_running = [](uint32_t, uint8_t value) noexcept { ship_probe.running = value; };
+	leaves.set_order_time = [](uint32_t, int32_t value) noexcept { ship_probe.order_time = static_cast<uint32_t>(value); };
+	leaves.set_direction = [](uint32_t, uint8_t value) noexcept { ship_probe.direction = value; };
+	leaves.set_speed = [](uint32_t, uint16_t value) noexcept { ship_probe.speed = value; };
+	leaves.set_dest = [](uint32_t, uint32_t value) noexcept { ship_probe.dest = value; };
+	leaves.path_clear = [](uint32_t) noexcept { ++ship_probe.paths; };
+	leaves.position = [](uint32_t) noexcept { ++ship_probe.positions; };
+	leaves.breakdown = [](uint32_t) noexcept {
+		CHECK(ship_probe.stage++ == 0);
+		CHECK(ship_probe.tick == 0 && ship_probe.running == 0 && ship_probe.order_time == 0);
+		return false;
+	};
+	leaves.process_orders = [](uint32_t) noexcept { CHECK(ship_probe.stage++ == 1); return true; };
+	leaves.yapf_reverse = [](uint32_t, bool trackdir) noexcept {
+		CHECK(ship_probe.stage++ == 2 && !trackdir);
+		return OpenTTDShipReverseResult{true, 255};
+	};
+	leaves.viewport = [](uint32_t id, bool update_delta, bool force) noexcept {
+		CHECK(ship_probe.stage++ == 3 && update_delta && force);
+		CHECK(ship_probe.direction == 5 && ship_probe.speed == 0 && ship_probe.paths == 1 && ship_probe.positions == 1);
+		CHECK(openttd_rust_ship_get_rotation_x(ship_probe.owner) == static_cast<int16_t>(ship_probe.x));
+		CHECK(openttd_rust_ship_get_rotation_y(ship_probe.owner) == static_cast<int16_t>(ship_probe.y));
+		/* The outer call holds no Rust reference to this owner during nested mutation. */
+		openttd_rust_ship_destination(id, 17, ship_probe.leaves, &ship_probe.services);
+		CHECK(ship_probe.dest == 17 && ship_probe.paths == 2);
+		openttd_rust_ship_set_rotation(ship_probe.owner, 3);
+	};
+	CHECK(openttd_rust_ship_tick(4, &leaves, &ship_probe.services));
+	CHECK(ship_probe.stage == 4 && openttd_rust_ship_get_rotation(state.get()) == 3);
+	CHECK(!openttd_rust_ship_find_depot(4, 80, &leaves, &ship_probe.services).valid);
+	leaves.owner = [](uint32_t) noexcept { return uint32_t{3}; };
+	leaves.next_depot = [](uint32_t first, OpenTTDShipDepot *out) noexcept {
+		if (first != 0) return false;
+		*out = {0x1234, 0x80000017, 3, 1};
+		return true;
+	};
+	leaves.dist_square = [](uint32_t, uint32_t) noexcept { return uint32_t{49}; };
+	auto depot = openttd_rust_ship_find_depot(4, 80, &leaves, &ship_probe.services);
+	CHECK(depot.valid && depot.tile == 0x80000017 && depot.id == 0x1234);
+	state.reset(openttd_rust_ship_state_new());
+	CHECK(openttd_rust_ship_get_rotation_x(state.get()) == 0 && openttd_rust_ship_get_rotation(state.get()) == 255);
+	std::printf("ship scalar widths, native transient narrowing, direct order and nested owner mutation passed\n");
+}
 static void AircraftOwnership()
 {
 	std::unique_ptr<OpenTTDAircraftState, decltype(&openttd_rust_aircraft_state_destroy)> state{openttd_rust_aircraft_state_new(), openttd_rust_aircraft_state_destroy};
@@ -1212,6 +1388,7 @@ static void AircraftOwnership()
 int main()
 {
 	Layouts();
+	ShipBoundary();
 	RoadBoundary();
 	RoadServiceBoundary();
 	WaterProbe::Run([](bool result) { CHECK(result); });

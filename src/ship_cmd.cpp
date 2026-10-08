@@ -40,6 +40,10 @@
 
 #include <unordered_set>
 
+#ifdef WITH_RUST
+#include "rust/services_ffi.h"
+static const OpenTTDShipLeaves &GetShipServices();
+#endif
 #include "safeguards.h"
 
 /** Max distance in tiles (as the crow flies) to search for depots when user clicks "go to depot". */
@@ -134,7 +138,7 @@ void Ship::GetImage(Direction direction, EngineImageType image_type, VehicleSpri
 {
 	uint8_t spritenum = this->spritenum;
 
-	if (image_type == EIT_ON_MAP) direction = this->rotation;
+	if (image_type == EIT_ON_MAP) direction = this->GetRotation();
 
 	if (IsCustomVehicleSpriteNum(spritenum)) {
 		GetCustomVehicleSprite(this, direction, image_type, result);
@@ -147,6 +151,7 @@ void Ship::GetImage(Direction direction, EngineImageType image_type, VehicleSpri
 	result->Set(_ship_sprites[spritenum] + direction);
 }
 
+#ifndef WITH_RUST
 static const Depot *FindClosestShipDepot(const Vehicle *v, uint max_distance)
 {
 	const int max_region_distance = (max_distance / WATER_REGION_EDGE_LENGTH) + 1;
@@ -225,11 +230,16 @@ static void CheckIfShipNeedsService(Vehicle *v)
 	SetWindowWidgetDirty(WC_VEHICLE_VIEW, v->index, WID_VV_START_STOP);
 }
 
+#endif
+
 /**
  * Update the caches of this ship.
  */
 void Ship::UpdateCache()
 {
+#ifdef WITH_RUST
+	openttd_rust_ship_cache(this->index.base(), &GetShipServices(), &GetRustSharedServices());
+#else
 	const ShipVehicleInfo *svi = ShipVehInfo(this->engine_type);
 
 	/* Get speed fraction for the current water type. Aqueducts are always canals. */
@@ -241,6 +251,7 @@ void Ship::UpdateCache()
 	this->vcache.cached_cargo_age_period = GetVehicleProperty(this, PROP_SHIP_CARGO_AGE_PERIOD, EngInfo(this->engine_type)->cargo_age_period);
 
 	this->UpdateVisualEffect();
+#endif
 }
 
 Money Ship::GetRunningCost() const
@@ -253,12 +264,19 @@ Money Ship::GetRunningCost() const
 /** Calendar day handler. */
 void Ship::OnNewCalendarDay()
 {
+#ifdef WITH_RUST
+	openttd_rust_ship_calendar_day(this->index.base(), &GetShipServices(), &GetRustSharedServices());
+#else
 	AgeVehicle(this);
+#endif
 }
 
 /** Economy day handler. */
 void Ship::OnNewEconomyDay()
 {
+#ifdef WITH_RUST
+	openttd_rust_ship_economy_day(this->index.base(), &GetShipServices(), &GetRustSharedServices());
+#else
 	EconomyAgeVehicle(this);
 
 	if ((++this->day_counter & 7) == 0) {
@@ -282,10 +300,14 @@ void Ship::OnNewEconomyDay()
 	SetWindowDirty(WC_VEHICLE_DETAILS, this->index);
 	/* we need this for the profit */
 	SetWindowClassesDirty(WC_SHIPS_LIST);
+#endif
 }
 
 Trackdir Ship::GetVehicleTrackdir() const
 {
+#ifdef WITH_RUST
+	return static_cast<Trackdir>(openttd_rust_ship_trackdir(this->index.base(), &GetShipServices(), &GetRustSharedServices()));
+#else
 	if (this->vehstatus.Test(VehState::Crashed)) return INVALID_TRACKDIR;
 
 	if (this->IsInDepot()) {
@@ -299,6 +321,7 @@ Trackdir Ship::GetVehicleTrackdir() const
 	}
 
 	return TrackDirectionToTrackdir(FindFirstTrack(this->state), this->direction);
+#endif
 }
 
 void Ship::MarkDirty()
@@ -316,6 +339,9 @@ void Ship::PlayLeaveStationSound(bool force) const
 
 TileIndex Ship::GetOrderStationLocation(StationID station)
 {
+#ifdef WITH_RUST
+	return TileIndex(static_cast<uint32_t>(openttd_rust_ship_station_destination(this->index.base(), station.base(), &GetShipServices(), &GetRustSharedServices())));
+#else
 	if (station == this->last_station_visited) this->last_station_visited = StationID::Invalid();
 
 	const Station *st = Station::Get(station);
@@ -325,6 +351,7 @@ TileIndex Ship::GetOrderStationLocation(StationID station)
 		this->IncrementRealOrderIndex();
 		return TileIndex{};
 	}
+#endif
 }
 
 void Ship::UpdateDeltaXY()
@@ -340,18 +367,19 @@ void Ship::UpdateDeltaXY()
 		{{ -3, -16, 0}, { 6, 32, 6}, {}}, // NW
 	};
 
-	this->bounds = ship_bounds[this->rotation];
+	this->bounds = ship_bounds[this->GetRotation()];
 
-	if (this->direction != this->rotation) {
+	if (this->direction != this->GetRotation()) {
 		/* If we are rotating, then it is possible the ship was moved to its next position. In that
 		 * case, because we are still showing the old direction, the ship will appear to glitch sideways
 		 * slightly. We can work around this by applying an additional offset to make the ship appear
 		 * where it was before it moved. */
-		this->bounds.origin.x -= this->x_pos - this->rotation_x_pos;
-		this->bounds.origin.y -= this->y_pos - this->rotation_y_pos;
+		this->bounds.origin.x -= this->x_pos - this->GetRotationX();
+		this->bounds.origin.y -= this->y_pos - this->GetRotationY();
 	}
 }
 
+#ifndef WITH_RUST
 static bool CheckReverseShip(const Ship *v, Trackdir *trackdir = nullptr)
 {
 	/* Ask pathfinder for best direction */
@@ -391,7 +419,7 @@ static bool CheckShipStayInDepot(Ship *v)
 	if (CheckReverseShip(v)) v->direction = ReverseDir(v->direction);
 
 	v->state = AxisToTrackBits(GetShipDepotAxis(v->tile));
-	v->rotation = v->direction;
+	v->SetRotation(v->direction);
 	v->vehstatus.Reset(VehState::Hidden);
 	v->cur_speed = 0;
 	v->UpdateViewport(true, true);
@@ -836,8 +864,18 @@ static void ShipController(Ship *v)
 	}
 }
 
+#endif
+
+#ifdef WITH_RUST
+bool IsShipDestinationTile(TileIndex tile, StationID station) { return openttd_rust_ship_is_destination( tile.base(), station.base(), &GetShipServices(), &GetRustSharedServices()); }
+#endif
+
 bool Ship::Tick()
 {
+#ifdef WITH_RUST
+	PerformanceAccumulator framerate(PFE_GL_SHIPS);
+	return openttd_rust_ship_tick(this->index.base(), &GetShipServices(), &GetRustSharedServices());
+#else
 	PerformanceAccumulator framerate(PFE_GL_SHIPS);
 
 	if (!this->vehstatus.Test(VehState::Stopped)) this->running_ticks++;
@@ -845,13 +883,18 @@ bool Ship::Tick()
 	ShipController(this);
 
 	return true;
+#endif
 }
 
 void Ship::SetDestTile(TileIndex tile)
 {
+#ifdef WITH_RUST
+	openttd_rust_ship_destination(this->index.base(), tile.base(), &GetShipServices(), &GetRustSharedServices());
+#else
 	if (tile == this->dest_tile) return;
 	this->path.clear();
 	this->dest_tile = tile;
+#endif
 }
 
 /**
@@ -864,6 +907,16 @@ void Ship::SetDestTile(TileIndex tile)
  */
 CommandCost CmdBuildShip(DoCommandFlags flags, TileIndex tile, const Engine *e, Vehicle **ret)
 {
+#ifdef WITH_RUST
+	tile = GetShipDepotNorthTile(tile);
+	if (flags.Test(DoCommandFlag::Execute)) {
+		Ship *v = new Ship();
+		*ret = v;
+		v->tile = tile;
+		openttd_rust_ship_build(v->index.base(), e->index.base(), &GetShipServices(), &GetRustSharedServices());
+	}
+	return CommandCost();
+#else
 	tile = GetShipDepotNorthTile(tile);
 	if (flags.Test(DoCommandFlag::Execute)) {
 		int x;
@@ -885,7 +938,7 @@ CommandCost CmdBuildShip(DoCommandFlags flags, TileIndex tile, const Engine *e, 
 		v->direction = DiagDirToDir(GetShipDepotDirection(tile));
 
 		/* UpdateDeltaXY() requires rotation to be initialised as well. */
-		v->rotation = v->direction;
+		v->SetRotation(v->direction);
 		v->UpdateDeltaXY();
 
 		v->vehstatus = {VehState::Hidden, VehState::Stopped, VehState::DefaultPalette};
@@ -904,7 +957,7 @@ CommandCost CmdBuildShip(DoCommandFlags flags, TileIndex tile, const Engine *e, 
 		v->reliability_spd_dec = e->reliability_spd_dec;
 		v->max_age = e->GetLifeLengthInDays();
 
-		v->state = TRACK_BIT_DEPOT;
+		v->SetState(TRACK_BIT_DEPOT);
 
 		v->SetServiceInterval(Company::Get(_current_company)->settings.vehicle.servint_ships);
 		v->date_of_last_service = TimerGameEconomy::date;
@@ -929,12 +982,22 @@ CommandCost CmdBuildShip(DoCommandFlags flags, TileIndex tile, const Engine *e, 
 	}
 
 	return CommandCost();
+#endif
 }
 
 ClosestDepot Ship::FindClosestDepot()
 {
+#ifdef WITH_RUST
+	auto depot = openttd_rust_ship_find_depot(this->index.base(), MAX_SHIP_DEPOT_SEARCH_DISTANCE, &GetShipServices(), &GetRustSharedServices());
+	return depot.valid ? ClosestDepot(TileIndex(depot.tile), DepotID(depot.id)) : ClosestDepot();
+#else
 	const Depot *depot = FindClosestShipDepot(this, MAX_SHIP_DEPOT_SEARCH_DISTANCE);
 	if (depot == nullptr) return ClosestDepot();
 
 	return ClosestDepot(depot->xy, depot->index);
+#endif
 }
+
+#ifdef WITH_RUST
+#include "rust/ship_control_services.h"
+#endif
