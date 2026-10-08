@@ -61,6 +61,25 @@ static bool OrdersScenario(std::span<std::string_view> args)
 		company.Restore();
 		return true;
 	}
+	if (args[1] == "implicit-wrap") {
+		Order station;
+		for (const Order &order : v->Orders()) if (order.IsType(OT_GOTO_STATION)) { station = order; break; }
+		if (!station.IsType(OT_GOTO_STATION)) std::abort();
+		CheckCommand("implicit-clear", Command<CMD_DELETE_ORDER>::Do(DoCommandFlag::Execute, v->index, VehicleOrderID(255)));
+		if (!OrderList::CanAllocateItem()) std::abort();
+		Order implicit;
+		implicit.MakeImplicit(station.GetDestination().ToStationID());
+		InsertOrder(v, Order(implicit), 0);
+		InsertOrder(v, Order(station), 1);
+		InsertOrder(v, Order(implicit), 2);
+		v->cur_implicit_order_index = 2;
+		v->cur_real_order_index = 1;
+		ClrBit(v->GetGroundVehicleFlags(), GVF_SUPPRESS_IMPLICIT_ORDERS);
+		v->DeleteUnreachedImplicitOrders();
+		State("implicit-wrap", v);
+		company.Restore();
+		return true;
+	}
 	if (args[1] == "setup") {
 		if (!v->IsInDepot()) std::abort();
 		/* Retain the player's legal station destinations before detaching the list. */

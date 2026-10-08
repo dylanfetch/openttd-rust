@@ -127,14 +127,17 @@ impl Vector {
         unsafe {
             self.reserve(size);
         }
-        if size < self.length {
-            // Each vacated slot is reinitialized for subsequent vector growth.
-            // Order is trivially destructible; no selected gameplay occurs here.
+        if size > self.length {
+            // Capacity slots stay live after logical erasure. The original's
+            // DeleteUnreachedImplicitOrders keeps a span across erase and reads
+            // the retained last slot on wraparound; preserve those bytes until
+            // a subsequent resize exposes the slot with its default value.
+            // Order destruction/construction is trivial and cannot reenter.
             unsafe {
-                (self.destroy)(self.data().add(size).cast(), self.length - size);
+                (self.destroy)(self.data().add(self.length).cast(), size - self.length);
             }
             unsafe {
-                (self.construct)(self.data().add(size).cast(), self.length - size);
+                (self.construct)(self.data().add(self.length).cast(), size - self.length);
             }
         }
         self.length = size;
@@ -2489,12 +2492,22 @@ impl Control {
             g.service_invalidate_order(v, 0);
             return;
         }
+        let list = g.orders(v);
+        let orders = if list.is_null() {
+            ptr::null_mut()
+        } else {
+            unsafe { (*g.vector(list)).data() }
+        };
         let mut current = unsafe { (*state).implicit };
         while current != u8::MAX {
             if unsafe { (*state).implicit == (*state).real } {
                 break;
             }
-            if g.vehicle_order(v, current).unwrap().kind() == 8 {
+            // Match the original captured span and unchanged local index after
+            // DeleteOrder. Erasure never reallocates; all capacity slots remain
+            // typed/live, including the retained former last order. No reference
+            // or borrow crosses the deletion/window callbacks.
+            if unsafe { orders.add(usize::from(current)).read() }.kind() == 8 {
                 self.delete(v, unsafe { (*state).implicit });
             } else {
                 let next = g.next_index(g.orders(v), current);
