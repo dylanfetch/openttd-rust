@@ -2120,16 +2120,17 @@ pub unsafe extern "C" fn openttd_rust_order_depot(
     destination: u16,
     depot_type: u8,
     nonstop: u8,
-    action_cargo: u16,
+    action: u8,
+    cargo: u8,
 ) -> u32 {
     let mut order = unsafe { p.read() };
     {
         order.kind = 2;
         order.flags = (order.flags & !7) | (depot_type & 7);
-        order.flags = (order.flags & !0x78) | ((action_cargo as u8 & 15) << 3);
+        order.flags = (order.flags & !0x78) | ((action & 15) << 3);
         order.kind = (order.kind & !0xc0) | ((nonstop & 3) << 6);
         order.destination = destination;
-        order.refit = (action_cargo >> 8) as u8;
+        order.refit = cargo;
     };
     unsafe {
         p.write(order);

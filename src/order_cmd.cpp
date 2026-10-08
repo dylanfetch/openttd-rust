@@ -840,7 +840,7 @@ void Order::MakeGoToStation(StationID destination)
 void Order::MakeGoToDepot(DestinationID destination, OrderDepotTypeFlags order, OrderNonStopFlags non_stop_type, OrderDepotActionFlags action, CargoType cargo)
 {
 #ifdef WITH_RUST
-	openttd_rust_order_depot(this, destination.base(), order.base(), non_stop_type.base(), action.base() | (cargo << 8));
+	openttd_rust_order_depot(this, destination.base(), order.base(), non_stop_type.base(), action.base(), cargo);
 #else
 	this->type = OT_GOTO_DEPOT;
 	this->SetDepotOrderType(order);

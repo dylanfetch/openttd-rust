@@ -184,7 +184,7 @@ uint32_t openttd_rust_wait_unbunching(void *, const OpenTTDOrdersLeaves *);
 uint32_t openttd_rust_measure_unbunching(void *, const OpenTTDOrdersLeaves *);
 uint32_t openttd_rust_order_free(void *);
 uint32_t openttd_rust_order_station(void *, uint16_t);
-uint32_t openttd_rust_order_depot(void *, uint16_t, uint8_t, uint8_t, uint16_t);
+uint32_t openttd_rust_order_depot(void *, uint16_t, uint8_t, uint8_t, uint8_t, uint8_t);
 uint32_t openttd_rust_order_waypoint(void *, uint16_t);
 uint32_t openttd_rust_order_loading(void *, uint8_t);
 uint32_t openttd_rust_order_leave(void *);
