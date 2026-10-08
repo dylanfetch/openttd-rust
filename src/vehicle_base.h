@@ -828,7 +828,7 @@ private:
 	void SkipToNextRealOrderIndex()
 	{
 #ifdef WITH_RUST
-	openttd_rust_orders_vehicle(1, this, 0, &GetRustOrdersLeaves());
+	openttd_rust_skip_real(this, &GetRustOrdersLeaves());
 #else
 		if (this->GetNumManualOrders() > 0) {
 			/* Advance to next real order */
@@ -851,7 +851,7 @@ public:
 	void IncrementImplicitOrderIndex()
 	{
 #ifdef WITH_RUST
-	openttd_rust_orders_vehicle(2, this, 0, &GetRustOrdersLeaves());
+	openttd_rust_increment_implicit(this, &GetRustOrdersLeaves());
 #else
 		if (this->cur_implicit_order_index == this->cur_real_order_index) {
 			/* Increment real order index as well */
@@ -879,7 +879,7 @@ public:
 	void IncrementRealOrderIndex()
 	{
 #ifdef WITH_RUST
-	openttd_rust_orders_vehicle(3, this, 0, &GetRustOrdersLeaves());
+	openttd_rust_increment_real(this, &GetRustOrdersLeaves());
 #else
 		if (this->cur_implicit_order_index == this->cur_real_order_index) {
 			/* Increment both real and implicit order */
@@ -898,7 +898,7 @@ public:
 	void UpdateRealOrderIndex()
 	{
 #ifdef WITH_RUST
-	openttd_rust_orders_vehicle(0, this, 0, &GetRustOrdersLeaves());
+	openttd_rust_update_real(this, &GetRustOrdersLeaves());
 #else
 		/* Make sure the index is valid */
 		if (this->cur_real_order_index >= this->GetNumOrders()) this->cur_real_order_index = 0;

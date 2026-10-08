@@ -143,7 +143,7 @@ static void ChangeTimetable(Vehicle *v, VehicleOrderID order_number, uint16_t va
 CommandCost CmdChangeTimetable(DoCommandFlags flags, VehicleID veh, VehicleOrderID order_number, ModifyTimetableFlags mtf, uint16_t data)
 {
 #ifdef WITH_RUST
-	CommandCost result; openttd_rust_orders_timetable(0, Vehicle::GetIfValid(veh), flags.Test(DoCommandFlag::Execute), order_number, mtf, data, &result, &GetRustOrdersLeaves()); return result;
+	CommandCost result; openttd_rust_timetable_change(Vehicle::GetIfValid(veh), flags.Test(DoCommandFlag::Execute), order_number, mtf, data, &result, &GetRustOrdersLeaves()); return result;
 #else
 	Vehicle *v = Vehicle::GetIfValid(veh);
 	if (v == nullptr || !v->IsPrimaryVehicle()) return CMD_ERROR;
@@ -242,7 +242,7 @@ CommandCost CmdChangeTimetable(DoCommandFlags flags, VehicleID veh, VehicleOrder
 CommandCost CmdBulkChangeTimetable(DoCommandFlags flags, VehicleID veh, ModifyTimetableFlags mtf, uint16_t data)
 {
 #ifdef WITH_RUST
-	CommandCost result; RunRustOrders(7, Vehicle::GetIfValid(veh), mtf, data, flags.Test(DoCommandFlag::Execute), nullptr, &result); return result;
+	CommandCost result; openttd_rust_timetable_bulk(Vehicle::GetIfValid(veh), mtf, data, flags.Test(DoCommandFlag::Execute), &result, &GetRustOrdersLeaves()); return result;
 #else
 	Vehicle *v = Vehicle::GetIfValid(veh);
 	if (v == nullptr || !v->IsPrimaryVehicle()) return CMD_ERROR;
@@ -277,7 +277,7 @@ CommandCost CmdBulkChangeTimetable(DoCommandFlags flags, VehicleID veh, ModifyTi
 CommandCost CmdSetVehicleOnTime(DoCommandFlags flags, VehicleID veh, bool apply_to_group)
 {
 #ifdef WITH_RUST
-	CommandCost result; openttd_rust_orders_timetable(2, Vehicle::GetIfValid(veh), flags.Test(DoCommandFlag::Execute), apply_to_group, 0, 0, &result, &GetRustOrdersLeaves()); return result;
+	CommandCost result; openttd_rust_timetable_on_time(Vehicle::GetIfValid(veh), flags.Test(DoCommandFlag::Execute), apply_to_group, &result, &GetRustOrdersLeaves()); return result;
 #else
 	Vehicle *v = Vehicle::GetIfValid(veh);
 	if (v == nullptr || !v->IsPrimaryVehicle() || v->orders == nullptr) return CMD_ERROR;
@@ -375,7 +375,7 @@ static bool VehicleTimetableSorter(Vehicle * const &a, Vehicle * const &b)
 CommandCost CmdSetTimetableStart(DoCommandFlags flags, VehicleID veh_id, bool timetable_all, TimerGameTick::TickCounter start_tick)
 {
 #ifdef WITH_RUST
-	CommandCost result; openttd_rust_orders_timetable(3, Vehicle::GetIfValid(veh_id), flags.Test(DoCommandFlag::Execute), timetable_all, start_tick, 0, &result, &GetRustOrdersLeaves()); return result;
+	CommandCost result; openttd_rust_timetable_start(Vehicle::GetIfValid(veh_id), flags.Test(DoCommandFlag::Execute), timetable_all, start_tick, &result, &GetRustOrdersLeaves()); return result;
 #else
 	Vehicle *v = Vehicle::GetIfValid(veh_id);
 	if (v == nullptr || !v->IsPrimaryVehicle() || v->orders == nullptr) return CMD_ERROR;
@@ -453,7 +453,7 @@ CommandCost CmdSetTimetableStart(DoCommandFlags flags, VehicleID veh_id, bool ti
 CommandCost CmdAutofillTimetable(DoCommandFlags flags, VehicleID veh, bool autofill, bool preserve_wait_time)
 {
 #ifdef WITH_RUST
-	CommandCost result; openttd_rust_orders_timetable(4, Vehicle::GetIfValid(veh), flags.Test(DoCommandFlag::Execute), autofill, preserve_wait_time, 0, &result, &GetRustOrdersLeaves()); return result;
+	CommandCost result; openttd_rust_timetable_autofill(Vehicle::GetIfValid(veh), flags.Test(DoCommandFlag::Execute), autofill, preserve_wait_time, &result, &GetRustOrdersLeaves()); return result;
 #else
 	Vehicle *v = Vehicle::GetIfValid(veh);
 	if (v == nullptr || !v->IsPrimaryVehicle() || v->orders == nullptr) return CMD_ERROR;
@@ -501,7 +501,7 @@ CommandCost CmdAutofillTimetable(DoCommandFlags flags, VehicleID veh, bool autof
 void UpdateVehicleTimetable(Vehicle *v, bool travelling)
 {
 #ifdef WITH_RUST
-	openttd_rust_orders_timetable(5, v, 0, travelling, 0, 0, nullptr, &GetRustOrdersLeaves());
+	openttd_rust_timetable_update(v, travelling, &GetRustOrdersLeaves());
 #else
 	TimerGameTick::Ticks time_taken = v->current_order_time;
 

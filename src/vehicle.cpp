@@ -1639,7 +1639,7 @@ void VehicleEnterDepot(Vehicle *v)
 		}
 
 #ifdef WITH_RUST
-		openttd_rust_orders_vehicle(7, v, 0, &GetRustOrdersLeaves());
+		openttd_rust_measure_unbunching(v, &GetRustOrdersLeaves());
 #else
 		/* If we've entered our unbunching depot, record the round trip duration. */
 		if (v->current_order.GetDepotActionType().Test(OrderDepotActionFlag::Unbunch) && v->depot_unbunching_last_departure > 0) {
@@ -2149,7 +2149,7 @@ PaletteID GetVehiclePalette(const Vehicle *v)
 void Vehicle::DeleteUnreachedImplicitOrders()
 {
 #ifdef WITH_RUST
-	RunRustOrders(6, this);
+	openttd_rust_delete_implicit(this, &GetRustOrdersLeaves());
 #else
 	if (this->IsGroundVehicle()) {
 		uint16_t &gv_flags = this->GetGroundVehicleFlags();
@@ -2194,7 +2194,7 @@ void Vehicle::BeginLoading()
 
 	TimerGameTick::Ticks travel_time = TimerGameTick::counter - this->last_loading_tick;
 #ifdef WITH_RUST
-	RunRustOrders(32, this);
+	openttd_rust_begin_loading(this, &GetRustOrdersLeaves());
 #else
 	if (this->current_order.IsType(OT_GOTO_STATION) &&
 			this->current_order.GetDestination() == this->last_station_visited) {
@@ -2454,7 +2454,7 @@ void Vehicle::HandleLoading(bool mode)
 bool Vehicle::HasFullLoadOrder() const
 {
 #ifdef WITH_RUST
-	return openttd_rust_orders_vehicle(4, const_cast<Vehicle *>(this), 1, &GetRustOrdersLeaves()) != 0;
+	return openttd_rust_has_full_load(const_cast<Vehicle *>(this), &GetRustOrdersLeaves()) != 0;
 #else
 	return std::ranges::any_of(this->Orders(), [](const Order &o) {
 		return o.IsType(OT_GOTO_STATION) && o.IsFullLoadOrder();
@@ -2469,7 +2469,7 @@ bool Vehicle::HasFullLoadOrder() const
 bool Vehicle::HasConditionalOrder() const
 {
 #ifdef WITH_RUST
-	return openttd_rust_orders_vehicle(4, const_cast<Vehicle *>(this), 2, &GetRustOrdersLeaves()) != 0;
+	return openttd_rust_has_conditional(const_cast<Vehicle *>(this), &GetRustOrdersLeaves()) != 0;
 #else
 	return std::ranges::any_of(this->Orders(), [](const Order &o) { return o.IsType(OT_CONDITIONAL); });
 #endif
@@ -2482,7 +2482,7 @@ bool Vehicle::HasConditionalOrder() const
 bool Vehicle::HasUnbunchingOrder() const
 {
 #ifdef WITH_RUST
-	return openttd_rust_orders_vehicle(4, const_cast<Vehicle *>(this), 3, &GetRustOrdersLeaves()) != 0;
+	return openttd_rust_has_unbunching(const_cast<Vehicle *>(this), &GetRustOrdersLeaves()) != 0;
 #else
 	return std::ranges::any_of(this->Orders(), [](const Order &o) {
 		return o.IsType(OT_GOTO_DEPOT) && o.GetDepotActionType().Test(OrderDepotActionFlag::Unbunch);
@@ -2512,7 +2512,7 @@ static bool PreviousOrderIsUnbunching(const Vehicle *v)
 void Vehicle::LeaveUnbunchingDepot()
 {
 #ifdef WITH_RUST
-	openttd_rust_orders_vehicle(5, this, 0, &GetRustOrdersLeaves());
+	openttd_rust_leave_unbunching(this, &GetRustOrdersLeaves());
 #else
 	/* Don't do anything if this is not our unbunching order. */
 	if (!PreviousOrderIsUnbunching(this)) return;
@@ -2563,7 +2563,7 @@ void Vehicle::LeaveUnbunchingDepot()
 bool Vehicle::IsWaitingForUnbunching() const
 {
 #ifdef WITH_RUST
-	assert(this->IsInDepot()); return openttd_rust_orders_vehicle(6, const_cast<Vehicle *>(this), 0, &GetRustOrdersLeaves()) != 0;
+	assert(this->IsInDepot()); return openttd_rust_wait_unbunching(const_cast<Vehicle *>(this), &GetRustOrdersLeaves()) != 0;
 #else
 	assert(this->IsInDepot());
 
@@ -2990,7 +2990,7 @@ void Vehicle::SetNext(Vehicle *next)
 void Vehicle::AddToShared(Vehicle *shared_chain)
 {
 #ifdef WITH_RUST
-	RunRustOrders(4, this, reinterpret_cast<uintptr_t>(shared_chain));
+	openttd_rust_add_shared(this, shared_chain, &GetRustOrdersLeaves());
 #else
 	assert(this->previous_shared == nullptr && this->next_shared == nullptr);
 
@@ -3017,7 +3017,7 @@ void Vehicle::AddToShared(Vehicle *shared_chain)
 void Vehicle::RemoveFromShared()
 {
 #ifdef WITH_RUST
-	RunRustOrders(5, this);
+	openttd_rust_remove_shared(this, &GetRustOrdersLeaves());
 #else
 	/* Remember if we were first and the old window number before RemoveVehicle()
 	 * as this changes first if needed. */
