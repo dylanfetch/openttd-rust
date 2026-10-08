@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Exercise recoverable archives using disposable clones, never real worktrees."""
 
-import importlib.util
 import json
 import os
 import subprocess
@@ -10,11 +9,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-spec = importlib.util.spec_from_file_location(
-    "worktrees", Path(__file__).with_name("worktrees.py")
-)
-archive = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(archive)
+import worktrees as archive
 
 
 class ArchiveTests(unittest.TestCase):
@@ -27,7 +22,9 @@ class ArchiveTests(unittest.TestCase):
         self.git("init", "-b", "rust-migration")
         self.git("config", "user.name", "Fixture")
         self.git("config", "user.email", "fixture@example.invalid")
-        (self.root / ".gitignore").write_text(".local/\ncache/\nasset-link\n")
+        (self.root / ".gitignore").write_text(
+            ".local/\nbuild-rust/\ncache/\nasset-link\n"
+        )
         (self.root / "tracked").write_text("source\n")
         self.git("add", ".")
         self.git("commit", "-m", "Add: Fixture")
@@ -62,7 +59,11 @@ class ArchiveTests(unittest.TestCase):
         )
 
     def test_plan_read_only_and_archive_repeat(self):
+        for name in ("build-rust", ".local/build-tools-rust", ".local/build-reference"):
+            (self.source / name).mkdir(parents=True)
+            (self.source / name / "rebuildable").write_text("discard")
         planned = self.plan()
+        self.assertFalse(any("build-" in item["path"] for item in planned["paths"]))
         saved = Path(planned["archive"])
         self.assertFalse(saved.exists())
         result = self.apply()
@@ -236,7 +237,7 @@ class ArchiveTests(unittest.TestCase):
 
         def different_device(path):
             info = lstat(path)
-            if path == self.source / ".local":
+            if path == self.source / ".local/evidence":
                 fields = list(info)
                 fields[2] += 1
                 return os.stat_result(fields)
