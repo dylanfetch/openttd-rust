@@ -16,11 +16,14 @@ import ci
 ROOT = Path(__file__).resolve().parents[1]
 HEAD = "a" * 40
 BASE = "b" * 40
+MERGE = "d" * 40
 PULL = {
     "state": "open",
     "head": {"sha": HEAD},
     "base": {"sha": BASE, "ref": "rust-migration"},
     "labels": [],
+    "mergeable": True,
+    "merge_commit_sha": MERGE,
 }
 
 
@@ -34,12 +37,22 @@ def script_for(filename, job):
     return "\n".join(line[10:] for line in match[1].splitlines())
 
 
+def node(harness):
+    return json.loads(subprocess.check_output(["node", "-e", harness], text=True))
+
+
 def good_needs():
     needs = {
         name: {"result": "success", "outputs": {}}
-        for name in ("plan", "quick", "native", "platform", "annotations")
+        for name in ("plan", "quick", "native", "platform")
     }
-    needs["plan"]["outputs"] = {"head": HEAD, "pr": "170", "profile": "full"}
+    needs["plan"]["outputs"] = {
+        "head": HEAD,
+        "base": BASE,
+        "merge": MERGE,
+        "pr": "170",
+        "profile": "full",
+    }
     for name in ("native", "platform"):
         needs[name]["outputs"]["validated"] = "true"
     return needs
@@ -75,11 +88,7 @@ process.env.RESULTS = JSON.stringify(NEEDS);
             ),
         )
     )
-    return json.loads(
-        subprocess.run(
-            ["node", "-e", harness], check=True, capture_output=True, text=True
-        ).stdout
-    )
+    return node(harness)
 
 
 def execute_invalidator(event, pull, latest=None):
@@ -97,11 +106,7 @@ const github = {{rest: {{
 }}}};
 (async () => {{{script}}})().then(() => console.log(JSON.stringify(statuses))).catch(error => {{console.error(error); process.exit(1);}});
 """
-    return json.loads(
-        subprocess.run(
-            ["node", "-e", harness], check=True, capture_output=True, text=True
-        ).stdout
-    )
+    return node(harness)
 
 
 class GateTests(unittest.TestCase):
@@ -140,16 +145,9 @@ class GateTests(unittest.TestCase):
                 harness = f"""
                 const inputs = {json.dumps(inputs)};
                 const github = {{event: {{pull_request: {{number: 170}}}}}};
-                console.log('validation-status-' + ({expression[1]}));
+                console.log(JSON.stringify('validation-status-' + ({expression[1]})));
                 """
-                groups.append(
-                    subprocess.run(
-                        ["node", "-e", harness],
-                        check=True,
-                        capture_output=True,
-                        text=True,
-                    ).stdout.strip()
-                )
+                groups.append(node(harness))
         self.assertEqual(groups, ["validation-status-170"] * 6)
 
     def test_delayed_invalidation_preserves_current_request(self):
@@ -196,7 +194,7 @@ class GateTests(unittest.TestCase):
             )
 
     def test_missing_jobs_are_rejected(self):
-        for job in ("quick", "native", "platform", "annotations"):
+        for job in ("quick", "native", "platform"):
             needs = good_needs()
             del needs[job]
             self.assertEqual(
@@ -271,14 +269,7 @@ class PolicyTests(unittest.TestCase):
                     console.log(JSON.stringify({expression.replace("inputs.checkout-ref", 'inputs["checkout-ref"]')}));
                     """
                     with self.subTest(filename=filename, job=job, cancelled=cancelled):
-                        result = json.loads(
-                            subprocess.run(
-                                ["node", "-e", harness],
-                                check=True,
-                                capture_output=True,
-                                text=True,
-                            ).stdout
-                        )
+                        result = node(harness)
                         self.assertEqual(result, expected)
 
     def test_bootstrap_on_demand_and_docs_classification(self):
@@ -309,14 +300,7 @@ class PolicyTests(unittest.TestCase):
                 const github = {{rest: {{repos: {{compareCommitsWithBasehead: async () => ({{data: {{files: {json.dumps(files)}}}}})}}}}}};
                 (async () => {{{script}}})().then(() => console.log(JSON.stringify(outputs)));
                 """
-                result = json.loads(
-                    subprocess.run(
-                        ["node", "-e", harness],
-                        check=True,
-                        capture_output=True,
-                        text=True,
-                    ).stdout
-                )
+                result = node(harness)
                 self.assertEqual(result["heavy"], expected)
 
 

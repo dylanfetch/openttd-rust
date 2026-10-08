@@ -32,7 +32,9 @@ def validate_pull(pull: dict, head: str | None = None) -> str:
     if pull["state"] != "open" or pull["base"]["ref"] != PROTECTED_REF:
         raise ValueError("PR must be open and target rust-migration")
     if pull.get("mergeable") is not True or not pull.get("merge_commit_sha"):
-        raise ValueError("PR is unmergeable or mergeability is pending; retry after resolving it")
+        raise ValueError(
+            "PR is unmergeable or mergeability is pending; retry after resolving it"
+        )
     current = pull["head"]["sha"]
     if head is not None and current != head:
         raise ValueError(f"PR head changed: requested {head}, current {current}")
