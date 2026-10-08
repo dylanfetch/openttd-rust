@@ -608,7 +608,7 @@ def run_scenario(
         for mode, desync in modes:
             runs = {
                 role: run_game(
-                    scenario,
+                    dict(scenario, **scenario.get("role_inputs", {}).get(role, {})),
                     scenario.get("executables", binaries)[role],
                     builds[role],
                     out / name / mode / role,

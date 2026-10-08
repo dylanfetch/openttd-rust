@@ -6,7 +6,14 @@ import shlex
 import subprocess
 from pathlib import Path
 
-from .core import ROOT, RUNTIME_DIRECTORIES, decode_element, read_save, run_game
+from .core import (
+    ROOT,
+    RUNTIME_DIRECTORIES,
+    compare_saves,
+    decode_element,
+    read_save,
+    run_game,
+)
 
 ADAPTER = ROOT / "tools/simulation/orders-console.cpp"
 COMMON = "roadveh[0]/common[0]/"
@@ -114,70 +121,98 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
             executables=executables,
             console=["orders_scenario setup", "unpause"],
         )
-    backup = folder / "backups.sav"
     shared = mode == "client-shared-restore"
-    setup = dict(
-        scenario,
-        console=[
-            f'orders_scenario setup "{backup}" {"shared" if shared else "unique"}',
-            "unpause",
-        ],
-        ticks=1,
-    )
-    run = run_game(
-        setup,
-        executables["reference"],
-        builds["reference"],
-        folder / "capture",
-        timeout,
-        env,
-        desync=False,
-    )
-    if run["exit"] or "ORDERS backups captured 2" not in run["log"]:
-        raise RuntimeError("reference did not capture two actual order backups")
-    if len(read_save(backup)["BKOR"]["elements"]) != 1:
-        raise RuntimeError("server-policy save has no actual BKOR contents")
-    result["orders_capture"] = {
-        "input_sha256": hashlib.sha256(backup.read_bytes()).hexdigest(),
-        "binary_sha256": provenance["reference"]["binary_sha256"],
-        "commands": setup["console"],
-        "witnesses": [line for line in run["log"] if line.startswith("ORDERS ")],
-    }
-    if mode == "active-reload":
-        active = dict(
+    saves, captures, active_inputs = {}, {}, {}
+    for role in ("reference", "candidate"):
+        backup = folder / role / "backups.sav"
+        setup = dict(
             scenario,
-            save=str(backup),
-            console=["orders_scenario active", "unpause"],
+            console=[
+                f'orders_scenario setup "{backup}" {"shared" if shared else "unique"}',
+                "unpause",
+            ],
             ticks=1,
         )
         run = run_game(
-            active,
-            executables["reference"],
-            builds["reference"],
-            folder / "active",
+            setup,
+            executables[role],
+            builds[role],
+            folder / role / "capture",
             timeout,
             env,
             desync=False,
         )
-        if run["exit"] or not any(
-            line.startswith("ORDERS state conditional-active ") for line in run["log"]
-        ):
-            raise RuntimeError("reference did not execute the active conditional order")
-        if "ORDERS active 7 8 1" not in run["log"] or not any(
-            line.startswith("ORDERS state conditional-active 126 4 2 3 3 ")
-            for line in run["log"]
-        ):
-            raise RuntimeError(
-                "reference has no resolved conditional/implicit active state"
-            )
-        backup = run["snapshots"][-1]
-        result["orders_active"] = {
+        if run["exit"] or "ORDERS backups captured 2" not in run["log"]:
+            raise RuntimeError(f"{role} did not capture two actual order backups")
+        if len(read_save(backup)["BKOR"]["elements"]) != 1:
+            raise RuntimeError("server-policy save has no actual BKOR contents")
+        captures[role] = {
             "input_sha256": hashlib.sha256(backup.read_bytes()).hexdigest(),
+            "binary_sha256": provenance[role]["binary_sha256"],
+            "commands": setup["console"],
             "witnesses": [line for line in run["log"] if line.startswith("ORDERS ")],
         }
+        saves[role] = backup
+    if captures["reference"]["witnesses"] != captures["candidate"]["witnesses"]:
+        raise RuntimeError("native command/departure witnesses differ")
+    result["orders_capture"] = captures
+    records = compare_saves(
+        saves["reference"], saves["candidate"], scenario["name"], 20, result["stats"]
+    )
+    if records:
+        result["differences"].extend(records)
+        raise RuntimeError("serialized backup preparation states differ")
+    if mode == "active-reload":
+        for role in ("reference", "candidate"):
+            active = dict(
+                scenario,
+                save=str(saves[role]),
+                console=["orders_scenario active", "unpause"],
+                ticks=1,
+            )
+            run = run_game(
+                active,
+                executables[role],
+                builds[role],
+                folder / role / "active",
+                timeout,
+                env,
+                desync=False,
+            )
+            if (
+                run["exit"]
+                or "ORDERS active 7 8 1" not in run["log"]
+                or not any(
+                    line.startswith("ORDERS state conditional-active 126 4 2 3 3 ")
+                    for line in run["log"]
+                )
+            ):
+                raise RuntimeError(
+                    f"{role} has no resolved conditional/implicit active state"
+                )
+            saves[role] = run["snapshots"][-1]
+            active_inputs[role] = {
+                "input_sha256": hashlib.sha256(saves[role].read_bytes()).hexdigest(),
+                "witnesses": [
+                    line for line in run["log"] if line.startswith("ORDERS ")
+                ],
+            }
+        result["orders_active"] = active_inputs
+        records = compare_saves(
+            saves["reference"],
+            saves["candidate"],
+            scenario["name"],
+            20,
+            result["stats"],
+        )
+        if records:
+            result["differences"].extend(records)
+            raise RuntimeError("active preparation states differ")
+    # Compare each preparation before loading its same-build save; crossing build
+    # revisions would add a GLOG revision event unrelated to orders behavior.
     return dict(
         scenario,
-        save=str(backup),
+        role_inputs={role: {"save": str(save)} for role, save in saves.items()},
         executables=executables,
         orders_client=mode in ("client-restore", "client-shared-restore"),
         console=[
