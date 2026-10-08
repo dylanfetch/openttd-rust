@@ -8,7 +8,7 @@ forward-looking, about 200 lines; completed work is one row, with evidence in PR
 
 - Eighteen ownership ports retire 24,221 original C++ lines, about 6.3% of roughly
   384k non-vendored `src/` lines (18,898 excluding town-name and road-movement
-  data). The last two integrations retire 1,394 lines for 1,052 glue + 700 net
+  data). The last two integrations retire 1,394 lines for 1,052 glue + 895 net
   tooling. Company's canonical save/writer adapters explain the cost; its
   allocating boundary still needs #168. Company's post-merge checks passed.
 - Reviewed road conversion lowers idle play-opus from **2.601x to 1.415x**, Grok
@@ -129,6 +129,9 @@ never in masks.
 Integration of reviewed work comes before new starts. Never hold more than six
 unintegrated component branches (#157). Independent items (#169, #156 slices)
 may run in parallel with this list.
+**#184 is blocked by the speed ratchet:** final Opus/Grok/mixed-2000 timings
+exceed cap plus 3%. Isolate the regression using its retained joins before full
+CI or another component start; keep the budgets unchanged.
 
 1. **#155 road conversion (#178).** Remove the Task/Future/Rc protocol for all 22
    services and 14 entries, and narrow RoadObserve: field getters or a hot
@@ -166,17 +169,20 @@ the current profile instead identifies entry and record-copy overhead.
 
 ## Resume checkpoint
 
-The #182 integration owner refreshes accepted heads in the selected batch;
-component branches stay unchanged. The primary checkout can request fork CI.
+Active checks finished after the user's wind-down request.
+Resume with reviewed #184's speed regression before CI/integration or new starts.
+Its source review is accepted; a later source fix needs fresh review. Merge the
+latest base before full CI; conflict-free docs refreshes need no new source review.
 
 | Issue / PR | Branch (worktree suffix), head | State and next step |
 | --- | --- | --- |
-| #155 / #178 | `road-direct-155` (`road-direct-155`), `636be8104f` | Source `4a28628dd2` reviewed; current native and exact-source semantic/timing evidence accepted. Selected #182. |
-| #139 / #151 | `cargo-storage-movement-139` (`cargo-storage`), `ff912bcfcb` | Accepted at `a25a7d41e2`; game source unchanged. Selected #182. |
-| #138 / #176 | `orders-direct-138` (`order-lifecycle`), `3ef37bc4fc` | Reviewed fixes verified; native/pair/self-soak pass. Selected #182. |
-| #146 / #152 | `ship-controller-ownership-146` (`ship-controller`), `df7a1d4d2e` | Joins accepted orders; fresh review and native/pair/self/soak pass. Selected #182. |
+| #155 / #178 | `road-direct-155` (`road-direct-155`), `636be8104f` | Reviewed source and ratchet joined into #184. |
+| #139 / #151 | `cargo-storage-movement-139` (`cargo-storage`), `ff912bcfcb` | Accepted source joined #184; its typed capacity delta has fresh review there. |
+| #138 / #176 | `orders-direct-138` (`order-lifecycle`), `3ef37bc4fc` | Reviewed fixes verified; joined #184. |
+| #146 / #152 | `ship-controller-ownership-146` (`ship-controller`), `df7a1d4d2e` | Reviewed with accepted orders; joined #184, including natural lock checks. |
 | #147 | `fleet-replacement-ownership-147` (`fleet-replacement`), `68d660adc9` | State-only WIP, no PR. |
-| #182 | Owner integration (branch pending) | Root selects road/cargo/orders/ship batch; ABI repair and fresh resolution review before full CI. |
+| #182 / #184 | `reviewed-owner-batch-182` (`reviewed-owners-182`), `fa0baea911` | Review/native/affected semantics pass; timing blocked on Opus 1.479898x, Grok 1.448534x and mixed 2.052632x. Full CI not requested. |
+| #183 / #185 | `import/padhattan-ridge-2006` (`padhattan-2006`), `d287c8e882` | Fresh review and root doc-fix verification pass; unchanged save joined #184. |
 
 The first dispatched full (#145), #174 bootstrap, #149 and #181 actual merges passed.
 `CI_ON_DEMAND=true` is restored; both local timing and remote push holds are released.
