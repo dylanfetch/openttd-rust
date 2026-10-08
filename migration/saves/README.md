@@ -67,7 +67,8 @@ freezes and hashes the unchanged-reference runtime and scenario AI files.
 With crashes enabled (setting1), seeds `(2443390976,1012692424)` produce the
 third shared draw21 and crash at threshold equality; `(2443382784,1011643848)`
 produce22 and survive; `(2443390968,1012691400)` produce`0x400015` and crash,
-requiring the low22-bit mask. Setting0 survives with two fewer shared draws.
+requiring the low22-bit mask. Setting0 survives after three shared draws,
+versus five for the enabled draw22 survivor (the equality crash uses six).
 One-tick witnesses require original DATE RNG, status8->138/counter0->3 on crash,
 empty plane/mail and station cargo, block mask3328, rating0 for goods0/2/5
 (nonzero status) and rating1 otherwise. Survivors retain cargo and ratings.
