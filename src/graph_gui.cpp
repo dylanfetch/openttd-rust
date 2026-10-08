@@ -860,7 +860,7 @@ public:
 
 		uint8_t nums = 0;
 		for (const Company *c : Company::Iterate()) {
-			nums = std::min(this->num_vert_lines, std::max(nums, c->num_valid_stat_ent));
+			nums = std::min(this->num_vert_lines, std::max(nums, c->Finances().num_valid_stat_ent));
 		}
 
 		int mo = (TimerGameEconomy::month / this->month_increment - nums) * this->month_increment;
@@ -891,7 +891,7 @@ public:
 			dataset.exclude_bit = k.base();
 
 			for (int j = this->num_on_x_axis, i = 0; --j >= 0;) {
-				if (j >= c->num_valid_stat_ent) {
+				if (j >= c->Finances().num_valid_stat_ent) {
 					dataset.values[i] = INVALID_DATAPOINT;
 				} else {
 					/* Ensure we never assign INVALID_DATAPOINT, as that has another meaning.
@@ -924,7 +924,7 @@ struct OperatingProfitGraphWindow : BaseCompanyGraphWindow {
 
 	OverflowSafeInt64 GetGraphData(const Company *c, int j) override
 	{
-		return c->old_economy[j].income + c->old_economy[j].expenses;
+		return c->Finances().old_economy[j].income + c->Finances().old_economy[j].expenses;
 	}
 };
 
@@ -977,7 +977,7 @@ struct IncomeGraphWindow : BaseCompanyGraphWindow {
 
 	OverflowSafeInt64 GetGraphData(const Company *c, int j) override
 	{
-		return c->old_economy[j].income;
+		return c->Finances().old_economy[j].income;
 	}
 };
 
@@ -1028,7 +1028,7 @@ struct DeliveredCargoGraphWindow : BaseCompanyGraphWindow {
 
 	OverflowSafeInt64 GetGraphData(const Company *c, int j) override
 	{
-		return c->old_economy[j].delivered_cargo.GetSum<OverflowSafeInt64>();
+		return c->Finances().old_economy[j].delivered_cargo.GetSum<OverflowSafeInt64>();
 	}
 };
 
@@ -1079,7 +1079,7 @@ struct PerformanceHistoryGraphWindow : BaseCompanyGraphWindow {
 
 	OverflowSafeInt64 GetGraphData(const Company *c, int j) override
 	{
-		return c->old_economy[j].performance_history;
+		return c->Finances().old_economy[j].performance_history;
 	}
 
 	void OnClick([[maybe_unused]] Point pt, WidgetID widget, [[maybe_unused]] int click_count) override
@@ -1137,7 +1137,7 @@ struct CompanyValueGraphWindow : BaseCompanyGraphWindow {
 
 	OverflowSafeInt64 GetGraphData(const Company *c, int j) override
 	{
-		return c->old_economy[j].company_value;
+		return c->Finances().old_economy[j].company_value;
 	}
 };
 

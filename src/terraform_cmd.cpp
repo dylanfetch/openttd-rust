@@ -276,7 +276,7 @@ std::tuple<CommandCost, Money, TileIndex> CmdTerraformLand(DoCommandFlags flags,
 	}
 
 	Company *c = Company::GetIfValid(_current_company);
-	if (c != nullptr && GB(c->terraform_limit, 16, 16) < ts.tile_to_new_height.size()) {
+	if (c != nullptr && GB(c->Finances().terraform_limit, 16, 16) < ts.tile_to_new_height.size()) {
 		return { CommandCost(STR_ERROR_TERRAFORM_LIMIT_REACHED), 0, INVALID_TILE };
 	}
 
@@ -297,7 +297,7 @@ std::tuple<CommandCost, Money, TileIndex> CmdTerraformLand(DoCommandFlags flags,
 			SetTileHeight(t, (uint)height);
 		}
 
-		if (c != nullptr) c->terraform_limit -= (uint32_t)ts.tile_to_new_height.size() << 16;
+		if (c != nullptr) c->Finances().terraform_limit -= (uint32_t)ts.tile_to_new_height.size() << 16;
 	}
 	return { total_cost, 0, total_cost.Succeeded() ? tile : INVALID_TILE };
 }
@@ -337,7 +337,7 @@ std::tuple<CommandCost, Money, TileIndex> CmdLevelLand(DoCommandFlags flags, Til
 	bool had_success = false;
 
 	const Company *c = Company::GetIfValid(_current_company);
-	int limit = (c == nullptr ? INT32_MAX : GB(c->terraform_limit, 16, 16));
+	int limit = (c == nullptr ? INT32_MAX : GB(c->Finances().terraform_limit, 16, 16));
 	if (limit == 0) return { CommandCost(STR_ERROR_TERRAFORM_LIMIT_REACHED), 0, INVALID_TILE };
 
 	TileIndex error_tile = INVALID_TILE;
