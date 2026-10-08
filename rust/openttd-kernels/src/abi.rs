@@ -26,6 +26,7 @@ macro_rules! layout {
 #[allow(clippy::too_many_lines)]
 pub fn layout(type_id: u8, item: u8) -> usize {
     match type_id {
+        210..=214 => crate::company::abi_layout(type_id, item),
         0 => {
             layout!(crate::IntegerResult, item; value_bits, length, error_offset, error_length, error_kind)
         }

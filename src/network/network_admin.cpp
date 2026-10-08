@@ -329,7 +329,7 @@ NetworkRecvStatus ServerNetworkAdminSocketHandler::SendCompanyInfo(const Company
 	p->Send_bool  (true);
 	p->Send_uint32(c->inaugurated_year.base());
 	p->Send_bool  (c->is_ai);
-	p->Send_uint8 (CeilDiv(c->months_of_bankruptcy, 3)); // send as quarters_of_bankruptcy
+	p->Send_uint8 (CeilDiv(c->Finances().months_of_bankruptcy, 3)); // send as quarters_of_bankruptcy
 
 	this->SendPacket(std::move(p));
 
@@ -350,7 +350,7 @@ NetworkRecvStatus ServerNetworkAdminSocketHandler::SendCompanyUpdate(const Compa
 	p->Send_string(GetString(STR_PRESIDENT_NAME, c->index));
 	p->Send_uint8 (c->colour);
 	p->Send_bool  (true);
-	p->Send_uint8 (CeilDiv(c->months_of_bankruptcy, 3)); // send as quarters_of_bankruptcy
+	p->Send_uint8 (CeilDiv(c->Finances().months_of_bankruptcy, 3)); // send as quarters_of_bankruptcy
 
 	this->SendPacket(std::move(p));
 
@@ -379,23 +379,23 @@ NetworkRecvStatus ServerNetworkAdminSocketHandler::SendCompanyEconomy()
 {
 	for (const Company *company : Company::Iterate()) {
 		/* Get the income. */
-		Money income = -std::reduce(std::begin(company->yearly_expenses[0]), std::end(company->yearly_expenses[0]));
+		Money income = -std::reduce(std::begin(company->Finances().yearly_expenses[0]), std::end(company->Finances().yearly_expenses[0]));
 
 		auto p = std::make_unique<Packet>(this, ADMIN_PACKET_SERVER_COMPANY_ECONOMY);
 
 		p->Send_uint8(company->index);
 
 		/* Current information. */
-		p->Send_uint64(company->money);
-		p->Send_uint64(company->current_loan);
+		p->Send_uint64(company->Finances().money);
+		p->Send_uint64(company->Finances().current_loan);
 		p->Send_uint64(income);
-		p->Send_uint16(static_cast<uint16_t>(std::min<uint64_t>(UINT16_MAX, company->cur_economy.delivered_cargo.GetSum<OverflowSafeInt64>())));
+		p->Send_uint16(static_cast<uint16_t>(std::min<uint64_t>(UINT16_MAX, company->Finances().cur_economy.delivered_cargo.GetSum<OverflowSafeInt64>())));
 
 		/* Send stats for the last 2 quarters. */
 		for (uint i = 0; i < 2; i++) {
-			p->Send_uint64(company->old_economy[i].company_value);
-			p->Send_uint16(company->old_economy[i].performance_history);
-			p->Send_uint16(static_cast<uint16_t>(std::min<uint64_t>(UINT16_MAX, company->old_economy[i].delivered_cargo.GetSum<OverflowSafeInt64>())));
+			p->Send_uint64(company->Finances().old_economy[i].company_value);
+			p->Send_uint16(company->Finances().old_economy[i].performance_history);
+			p->Send_uint16(static_cast<uint16_t>(std::min<uint64_t>(UINT16_MAX, company->Finances().old_economy[i].delivered_cargo.GetSum<OverflowSafeInt64>())));
 		}
 
 		this->SendPacket(std::move(p));

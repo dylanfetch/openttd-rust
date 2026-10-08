@@ -60,6 +60,10 @@
 #include "table/strings.h"
 #include "table/pricebase.h"
 
+#ifdef WITH_RUST
+#include "rust/company_adapter.h"
+#endif
+
 #include "safeguards.h"
 
 
@@ -103,10 +107,30 @@ const ScoreInfo _score_info[] = {
 	{       0,   0}  // SCORE_TOTAL
 };
 
+#ifdef WITH_RUST
+Economy &GetRustEconomy()
+{
+	static Economy *state = new (openttd_rust_economy_state()) Economy{};
+	return *state;
+}
+Prices &GetRustPrices()
+{
+	static Money *prices = new (openttd_rust_economy_prices()) Prices{};
+	return *reinterpret_cast<Prices *>(prices);
+}
+CompanyScoreParts &GetRustCompanyScores()
+{
+	static CompanyScoreParts *scores = new (openttd_rust_company_scores()) CompanyScoreParts{};
+	return *scores;
+}
+#else
 TypedIndexContainer<std::array<std::array<int64_t, SCORE_END>, MAX_COMPANIES>, CompanyID> _score_part;
 Economy _economy;
 Prices _price;
+#endif
+#ifndef WITH_RUST
 static PriceMultipliers _price_base_multiplier;
+#endif
 
 /**
  * Calculate the value of the assets of a company.
@@ -114,6 +138,7 @@ static PriceMultipliers _price_base_multiplier;
  * @param c The company to calculate the value of.
  * @return The value of the assets of the company.
  */
+#ifndef WITH_RUST
 static Money CalculateCompanyAssetValue(const Company *c)
 {
 	Owner owner = c->index;
@@ -139,6 +164,7 @@ static Money CalculateCompanyAssetValue(const Company *c)
 
 	return value;
 }
+#endif /* !WITH_RUST */
 
 /**
  * Calculate the value of the company. That is the value of all
@@ -151,13 +177,17 @@ static Money CalculateCompanyAssetValue(const Company *c)
  */
 Money CalculateCompanyValue(const Company *c, bool including_loan)
 {
+#ifdef WITH_RUST
+	return RunRustCompany(4, c->index.base(), including_loan).b;
+#else
 	Money value = CalculateCompanyAssetValue(c);
 
 	/* Add real money value */
-	if (including_loan) value -= c->current_loan;
-	value += c->money;
+	if (including_loan) value -= c->Finances().current_loan;
+	value += c->Finances().money;
 
 	return std::max<Money>(value, 1);
+#endif /* WITH_RUST */
 }
 
 /**
@@ -178,19 +208,23 @@ Money CalculateCompanyValue(const Company *c, bool including_loan)
  */
 Money CalculateHostileTakeoverValue(const Company *c)
 {
+#ifdef WITH_RUST
+	return RunRustCompany(5, c->index.base()).b;
+#else
 	Money value = CalculateCompanyAssetValue(c);
 
-	value += c->current_loan;
+	value += c->Finances().current_loan;
 	/* Negative balance is basically a loan. */
-	if (c->money < 0) {
-		value += -c->money;
+	if (c->Finances().money < 0) {
+		value += -c->Finances().money;
 	}
 
 	for (int quarter = 0; quarter < 4; quarter++) {
-		value += std::max<Money>(c->old_economy[quarter].income + c->old_economy[quarter].expenses, 0) * 2;
+		value += std::max<Money>(c->Finances().old_economy[quarter].income + c->Finances().old_economy[quarter].expenses, 0) * 2;
 	}
 
 	return std::max<Money>(value, 1);
+#endif /* WITH_RUST */
 }
 
 /**
@@ -203,6 +237,9 @@ Money CalculateHostileTakeoverValue(const Company *c)
  */
 int UpdateCompanyRatingAndValue(Company *c, bool update)
 {
+#ifdef WITH_RUST
+	return static_cast<int>(RunRustCompany(6, c->index.base(), update).b);
+#else
 	Owner owner = c->index;
 	int score = 0;
 
@@ -249,9 +286,9 @@ int UpdateCompanyRatingAndValue(Company *c, bool update)
 
 	/* Generate statistics depending on recent income statistics */
 	{
-		int numec = std::min<uint>(c->num_valid_stat_ent, 12u);
+		int numec = std::min<uint>(c->Finances().num_valid_stat_ent, 12u);
 		if (numec != 0) {
-			auto [min_income, max_income] = std::ranges::minmax(c->old_economy | std::views::take(numec) | std::views::transform([](const auto &ce) { return ce.income + ce.expenses; }));
+			auto [min_income, max_income] = std::ranges::minmax(c->Finances().old_economy | std::views::take(numec) | std::views::transform([](const auto &ce) { return ce.income + ce.expenses; }));
 
 			if (min_income > 0) _score_part[owner][SCORE_MIN_INCOME] = min_income;
 			_score_part[owner][SCORE_MAX_INCOME] = max_income;
@@ -260,10 +297,10 @@ int UpdateCompanyRatingAndValue(Company *c, bool update)
 
 	/* Generate score depending on amount of transported cargo */
 	{
-		int numec = std::min<uint>(c->num_valid_stat_ent, 4u);
+		int numec = std::min<uint>(c->Finances().num_valid_stat_ent, 4u);
 		if (numec != 0) {
 			OverflowSafeInt64 total_delivered = 0;
-			for (auto &ce : c->old_economy | std::views::take(numec)) total_delivered += ce.delivered_cargo.GetSum<OverflowSafeInt64>();
+			for (auto &ce : c->Finances().old_economy | std::views::take(numec)) total_delivered += ce.delivered_cargo.GetSum<OverflowSafeInt64>();
 
 			_score_part[owner][SCORE_DELIVERED] = total_delivered;
 		}
@@ -271,19 +308,19 @@ int UpdateCompanyRatingAndValue(Company *c, bool update)
 
 	/* Generate score for variety of cargo */
 	{
-		_score_part[owner][SCORE_CARGO] = c->old_economy[0].delivered_cargo.GetCount();
+		_score_part[owner][SCORE_CARGO] = c->Finances().old_economy[0].delivered_cargo.GetCount();
 	}
 
 	/* Generate score for company's money */
 	{
-		if (c->money > 0) {
-			_score_part[owner][SCORE_MONEY] = c->money;
+		if (c->Finances().money > 0) {
+			_score_part[owner][SCORE_MONEY] = c->Finances().money;
 		}
 	}
 
 	/* Generate score for loan */
 	{
-		_score_part[owner][SCORE_LOAN] = _score_info[SCORE_LOAN].needed - c->current_loan;
+		_score_part[owner][SCORE_LOAN] = _score_info[SCORE_LOAN].needed - c->Finances().current_loan;
 	}
 
 	/* Now we calculate the score for each item.. */
@@ -307,13 +344,14 @@ int UpdateCompanyRatingAndValue(Company *c, bool update)
 	}
 
 	if (update) {
-		c->old_economy[0].performance_history = score;
+		c->Finances().old_economy[0].performance_history = score;
 		UpdateCompanyHQ(c->location_of_HQ, score);
-		c->old_economy[0].company_value = CalculateCompanyValue(c);
+		c->Finances().old_economy[0].company_value = CalculateCompanyValue(c);
 	}
 
 	SetWindowDirty(WC_PERFORMANCE_DETAIL, 0);
 	return score;
+#endif /* WITH_RUST */
 }
 
 /**
@@ -323,6 +361,9 @@ int UpdateCompanyRatingAndValue(Company *c, bool update)
  */
 void ChangeOwnershipOfCompanyItems(Owner old_owner, Owner new_owner)
 {
+#ifdef WITH_RUST
+	RunRustCompany(26, old_owner.base(), new_owner.base());
+#else
 	/* We need to set _current_company to old_owner before we try to move
 	 * the client. This is needed as it needs to know whether "you" really
 	 * are the current local company. */
@@ -350,7 +391,7 @@ void ChangeOwnershipOfCompanyItems(Owner old_owner, Owner new_owner)
 	 * removing their property doesn't fail because of lack of money.
 	 * Not too drastically though, because it could overflow */
 	if (new_owner == INVALID_OWNER) {
-		Company::Get(old_owner)->money = UINT64_MAX >> 2; // jackpot ;p
+		Company::Get(old_owner)->Finances().money = UINT64_MAX >> 2; // jackpot ;p
 	}
 
 	for (Subsidy *s : Subsidy::Iterate()) {
@@ -543,29 +584,31 @@ void ChangeOwnershipOfCompanyItems(Owner old_owner, Owner new_owner)
 	cur_company.Restore();
 
 	MarkWholeScreenDirty();
+#endif /* WITH_RUST */
 }
 
 /**
  * Check for bankruptcy of a company. Called every three months.
  * @param c Company to check.
  */
+#ifndef WITH_RUST
 static void CompanyCheckBankrupt(Company *c)
 {
 	/* If "Infinite money" setting is on, companies should not go bankrupt. */
 	if (_settings_game.difficulty.infinite_money) return;
 
 	/*  If the company has money again, it does not go bankrupt */
-	if (c->money - c->current_loan >= -c->GetMaxLoan()) {
-		int previous_months_of_bankruptcy = CeilDiv(c->months_of_bankruptcy, 3);
-		c->months_of_bankruptcy = 0;
-		c->bankrupt_asked = CompanyMask{};
+	if (c->Finances().money - c->Finances().current_loan >= -c->GetMaxLoan()) {
+		int previous_months_of_bankruptcy = CeilDiv(c->Finances().months_of_bankruptcy, 3);
+		c->Finances().months_of_bankruptcy = 0;
+		c->Finances().bankrupt_asked = CompanyMask{};
 		if (previous_months_of_bankruptcy != 0) CompanyAdminUpdate(c);
 		return;
 	}
 
-	c->months_of_bankruptcy++;
+	c->Finances().months_of_bankruptcy++;
 
-	switch (c->months_of_bankruptcy) {
+	switch (c->Finances().months_of_bankruptcy) {
 		/* All the boring cases (months) with a bad balance where no action is taken */
 		case 0:
 		case 1:
@@ -594,12 +637,12 @@ static void CompanyCheckBankrupt(Company *c)
 			/* Don't consider the loan */
 			Money val = CalculateCompanyValue(c, false);
 
-			c->bankrupt_value = val;
-			c->bankrupt_asked = CompanyMask{}.Set(c->index); // Don't ask the owner
-			c->bankrupt_timeout = 0;
+			c->Finances().bankrupt_value = val;
+			c->Finances().bankrupt_asked = CompanyMask{}.Set(c->index); // Don't ask the owner
+			c->Finances().bankrupt_timeout = 0;
 
 			/* The company assets should always have some value */
-			assert(c->bankrupt_value > 0);
+			assert(c->Finances().bankrupt_value > 0);
 			break;
 		}
 
@@ -612,7 +655,7 @@ static void CompanyCheckBankrupt(Company *c)
 				 * is no THE-END, otherwise mark the client as spectator to make sure
 				 * they are no longer in control of this company. However... when you
 				 * join another company (cheat) the "unowned" company can bankrupt. */
-				c->bankrupt_asked.Set();
+				c->Finances().bankrupt_asked.Set();
 				break;
 			}
 
@@ -633,13 +676,15 @@ static void CompanyCheckBankrupt(Company *c)
 		}
 	}
 
-	if (CeilDiv(c->months_of_bankruptcy, 3) != CeilDiv(c->months_of_bankruptcy - 1, 3)) CompanyAdminUpdate(c);
+	if (CeilDiv(c->Finances().months_of_bankruptcy, 3) != CeilDiv(c->Finances().months_of_bankruptcy - 1, 3)) CompanyAdminUpdate(c);
 }
+#endif /* !WITH_RUST */
 
 /**
  * Update the finances of all companies.
  * Pay for the stations, update the history graph, update ratings and company values, and deal with bankruptcy.
  */
+#ifndef WITH_RUST
 static void CompaniesGenStatistics()
 {
 	/* Check for bankruptcy each month */
@@ -680,14 +725,14 @@ static void CompaniesGenStatistics()
 
 	for (Company *c : Company::Iterate()) {
 		/* Drop the oldest history off the end */
-		std::copy_backward(c->old_economy.data(), c->old_economy.data() + MAX_HISTORY_QUARTERS - 1, c->old_economy.data() + MAX_HISTORY_QUARTERS);
-		c->old_economy[0] = c->cur_economy;
-		c->cur_economy = {};
+		std::copy_backward(c->Finances().old_economy.data(), c->Finances().old_economy.data() + MAX_HISTORY_QUARTERS - 1, c->Finances().old_economy.data() + MAX_HISTORY_QUARTERS);
+		c->Finances().old_economy[0] = c->Finances().cur_economy;
+		c->Finances().cur_economy = {};
 
-		if (c->num_valid_stat_ent != MAX_HISTORY_QUARTERS) c->num_valid_stat_ent++;
+		if (c->Finances().num_valid_stat_ent != MAX_HISTORY_QUARTERS) c->Finances().num_valid_stat_ent++;
 
 		UpdateCompanyRatingAndValue(c, true);
-		if (c->block_preview != 0) c->block_preview--;
+		if (c->Finances().block_preview != 0) c->Finances().block_preview--;
 	}
 
 	SetWindowDirty(WC_INCOME_GRAPH, 0);
@@ -697,6 +742,7 @@ static void CompaniesGenStatistics()
 	SetWindowDirty(WC_COMPANY_VALUE, 0);
 	SetWindowDirty(WC_COMPANY_LEAGUE, 0);
 }
+#endif /* !WITH_RUST */
 
 /**
  * Add monthly inflation
@@ -705,6 +751,9 @@ static void CompaniesGenStatistics()
  */
 bool AddInflation(bool check_year)
 {
+#ifdef WITH_RUST
+	return RunRustCompany(8, 0, check_year).b != 0;
+#else
 	/* The cargo payment inflation differs from the normal inflation, so the
 	 * relative amount of money you make with a transport decreases slowly over
 	 * the 170 years. After a few hundred years we reach a level in which the
@@ -736,6 +785,7 @@ bool AddInflation(bool check_year)
 	if (_economy.inflation_payment > MAX_INFLATION) _economy.inflation_payment = MAX_INFLATION;
 
 	return false;
+#endif /* WITH_RUST */
 }
 
 /**
@@ -743,6 +793,9 @@ bool AddInflation(bool check_year)
  */
 void RecomputePrices()
 {
+#ifdef WITH_RUST
+	RunRustCompany(9);
+#else
 	/* Setup maximum loan as a rounded down multiple of LOAN_INTERVAL. */
 	_economy.max_loan = ((uint64_t)_settings_game.difficulty.max_loan * _economy.inflation_prices >> 16) / LOAN_INTERVAL * LOAN_INTERVAL;
 
@@ -805,9 +858,11 @@ void RecomputePrices()
 	SetWindowClassesDirty(WC_VEHICLE_DETAILS);
 	SetWindowClassesDirty(WC_COMPANY_INFRASTRUCTURE);
 	InvalidateWindowData(WC_PAYMENT_RATES, 0);
+#endif /* WITH_RUST */
 }
 
 /** Let all companies pay the monthly interest on their loan. */
+#ifndef WITH_RUST
 static void CompaniesPayInterest()
 {
 	Backup<CompanyID> cur_company(_current_company);
@@ -828,7 +883,7 @@ static void CompaniesPayInterest()
 		 * taking a loan) we make companies pay interest on negative cash as well,
 		 * except if infinite money is enabled.
 		 */
-		Money yearly_fee = c->current_loan * _economy.interest_rate / 100;
+		Money yearly_fee = c->Finances().current_loan * _economy.interest_rate / 100;
 		Money available_money = GetAvailableMoney(c->index);
 		if (available_money < 0) {
 			yearly_fee += -available_money * _economy.interest_rate / 100;
@@ -842,7 +897,9 @@ static void CompaniesPayInterest()
 	}
 	cur_company.Restore();
 }
+#endif /* !WITH_RUST */
 
+#ifndef WITH_RUST
 static void HandleEconomyFluctuations()
 {
 	if (_settings_game.difficulty.economy != 0) {
@@ -864,6 +921,7 @@ static void HandleEconomyFluctuations()
 		AddNewsItem(GetEncodedString(STR_NEWS_END_OF_RECESSION), NewsType::Economy, NewsStyle::Normal, {});
 	}
 }
+#endif /* !WITH_RUST */
 
 
 /**
@@ -871,7 +929,11 @@ static void HandleEconomyFluctuations()
  */
 void ResetPriceBaseMultipliers()
 {
+#ifdef WITH_RUST
+	RunRustCompany(10);
+#else
 	_price_base_multiplier.fill(0);
+#endif /* WITH_RUST */
 }
 
 /**
@@ -883,8 +945,13 @@ void ResetPriceBaseMultipliers()
  */
 void SetPriceBaseMultiplier(Price price, int factor)
 {
+#ifdef WITH_RUST
+	assert(price < PR_END);
+	RunRustCompany(11, price, factor);
+#else
 	assert(price < PR_END);
 	_price_base_multiplier[price] = Clamp(factor, MIN_PRICE_MODIFIER, MAX_PRICE_MODIFIER);
+#endif /* WITH_RUST */
 }
 
 /**
@@ -916,6 +983,9 @@ void StartupIndustryDailyChanges(bool init_counter)
 
 void StartupEconomy()
 {
+#ifdef WITH_RUST
+	RunRustCompany(12);
+#else
 	_economy.interest_rate = _settings_game.difficulty.initial_interest;
 	_economy.infl_amount = _settings_game.difficulty.initial_interest;
 	_economy.infl_amount_pr = std::max(0, _settings_game.difficulty.initial_interest - 1);
@@ -934,6 +1004,7 @@ void StartupEconomy()
 
 	StartupIndustryDailyChanges(true); // As we are starting a new game, initialize the counter too
 
+#endif /* WITH_RUST */
 }
 
 /**
@@ -941,9 +1012,13 @@ void StartupEconomy()
  */
 void InitializeEconomy()
 {
+#ifdef WITH_RUST
+	RunRustCompany(13);
+#else
 	_economy.inflation_prices = _economy.inflation_payment = 1 << 16;
 	ClearCargoPickupMonitoring();
 	ClearCargoDeliveryMonitoring();
+#endif /* WITH_RUST */
 }
 
 /**
@@ -956,6 +1031,12 @@ void InitializeEconomy()
  */
 Money GetPrice(Price index, uint cost_factor, const GRFFile *grf_file, int shift)
 {
+#ifdef WITH_RUST
+	/* GRF storage stays canonical C++; observe its scalar at the original point. */
+	if (index >= PR_END) return 0;
+	if (grf_file != nullptr) shift += grf_file->price_base_multipliers[index];
+	return RunRustCompany(14, index, cost_factor, shift).b;
+#else
 	if (index >= PR_END) return 0;
 
 	Money cost = _price[index] * cost_factor;
@@ -968,6 +1049,7 @@ Money GetPrice(Price index, uint cost_factor, const GRFFile *grf_file, int shift
 	}
 
 	return cost;
+#endif /* WITH_RUST */
 }
 
 #ifdef WITH_RUST
@@ -1027,7 +1109,7 @@ static const OpenTTDCargoServices _cargo_services = {
 		Station *st = Station::Get(StationID(station));
 		switch (field) {
 			case 0: st->goods[cargo].status.Set({GoodsEntry::State::EverAccepted, GoodsEntry::State::CurrentMonth, GoodsEntry::State::AcceptedBigtick}); break;
-			case 1: Company::Get(CompanyID(company))->cur_economy.delivered_cargo[cargo] += amount; break;
+			case 1: Company::Get(CompanyID(company))->Finances().cur_economy.delivered_cargo[cargo] += amount; break;
 			case 2: st->town->received[CargoSpec::Get(cargo)->town_acceptance_effect].new_act += amount; break;
 			default: NOT_REACHED();
 		}
@@ -1252,7 +1334,7 @@ static Money DeliverGoods(int num_pieces, CargoType cargo_type, StationID dest, 
 	}
 
 	/* Update company statistics */
-	company->cur_economy.delivered_cargo[cargo_type] += accepted_total;
+	company->Finances().cur_economy.delivered_cargo[cargo_type] += accepted_total;
 
 	/* Increase town's counter for town effects */
 	const CargoSpec *cs = CargoSpec::Get(cargo_type);
@@ -2337,10 +2419,14 @@ void LoadUnloadStation(Station *st)
  */
 static const IntervalTimer<TimerGameCalendar> _calendar_inflation_monthly({TimerGameCalendar::MONTH, TimerGameCalendar::Priority::COMPANY}, [](auto)
 {
+#ifdef WITH_RUST
+	RunRustCompany(35);
+#else
 	if (_settings_game.economy.inflation) {
 		AddInflation();
 		RecomputePrices();
 	}
+#endif /* WITH_RUST */
 });
 
 /**
@@ -2348,11 +2434,16 @@ static const IntervalTimer<TimerGameCalendar> _calendar_inflation_monthly({Timer
  */
 static const IntervalTimer<TimerGameEconomy> _economy_companies_monthly({ TimerGameEconomy::MONTH, TimerGameEconomy::Priority::COMPANY }, [](auto)
 {
+#ifdef WITH_RUST
+	RunRustCompany(7);
+#else
 	CompaniesGenStatistics();
 	CompaniesPayInterest();
 	HandleEconomyFluctuations();
+#endif /* WITH_RUST */
 });
 
+#ifndef WITH_RUST
 static void DoAcquireCompany(Company *c, bool hostile_takeover)
 {
 	CompanyID ci = c->index;
@@ -2360,7 +2451,7 @@ static void DoAcquireCompany(Company *c, bool hostile_takeover)
 	auto cni = std::make_unique<CompanyNewsInformation>(STR_NEWS_COMPANY_MERGER_TITLE, c, Company::Get(_current_company));
 	EncodedString headline = hostile_takeover
 		? GetEncodedString(STR_NEWS_MERGER_TAKEOVER_TITLE, cni->company_name, cni->other_company_name)
-		: GetEncodedString(STR_NEWS_COMPANY_MERGER_DESCRIPTION, cni->company_name, cni->other_company_name, c->bankrupt_value);
+		: GetEncodedString(STR_NEWS_COMPANY_MERGER_DESCRIPTION, cni->company_name, cni->other_company_name, c->Finances().bankrupt_value);
 	AddCompanyNewsItem(std::move(headline), std::move(cni));
 	AI::BroadcastNewEvent(new ScriptEventCompanyMerger(ci, _current_company));
 	Game::NewEvent(new ScriptEventCompanyMerger(ci, _current_company));
@@ -2378,6 +2469,7 @@ static void DoAcquireCompany(Company *c, bool hostile_takeover)
 
 	delete c;
 }
+#endif /* !WITH_RUST */
 
 /**
  * Buy up another company.
@@ -2391,14 +2483,17 @@ static void DoAcquireCompany(Company *c, bool hostile_takeover)
  */
 CommandCost CmdBuyCompany(DoCommandFlags flags, CompanyID target_company, bool hostile_takeover)
 {
+#ifdef WITH_RUST
+	return RustCompanyCost(RunRustCompany(27, target_company.base(), hostile_takeover, flags.Test(DoCommandFlag::Execute)));
+#else
 	Company *c = Company::GetIfValid(target_company);
 	if (c == nullptr) return CMD_ERROR;
 
 	/* If you do a hostile takeover but the company went bankrupt, buy it via bankruptcy rules. */
-	if (hostile_takeover && c->bankrupt_asked.Test(_current_company)) hostile_takeover = false;
+	if (hostile_takeover && c->Finances().bankrupt_asked.Test(_current_company)) hostile_takeover = false;
 
 	/* Disable takeovers when not asked */
-	if (!hostile_takeover && !c->bankrupt_asked.Test(_current_company)) return CMD_ERROR;
+	if (!hostile_takeover && !c->Finances().bankrupt_asked.Test(_current_company)) return CMD_ERROR;
 
 	/* Only allow hostile takeover of AI companies and when in single player */
 	if (hostile_takeover && !c->is_ai) return CMD_ERROR;
@@ -2416,10 +2511,11 @@ CommandCost CmdBuyCompany(DoCommandFlags flags, CompanyID target_company, bool h
 	/* Get the cost here as the company is deleted in DoAcquireCompany.
 	 * For bankruptcy this amount is calculated when the offer was made;
 	 * for hostile takeover you pay the current price. */
-	CommandCost cost(EXPENSES_OTHER, hostile_takeover ? CalculateHostileTakeoverValue(c) : c->bankrupt_value);
+	CommandCost cost(EXPENSES_OTHER, hostile_takeover ? CalculateHostileTakeoverValue(c) : c->Finances().bankrupt_value);
 
 	if (flags.Test(DoCommandFlag::Execute)) {
 		DoAcquireCompany(c, hostile_takeover);
 	}
 	return cost;
+#endif /* WITH_RUST */
 }

@@ -455,7 +455,7 @@ static bool FixTTOEngines()
 static void FixTTOCompanies()
 {
 	for (Company *c : Company::Iterate()) {
-		c->cur_economy.company_value = CalculateCompanyValue(c); // company value history is zeroed
+		c->Finances().cur_economy.company_value = CalculateCompanyValue(c); // company value history is zeroed
 	}
 }
 
@@ -971,7 +971,7 @@ static bool LoadOldCompanyYearly(LoadgameState &ls, int num)
 			if (!LoadChunk(ls, nullptr, _company_yearly_chunk)) return false;
 		}
 
-		c->yearly_expenses[num][i] = _old_yearly;
+		c->Finances().yearly_expenses[num][i] = _old_yearly;
 	}
 
 	return true;
@@ -991,17 +991,17 @@ static bool LoadOldCompanyEconomy(LoadgameState &ls, int)
 {
 	Company *c = Company::Get(_current_company_id);
 
-	if (!LoadChunk(ls, &c->cur_economy, _company_economy_chunk)) return false;
+	if (!LoadChunk(ls, &c->Finances().cur_economy, _company_economy_chunk)) return false;
 
 	/* Don't ask, but the number in TTD(Patch) are inverted to OpenTTD */
-	c->cur_economy.income   = -c->cur_economy.income;
-	c->cur_economy.expenses = -c->cur_economy.expenses;
+	c->Finances().cur_economy.income   = -c->Finances().cur_economy.income;
+	c->Finances().cur_economy.expenses = -c->Finances().cur_economy.expenses;
 
 	for (uint i = 0; i < 24; i++) {
-		if (!LoadChunk(ls, &c->old_economy[i], _company_economy_chunk)) return false;
+		if (!LoadChunk(ls, &c->Finances().old_economy[i], _company_economy_chunk)) return false;
 
-		c->old_economy[i].income   = -c->old_economy[i].income;
-		c->old_economy[i].expenses = -c->old_economy[i].expenses;
+		c->Finances().old_economy[i].income   = -c->Finances().old_economy[i].income;
+		c->Finances().old_economy[i].expenses = -c->Finances().old_economy[i].expenses;
 	}
 
 	return true;
@@ -1014,15 +1014,15 @@ static const OldChunks _company_chunk[] = {
 	OCL_VAR ( OC_UINT16,   1, &_old_string_id_2 ),
 	OCL_SVAR( OC_UINT32, Company, president_name_2 ),
 
-	OCL_SVAR( OC_FILE_I32 | OC_VAR_I64, Company, money ),
-	OCL_SVAR( OC_FILE_I32 | OC_VAR_I64, Company, current_loan ),
+	OCL_SVAR( OC_FILE_I32 | OC_VAR_I64, Company, Finances().money ),
+	OCL_SVAR( OC_FILE_I32 | OC_VAR_I64, Company, Finances().current_loan ),
 
 	OCL_SVAR(  OC_UINT8, Company, colour ),
-	OCL_SVAR(  OC_UINT8, Company, money_fraction ),
-	OCL_SVAR(  OC_UINT8, Company, months_of_bankruptcy ),
-	OCL_SVAR( OC_FILE_U8  | OC_VAR_U16, Company, bankrupt_asked ),
-	OCL_SVAR( OC_FILE_U32 | OC_VAR_I64, Company, bankrupt_value ),
-	OCL_SVAR( OC_UINT16, Company, bankrupt_timeout ),
+	OCL_SVAR(  OC_UINT8, Company, Finances().money_fraction ),
+	OCL_SVAR(  OC_UINT8, Company, Finances().months_of_bankruptcy ),
+	OCL_SVAR( OC_FILE_U8  | OC_VAR_U16, Company, Finances().bankrupt_asked ),
+	OCL_SVAR( OC_FILE_U32 | OC_VAR_I64, Company, Finances().bankrupt_value ),
+	OCL_SVAR( OC_UINT16, Company, Finances().bankrupt_timeout ),
 
 	OCL_CNULL( OC_TTD, 4 ), // cargo_types
 	OCL_CNULL( OC_TTO, 2 ), // cargo_types
@@ -1032,11 +1032,11 @@ static const OldChunks _company_chunk[] = {
 
 	OCL_SVAR( OC_FILE_U16 | OC_VAR_I32, Company, inaugurated_year),
 	OCL_SVAR(                  OC_TILE, Company, last_build_coordinate ),
-	OCL_SVAR(                 OC_UINT8, Company, num_valid_stat_ent ),
+	OCL_SVAR(                 OC_UINT8, Company, Finances().num_valid_stat_ent ),
 
 	OCL_NULL( 230 ),         // Old AI
 
-	OCL_SVAR(  OC_UINT8, Company, block_preview ),
+	OCL_SVAR(  OC_UINT8, Company, Finances().block_preview ),
 	OCL_CNULL( OC_TTD, 1 ),           // Old AI
 	OCL_CNULL( OC_TTD, 1 ), // avail_railtypes
 	OCL_SVAR(   OC_TILE, Company, location_of_HQ ),
@@ -1109,7 +1109,7 @@ static bool LoadOldCompany(LoadgameState &ls, int num)
 		 * but correct for those oldies
 		 * Ps: this also means that if you had exact 893288 pounds, you will go back
 		 * to 100000.. this is a very VERY small chance ;) */
-		if (c->money == 893288) c->money = c->current_loan = 100000;
+		if (c->Finances().money == 893288) c->Finances().money = c->Finances().current_loan = 100000;
 	}
 
 	_company_colours[num] = c->colour;

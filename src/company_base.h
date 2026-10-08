@@ -67,8 +67,50 @@ private:
 typedef Pool<Company, CompanyID, 1> CompanyPool;
 extern CompanyPool _company_pool;
 
+/** Canonical finance fields; WITH_RUST storage is allocated and owned in Rust. */
+struct CompanyFinances {
+	Money money = 0; ///< Money owned by the company.
+	uint8_t money_fraction = 0; ///< Fraction of money of the company, too small to represent in #money.
+	Money current_loan = 0; ///< Amount of money borrowed from the bank.
+	Money max_loan = COMPANY_MAX_LOAN_DEFAULT; ///< Max allowed amount of the loan or COMPANY_MAX_LOAN_DEFAULT.
+	uint8_t block_preview = 0; ///< Number of quarters that the company is not allowed to get new exclusive engine previews (see CompaniesGenStatistics).
+	uint8_t months_empty = 0; ///< NOSAVE: Number of months this company has not had a client in multiplayer.
+	uint8_t months_of_bankruptcy = 0; ///< Number of months that the company is unable to pay its debts
+	CompanyMask bankrupt_asked{}; ///< which companies were asked about buying it?
+	int16_t bankrupt_timeout = 0; ///< If bigger than \c 0, amount of time to wait for an answer on an offer to buy this company.
+	Money bankrupt_value = 0;
+	uint32_t terraform_limit = 0; ///< Amount of tileheights we can (still) terraform (times 65536).
+	uint32_t clear_limit = 0; ///< Amount of tiles we can (still) clear (times 65536).
+	uint32_t tree_limit = 0; ///< Amount of trees we can (still) plant (times 65536).
+	uint32_t build_object_limit = 0; ///< Amount of tiles we can (still) build objects on (times 65536). Also applies to buying land.
+	std::array<Expenses, 3> yearly_expenses{}; ///< Expenses of the company for the last three years.
+	CompanyEconomyEntry cur_economy{}; ///< Economic data of the company of this quarter.
+	std::array<CompanyEconomyEntry, MAX_HISTORY_QUARTERS> old_economy{}; ///< Economic data of the company of the last #MAX_HISTORY_QUARTERS quarters.
+	uint8_t num_valid_stat_ent = 0; ///< Number of valid statistical entries in #old_economy.
+};
+
+#ifdef WITH_RUST
+#include "rust/company_ffi.h"
+struct CompanyFinanceOwner {
+	CompanyFinances *state;
+	CompanyFinanceOwner() : state(static_cast<CompanyFinances *>(openttd_rust_company_state_create())) { new (state) CompanyFinances(); }
+	CompanyFinanceOwner(const CompanyFinanceOwner &other) : CompanyFinanceOwner() { *state = *other.state; }
+	CompanyFinanceOwner &operator=(const CompanyFinanceOwner &other) { *state = *other.state; return *this; }
+	~CompanyFinanceOwner() { state->~CompanyFinances(); openttd_rust_company_state_destroy(state); }
+};
+#endif
+
 /** Statically loadable part of Company pool item */
 struct CompanyProperties {
+#ifdef WITH_RUST
+	CompanyFinanceOwner finances{};
+	CompanyFinances &Finances() { return *this->finances.state; }
+	const CompanyFinances &Finances() const { return *this->finances.state; }
+#else
+	CompanyFinances finances{};
+	CompanyFinances &Finances() { return this->finances; }
+	const CompanyFinances &Finances() const { return this->finances; }
+#endif
 	uint32_t name_2 = 0; ///< Parameter of #name_1.
 	StringID name_1 = INVALID_STRING_ID; ///< Name of the company if the user did not change it.
 	std::string name{}; ///< Name of the company if the user changed it.
@@ -81,14 +123,9 @@ struct CompanyProperties {
 
 	CompanyManagerFace face{}; ///< Face description of the president.
 
-	Money money = 0; ///< Money owned by the company.
-	uint8_t money_fraction = 0; ///< Fraction of money of the company, too small to represent in #money.
-	Money current_loan = 0; ///< Amount of money borrowed from the bank.
-	Money max_loan = COMPANY_MAX_LOAN_DEFAULT; ///< Max allowed amount of the loan or COMPANY_MAX_LOAN_DEFAULT.
 
 	Colours colour = COLOUR_BEGIN; ///< Company colour.
 
-	uint8_t block_preview = 0; ///< Number of quarters that the company is not allowed to get new exclusive engine previews (see CompaniesGenStatistics).
 
 	TileIndex location_of_HQ = INVALID_TILE; ///< Northern tile of HQ; #INVALID_TILE when there is none.
 	TileIndex last_build_coordinate{}; ///< Coordinate of the last build thing by this company.
@@ -96,16 +133,7 @@ struct CompanyProperties {
 	TimerGameEconomy::Year inaugurated_year{}; ///< Economy year of starting the company.
 	TimerGameCalendar::Year inaugurated_year_calendar{}; ///< Calendar year of starting the company. Used to display proper Inauguration year while in wallclock mode.
 
-	uint8_t months_empty = 0; ///< NOSAVE: Number of months this company has not had a client in multiplayer.
-	uint8_t months_of_bankruptcy = 0; ///< Number of months that the company is unable to pay its debts
-	CompanyMask bankrupt_asked{}; ///< which companies were asked about buying it?
-	int16_t bankrupt_timeout = 0; ///< If bigger than \c 0, amount of time to wait for an answer on an offer to buy this company.
-	Money bankrupt_value = 0;
 
-	uint32_t terraform_limit = 0; ///< Amount of tileheights we can (still) terraform (times 65536).
-	uint32_t clear_limit = 0; ///< Amount of tiles we can (still) clear (times 65536).
-	uint32_t tree_limit = 0; ///< Amount of trees we can (still) plant (times 65536).
-	uint32_t build_object_limit = 0; ///< Amount of tiles we can (still) build objects on (times 65536). Also applies to buying land.
 
 	/**
 	 * If \c true, the company is (also) controlled by the computer (a NoAI program).
@@ -113,10 +141,6 @@ struct CompanyProperties {
 	 */
 	bool is_ai = false;
 
-	std::array<Expenses, 3> yearly_expenses{}; ///< Expenses of the company for the last three years.
-	CompanyEconomyEntry cur_economy{}; ///< Economic data of the company of this quarter.
-	std::array<CompanyEconomyEntry, MAX_HISTORY_QUARTERS> old_economy{}; ///< Economic data of the company of the last #MAX_HISTORY_QUARTERS quarters.
-	uint8_t num_valid_stat_ent = 0; ///< Number of valid statistical entries in #old_economy.
 
 	std::array<Livery, LS_END> livery{};
 
@@ -198,6 +222,10 @@ struct Company : CompanyProperties, CompanyPool::PoolItem<&_company_pool> {
 Money CalculateCompanyValue(const Company *c, bool including_loan = true);
 Money CalculateHostileTakeoverValue(const Company *c);
 
+#ifdef WITH_RUST
+#define _cur_company_tick_index (*openttd_rust_company_tick())
+#else
 extern uint _cur_company_tick_index;
+#endif
 
 #endif /* COMPANY_BASE_H */
