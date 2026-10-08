@@ -43,7 +43,7 @@
 #include "safeguards.h"
 
 #ifdef WITH_RUST
-static uint64_t RunRustRoad(uint32_t kind, const RoadVehicle *v, uint64_t a = 0, uint64_t b = 0, uint64_t c = 0);
+static const OpenTTDRoadLeaves &GetRoadLeaves();
 #endif
 
 static const uint16_t _roadveh_images[] = {
@@ -228,7 +228,7 @@ static uint GetRoadVehLength(const RoadVehicle *v)
 void RoadVehUpdateCache(RoadVehicle *v, bool same_length)
 {
 #ifdef WITH_RUST
-	RunRustRoad(4, v, same_length);
+	openttd_rust_road_update_cache(v->index.base(), v->GetRustState(), same_length, &GetRoadLeaves(), &GetRustSharedServices());
 #else
 	assert(v->type == VEH_ROAD);
 	assert(v->IsFrontEngine());
@@ -383,7 +383,7 @@ CommandCost CmdTurnRoadVeh(DoCommandFlags flags, VehicleID veh_id)
 	if (ret.Failed()) return ret;
 
 #ifdef WITH_RUST
-	if (RunRustRoad(11, v, flags.Test(DoCommandFlag::Execute)) == 0) return CMD_ERROR;
+	if (openttd_rust_road_turn(v->index.base(), v->GetRustState(), flags.Test(DoCommandFlag::Execute), &GetRoadLeaves(), &GetRustSharedServices()) == 0) return CMD_ERROR;
 #else
 	if (v->vehstatus.Any({VehState::Stopped, VehState::Crashed}) ||
 			v->breakdown_ctr != 0 ||
@@ -481,7 +481,7 @@ void RoadVehicle::UpdateDeltaXY()
 inline int RoadVehicle::GetCurrentMaxSpeed() const
 {
 #ifdef WITH_RUST
-	return static_cast<int>(RunRustRoad(8, this));
+	return static_cast<int>(openttd_rust_road_max_speed(this->index.base(), this->GetRustState(), &GetRoadLeaves(), &GetRustSharedServices()));
 #else
 	int max_speed = this->gcache.cached_max_track_speed;
 
@@ -571,7 +571,7 @@ static bool RoadVehIsCrashed(RoadVehicle *v)
 uint RoadVehicle::Crash(bool flooded)
 {
 #ifdef WITH_RUST
-	return static_cast<uint>(RunRustRoad(3, this, flooded));
+	return static_cast<uint>(openttd_rust_road_crash(this->index.base(), this->GetRustState(), flooded, &GetRoadLeaves(), &GetRustSharedServices()));
 #else
 	uint victims = this->GroundVehicleBase::Crash(flooded);
 	if (this->IsFrontEngine()) {
@@ -812,7 +812,7 @@ static void RoadVehArrivesAt(const RoadVehicle *v, Station *st)
 int RoadVehicle::UpdateSpeed()
 {
 #ifdef WITH_RUST
-	return static_cast<int>(RunRustRoad(9, this));
+	return static_cast<int>(openttd_rust_road_update_speed(this->index.base(), this->GetRustState(), &GetRoadLeaves(), &GetRustSharedServices()));
 #else
 	switch (_settings_game.vehicle.roadveh_acceleration_model) {
 		default: NOT_REACHED();
@@ -1112,7 +1112,7 @@ struct RoadDriveEntry {
 bool RoadVehLeaveDepot(RoadVehicle *v, bool first)
 {
 #ifdef WITH_RUST
-	return RunRustRoad(2, v, first) != 0;
+	return openttd_rust_road_leave_depot(v->index.base(), v->GetRustState(), first, &GetRoadLeaves(), &GetRustSharedServices()) != 0;
 #else
 	/* Don't leave unless v and following wagons are in the depot. */
 	for (const RoadVehicle *u = v; u != nullptr; u = u->Next()) {
@@ -1261,7 +1261,7 @@ static bool CanBuildTramTrackOnTile(CompanyID c, TileIndex t, RoadType rt, RoadB
 bool IndividualRoadVehicleController(RoadVehicle *v, const RoadVehicle *prev)
 {
 #ifdef WITH_RUST
-	return RunRustRoad(1, v, prev == nullptr ? UINT32_MAX : prev->index.base()) != 0;
+	return openttd_rust_road_individual(v->index.base(), v->GetRustState(), prev == nullptr ? UINT32_MAX : prev->index.base(), &GetRoadLeaves(), &GetRustSharedServices()) != 0;
 #else
 	if (v->overtaking != 0)  {
 		if (IsTileType(v->tile, MP_STATION)) {
@@ -1769,7 +1769,7 @@ static bool RoadVehController(RoadVehicle *v)
 Money RoadVehicle::GetRunningCost() const
 {
 #ifdef WITH_RUST
-	return static_cast<int64_t>(RunRustRoad(7, this));
+	return static_cast<int64_t>(openttd_rust_road_running_cost(this->index.base(), this->GetRustState(), &GetRoadLeaves(), &GetRustSharedServices()));
 #else
 	const Engine *e = this->GetEngine();
 	if (e->VehInfo<RoadVehicleInfo>().running_cost_class == INVALID_PRICE) return 0;
@@ -1785,7 +1785,7 @@ bool RoadVehicle::Tick()
 {
 #ifdef WITH_RUST
 	PerformanceAccumulator framerate(PFE_GL_ROADVEHS);
-	return RunRustRoad(0, this) != 0;
+	return openttd_rust_road_tick(this->index.base(), this->GetRustState(), &GetRoadLeaves(), &GetRustSharedServices()) != 0;
 #else
 	PerformanceAccumulator framerate(PFE_GL_ROADVEHS);
 
@@ -1803,7 +1803,7 @@ bool RoadVehicle::Tick()
 void RoadVehicle::SetDestTile(TileIndex tile)
 {
 #ifdef WITH_RUST
-	RunRustRoad(10, this, tile.base());
+	openttd_rust_road_set_dest(this->index.base(), this->GetRustState(), tile.base(), &GetRoadLeaves(), &GetRustSharedServices());
 #else
 	if (tile == this->dest_tile) return;
 	this->path.clear();
@@ -1856,7 +1856,7 @@ static void CheckIfRoadVehNeedsService(RoadVehicle *v)
 void RoadVehicle::OnNewCalendarDay()
 {
 #ifdef WITH_RUST
-	RunRustRoad(5, this);
+	openttd_rust_road_calendar_day(this->index.base(), this->GetRustState(), &GetRoadLeaves(), &GetRustSharedServices());
 #else
 	if (!this->IsFrontEngine()) return;
 	AgeVehicle(this);
@@ -1867,7 +1867,7 @@ void RoadVehicle::OnNewCalendarDay()
 void RoadVehicle::OnNewEconomyDay()
 {
 #ifdef WITH_RUST
-	RunRustRoad(6, this);
+	openttd_rust_road_economy_day(this->index.base(), this->GetRustState(), &GetRoadLeaves(), &GetRustSharedServices());
 #else
 	if (!this->IsFrontEngine()) return;
 	EconomyAgeVehicle(this);
@@ -1896,7 +1896,7 @@ void RoadVehicle::OnNewEconomyDay()
 Trackdir RoadVehicle::GetVehicleTrackdir() const
 {
 #ifdef WITH_RUST
-	return static_cast<Trackdir>(RunRustRoad(12, this));
+	return static_cast<Trackdir>(openttd_rust_road_trackdir(this->index.base(), this->GetRustState(), &GetRoadLeaves(), &GetRustSharedServices()));
 #else
 	if (this->vehstatus.Test(VehState::Crashed)) return INVALID_TRACKDIR;
 
@@ -1940,42 +1940,221 @@ static OpenTTDRoadState *OPENTTD_ROAD_CALL RoadOwner(uint32_t id) noexcept
 	return RoadVehicle::Get(VehicleID(id))->GetRustState();
 }
 
-/** Pool iteration copies IDs only. Selection/control and all mutation remain Rust. */
-static size_t OPENTTD_ROAD_CALL RoadNearby(uint32_t id, uint32_t kind, int32_t x, int32_t y, uint32_t *out, size_t capacity) noexcept
+/** Single-pass synchronous visitors retain the original pool traversal order.
+ * Rust owns selection and stops traversal when the original predicate succeeds. */
+static void OPENTTD_ROAD_CALL RoadVisitClose(uint32_t, int32_t x, int32_t y, OpenTTDRoadVisitor visit, void *context) noexcept
 {
-	size_t count = 0;
-	auto append = [&](const Vehicle *v) {
-		if (out != nullptr && count < capacity) out[count] = v->index.base();
-		++count;
-	};
-	switch (kind) {
-		case 0: for (const Vehicle *v : VehiclesNearTileXY(x, y, 8)) append(v); break;
-		case 1: {
-			TileIndex tile = RoadVehicle::Get(VehicleID(id))->tile;
-			for (const Vehicle *v : VehiclesOnTile(tile)) append(v);
-			for (const Vehicle *v : VehiclesOnTile(GetOtherTunnelBridgeEnd(tile))) append(v);
-			break;
-		}
-		case 2: for (const Vehicle *v : VehiclesOnTile(TileIndex(static_cast<uint32_t>(x)))) append(v); break;
-		case 3: for (const Vehicle *v : VehiclesNearTileXY(x, y, 4)) append(v); break;
-		default: NOT_REACHED();
-	}
-	return count;
+	for (const Vehicle *v : VehiclesNearTileXY(x, y, 8)) if (!visit(context, v->index.base())) break;
+}
+static void OPENTTD_ROAD_CALL RoadVisitTunnel(uint32_t id, int32_t, int32_t, OpenTTDRoadVisitor visit, void *context) noexcept
+{
+	TileIndex tile = RoadVehicle::Get(VehicleID(id))->tile;
+	for (const Vehicle *v : VehiclesOnTile(tile)) if (!visit(context, v->index.base())) return;
+	for (const Vehicle *v : VehiclesOnTile(GetOtherTunnelBridgeEnd(tile))) if (!visit(context, v->index.base())) return;
+}
+static void OPENTTD_ROAD_CALL RoadVisitTile(uint32_t, int32_t tile, int32_t, OpenTTDRoadVisitor visit, void *context) noexcept
+{
+	for (const Vehicle *v : VehiclesOnTile(TileIndex(static_cast<uint32_t>(tile)))) if (!visit(context, v->index.base())) break;
+}
+static void OPENTTD_ROAD_CALL RoadVisitTrain(uint32_t, int32_t x, int32_t y, OpenTTDRoadVisitor visit, void *context) noexcept
+{
+	for (const Vehicle *v : VehiclesNearTileXY(x, y, 4)) if (!visit(context, v->index.base())) break;
 }
 
-static uint64_t RunRustRoad(uint32_t kind, const RoadVehicle *v, uint64_t a, uint64_t b, uint64_t c)
+static const OpenTTDRoadLeaves &GetRoadLeaves()
 {
-	static const OpenTTDRoadLeaves leaves{RoadObserve, RoadWrite, RoadLeaf, RoadOwner, RoadNearby};
-	std::unique_ptr<void, decltype(&openttd_rust_road_task_destroy)> task(openttd_rust_road_create(kind, v->index.base(), a, b, c, &leaves, &GetRustSharedServices()), openttd_rust_road_task_destroy);
-	uint64_t response = 0;
-	for (;;) {
-		auto action = openttd_rust_road_advance(task.get(), response);
-		if (action.op == 0) return action.a;
-		response = RoadAction(action);
-	}
+	static const OpenTTDRoadLeaves leaves{
+		RoadReadZ,
+		RoadReadType,
+		RoadAccModel,
+		RoadRoadSide,
+		RoadTileType,
+		RoadHasRoad,
+		RoadTrackStatus,
+		RoadTileOwner,
+		RoadDepotDir,
+		RoadBayDir,
+		RoadIsDepot,
+		RoadNormalRoad,
+		RoadRoadWorks,
+		RoadDisallowed,
+		RoadBayStop,
+		RoadIsDtStop,
+		RoadStopType,
+		RoadFreeBay,
+		RoadAnyRoadBits,
+		RoadRoadBits,
+		RoadOffset,
+		RoadTileX,
+		RoadTileY,
+		RoadStation,
+		RoadContinuation,
+		RoadBridgeSpeed,
+		RoadMaxPenalty,
+		RoadServint,
+		RoadNeedsService,
+		RoadWaitUnbunch,
+		RoadOrderStop,
+		RoadRoadType,
+		RoadQueue,
+		RoadTunnelDir,
+		RoadAcceleration,
+		RoadUpdateSpeed,
+		RoadAdvance,
+		RoadPosition,
+		RoadBaseViewport,
+		RoadLastSpeed,
+		RoadRoadstopLeave,
+		RoadEntranceSet,
+		RoadEntranceBusy,
+		RoadOrderFree,
+		RoadSetNext,
+		RoadStartStopDirty,
+		RoadDepotDirty,
+		RoadDetailsDirty,
+		RoadService,
+		RoadLeaveUnbunch,
+		RoadResetUnbunch,
+		RoadPathResult,
+		RoadOrderDummy,
+		RoadOrderDepot,
+		RoadDepotIndex,
+		RoadDecreaseValue,
+		RoadAge,
+		RoadEconomyAge,
+		RoadCheckBreakdown,
+		RoadCheckOrders,
+		RoadPayRunning,
+		RoadCostClass,
+		RoadCostFactor,
+		RoadGetPrice,
+		RoadGrfVersion,
+		RoadLengthDefault,
+		RoadAgeDefault,
+		RoadSpeedDefault,
+		RoadLengthError,
+		RoadDisconnect,
+		RoadExplosion,
+		RoadSoundDefault,
+		RoadSound,
+		RoadSoundOld1,
+		RoadSoundOld2,
+		RoadEngineInvalid,
+		RoadInvalidPrice,
+		RoadCostDivisor,
+		RoadIsCrossing,
+		RoadNewPosition,
+		RoadVirtTile,
+		RoadIsRoadStop,
+		RoadSetDest,
+		RoadCacheInvalidate,
+		RoadArrival,
+		RoadCrashNews,
+		RoadStationVisits,
+		RoadStationVisitSet,
+		RoadLocalCompany,
+		RoadEnterTile,
+		RoadEnterDepot,
+		RoadProcessOrders,
+		RoadLoading,
+		RoadBeginLoading,
+		RoadTramProbe,
+		RoadProperty,
+		RoadLengthCallback,
+		RoadPlaySound,
+		RoadVisual,
+		RoadUpdateVisual,
+		RoadCargoChanged,
+		RoadLengthChanged,
+		RoadBreakdown,
+		RoadDelete,
+		RoadGroundCrash,
+		RoadStopRandom,
+		RoadStopAnimation,
+		RoadYapf,
+		RoadFindDepot,
+		RoadInclination,
+		RoadViewport,
+		RoadSetTile,
+		RoadSetX,
+		RoadSetY,
+		RoadSetDirection,
+		RoadSetSpeed,
+		RoadSetTick,
+		RoadSetRunning,
+		RoadSetDay,
+		RoadSetOrderTime,
+		RoadSetProgress,
+		RoadSetLastStation,
+		RoadSetHidden,
+		RoadSetFirstEngine,
+		RoadSetLength,
+		RoadSetTotalLength,
+		RoadSetCargoAge,
+		RoadSetMaxSpeed,
+		RoadSetSuppressImplicit,
+		RoadReadDay,
+		RoadReadDest,
+		RoadReadDirection,
+		RoadReadEngine,
+		RoadReadFirst,
+		RoadReadFront,
+		RoadReadLastStation,
+		RoadReadLength,
+		RoadReadNext,
+		RoadReadOrderType,
+		RoadReadPrevious,
+		RoadReadProgress,
+		RoadReadRunning,
+		RoadReadSpeed,
+		RoadReadStatus,
+		RoadReadTick,
+		RoadReadTile,
+		RoadReadTotalLength,
+		RoadReadTram,
+		RoadSpeedLimits,
+		RoadConsistSpeed,
+		RoadCloseOrigin,
+		RoadCloseCandidate,
+		RoadOvertakeOrigin,
+		RoadOvertakeSpeed,
+		RoadSlidingPosition,
+		RoadHeightSpeed,
+		RoadCollisionPart,
+		RoadCollisionOrigin,
+		RoadCrashDirection,
+		RoadPathVehicle,
+		RoadDepotPart,
+		RoadDepotOrders,
+		RoadVehicleTile,
+		RoadArrivalVehicle,
+		RoadTunnelVehicle,
+		RoadMoveVehicle,
+		RoadMoveTransition,
+		RoadMovePosition,
+		RoadBlockVehicle,
+		RoadStopOrder,
+		RoadMoveStop,
+		RoadOrderClock,
+		RoadControllerPart,
+		RoadServiceOrigin,
+		RoadServiceOrder,
+		RoadTrackDirection,
+		RoadSlopeOrigin,
+		RoadSlopePart,
+		RoadTurnVehicle,
+		RoadOwner,
+		RoadVisitClose,
+		RoadVisitTunnel,
+		RoadVisitTile,
+		RoadVisitTrain,
+		RoadReadBus,
+
+	};
+	return leaves;
 }
 #endif /* WITH_RUST */
 
 #ifdef WITH_RUST
-bool RoadVehicle::HasToUseGetSlopePixelZ() { return RunRustRoad(13, this) != 0; }
+bool RoadVehicle::HasToUseGetSlopePixelZ() { return openttd_rust_road_slope_pixel(this->index.base(), this->GetRustState(), &GetRoadLeaves(), &GetRustSharedServices()) != 0; }
 #endif

@@ -79,7 +79,7 @@ pub fn layout(type_id: u8, item: u8) -> usize {
         39 => {
             layout!(crate::effect::View, item; x, y, z, sprite, progress, spritenum, subtype, ambient)
         }
-        40 => 0, // Retired effect invocation cursor.
+        40 | 83 => 0, // Retired effect cursor and road invocation action.
         41 => {
             layout!(crate::effect::Leaves, item; observe, write, viewport, sound, animated)
         }
@@ -87,11 +87,45 @@ pub fn layout(type_id: u8, item: u8) -> usize {
             layout!(crate::services::Services, item; context, random, observe_tile, write_tile, trig, industry)
         }
         80 => layout!(crate::road::PathElement, item; trackdir, tile),
-        81 => {
-            layout!(crate::road::View, item; r#type, first, next, previous, tile, dest, x, y, z, direction, speed, tick, running, day, order_time, progress, status, owner, engine, last_station, order_destination, order_type, order_max_speed, breakdown, max_track_speed, length, total_length, roadtype, front, articulated, tram, bus, order_nonstop)
+        81 => layout!(crate::road::SpeedLimits, item; max_track_speed, order_max_speed),
+        82 => {
+            layout!(crate::road::Leaves, item; read_z, read_type, op_acc_model, op_road_side, op_tile_type, op_has_road, op_track_status, op_tile_owner, op_depot_dir, op_bay_dir, op_is_depot, op_normal_road, op_road_works, op_disallowed, op_bay_stop, op_is_dt_stop, op_stop_type, op_free_bay, op_any_road_bits, op_road_bits, op_offset, op_tile_x, op_tile_y, op_station, op_continuation, op_bridge_speed, op_max_penalty, op_servint, op_needs_service, op_wait_unbunch, op_order_stop, op_road_type, op_queue, op_tunnel_dir, op_acceleration, op_update_speed, op_advance, op_position, op_base_viewport, op_last_speed, op_roadstop_leave, op_entrance_set, op_entrance_busy, op_order_free, op_set_next, op_start_stop_dirty, op_depot_dirty, op_details_dirty, op_service, op_leave_unbunch, op_reset_unbunch, op_path_result, op_order_dummy, op_order_depot, op_depot_index, op_decrease_value, op_age, op_economy_age, op_check_breakdown, op_check_orders, op_pay_running, op_cost_class, op_cost_factor, op_get_price, op_grf_version, op_length_default, op_age_default, op_speed_default, op_length_error, op_disconnect, op_explosion, op_sound_default, op_sound, op_sound_old1, op_sound_old2, op_engine_invalid, op_invalid_price, op_cost_divisor, op_is_crossing, op_new_position, op_virt_tile, op_is_road_stop, op_set_dest, op_cache_invalidate, op_arrival, op_crash_news, op_station_visits, op_station_visit_set, op_local_company, op_enter_tile, op_enter_depot, op_process_orders, op_loading, op_begin_loading, op_tram_probe, op_property, op_length_callback, op_play_sound, op_visual, op_update_visual, op_cargo_changed, op_length_changed, op_breakdown, op_delete, op_ground_crash, op_stop_random, op_stop_animation, op_yapf, op_find_depot, op_inclination, op_viewport, set_tile, set_x, set_y, set_direction, set_speed, set_tick, set_running, set_day, set_order_time, set_progress, set_last_station, set_hidden, set_first_engine, set_length, set_total_length, set_cargo_age, set_max_speed, set_suppress_implicit, read_day, read_dest, read_direction, read_engine, read_first, read_front, read_last_station, read_length, read_next, read_order_type, read_previous, read_progress, read_running, read_speed, read_status, read_tick, read_tile, read_total_length, read_tram, speed_limits, consist_speed, close_origin, close_candidate, overtake_origin, overtake_speed, sliding_position, height_speed, collision_part, collision_origin, crash_direction, path_vehicle, depot_part, depot_orders, vehicle_tile, arrival_vehicle, tunnel_vehicle, move_vehicle, move_transition, move_position, block_vehicle, stop_order, move_stop, order_clock, controller_part, service_origin, service_order, track_direction, slope_origin, slope_part, turn_vehicle, owner, visit_close, visit_tunnel, visit_tile, visit_train, read_bus)
         }
-        82 => layout!(crate::road::Leaves, item; observe, write, leaf, owner, nearby),
-        83 => layout!(crate::road::Action, item; op, id, a, b, c),
+        215 => layout!(crate::road::ConsistSpeed, item; direction, next, status, tile),
+        216 => layout!(crate::road::CloseOrigin, item; first, z),
+        217 => layout!(crate::road::CloseCandidate, item; direction, first, x, y, z),
+        218 => layout!(crate::road::OvertakeOrigin, item; articulated, direction, tile, tram),
+        219 => layout!(crate::road::OvertakeSpeed, item; direction, speed, status, tile),
+        220 => layout!(crate::road::SlidingPosition, item; direction, x, y),
+        221 => layout!(crate::road::HeightSpeed, item; max_track_speed, speed, z),
+        222 => layout!(crate::road::CollisionPart, item; next, tile, z),
+        223 => layout!(crate::road::CollisionOrigin, item; x, y),
+        224 => layout!(crate::road::CrashDirection, item; direction),
+        225 => layout!(crate::road::PathVehicle, item; articulated, owner, tile, tram),
+        226 => layout!(crate::road::DepotPart, item; next, tile),
+        227 => layout!(crate::road::DepotOrders, item; dest, order_type),
+        228 => layout!(crate::road::VehicleTile, item; tile),
+        229 => layout!(crate::road::ArrivalVehicle, item; owner, tram),
+        230 => layout!(crate::road::TunnelVehicle, item; direction, front),
+        231 => layout!(crate::road::MoveVehicle, item; front, tile, tram),
+        232 => layout!(crate::road::MoveTransition, item; length, next, tile),
+        233 => layout!(crate::road::MovePosition, item; order_type, owner, speed, tile),
+        234 => layout!(crate::road::BlockVehicle, item; direction, front, owner, tile),
+        235 => layout!(crate::road::StopOrder, item; order_destination, order_type, tile),
+        236 => layout!(crate::road::MoveStop, item; order_type, tile),
+        237 => layout!(crate::road::OrderClock, item; order_time),
+        238 => layout!(crate::road::ControllerPart, item; next, status),
+        239 => layout!(crate::road::ServiceOrigin, item; first, speed, tile),
+        240 => layout!(crate::road::ServiceOrder, item; order_nonstop, order_type),
+        241 => layout!(crate::road::TrackDirection, item; direction, status, tile),
+        242 => layout!(crate::road::SlopeOrigin, item; direction, first),
+        243 => layout!(crate::road::SlopePart, item; direction, next),
+        244 => {
+            layout!(crate::road::TurnVehicle, item; breakdown, direction, order_type, status, tile)
+        }
+        245 => layout!(crate::road::Position, item; x, y),
+        246 => layout!(crate::road::TrackChoice, item; trackdir, found),
+        247 => layout!(crate::road::DepotResult, item; tile, length),
         44 => layout!(crate::disaster::State, item; image_override, target, state, flags),
         45 => layout!(crate::disaster::Action, item; kind, id, other, a, b, c, d),
         46 => layout!(crate::water_regions::Patch, item; x, y, label),

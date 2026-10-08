@@ -112,9 +112,41 @@ static void Layouts()
 	Layout(39, "OpenTTDEffectView", {sizeof(OpenTTDEffectView), alignof(OpenTTDEffectView), offsetof(OpenTTDEffectView, x), offsetof(OpenTTDEffectView, y), offsetof(OpenTTDEffectView, z), offsetof(OpenTTDEffectView, sprite), offsetof(OpenTTDEffectView, progress), offsetof(OpenTTDEffectView, spritenum), offsetof(OpenTTDEffectView, subtype), offsetof(OpenTTDEffectView, ambient)});
 	Layout(41, "OpenTTDEffectLeaves", {sizeof(OpenTTDEffectLeaves), alignof(OpenTTDEffectLeaves), offsetof(OpenTTDEffectLeaves, observe), offsetof(OpenTTDEffectLeaves, write), offsetof(OpenTTDEffectLeaves, viewport), offsetof(OpenTTDEffectLeaves, sound), offsetof(OpenTTDEffectLeaves, animated)});
 	Layout(80, "OpenTTDRoadPathElement", {sizeof(OpenTTDRoadPathElement), alignof(OpenTTDRoadPathElement), offsetof(OpenTTDRoadPathElement, trackdir), offsetof(OpenTTDRoadPathElement, tile)});
-	Layout(81, "OpenTTDRoadView", {sizeof(OpenTTDRoadView), alignof(OpenTTDRoadView), offsetof(OpenTTDRoadView, type), offsetof(OpenTTDRoadView, first), offsetof(OpenTTDRoadView, next), offsetof(OpenTTDRoadView, previous), offsetof(OpenTTDRoadView, tile), offsetof(OpenTTDRoadView, dest), offsetof(OpenTTDRoadView, x), offsetof(OpenTTDRoadView, y), offsetof(OpenTTDRoadView, z), offsetof(OpenTTDRoadView, direction), offsetof(OpenTTDRoadView, speed), offsetof(OpenTTDRoadView, tick), offsetof(OpenTTDRoadView, running), offsetof(OpenTTDRoadView, day), offsetof(OpenTTDRoadView, order_time), offsetof(OpenTTDRoadView, progress), offsetof(OpenTTDRoadView, status), offsetof(OpenTTDRoadView, owner), offsetof(OpenTTDRoadView, engine), offsetof(OpenTTDRoadView, last_station), offsetof(OpenTTDRoadView, order_destination), offsetof(OpenTTDRoadView, order_type), offsetof(OpenTTDRoadView, order_max_speed), offsetof(OpenTTDRoadView, breakdown), offsetof(OpenTTDRoadView, max_track_speed), offsetof(OpenTTDRoadView, length), offsetof(OpenTTDRoadView, total_length), offsetof(OpenTTDRoadView, roadtype), offsetof(OpenTTDRoadView, front), offsetof(OpenTTDRoadView, articulated), offsetof(OpenTTDRoadView, tram), offsetof(OpenTTDRoadView, bus), offsetof(OpenTTDRoadView, order_nonstop)});
-	Layout(82, "OpenTTDRoadLeaves", {sizeof(OpenTTDRoadLeaves), alignof(OpenTTDRoadLeaves), offsetof(OpenTTDRoadLeaves, observe), offsetof(OpenTTDRoadLeaves, write), offsetof(OpenTTDRoadLeaves, leaf), offsetof(OpenTTDRoadLeaves, owner), offsetof(OpenTTDRoadLeaves, nearby)});
-	Layout(83, "OpenTTDRoadAction", {sizeof(OpenTTDRoadAction), alignof(OpenTTDRoadAction), offsetof(OpenTTDRoadAction, op), offsetof(OpenTTDRoadAction, id), offsetof(OpenTTDRoadAction, a), offsetof(OpenTTDRoadAction, b), offsetof(OpenTTDRoadAction, c)});
+	Layout(81, "OpenTTDRoadSpeedLimits", {sizeof(OpenTTDRoadSpeedLimits), alignof(OpenTTDRoadSpeedLimits), offsetof(OpenTTDRoadSpeedLimits, max_track_speed), offsetof(OpenTTDRoadSpeedLimits, order_max_speed)});
+	Layout(82, "OpenTTDRoadLeaves", {sizeof(OpenTTDRoadLeaves), alignof(OpenTTDRoadLeaves), offsetof(OpenTTDRoadLeaves, read_z), offsetof(OpenTTDRoadLeaves, read_type), offsetof(OpenTTDRoadLeaves, op_acc_model), offsetof(OpenTTDRoadLeaves, op_road_side), offsetof(OpenTTDRoadLeaves, op_tile_type), offsetof(OpenTTDRoadLeaves, op_has_road), offsetof(OpenTTDRoadLeaves, op_track_status), offsetof(OpenTTDRoadLeaves, op_tile_owner), offsetof(OpenTTDRoadLeaves, op_depot_dir), offsetof(OpenTTDRoadLeaves, op_bay_dir), offsetof(OpenTTDRoadLeaves, op_is_depot), offsetof(OpenTTDRoadLeaves, op_normal_road), offsetof(OpenTTDRoadLeaves, op_road_works), offsetof(OpenTTDRoadLeaves, op_disallowed), offsetof(OpenTTDRoadLeaves, op_bay_stop), offsetof(OpenTTDRoadLeaves, op_is_dt_stop), offsetof(OpenTTDRoadLeaves, op_stop_type), offsetof(OpenTTDRoadLeaves, op_free_bay), offsetof(OpenTTDRoadLeaves, op_any_road_bits), offsetof(OpenTTDRoadLeaves, op_road_bits), offsetof(OpenTTDRoadLeaves, op_offset), offsetof(OpenTTDRoadLeaves, op_tile_x), offsetof(OpenTTDRoadLeaves, op_tile_y), offsetof(OpenTTDRoadLeaves, op_station), offsetof(OpenTTDRoadLeaves, op_continuation), offsetof(OpenTTDRoadLeaves, op_bridge_speed), offsetof(OpenTTDRoadLeaves, op_max_penalty), offsetof(OpenTTDRoadLeaves, op_servint), offsetof(OpenTTDRoadLeaves, op_needs_service), offsetof(OpenTTDRoadLeaves, op_wait_unbunch), offsetof(OpenTTDRoadLeaves, op_order_stop), offsetof(OpenTTDRoadLeaves, op_road_type), offsetof(OpenTTDRoadLeaves, op_queue), offsetof(OpenTTDRoadLeaves, op_tunnel_dir), offsetof(OpenTTDRoadLeaves, op_acceleration), offsetof(OpenTTDRoadLeaves, op_update_speed), offsetof(OpenTTDRoadLeaves, op_advance), offsetof(OpenTTDRoadLeaves, op_position), offsetof(OpenTTDRoadLeaves, op_base_viewport), offsetof(OpenTTDRoadLeaves, op_last_speed), offsetof(OpenTTDRoadLeaves, op_roadstop_leave), offsetof(OpenTTDRoadLeaves, op_entrance_set), offsetof(OpenTTDRoadLeaves, op_entrance_busy), offsetof(OpenTTDRoadLeaves, op_order_free), offsetof(OpenTTDRoadLeaves, op_set_next), offsetof(OpenTTDRoadLeaves, op_start_stop_dirty), offsetof(OpenTTDRoadLeaves, op_depot_dirty), offsetof(OpenTTDRoadLeaves, op_details_dirty), offsetof(OpenTTDRoadLeaves, op_service), offsetof(OpenTTDRoadLeaves, op_leave_unbunch), offsetof(OpenTTDRoadLeaves, op_reset_unbunch), offsetof(OpenTTDRoadLeaves, op_path_result), offsetof(OpenTTDRoadLeaves, op_order_dummy), offsetof(OpenTTDRoadLeaves, op_order_depot), offsetof(OpenTTDRoadLeaves, op_depot_index), offsetof(OpenTTDRoadLeaves, op_decrease_value), offsetof(OpenTTDRoadLeaves, op_age), offsetof(OpenTTDRoadLeaves, op_economy_age), offsetof(OpenTTDRoadLeaves, op_check_breakdown), offsetof(OpenTTDRoadLeaves, op_check_orders), offsetof(OpenTTDRoadLeaves, op_pay_running), offsetof(OpenTTDRoadLeaves, op_cost_class), offsetof(OpenTTDRoadLeaves, op_cost_factor), offsetof(OpenTTDRoadLeaves, op_get_price), offsetof(OpenTTDRoadLeaves, op_grf_version), offsetof(OpenTTDRoadLeaves, op_length_default), offsetof(OpenTTDRoadLeaves, op_age_default), offsetof(OpenTTDRoadLeaves, op_speed_default), offsetof(OpenTTDRoadLeaves, op_length_error), offsetof(OpenTTDRoadLeaves, op_disconnect), offsetof(OpenTTDRoadLeaves, op_explosion), offsetof(OpenTTDRoadLeaves, op_sound_default), offsetof(OpenTTDRoadLeaves, op_sound), offsetof(OpenTTDRoadLeaves, op_sound_old1), offsetof(OpenTTDRoadLeaves, op_sound_old2), offsetof(OpenTTDRoadLeaves, op_engine_invalid), offsetof(OpenTTDRoadLeaves, op_invalid_price), offsetof(OpenTTDRoadLeaves, op_cost_divisor), offsetof(OpenTTDRoadLeaves, op_is_crossing), offsetof(OpenTTDRoadLeaves, op_new_position), offsetof(OpenTTDRoadLeaves, op_virt_tile), offsetof(OpenTTDRoadLeaves, op_is_road_stop), offsetof(OpenTTDRoadLeaves, op_set_dest), offsetof(OpenTTDRoadLeaves, op_cache_invalidate), offsetof(OpenTTDRoadLeaves, op_arrival), offsetof(OpenTTDRoadLeaves, op_crash_news), offsetof(OpenTTDRoadLeaves, op_station_visits), offsetof(OpenTTDRoadLeaves, op_station_visit_set), offsetof(OpenTTDRoadLeaves, op_local_company), offsetof(OpenTTDRoadLeaves, op_enter_tile), offsetof(OpenTTDRoadLeaves, op_enter_depot), offsetof(OpenTTDRoadLeaves, op_process_orders), offsetof(OpenTTDRoadLeaves, op_loading), offsetof(OpenTTDRoadLeaves, op_begin_loading), offsetof(OpenTTDRoadLeaves, op_tram_probe), offsetof(OpenTTDRoadLeaves, op_property), offsetof(OpenTTDRoadLeaves, op_length_callback), offsetof(OpenTTDRoadLeaves, op_play_sound), offsetof(OpenTTDRoadLeaves, op_visual), offsetof(OpenTTDRoadLeaves, op_update_visual), offsetof(OpenTTDRoadLeaves, op_cargo_changed), offsetof(OpenTTDRoadLeaves, op_length_changed), offsetof(OpenTTDRoadLeaves, op_breakdown), offsetof(OpenTTDRoadLeaves, op_delete), offsetof(OpenTTDRoadLeaves, op_ground_crash), offsetof(OpenTTDRoadLeaves, op_stop_random), offsetof(OpenTTDRoadLeaves, op_stop_animation), offsetof(OpenTTDRoadLeaves, op_yapf), offsetof(OpenTTDRoadLeaves, op_find_depot), offsetof(OpenTTDRoadLeaves, op_inclination), offsetof(OpenTTDRoadLeaves, op_viewport), offsetof(OpenTTDRoadLeaves, set_tile), offsetof(OpenTTDRoadLeaves, set_x), offsetof(OpenTTDRoadLeaves, set_y), offsetof(OpenTTDRoadLeaves, set_direction), offsetof(OpenTTDRoadLeaves, set_speed), offsetof(OpenTTDRoadLeaves, set_tick), offsetof(OpenTTDRoadLeaves, set_running), offsetof(OpenTTDRoadLeaves, set_day), offsetof(OpenTTDRoadLeaves, set_order_time), offsetof(OpenTTDRoadLeaves, set_progress), offsetof(OpenTTDRoadLeaves, set_last_station), offsetof(OpenTTDRoadLeaves, set_hidden), offsetof(OpenTTDRoadLeaves, set_first_engine), offsetof(OpenTTDRoadLeaves, set_length), offsetof(OpenTTDRoadLeaves, set_total_length), offsetof(OpenTTDRoadLeaves, set_cargo_age), offsetof(OpenTTDRoadLeaves, set_max_speed), offsetof(OpenTTDRoadLeaves, set_suppress_implicit), offsetof(OpenTTDRoadLeaves, read_day), offsetof(OpenTTDRoadLeaves, read_dest), offsetof(OpenTTDRoadLeaves, read_direction), offsetof(OpenTTDRoadLeaves, read_engine), offsetof(OpenTTDRoadLeaves, read_first), offsetof(OpenTTDRoadLeaves, read_front), offsetof(OpenTTDRoadLeaves, read_last_station), offsetof(OpenTTDRoadLeaves, read_length), offsetof(OpenTTDRoadLeaves, read_next), offsetof(OpenTTDRoadLeaves, read_order_type), offsetof(OpenTTDRoadLeaves, read_previous), offsetof(OpenTTDRoadLeaves, read_progress), offsetof(OpenTTDRoadLeaves, read_running), offsetof(OpenTTDRoadLeaves, read_speed), offsetof(OpenTTDRoadLeaves, read_status), offsetof(OpenTTDRoadLeaves, read_tick), offsetof(OpenTTDRoadLeaves, read_tile), offsetof(OpenTTDRoadLeaves, read_total_length), offsetof(OpenTTDRoadLeaves, read_tram), offsetof(OpenTTDRoadLeaves, speed_limits), offsetof(OpenTTDRoadLeaves, consist_speed), offsetof(OpenTTDRoadLeaves, close_origin), offsetof(OpenTTDRoadLeaves, close_candidate), offsetof(OpenTTDRoadLeaves, overtake_origin), offsetof(OpenTTDRoadLeaves, overtake_speed), offsetof(OpenTTDRoadLeaves, sliding_position), offsetof(OpenTTDRoadLeaves, height_speed), offsetof(OpenTTDRoadLeaves, collision_part), offsetof(OpenTTDRoadLeaves, collision_origin), offsetof(OpenTTDRoadLeaves, crash_direction), offsetof(OpenTTDRoadLeaves, path_vehicle), offsetof(OpenTTDRoadLeaves, depot_part), offsetof(OpenTTDRoadLeaves, depot_orders), offsetof(OpenTTDRoadLeaves, vehicle_tile), offsetof(OpenTTDRoadLeaves, arrival_vehicle), offsetof(OpenTTDRoadLeaves, tunnel_vehicle), offsetof(OpenTTDRoadLeaves, move_vehicle), offsetof(OpenTTDRoadLeaves, move_transition), offsetof(OpenTTDRoadLeaves, move_position), offsetof(OpenTTDRoadLeaves, block_vehicle), offsetof(OpenTTDRoadLeaves, stop_order), offsetof(OpenTTDRoadLeaves, move_stop), offsetof(OpenTTDRoadLeaves, order_clock), offsetof(OpenTTDRoadLeaves, controller_part), offsetof(OpenTTDRoadLeaves, service_origin), offsetof(OpenTTDRoadLeaves, service_order), offsetof(OpenTTDRoadLeaves, track_direction), offsetof(OpenTTDRoadLeaves, slope_origin), offsetof(OpenTTDRoadLeaves, slope_part), offsetof(OpenTTDRoadLeaves, turn_vehicle), offsetof(OpenTTDRoadLeaves, owner), offsetof(OpenTTDRoadLeaves, visit_close), offsetof(OpenTTDRoadLeaves, visit_tunnel), offsetof(OpenTTDRoadLeaves, visit_tile), offsetof(OpenTTDRoadLeaves, visit_train), offsetof(OpenTTDRoadLeaves, read_bus)});
+	Layout(215, "OpenTTDRoadConsistSpeed", {sizeof(OpenTTDRoadConsistSpeed), alignof(OpenTTDRoadConsistSpeed), offsetof(OpenTTDRoadConsistSpeed, direction), offsetof(OpenTTDRoadConsistSpeed, next), offsetof(OpenTTDRoadConsistSpeed, status), offsetof(OpenTTDRoadConsistSpeed, tile)});
+	Layout(216, "OpenTTDRoadCloseOrigin", {sizeof(OpenTTDRoadCloseOrigin), alignof(OpenTTDRoadCloseOrigin), offsetof(OpenTTDRoadCloseOrigin, first), offsetof(OpenTTDRoadCloseOrigin, z)});
+	Layout(217, "OpenTTDRoadCloseCandidate", {sizeof(OpenTTDRoadCloseCandidate), alignof(OpenTTDRoadCloseCandidate), offsetof(OpenTTDRoadCloseCandidate, direction), offsetof(OpenTTDRoadCloseCandidate, first), offsetof(OpenTTDRoadCloseCandidate, x), offsetof(OpenTTDRoadCloseCandidate, y), offsetof(OpenTTDRoadCloseCandidate, z)});
+	Layout(218, "OpenTTDRoadOvertakeOrigin", {sizeof(OpenTTDRoadOvertakeOrigin), alignof(OpenTTDRoadOvertakeOrigin), offsetof(OpenTTDRoadOvertakeOrigin, articulated), offsetof(OpenTTDRoadOvertakeOrigin, direction), offsetof(OpenTTDRoadOvertakeOrigin, tile), offsetof(OpenTTDRoadOvertakeOrigin, tram)});
+	Layout(219, "OpenTTDRoadOvertakeSpeed", {sizeof(OpenTTDRoadOvertakeSpeed), alignof(OpenTTDRoadOvertakeSpeed), offsetof(OpenTTDRoadOvertakeSpeed, direction), offsetof(OpenTTDRoadOvertakeSpeed, speed), offsetof(OpenTTDRoadOvertakeSpeed, status), offsetof(OpenTTDRoadOvertakeSpeed, tile)});
+	Layout(220, "OpenTTDRoadSlidingPosition", {sizeof(OpenTTDRoadSlidingPosition), alignof(OpenTTDRoadSlidingPosition), offsetof(OpenTTDRoadSlidingPosition, direction), offsetof(OpenTTDRoadSlidingPosition, x), offsetof(OpenTTDRoadSlidingPosition, y)});
+	Layout(221, "OpenTTDRoadHeightSpeed", {sizeof(OpenTTDRoadHeightSpeed), alignof(OpenTTDRoadHeightSpeed), offsetof(OpenTTDRoadHeightSpeed, max_track_speed), offsetof(OpenTTDRoadHeightSpeed, speed), offsetof(OpenTTDRoadHeightSpeed, z)});
+	Layout(222, "OpenTTDRoadCollisionPart", {sizeof(OpenTTDRoadCollisionPart), alignof(OpenTTDRoadCollisionPart), offsetof(OpenTTDRoadCollisionPart, next), offsetof(OpenTTDRoadCollisionPart, tile), offsetof(OpenTTDRoadCollisionPart, z)});
+	Layout(223, "OpenTTDRoadCollisionOrigin", {sizeof(OpenTTDRoadCollisionOrigin), alignof(OpenTTDRoadCollisionOrigin), offsetof(OpenTTDRoadCollisionOrigin, x), offsetof(OpenTTDRoadCollisionOrigin, y)});
+	Layout(224, "OpenTTDRoadCrashDirection", {sizeof(OpenTTDRoadCrashDirection), alignof(OpenTTDRoadCrashDirection), offsetof(OpenTTDRoadCrashDirection, direction)});
+	Layout(225, "OpenTTDRoadPathVehicle", {sizeof(OpenTTDRoadPathVehicle), alignof(OpenTTDRoadPathVehicle), offsetof(OpenTTDRoadPathVehicle, articulated), offsetof(OpenTTDRoadPathVehicle, owner), offsetof(OpenTTDRoadPathVehicle, tile), offsetof(OpenTTDRoadPathVehicle, tram)});
+	Layout(226, "OpenTTDRoadDepotPart", {sizeof(OpenTTDRoadDepotPart), alignof(OpenTTDRoadDepotPart), offsetof(OpenTTDRoadDepotPart, next), offsetof(OpenTTDRoadDepotPart, tile)});
+	Layout(227, "OpenTTDRoadDepotOrders", {sizeof(OpenTTDRoadDepotOrders), alignof(OpenTTDRoadDepotOrders), offsetof(OpenTTDRoadDepotOrders, dest), offsetof(OpenTTDRoadDepotOrders, order_type)});
+	Layout(228, "OpenTTDRoadVehicleTile", {sizeof(OpenTTDRoadVehicleTile), alignof(OpenTTDRoadVehicleTile), offsetof(OpenTTDRoadVehicleTile, tile)});
+	Layout(229, "OpenTTDRoadArrivalVehicle", {sizeof(OpenTTDRoadArrivalVehicle), alignof(OpenTTDRoadArrivalVehicle), offsetof(OpenTTDRoadArrivalVehicle, owner), offsetof(OpenTTDRoadArrivalVehicle, tram)});
+	Layout(230, "OpenTTDRoadTunnelVehicle", {sizeof(OpenTTDRoadTunnelVehicle), alignof(OpenTTDRoadTunnelVehicle), offsetof(OpenTTDRoadTunnelVehicle, direction), offsetof(OpenTTDRoadTunnelVehicle, front)});
+	Layout(231, "OpenTTDRoadMoveVehicle", {sizeof(OpenTTDRoadMoveVehicle), alignof(OpenTTDRoadMoveVehicle), offsetof(OpenTTDRoadMoveVehicle, front), offsetof(OpenTTDRoadMoveVehicle, tile), offsetof(OpenTTDRoadMoveVehicle, tram)});
+	Layout(232, "OpenTTDRoadMoveTransition", {sizeof(OpenTTDRoadMoveTransition), alignof(OpenTTDRoadMoveTransition), offsetof(OpenTTDRoadMoveTransition, length), offsetof(OpenTTDRoadMoveTransition, next), offsetof(OpenTTDRoadMoveTransition, tile)});
+	Layout(233, "OpenTTDRoadMovePosition", {sizeof(OpenTTDRoadMovePosition), alignof(OpenTTDRoadMovePosition), offsetof(OpenTTDRoadMovePosition, order_type), offsetof(OpenTTDRoadMovePosition, owner), offsetof(OpenTTDRoadMovePosition, speed), offsetof(OpenTTDRoadMovePosition, tile)});
+	Layout(234, "OpenTTDRoadBlockVehicle", {sizeof(OpenTTDRoadBlockVehicle), alignof(OpenTTDRoadBlockVehicle), offsetof(OpenTTDRoadBlockVehicle, direction), offsetof(OpenTTDRoadBlockVehicle, front), offsetof(OpenTTDRoadBlockVehicle, owner), offsetof(OpenTTDRoadBlockVehicle, tile)});
+	Layout(235, "OpenTTDRoadStopOrder", {sizeof(OpenTTDRoadStopOrder), alignof(OpenTTDRoadStopOrder), offsetof(OpenTTDRoadStopOrder, order_destination), offsetof(OpenTTDRoadStopOrder, order_type), offsetof(OpenTTDRoadStopOrder, tile)});
+	Layout(236, "OpenTTDRoadMoveStop", {sizeof(OpenTTDRoadMoveStop), alignof(OpenTTDRoadMoveStop), offsetof(OpenTTDRoadMoveStop, order_type), offsetof(OpenTTDRoadMoveStop, tile)});
+	Layout(237, "OpenTTDRoadOrderClock", {sizeof(OpenTTDRoadOrderClock), alignof(OpenTTDRoadOrderClock), offsetof(OpenTTDRoadOrderClock, order_time)});
+	Layout(238, "OpenTTDRoadControllerPart", {sizeof(OpenTTDRoadControllerPart), alignof(OpenTTDRoadControllerPart), offsetof(OpenTTDRoadControllerPart, next), offsetof(OpenTTDRoadControllerPart, status)});
+	Layout(239, "OpenTTDRoadServiceOrigin", {sizeof(OpenTTDRoadServiceOrigin), alignof(OpenTTDRoadServiceOrigin), offsetof(OpenTTDRoadServiceOrigin, first), offsetof(OpenTTDRoadServiceOrigin, speed), offsetof(OpenTTDRoadServiceOrigin, tile)});
+	Layout(240, "OpenTTDRoadServiceOrder", {sizeof(OpenTTDRoadServiceOrder), alignof(OpenTTDRoadServiceOrder), offsetof(OpenTTDRoadServiceOrder, order_nonstop), offsetof(OpenTTDRoadServiceOrder, order_type)});
+	Layout(241, "OpenTTDRoadTrackDirection", {sizeof(OpenTTDRoadTrackDirection), alignof(OpenTTDRoadTrackDirection), offsetof(OpenTTDRoadTrackDirection, direction), offsetof(OpenTTDRoadTrackDirection, status), offsetof(OpenTTDRoadTrackDirection, tile)});
+	Layout(242, "OpenTTDRoadSlopeOrigin", {sizeof(OpenTTDRoadSlopeOrigin), alignof(OpenTTDRoadSlopeOrigin), offsetof(OpenTTDRoadSlopeOrigin, direction), offsetof(OpenTTDRoadSlopeOrigin, first)});
+	Layout(243, "OpenTTDRoadSlopePart", {sizeof(OpenTTDRoadSlopePart), alignof(OpenTTDRoadSlopePart), offsetof(OpenTTDRoadSlopePart, direction), offsetof(OpenTTDRoadSlopePart, next)});
+	Layout(244, "OpenTTDRoadTurnVehicle", {sizeof(OpenTTDRoadTurnVehicle), alignof(OpenTTDRoadTurnVehicle), offsetof(OpenTTDRoadTurnVehicle, breakdown), offsetof(OpenTTDRoadTurnVehicle, direction), offsetof(OpenTTDRoadTurnVehicle, order_type), offsetof(OpenTTDRoadTurnVehicle, status), offsetof(OpenTTDRoadTurnVehicle, tile)});
+	Layout(245, "OpenTTDRoadPosition", {sizeof(OpenTTDRoadPosition), alignof(OpenTTDRoadPosition), offsetof(OpenTTDRoadPosition, x), offsetof(OpenTTDRoadPosition, y)});
+	Layout(246, "OpenTTDRoadTrackChoice", {sizeof(OpenTTDRoadTrackChoice), alignof(OpenTTDRoadTrackChoice), offsetof(OpenTTDRoadTrackChoice, trackdir), offsetof(OpenTTDRoadTrackChoice, found)});
+	Layout(247, "OpenTTDRoadDepotResult", {sizeof(OpenTTDRoadDepotResult), alignof(OpenTTDRoadDepotResult), offsetof(OpenTTDRoadDepotResult, tile), offsetof(OpenTTDRoadDepotResult, length)});
 	Layout(44, "OpenTTDDisasterState", {sizeof(OpenTTDDisasterState), alignof(OpenTTDDisasterState), offsetof(OpenTTDDisasterState, image_override), offsetof(OpenTTDDisasterState, target), offsetof(OpenTTDDisasterState, state), offsetof(OpenTTDDisasterState, flags)});
 	Layout(45, "OpenTTDDisasterAction", {sizeof(OpenTTDDisasterAction), alignof(OpenTTDDisasterAction), offsetof(OpenTTDDisasterAction, kind), offsetof(OpenTTDDisasterAction, id), offsetof(OpenTTDDisasterAction, other), offsetof(OpenTTDDisasterAction, a), offsetof(OpenTTDDisasterAction, b), offsetof(OpenTTDDisasterAction, c), offsetof(OpenTTDDisasterAction, d)});
 	Layout(46, "OpenTTDWaterPatch", {sizeof(OpenTTDWaterPatch), alignof(OpenTTDWaterPatch), offsetof(OpenTTDWaterPatch, x), offsetof(OpenTTDWaterPatch, y), offsetof(OpenTTDWaterPatch, label)});
@@ -736,54 +768,312 @@ static void Trees()
 
 /* Complete typed tables exercise road cdecl calls without importing game globals.
  * These are boundary/lifetime checks, not a second simulation oracle. */
+template <typename Function> struct RoadUnused;
+template <typename Result, typename... Args>
+struct RoadUnused<Result (OPENTTD_ROAD_CALL *)(Args...) noexcept> {
+	static Result OPENTTD_ROAD_CALL Call(Args...) noexcept
+	{
+		CHECK(false);
+		if constexpr (!std::is_void_v<Result>) return {};
+	}
+};
+static OpenTTDRoadLeaves RoadTestLeaves()
+{
+	OpenTTDRoadLeaves table;
+	table.read_z = RoadUnused<decltype(table.read_z)>::Call;
+	table.read_type = RoadUnused<decltype(table.read_type)>::Call;
+	table.op_acc_model = RoadUnused<decltype(table.op_acc_model)>::Call;
+	table.op_road_side = RoadUnused<decltype(table.op_road_side)>::Call;
+	table.op_tile_type = RoadUnused<decltype(table.op_tile_type)>::Call;
+	table.op_has_road = RoadUnused<decltype(table.op_has_road)>::Call;
+	table.op_track_status = RoadUnused<decltype(table.op_track_status)>::Call;
+	table.op_tile_owner = RoadUnused<decltype(table.op_tile_owner)>::Call;
+	table.op_depot_dir = RoadUnused<decltype(table.op_depot_dir)>::Call;
+	table.op_bay_dir = RoadUnused<decltype(table.op_bay_dir)>::Call;
+	table.op_is_depot = RoadUnused<decltype(table.op_is_depot)>::Call;
+	table.op_normal_road = RoadUnused<decltype(table.op_normal_road)>::Call;
+	table.op_road_works = RoadUnused<decltype(table.op_road_works)>::Call;
+	table.op_disallowed = RoadUnused<decltype(table.op_disallowed)>::Call;
+	table.op_bay_stop = RoadUnused<decltype(table.op_bay_stop)>::Call;
+	table.op_is_dt_stop = RoadUnused<decltype(table.op_is_dt_stop)>::Call;
+	table.op_stop_type = RoadUnused<decltype(table.op_stop_type)>::Call;
+	table.op_free_bay = RoadUnused<decltype(table.op_free_bay)>::Call;
+	table.op_any_road_bits = RoadUnused<decltype(table.op_any_road_bits)>::Call;
+	table.op_road_bits = RoadUnused<decltype(table.op_road_bits)>::Call;
+	table.op_offset = RoadUnused<decltype(table.op_offset)>::Call;
+	table.op_tile_x = RoadUnused<decltype(table.op_tile_x)>::Call;
+	table.op_tile_y = RoadUnused<decltype(table.op_tile_y)>::Call;
+	table.op_station = RoadUnused<decltype(table.op_station)>::Call;
+	table.op_continuation = RoadUnused<decltype(table.op_continuation)>::Call;
+	table.op_bridge_speed = RoadUnused<decltype(table.op_bridge_speed)>::Call;
+	table.op_max_penalty = RoadUnused<decltype(table.op_max_penalty)>::Call;
+	table.op_servint = RoadUnused<decltype(table.op_servint)>::Call;
+	table.op_needs_service = RoadUnused<decltype(table.op_needs_service)>::Call;
+	table.op_wait_unbunch = RoadUnused<decltype(table.op_wait_unbunch)>::Call;
+	table.op_order_stop = RoadUnused<decltype(table.op_order_stop)>::Call;
+	table.op_road_type = RoadUnused<decltype(table.op_road_type)>::Call;
+	table.op_queue = RoadUnused<decltype(table.op_queue)>::Call;
+	table.op_tunnel_dir = RoadUnused<decltype(table.op_tunnel_dir)>::Call;
+	table.op_acceleration = RoadUnused<decltype(table.op_acceleration)>::Call;
+	table.op_update_speed = RoadUnused<decltype(table.op_update_speed)>::Call;
+	table.op_advance = RoadUnused<decltype(table.op_advance)>::Call;
+	table.op_position = RoadUnused<decltype(table.op_position)>::Call;
+	table.op_base_viewport = RoadUnused<decltype(table.op_base_viewport)>::Call;
+	table.op_last_speed = RoadUnused<decltype(table.op_last_speed)>::Call;
+	table.op_roadstop_leave = RoadUnused<decltype(table.op_roadstop_leave)>::Call;
+	table.op_entrance_set = RoadUnused<decltype(table.op_entrance_set)>::Call;
+	table.op_entrance_busy = RoadUnused<decltype(table.op_entrance_busy)>::Call;
+	table.op_order_free = RoadUnused<decltype(table.op_order_free)>::Call;
+	table.op_set_next = RoadUnused<decltype(table.op_set_next)>::Call;
+	table.op_start_stop_dirty = RoadUnused<decltype(table.op_start_stop_dirty)>::Call;
+	table.op_depot_dirty = RoadUnused<decltype(table.op_depot_dirty)>::Call;
+	table.op_details_dirty = RoadUnused<decltype(table.op_details_dirty)>::Call;
+	table.op_service = RoadUnused<decltype(table.op_service)>::Call;
+	table.op_leave_unbunch = RoadUnused<decltype(table.op_leave_unbunch)>::Call;
+	table.op_reset_unbunch = RoadUnused<decltype(table.op_reset_unbunch)>::Call;
+	table.op_path_result = RoadUnused<decltype(table.op_path_result)>::Call;
+	table.op_order_dummy = RoadUnused<decltype(table.op_order_dummy)>::Call;
+	table.op_order_depot = RoadUnused<decltype(table.op_order_depot)>::Call;
+	table.op_depot_index = RoadUnused<decltype(table.op_depot_index)>::Call;
+	table.op_decrease_value = RoadUnused<decltype(table.op_decrease_value)>::Call;
+	table.op_age = RoadUnused<decltype(table.op_age)>::Call;
+	table.op_economy_age = RoadUnused<decltype(table.op_economy_age)>::Call;
+	table.op_check_breakdown = RoadUnused<decltype(table.op_check_breakdown)>::Call;
+	table.op_check_orders = RoadUnused<decltype(table.op_check_orders)>::Call;
+	table.op_pay_running = RoadUnused<decltype(table.op_pay_running)>::Call;
+	table.op_cost_class = RoadUnused<decltype(table.op_cost_class)>::Call;
+	table.op_cost_factor = RoadUnused<decltype(table.op_cost_factor)>::Call;
+	table.op_get_price = RoadUnused<decltype(table.op_get_price)>::Call;
+	table.op_grf_version = RoadUnused<decltype(table.op_grf_version)>::Call;
+	table.op_length_default = RoadUnused<decltype(table.op_length_default)>::Call;
+	table.op_age_default = RoadUnused<decltype(table.op_age_default)>::Call;
+	table.op_speed_default = RoadUnused<decltype(table.op_speed_default)>::Call;
+	table.op_length_error = RoadUnused<decltype(table.op_length_error)>::Call;
+	table.op_disconnect = RoadUnused<decltype(table.op_disconnect)>::Call;
+	table.op_explosion = RoadUnused<decltype(table.op_explosion)>::Call;
+	table.op_sound_default = RoadUnused<decltype(table.op_sound_default)>::Call;
+	table.op_sound = RoadUnused<decltype(table.op_sound)>::Call;
+	table.op_sound_old1 = RoadUnused<decltype(table.op_sound_old1)>::Call;
+	table.op_sound_old2 = RoadUnused<decltype(table.op_sound_old2)>::Call;
+	table.op_engine_invalid = RoadUnused<decltype(table.op_engine_invalid)>::Call;
+	table.op_invalid_price = RoadUnused<decltype(table.op_invalid_price)>::Call;
+	table.op_cost_divisor = RoadUnused<decltype(table.op_cost_divisor)>::Call;
+	table.op_is_crossing = RoadUnused<decltype(table.op_is_crossing)>::Call;
+	table.op_new_position = RoadUnused<decltype(table.op_new_position)>::Call;
+	table.op_virt_tile = RoadUnused<decltype(table.op_virt_tile)>::Call;
+	table.op_is_road_stop = RoadUnused<decltype(table.op_is_road_stop)>::Call;
+	table.op_set_dest = RoadUnused<decltype(table.op_set_dest)>::Call;
+	table.op_cache_invalidate = RoadUnused<decltype(table.op_cache_invalidate)>::Call;
+	table.op_arrival = RoadUnused<decltype(table.op_arrival)>::Call;
+	table.op_crash_news = RoadUnused<decltype(table.op_crash_news)>::Call;
+	table.op_station_visits = RoadUnused<decltype(table.op_station_visits)>::Call;
+	table.op_station_visit_set = RoadUnused<decltype(table.op_station_visit_set)>::Call;
+	table.op_local_company = RoadUnused<decltype(table.op_local_company)>::Call;
+	table.op_enter_tile = RoadUnused<decltype(table.op_enter_tile)>::Call;
+	table.op_enter_depot = RoadUnused<decltype(table.op_enter_depot)>::Call;
+	table.op_process_orders = RoadUnused<decltype(table.op_process_orders)>::Call;
+	table.op_loading = RoadUnused<decltype(table.op_loading)>::Call;
+	table.op_begin_loading = RoadUnused<decltype(table.op_begin_loading)>::Call;
+	table.op_tram_probe = RoadUnused<decltype(table.op_tram_probe)>::Call;
+	table.op_property = RoadUnused<decltype(table.op_property)>::Call;
+	table.op_length_callback = RoadUnused<decltype(table.op_length_callback)>::Call;
+	table.op_play_sound = RoadUnused<decltype(table.op_play_sound)>::Call;
+	table.op_visual = RoadUnused<decltype(table.op_visual)>::Call;
+	table.op_update_visual = RoadUnused<decltype(table.op_update_visual)>::Call;
+	table.op_cargo_changed = RoadUnused<decltype(table.op_cargo_changed)>::Call;
+	table.op_length_changed = RoadUnused<decltype(table.op_length_changed)>::Call;
+	table.op_breakdown = RoadUnused<decltype(table.op_breakdown)>::Call;
+	table.op_delete = RoadUnused<decltype(table.op_delete)>::Call;
+	table.op_ground_crash = RoadUnused<decltype(table.op_ground_crash)>::Call;
+	table.op_stop_random = RoadUnused<decltype(table.op_stop_random)>::Call;
+	table.op_stop_animation = RoadUnused<decltype(table.op_stop_animation)>::Call;
+	table.op_yapf = RoadUnused<decltype(table.op_yapf)>::Call;
+	table.op_find_depot = RoadUnused<decltype(table.op_find_depot)>::Call;
+	table.op_inclination = RoadUnused<decltype(table.op_inclination)>::Call;
+	table.op_viewport = RoadUnused<decltype(table.op_viewport)>::Call;
+	table.set_tile = RoadUnused<decltype(table.set_tile)>::Call;
+	table.set_x = RoadUnused<decltype(table.set_x)>::Call;
+	table.set_y = RoadUnused<decltype(table.set_y)>::Call;
+	table.set_direction = RoadUnused<decltype(table.set_direction)>::Call;
+	table.set_speed = RoadUnused<decltype(table.set_speed)>::Call;
+	table.set_tick = RoadUnused<decltype(table.set_tick)>::Call;
+	table.set_running = RoadUnused<decltype(table.set_running)>::Call;
+	table.set_day = RoadUnused<decltype(table.set_day)>::Call;
+	table.set_order_time = RoadUnused<decltype(table.set_order_time)>::Call;
+	table.set_progress = RoadUnused<decltype(table.set_progress)>::Call;
+	table.set_last_station = RoadUnused<decltype(table.set_last_station)>::Call;
+	table.set_hidden = RoadUnused<decltype(table.set_hidden)>::Call;
+	table.set_first_engine = RoadUnused<decltype(table.set_first_engine)>::Call;
+	table.set_length = RoadUnused<decltype(table.set_length)>::Call;
+	table.set_total_length = RoadUnused<decltype(table.set_total_length)>::Call;
+	table.set_cargo_age = RoadUnused<decltype(table.set_cargo_age)>::Call;
+	table.set_max_speed = RoadUnused<decltype(table.set_max_speed)>::Call;
+	table.set_suppress_implicit = RoadUnused<decltype(table.set_suppress_implicit)>::Call;
+	table.read_day = RoadUnused<decltype(table.read_day)>::Call;
+	table.read_dest = RoadUnused<decltype(table.read_dest)>::Call;
+	table.read_direction = RoadUnused<decltype(table.read_direction)>::Call;
+	table.read_engine = RoadUnused<decltype(table.read_engine)>::Call;
+	table.read_first = RoadUnused<decltype(table.read_first)>::Call;
+	table.read_front = RoadUnused<decltype(table.read_front)>::Call;
+	table.read_last_station = RoadUnused<decltype(table.read_last_station)>::Call;
+	table.read_length = RoadUnused<decltype(table.read_length)>::Call;
+	table.read_next = RoadUnused<decltype(table.read_next)>::Call;
+	table.read_order_type = RoadUnused<decltype(table.read_order_type)>::Call;
+	table.read_previous = RoadUnused<decltype(table.read_previous)>::Call;
+	table.read_progress = RoadUnused<decltype(table.read_progress)>::Call;
+	table.read_running = RoadUnused<decltype(table.read_running)>::Call;
+	table.read_speed = RoadUnused<decltype(table.read_speed)>::Call;
+	table.read_status = RoadUnused<decltype(table.read_status)>::Call;
+	table.read_tick = RoadUnused<decltype(table.read_tick)>::Call;
+	table.read_tile = RoadUnused<decltype(table.read_tile)>::Call;
+	table.read_total_length = RoadUnused<decltype(table.read_total_length)>::Call;
+	table.read_tram = RoadUnused<decltype(table.read_tram)>::Call;
+	table.speed_limits = RoadUnused<decltype(table.speed_limits)>::Call;
+	table.consist_speed = RoadUnused<decltype(table.consist_speed)>::Call;
+	table.close_origin = RoadUnused<decltype(table.close_origin)>::Call;
+	table.close_candidate = RoadUnused<decltype(table.close_candidate)>::Call;
+	table.overtake_origin = RoadUnused<decltype(table.overtake_origin)>::Call;
+	table.overtake_speed = RoadUnused<decltype(table.overtake_speed)>::Call;
+	table.sliding_position = RoadUnused<decltype(table.sliding_position)>::Call;
+	table.height_speed = RoadUnused<decltype(table.height_speed)>::Call;
+	table.collision_part = RoadUnused<decltype(table.collision_part)>::Call;
+	table.collision_origin = RoadUnused<decltype(table.collision_origin)>::Call;
+	table.crash_direction = RoadUnused<decltype(table.crash_direction)>::Call;
+	table.path_vehicle = RoadUnused<decltype(table.path_vehicle)>::Call;
+	table.depot_part = RoadUnused<decltype(table.depot_part)>::Call;
+	table.depot_orders = RoadUnused<decltype(table.depot_orders)>::Call;
+	table.vehicle_tile = RoadUnused<decltype(table.vehicle_tile)>::Call;
+	table.arrival_vehicle = RoadUnused<decltype(table.arrival_vehicle)>::Call;
+	table.tunnel_vehicle = RoadUnused<decltype(table.tunnel_vehicle)>::Call;
+	table.move_vehicle = RoadUnused<decltype(table.move_vehicle)>::Call;
+	table.move_transition = RoadUnused<decltype(table.move_transition)>::Call;
+	table.move_position = RoadUnused<decltype(table.move_position)>::Call;
+	table.block_vehicle = RoadUnused<decltype(table.block_vehicle)>::Call;
+	table.stop_order = RoadUnused<decltype(table.stop_order)>::Call;
+	table.move_stop = RoadUnused<decltype(table.move_stop)>::Call;
+	table.order_clock = RoadUnused<decltype(table.order_clock)>::Call;
+	table.controller_part = RoadUnused<decltype(table.controller_part)>::Call;
+	table.service_origin = RoadUnused<decltype(table.service_origin)>::Call;
+	table.service_order = RoadUnused<decltype(table.service_order)>::Call;
+	table.track_direction = RoadUnused<decltype(table.track_direction)>::Call;
+	table.slope_origin = RoadUnused<decltype(table.slope_origin)>::Call;
+	table.slope_part = RoadUnused<decltype(table.slope_part)>::Call;
+	table.turn_vehicle = RoadUnused<decltype(table.turn_vehicle)>::Call;
+	table.owner = RoadUnused<decltype(table.owner)>::Call;
+	table.visit_close = RoadUnused<decltype(table.visit_close)>::Call;
+	table.visit_tunnel = RoadUnused<decltype(table.visit_tunnel)>::Call;
+	table.visit_tile = RoadUnused<decltype(table.visit_tile)>::Call;
+	table.visit_train = RoadUnused<decltype(table.visit_train)>::Call;
+	table.read_bus = RoadUnused<decltype(table.read_bus)>::Call;
+	return table;
+}
 struct RoadAbiProbe {
-	OpenTTDRoadState *state;
-	OpenTTDRoadView view{};
-	uint32_t leaves = 0;
+	OpenTTDRoadState *state = openttd_rust_road_new();
+	const OpenTTDRoadLeaves *leaves = nullptr;
+	const OpenTTDSharedServices *services = nullptr;
+	uint32_t tick = 255, front = 0, status = 0, order_time = 0;
+	uint32_t length = 8, total_length = 8, dest = 0;
+	uint32_t departures = 0, nested = 0, destroyed = 0, owner_reads = 0;
 };
 static RoadAbiProbe *road_abi_probe;
-static void OPENTTD_ROAD_CALL RoadAbiObserve(uint32_t, OpenTTDRoadView *view) noexcept { *view = road_abi_probe->view; }
-static void OPENTTD_ROAD_CALL RoadAbiWrite(uint32_t, uint32_t field, uint64_t value) noexcept
-{
-	CHECK(field == ROAD_WRITE_TICK);
-	road_abi_probe->view.tick = static_cast<uint8_t>(value);
-}
-static uint64_t OPENTTD_ROAD_CALL RoadAbiLeaf(uint32_t op, uint32_t, uint64_t, uint64_t, uint64_t) noexcept
-{
-	CHECK(op == ROAD_OP_ROADSTOP_LEAVE);
-	++road_abi_probe->leaves;
-	return 0;
-}
-static OpenTTDRoadState *OPENTTD_ROAD_CALL RoadAbiOwner(uint32_t) noexcept { return road_abi_probe->state; }
-static size_t OPENTTD_ROAD_CALL RoadAbiNearby(uint32_t, uint32_t, int32_t, int32_t, uint32_t *, size_t) noexcept { return 0; }
 static void RoadBoundary()
 {
-	RoadAbiProbe probe{openttd_rust_road_new()};
+	RoadAbiProbe probe;
 	road_abi_probe = &probe;
-	probe.view.tick = 255;
-	const OpenTTDRoadLeaves leaves{RoadAbiObserve, RoadAbiWrite, RoadAbiLeaf, RoadAbiOwner, RoadAbiNearby};
-	/* All shared fields are typed functions, even unused fields. */
 	EffectTestWorld world;
 	effect_test_world = &world;
 	const OpenTTDSharedServices services{&world, EffectTestRandom, EffectTestTile, EffectTestMapWrite, EffectTestTrig, EffectTestIndustry};
-	auto create = [&](uint32_t kind) {
-		return std::unique_ptr<void, decltype(&openttd_rust_road_task_destroy)>(openttd_rust_road_create(kind, 17, 0, 0, 0, &leaves, &services), openttd_rust_road_task_destroy);
+	auto leaves = RoadTestLeaves();
+	probe.leaves = &leaves;
+	probe.services = &services;
+	leaves.owner = [](uint32_t) noexcept { ++road_abi_probe->owner_reads; return road_abi_probe->state; };
+	leaves.read_tick = [](uint32_t) noexcept { return road_abi_probe->tick; };
+	leaves.set_tick = [](uint32_t, uint8_t tick) noexcept { road_abi_probe->tick = tick; };
+	leaves.read_front = [](uint32_t) noexcept { return road_abi_probe->front; };
+	CHECK(openttd_rust_road_tick(17, probe.state, &leaves, &services));
+	CHECK(probe.tick == 0 && world.draws == 0 && probe.owner_reads == 0);
+
+	leaves.op_ground_crash = [](uint32_t id, bool flooded) noexcept -> uint32_t {
+		CHECK(id == 17 && !flooded);
+		/* A direct callback changes canonical state before Rust reobserves it. */
+		road_abi_probe->front = 1;
+		openttd_rust_road_set(road_abi_probe->state, 0, 64);
+		return 7;
 	};
-	auto tick = create(0);
-	CHECK(openttd_rust_road_advance(tick.get(), 0).op == 0);
-	CHECK(probe.view.tick == 0 && world.draws == 0);
-	auto crash = create(3);
-	CHECK(openttd_rust_road_advance(crash.get(), 0).op == ROAD_OP_GROUND_CRASH);
-	/* An actual callback may mutate owner state before the continuation resumes. */
-	probe.view.front = 1;
-	openttd_rust_road_set(probe.state, 0, 64);
-	auto done = openttd_rust_road_advance(crash.get(), 7);
-	CHECK(done.op == 0 && done.a == 8 && probe.leaves == 1);
-	CHECK(openttd_rust_road_get(probe.state, 5) == 1);
-	crash.reset();
-	tick.reset();
-	openttd_rust_road_destroy(probe.state);
-	std::printf("road_native_tables_owner_reentry_and_tick_wrap passed\n");
+	leaves.op_roadstop_leave = [](uint32_t) noexcept { ++road_abi_probe->departures; };
+	CHECK(openttd_rust_road_crash(17, probe.state, false, &leaves, &services) == 8);
+	CHECK(probe.departures == 1 && openttd_rust_road_get(probe.state, 5) == 1);
+
+	leaves.speed_limits = [](uint32_t) noexcept -> OpenTTDRoadSpeedLimits { return {80, 65535}; };
+	leaves.consist_speed = [](uint32_t) noexcept -> OpenTTDRoadConsistSpeed { return {1, UINT32_MAX, 0, 100}; };
+	leaves.op_acc_model = []() noexcept -> uint32_t { return 0; };
+	leaves.op_bay_stop = [](uint32_t) noexcept -> uint32_t { return 0; };
+	leaves.track_direction = [](uint32_t) noexcept -> OpenTTDRoadTrackDirection { return {1, 0, 100}; };
+	leaves.read_dest = [](uint32_t) noexcept { return road_abi_probe->dest; };
+	leaves.op_set_dest = [](uint32_t, uint32_t tile) noexcept { road_abi_probe->dest = tile; };
+	leaves.op_cache_invalidate = [](uint32_t) noexcept {};
+	leaves.set_total_length = [](uint32_t, uint16_t length) noexcept { road_abi_probe->total_length = length; };
+	leaves.op_engine_invalid = []() noexcept -> uint32_t { return 65535; };
+	leaves.set_first_engine = [](uint32_t, uint16_t) noexcept {};
+	leaves.op_grf_version = [](uint32_t) noexcept -> uint32_t { return 8; };
+	leaves.op_property = [](uint32_t id, uint8_t property, uint32_t fallback) noexcept -> uint32_t {
+		auto &p = *road_abi_probe;
+		CHECK(openttd_rust_road_max_speed(id, p.state, p.leaves, p.services) == 80);
+		CHECK(openttd_rust_road_trackdir(id, p.state, p.leaves, p.services) == 0);
+		++p.nested;
+		openttd_rust_road_set_dest(id, p.state, 142 + p.nested, p.leaves, p.services);
+		CHECK(openttd_rust_road_path_size(p.state) == 0);
+		openttd_rust_road_path_push(p.state, {10, 10815});
+		return property == 0x23 ? 0 : property == 0x15 ? 20 : fallback;
+	};
+	leaves.read_length = [](uint32_t) noexcept { return road_abi_probe->length; };
+	leaves.set_length = [](uint32_t, uint8_t length) noexcept { road_abi_probe->length = length; };
+	leaves.read_total_length = [](uint32_t) noexcept { return road_abi_probe->total_length; };
+	leaves.op_update_visual = [](uint32_t) noexcept {};
+	leaves.op_age_default = [](uint32_t) noexcept -> uint32_t { return 74; };
+	leaves.set_cargo_age = [](uint32_t, uint16_t age) noexcept { CHECK(age == 74); };
+	leaves.read_next = [](uint32_t) noexcept -> uint32_t { return UINT32_MAX; };
+	leaves.set_max_speed = [](uint32_t, uint16_t speed) noexcept { CHECK(speed == 80); };
+	openttd_rust_road_update_cache(17, probe.state, false, &leaves, &services);
+	CHECK(probe.nested == 3 && probe.dest == 145 && probe.total_length == 8);
+	CHECK(openttd_rust_road_path_get(probe.state, 0).tile == 10815);
+
+	/* ShowVisualEffect's nested speed getter uses the same direct entry/table. */
+	leaves.read_status = [](uint32_t) noexcept { return road_abi_probe->status; };
+	leaves.set_running = [](uint32_t, uint8_t) noexcept {};
+	leaves.read_running = [](uint32_t) noexcept -> uint32_t { return 0; };
+	leaves.order_clock = [](uint32_t) noexcept -> OpenTTDRoadOrderClock { return {road_abi_probe->order_time}; };
+	leaves.set_order_time = [](uint32_t, int32_t value) noexcept { road_abi_probe->order_time = static_cast<uint32_t>(value); };
+	leaves.collision_part = [](uint32_t) noexcept -> OpenTTDRoadCollisionPart { return {UINT32_MAX, 100, 0}; };
+	leaves.op_is_crossing = [](uint32_t) noexcept -> uint32_t { return 0; };
+	leaves.op_breakdown = [](uint32_t) noexcept -> uint32_t { return 0; };
+	leaves.op_process_orders = [](uint32_t id) noexcept { auto &p = *road_abi_probe; openttd_rust_road_set_dest(id, p.state, 100, p.leaves, p.services); };
+	leaves.op_loading = [](uint32_t) noexcept {};
+	leaves.read_order_type = [](uint32_t) noexcept -> uint32_t { return 0; };
+	leaves.op_visual = [](uint32_t id) noexcept { auto &p = *road_abi_probe; CHECK(openttd_rust_road_max_speed(id, p.state, p.leaves, p.services) == 80); ++p.nested; };
+	leaves.op_update_speed = [](uint32_t, uint32_t acceleration, int32_t minimum, int32_t maximum) noexcept -> int32_t { CHECK(acceleration == 256 && minimum == 0 && maximum == 80); return 0; };
+	leaves.op_advance = [](uint32_t) noexcept -> uint32_t { return 1; };
+	leaves.controller_part = [](uint32_t) noexcept -> OpenTTDRoadControllerPart { return {UINT32_MAX, 0}; };
+	leaves.op_viewport = [](uint32_t, bool force, bool delta) noexcept { CHECK(!force && !delta); };
+	leaves.read_progress = [](uint32_t) noexcept -> uint32_t { return 0; };
+	leaves.set_progress = [](uint32_t, uint8_t progress) noexcept { CHECK(progress == 0); };
+	leaves.op_last_speed = [](uint32_t) noexcept {};
+	CHECK(openttd_rust_road_tick(17, probe.state, &leaves, &services));
+	CHECK(probe.nested == 4 && probe.dest == 100 && world.draws == 0);
+
+	/* The final-part deletion continuation returns its copied alive result only. */
+	probe.tick = 31;
+	probe.status = 128;
+	openttd_rust_road_set(probe.state, 0, 0);
+	openttd_rust_road_set(probe.state, 5, 2219);
+	leaves.read_first = [](uint32_t) noexcept -> uint32_t { return 17; };
+	leaves.op_set_next = [](uint32_t id, uint32_t next) noexcept { CHECK(id == 17 && next == UINT32_MAX); };
+	leaves.read_last_station = [](uint32_t) noexcept -> uint32_t { return 23; };
+	leaves.set_last_station = [](uint32_t id, uint16_t station) noexcept { CHECK(id == 17 && station == 23); };
+	leaves.op_delete = [](uint32_t id) noexcept { CHECK(id == 17); openttd_rust_road_destroy(road_abi_probe->state); road_abi_probe->state = nullptr; ++road_abi_probe->destroyed; };
+	CHECK(!openttd_rust_road_tick(17, probe.state, &leaves, &services));
+	CHECK(probe.state == nullptr && probe.destroyed == 1 && probe.owner_reads == 0);
+	std::printf("road_native_typed_reentry_path_and_owner_destruction passed\n");
 }
 
 /* Moving and partly entered consists cannot use IsChainInDepot's service path,
@@ -791,77 +1081,60 @@ static void RoadBoundary()
 struct RoadServiceProbe {
 	OpenTTDRoadState *head = openttd_rust_road_new();
 	OpenTTDRoadState *tail = openttd_rust_road_new();
-	OpenTTDRoadView view{};
+	uint32_t tile = 3091, dest = 0, speed = 5;
 	bool depot_tile = true;
-	uint32_t depot_orders = 0;
-	uint32_t services = 0;
+	uint32_t depot_orders = 0, services = 0, searches = 0;
 };
 static RoadServiceProbe *road_service_probe;
-static void OPENTTD_ROAD_CALL RoadServiceObserve(uint32_t id, OpenTTDRoadView *view) noexcept
-{
-	*view = road_service_probe->view;
-	view->next = id == 17 ? 18 : UINT32_MAX;
-}
-static void OPENTTD_ROAD_CALL RoadServiceWrite(uint32_t, uint32_t field, uint64_t) noexcept
-{
-	CHECK(field == ROAD_WRITE_DAY || field == ROAD_WRITE_SUPPRESS_IMPLICIT);
-}
-static uint64_t OPENTTD_ROAD_CALL RoadServiceLeaf(uint32_t op, uint32_t, uint64_t a, uint64_t, uint64_t) noexcept
-{
-	auto &probe = *road_service_probe;
-	switch (op) {
-		case ROAD_OP_SERVINT: case ROAD_OP_NEEDS_SERVICE: return 1;
-		case ROAD_OP_IS_DEPOT: CHECK(a == probe.view.tile); return probe.depot_tile;
-		case ROAD_OP_MAX_PENALTY: return 300;
-		case ROAD_OP_DEPOT_INDEX: CHECK(a == probe.view.tile); return 55;
-		case ROAD_OP_ORDER_DEPOT: CHECK(a == 55); ++probe.depot_orders; break;
-		case ROAD_OP_SET_DEST: CHECK(a == probe.view.tile); probe.view.dest = static_cast<uint32_t>(a); break;
-		case ROAD_OP_SERVICE: ++probe.services; break;
-		case ROAD_OP_ECONOMY_AGE: case ROAD_OP_CHECK_BREAKDOWN:
-		case ROAD_OP_CHECK_ORDERS: case ROAD_OP_START_STOP_DIRTY: break;
-		default: CHECK(false);
-	}
-	return 0;
-}
-static OpenTTDRoadState *OPENTTD_ROAD_CALL RoadServiceOwner(uint32_t id) noexcept
-{
-	return id == 17 ? road_service_probe->head : road_service_probe->tail;
-}
 static void RoadServiceBoundary()
 {
 	RoadServiceProbe probe;
 	road_service_probe = &probe;
-	probe.view.front = 1;
-	probe.view.first = 17;
-	probe.view.tile = 3091;
-	probe.view.speed = 5;
-	const OpenTTDRoadLeaves leaves{RoadServiceObserve, RoadServiceWrite, RoadServiceLeaf, RoadServiceOwner, RoadAbiNearby};
 	EffectTestWorld world;
 	effect_test_world = &world;
 	const OpenTTDSharedServices services{&world, EffectTestRandom, EffectTestTile, EffectTestMapWrite, EffectTestTrig, EffectTestIndustry};
-	using Task = std::unique_ptr<void, decltype(&openttd_rust_road_task_destroy)>;
-	auto day = [&]() { return Task(openttd_rust_road_create(6, 17, 0, 0, 0, &leaves, &services), openttd_rust_road_task_destroy); };
+	auto leaves = RoadTestLeaves();
+	leaves.owner = [](uint32_t id) noexcept { return id == 17 ? road_service_probe->head : road_service_probe->tail; };
+	leaves.read_front = [](uint32_t) noexcept -> uint32_t { return 1; };
+	leaves.read_day = [](uint32_t) noexcept -> uint32_t { return 0; };
+	leaves.read_running = [](uint32_t) noexcept -> uint32_t { return 0; };
+	leaves.set_day = [](uint32_t, uint8_t day) noexcept { CHECK(day == 1); };
+	leaves.set_suppress_implicit = [](uint32_t) noexcept {};
+	leaves.op_servint = [](uint32_t) noexcept -> uint32_t { return 1; };
+	leaves.op_needs_service = [](uint32_t) noexcept -> uint32_t { return 1; };
+	leaves.service_origin = [](uint32_t) noexcept -> OpenTTDRoadServiceOrigin { auto &p = *road_service_probe; return {17, p.speed, p.tile}; };
+	leaves.depot_part = [](uint32_t id) noexcept -> OpenTTDRoadDepotPart { return {id == 17 ? 18U : UINT32_MAX, road_service_probe->tile}; };
+	leaves.op_is_depot = [](uint32_t tile) noexcept -> uint32_t { CHECK(tile == road_service_probe->tile); return road_service_probe->depot_tile; };
+	leaves.op_max_penalty = []() noexcept -> uint32_t { return 300; };
+	leaves.op_depot_index = [](uint32_t tile) noexcept -> uint32_t { CHECK(tile == road_service_probe->tile); return 55; };
+	leaves.op_order_depot = [](uint32_t, uint16_t depot) noexcept { CHECK(depot == 55); ++road_service_probe->depot_orders; };
+	leaves.read_dest = [](uint32_t) noexcept { return road_service_probe->dest; };
+	leaves.op_set_dest = [](uint32_t, uint32_t tile) noexcept { CHECK(tile == road_service_probe->tile); road_service_probe->dest = tile; };
+	leaves.op_service = [](uint32_t) noexcept { ++road_service_probe->services; };
+	leaves.service_order = [](uint32_t) noexcept -> OpenTTDRoadServiceOrder { return {}; };
+	leaves.read_order_type = [](uint32_t) noexcept -> uint32_t { return 0; };
+	leaves.op_find_depot = [](uint32_t, int32_t penalty) noexcept -> OpenTTDRoadDepotResult { CHECK(penalty == 300); ++road_service_probe->searches; return {UINT32_MAX, UINT32_MAX}; };
+	leaves.op_economy_age = [](uint32_t) noexcept {};
+	leaves.op_check_breakdown = [](uint32_t) noexcept {};
+	leaves.op_check_orders = [](uint32_t) noexcept {};
+	leaves.op_start_stop_dirty = [](uint32_t) noexcept {};
+	auto day = [&]() { openttd_rust_road_economy_day(17, probe.head, &leaves, &services); };
 	for (bool moving : {true, false}) {
-		probe.view.speed = moving ? 5 : 0;
-		probe.view.dest = 42;
+		probe.speed = moving ? 5 : 0;
+		probe.dest = 42;
 		openttd_rust_road_set(probe.head, 0, 254);
 		openttd_rust_road_set(probe.tail, 0, moving ? 254 : 1);
 		openttd_rust_road_path_push(probe.head, {10, 10815});
-		auto run = day();
-		CHECK(openttd_rust_road_advance(run.get(), 0).op == 0);
-		CHECK(probe.view.dest == probe.view.tile && openttd_rust_road_path_size(probe.head) == 0);
+		day();
+		CHECK(probe.dest == probe.tile && openttd_rust_road_path_size(probe.head) == 0);
 	}
 	CHECK(probe.depot_orders == 2 && probe.services == 0 && world.draws == 0);
 	openttd_rust_road_set(probe.tail, 0, 254);
-	auto parked = day();
-	CHECK(openttd_rust_road_advance(parked.get(), 0).op == 0);
+	day();
 	CHECK(probe.services == 1 && probe.depot_orders == 2);
 	probe.depot_tile = false;
-	auto outside = day();
-	const auto search = openttd_rust_road_advance(outside.get(), 0);
-	CHECK(search.op == ROAD_OP_FIND_DEPOT && search.a == 300);
-	outside.reset();
-	parked.reset();
+	day();
+	CHECK(probe.searches == 1);
 	openttd_rust_road_destroy(probe.head);
 	openttd_rust_road_destroy(probe.tail);
 	std::printf("road_service_moving_partial_parked_and_search_branches passed\n");
