@@ -76,3 +76,24 @@ TEST_CASE("Base consist copies preserve values with independent aliases")
 	copied = original;
 	CHECK(copied.round_trip_time == 4200);
 }
+TEST_CASE("Order list owners retire and reconstruct at a reused pool index")
+{
+	REQUIRE(OrderList::CanAllocateItem());
+	OrderList *list = new OrderList();
+	OrderListID index = list->index;
+	Order order;
+	order.MakeDummy();
+	list->InsertOrderAt(std::move(order), 0);
+	CHECK(list->GetNumOrders() == 1);
+	CHECK(list->GetNumManualOrders() == 1);
+	delete list;
+
+	/* Save/load uses indexed construction before populating the new owner. */
+	list = new (index) OrderList();
+	CHECK(list->index == index);
+	CHECK(list->GetNumOrders() == 0);
+	CHECK(list->GetNumManualOrders() == 0);
+	CHECK(list->GetNumVehicles() == 0);
+	CHECK(list->GetTimetableDurationIncomplete() == 0);
+	delete list;
+}

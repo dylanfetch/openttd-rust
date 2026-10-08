@@ -104,7 +104,7 @@ struct OpenTTDOrdersLeaves {
 	uint64_t (*waypoint_facilities)(uint16_t destination) noexcept;
 	uint64_t (*waypoint_owner)(uint16_t destination) noexcept;
 	uint64_t (*list_capacity)() noexcept;
-	void *(*next_backup)(uint32_t first) noexcept;
+	void *(*next_backup)(uint32_t *cursor) noexcept;
 	void *(*next_vehicle)(uint32_t first) noexcept;
 	uint64_t (*aircraft_range)(void *ctx) noexcept;
 	uint64_t (*aircraft_range_square)(void *ctx) noexcept;
@@ -291,7 +291,7 @@ uint64_t openttd_orders_valid_waypoint(uint16_t destination) noexcept;
 uint64_t openttd_orders_waypoint_facilities(uint16_t destination) noexcept;
 uint64_t openttd_orders_waypoint_owner(uint16_t destination) noexcept;
 uint64_t openttd_orders_list_capacity() noexcept;
-void *openttd_orders_next_backup(uint32_t first) noexcept;
+void *openttd_orders_next_backup(uint32_t *cursor) noexcept;
 void *openttd_orders_next_vehicle(uint32_t first) noexcept;
 uint64_t openttd_orders_aircraft_range(void *ctx) noexcept;
 uint64_t openttd_orders_aircraft_range_square(void *ctx) noexcept;

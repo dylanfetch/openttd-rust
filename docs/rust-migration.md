@@ -1455,30 +1455,31 @@ cover every field on supported hosts. Arbitrary maps/NewGRFs, articulated/tram,
 road waypoints, exhaustive occupied-stop/loop/segment-length branches and actual
 legacy saves remain limits; shared follower logic is deliberately unported.
 
-### Orders lifecycle ownership checkpoint
+### Orders lifecycle ownership
 
-Issue #138 moves order vectors, list counters/durations, current orders, shared
-links, backups and consist timetable/unbunching state into Rust. Rust implements
-list traversal, command validation/edit/copy/share/unshare, conditional/depot
-execution, implicit-order maintenance, backup capture/restoration/cleanup and
-complete timetable/unbunching policy. Original bodies remain portable-only.
-C++ retains pool shells, typed Order/ID/flag construction, format conversion and
-save/load error boundaries, world observations, GUI/news and vehicle services.
-ORDL/BKOR/VEHS adapters address canonical storage; ancient ORDR conversion uses
-load-only staging. Typed aliases own no parallel authoritative fields.
-Direct noexcept leaves handle non-reentrant observations/writes. Actions return
-to C++ for commands, station departure, train reversal, aircraft destination
-updates, vehicle destination/depot queries, list/backup destruction and GUI
-backup invalidation; no Rust owner/world borrow crosses these boundaries.
-Allocation/environmental failures and Rust panics abort. ABI IDs 240-247 cover
-all crossing records; native tests check layouts, full consist copies, typed
-vector defaults, overlapping edits and allocation invalidation.
-This is a draft implementation checkpoint, not completed migration evidence.
-The existing regression order command transcript and road/water simulations are
-available checks. Focused actual backup save/restoration, timetable command
-execution, conditional/implicit reload and shared-depot unbunching witnesses
-remain required. In particular #83's general round-trip mask must be accompanied
-by separate unmasked initialized-peer evidence before this component integrates.
+Issue #138 / PR #176 moves order vectors, list counts/durations, current orders,
+shared links, backups and consist timetable/unbunching state into Rust. Rust owns
+traversal, command validation/edit/copy/share/unshare, conditional/depot execution,
+implicit maintenance, backup capture/restoration/cleanup and timetable/unbunching
+policy. Original bodies remain portable-only. C++ retains pool shells, typed
+construction, format conversion and save/load errors, world access and GUI/news.
+ORDL/BKOR/VEHS address canonical storage; ancient ORDR uses load-only staging.
+Named synchronous entries borrow an immutable typed noexcept service table;
+there is no per-entry allocation or task/future/action protocol. Owner borrows end
+before callbacks, including nested commands and destruction. No selected service
+unwinds during ordinary play; environmental failures and Rust panics abort.
+ABI IDs 240-245 and 247 describe crossing records. Native checks cover layouts,
+full consist copies, typed defaults, overlapping edits, allocation invalidation
+and ordinary/indexed pool retirement and reuse.
+`simulate orders-` runs commands, initialized shared-depot departure, offline
+backup clearing, client-policy unique/shared restoration and conditional/implicit
+active reload. The identical orders-only console/AfterLoadGame adapter exposes
+original commands and declared typed inputs; executed adapters, frozen runtimes,
+link/compile inputs and actual BKOR saves have reproducible provenance.
+Unmasked 3000/6000-tick peer samples supplement #83's general round-trip mask.
+Network transport, historical saves and exhaustive NewGRF/error domains remain
+limits in #156. A retained pinned-original multi-row BKOR load failure requires
+separate index-zero serialized fixtures; the original source stays unchanged.
 
 ### Station cargo service
 

@@ -403,7 +403,7 @@ pub struct Leaves {
     pub waypoint_facilities: unsafe extern "C" fn(destination: u16) -> u64,
     pub waypoint_owner: unsafe extern "C" fn(destination: u16) -> u64,
     pub list_capacity: unsafe extern "C" fn() -> u64,
-    pub next_backup: unsafe extern "C" fn(first: u32) -> *mut c_void,
+    pub next_backup: unsafe extern "C" fn(cursor: *mut u32) -> *mut c_void,
     pub next_vehicle: unsafe extern "C" fn(first: u32) -> *mut c_void,
     pub aircraft_range: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
     pub aircraft_range_square: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
@@ -625,8 +625,8 @@ impl Game {
     fn service_list_capacity(self) -> u64 {
         unsafe { ((*self.0).list_capacity)() }
     }
-    fn service_next_backup(self, a: u64) -> *mut c_void {
-        unsafe { ((*self.0).next_backup)(a as u32) }
+    fn service_next_backup(self, cursor: *mut u32) -> *mut c_void {
+        unsafe { ((*self.0).next_backup)(cursor) }
     }
     fn service_next_vehicle(self, a: u64) -> *mut c_void {
         unsafe { ((*self.0).next_vehicle)(a as u32) }
@@ -669,9 +669,6 @@ impl Game {
     }
     fn service_unique_backup_name(self, ctx: *mut c_void) -> u64 {
         unsafe { ((*self.0).unique_backup_name)(ctx) }
-    }
-    fn service_backup_id(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).backup_id)(ctx) }
     }
     fn service_backup_hangar(self, ctx: *mut c_void) -> u64 {
         unsafe { ((*self.0).backup_hangar)(ctx) }
@@ -3929,8 +3926,8 @@ impl Game {
     fn backup_consist(self, b: *mut c_void) -> *mut Consist {
         unsafe { ((*self.0).backup_consist)(b) }
     }
-    fn next_backup(self, first: u32) -> *mut c_void {
-        self.service_next_backup(u64::from(first))
+    fn next_backup(self, cursor: *mut u32) -> *mut c_void {
+        self.service_next_backup(cursor)
     }
     fn next_vehicle(self, first: u32) -> *mut c_void {
         self.service_next_vehicle(u64::from(first))
@@ -4127,13 +4124,13 @@ impl Control {
     }
     fn backup_create(&self, v: *mut c_void, a: u64) -> u64 {
         let g = self.g;
-        let mut ob = self.g.next_backup(0);
+        let mut cursor = 0;
+        let mut ob = self.g.next_backup(&raw mut cursor);
         while !ob.is_null() {
-            let next = (g.service_backup_id(ob) as u32).wrapping_add(1);
             if unsafe { (*g.backup(ob)).user == a as u32 } {
                 g.service_delete_backup(ob);
             }
-            ob = self.g.next_backup(next);
+            ob = self.g.next_backup(&raw mut cursor);
         }
         if g.service_backup_capacity() != 0 {
             g.service_create_backup(v, a);
@@ -4142,9 +4139,9 @@ impl Control {
     }
     fn backup_restore(&self, v: *mut c_void, a: u64) -> u64 {
         let g = self.g;
-        let mut ob = self.g.next_backup(0);
+        let mut cursor = 0;
+        let mut ob = self.g.next_backup(&raw mut cursor);
         while !ob.is_null() {
-            let next = (g.service_backup_id(ob) as u32).wrapping_add(1);
             let state = g.backup(ob);
             if g.service_vehicle_tile(v) as u32 == unsafe { (*state).tile }
                 && unsafe { (*state).user == a as u32 }
@@ -4152,29 +4149,28 @@ impl Control {
                 self.restore_backup(ob, v);
                 g.service_delete_backup(ob);
             }
-            ob = self.g.next_backup(next);
+            ob = self.g.next_backup(&raw mut cursor);
         }
         0
     }
     fn backup_reset(&self, a: u64) -> u64 {
         let g = self.g;
-        let mut ob = self.g.next_backup(0);
+        let mut cursor = 0;
+        let mut ob = self.g.next_backup(&raw mut cursor);
         while !ob.is_null() {
             if unsafe { (*g.backup(ob)).user == a as u32 } {
                 g.service_clear_backup_post(a);
                 return 0;
             }
-            ob = self
-                .g
-                .next_backup((g.service_backup_id(ob) as u32).wrapping_add(1));
+            ob = self.g.next_backup(&raw mut cursor);
         }
         0
     }
     fn backup_clear_user(&self, a: u64, b: u64) -> u64 {
         let g = self.g;
-        let mut ob = self.g.next_backup(0);
+        let mut cursor = 0;
+        let mut ob = self.g.next_backup(&raw mut cursor);
         while !ob.is_null() {
-            let next = (g.service_backup_id(ob) as u32).wrapping_add(1);
             let state = g.backup(ob);
             {
                 if unsafe {
@@ -4183,7 +4179,7 @@ impl Control {
                     g.service_delete_backup(ob);
                 }
             }
-            ob = self.g.next_backup(next);
+            ob = self.g.next_backup(&raw mut cursor);
         }
         0
     }
@@ -4194,9 +4190,9 @@ impl Control {
         } else {
             g.service_server_client() as u32
         };
-        let mut ob = self.g.next_backup(0);
+        let mut cursor = 0;
+        let mut ob = self.g.next_backup(&raw mut cursor);
         while !ob.is_null() {
-            let next = (g.service_backup_id(ob) as u32).wrapping_add(1);
             let state = g.backup(ob);
             {
                 if (b == 0 || unsafe { (*state).user == user })
@@ -4212,15 +4208,15 @@ impl Control {
                     }
                 }
             }
-            ob = self.g.next_backup(next);
+            ob = self.g.next_backup(&raw mut cursor);
         }
         0
     }
     fn backup_group_clear(&self, a: u64) -> u64 {
         let g = self.g;
-        let mut ob = self.g.next_backup(0);
+        let mut cursor = 0;
+        let mut ob = self.g.next_backup(&raw mut cursor);
         while !ob.is_null() {
-            let next = (g.service_backup_id(ob) as u32).wrapping_add(1);
             let state = g.backup(ob);
             {
                 if unsafe { (*state).group == a as u16 } {
@@ -4229,15 +4225,15 @@ impl Control {
                     }
                 }
             }
-            ob = self.g.next_backup(next);
+            ob = self.g.next_backup(&raw mut cursor);
         }
         0
     }
     fn backup_vehicle_clear(&self, v: *mut c_void) -> u64 {
         let g = self.g;
-        let mut ob = self.g.next_backup(0);
+        let mut cursor = 0;
+        let mut ob = self.g.next_backup(&raw mut cursor);
         while !ob.is_null() {
-            let next = (g.service_backup_id(ob) as u32).wrapping_add(1);
             let state = g.backup(ob);
             {
                 if unsafe { (*state).clone == v } {
@@ -4251,15 +4247,15 @@ impl Control {
                     }
                 }
             }
-            ob = self.g.next_backup(next);
+            ob = self.g.next_backup(&raw mut cursor);
         }
         0
     }
     fn backup_destination_clear(&self, a: u64, b: u64, c: u64) -> u64 {
         let g = self.g;
-        let mut ob = self.g.next_backup(0);
+        let mut cursor = 0;
+        let mut ob = self.g.next_backup(&raw mut cursor);
         while !ob.is_null() {
-            let next = (g.service_backup_id(ob) as u32).wrapping_add(1);
             {
                 let length = unsafe { (*g.backup_vector(ob)).length };
                 for i in 0..length {
@@ -4281,7 +4277,7 @@ impl Control {
                     }
                 }
             }
-            ob = self.g.next_backup(next);
+            ob = self.g.next_backup(&raw mut cursor);
         }
         0
     }

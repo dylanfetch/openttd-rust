@@ -364,10 +364,13 @@ extern "C" uint64_t openttd_orders_list_capacity() noexcept
 	return OrderList::CanAllocateItem();
 }
 
-extern "C" void *openttd_orders_next_backup(uint32_t first) noexcept
+extern "C" void *openttd_orders_next_backup(uint32_t *cursor) noexcept
 {
-	for (OrderBackup *backup : OrderBackup::Iterate(first)) return backup;
-	return nullptr;
+	/* The original pool iterator advances its physical slot independently of
+	 * the object's index, including during partially restored save loading. */
+	while (*cursor < OrderBackup::GetPoolSize() && !OrderBackup::IsValidID(*cursor)) ++*cursor;
+	if (*cursor >= OrderBackup::GetPoolSize()) return nullptr;
+	return OrderBackup::Get((*cursor)++);
 }
 
 extern "C" void *openttd_orders_next_vehicle(uint32_t first) noexcept
