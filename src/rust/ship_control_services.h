@@ -192,7 +192,7 @@ static uint32_t Ship_tile_y(uint32_t tile) noexcept { return TileY(TileIndex(til
 
 static bool Ship_build_flag(uint32_t engine) noexcept { return Engine::Get(EngineID(engine))->flags.Test(EngineFlag::ExclusivePreview); }
 
-static void Ship_build_random(uint32_t id, uint32_t random) noexcept { Ship *v = Ship::Get(VehicleID(id)); v->random_bits = static_cast<uint8_t>(random); }
+static void Ship_build_random(uint32_t id, uint16_t random) noexcept { Ship *v = Ship::Get(VehicleID(id)); v->random_bits = random; }
 
 static OpenTTDShipPosition Ship_new_position(uint32_t id) noexcept { Ship *v = Ship::Get(VehicleID(id)); auto gp = GetNewVehiclePos(v); return {gp.x, gp.y, gp.old_tile.base(), gp.new_tile.base()}; }
 

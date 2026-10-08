@@ -226,7 +226,7 @@ pub struct Leaves {
     pub tile_x: extern "C" fn(u32) -> u32,
     pub tile_y: extern "C" fn(u32) -> u32,
     pub build_flag: extern "C" fn(u32) -> bool,
-    pub build_random: extern "C" fn(u32, u32),
+    pub build_random: extern "C" fn(u32, u16),
     pub new_position: extern "C" fn(u32) -> Position,
     pub exit_dir: extern "C" fn(u32, u32) -> u32,
     pub track_direction: extern "C" fn(u32, u32) -> u32,
@@ -1070,7 +1070,7 @@ pub unsafe extern "C" fn openttd_rust_ship_build(
     (game.leaves.build_properties)(id, engine);
     game.set_state(DEPOT);
     (game.leaves.build_dates)(id);
-    (game.leaves.build_random)(id, game.services.random());
+    (game.leaves.build_random)(id, game.services.random() as u16);
     (game.leaves.build_acceleration)(id, engine);
     (game.leaves.cache)(id);
     if (game.leaves.build_flag)(engine) {

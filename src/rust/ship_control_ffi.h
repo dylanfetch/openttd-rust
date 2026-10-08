@@ -88,7 +88,7 @@ struct OpenTTDShipLeaves {
 	uint32_t (*tile_x)(uint32_t) noexcept;
 	uint32_t (*tile_y)(uint32_t) noexcept;
 	bool (*build_flag)(uint32_t) noexcept;
-	void (*build_random)(uint32_t, uint32_t) noexcept;
+	void (*build_random)(uint32_t, uint16_t) noexcept;
 	OpenTTDShipPosition (*new_position)(uint32_t) noexcept;
 	uint32_t (*exit_dir)(uint32_t, uint32_t) noexcept;
 	uint32_t (*track_direction)(uint32_t, uint32_t) noexcept;
