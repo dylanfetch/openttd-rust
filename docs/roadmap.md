@@ -143,6 +143,8 @@ may run in parallel with this list.
    rather than 416 full-CI job-minutes. Preserve each component's source review;
    a fresh Sol high reviewer fixes ABI/module conflict resolutions. Widened audit
    selectors retain company registrations and orders move to free IDs 260-266.
+   Replace cargo capacity's residual pointer selector with three typed reads;
+   preserve call order and include the source delta in the fresh review.
    Run combined native/Cargo, default, affected soaks/comparisons and five idle
    three-pair benchmarks before full CI. Bisect retained joins on regressions;
    component metrics use successive joins, road retirement is old boundary glue.
