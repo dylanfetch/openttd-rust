@@ -289,7 +289,9 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         310 => {
             layout!(crate::cargo_storage::Vehicle, item; list, capacity, cargo, train, articulated)
         }
-        311 => layout!(crate::cargo_storage::CapacityServices, item; read, pointer, cargo),
+        311 => {
+            layout!(crate::cargo_storage::CapacityServices, item; read, next_part, last_engine_part, other_multiheaded_part, cargo)
+        }
         _ => usize::MAX,
     }
 }

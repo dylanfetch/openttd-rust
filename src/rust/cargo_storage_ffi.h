@@ -59,7 +59,9 @@ struct OpenTTDCargoCapacityVehicle {
 };
 struct OpenTTDCargoCapacityServices {
 	void (*read)(void *, OpenTTDCargoCapacityVehicle *) noexcept;
-	void *(*pointer)(void *, uint8_t) noexcept;
+	void *(*next_part)(void *) noexcept;
+	void *(*last_engine_part)(void *) noexcept;
+	void *(*other_multiheaded_part)(void *) noexcept;
 	const OpenTTDCargoStorageServices *cargo;
 };
 /* capacity mode0 spreads/shrinks, mode1 transfers. Return1 requires the native
