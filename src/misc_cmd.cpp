@@ -25,6 +25,10 @@
 
 #include "table/strings.h"
 
+#ifdef WITH_RUST
+#include "rust/company_adapter.h"
+#endif
+
 #include "safeguards.h"
 
 /**
@@ -38,9 +42,12 @@
  */
 CommandCost CmdIncreaseLoan(DoCommandFlags flags, LoanCommand cmd, Money amount)
 {
+#ifdef WITH_RUST
+	return RustCompanyCost(RunRustCompany(22, 0, static_cast<uint8_t>(cmd), amount, flags.Test(DoCommandFlag::Execute)));
+#else
 	Company *c = Company::Get(_current_company);
 	Money max_loan = c->GetMaxLoan();
-	if (c->current_loan >= max_loan) {
+	if (c->Finances().current_loan >= max_loan) {
 		return CommandCostWithParam(STR_ERROR_MAXIMUM_PERMITTED_LOAN, max_loan);
 	}
 
@@ -51,26 +58,27 @@ CommandCost CmdIncreaseLoan(DoCommandFlags flags, LoanCommand cmd, Money amount)
 			loan = LOAN_INTERVAL;
 			break;
 		case LoanCommand::Max: // Take a loan as big as possible
-			loan = max_loan - c->current_loan;
+			loan = max_loan - c->Finances().current_loan;
 			break;
 		case LoanCommand::Amount: // Take the given amount of loan
 			loan = amount;
-			if (loan < LOAN_INTERVAL || c->current_loan + loan > max_loan || loan % LOAN_INTERVAL != 0) return CMD_ERROR;
+			if (loan < LOAN_INTERVAL || c->Finances().current_loan + loan > max_loan || loan % LOAN_INTERVAL != 0) return CMD_ERROR;
 			break;
 	}
 
 	/* In case adding the loan triggers the overflow protection of Money,
 	 * we would essentially be losing money as taking and repaying the loan
 	 * immediately would not get us back to the same bank balance anymore. */
-	if (c->money > Money::max() - loan) return CMD_ERROR;
+	if (c->Finances().money > Money::max() - loan) return CMD_ERROR;
 
 	if (flags.Test(DoCommandFlag::Execute)) {
-		c->money        += loan;
-		c->current_loan += loan;
+		c->Finances().money        += loan;
+		c->Finances().current_loan += loan;
 		InvalidateCompanyWindows(c);
 	}
 
 	return CommandCost(EXPENSES_OTHER);
+#endif /* WITH_RUST */
 }
 
 /**
@@ -84,23 +92,26 @@ CommandCost CmdIncreaseLoan(DoCommandFlags flags, LoanCommand cmd, Money amount)
  */
 CommandCost CmdDecreaseLoan(DoCommandFlags flags, LoanCommand cmd, Money amount)
 {
+#ifdef WITH_RUST
+	return RustCompanyCost(RunRustCompany(23, 0, static_cast<uint8_t>(cmd), amount, flags.Test(DoCommandFlag::Execute)));
+#else
 	Company *c = Company::Get(_current_company);
 
-	if (c->current_loan == 0) return CommandCost(STR_ERROR_LOAN_ALREADY_REPAID);
+	if (c->Finances().current_loan == 0) return CommandCost(STR_ERROR_LOAN_ALREADY_REPAID);
 
 	Money loan;
 	switch (cmd) {
 		default: return CMD_ERROR; // Invalid method
 		case LoanCommand::Interval: // Pay back one step
-			loan = std::min(c->current_loan, (Money)LOAN_INTERVAL);
+			loan = std::min(c->Finances().current_loan, (Money)LOAN_INTERVAL);
 			break;
 		case LoanCommand::Max: // Pay back as much as possible
-			loan = std::max(std::min(c->current_loan, GetAvailableMoneyForCommand()), (Money)LOAN_INTERVAL);
+			loan = std::max(std::min(c->Finances().current_loan, GetAvailableMoneyForCommand()), (Money)LOAN_INTERVAL);
 			loan -= loan % LOAN_INTERVAL;
 			break;
 		case LoanCommand::Amount: // Repay the given amount of loan
 			loan = amount;
-			if (loan % LOAN_INTERVAL != 0 || loan < LOAN_INTERVAL || loan > c->current_loan) return CMD_ERROR; // Invalid amount to loan
+			if (loan % LOAN_INTERVAL != 0 || loan < LOAN_INTERVAL || loan > c->Finances().current_loan) return CMD_ERROR; // Invalid amount to loan
 			break;
 	}
 
@@ -109,11 +120,12 @@ CommandCost CmdDecreaseLoan(DoCommandFlags flags, LoanCommand cmd, Money amount)
 	}
 
 	if (flags.Test(DoCommandFlag::Execute)) {
-		c->money        -= loan;
-		c->current_loan -= loan;
+		c->Finances().money        -= loan;
+		c->Finances().current_loan -= loan;
 		InvalidateCompanyWindows(c);
 	}
 	return CommandCost();
+#endif /* WITH_RUST */
 }
 
 /**
@@ -124,6 +136,9 @@ CommandCost CmdDecreaseLoan(DoCommandFlags flags, LoanCommand cmd, Money amount)
  */
 CommandCost CmdSetCompanyMaxLoan(DoCommandFlags flags, CompanyID company, Money amount)
 {
+#ifdef WITH_RUST
+	return RustCompanyCost(RunRustCompany(24, company.base(), amount, flags.Test(DoCommandFlag::Execute)));
+#else
 	if (_current_company != OWNER_DEITY) return CMD_ERROR;
 	if (amount != COMPANY_MAX_LOAN_DEFAULT) {
 		if (amount < 0 || amount > (Money)MAX_LOAN_LIMIT) return CMD_ERROR;
@@ -136,10 +151,11 @@ CommandCost CmdSetCompanyMaxLoan(DoCommandFlags flags, CompanyID company, Money 
 		/* Round the amount down to a multiple of LOAN_INTERVAL. */
 		if (amount != COMPANY_MAX_LOAN_DEFAULT) amount -= (int64_t)amount % LOAN_INTERVAL;
 
-		c->max_loan = amount;
+		c->Finances().max_loan = amount;
 		InvalidateCompanyWindows(c);
 	}
 	return CommandCost();
+#endif /* WITH_RUST */
 }
 
 /**
@@ -233,6 +249,9 @@ CommandCost CmdMoneyCheat(DoCommandFlags, Money amount)
  */
 CommandCost CmdChangeBankBalance(DoCommandFlags flags, TileIndex tile, Money delta, CompanyID company, ExpensesType expenses_type)
 {
+#ifdef WITH_RUST
+	return RustCompanyCost(RunRustCompany(25, company.base(), delta, expenses_type, flags.Test(DoCommandFlag::Execute), tile.base()));
+#else
 	if (!Company::IsValidID(company)) return CMD_ERROR;
 	if (expenses_type >= EXPENSES_END) return CMD_ERROR;
 	if (_current_company != OWNER_DEITY) return CMD_ERROR;
@@ -251,4 +270,5 @@ CommandCost CmdChangeBankBalance(DoCommandFlags flags, TileIndex tile, Money del
 	/* This command doesn't cost anything for deity. */
 	CommandCost zero_cost(expenses_type, (Money)0);
 	return zero_cost;
+#endif /* WITH_RUST */
 }

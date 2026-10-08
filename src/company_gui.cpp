@@ -360,17 +360,17 @@ struct CompanyFinancesWindow : Window {
 
 			case WID_CF_BALANCE_VALUE: {
 				const Company *c = Company::Get(this->window_number);
-				return GetString(STR_FINANCES_BANK_BALANCE, c->money);
+				return GetString(STR_FINANCES_BANK_BALANCE, c->Finances().money);
 			}
 
 			case WID_CF_LOAN_VALUE: {
 				const Company *c = Company::Get(this->window_number);
-				return GetString(STR_FINANCES_TOTAL_CURRENCY, c->current_loan);
+				return GetString(STR_FINANCES_TOTAL_CURRENCY, c->Finances().current_loan);
 			}
 
 			case WID_CF_OWN_VALUE: {
 				const Company *c = Company::Get(this->window_number);
-				return GetString(STR_FINANCES_TOTAL_CURRENCY, c->money - c->current_loan);
+				return GetString(STR_FINANCES_TOTAL_CURRENCY, c->Finances().money - c->Finances().current_loan);
 			}
 
 			case WID_CF_INTEREST_RATE:
@@ -435,7 +435,7 @@ struct CompanyFinancesWindow : Window {
 				if (period < this->first_visible) break;
 
 				const Company *c = Company::Get(this->window_number);
-				const auto &expenses = c->yearly_expenses[NUM_PERIODS - period - 1];
+				const auto &expenses = c->Finances().yearly_expenses[NUM_PERIODS - period - 1];
 				DrawYearColumn(r, TimerGameEconomy::year - (NUM_PERIODS - period - 1), expenses);
 				break;
 			}
@@ -483,8 +483,8 @@ struct CompanyFinancesWindow : Window {
 			}
 
 			const Company *c = Company::Get(company);
-			this->SetWidgetDisabledState(WID_CF_INCREASE_LOAN, c->current_loan >= c->GetMaxLoan()); // Borrow button only shows when there is any more money to loan.
-			this->SetWidgetDisabledState(WID_CF_REPAY_LOAN, company != _local_company || c->current_loan == 0); // Repay button only shows when there is any more money to repay.
+			this->SetWidgetDisabledState(WID_CF_INCREASE_LOAN, c->Finances().current_loan >= c->GetMaxLoan()); // Borrow button only shows when there is any more money to loan.
+			this->SetWidgetDisabledState(WID_CF_REPAY_LOAN, company != _local_company || c->Finances().current_loan == 0); // Repay button only shows when there is any more money to repay.
 		}
 
 		this->DrawWidgets();
@@ -523,7 +523,7 @@ struct CompanyFinancesWindow : Window {
 	{
 		for (uint period = 0; period < this->first_visible; ++period) {
 			const Company *c = Company::Get(this->window_number);
-			const Expenses &expenses = c->yearly_expenses[NUM_PERIODS - period - 1];
+			const Expenses &expenses = c->Finances().yearly_expenses[NUM_PERIODS - period - 1];
 			/* Show expenses column if it has any non-zero value in it. */
 			if (std::ranges::any_of(expenses, [](const Money &value) { return value != 0; })) {
 				this->first_visible = period;
@@ -543,8 +543,8 @@ struct CompanyFinancesWindow : Window {
 	 */
 	const IntervalTimer<TimerWindow> rescale_interval = {std::chrono::seconds(3), [this](auto) {
 		const Company *c = Company::Get(this->window_number);
-		if (c->money > CompanyFinancesWindow::max_money) {
-			CompanyFinancesWindow::max_money = std::max(c->money * 2, CompanyFinancesWindow::max_money * 4);
+		if (c->Finances().money > CompanyFinancesWindow::max_money) {
+			CompanyFinancesWindow::max_money = std::max(c->Finances().money * 2, CompanyFinancesWindow::max_money * 4);
 			this->SetupWidgets();
 			this->ReInit();
 		}
@@ -2327,7 +2327,7 @@ struct BuyCompanyWindow : Window {
 		this->InitNested(window_number);
 
 		const Company *c = Company::Get(this->window_number);
-		this->company_value = hostile_takeover ? CalculateHostileTakeoverValue(c) : c->bankrupt_value;
+		this->company_value = hostile_takeover ? CalculateHostileTakeoverValue(c) : c->Finances().bankrupt_value;
 	}
 
 	void UpdateWidgetSize(WidgetID widget, Dimension &size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize) override
