@@ -222,7 +222,13 @@ static int64_t RunAircraft(uint32_t operation, uint32_t id, int64_t a = 0, int64
 	}
 }
 
-bool Aircraft::Tick() { PerformanceAccumulator framerate(PFE_GL_AIRCRAFT); return RunAircraft(0, this->index.base()) != 0; }
+bool Aircraft::Tick()
+{
+	if (!this->IsNormalAircraft()) return true;
+
+	PerformanceAccumulator framerate(PFE_GL_AIRCRAFT);
+	return RunAircraft(0, this->index.base()) != 0;
+}
 void Aircraft::OnNewCalendarDay() { RunAircraft(1, this->index.base()); }
 void Aircraft::OnNewEconomyDay() { RunAircraft(2, this->index.base()); }
 void SetAircraftPosition(Aircraft *v, int x, int y, int z) { RunAircraft(3, v->index.base(), x, y, z); }
