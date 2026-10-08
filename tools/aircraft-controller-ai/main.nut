@@ -25,6 +25,17 @@ class MigrationAircraftController extends AIController {
 	}
 	function Start() {
 		AIController.SetCommandDelay(1);
+		if (AIRCRAFT_ACTION == "landing-event") {
+			while (true) {
+				while (AIEventController.IsEventWaiting()) {
+					local event = AIEventController.GetNextEvent();
+					if (event.GetEventType() != AIEvent.ET_VEHICLE_CRASHED) continue;
+					local crash = AIEventVehicleCrashed.Convert(event);
+					print("LANDING-EVENT " + crash.GetVehicleID() + " " + crash.GetCrashSite() + " " + crash.GetCrashReason() + " " + crash.GetVictims());
+				}
+				this.Sleep(1);
+			}
+		}
 		if (AIRCRAFT_ACTION == "crash") {
 			local pending = AIRCRAFT_AIRPORTS;
 			while (pending.len() != 0) {
