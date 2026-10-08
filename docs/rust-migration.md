@@ -1392,30 +1392,28 @@ real custom NewGRF callbacks and complete historical saves remain evidence limit
 
 ### Road vehicle control and private state
 
-Issue #121 moves consist/tick/day control, movement, blocking/overtaking, reversal,
-station/depot transitions, crash expiry, service, speed/cache policy and turns
-into Rust. Each shell owns seven private scalars and the canonical ordered path;
-modern, historical split-vector and TTD/TTO adapters stage them in C++.
-Original algorithms and movement data compile only in portable builds. Shared
-Vehicle/GroundVehicle physics, pools, orders/loading, map/road stops, construction
-and rendering remain C++; #124 YAPF writes the same canonical path.
+Issue #121 moves road tick/day control, movement, blocking/overtaking, reversal,
+station/depot transitions, crash expiry, service, speed/cache policy and turns to
+Rust. Each shell owns seven scalars and the canonical path; modern, split-vector
+and TTD/TTO adapters stage them in C++. Original algorithms/data stay portable.
+C++ keeps shared physics, map/pools, orders/loading, construction and rendering;
+#124 YAPF writes the same canonical path.
 
 #155 replaces all fourteen allocated invocation kinds and twenty-two actions
-with typed synchronous entries/services. Immutable native tables are borrowed;
-reads copy consumed fields only, and nearby visitors traverse once without an ID
-vector. Bus classification runs only where needed. The primary owner is resolved
-once per entry. No owner/path/world borrow spans a callback, including nested
-cache/destination/speed/slope/trackdir calls and deletion. Destruction follows
-PreDestructor; its continuation returns a copied result. Native commands return
-CommandCost, NewGRF resolution is bounded, and AI/Game events enqueue. All world
-wrappers are noexcept; panic and environmental failures abort.
+with typed synchronous entries/services. Native tables are borrowed; reads return
+only consumed fields, and nearby visitors traverse once without an ID vector.
+Bus classification runs only where needed; each entry resolves its owner once.
+No owner/path/world borrow spans callbacks, including nested cache, destination,
+speed, slope and trackdir calls. Deletion follows PreDestructor and returns a
+copied result. Commands return CommandCost, NewGRF resolution is bounded, and
+AI/Game events enqueue. Wrappers are noexcept; panic and escaping exceptions abort.
 
-`python3 tools/migration.py simulate roads` and self/soak variants compare all
-saved fields/logs for acceleration, service, blocking, overtaking, canonical path,
-RNG, crossing collision, flooding, crash expiry and reload. Native checks cover
-typed ABI, nested getter/cache/destination/path mutation, owner destruction,
-movement/stop data, widths and save staging. Four existing benchmark scenarios
-report a committed best-known ratio ratchet without failing CI on timing noise.
+Paired `simulate roads` and soak runs compare saved fields/logs for acceleration,
+service, blocking/overtaking, path, RNG, crossing/flooding, crash expiry and reload;
+`--self` controls reference determinism. Native checks cover typed ABI, nested
+getter/cache/destination/path mutation, destruction, movement data and save staging.
+Five benchmark budgets report best-known medians without failing noisy CI;
+the unchanged generation excess is a temporary company boundary exception (#168).
 Actual legacy saves, NewGRFs, articulated/tram turns, sounds and viewport pixels
 remain unexercised domains tracked by #156.
 

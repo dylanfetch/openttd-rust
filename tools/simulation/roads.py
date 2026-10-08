@@ -16,9 +16,10 @@ AI_FOLDER = "road-scenario-ai"
 # Best-known idle-host medians from three semantic-equal pairs (#155).
 # Lower these only after coordinated measurements; never raise them for a port.
 SPEED_BUDGETS = {
-    "play-opus-55-167-002-manual": 2.54,
-    "play-grok-159-001-manual": 2.55,
-    "play-padhattan-ridge-1996-manual": 2.17,
+    "play-opus-55-167-002-manual": 1.415444,
+    "play-grok-159-001-manual": 1.405295,
+    "play-padhattan-ridge-1996-manual": 1.678295,
+    "play-padhattan-ridge-2000-manual": 1.910615,
     "generate-tgp-256-1": 1.41,
 }
 
