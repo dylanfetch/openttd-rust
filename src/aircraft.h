@@ -12,6 +12,9 @@
 
 #include "station_map.h"
 #include "vehicle_base.h"
+#ifdef WITH_RUST
+#include "rust/aircraft_ffi.h"
+#endif
 
 /**
  * Base values for flight levels above ground level for 'normal' flight and holding patterns.
@@ -66,10 +69,30 @@ struct AircraftCache {
 	uint16_t cached_max_range = 0; ///< Cached maximum range.
 };
 
+static_assert(sizeof(AircraftCache) == 8 && alignof(AircraftCache) == alignof(uint32_t) && offsetof(AircraftCache, cached_max_range) == 4);
+static_assert(sizeof(StationID) == 2 && alignof(StationID) == alignof(uint16_t) && sizeof(Direction) == 1);
+static_assert(std::is_trivially_destructible_v<StationID> && std::is_trivially_destructible_v<Direction> && std::is_trivially_destructible_v<AircraftCache>);
+
 /**
  * Aircraft, helicopters, rotors and their shadows belong to this class.
  */
 struct Aircraft final : public SpecializedVehicle<Aircraft, VEH_AIRCRAFT> {
+#ifdef WITH_RUST
+	std::unique_ptr<OpenTTDAircraftState, decltype(&openttd_rust_aircraft_state_destroy)> rust_state{openttd_rust_aircraft_state_new(), openttd_rust_aircraft_state_destroy};
+	uint16_t &crashed_counter = this->rust_state->crashed_counter;
+	uint8_t &pos = this->rust_state->pos;
+	uint8_t &previous_pos = this->rust_state->previous_pos;
+	/* Start the typed C++ lifetimes in fixed Rust storage before publishing aliases.
+	 * Defaults match the original fields. Rust accesses only the corresponding raw
+	 * primitive bytes; trivial C++ lifetimes end when rust_state frees the allocation. */
+	StationID &targetairport = *new (std::addressof(this->rust_state->targetairport)) StationID{StationID::Invalid()};
+	uint8_t &state = this->rust_state->state;
+	Direction &last_direction = *new (std::addressof(this->rust_state->last_direction)) Direction{INVALID_DIR};
+	uint8_t &number_consecutive_turns = this->rust_state->number_consecutive_turns;
+	uint8_t &turn_counter = this->rust_state->turn_counter;
+	uint8_t &flags = this->rust_state->flags;
+	AircraftCache &acache = *new (std::addressof(this->rust_state->cached_max_range_sqr)) AircraftCache{};
+#else
 	uint16_t crashed_counter = 0; ///< Timer for handling crash animations.
 	uint8_t pos = 0; ///< Next desired position of the aircraft.
 	uint8_t previous_pos = 0; ///< Previous desired position of the aircraft.
@@ -81,6 +104,8 @@ struct Aircraft final : public SpecializedVehicle<Aircraft, VEH_AIRCRAFT> {
 	uint8_t flags = 0; ///< Aircraft flags. @see AirVehicleFlags
 
 	AircraftCache acache{};
+
+#endif
 
 	/** We don't want GCC to zero our struct! It already is zeroed and has an index! */
 	Aircraft() : SpecializedVehicleBase() {}
@@ -140,5 +165,9 @@ void GetRotorImage(const Aircraft *v, EngineImageType image_type, VehicleSpriteS
 
 Station *GetTargetAirportIfValid(const Aircraft *v);
 void HandleMissingAircraftOrders(Aircraft *v);
+#ifdef WITH_RUST
+void ReleaseAircraftAirportBlocks(const Aircraft *v);
+void InvalidateAircraftTargetStation(StationID station);
+#endif
 
 #endif /* AIRCRAFT_H */

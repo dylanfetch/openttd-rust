@@ -8,6 +8,7 @@
 //! Migrated game and text kernels exposed through the documented `src/rust` ABIs.
 
 mod admin_conversion;
+mod aircraft;
 mod alternating;
 mod auth;
 mod byte_strings;
