@@ -33,6 +33,8 @@ extern "C" {
  * 130-138 industry storage, observation, world services and production result.
  * 210 company history entry, 211 finances, 212 economy, 213 action, 214 leaves.
  * 215-244 narrow road reads, 245 position, 246 track choice, 247 depot result.
+ * 260 order fields, 261 consist, 262 vehicle orders, 263 order list,
+ * 264 order backup, 265 typed order services, 266 closest-depot result.
  * Item 0 size, 1 alignment, then every field offset in declaration order.
  * Unknown type/item returns SIZE_MAX. No memory borrow, ownership or callback.
  * Native extern-C convention (cdecl on i686 MSVC); Rust panic never unwinds.

@@ -19,6 +19,9 @@
 #include "vehicle_type.h"
 #include "timer/timer_game_tick.h"
 #include "saveload/saveload.h"
+#ifdef WITH_RUST
+#include "rust/orders_ffi.h"
+#endif
 
 using OrderListPool = Pool<OrderList, OrderListID, 128>;
 extern OrderListPool _orderlist_pool;
@@ -254,6 +257,46 @@ public:
 	void ConvertFromOldSavegame();
 };
 
+#ifdef WITH_RUST
+/** Thin scoped view of the canonical contiguous Rust order allocation. Structural
+ * writes invalidate pointers at the same logical operations as std::vector. */
+class RustOrderVector {
+	std::unique_ptr<OpenTTDOrderVector, decltype(&openttd_rust_order_vector_delete)> owner{openttd_rust_order_vector_new(openttd_orders_construct, openttd_orders_destroy), openttd_rust_order_vector_delete};
+public:
+	RustOrderVector() = default;
+	RustOrderVector(const RustOrderVector &) = delete;
+	RustOrderVector &operator=(const RustOrderVector &) = delete;
+	RustOrderVector(RustOrderVector &&src) : RustOrderVector() { this->owner.swap(src.owner); }
+	RustOrderVector &operator=(RustOrderVector &&src) {
+		if (this == &src) { this->clear(); return *this; }
+		RustOrderVector empty;
+		this->owner = std::move(src.owner);
+		src.owner = std::move(empty.owner);
+		return *this;
+	}
+	size_t size() const { return openttd_rust_order_vector_size(this->owner.get()); }
+	bool empty() const { return this->size() == 0; }
+	Order *data() const { return reinterpret_cast<Order *>(openttd_rust_order_vector_data(this->owner.get())); }
+	Order *begin() { return this->data(); }
+	Order *end() { return this->empty() ? this->data() : this->data() + this->size(); }
+	const Order *begin() const { return this->data(); }
+	const Order *end() const { return this->empty() ? this->data() : this->data() + this->size(); }
+	Order &operator[](size_t index) { return this->data()[index]; }
+	const Order &operator[](size_t index) const { return this->data()[index]; }
+	void clear() { openttd_rust_order_vector_resize(this->owner.get(), 0); }
+	void resize(size_t size) { openttd_rust_order_vector_resize(this->owner.get(), size); }
+	template <typename Iterator> void assign(Iterator first, Iterator last) { openttd_rust_order_vector_assign(this->owner.get(), std::to_address(first), std::distance(first, last)); }
+	void assign(const Order *first, const Order *last) { openttd_rust_order_vector_assign(this->owner.get(), first, first == last ? 0 : last - first); }
+	RustOrderVector &operator=(std::vector<Order> &&src) { this->assign(src.data(), src.data() + src.size()); src.clear(); return *this; }
+	Order &emplace_back() { size_t index = this->size(); this->resize(index + 1); return (*this)[index]; }
+	void emplace_back(Order &&order) { openttd_rust_order_vector_insert(this->owner.get(), this->size(), &order); }
+	Order *emplace(Order *pos, Order &&order) { size_t index = this->empty() ? 0 : pos - this->data(); openttd_rust_order_vector_insert(this->owner.get(), index, &order); return this->data() + index; }
+	void erase(Order *pos) { openttd_rust_order_vector_erase(this->owner.get(), pos - this->data()); }
+	void Move(size_t from, size_t to) { openttd_rust_order_vector_move(this->owner.get(), from, to); }
+	OpenTTDOrderVector *GetRustOwner() const { return this->owner.get(); }
+};
+#endif
+
 /** Compatibility struct to allow saveload of pool-based orders. */
 struct OldOrderSaveLoadItem {
 	uint32_t index = 0; ///< This order's index (1-based).
@@ -279,14 +322,28 @@ private:
 	template <typename T>
 	friend class SlOrders;
 
+#ifdef WITH_RUST
+	std::unique_ptr<OpenTTDOrderListState, decltype(&openttd_rust_orderlist_delete)> rust_state{openttd_rust_orderlist_new(), openttd_rust_orderlist_delete};
+	VehicleOrderID &num_manual_orders = this->rust_state->manual;
+	uint &num_vehicles = this->rust_state->vehicles;
+	Vehicle *&first_shared = *new (std::addressof(this->rust_state->first_shared)) Vehicle *{nullptr};
+	RustOrderVector orders;
+#else
 	VehicleOrderID num_manual_orders = 0; ///< NOSAVE: How many manually added orders are there in the list.
 	uint num_vehicles = 0; ///< NOSAVE: Number of vehicles that share this order list.
 	Vehicle *first_shared = nullptr; ///< NOSAVE: pointer to the first vehicle in the shared order chain.
 	std::vector<Order> orders; ///< Orders of the order list.
+#endif
 	uint32_t old_order_index = 0;
 
+#ifdef WITH_RUST
+	TimerGameTick::Ticks &timetable_duration = this->rust_state->timetable_duration;
+	TimerGameTick::Ticks &total_duration = this->rust_state->total_duration;
+#else
 	TimerGameTick::Ticks timetable_duration{}; ///< NOSAVE: Total timetabled duration of the order list.
 	TimerGameTick::Ticks total_duration{}; ///< NOSAVE: Total (timetabled or not) duration of the order list.
+
+#endif
 
 public:
 	/** Default constructor producing an invalid order list. */
@@ -317,6 +374,11 @@ public:
 	/** Destructor. Invalidates OrderList for re-usage by the pool. */
 	~OrderList() {}
 
+#ifdef WITH_RUST
+	OrderList(RustOrderVector &&orders, Vehicle *v) : orders(std::move(orders)) { this->Initialize(v); }
+	OpenTTDOrderListState *GetRustState() const { return this->rust_state.get(); }
+	OpenTTDOrderVector *GetRustOrders() const { return this->orders.GetRustOwner(); }
+#endif
 	void Initialize(Vehicle *v);
 
 	void RecalculateTimetableDuration();
@@ -327,8 +389,8 @@ public:
 	 */
 	inline VehicleOrderID GetFirstOrder() const { return this->orders.empty() ? INVALID_VEH_ORDER_ID : 0; }
 
-	inline std::span<const Order> GetOrders() const { return this->orders; }
-	inline std::span<Order> GetOrders() { return this->orders; }
+	inline std::span<const Order> GetOrders() const { return {this->orders.data(), this->orders.size()}; }
+	inline std::span<Order> GetOrders() { return {this->orders.data(), this->orders.size()}; }
 
 	/**
 	 * Get a certain order of the order chain.

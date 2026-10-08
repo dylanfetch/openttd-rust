@@ -79,6 +79,7 @@ def scenario_modules():
         effects,
         generated,
         industries,
+        orders,
         play_saves,
         rails,
         roads,
@@ -104,6 +105,7 @@ def scenario_modules():
         stations,
         industries,
         cargo_storage,
+        orders,
     )
 
 
@@ -461,6 +463,9 @@ def run_game(
         XDG_CONFIG_HOME=str(run_dir / "xdg-config"),
         XDG_CACHE_HOME=str(run_dir / "xdg-cache"),
     )
+    for module in scenario_modules():
+        if game_environment := getattr(module, "game_environment", None):
+            env.update(game_environment(scenario))
     with (
         game_slot(isolate),
         open(run_dir / "stdout.log", "wb") as out,
@@ -608,8 +613,8 @@ def run_scenario(
         for mode, desync in modes:
             runs = {
                 role: run_game(
-                    scenario,
-                    binaries[role],
+                    dict(scenario, **scenario.get("role_inputs", {}).get(role, {})),
+                    scenario.get("executables", binaries)[role],
                     builds[role],
                     out / name / mode / role,
                     timeout,

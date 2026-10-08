@@ -1311,6 +1311,7 @@ mod industry;
 #[allow(unsafe_code)]
 mod ship_yapf;
 
+mod orders;
 mod train;
 mod train_state;
 
