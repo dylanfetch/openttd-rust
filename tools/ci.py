@@ -31,6 +31,8 @@ def api(repository: str, path: str) -> dict:
 def validate_pull(pull: dict, head: str | None = None) -> str:
     if pull["state"] != "open" or pull["base"]["ref"] != PROTECTED_REF:
         raise ValueError("PR must be open and target rust-migration")
+    if pull.get("mergeable") is not True or not pull.get("merge_commit_sha"):
+        raise ValueError("PR is unmergeable or mergeability is pending; retry after resolving it")
     current = pull["head"]["sha"]
     if head is not None and current != head:
         raise ValueError(f"PR head changed: requested {head}, current {current}")
@@ -100,7 +102,7 @@ def request(args: argparse.Namespace) -> Path:
             for item in variables
         ):
             raise ValueError(
-                "Bootstrap is disabled after CI_ON_DEMAND is enabled; use normal dispatch"
+                "Label requests need CI_ON_DEMAND unset; root must review workflow changes first"
             )
         # Remove/add is intentional: only the explicit label event requests a run.
         labels = {label["name"] for label in pull["labels"]}
@@ -210,7 +212,7 @@ def main() -> int:
     submit.add_argument(
         "--bootstrap",
         action="store_true",
-        help="one-time pre-integration ci:full label request",
+        help="ci:full label request for reviewed workflow changes with CI_ON_DEMAND unset",
     )
     submit.add_argument("--wait", action="store_true")
     for command in ("status", "wait"):

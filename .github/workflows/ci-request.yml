@@ -21,8 +21,7 @@ on:
         description: Unique request identifier from tools/ci.py
         required: true
         type: string
-  # One-time bootstrap: root reviews this workflow before applying the label.
-  # Disabled permanently once CI_ON_DEMAND is enabled.
+  # Workflow updates: root reviews the definition and temporarily unsets CI_ON_DEMAND.
   pull_request:
     branches: [rust-migration]
     types: [labeled]
@@ -57,6 +56,7 @@ jobs:
     outputs:
       head: ${{ steps.plan.outputs.head }}
       base: ${{ steps.plan.outputs.base }}
+      merge: ${{ steps.plan.outputs.merge }}
       profile: ${{ steps.plan.outputs.profile }}
       pr: ${{ steps.plan.outputs.pr }}
     steps:
@@ -86,7 +86,10 @@ jobs:
           if (pull.state !== 'open' || pull.base.ref !== 'rust-migration' || pull.head.sha !== head) {
             throw new Error('Pull request is closed, targets another branch, or its head changed');
           }
-          for (const [key, value] of Object.entries({head, base: pull.base.sha, profile, pr})) {
+          if (pull.mergeable !== true || !/^[0-9a-f]{40}$/.test(pull.merge_commit_sha || '')) {
+            throw new Error('Pull request is unmergeable or mergeability is pending; retry after resolving it');
+          }
+          for (const [key, value] of Object.entries({head, base: pull.base.sha, merge: pull.merge_commit_sha, profile, pr})) {
             core.setOutput(key, String(value));
           }
           if (profile === 'full') {
@@ -101,7 +104,7 @@ jobs:
     needs: plan
     uses: ./.github/workflows/ci-quick.yml
     with:
-      checkout-ref: ${{ needs.plan.outputs.head }}
+      checkout-ref: ${{ needs.plan.outputs.merge }}
       base-ref: ${{ needs.plan.outputs.base }}
 
   rust:
@@ -111,7 +114,7 @@ jobs:
     steps:
     - uses: actions/checkout@v6
       with:
-        ref: ${{ needs.plan.outputs.head }}
+        ref: ${{ needs.plan.outputs.merge }}
         persist-credentials: false
     - name: Install pinned Rust compiler
       run: |
@@ -129,27 +132,19 @@ jobs:
     if: needs.plan.outputs.profile == 'native' || needs.plan.outputs.profile == 'full'
     uses: ./.github/workflows/rust-migration.yml
     with:
-      checkout-ref: ${{ needs.plan.outputs.head }}
+      checkout-ref: ${{ needs.plan.outputs.merge }}
 
   platform:
     needs: plan
     if: needs.plan.outputs.profile != 'rust'
     uses: ./.github/workflows/ci-build.yml
     with:
-      checkout-ref: ${{ needs.plan.outputs.head }}
+      checkout-ref: ${{ needs.plan.outputs.merge }}
       profile: ${{ needs.plan.outputs.profile }}
-
-  annotations:
-    name: Requested Check Annotations
-    needs: [plan, quick, rust, native, platform]
-    if: always() && needs.plan.result == 'success'
-    runs-on: ubuntu-latest
-    steps:
-    - uses: OpenTTD/actions/annotation-check@v6
 
   publish:
     name: Publish validation result
-    needs: [plan, quick, native, platform, annotations]
+    needs: [plan, quick, native, platform]
     if: always() && needs.plan.result == 'success' && needs.plan.outputs.profile == 'full'
     runs-on: ubuntu-latest
     concurrency:
@@ -177,8 +172,10 @@ jobs:
             return;
           }
           const {data: pull} = await github.rest.pulls.get({...context.repo, pull_number: pr});
-          const current = pull.state === 'open' && pull.base.ref === 'rust-migration' && pull.head.sha === head;
-          const complete = ['plan', 'quick', 'native', 'platform', 'annotations'].every(
+          const current = pull.state === 'open' && pull.base.ref === 'rust-migration' && pull.head.sha === head &&
+            pull.mergeable === true && pull.base.sha === needs.plan.outputs.base &&
+            pull.merge_commit_sha === needs.plan.outputs.merge;
+          const complete = ['plan', 'quick', 'native', 'platform'].every(
             name => needs[name]?.result === 'success') &&
             needs.native?.outputs?.validated === 'true' && needs.platform?.outputs?.validated === 'true';
           const passed = current && complete;

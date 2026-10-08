@@ -18,7 +18,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: quick-ci-${{ inputs.checkout-ref && github.run_id || github.ref }}
+  group: quick-ci-${{ inputs.checkout-ref && github.run_id || github.ref == 'refs/heads/rust-migration' && github.sha || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/rust-migration' }}
 
 jobs:

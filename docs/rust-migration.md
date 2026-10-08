@@ -355,7 +355,7 @@ Server-side protection on `rust-migration` requires `Full validation`, the cheap
 commit/string/script-mode checks, and resolved conversations. Full validation is
 an explicit commit status, published only after the native comparisons, simulation,
 entire platform matrix, quick checks and annotation checks succeed for a captured
-PR head. Skipped or cancelled jobs cannot satisfy it. Workflow dispatch runs the
+PR merge commit, with the status published on its head. Skipped or cancelled jobs cannot satisfy it. Workflow dispatch runs the
 controller from protected `rust-migration`; candidate test jobs have read-only
 permissions and the status publishers never execute candidate code.
 
@@ -371,16 +371,22 @@ python3 tools/ci.py wait .local/ci-requests/REQUEST.json
 
 `rust` runs four Cargo checks; `native` adds the Linux matrix and full migration
 comparison; `platform` runs the platform matrix. All include quick checks.
-Only `full` satisfies the merge gate, and a new PR head needs a new full request.
+Only `full` satisfies the merge gate. Unmergeable or pending-mergeability PRs
+are refused; a changed PR head or base needs a new full request.
 The CLI records the SHA and request/run identity and refuses a changed PR head.
 `CI_ON_DEMAND=true` enables this scheduling after root installs and verifies the
 required status. With the variable absent, automatic full CI remains as a safe
-bootstrap; the one-time `ci:full` label path is disabled when it is enabled.
+bootstrap. For a workflow-changing PR, root reviews its workflow definitions,
+temporarily unsets `CI_ON_DEMAND`, and requests `--profile full --bootstrap`
+(the `ci:full` label path tests the PR definitions). Root restores the variable
+to `true` after merge and records both changes in the PR; never use `--admin`.
 For capacity batching, test a concrete integration PR and merge it once. A stack
 organizes dependent PRs but does not itself combine validation runs.
 
 Required checks must pass on the PR head; branches need not be up to date with the
-base. Platform CI also runs after code merges into `rust-migration`; markdown-only
+base; the captured merge commit must still match when validation publishes.
+Protected pushes have per-SHA concurrency, so a later docs push cannot cancel
+the code merge run. Platform CI also runs after code merges into `rust-migration`; markdown-only
 pushes skip heavy builds after complete file classification. A post-merge
 failure is fixed forward first. Force pushes and branch deletion are disallowed,
 including for administrators. The approving-review count is zero because agents
