@@ -52,6 +52,42 @@ gives exact reproduction and comparison commands and coverage limits.
 Only optional input GLOG history is removed; every other chunk is unchanged.
 The original owner-built and road saves retain their original bytes.
 
+## Aircraft landing RNG witnesses (#156)
+
+Agent: /root/aircraft_landing_rng_156 | Model: gpt-6.1-sol | Reasoning effort: high
+
+`aircraft-controller-landing-*` reuses the existing eight-plane controller setup
+and 411-tick reference reload. Plane 2 naturally reaches state16/position34,
+speed293/target0 with passenger and mail cargo; the target station also has both.
+Typed DATE seeds are the only field edits; optional GLOG is removed. The event
+case additionally restores the setup's exact AIPL configuration for a passive
+observer. Preparation receipts record input hashes/assignments; the harness
+freezes and hashes the unchanged-reference runtime and scenario AI files.
+
+With crashes enabled (setting1), seeds `(2443390976,1012692424)` produce the
+third shared draw21 and crash at threshold equality; `(2443382784,1011643848)`
+produce22 and survive; `(2443390968,1012691400)` produce`0x400015` and crash,
+requiring the low22-bit mask. Setting0 survives after three shared draws,
+versus five for the enabled draw22 survivor (the equality crash uses six).
+One-tick witnesses require original DATE RNG, status8->138/counter0->3 on crash,
+empty plane/mail and station cargo, block mask3328, rating0 for goods0/2/5
+(nonzero status) and rating1 otherwise. Survivors retain cargo and ratings.
+The 16-tick passive observer requires exactly `LANDING-EVENT 2 10064 3 10`
+and counter93 in both plain/desync modes; every semantic chunk/log is compared.
+
+```sh
+python3 tools/migration.py simulate aircraft-controller-landing --self --jobs 2
+python3 tools/migration.py simulate aircraft aircraft-controller --jobs 2
+python3 tools/migration.py verify --jobs 2
+```
+
+Sensitivity: in the candidate only, change `maybe_crash`'s `> prob` to `>= prob`,
+then separately replace only its `self.random()` with `0`. Rebuild and run the
+landing selection above; each must fail. Restore exact Rust source and rerun
+the suite. Never alter reference bodies or expectations to fit a mutation.
+Short-strip fast jets, cheat/setting2 probability, flood crashes, finite-range
+NewGRF sequences, historical saves and arbitrary airport layouts remain limits.
+
 ## Road service-routing RNG witness (#156)
 
 `roads-service-retain` and `roads-service-refresh` reuse `opus-55-167-002.sav`.
