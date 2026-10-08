@@ -47,6 +47,13 @@ pub extern "C" fn openttd_rust_ship_control_reload_rotation() {
 const INVALID: u32 = u32::MAX;
 const DEPOT: u16 = 128;
 const WORMHOLE: u16 = 64;
+// Match FindFirstBit and FindFirstTrack, including their distinct zero results.
+fn first_bit(bits: u32) -> u32 {
+    if bits == 0 { 0 } else { bits.trailing_zeros() }
+}
+fn first_track(bits: u32) -> u32 {
+    if bits == 0 { 255 } else { first_bit(bits) }
+}
 /// One private allocation per shell, including indexed load construction.
 pub struct State {
     track: u8,
@@ -585,12 +592,12 @@ impl Game<'_> {
         let found;
         let track;
         if (self.leaves.dest)(id) == 0 {
-            let mut choice = u32::from(self.state()).trailing_zeros();
+            let mut choice = first_bit(u32::from(self.state()) & 63);
             if choice >= 2 {
                 choice ^= 1;
             }
             if tracks & (1 << choice) == 0 {
-                choice = tracks.trailing_zeros();
+                choice = first_track(tracks);
             }
             track = choice;
             found = false;
@@ -1036,7 +1043,7 @@ pub unsafe extern "C" fn openttd_rust_ship_trackdir(
         [0_u32, 1, 8, 9][((game.leaves.direction)(id) / 2) as usize]
     } else {
         (game.leaves.track_direction)(
-            u32::from(game.state()).trailing_zeros(),
+            first_track(u32::from(game.state())),
             (game.leaves.direction)(id),
         )
     }) as u8
