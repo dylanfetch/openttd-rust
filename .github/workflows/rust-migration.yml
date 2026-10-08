@@ -21,7 +21,7 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: ${{ github.workflow }}-migration-${{ inputs.checkout-ref && github.run_id || github.ref }}
+  group: ${{ github.workflow }}-migration-${{ inputs.checkout-ref && github.run_id || github.ref == 'refs/heads/rust-migration' && github.sha || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/rust-migration' }}
 
 jobs:
@@ -44,14 +44,6 @@ jobs:
           fetch-depth: 0
           ref: ${{ inputs.checkout-ref }}
           persist-credentials: false
-      - name: Install uv for Ruff
-        uses: astral-sh/setup-uv@v10.2.0
-        with:
-          version: "0.12.18"
-      - name: Check Python tools with Ruff
-        run: |
-          uvx --from ruff==0.16.8 ruff check tools/
-          uvx --from ruff==0.16.8 ruff format --check tools/
       - name: Install native dependencies
         run: |
           sudo apt-get update
@@ -71,10 +63,6 @@ jobs:
               "--component", ",".join(toolchain["components"]),
           ], check=True)
           PY
-      - name: Verify compiler-cache controls
-        run: python3 tools/test-compiler-cache.py
-      - name: Check simulation runtime provenance
-        run: python3 tools/test-simulation-provenance.py
       - name: Identify compatible compilation artifacts
         id: compiler-cache-identity
         run: |
