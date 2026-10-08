@@ -123,6 +123,8 @@ class GateTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/ci-request.yml").read_text()
         self.assertEqual(workflow.count("ref: ${{ needs.plan.outputs.merge }}"), 4)
         self.assertNotIn("ref: ${{ needs.plan.outputs.head }}", workflow)
+        quick = (ROOT / ".github/workflows/ci-quick.yml").read_text()
+        self.assertIn("HEAD: ${{ inputs.checkout-ref }}^2", quick)
 
     def test_full_success(self):
         result = execute_publisher(good_needs(), PULL)

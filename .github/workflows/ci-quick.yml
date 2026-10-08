@@ -61,7 +61,7 @@ jobs:
       if: inputs.base-ref != ''
       env:
         BASE: ${{ inputs.base-ref }}
-        HEAD: ${{ inputs.checkout-ref }}
+        HEAD: ${{ inputs.checkout-ref }}^2
       run: |
         hooks="$GITHUB_WORKSPACE/.local/commit-hooks"
         echo "::add-matcher::$hooks/action/check-diff-matcher.json"
