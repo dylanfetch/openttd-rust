@@ -29,7 +29,7 @@ env:
   CTEST_OUTPUT_ON_FAILURE: 1
 
 concurrency:
-  group: ${{ github.workflow }}-build-${{ inputs.checkout-ref && github.run_id || github.ref }}
+  group: ${{ github.workflow }}-build-${{ inputs.checkout-ref && github.run_id || github.ref == 'refs/heads/rust-migration' && github.sha || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/master' && github.ref != 'refs/heads/rust-migration' }}
 
 jobs:
