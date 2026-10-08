@@ -117,6 +117,10 @@ never in masks.
    six-year soaks and idle three-pair comparisons pass. Presence of PBS signals,
    buoys and subsidies does not establish every route, traversal or multiplier;
    remaining branches stay in #156.
+   **Selected next input (#183):** the owner's 2006-09-21 Padhattan save adds
+   monorail, bridges, tunnels, canal and locks. Import unchanged through existing
+   rail/play scenarios, inventory presence separately from witnessed traversal,
+   and run self/pair/soak checks. Preserve the established five benchmark cases.
 
 ## Phase 2: current work, in order
 
