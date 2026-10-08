@@ -1004,11 +1004,11 @@ static void RoadBoundary()
 	CHECK(openttd_rust_road_crash(17, probe.state, false, &leaves, &services) == 8);
 	CHECK(probe.departures == 1 && openttd_rust_road_get(probe.state, 5) == 1);
 
-	leaves.speed_limits = [](uint32_t, OpenTTDRoadSpeedLimits *out) noexcept { *out = {80, 65535}; };
-	leaves.consist_speed = [](uint32_t, OpenTTDRoadConsistSpeed *out) noexcept { *out = {1, UINT32_MAX, 0, 100}; };
+	leaves.speed_limits = [](uint32_t) noexcept -> OpenTTDRoadSpeedLimits { return {80, 65535}; };
+	leaves.consist_speed = [](uint32_t) noexcept -> OpenTTDRoadConsistSpeed { return {1, UINT32_MAX, 0, 100}; };
 	leaves.op_acc_model = []() noexcept -> uint32_t { return 0; };
 	leaves.op_bay_stop = [](uint32_t) noexcept -> uint32_t { return 0; };
-	leaves.track_direction = [](uint32_t, OpenTTDRoadTrackDirection *out) noexcept { *out = {1, 0, 100}; };
+	leaves.track_direction = [](uint32_t) noexcept -> OpenTTDRoadTrackDirection { return {1, 0, 100}; };
 	leaves.read_dest = [](uint32_t) noexcept { return road_abi_probe->dest; };
 	leaves.op_set_dest = [](uint32_t, uint32_t tile) noexcept { road_abi_probe->dest = tile; };
 	leaves.op_cache_invalidate = [](uint32_t) noexcept {};
@@ -1042,9 +1042,9 @@ static void RoadBoundary()
 	leaves.read_status = [](uint32_t) noexcept { return road_abi_probe->status; };
 	leaves.set_running = [](uint32_t, uint8_t) noexcept {};
 	leaves.read_running = [](uint32_t) noexcept -> uint32_t { return 0; };
-	leaves.order_clock = [](uint32_t, OpenTTDRoadOrderClock *out) noexcept { out->order_time = road_abi_probe->order_time; };
+	leaves.order_clock = [](uint32_t) noexcept -> OpenTTDRoadOrderClock { return {road_abi_probe->order_time}; };
 	leaves.set_order_time = [](uint32_t, int32_t value) noexcept { road_abi_probe->order_time = static_cast<uint32_t>(value); };
-	leaves.collision_part = [](uint32_t, OpenTTDRoadCollisionPart *out) noexcept { *out = {UINT32_MAX, 100, 0}; };
+	leaves.collision_part = [](uint32_t) noexcept -> OpenTTDRoadCollisionPart { return {UINT32_MAX, 100, 0}; };
 	leaves.op_is_crossing = [](uint32_t) noexcept -> uint32_t { return 0; };
 	leaves.op_breakdown = [](uint32_t) noexcept -> uint32_t { return 0; };
 	leaves.op_process_orders = [](uint32_t id) noexcept { auto &p = *road_abi_probe; openttd_rust_road_set_dest(id, p.state, 100, p.leaves, p.services); };
@@ -1053,7 +1053,7 @@ static void RoadBoundary()
 	leaves.op_visual = [](uint32_t id) noexcept { auto &p = *road_abi_probe; CHECK(openttd_rust_road_max_speed(id, p.state, p.leaves, p.services) == 80); ++p.nested; };
 	leaves.op_update_speed = [](uint32_t, uint32_t acceleration, int32_t minimum, int32_t maximum) noexcept -> int32_t { CHECK(acceleration == 256 && minimum == 0 && maximum == 80); return 0; };
 	leaves.op_advance = [](uint32_t) noexcept -> uint32_t { return 1; };
-	leaves.controller_part = [](uint32_t, OpenTTDRoadControllerPart *out) noexcept { *out = {UINT32_MAX, 0}; };
+	leaves.controller_part = [](uint32_t) noexcept -> OpenTTDRoadControllerPart { return {UINT32_MAX, 0}; };
 	leaves.op_viewport = [](uint32_t, bool force, bool delta) noexcept { CHECK(!force && !delta); };
 	leaves.read_progress = [](uint32_t) noexcept -> uint32_t { return 0; };
 	leaves.set_progress = [](uint32_t, uint8_t progress) noexcept { CHECK(progress == 0); };
@@ -1102,8 +1102,8 @@ static void RoadServiceBoundary()
 	leaves.set_suppress_implicit = [](uint32_t) noexcept {};
 	leaves.op_servint = [](uint32_t) noexcept -> uint32_t { return 1; };
 	leaves.op_needs_service = [](uint32_t) noexcept -> uint32_t { return 1; };
-	leaves.service_origin = [](uint32_t, OpenTTDRoadServiceOrigin *out) noexcept { auto &p = *road_service_probe; *out = {17, p.speed, p.tile}; };
-	leaves.depot_part = [](uint32_t id, OpenTTDRoadDepotPart *out) noexcept { *out = {id == 17 ? 18U : UINT32_MAX, road_service_probe->tile}; };
+	leaves.service_origin = [](uint32_t) noexcept -> OpenTTDRoadServiceOrigin { auto &p = *road_service_probe; return {17, p.speed, p.tile}; };
+	leaves.depot_part = [](uint32_t id) noexcept -> OpenTTDRoadDepotPart { return {id == 17 ? 18U : UINT32_MAX, road_service_probe->tile}; };
 	leaves.op_is_depot = [](uint32_t tile) noexcept -> uint32_t { CHECK(tile == road_service_probe->tile); return road_service_probe->depot_tile; };
 	leaves.op_max_penalty = []() noexcept -> uint32_t { return 300; };
 	leaves.op_depot_index = [](uint32_t tile) noexcept -> uint32_t { CHECK(tile == road_service_probe->tile); return 55; };
@@ -1111,7 +1111,7 @@ static void RoadServiceBoundary()
 	leaves.read_dest = [](uint32_t) noexcept { return road_service_probe->dest; };
 	leaves.op_set_dest = [](uint32_t, uint32_t tile) noexcept { CHECK(tile == road_service_probe->tile); road_service_probe->dest = tile; };
 	leaves.op_service = [](uint32_t) noexcept { ++road_service_probe->services; };
-	leaves.service_order = [](uint32_t, OpenTTDRoadServiceOrder *out) noexcept { *out = {}; };
+	leaves.service_order = [](uint32_t) noexcept -> OpenTTDRoadServiceOrder { return {}; };
 	leaves.read_order_type = [](uint32_t) noexcept -> uint32_t { return 0; };
 	leaves.op_find_depot = [](uint32_t, int32_t penalty) noexcept -> OpenTTDRoadDepotResult { CHECK(penalty == 300); ++road_service_probe->searches; return {UINT32_MAX, UINT32_MAX}; };
 	leaves.op_economy_age = [](uint32_t) noexcept {};

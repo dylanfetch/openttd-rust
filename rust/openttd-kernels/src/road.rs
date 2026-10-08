@@ -594,37 +594,37 @@ pub struct Leaves {
     pub read_tile: extern "C" fn(u32) -> u32,
     pub read_total_length: extern "C" fn(u32) -> u32,
     pub read_tram: extern "C" fn(u32) -> u32,
-    pub speed_limits: extern "C" fn(u32, *mut SpeedLimits) -> (),
-    pub consist_speed: extern "C" fn(u32, *mut ConsistSpeed) -> (),
-    pub close_origin: extern "C" fn(u32, *mut CloseOrigin) -> (),
-    pub close_candidate: extern "C" fn(u32, *mut CloseCandidate) -> (),
-    pub overtake_origin: extern "C" fn(u32, *mut OvertakeOrigin) -> (),
-    pub overtake_speed: extern "C" fn(u32, *mut OvertakeSpeed) -> (),
-    pub sliding_position: extern "C" fn(u32, *mut SlidingPosition) -> (),
-    pub height_speed: extern "C" fn(u32, *mut HeightSpeed) -> (),
-    pub collision_part: extern "C" fn(u32, *mut CollisionPart) -> (),
-    pub collision_origin: extern "C" fn(u32, *mut CollisionOrigin) -> (),
-    pub crash_direction: extern "C" fn(u32, *mut CrashDirection) -> (),
-    pub path_vehicle: extern "C" fn(u32, *mut PathVehicle) -> (),
-    pub depot_part: extern "C" fn(u32, *mut DepotPart) -> (),
-    pub depot_orders: extern "C" fn(u32, *mut DepotOrders) -> (),
-    pub vehicle_tile: extern "C" fn(u32, *mut VehicleTile) -> (),
-    pub arrival_vehicle: extern "C" fn(u32, *mut ArrivalVehicle) -> (),
-    pub tunnel_vehicle: extern "C" fn(u32, *mut TunnelVehicle) -> (),
-    pub move_vehicle: extern "C" fn(u32, *mut MoveVehicle) -> (),
-    pub move_transition: extern "C" fn(u32, *mut MoveTransition) -> (),
-    pub move_position: extern "C" fn(u32, *mut MovePosition) -> (),
-    pub block_vehicle: extern "C" fn(u32, *mut BlockVehicle) -> (),
-    pub stop_order: extern "C" fn(u32, *mut StopOrder) -> (),
-    pub move_stop: extern "C" fn(u32, *mut MoveStop) -> (),
-    pub order_clock: extern "C" fn(u32, *mut OrderClock) -> (),
-    pub controller_part: extern "C" fn(u32, *mut ControllerPart) -> (),
-    pub service_origin: extern "C" fn(u32, *mut ServiceOrigin) -> (),
-    pub service_order: extern "C" fn(u32, *mut ServiceOrder) -> (),
-    pub track_direction: extern "C" fn(u32, *mut TrackDirection) -> (),
-    pub slope_origin: extern "C" fn(u32, *mut SlopeOrigin) -> (),
-    pub slope_part: extern "C" fn(u32, *mut SlopePart) -> (),
-    pub turn_vehicle: extern "C" fn(u32, *mut TurnVehicle) -> (),
+    pub speed_limits: extern "C" fn(u32) -> SpeedLimits,
+    pub consist_speed: extern "C" fn(u32) -> ConsistSpeed,
+    pub close_origin: extern "C" fn(u32) -> CloseOrigin,
+    pub close_candidate: extern "C" fn(u32) -> CloseCandidate,
+    pub overtake_origin: extern "C" fn(u32) -> OvertakeOrigin,
+    pub overtake_speed: extern "C" fn(u32) -> OvertakeSpeed,
+    pub sliding_position: extern "C" fn(u32) -> SlidingPosition,
+    pub height_speed: extern "C" fn(u32) -> HeightSpeed,
+    pub collision_part: extern "C" fn(u32) -> CollisionPart,
+    pub collision_origin: extern "C" fn(u32) -> CollisionOrigin,
+    pub crash_direction: extern "C" fn(u32) -> CrashDirection,
+    pub path_vehicle: extern "C" fn(u32) -> PathVehicle,
+    pub depot_part: extern "C" fn(u32) -> DepotPart,
+    pub depot_orders: extern "C" fn(u32) -> DepotOrders,
+    pub vehicle_tile: extern "C" fn(u32) -> VehicleTile,
+    pub arrival_vehicle: extern "C" fn(u32) -> ArrivalVehicle,
+    pub tunnel_vehicle: extern "C" fn(u32) -> TunnelVehicle,
+    pub move_vehicle: extern "C" fn(u32) -> MoveVehicle,
+    pub move_transition: extern "C" fn(u32) -> MoveTransition,
+    pub move_position: extern "C" fn(u32) -> MovePosition,
+    pub block_vehicle: extern "C" fn(u32) -> BlockVehicle,
+    pub stop_order: extern "C" fn(u32) -> StopOrder,
+    pub move_stop: extern "C" fn(u32) -> MoveStop,
+    pub order_clock: extern "C" fn(u32) -> OrderClock,
+    pub controller_part: extern "C" fn(u32) -> ControllerPart,
+    pub service_origin: extern "C" fn(u32) -> ServiceOrigin,
+    pub service_order: extern "C" fn(u32) -> ServiceOrder,
+    pub track_direction: extern "C" fn(u32) -> TrackDirection,
+    pub slope_origin: extern "C" fn(u32) -> SlopeOrigin,
+    pub slope_part: extern "C" fn(u32) -> SlopePart,
+    pub turn_vehicle: extern "C" fn(u32) -> TurnVehicle,
     pub owner: extern "C" fn(u32) -> *mut State,
     pub visit_close: extern "C" fn(u32, i32, i32, Visitor, *mut c_void),
     pub visit_tunnel: extern "C" fn(u32, i32, i32, Visitor, *mut c_void),
@@ -706,161 +706,99 @@ impl Game<'_> {
         self.read_status(id) & 1 != 0
     }
     fn speed_limits(&self, id: u32) -> SpeedLimits {
-        let mut out = SpeedLimits::default();
-        (self.leaves.speed_limits)(id, &raw mut out);
-        out
+        (self.leaves.speed_limits)(id)
     }
     fn consist_speed(&self, id: u32) -> ConsistSpeed {
-        let mut out = ConsistSpeed::default();
-        (self.leaves.consist_speed)(id, &raw mut out);
-        out
+        (self.leaves.consist_speed)(id)
     }
     fn close_origin(&self, id: u32) -> CloseOrigin {
-        let mut out = CloseOrigin::default();
-        (self.leaves.close_origin)(id, &raw mut out);
-        out
+        (self.leaves.close_origin)(id)
     }
     fn close_candidate(&self, id: u32) -> CloseCandidate {
-        let mut out = CloseCandidate::default();
-        (self.leaves.close_candidate)(id, &raw mut out);
-        out
+        (self.leaves.close_candidate)(id)
     }
 
     fn overtake_origin(&self, id: u32) -> OvertakeOrigin {
-        let mut out = OvertakeOrigin::default();
-        (self.leaves.overtake_origin)(id, &raw mut out);
-        out
+        (self.leaves.overtake_origin)(id)
     }
     fn overtake_speed(&self, id: u32) -> OvertakeSpeed {
-        let mut out = OvertakeSpeed::default();
-        (self.leaves.overtake_speed)(id, &raw mut out);
-        out
+        (self.leaves.overtake_speed)(id)
     }
     fn sliding_position(&self, id: u32) -> SlidingPosition {
-        let mut out = SlidingPosition::default();
-        (self.leaves.sliding_position)(id, &raw mut out);
-        out
+        (self.leaves.sliding_position)(id)
     }
     fn observe_height_speed(&self, id: u32) -> HeightSpeed {
-        let mut out = HeightSpeed::default();
-        (self.leaves.height_speed)(id, &raw mut out);
-        out
+        (self.leaves.height_speed)(id)
     }
     fn collision_part(&self, id: u32) -> CollisionPart {
-        let mut out = CollisionPart::default();
-        (self.leaves.collision_part)(id, &raw mut out);
-        out
+        (self.leaves.collision_part)(id)
     }
     fn collision_origin(&self, id: u32) -> CollisionOrigin {
-        let mut out = CollisionOrigin::default();
-        (self.leaves.collision_origin)(id, &raw mut out);
-        out
+        (self.leaves.collision_origin)(id)
     }
 
     fn crash_direction(&self, id: u32) -> CrashDirection {
-        let mut out = CrashDirection::default();
-        (self.leaves.crash_direction)(id, &raw mut out);
-        out
+        (self.leaves.crash_direction)(id)
     }
     fn path_vehicle(&self, id: u32) -> PathVehicle {
-        let mut out = PathVehicle::default();
-        (self.leaves.path_vehicle)(id, &raw mut out);
-        out
+        (self.leaves.path_vehicle)(id)
     }
     fn depot_part(&self, id: u32) -> DepotPart {
-        let mut out = DepotPart::default();
-        (self.leaves.depot_part)(id, &raw mut out);
-        out
+        (self.leaves.depot_part)(id)
     }
     fn depot_orders(&self, id: u32) -> DepotOrders {
-        let mut out = DepotOrders::default();
-        (self.leaves.depot_orders)(id, &raw mut out);
-        out
+        (self.leaves.depot_orders)(id)
     }
     fn vehicle_tile(&self, id: u32) -> VehicleTile {
-        let mut out = VehicleTile::default();
-        (self.leaves.vehicle_tile)(id, &raw mut out);
-        out
+        (self.leaves.vehicle_tile)(id)
     }
     fn arrival_vehicle(&self, id: u32) -> ArrivalVehicle {
-        let mut out = ArrivalVehicle::default();
-        (self.leaves.arrival_vehicle)(id, &raw mut out);
-        out
+        (self.leaves.arrival_vehicle)(id)
     }
     fn tunnel_vehicle(&self, id: u32) -> TunnelVehicle {
-        let mut out = TunnelVehicle::default();
-        (self.leaves.tunnel_vehicle)(id, &raw mut out);
-        out
+        (self.leaves.tunnel_vehicle)(id)
     }
     fn move_vehicle(&self, id: u32) -> MoveVehicle {
-        let mut out = MoveVehicle::default();
-        (self.leaves.move_vehicle)(id, &raw mut out);
-        out
+        (self.leaves.move_vehicle)(id)
     }
     fn move_transition(&self, id: u32) -> MoveTransition {
-        let mut out = MoveTransition::default();
-        (self.leaves.move_transition)(id, &raw mut out);
-        out
+        (self.leaves.move_transition)(id)
     }
     fn move_position(&self, id: u32) -> MovePosition {
-        let mut out = MovePosition::default();
-        (self.leaves.move_position)(id, &raw mut out);
-        out
+        (self.leaves.move_position)(id)
     }
     fn block_vehicle(&self, id: u32) -> BlockVehicle {
-        let mut out = BlockVehicle::default();
-        (self.leaves.block_vehicle)(id, &raw mut out);
-        out
+        (self.leaves.block_vehicle)(id)
     }
     fn stop_order(&self, id: u32) -> StopOrder {
-        let mut out = StopOrder::default();
-        (self.leaves.stop_order)(id, &raw mut out);
-        out
+        (self.leaves.stop_order)(id)
     }
     fn move_stop(&self, id: u32) -> MoveStop {
-        let mut out = MoveStop::default();
-        (self.leaves.move_stop)(id, &raw mut out);
-        out
+        (self.leaves.move_stop)(id)
     }
     fn order_clock(&self, id: u32) -> OrderClock {
-        let mut out = OrderClock::default();
-        (self.leaves.order_clock)(id, &raw mut out);
-        out
+        (self.leaves.order_clock)(id)
     }
     fn controller_part(&self, id: u32) -> ControllerPart {
-        let mut out = ControllerPart::default();
-        (self.leaves.controller_part)(id, &raw mut out);
-        out
+        (self.leaves.controller_part)(id)
     }
     fn service_origin(&self, id: u32) -> ServiceOrigin {
-        let mut out = ServiceOrigin::default();
-        (self.leaves.service_origin)(id, &raw mut out);
-        out
+        (self.leaves.service_origin)(id)
     }
     fn service_order(&self, id: u32) -> ServiceOrder {
-        let mut out = ServiceOrder::default();
-        (self.leaves.service_order)(id, &raw mut out);
-        out
+        (self.leaves.service_order)(id)
     }
     fn track_direction(&self, id: u32) -> TrackDirection {
-        let mut out = TrackDirection::default();
-        (self.leaves.track_direction)(id, &raw mut out);
-        out
+        (self.leaves.track_direction)(id)
     }
     fn slope_origin(&self, id: u32) -> SlopeOrigin {
-        let mut out = SlopeOrigin::default();
-        (self.leaves.slope_origin)(id, &raw mut out);
-        out
+        (self.leaves.slope_origin)(id)
     }
     fn slope_part(&self, id: u32) -> SlopePart {
-        let mut out = SlopePart::default();
-        (self.leaves.slope_part)(id, &raw mut out);
-        out
+        (self.leaves.slope_part)(id)
     }
     fn turn_vehicle(&self, id: u32) -> TurnVehicle {
-        let mut out = TurnVehicle::default();
-        (self.leaves.turn_vehicle)(id, &raw mut out);
-        out
+        (self.leaves.turn_vehicle)(id)
     }
     fn owner(&self, id: u32) -> *mut State {
         if id == self.id {
