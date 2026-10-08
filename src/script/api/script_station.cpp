@@ -58,11 +58,12 @@ template <bool Tfrom, bool Tvia>
 	const StationCargoList &cargo_list = goods.GetData().cargo;
 	if (!Tfrom && !Tvia) return cargo_list.TotalCount();
 
+	auto packets = cargo_list.Packets();
 	uint16_t cargo_count = 0;
 	std::pair<StationCargoList::ConstIterator, StationCargoList::ConstIterator> range = Tvia ?
-				cargo_list.Packets()->equal_range(via_station_id) :
-				std::make_pair(StationCargoList::ConstIterator(cargo_list.Packets()->begin()),
-						StationCargoList::ConstIterator(cargo_list.Packets()->end()));
+				std::pair<StationCargoList::ConstIterator, StationCargoList::ConstIterator>(packets->equal_range(via_station_id)) :
+				std::make_pair(StationCargoList::ConstIterator(packets->begin()),
+						StationCargoList::ConstIterator(packets->end()));
 	for (StationCargoList::ConstIterator it = range.first; it != range.second; it++) {
 		const CargoPacket *cp = *it;
 		if (!Tfrom || cp->GetFirstStation() == from_station_id) cargo_count += cp->Count();

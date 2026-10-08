@@ -72,6 +72,7 @@ def scenario_modules():
     """Families in scenario-list order; import after shared core initialization."""
     from . import (
         aircraft,
+        cargo_storage,
         companies,
         disasters,
         economy,
@@ -102,6 +103,7 @@ def scenario_modules():
         companies,
         stations,
         industries,
+        cargo_storage,
     )
 
 

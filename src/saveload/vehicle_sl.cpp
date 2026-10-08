@@ -644,6 +644,23 @@ static Money  _cargo_feeder_share;
 
 class SlVehicleCommon : public DefaultSaveLoadHandler<SlVehicleCommon, Vehicle> {
 public:
+#ifdef WITH_RUST
+	static inline CargoPacketList cargo_packets;
+	static inline uint32_t cargo_actions[4];
+	static void ExportCargo(Vehicle *v)
+	{
+		cargo_packets = *v->cargo.Packets();
+		auto fields = v->cargo.Export();
+		std::copy(std::begin(fields.action_counts), std::end(fields.action_counts), cargo_actions);
+	}
+	static void ImportCargo(Vehicle *v)
+	{
+		v->cargo.ImportPackets(cargo_packets);
+		auto fields = v->cargo.Export();
+		std::copy(std::begin(cargo_actions), std::end(cargo_actions), fields.action_counts);
+		v->cargo.ImportMeta(fields);
+	}
+#endif
 	static inline const SaveLoad description[] = {
 		    SLE_VAR(Vehicle, subtype,               SLE_UINT8),
 
@@ -688,8 +705,13 @@ public:
 		    SLE_VAR(Vehicle, cargo_cap,             SLE_UINT16),
 		SLE_CONDVAR(Vehicle, refit_cap,             SLE_UINT16,                 SLV_182, SL_MAX_VERSION),
 		SLEG_CONDVAR("cargo_count", _cargo_count,   SLE_UINT16,                   SL_MIN_VERSION,  SLV_68),
+#ifdef WITH_RUST
+		SLEG_CONDREFLIST("cargo.packets", cargo_packets, REF_CARGO_PACKET, SLV_68, SL_MAX_VERSION),
+		SLEG_CONDARR("cargo.action_counts", cargo_actions, SLE_UINT, 4, SLV_181, SL_MAX_VERSION),
+#else
 		SLE_CONDREFLIST(Vehicle, cargo.packets,     REF_CARGO_PACKET,            SLV_68, SL_MAX_VERSION),
 		SLE_CONDARR(Vehicle, cargo.action_counts,   SLE_UINT, VehicleCargoList::NUM_MOVE_TO_ACTION, SLV_181, SL_MAX_VERSION),
+#endif
 		SLE_CONDVAR(Vehicle, cargo_age_counter,     SLE_UINT16,                 SLV_162, SL_MAX_VERSION),
 
 		    SLE_VAR(Vehicle, day_counter,           SLE_UINT8),
@@ -779,17 +801,33 @@ public:
 
 	void Save(Vehicle *v) const override
 	{
+#ifdef WITH_RUST
+		ExportCargo(v);
+#endif
 		SlObject(v, this->GetDescription());
 	}
 
 	void Load(Vehicle *v) const override
 	{
+#ifdef WITH_RUST
+		cargo_packets.clear();
+		std::fill(std::begin(cargo_actions), std::end(cargo_actions), 0);
+#endif
 		SlObject(v, this->GetLoadDescription());
+#ifdef WITH_RUST
+		ImportCargo(v);
+#endif
 	}
 
 	void FixPointers(Vehicle *v) const override
 	{
+#ifdef WITH_RUST
+		ExportCargo(v);
+#endif
 		SlObject(v, this->GetDescription());
+#ifdef WITH_RUST
+		ImportCargo(v);
+#endif
 	}
 };
 

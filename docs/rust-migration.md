@@ -1598,3 +1598,29 @@ engines have unlimited range. ABI checks cover owner defaults/layout/lifetime.
 Full legacy files, arbitrary NewGRFs/airport rotations and viewport/sound output
 remain evidence limits. A reference-built ownerless oilrig route checks public
 helicopter landing through the ordinary FTA path.
+### Cargo storage and movement (#139)
+
+Rust owns packet fields, ordered station/vehicle lists, count/age/feeder/action/
+reservation caches, cumulative flow shares and origin maps. It runs packet
+operations, cargo movement/staging/rerouting, live-flow reconciliation, capacity
+redistribution and autoreplace cargo transfer. Stable arena slots and linked
+ordering give constant-time list operations; destination endpoints bound station
+lookups to the selected queue. Freed slots are reused; arena capacity is retained.
+C++ retains packet pool identity/allocation/hooks, payment/delivery (#117),
+loading policy (#125), link-graph computation (#74), world access and thread join.
+CAPA/STNN/VEHS/flow adapters export call-local containers or scalar-key readers;
+pointer fixups and save errors finish outside Rust. Payment getters reenter after
+owner borrows end; ConsistChanged runs after Rust returns. Portable bodies stay.
+
+Checks: `python3 tools/migration.py verify --jobs 2`,
+`python3 tools/migration.py simulate cargo-storage economy stations play-padhattan aircraft --jobs 2`,
+`python3 tools/migration.py simulate cargo-storage --self --jobs 2`, and
+`python3 tools/migration.py simulate cargo-storage --soak --jobs 2`.
+Active CAPY scenarios check saved packet references/actions, aging, feeder credits
+and forced policies. Rust tests cover partial movement, payment getter reentry,
+same-list rerouting and capacity changes. `python3 tools/cargo-storage-comparison.py`
+checks unreachable pool-limit Split failure against the unchanged pinned body.
+After building, `python3 -m tools.simulation.cargo_storage` probes 1k-64k queues,
+identity/order/cache preservation and bounded reads for first-hit append/keyed load;
+its synthetic timings are not whole-game speed ratios. Legacy conversions and
+complete refit/autoreplace transactions lack additional play witnesses (#156).
