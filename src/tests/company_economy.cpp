@@ -49,8 +49,9 @@ TEST_CASE("Company economy - canonical owner layouts and property copy lifetime"
  * network modes. They check posting and post-deletion iteration, not multiplayer
  * transport or an additional oracle for ordinary financial calculations. */
 static std::array<std::unique_ptr<CompanyProperties>, 3> network_companies;
-static bool company_networking, company_server;
+static bool company_networking, company_server, company_competitor;
 static uint8_t company_current;
+static int64_t company_competitor_interval;
 static std::vector<uint32_t> company_admin_updates;
 static uint32_t OPENTTD_COMPANY_CALL CompanyGapNext(uint32_t kind, uint32_t from)
 {
@@ -65,7 +66,10 @@ static void *OPENTTD_COMPANY_CALL CompanyGapOwner(uint32_t id)
 static void OPENTTD_COMPANY_CALL CompanyGapRead(uint32_t kind, uint32_t, int64_t, int64_t *v)
 {
 	std::fill_n(v, 32, 0);
-	if (kind == 0) { v[2] = company_networking; v[3] = company_server; v[4] = 0; v[5] = company_current; v[7] = 1; }
+	if (kind == 0) {
+		v[2] = company_networking; v[3] = company_server; v[4] = 0; v[5] = company_current; v[7] = 1;
+		if (company_competitor) { v[12] = company_competitor_interval; v[13] = 1; v[14] = 15; v[16] = 1; v[17] = 1; v[19] = 74; }
+	}
 }
 static int64_t OPENTTD_COMPANY_CALL CompanyGapService(const OpenTTDCompanyAction *x)
 {
@@ -91,7 +95,7 @@ TEST_CASE("Company economy - network deferred deletion and synchronous pool iter
 		for (;;) {
 			auto action = openttd_rust_company_advance(run.get(), 0);
 			if (action.kind == 0) break;
-			REQUIRE(action.kind == 1000); CHECK(action.a == 2); CHECK(action.b == 2); CHECK(action.c == UINT32_MAX);
+			REQUIRE(action.kind == 1000); CHECK(action.a == 2); CHECK(action.b == 2); CHECK(action.c == 0);
 			posts.push_back(action.id);
 			if (mode == 0) network_companies[action.id].reset(); // actual singleplayer Post can synchronously delete
 		}
@@ -101,5 +105,18 @@ TEST_CASE("Company economy - network deferred deletion and synchronous pool iter
 		for (uint32_t i : {1U, 2U}) CHECK((network_companies[i] == nullptr) == (mode == 0));
 	}
 	for (auto &p : network_companies) p.reset();
+}
+TEST_CASE("Company economy - competitor posts retain invalid client ID")
+{
+	OpenTTDCompanyLeaves leaves{CompanyGapNext, CompanyGapRead, CompanyGapOwner, CompanyGapService};
+	company_networking = false; company_server = false; company_competitor = true;
+	for (uint32_t op : {16U, 17U}) {
+		company_competitor_interval = op == 16 ? 1 : 0;
+		std::unique_ptr<OpenTTDCompanyRun, decltype(&openttd_rust_company_destroy)> run(openttd_rust_company_create(op, 0, 0, 0, 0, 0, &leaves), openttd_rust_company_destroy);
+		auto action = openttd_rust_company_advance(run.get(), 0);
+		REQUIRE(action.kind == 1000); CHECK(action.id == 255); CHECK(action.a == 1); CHECK(action.b == 0); CHECK(action.c == 0);
+		CHECK(openttd_rust_company_advance(run.get(), 0).kind == 0);
+	}
+	company_competitor = false;
 }
 #endif /* WITH_RUST */

@@ -598,8 +598,7 @@ async fn bankruptcy(w: &World, id: u32) {
             if world[2] == 0 && world[4] as u32 == id {
                 put!(p, u16::MAX, asked);
             } else if world[2] == 0 || world[3] != 0 {
-                w.action(Reentry::PostCompanyControl, id, 2, 2, u32::MAX.into(), 0)
-                    .await;
+                w.action(Reentry::PostCompanyControl, id, 2, 2, 0, 0).await;
                 return;
             }
         }
@@ -872,8 +871,7 @@ async fn competitor_timeout(w: &World) {
     if i64::from(n) >= world[13] {
         return;
     }
-    w.action(Reentry::PostCompanyControl, 255, 1, 0, u32::MAX.into(), 0)
-        .await;
+    w.action(Reentry::PostCompanyControl, 255, 1, 0, 0, 0).await;
 }
 async fn tick(w: &World) {
     if w.read(0, 0, 0)[0] != 0 {
@@ -914,8 +912,7 @@ async fn tick(w: &World) {
                 if i64::from(old) >= world[13] {
                     break;
                 }
-                w.action(Reentry::PostCompanyControl, 255, 1, 0, u32::MAX.into(), 0)
-                    .await;
+                w.action(Reentry::PostCompanyControl, 255, 1, 0, 0, 0).await;
             }
             timeout = 10 * 60 * world[19] as i32;
         }
