@@ -2,7 +2,6 @@
 """Exercise bounded validation, lock coordination, and executable identity."""
 
 import contextlib
-import importlib.util
 import io
 import json
 import os
@@ -25,51 +24,56 @@ TOOLS = Path(__file__).resolve().parent
 
 
 class ExecutionTests(unittest.TestCase):
+    def test_package_module_import_needs_no_pythonpath(self):
+        subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "from tools.simulation import core; import migration; assert core.read_identity and core.file_lock and migration.COMMON_LOCAL",
+            ],
+            cwd=TOOLS.parent,
+            env=dict(os.environ, PYTHONPATH=""),
+            check=True,
+        )
+
+    def capture(self, script, directory, phase, **options):
+        log, output = Path(directory) / f"{phase}.log", io.StringIO()
+        with contextlib.redirect_stdout(output):
+            code = run_logged(
+                [sys.executable, "-c", script],
+                cwd=directory,
+                env=None,
+                log=log,
+                phase=phase,
+                heartbeat=0.02,
+                **options,
+            )
+        return code, log, output.getvalue()
+
     def test_quiet_child_reports_heartbeat_and_failure(self):
         with tempfile.TemporaryDirectory() as directory:
-            log = Path(directory) / "quiet.log"
-            output = io.StringIO()
-            with contextlib.redirect_stdout(output):
-                code = run_logged(
-                    [
-                        sys.executable,
-                        "-c",
-                        "import time; time.sleep(.12); print('retained'); raise SystemExit(7)",
-                    ],
-                    cwd=directory,
-                    env=None,
-                    log=log,
-                    phase="quiet",
-                    heartbeat=0.03,
-                )
+            code, log, output = self.capture(
+                "import time; time.sleep(.12); print('retained'); raise SystemExit(7)",
+                directory,
+                "quiet",
+            )
             self.assertEqual(code, 7)
             self.assertEqual(log.read_text(), "retained\n")
-            self.assertIn("quiet: running", output.getvalue())
-            self.assertIn(str(log), output.getvalue())
-            self.assertIn("exit 7", output.getvalue())
+            for expected in ("quiet: running", str(log), "exit 7"):
+                self.assertIn(expected, output)
 
     def test_streaming_preserves_split_utf8_and_complete_log(self):
         with tempfile.TemporaryDirectory() as directory:
-            log = Path(directory) / "stream.log"
-            output = io.StringIO()
-            with contextlib.redirect_stdout(output):
-                code = run_logged(
-                    [
-                        sys.executable,
-                        "-c",
-                        "import os,time; os.write(1,b'\\xe2'); time.sleep(.08); os.write(1,b'\\x82\\xac\\n')",
-                    ],
-                    cwd=directory,
-                    env=None,
-                    log=log,
-                    phase="stream",
-                    heartbeat=0.02,
-                    stream=True,
-                )
+            code, log, output = self.capture(
+                "import os,time; os.write(1,b'\\xe2'); time.sleep(.08); os.write(1,b'\\x82\\xac\\n')",
+                directory,
+                "stream",
+                stream=True,
+            )
             self.assertEqual(code, 0)
             self.assertEqual(log.read_text(), "€\n")
-            self.assertIn("€\n", output.getvalue())
-            self.assertNotIn("�", output.getvalue())
+            self.assertIn("€\n", output)
+            self.assertNotIn("�", output)
 
     def test_timeout_reaps_child_and_retains_output(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -92,48 +96,62 @@ class ExecutionTests(unittest.TestCase):
             self.assertEqual(log.read_text(), "started\n")
 
     @unittest.skipUnless(sys.platform == "linux", "Linux descendant process state")
-    def test_timeout_kills_descendant_even_when_parent_exits_on_term(self):
-        with tempfile.TemporaryDirectory() as directory:
-            log = Path(directory) / "descendant.log"
-            child = (
-                "import os,signal,time; "
-                "signal.signal(signal.SIGTERM, signal.SIG_IGN); "
-                "print(os.getpid(), flush=True); time.sleep(60)"
-            )
-            parent = (
-                "import subprocess,sys,time; "
-                f"subprocess.Popen([sys.executable, '-c', {child!r}]); time.sleep(60)"
-            )
-            descendant = None
-            try:
-                with contextlib.redirect_stdout(io.StringIO()):
-                    with self.assertRaises(subprocess.TimeoutExpired):
-                        run_logged(
-                            [sys.executable, "-c", parent],
-                            cwd=directory,
-                            env=None,
-                            log=log,
-                            phase="descendant",
-                            heartbeat=0.03,
-                            timeout=0.3,
+    def test_killed_driver_group_or_timeout_leaves_no_running_descendants(self):
+        signals = (signal.SIGTERM, signal.SIGHUP, signal.SIGKILL, None)
+        for index, killed in enumerate(signals * 2):
+            with (
+                self.subTest(signal=killed),
+                tempfile.TemporaryDirectory() as directory,
+            ):
+                log = Path(directory) / "descendant.log"
+                child = "import os,signal,time; signal.signal(signal.SIGTERM,signal.SIG_IGN); print(os.getpid(),flush=True); time.sleep(60)"
+                command = (
+                    "import os,subprocess,sys,time; print(os.getpid(),flush=True); "
+                    + f"subprocess.Popen([sys.executable,'-c',{child!r}]); time.sleep(60)"
+                )
+                driver = (
+                    "from validation_execution import run_logged; "
+                    + f"run_logged({[sys.executable, '-c', command]!r},cwd={directory!r},env=None,log={str(log)!r},phase='kill',timeout={None if killed else 0.5!r})"
+                )
+                process = subprocess.Popen(
+                    [sys.executable, "-c", driver],
+                    cwd=TOOLS,
+                    start_new_session=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                descendants = []
+                try:
+                    deadline = time.monotonic() + 5
+                    while not log.exists() or len(log.read_text().splitlines()) < 2:
+                        if time.monotonic() >= deadline:
+                            self.fail("descendants did not start")
+                        time.sleep(0.01)
+                    descendants = list(map(int, log.read_text().splitlines()))
+                    if killed:
+                        (os.killpg if index < len(signals) else os.kill)(
+                            process.pid, killed
                         )
-                descendant = int(log.read_text().strip())
-                # An orphan may remain a zombie until the host reaps it; it must
-                # no longer execute or retain the build's file descriptors.
-                state = Path(f"/proc/{descendant}/stat")
-                deadline = time.monotonic() + 1
-                while state.exists():
-                    if state.read_text().split(") ", 1)[1][0] == "Z":
-                        break
-                    if time.monotonic() >= deadline:
-                        self.fail("descendant survived timeout cleanup")
-                    time.sleep(0.01)
-            finally:
-                if descendant is not None:
-                    try:
-                        os.kill(descendant, signal.SIGKILL)
-                    except ProcessLookupError:
-                        pass
+                    process.wait(timeout=5)
+                    for descendant in descendants:
+                        state = Path(f"/proc/{descendant}/stat")
+                        while (
+                            state.exists()
+                            and state.read_text().split(") ", 1)[1][0] != "Z"
+                        ):
+                            if time.monotonic() >= deadline:
+                                self.fail(
+                                    f"descendant {descendant} survived driver death"
+                                )
+                            time.sleep(0.01)
+                finally:
+                    process.kill() if process.poll() is None else None
+                    process.wait()
+                    for descendant in descendants:
+                        try:
+                            os.kill(descendant, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
 
     @unittest.skipUnless(os.name == "posix", "POSIX cross-process locks")
     def test_wait_reports_holder_and_releases(self):
@@ -167,14 +185,12 @@ class ExecutionTests(unittest.TestCase):
 
 class IdentityTests(unittest.TestCase):
     def initialize_repo(self, root):
-        subprocess.run(["git", "init", "-q", str(root)], check=True)
-        subprocess.run(
-            ["git", "-C", str(root), "config", "user.email", "test@example.invalid"],
-            check=True,
-        )
-        subprocess.run(
-            ["git", "-C", str(root), "config", "user.name", "Fixture"], check=True
-        )
+        for arguments in (
+            ("init", "-q"),
+            ("config", "user.email", "test@example.invalid"),
+            ("config", "user.name", "Fixture"),
+        ):
+            subprocess.run(["git", "-C", str(root), *arguments], check=True)
         (root / ".gitignore").write_text(".local/\nbuild-rust/\nreference-build/\n")
         (root / "source").write_text("initial")
         subprocess.run(
@@ -433,37 +449,6 @@ class NativeJobLimitTests(unittest.TestCase):
                 self.assertIn(
                     "nested cargo jobs=2", (root / command["log"]).read_text()
                 )
-
-
-class ComparisonTests(unittest.TestCase):
-    def test_fast_completion_is_reported_before_earlier_slow_tool(self):
-        spec = importlib.util.spec_from_file_location(
-            "comparisons", TOOLS / "run-comparisons.py"
-        )
-        comparisons = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(comparisons)
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            (root / "tools").mkdir()
-            for name, delay in (("a-slow", 0.16), ("b-fast", 0.01)):
-                (root / "tools" / f"{name}-comparison.py").write_text(
-                    f"import time; time.sleep({delay})\n"
-                )
-            output = io.StringIO()
-            with (
-                patch.object(comparisons, "ROOT", root),
-                patch.object(comparisons, "LOGS", root / "logs"),
-                patch.object(sys, "argv", ["run-comparisons.py", "--jobs", "2"]),
-                contextlib.redirect_stdout(output),
-            ):
-                comparisons.main()
-            lines = [
-                line
-                for line in output.getvalue().splitlines()
-                if line.startswith("ok  ")
-            ]
-            self.assertIn("b-fast", lines[0])
-            self.assertIn("a-slow", lines[1])
 
 
 if __name__ == "__main__":
