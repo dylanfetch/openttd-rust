@@ -27,7 +27,9 @@ class PreflightTests(unittest.TestCase):
             with (
                 patch.object(preflight.migration, "LOCAL", root / ".local"),
                 patch.object(preflight, "hooks_checkout", return_value=root),
-                patch.object(preflight, "git", return_value="a" * 40),
+                patch.object(
+                    preflight, "git", side_effect=["a" * 40] * 3 + ["src/game.cpp"]
+                ),
                 patch.object(preflight, "run_logged", return_value=0),
                 patch.object(sys, "argv", ["preflight.py", "--build-log", str(log)]),
                 contextlib.redirect_stdout(io.StringIO()),
@@ -55,6 +57,13 @@ class PreflightTests(unittest.TestCase):
             )
             self.assertEqual(
                 [item["line"] for item in preflight.warnings(path)], [1, 2, 3, 4]
+            )
+            self.assertEqual(
+                [item["line"] for item in preflight.warnings(path, ["src/game.cpp"])],
+                [1, 2, 3, 4],
+            )
+            self.assertEqual(
+                [item["line"] for item in preflight.warnings(path, [])], [3, 4]
             )
 
     def test_receipt_selects_candidate_only_and_rejects_partial_scope(self):

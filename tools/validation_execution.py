@@ -4,9 +4,11 @@ import codecs
 import errno
 import json
 import os
+import select
 import signal
 import socket
 import subprocess
+import sys
 import time
 import uuid
 from contextlib import contextmanager
@@ -34,14 +36,19 @@ def run_logged(
     decoder = codecs.getincrementaldecoder("utf-8")("replace")
     next_heartbeat = started + heartbeat
     with log.open("w") as output:
+        reader, writer = os.pipe() if os.name == "posix" else (None, None)
+        supervised = [sys.executable, __file__, str(reader), *map(str, command)]
         process = subprocess.Popen(
-            command,
+            supervised if reader is not None else command,
             cwd=cwd,
             env=env,
             stdout=output,
             stderr=subprocess.STDOUT,
             start_new_session=os.name == "posix",
+            pass_fds=(reader,) if reader is not None else (),
         )
+        if reader is not None:
+            os.close(reader)
         try:
             while True:
                 try:
@@ -66,31 +73,14 @@ def run_logged(
                         flush=True,
                     )
                     next_heartbeat = now + heartbeat
-        except BaseException:
-            # Build/comparison tools launch children. End the whole POSIX group
-            # before callers release their build locks, even if the parent exits
-            # on TERM while a child ignores it. Windows retains parent cleanup.
-            if os.name == "posix":
-                try:
-                    os.killpg(process.pid, signal.SIGTERM)
-                except ProcessLookupError:
-                    pass
-            else:
-                process.terminate()
-            try:
-                process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                pass
-            finally:
-                if os.name == "posix":
-                    try:
-                        os.killpg(process.pid, signal.SIGKILL)
-                    except ProcessLookupError:
-                        pass
-                elif process.poll() is None:
-                    process.kill()
-                process.wait()
-            raise
+        finally:
+            # The supervisor owns the command's session. EOF kills its group even
+            # when this driver dies from SIGKILL and cannot run Python cleanup.
+            if writer is not None:
+                os.close(writer)
+            elif process.poll() is None:
+                process.kill()
+            process.wait()
     print(
         f"{phase}: exit {code} after {time.monotonic() - started:.1f}s; log: {log}",
         flush=True,
@@ -188,3 +178,15 @@ def file_lock(path, *, shared=False, label=None, heartbeat=HEARTBEAT_SECONDS):
         finally:
             owner.unlink(missing_ok=True)
             release(handle)
+
+
+if __name__ == "__main__":
+    reader = int(sys.argv[1])
+    process = subprocess.Popen(sys.argv[2:])
+    while process.poll() is None:
+        ready, _, _ = select.select([reader], [], [], 0.1)
+        if ready and not os.read(reader, 1):
+            os.killpg(os.getpgrp(), signal.SIGKILL)
+    sys.exit(
+        process.returncode if process.returncode >= 0 else 128 - process.returncode
+    )

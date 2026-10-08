@@ -29,8 +29,9 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from build_identity import IDENTITY_NAME, read_identity
-from validation_execution import file_lock
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from build_identity import IDENTITY_NAME, read_identity  # noqa: E402
+from validation_execution import file_lock  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -818,7 +819,6 @@ def _copy_runtime(build, binary, destination):
 
 
 def main():
-    sys.path.insert(0, str(ROOT / "tools"))
     import importlib.util
 
     spec = importlib.util.spec_from_file_location(
