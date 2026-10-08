@@ -58,7 +58,7 @@ StringID EndGameGetPerformanceTitleFromValue(uint value)
 int8_t SaveHighScoreValue(const Company *c)
 {
 	auto &highscores = _highscore_table[SP_CUSTOM];
-	uint16_t score = c->old_economy[0].performance_history;
+	uint16_t score = c->Finances().old_economy[0].performance_history;
 
 	auto it = std::ranges::find_if(highscores, [&score](auto &highscore) { return highscore.score <= score; });
 
@@ -78,7 +78,7 @@ int8_t SaveHighScoreValue(const Company *c)
 /** Sort all companies given their performance */
 static bool HighScoreSorter(const Company * const &a, const Company * const &b)
 {
-	return b->old_economy[0].performance_history < a->old_economy[0].performance_history;
+	return b->Finances().old_economy[0].performance_history < a->Finances().old_economy[0].performance_history;
 }
 
 /**
@@ -103,7 +103,7 @@ int8_t SaveHighScoreValueNetwork()
 		const Company *c = cl[i];
 		auto &highscore = highscores[i];
 		highscore.name = GetString(STR_HIGHSCORE_NAME, c->index, c->index); // get manager/company name string
-		highscore.score = c->old_economy[0].performance_history;
+		highscore.score = c->Finances().old_economy[0].performance_history;
 		highscore.title = EndGameGetPerformanceTitleFromValue(highscore.score);
 
 		if (c->index == _local_company) local_company_place = static_cast<int8_t>(i);

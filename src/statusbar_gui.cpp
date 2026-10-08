@@ -89,7 +89,7 @@ struct StatusBarWindow : Window {
 
 			case WID_S_RIGHT: {
 				int64_t max_money = UINT32_MAX;
-				for (const Company *c : Company::Iterate()) max_money = std::max<int64_t>(c->money, max_money);
+				for (const Company *c : Company::Iterate()) max_money = std::max<int64_t>(c->Finances().money, max_money);
 				d = GetStringBoundingBox(GetString(STR_JUST_CURRENCY_LONG, 100LL * max_money));
 				break;
 			}
@@ -122,7 +122,7 @@ struct StatusBarWindow : Window {
 					/* Draw company money, if any */
 					const Company *c = Company::GetIfValid(_local_company);
 					if (c != nullptr) {
-						DrawString(tr, GetString(STR_JUST_CURRENCY_LONG, c->money), TC_WHITE, SA_HOR_CENTER);
+						DrawString(tr, GetString(STR_JUST_CURRENCY_LONG, c->Finances().money), TC_WHITE, SA_HOR_CENTER);
 					}
 				}
 				break;

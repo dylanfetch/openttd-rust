@@ -2089,7 +2089,7 @@ bool AfterLoadGame()
 
 		/* More companies ... */
 		for (Company *c : Company::Iterate()) {
-			if (c->bankrupt_asked.base() == 0xFF) c->bankrupt_asked.Set();
+			if (c->Finances().bankrupt_asked.base() == 0xFF) c->Finances().bankrupt_asked.Set();
 		}
 
 		for (Engine *e : Engine::Iterate()) {
@@ -2714,8 +2714,8 @@ bool AfterLoadGame()
 
 		/* Introduced terraform/clear limits. */
 		for (Company *c : Company::Iterate()) {
-			c->terraform_limit = _settings_game.construction.terraform_frame_burst << 16;
-			c->clear_limit     = _settings_game.construction.clear_frame_burst << 16;
+			c->Finances().terraform_limit = _settings_game.construction.terraform_frame_burst << 16;
+			c->Finances().clear_limit     = _settings_game.construction.clear_frame_burst << 16;
 		}
 	}
 
@@ -2971,7 +2971,7 @@ bool AfterLoadGame()
 
 	if (IsSavegameVersionBefore(SLV_175)) {
 		/* Introduced tree planting limit. */
-		for (Company *c : Company::Iterate()) c->tree_limit = _settings_game.construction.tree_frame_burst << 16;
+		for (Company *c : Company::Iterate()) c->Finances().tree_limit = _settings_game.construction.tree_frame_burst << 16;
 	}
 
 	if (IsSavegameVersionBefore(SLV_177)) {
@@ -2981,7 +2981,7 @@ bool AfterLoadGame()
 
 		/* We have to convert the quarters of bankruptcy into months of bankruptcy */
 		for (Company *c : Company::Iterate()) {
-			c->months_of_bankruptcy = 3 * c->months_of_bankruptcy;
+			c->Finances().months_of_bankruptcy = 3 * c->Finances().months_of_bankruptcy;
 		}
 	}
 
@@ -3367,7 +3367,7 @@ bool AfterLoadGame()
 
 	if (IsSavegameVersionBefore(SLV_MAX_LOAN_FOR_COMPANY)) {
 		for (Company *c : Company::Iterate()) {
-			c->max_loan = COMPANY_MAX_LOAN_DEFAULT;
+			c->Finances().max_loan = COMPANY_MAX_LOAN_DEFAULT;
 		}
 	}
 
