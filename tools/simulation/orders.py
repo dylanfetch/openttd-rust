@@ -27,7 +27,9 @@ def scenarios(soak):
             "save": str(ROOT / "migration/saves/opus-55-167-002.sav"),
             "orders": mode,
             "short_checkpoint": True,
-            "ticks": 74 if soak else 1,
+            "ticks": 74
+            if soak and mode not in ("client-restore", "client-shared-restore")
+            else 1,
             "console": ["unpause"],
         }
         for mode in (
@@ -113,6 +115,18 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
                 (folder / role / name).symlink_to(
                     builds[role] / name, target_is_directory=True
                 )
+    for role in ("reference", "candidate"):
+        manifest = {
+            str(path.relative_to(builds[role])): hashlib.sha256(
+                path.read_bytes()
+            ).hexdigest()
+            for name in RUNTIME_DIRECTORIES
+            for path in (builds[role] / name).rglob("*")
+            if path.is_file()
+        }
+        provenance[role]["runtime_sha256"] = hashlib.sha256(
+            json.dumps(manifest, sort_keys=True).encode()
+        ).hexdigest()
     result["orders_adapter"] = provenance
     mode = scenario["orders"]
     if mode == "commands":
