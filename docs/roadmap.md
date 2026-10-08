@@ -20,8 +20,8 @@ row, and its evidence stays in the PR (`AGENTS.md`, "Evidence budget").
   of 80. A full run costs about 104 job-minutes and 30 minutes wall time, once per
   final head.
 - Six component branches are unintegrated (#157 cap): #145, #149, #151, #152,
-  #153, #147. All six conflict with the base (pre-existing conflicts, none from
-  #171). Merging the base brings in #171's workflows.
+  #153, #147. Aircraft, company, orders and ship have joined the current base;
+  cargo and fleet still need an update before their next push.
 
 ## Fourth steering review (2026-10-07)
 
@@ -118,8 +118,8 @@ never in masks.
    road conversion; <=1.5x on play saves and <=1.15x on generation when #168 closes.
 2. **#156 coverage, standing capacity.** Random and crash branches first. A mixed
    save with trains (PBS junctions, crossings), ships, aircraft and subsidies
-   closes many gaps and gives the speed budget a non-road benchmark. Ask the user
-   for one through the play-save pipeline before building more per-branch fixtures.
+   closes many gaps and gives the speed budget a non-road benchmark. The user
+   expects to supply one in a few hours; continue existing fixtures until then.
 3. **Validation gaps (#173).** Bounded fixes to #171 only; see the fourth steering
    review. Avoid merges whose only purpose is dependency ancestry.
 
@@ -129,11 +129,10 @@ Integration of reviewed work comes before new starts. Never hold more than six
 unintegrated component branches (#157). Independent items (#169, #156 slices)
 may run in parallel with this list.
 
-1. **Integrate #145 aircraft.** Resolve the `abi.rs` conflict (the reviewer checks
-   it), restore the `PerformanceAccumulator` order, re-measure metrics and
-   ratio, then pass CI.
-2. **Integrate #149 company.** Fix client ID 0 and the u16 shift, get re-review,
-   update the base (conflict only in `tools/`), then pass CI.
+1. **Integrate #145 aircraft.** Finish review of the `abi.rs` resolution and
+   restored `PerformanceAccumulator` order, measure ratio, then pass CI.
+2. **Integrate #149 company.** Finish re-review of client ID 0 and the u16 shift,
+   refresh the base after aircraft, then pass CI.
 3. **#155 road conversion.** Remove the Task/Future/Rc protocol for all 22
    services and 14 entries, and narrow RoadObserve: field getters or a hot
    record, no `IsBus` in the view, type-filter in `close`, single-pass `nearby`,
@@ -163,12 +162,14 @@ checkout's `tools/ci.py` can request CI for any fork PR.
 
 | Issue / PR | Branch (worktree suffix), head | State and next step |
 | --- | --- | --- |
-| #136 / #145 | `aircraft-controller-ownership-136` (`aircraft-controller`), `dd0f2f0475` | Source accepted; base conflict in `abi.rs`; Phase 2 item 1. |
-| #137 / #149 | `company-economy-ownership-137` (`company-economy`), `5b9a005064` | Source accepted; two audit fixes need re-review; item 2. |
+| #136 / #145 | `aircraft-controller-ownership-136` (`aircraft-controller`), `36c923a2fb` | Fresh review resolved ABI/scope/import; native verify passed; semantic checks and idle timing running. |
+| #137 / #149 | `company-economy-ownership-137` (`company-economy`) | Reviewer owns client ID/shift fixes and base refresh; native/semantic checks pending. |
 | #139 / #151 | `cargo-storage-movement-139` (`cargo-storage`), `ff912bcfcb` | Accepted at `a25a7d41e2`; final base and CI after item 3. |
-| #138 / #153 | `order-lifecycle-ownership-138` (`order-lifecycle`), `ef58c967f7` | Draft checkpoint; evidence plan and #168 conversion in PR comments. |
-| #146 / #152 | `ship-controller-ownership-146` (`ship-controller`), `7ec70a1768` | Draft; join #154 launcher, convert per #168, follow #153. |
+| #138 / #153 | `order-lifecycle-ownership-138` (`order-lifecycle`) | Base joined; direct typed conversion and orders scenarios in progress. |
+| #146 / #152 | `ship-controller-ownership-146` (`ship-controller`) | Base joined; direct typed conversion in progress; follows #153. |
 | #147 | `fleet-replacement-ownership-147` (`fleet-replacement`), `68d660adc9` | State-only WIP, no PR. |
+| #173 / #174 | `validation-gaps-173` (`validation-gaps-173`) | One agent; merge-ref, post-merge and local fixes; net tooling lines must stay non-positive. |
+| #169 / #175 | `crossing-sound-169` (`crossing-sound-169`), `dc409bee71` | Four original sound arguments restored; validation, fresh review and full CI pending. |
 
 Standing #156 work: aircraft landing RNG after #145 (plan in #156), then the
 2026-10-07 audit list there. Preserve the pinned reference, paused curve
@@ -178,9 +179,8 @@ Build and test with `--jobs 2`; standalone fixture games share the benchmark loc
 
 ## Choosing the next task
 
-Take the first unblocked item above. Fill idle capacity in this order: review and
-integration of finished work, Phase 1 items, then Phase 2 in order. Paused,
-deferred and out-of-scope issues are not fallbacks. Root selects further
+Take the first unblocked item above: review/integration, Phase 1, then Phase 2.
+Paused, deferred and out-of-scope issues are not fallbacks. Root selects further
 ownership work here before implementation starts.
 
 ## Out of scope for the near term

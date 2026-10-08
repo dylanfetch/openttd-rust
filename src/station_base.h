@@ -393,10 +393,22 @@ private:
 };
 
 /** All airport-related information. Only valid if tile != INVALID_TILE. */
+#ifdef WITH_RUST
+#include "rust/aircraft_ffi.h"
+static_assert(sizeof(AirportBlocks) == sizeof(uint64_t) && alignof(AirportBlocks) == alignof(uint64_t));
+static_assert(std::is_trivially_destructible_v<AirportBlocks>);
+#endif
 struct Airport : public TileArea {
 	Airport() : TileArea(INVALID_TILE, 0, 0) {}
 
+#ifdef WITH_RUST
+	std::unique_ptr<uint64_t, decltype(&openttd_rust_airport_blocks_destroy)> rust_blocks{openttd_rust_airport_blocks_new(), openttd_rust_airport_blocks_destroy};
+	/* Begin the trivial bitset's lifetime in its canonical allocation. Rust reads
+	 * and writes only its raw uint64 representation; allocation release ends it. */
+	AirportBlocks &blocks = *new (this->rust_blocks.get()) AirportBlocks{};
+#else
 	AirportBlocks blocks{}; ///< stores which blocks on the airport are taken. was 16 bit earlier on, then 32
+#endif
 	uint8_t type = 0; ///< Type of this airport, @see AirportTypes
 	uint8_t layout = 0; ///< Airport layout number.
 	Direction rotation = INVALID_DIR; ///< How this airport is rotated.

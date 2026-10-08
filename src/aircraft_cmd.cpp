@@ -79,12 +79,15 @@ void Aircraft::UpdateDeltaXY()
 	}
 }
 
+#ifndef WITH_RUST
 static bool AirportMove(Aircraft *v, const AirportFTAClass *apc);
 static bool AirportSetBlocks(Aircraft *v, const AirportFTA *current_pos, const AirportFTAClass *apc);
 static bool AirportHasBlock(Aircraft *v, const AirportFTA *current_pos, const AirportFTAClass *apc);
 static bool AirportFindFreeTerminal(Aircraft *v, const AirportFTAClass *apc);
 static bool AirportFindFreeHelipad(Aircraft *v, const AirportFTAClass *apc);
 static void CrashAirplane(Aircraft *v);
+
+#endif
 
 static const SpriteID _aircraft_sprite[] = {
 	0x0EB5, 0x0EBD, 0x0EC5, 0x0ECD,
@@ -117,6 +120,7 @@ enum HelicopterRotorStates : uint8_t {
  * @param v vehicle looking for a hangar
  * @return the StationID if one is found, otherwise, StationID::Invalid()
  */
+#ifndef WITH_RUST
 static StationID FindNearestHangar(const Aircraft *v)
 {
 	uint best = 0;
@@ -168,6 +172,8 @@ static StationID FindNearestHangar(const Aircraft *v)
 	}
 	return index;
 }
+
+#endif
 
 void Aircraft::GetImage(Direction direction, EngineImageType image_type, VehicleSpriteSeq *result) const
 {
@@ -394,6 +400,14 @@ CommandCost CmdBuildAircraft(DoCommandFlags flags, TileIndex tile, const Engine 
 }
 
 
+Money Aircraft::GetRunningCost() const
+{
+	const Engine *e = this->GetEngine();
+	uint cost_factor = GetVehicleProperty(this, PROP_AIRCRAFT_RUNNING_COST_FACTOR, e->VehInfo<AircraftVehicleInfo>().running_cost);
+	return GetPrice(PR_RUNNING_AIRCRAFT, cost_factor, e->GetGRF());
+}
+
+#ifndef WITH_RUST
 ClosestDepot Aircraft::FindClosestDepot()
 {
 	const Station *st = GetTargetAirportIfValid(this);
@@ -434,13 +448,6 @@ static void CheckIfAircraftNeedsService(Aircraft *v)
 		v->current_order.MakeDummy();
 		SetWindowWidgetDirty(WC_VEHICLE_VIEW, v->index, WID_VV_START_STOP);
 	}
-}
-
-Money Aircraft::GetRunningCost() const
-{
-	const Engine *e = this->GetEngine();
-	uint cost_factor = GetVehicleProperty(this, PROP_AIRCRAFT_RUNNING_COST_FACTOR, e->VehInfo<AircraftVehicleInfo>().running_cost);
-	return GetPrice(PR_RUNNING_AIRCRAFT, cost_factor, e->GetGRF());
 }
 
 /** Calendar day handler */
@@ -1327,6 +1334,8 @@ TileIndex Aircraft::GetOrderStationLocation(StationID)
 	return TileIndex{};
 }
 
+#endif
+
 void Aircraft::MarkDirty()
 {
 	this->colourmap = PAL_NONE;
@@ -1337,6 +1346,7 @@ void Aircraft::MarkDirty()
 }
 
 
+#ifndef WITH_RUST
 uint Aircraft::Crash(bool flooded)
 {
 	uint victims = Vehicle::Crash(flooded) + 2; // pilots
@@ -2203,3 +2213,7 @@ void UpdateAirplanesOnNewStation(const Station *st)
 	/* Heliports don't have a hangar. Invalidate all go to hangar orders from all aircraft. */
 	if (!st->airport.HasHangar()) RemoveOrderFromAllVehicles(OT_GOTO_DEPOT, st->index, true);
 }
+
+#else
+#include "rust/aircraft_adapter.hpp"
+#endif

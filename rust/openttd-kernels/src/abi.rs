@@ -211,6 +211,11 @@ pub fn layout(type_id: u8, item: u8) -> usize {
         138 => {
             layout!(crate::industry::ProductionResult, item; subtract, add, again, cargo_input, cargo_output, version, num_input, num_output, present)
         }
+
+        180 => {
+            layout!(crate::aircraft::State, item; cached_max_range_sqr, cached_max_range, cache_padding, crashed_counter, targetairport, pos, previous_pos, state, last_direction, number_consecutive_turns, turn_counter, flags)
+        }
+        181 => layout!(crate::aircraft::Action, item; kind, id, other, a, b, c, d),
         _ => usize::MAX,
     }
 }
