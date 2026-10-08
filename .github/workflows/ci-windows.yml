@@ -3,6 +3,10 @@ name: CI (Windows)
 on:
   workflow_call:
     inputs:
+      checkout-ref:
+        required: false
+        type: string
+        default: ""
       arch:
         required: true
         type: string
@@ -25,6 +29,9 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v6
+      with:
+        ref: ${{ inputs.checkout-ref }}
+        persist-credentials: false
 
     - name: Setup vcpkg
       id: vcpkg
@@ -128,7 +135,7 @@ jobs:
         path: ${{ runner.temp }}/ccache
         # compiler_check=content hashes cl.exe but not its backend DLLs, so the
         # runner image (and with it the MSVC toolset) is part of the key.
-        key: ccache-msvc-v1-${{ inputs.arch }}-${{ steps.runner-image.outputs.version }}-${{ hashFiles('migration/ccache.conf') }}-${{ github.sha }}
+        key: ccache-msvc-v1-${{ inputs.arch }}-${{ steps.runner-image.outputs.version }}-${{ hashFiles('migration/ccache.conf') }}-${{ inputs.checkout-ref || github.sha }}
         restore-keys: ccache-msvc-v1-${{ inputs.arch }}-${{ steps.runner-image.outputs.version }}-${{ hashFiles('migration/ccache.conf') }}-
 
     - name: Build

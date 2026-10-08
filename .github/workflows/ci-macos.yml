@@ -3,6 +3,10 @@ name: CI (MacOS)
 on:
   workflow_call:
     inputs:
+      checkout-ref:
+        required: false
+        type: string
+        default: ""
       arch:
         required: true
         type: string
@@ -37,6 +41,9 @@ jobs:
 
     - name: Checkout
       uses: actions/checkout@v6
+      with:
+        ref: ${{ inputs.checkout-ref }}
+        persist-credentials: false
 
     - name: Install pinned Rust and select native SDK
       if: inputs.rust
@@ -99,7 +106,7 @@ jobs:
       with:
         path: ${{ runner.temp }}/ccache
         # The runner image pins the Xcode toolchain, so it is part of the key.
-        key: ccache-macos-v1-${{ inputs.arch }}-${{ steps.runner-image.outputs.version }}-${{ steps.runner-image.outputs.flavour }}-${{ hashFiles('migration/ccache.conf') }}-${{ github.sha }}
+        key: ccache-macos-v1-${{ inputs.arch }}-${{ steps.runner-image.outputs.version }}-${{ steps.runner-image.outputs.flavour }}-${{ hashFiles('migration/ccache.conf') }}-${{ inputs.checkout-ref || github.sha }}
         restore-keys: ccache-macos-v1-${{ inputs.arch }}-${{ steps.runner-image.outputs.version }}-${{ steps.runner-image.outputs.flavour }}-${{ hashFiles('migration/ccache.conf') }}-
 
     - name: Install OpenGFX

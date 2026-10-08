@@ -2,6 +2,11 @@ name: CI (Emscripten)
 
 on:
   workflow_call:
+    inputs:
+      checkout-ref:
+        required: false
+        type: string
+        default: ""
 
 env:
   CTEST_OUTPUT_ON_FAILURE: 1
@@ -19,6 +24,9 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v6
+      with:
+        ref: ${{ inputs.checkout-ref }}
+        persist-credentials: false
 
     - name: Fix dubious ownership
       run: |

@@ -52,11 +52,11 @@ static OpenTTDRailTrain RailTrain(void *context) noexcept
 {
 	const Train *v = static_cast<RailYapfContext *>(context)->train;
 	const Train *rear = v->Last();
-	return {v->compatible_railtypes.base(), GetAllCompatibleRailTypes(v->railtypes).base(),
+	return {v->GetCompatibleRailTypes().base(), GetAllCompatibleRailTypes(v->GetRailTypes()).base(),
 		v->tile.base(), rear->tile.base(), TileVirtXY(v->x_pos, v->y_pos).base(), TileVirtXY(rear->x_pos, rear->y_pos).base(),
 		v->dest_tile.base(), v->gcache.cached_total_length, static_cast<uint32_t>(std::min<int>(v->GetDisplayMaxSpeed(), v->current_order.GetMaxSpeed())),
 		v->current_order.GetDestination().base(), static_cast<uint8_t>(v->GetVehicleTrackdir()), static_cast<uint8_t>(rear->GetVehicleTrackdir()),
-		static_cast<uint8_t>(v->track == TRACK_BIT_WORMHOLE), static_cast<uint8_t>(rear->track == TRACK_BIT_WORMHOLE),
+		static_cast<uint8_t>(v->GetTrack() == TRACK_BIT_WORMHOLE), static_cast<uint8_t>(rear->GetTrack() == TRACK_BIT_WORMHOLE),
 		static_cast<uint8_t>(v->current_order.GetType()), static_cast<uint8_t>(v->current_order.GetDepotActionType().Test(OrderDepotActionFlag::NearestDepot)),
 		static_cast<uint8_t>(v->current_order.IsType(OT_GOTO_WAYPOINT) && !Waypoint::Get(v->current_order.GetDestination().ToStationID())->IsSingleTile())};
 }
@@ -872,7 +872,7 @@ bool YapfTrainCheckReverse(const Train *v)
 
 	int reverse_penalty = 0;
 
-	if (v->track == TRACK_BIT_WORMHOLE) {
+	if (v->GetTrack() == TRACK_BIT_WORMHOLE) {
 		/* front in tunnel / on bridge */
 		DiagDirection dir_into_wormhole = GetTunnelBridgeDirection(tile);
 
@@ -887,7 +887,7 @@ bool YapfTrainCheckReverse(const Train *v)
 		reverse_penalty -= DistanceManhattan(cur_tile, tile) * YAPF_TILE_LENGTH;
 	}
 
-	if (last_veh->track == TRACK_BIT_WORMHOLE) {
+	if (last_veh->GetTrack() == TRACK_BIT_WORMHOLE) {
 		/* back in tunnel / on bridge */
 		DiagDirection dir_into_wormhole = GetTunnelBridgeDirection(tile_rev);
 

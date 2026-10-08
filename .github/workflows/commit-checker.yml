@@ -3,6 +3,9 @@ name: Commit checker
 on:
   pull_request:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
@@ -23,4 +26,4 @@ jobs:
       uses: OpenTTD/actions/checkout-pull-request@v6
 
     - name: Check commits
-      uses: OpenTTD/OpenTTD-git-hooks@main
+      uses: OpenTTD/OpenTTD-git-hooks@eeb3791aadf0aded5a7cd634c80823f17e87af9c

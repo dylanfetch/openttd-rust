@@ -14,18 +14,23 @@ check) and `--soak` for the larger scenario set.
 
 import argparse
 import concurrent.futures
+import contextlib
 import fnmatch
 import hashlib
 import json
 import os
 import re
 import shutil
+import statistics
 import struct
 import subprocess
 import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+
+from build_identity import IDENTITY_NAME, read_identity
+from validation_execution import file_lock
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -76,6 +81,7 @@ def scenario_modules():
         rails,
         roads,
         ships,
+        stations,
         towns,
         trees,
     )
@@ -93,6 +99,7 @@ def scenario_modules():
         economy,
         roads,
         companies,
+        stations,
         industries,
     )
 
@@ -378,7 +385,34 @@ def write_config(scenario, build, run_dir):
     (run_dir / "openttd.cfg").write_text(text)
 
 
-def run_game(scenario, binary, build, run_dir, timeout, base_env=None, desync=True):
+GAME_LOCK = None  # Set by main to the clone-wide benchmark coordination file.
+
+
+@contextlib.contextmanager
+def game_slot(isolate):
+    """Ordinary games share the lock; a timed benchmark game holds it alone."""
+    path = GAME_LOCK
+    if path is None:
+        # Fixture entry points also coordinate with benchmark runs, without
+        # requiring main() or mutable global setup.
+        import migration
+
+        path = migration.COMMON_LOCAL / "simulation-game.lock"
+    with file_lock(path, shared=not isolate, label="simulation game"):
+        yield
+
+
+def run_game(
+    scenario,
+    binary,
+    build,
+    run_dir,
+    timeout,
+    base_env=None,
+    desync=True,
+    *,
+    isolate=False,
+):
     """Run one binary on one scenario in an isolated personal directory.
 
     desync=3 writes the 32-day snapshots but also checks and rebuilds caches
@@ -424,11 +458,12 @@ def run_game(scenario, binary, build, run_dir, timeout, base_env=None, desync=Tr
         XDG_CONFIG_HOME=str(run_dir / "xdg-config"),
         XDG_CACHE_HOME=str(run_dir / "xdg-cache"),
     )
-    started = time.monotonic()
     with (
+        game_slot(isolate),
         open(run_dir / "stdout.log", "wb") as out,
         open(run_dir / "stderr.log", "wb") as err,
     ):
+        started = time.monotonic()
         try:
             code = subprocess.run(
                 [
@@ -444,6 +479,7 @@ def run_game(scenario, binary, build, run_dir, timeout, base_env=None, desync=Tr
             ).returncode
         except subprocess.TimeoutExpired:
             code = "timeout"
+        seconds = round(time.monotonic() - started, 3)
     autosave = run_dir / "save/autosave"
     snapshots = sorted(
         path
@@ -454,7 +490,8 @@ def run_game(scenario, binary, build, run_dir, timeout, base_env=None, desync=Tr
         snapshots.append(autosave / "exit.sav")
     return {
         "exit": code,
-        "seconds": round(time.monotonic() - started, 3),
+        "seconds": seconds,
+        "command": command,
         "snapshots": snapshots,
         "log": log_lines(run_dir),
         "stdout": (run_dir / "stdout.log").read_bytes(),
@@ -516,7 +553,9 @@ def field_spans(body, header):
     return spans
 
 
-def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
+def run_scenario(
+    scenario, binaries, builds, out, limit, timeout, env, benchmark_repetitions=0
+):
     """Run both binaries twice (with and without desync snapshots) and compare.
 
     The child launcher denies worker threads, selecting the original synchronous
@@ -525,6 +564,7 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
     name = scenario["name"]
     result = {
         "scenario": name,
+        "plain_speed": {"samples": [], "median_candidate_reference_ratio": None},
         "differences": [],
         "known_failures": [],
         "problems": [],
@@ -557,7 +597,12 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
                     scenario, binaries, builds, out, timeout, env, result
                 )
         result["requested_ticks"] = scenario["ticks"]
-        for mode, desync in (("snapshots", True), ("plain", False)):
+        modes = (
+            (("plain", False),) * benchmark_repetitions
+            if benchmark_repetitions
+            else (("snapshots", True), ("plain", False))
+        )
+        for mode, desync in modes:
             runs = {
                 role: run_game(
                     scenario,
@@ -567,6 +612,7 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
                     timeout,
                     env,
                     desync,
+                    isolate=bool(benchmark_repetitions),
                 )
                 for role in ("reference", "candidate")
             }
@@ -669,12 +715,49 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
                             "candidate": repr(cand_line),
                         }
                     )
+            if mode == "plain":
+                reference_seconds = runs["reference"]["seconds"]
+                candidate_seconds = runs["candidate"]["seconds"]
+                ratio = (
+                    candidate_seconds / reference_seconds
+                    if (
+                        same_end
+                        and not result["differences"]
+                        and not result["known_failures"]
+                        and not result["problems"]
+                        and reference_seconds > 0
+                    )
+                    else None
+                )
+                result["plain_speed"]["samples"].append(
+                    {
+                        "reference_seconds": reference_seconds,
+                        "candidate_seconds": candidate_seconds,
+                        "candidate_reference_ratio": ratio,
+                        "same_end": same_end,
+                    }
+                )
+                if benchmark_repetitions:
+                    result["plain_commands"] = {
+                        role: run["command"] for role, run in runs.items()
+                    }
+            if benchmark_repetitions and (result["differences"] or result["problems"]):
+                break  # Preserve the first failing repetition instead of overwriting it.
     except (
         Exception
     ) as error:  # Record and continue, so the report covers every scenario.
         result["problems"].append(f"harness error: {type(error).__name__}: {error}")
+    ratios = [
+        sample["candidate_reference_ratio"]
+        for sample in result["plain_speed"]["samples"]
+        if sample["candidate_reference_ratio"] is not None
+    ]
+    if ratios:
+        result["plain_speed"]["median_candidate_reference_ratio"] = statistics.median(
+            ratios
+        )
     result["passed"] = not result["differences"] and not result["problems"]
-    if result["passed"]:
+    if result["passed"] and not benchmark_repetitions:
         if (
             "reload_input" in result
             or "town_name_input" in result
@@ -682,6 +765,7 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
             or "effect_input" in result
             or "economy_input" in result
             or "company_input" in result
+            or "station_input" in result
             or "disaster_input" in result
         ):
             for mode in ("snapshots", "plain"):
@@ -691,7 +775,24 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
     return result
 
 
-def copy_runtime(build, binary, destination):
+def copy_runtime(build, binary, destination, *, candidate=False):
+    if candidate:
+        with file_lock(
+            Path(build).resolve() / ".migration.lock",
+            shared=True,
+            label="candidate capture",
+        ):
+            executable = _copy_runtime(build, binary, destination)
+            identity = read_identity(build, executable)
+            if identity is not None:
+                (destination / IDENTITY_NAME).write_text(
+                    json.dumps(identity, indent=2) + "\n"
+                )
+            return executable
+    return _copy_runtime(build, binary, destination)
+
+
+def _copy_runtime(build, binary, destination):
     """Freeze the executable and its data, including symlink targets, for one run."""
 
     def missing_links(directory, names):
@@ -748,6 +849,12 @@ def main():
     )
     parser.add_argument("--list", action="store_true")
     parser.add_argument(
+        "--benchmark",
+        type=int,
+        metavar="REPETITIONS",
+        help="repeat only plain pairs in isolation; retain final runs for profiling",
+    )
+    parser.add_argument(
         "--prepare-water-save",
         choices=("ferry", "structures"),
         help="build a committed ship fixture using only the pinned reference",
@@ -759,8 +866,20 @@ def main():
     )
     args = parser.parse_args()
 
+    if args.jobs < 1:
+        parser.error("--jobs must be positive")
+    if args.benchmark is not None and args.benchmark < 1:
+        parser.error("--benchmark repetitions must be positive")
+    if args.benchmark and args.jobs != 1:
+        parser.error("--benchmark requires --jobs 1")
+
     every = scenario_list(args.soak)
     # An exact scenario name selects only that scenario; anything else is a substring filter.
+    unmatched = [
+        name for name in args.names if not any(name in s["name"] for s in every)
+    ]
+    if unmatched:
+        parser.error(f"no scenario matches selectors {unmatched}; see --list")
     scenarios = [
         s
         for s in every
@@ -780,6 +899,9 @@ def main():
         migration.LOCAL / "simulation" / f"{stamp}-{os.getpid()}"
     )  # concurrent runs never share
     out.mkdir(parents=True)
+    global GAME_LOCK
+    migration.COMMON_LOCAL.mkdir(parents=True, exist_ok=True)
+    GAME_LOCK = migration.COMMON_LOCAL / "simulation-game.lock"
     if args.prepare_water_save:
         from .ships import prepare_water_save
 
@@ -814,7 +936,7 @@ def main():
             )
         sources["candidate"] = candidate
         binaries["candidate"] = copy_runtime(
-            candidate.parent, candidate, builds["candidate"]
+            candidate.parent, candidate, builds["candidate"], candidate=True
         )
     binary_evidence = {
         role: {
@@ -824,6 +946,11 @@ def main():
         }
         for role, path in binaries.items()
     }
+
+    if not args.self and (builds["candidate"] / IDENTITY_NAME).is_file():
+        identity = json.loads((builds["candidate"] / IDENTITY_NAME).read_text())
+        if identity["binary_sha256"] == binary_evidence["candidate"]["sha256"]:
+            binary_evidence["candidate"]["build_identity"] = identity
 
     # Freeze the two scenario AIs before workers launch; both roles install the
     # same immutable script bytes while command parameters remain per-run.
@@ -857,7 +984,15 @@ def main():
         env = migration.environment()
         futures = {
             pool.submit(
-                run_scenario, s, binaries, builds, out, args.limit, args.timeout, env
+                run_scenario,
+                s,
+                binaries,
+                builds,
+                out,
+                args.limit,
+                args.timeout,
+                env,
+                args.benchmark or 0,
             ): s
             for s in scenarios
         }
@@ -870,9 +1005,11 @@ def main():
                 if result["known_failures"]
                 else ""
             )
+            ratio = result["plain_speed"]["median_candidate_reference_ratio"]
+            speed = f", plain {ratio:.3f}x" if ratio is not None else ""
             print(
                 f"{status} {result['scenario']}: {result['snapshots']} snapshots, "
-                f"{result['stats']['chunks']} chunks, {result['stats']['elements']} elements{known}",
+                f"{result['stats']['chunks']} chunks, {result['stats']['elements']} elements{known}{speed}",
                 flush=True,
             )
             for problem in result["problems"]:
@@ -885,9 +1022,12 @@ def main():
                 )
     results.sort(key=lambda r: r["scenario"])
     report = {
+        "schema_version": 1,
         "mode": "reference-vs-reference" if args.self else "reference-vs-candidate",
         "execution": "Linux child RLIMIT_NPROC=0; original synchronous thread-failure fallback",
         "started_at": stamp,
+        "benchmark_repetitions": args.benchmark or 0,
+        "jobs": args.jobs,
         "candidate_commit": candidate_commit,
         "candidate_status": candidate_status,
         "binaries": binary_evidence,
@@ -905,8 +1045,9 @@ def main():
         "passed": all(r["passed"] for r in results),
     }
     (out / "report.json").write_text(json.dumps(report, indent=2) + "\n")
-    for build in set(builds.values()):
-        shutil.rmtree(build, ignore_errors=True)
+    if not args.benchmark:
+        for build in set(builds.values()):
+            shutil.rmtree(build, ignore_errors=True)
     passed = sum(r["passed"] for r in results)
     print(
         f"Simulation: {passed}/{len(results)} scenarios equal, "

@@ -16,6 +16,10 @@ Agent: <agent path> | Model: <exact model> | Reasoning effort: <effort>
 
 <!-- Exact commands run, and their results. Harness scenarios that exercise this component. -->
 
+## Simulation speed
+
+<!-- Play-save benchmark before/after candidate/reference median wall ratios, commits and exact command; explain regressions above the roadmap budget. For non-simulation changes, say not applicable. -->
+
 ## Metrics
 
 <!-- Paste the output of: python3 tools/port-metrics.py. If C++ retired is less than glue plus tooling, give the reason. -->
@@ -28,6 +32,6 @@ Agent: <agent path> | Model: <exact model> | Reasoning effort: <effort>
 Review report (reviewer posts it as a separate comment, about 20 lines):
 Agent: <path> | Model: <exact model> | Reasoning effort: <effort>
 Reviewed commit: <sha>
-Findings and dispositions: <list, or "none">
+Findings and fixing commits: <finding -> commit, or why it went to root; or "none">
 Shared credentials require an attributed report, not a GitHub platform approval.
 -->

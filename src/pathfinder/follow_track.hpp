@@ -65,7 +65,7 @@ struct CFollowTrackT {
 	{
 		assert(!IsRailTT() || (v != nullptr && v->type == VEH_TRAIN));
 		this->veh = v;
-		Init(v != nullptr ? v->owner : INVALID_OWNER, IsRailTT() && railtype_override == INVALID_RAILTYPES ? Train::From(v)->compatible_railtypes : railtype_override);
+		Init(v != nullptr ? v->owner : INVALID_OWNER, IsRailTT() && railtype_override == INVALID_RAILTYPES ? Train::From(v)->GetCompatibleRailTypes() : railtype_override);
 	}
 
 	inline void Init(Owner o, RailTypes railtype_override)

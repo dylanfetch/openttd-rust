@@ -28,6 +28,7 @@ mod road_yapf;
 mod script_list;
 pub mod services;
 mod station_cargo;
+mod station_service;
 mod string_validation;
 mod tgp;
 mod town;
@@ -1307,3 +1308,8 @@ mod water_regions;
 mod industry;
 #[allow(unsafe_code)]
 mod ship_yapf;
+
+mod train;
+mod train_state;
+
+mod train_reservation;

@@ -67,9 +67,13 @@ struct OpenTTDRailLeaves {
  * banks. Searches hold private arenas/queues and per-search segments. The opaque
  * context and copied leaves live through destruction. Synchronous leaves are
  * noexcept and cannot reenter rail YAPF; tile/write operations access canonical
- * map/PBS services only. No C++ object or STL layout is viewed by Rust.
- * step returns action=1 before station randomisation + animation (in that order)
- * and releases ALL Rust borrows. The next step resumes the exact interrupted
+ * map/PBS services. Write operation 1 retains TryReserveRailTrack's default
+ * station triggers: a waypoint runs randomisation + animation synchronously
+ * while search/reservation borrows remain active, as in the original PBS call.
+ * No C++ object or STL layout is viewed by Rust. step returns action=1 before
+ * the explicit platform/waypoint randomisation + animation (in that order)
+ * and releases ALL Rust borrows; a waypoint keeps the original second trigger.
+ * The next step resumes the exact interrupted
  * reservation traversal. Destroy once, also if an ordinary station callback
  * throws. Map replacement during a reservation violates the original lifetime.
  * output writes caller outputs immediately at original mutation points. Write

@@ -28,6 +28,8 @@ extern "C" {
  * 49 cargo specification, 50 cargo payment saved fields, 51 cargo services.
  * 52 ship YAPF input, 53 leaves, 54 follower, 55 tile, 56 choice result.
  * 60 town action, 61 town direct leaves.
+ * 110 station cargo metadata, 111 station scalars, 112 station services,
+ * 113 station edge observations, 114 station links, 115 station loading.
  * 130-138 industry storage, observation, world services and production result.
  * 210 company history entry, 211 finances, 212 economy, 213 action, 214 leaves.
  * Item 0 size, 1 alignment, then every field offset in declaration order.

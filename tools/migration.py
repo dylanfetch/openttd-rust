@@ -10,9 +10,12 @@ import shutil
 import subprocess
 import sys
 import time
-from contextlib import contextmanager, nullcontext
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+
+from build_identity import IDENTITY_NAME, read_identity, source_identity, write_identity
+from validation_execution import file_lock, run_logged
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCAL = ROOT / ".local"
@@ -292,20 +295,17 @@ def reference_lock(shared=False):
 
     Shared holders (tools/simulate.py copying the built reference's runtime) may
     overlap each other but never a build."""
-    try:
-        import fcntl
-    except (
-        ImportError
-    ):  # Windows CI imports this module but never builds the reference.
+    with file_lock(COMMON_LOCAL / "reference.lock", shared=shared, label="reference"):
         yield
-        return
-    COMMON_LOCAL.mkdir(parents=True, exist_ok=True)
-    with (COMMON_LOCAL / "reference.lock").open("w") as handle:
-        fcntl.flock(handle, fcntl.LOCK_SH if shared else fcntl.LOCK_EX)
-        try:
-            yield
-        finally:
-            fcntl.flock(handle, fcntl.LOCK_UN)
+
+
+@contextmanager
+def candidate_lock(build, shared=False):
+    """Protect candidate compilation and runtime capture in this build directory."""
+    with file_lock(
+        Path(build).resolve() / ".migration.lock", shared=shared, label="candidate"
+    ):
+        yield
 
 
 def ensure_reference():
@@ -353,11 +353,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "action",
-        choices=("build", "verify", "tools", "simulate"),
+        choices=("build", "verify", "tools", "simulate", "rust-checks"),
         nargs="?",
         default="verify",
     )
-    parser.add_argument("--jobs", type=int, default=min(6, os.cpu_count() or 1))
+    parser.add_argument("--jobs", type=int, default=2)
     parser.add_argument(
         "--ccache",
         action="store_true",
@@ -382,13 +382,21 @@ def main():
     if args.jobs < 1:
         parser.error("--jobs must be positive")
     started = time.monotonic()
-    with reference_lock():
-        ensure_reference()
+    if args.action != "rust-checks":
+        with reference_lock():
+            ensure_reference()
     env = environment()
+    env["CARGO_BUILD_JOBS"] = str(args.jobs)
     cache_executable = (
-        None if args.no_ccache else shutil.which("ccache", path=env["PATH"])
+        None
+        if args.no_ccache or args.action == "rust-checks"
+        else shutil.which("ccache", path=env["PATH"])
     )
-    if (args.ccache or args.ccache_bypass) and cache_executable is None:
+    if (
+        args.action != "rust-checks"
+        and (args.ccache or args.ccache_bypass)
+        and cache_executable is None
+    ):
         parser.error("--ccache requires ccache on PATH")
     args.ccache = cache_executable is not None
     env["CARGO_TARGET_DIR"] = str(ROOT / "build-rust/cargo")
@@ -396,11 +404,14 @@ def main():
     evidence = LOCAL / "verification" / stamp
     evidence.mkdir(parents=True)
     report = {
+        "schema_version": 1,
+        "jobs": args.jobs,
+        "candidate_root": str(ROOT.resolve()),
         "baseline": BASELINE,
         "candidate_commit": git("rev-parse", "HEAD"),
         "candidate_status": git("status", "--short"),
         "action": args.action,
-        "candidate_rust_enabled": True,
+        "candidate_rust_enabled": args.action != "rust-checks",
         "started_at": stamp,
         "commands": [],
         "compiler_cache": {
@@ -439,24 +450,22 @@ def main():
         shutil.copy2(ROOT / name, destination)
 
     def run(name, command, cwd=ROOT):
-        print(f"{name}: {' '.join(map(str, command))}", flush=True)
         log = evidence / f"{name}.log"
         start = time.monotonic()
-        with log.open("w") as output:
-            result = subprocess.run(
-                command, cwd=cwd, env=env, stdout=output, stderr=subprocess.STDOUT
-            )
+        code = run_logged(
+            command, cwd=cwd, env=env, log=log, phase=name, stream=name == "simulate"
+        )
         report["commands"].append(
             {
                 "name": name,
                 "argv": list(map(str, command)),
                 "cwd": str(cwd),
-                "exit_code": result.returncode,
+                "exit_code": code,
                 "seconds": round(time.monotonic() - start, 3),
                 "log": str(log.relative_to(ROOT)),
             }
         )
-        if result.returncode:
+        if code:
             print(log.read_text(errors="replace")[-16000:], file=sys.stderr)
             raise RuntimeError(f"{name} failed; see {log}")
         return log
@@ -484,7 +493,7 @@ def main():
             }
 
     try:
-        if args.action == "verify":
+        if args.action in ("verify", "rust-checks"):
             for name, command in (
                 ("rust-fmt", ["cargo", "fmt", "--all", "--", "--check"]),
                 (
@@ -507,6 +516,10 @@ def main():
                 ("rust-tests", ["cargo", "test", "--workspace", "--locked"]),
             ):
                 run(name, command)
+        if args.action == "rust-checks":
+            report["passed"] = True
+            print("rust-checks: passed", flush=True)
+            return
         common = [
             "-G",
             "Ninja",
@@ -526,8 +539,9 @@ def main():
             ]
         common.extend(compiler_cache_options(cache_executable))
         for name, build in builds.items():
-            with reference_lock() if name == "reference" else nullcontext():
+            with reference_lock() if name == "reference" else candidate_lock(build):
                 select_role(name)
+                before = source_identity(ROOT) if name == "candidate" else None
                 source = REFERENCE.resolve() if name == "reference" else ROOT
                 extra = (
                     []
@@ -564,6 +578,8 @@ def main():
                     report["rust_configuration"] = rust_configuration(build)
                 if args.action != "tools":
                     supply_graphics(build)
+                if name == "candidate":
+                    (build / IDENTITY_NAME).unlink(missing_ok=True)
                 run(
                     f"{name}-build",
                     ["cmake", "--build", str(build), "--parallel", str(args.jobs)],
@@ -586,11 +602,52 @@ def main():
                     report[f"{name}_binary_sha256"] = hashlib.sha256(
                         binary.read_bytes()
                     ).hexdigest()
+                    if name == "candidate":
+                        report["candidate_build_identity"] = write_identity(
+                            build,
+                            binary,
+                            before,
+                            source_identity(ROOT),
+                            {
+                                "configure": configure,
+                                "cache": cmake_cache(build),
+                                "environment": {
+                                    key: env.get(key)
+                                    for key in (
+                                        "CC",
+                                        "CXX",
+                                        "CFLAGS",
+                                        "CXXFLAGS",
+                                        "RUSTFLAGS",
+                                        "CARGO_BUILD_JOBS",
+                                        "PATH",
+                                    )
+                                },
+                            },
+                        )
 
         if args.action == "verify":
             inventories = {}
             for name, build in builds.items():
-                with reference_lock() if name == "reference" else nullcontext():
+                with reference_lock() if name == "reference" else candidate_lock(build):
+                    binary = build / (
+                        "openttd" if name == "reference" else "openttd-rust"
+                    )
+                    if (
+                        hashlib.sha256(binary.read_bytes()).hexdigest()
+                        != report[f"{name}_binary_sha256"]
+                    ):
+                        raise RuntimeError(
+                            f"{name} executable changed between build and tests; repeat verification"
+                        )
+                    if (
+                        name == "candidate"
+                        and read_identity(build, binary)
+                        != report["candidate_build_identity"]
+                    ):
+                        raise RuntimeError(
+                            "Candidate build identity changed before tests; repeat verification"
+                        )
                     log = run(
                         f"{name}-test-inventory",
                         ["ctest", "--show-only=json-v1"],
@@ -616,6 +673,13 @@ def main():
                         ],
                         cwd=build,
                     )
+                    if (
+                        hashlib.sha256(binary.read_bytes()).hexdigest()
+                        != report[f"{name}_binary_sha256"]
+                    ):
+                        raise RuntimeError(
+                            f"{name} executable changed during tests; repeat verification"
+                        )
             missing = inventories["reference"] - inventories["candidate"]
             if missing:
                 raise RuntimeError(
@@ -633,7 +697,6 @@ def main():
                     *simulate_args,
                 ],
             )
-            print(log.read_text(errors="replace"), end="", flush=True)
         ensure_reference()
         report["passed"] = True
     finally:

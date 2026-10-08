@@ -1,0 +1,37 @@
+name: Invalidate previous validation
+
+on:
+  pull_request_target:
+    branches: [rust-migration]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+
+jobs:
+  invalidate:
+    if: vars.CI_ON_DEMAND == 'true'
+    runs-on: ubuntu-latest
+    # Share the plan/publish lock so a delayed read cannot erase a newer request.
+    concurrency:
+      group: validation-status-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    steps:
+    # The protected base defines this job. Never check out the PR here.
+    - uses: actions/github-script@v7
+      with:
+        script: |
+          const event = context.payload.pull_request;
+          const head = event.head.sha;
+          const {data: pull} = await github.rest.pulls.get({...context.repo, pull_number: event.number});
+          if (pull.head.sha !== head) return; // An older synchronize event arrived late.
+          const {data: combined} = await github.rest.repos.getCombinedStatusForRef({...context.repo, ref: head});
+          const latest = combined.statuses.find(status => status.context === 'Full validation');
+          // Never let a delayed invalidation overwrite a request started after this push.
+          if (latest && latest.updated_at >= event.updated_at) return;
+          await github.rest.repos.createCommitStatus({
+            ...context.repo, sha: head, context: 'Full validation', state: 'pending',
+            description: 'Request full CI for this PR head before merge'
+          });

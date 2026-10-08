@@ -15,6 +15,9 @@
 #include "viewport_type.h"
 #include "station_map.h"
 #include "timer/timer_game_calendar.h"
+#ifdef WITH_RUST
+#include "rust/station_service_ffi.h"
+#endif
 
 typedef Pool<BaseStation, StationID, 32> StationPool;
 extern StationPool _station_pool;
@@ -58,7 +61,12 @@ struct StationRect : public Rect {
 struct BaseStation : StationPool::PoolItem<&_station_pool> {
 	TileIndex xy = INVALID_TILE; ///< Base tile of the station
 	TrackedViewportSign sign{}; ///< NOSAVE: Dimensions of sign
+#ifdef WITH_RUST
+	std::unique_ptr<OpenTTDStationService, decltype(&openttd_rust_station_service_destroy)> rust_service{openttd_rust_station_service_new(), openttd_rust_station_service_destroy};
+	uint8_t &delete_ctr = openttd_rust_station_service_fields(this->rust_service.get())->delete_ctr;
+#else
 	uint8_t delete_ctr = 0; ///< Delete counter. If greater than 0 then it is decremented until it reaches 0; the waypoint is then is deleted.
+#endif
 
 	std::string name{}; ///< Custom name
 	StringID string_id = INVALID_STRING_ID; ///< Default name (town area) of station
