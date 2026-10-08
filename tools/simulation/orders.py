@@ -39,6 +39,7 @@ def scenarios(soak):
             "client-shared-restore",
             "active-reload",
             "implicit-wrap",
+            "oversized",
         )
     ]
 
@@ -130,7 +131,7 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
         ).hexdigest()
     result["orders_adapter"] = provenance
     mode = scenario["orders"]
-    if mode in ("commands", "implicit-wrap"):
+    if mode in ("commands", "implicit-wrap", "oversized"):
         return dict(
             scenario,
             executables=executables,
@@ -261,6 +262,7 @@ def check(scenario, run, mode, role, result):
         ],
         "active-reload": ["ORDERS backups offline 0"],
         "implicit-wrap": ["ORDERS state implicit-wrap 126 1 1 0 0 0 0 0 0 0"],
+        "oversized": ["ORDERS oversized 300 0"],
     }[operation]
     for line in required:
         if line not in run["log"]:

@@ -3107,7 +3107,10 @@ impl Game {
     }
     fn distance(self, previous: u8, current: u8, v: *mut c_void, depth: i32) -> u32 {
         let list = self.orders(v);
-        let order = self.order(list, current).unwrap();
+        // This source helper indexes the full stored span, not GetOrderAt's
+        // uint8 count. Oversized save-loaded lists can still have conditional
+        // destinations beyond their narrowed GetNumOrders value.
+        let order = self.stored_order(list, usize::from(current));
         if order.kind() == 7 {
             if depth > i32::from(self.count(v)) {
                 return 0;
@@ -3121,7 +3124,7 @@ impl Game {
             ) as i32;
             return d1.max(d2) as u32;
         }
-        let prev = self.location(self.order(list, previous).unwrap(), v, true);
+        let prev = self.location(self.stored_order(list, usize::from(previous)), v, true);
         let cur = self.location(order, v, true);
         if prev == u32::MAX || cur == u32::MAX {
             return 0;
