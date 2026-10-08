@@ -42,30 +42,11 @@ def hooks_checkout(supplied=None):
             destination.mkdir(parents=True)
             subprocess.run(["git", "init", "--quiet", str(destination)], check=True)
         if supplied is None and not (destination / "hooks/check-commits.sh").exists():
-            subprocess.run(
-                [
-                    "git",
-                    "-C",
-                    str(destination),
-                    "fetch",
-                    "--depth=1",
-                    HOOKS_URL,
-                    HOOKS_REVISION,
-                ],
-                check=True,
-            )
-            subprocess.run(
-                [
-                    "git",
-                    "-C",
-                    str(destination),
-                    "checkout",
-                    "--quiet",
-                    "--detach",
-                    HOOKS_REVISION,
-                ],
-                check=True,
-            )
+            for command in (
+                ["fetch", "--depth=1", HOOKS_URL, HOOKS_REVISION],
+                ["checkout", "--quiet", "--detach", HOOKS_REVISION],
+            ):
+                subprocess.run(["git", "-C", str(destination), *command], check=True)
         if git(destination, "rev-parse", "HEAD") != HOOKS_REVISION:
             raise ValueError("commit checker is not at the pinned revision")
         if git(destination, "status", "--porcelain", "--untracked-files=all"):
@@ -73,12 +54,20 @@ def hooks_checkout(supplied=None):
     return destination
 
 
-def warnings(path):
-    return [
-        {"line": number, "text": line}
-        for number, line in enumerate(path.read_text(errors="replace").splitlines(), 1)
-        if WARNING.search(line)
-    ]
+def warnings(path, changed=None):
+    found = []
+    for number, line in enumerate(path.read_text(errors="replace").splitlines(), 1):
+        if not WARNING.search(line):
+            continue
+        source = re.match(r"(.+?)(?::\d+(?::\d+)?|\(\d+(?:,\d+)?\))\s*:", line)
+        if (
+            changed is not None
+            and source
+            and not any(source[1].replace("\\", "/").endswith(name) for name in changed)
+        ):
+            continue
+        found.append({"line": number, "text": line})
+    return found
 
 
 def verification_logs(path):
@@ -111,7 +100,10 @@ def main():
         migration.LOCAL / "preflight" / datetime.now(UTC).strftime("%Y%m%dT%H%M%S.%fZ")
     )
     evidence.mkdir(parents=True)
-    report = {"schema_version": 1, "scope": "commit style and supplied compiler logs"}
+    report = {
+        "schema_version": 1,
+        "scope": "commit style and warnings in branch-changed files or without source locations",
+    }
     code = 1
     try:
         base = git(
@@ -151,11 +143,13 @@ def main():
         logs = arguments.build_log + (
             verification_logs(arguments.verification) if arguments.verification else []
         )
+        changed = git(
+            migration.ROOT, "diff", "--name-only", f"{base}...{head}"
+        ).splitlines()
         report["compiler_logs"] = []
-        total_warnings = 0
-        displayed_warnings = 0
+        found_warnings = []
         for path in dict.fromkeys(path.resolve() for path in logs):
-            found = warnings(path)
+            found = warnings(path, changed)
             report["compiler_logs"].append(
                 {
                     "path": str(path),
@@ -163,20 +157,18 @@ def main():
                     "warnings": found,
                 }
             )
-            total_warnings += len(found)
-            displayed = found[: MAX_WARNING_OUTPUT - displayed_warnings]
-            for item in displayed:
-                print(f"{path}:{item['line']}: {item['text']}", file=sys.stderr)
-            displayed_warnings += len(displayed)
-        if total_warnings:
+            found_warnings.extend(
+                f"{path}:{item['line']}: {item['text']}" for item in found
+            )
+        for text in found_warnings[:MAX_WARNING_OUTPUT]:
+            print(text, file=sys.stderr)
+        if found_warnings:
             print(
-                f"Compiler warnings: {total_warnings} found; showing {displayed_warnings}. "
+                f"Compiler warnings: {len(found_warnings)} found; showing {min(MAX_WARNING_OUTPUT, len(found_warnings))}. "
                 f"All warnings retained in {evidence / 'report.json'}",
                 file=sys.stderr,
             )
-        code = int(
-            bool(check or any(item["warnings"] for item in report["compiler_logs"]))
-        )
+        code = int(bool(check or found_warnings))
         if not logs:
             print(
                 "Compiler warnings: not checked (no explicit candidate log supplied)."

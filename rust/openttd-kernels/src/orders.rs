@@ -127,14 +127,17 @@ impl Vector {
         unsafe {
             self.reserve(size);
         }
-        if size < self.length {
-            // Each vacated slot is reinitialized for subsequent vector growth.
-            // Order is trivially destructible; no selected gameplay occurs here.
+        if size > self.length {
+            // Capacity slots stay live after logical erasure. The original's
+            // DeleteUnreachedImplicitOrders keeps a span across erase and reads
+            // the retained last slot on wraparound; preserve those bytes until
+            // a subsequent resize exposes the slot with its default value.
+            // Order destruction/construction is trivial and cannot reenter.
             unsafe {
-                (self.destroy)(self.data().add(size).cast(), self.length - size);
+                (self.destroy)(self.data().add(self.length).cast(), size - self.length);
             }
             unsafe {
-                (self.construct)(self.data().add(size).cast(), self.length - size);
+                (self.construct)(self.data().add(self.length).cast(), size - self.length);
             }
         }
         self.length = size;
@@ -2120,16 +2123,17 @@ pub unsafe extern "C" fn openttd_rust_order_depot(
     destination: u16,
     depot_type: u8,
     nonstop: u8,
-    action_cargo: u16,
+    action: u8,
+    cargo: u8,
 ) -> u32 {
     let mut order = unsafe { p.read() };
     {
         order.kind = 2;
         order.flags = (order.flags & !7) | (depot_type & 7);
-        order.flags = (order.flags & !0x78) | ((action_cargo as u8 & 15) << 3);
+        order.flags = (order.flags & !0x78) | ((action & 15) << 3);
         order.kind = (order.kind & !0xc0) | ((nonstop & 3) << 6);
         order.destination = destination;
-        order.refit = (action_cargo >> 8) as u8;
+        order.refit = cargo;
     };
     unsafe {
         p.write(order);
@@ -2488,12 +2492,22 @@ impl Control {
             g.service_invalidate_order(v, 0);
             return;
         }
+        let list = g.orders(v);
+        let orders = if list.is_null() {
+            ptr::null_mut()
+        } else {
+            unsafe { (*g.vector(list)).data() }
+        };
         let mut current = unsafe { (*state).implicit };
         while current != u8::MAX {
             if unsafe { (*state).implicit == (*state).real } {
                 break;
             }
-            if g.vehicle_order(v, current).unwrap().kind() == 8 {
+            // Match the original captured span and unchanged local index after
+            // DeleteOrder. Erasure never reallocates; all capacity slots remain
+            // typed/live, including the retained former last order. No reference
+            // or borrow crosses the deletion/window callbacks.
+            if unsafe { orders.add(usize::from(current)).read() }.kind() == 8 {
                 self.delete(v, unsafe { (*state).implicit });
             } else {
                 let next = g.next_index(g.orders(v), current);
@@ -3093,7 +3107,10 @@ impl Game {
     }
     fn distance(self, previous: u8, current: u8, v: *mut c_void, depth: i32) -> u32 {
         let list = self.orders(v);
-        let order = self.order(list, current).unwrap();
+        // This source helper indexes the full stored span, not GetOrderAt's
+        // uint8 count. Oversized save-loaded lists can still have conditional
+        // destinations beyond their narrowed GetNumOrders value.
+        let order = self.stored_order(list, usize::from(current));
         if order.kind() == 7 {
             if depth > i32::from(self.count(v)) {
                 return 0;
@@ -3107,7 +3124,7 @@ impl Game {
             ) as i32;
             return d1.max(d2) as u32;
         }
-        let prev = self.location(self.order(list, previous).unwrap(), v, true);
+        let prev = self.location(self.stored_order(list, usize::from(previous)), v, true);
         let cur = self.location(order, v, true);
         if prev == u32::MAX || cur == u32::MAX {
             return 0;

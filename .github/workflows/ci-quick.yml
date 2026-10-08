@@ -18,7 +18,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: quick-ci-${{ inputs.checkout-ref && github.run_id || github.ref }}
+  group: quick-ci-${{ inputs.checkout-ref && github.run_id || github.ref == 'refs/heads/rust-migration' && github.sha || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/rust-migration' }}
 
 jobs:
@@ -61,7 +61,7 @@ jobs:
       if: inputs.base-ref != ''
       env:
         BASE: ${{ inputs.base-ref }}
-        HEAD: ${{ inputs.checkout-ref }}
+        HEAD: ${{ inputs.checkout-ref }}^2
       run: |
         hooks="$GITHUB_WORKSPACE/.local/commit-hooks"
         echo "::add-matcher::$hooks/action/check-diff-matcher.json"

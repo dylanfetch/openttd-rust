@@ -1,27 +1,28 @@
 # OpenTTD-Rust near-term roadmap
 
-Root owns this file and updates it when a phase completes or priorities change.
-`AGENTS.md` and `docs/rust-migration.md` define the rules; this file decides what
-to work on next. If an issue conflicts with this roadmap, follow the roadmap;
-a subagent stops and reports the conflict in its hand-off to root. Keep this
-file forward-looking and under about 200 lines: completed work is one table
-row, and its evidence stays in the PR (`AGENTS.md`, "Evidence budget").
+Root owns selection here; `AGENTS.md` and `docs/rust-migration.md` define process.
+If an issue conflicts, follow this roadmap and report it to root. Keep this
+forward-looking, about 200 lines; completed work is one row, with evidence in PRs.
 
-## Where the fork stands (2026-10-07, `be87a84a78`)
+## Where the fork stands (2026-10-08, `cd0297938c`)
 
-- Sixteen ownership ports retire 20,947 original C++ lines, about 5.5% of roughly
-  384k non-vendored `src/` lines (15,624 excluding town-name and road-movement
-  data). No game logic moved since the third review. Main CI is green.
-- The play saves run **2.54x** slower than the original (play-opus-55-167-002
-  2.54x, play-grok-159-001 2.55x, padhattan 2.17x, generate-tgp-256-1 1.41x).
+- Seventeen ownership ports retire 22,827 original C++ lines, about 5.9% of roughly
+  384k non-vendored `src/` lines (17,504 excluding town-name and road-movement
+  data). These two integrations retire 1,880 lines for 380 glue + 764 tooling;
+  #173's maintenance is net -2 tooling lines. Post-merge native CI is running.
+- Latest aircraft-base play-opus is **2.626x**; company is 2.624x on the same host.
+  Generation is 1.411x / 1.552x; root accepts company's temporary allocating
+  boundary cost, with 50 ms process-wait resolution limiting attribution (#149).
+  Best-known budgets remain play-opus-55-167-002 2.54x,
+  play-grok-159-001 2.55x, padhattan 2.17x, generate-tgp-256-1 1.41x.
   Road is 87% of the gap, and most of it is boundary overhead, not game logic
   (#155, #168).
 - CI is on demand (#171). An ordinary PR push costs about 2 job-minutes instead
   of 80. A full run costs about 104 job-minutes and 30 minutes wall time, once per
   final head.
-- Six component branches are unintegrated (#157 cap): #145, #149, #151, #152,
-  #153, #147. Aircraft, company, orders and ship have joined the current base;
-  cargo and fleet still need an update before their next push.
+- Six component branches are unintegrated (#157 cap): #149, #151, #152,
+  #176, #147 and the selected #155 conversion. #176 replaces closed #153.
+  Company, orders and ship have joined aircraft; cargo and fleet need an update.
 
 ## Fourth steering review (2026-10-07)
 
@@ -88,6 +89,7 @@ Metrics are `tools/port-metrics.py`: Rust / tooling / C++ glue / C++ retired.
 | #125 | Station cargo-service control and state | #142 | `ba920555ca` | 1516 / 241 / 1022 / 1332 |
 | #130 | Rail controller, reservation and private state | #143 via #166 | `dace87c9b1` | 4087 / 613 / 1660 / 2585 |
 | #129 | Industry production, histories and builder state | #144 via #166 | `dace87c9b1` | 1508 / 474 / 678 / 932 |
+| #136 | Aircraft controller and airport blocks | #145 | `f0e0b3d712` | 1773 / 764 / 380 / 1880 |
 
 Harness and process: #72 harness (#85), #84 play saves (#87), #97 provenance
 freeze (#100), #88 Ruff (#92), #75 partial-pixel fidelity (#91), #90 world-state
@@ -98,7 +100,8 @@ code); #107 direct services #113, #115; #86 transport save #110 (141) and
 aircraft fixture #132 (347); #108 map decision #116; #154 harness endpoints #160
 (277); #158 MinGW nightly #159; #155 speed report #163 (212); #156 road witnesses
 #161, #162, #164, #167 (581); #170 on-demand CI and validation tools #171 (3267,
-no game logic). CI-capacity batches #134, #141 and #166 integrated owners above.
+no game logic); #173 validation repairs #174 (`cd0297938c`, net tooling -2).
+CI-capacity batches #134, #141 and #166 integrated owners above.
 
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -129,31 +132,30 @@ Integration of reviewed work comes before new starts. Never hold more than six
 unintegrated component branches (#157). Independent items (#169, #156 slices)
 may run in parallel with this list.
 
-1. **Integrate #145 aircraft.** Finish review of the `abi.rs` resolution and
-   restored `PerformanceAccumulator` order, measure ratio, then pass CI.
-2. **Integrate #149 company.** Finish re-review of client ID 0 and the u16 shift,
-   refresh the base after aircraft, then pass CI.
-3. **#155 road conversion.** Remove the Task/Future/Rc protocol for all 22
+1. **Integrate #149 company.** Reviewed client ID/shift fixes and the conflict-free
+   aircraft refresh await final evidence and full CI. Root accepted temporary
+   allocation/settings overhead; the best-known speed budgets do not increase.
+2. **#155 road conversion.** Remove the Task/Future/Rc protocol for all 22
    services and 14 entries, and narrow RoadObserve: field getters or a hot
    record, no `IsBus` in the view, type-filter in `close`, single-pass `nearby`,
    owner resolved once per entry, and nested `GetCurrentMaxSpeed`. Add the ratchet.
-   The expected result is about 1.7-1.9x.
-4. **Integrate #151 cargo storage** (already direct) on the fresh baseline.
-5. **#168 train and train-reservation conversion**, including the O(n^2) consist
+   Start local work on integrated aircraft while company awaits CI; join integrated
+   company before final evidence. The expected result is about 1.7-1.9x.
+3. **Integrate #151 cargo storage** (already direct) on the fresh baseline.
+4. **#168 train and train-reservation conversion**, including the O(n^2) consist
    walk and the per-step `nearby` Vec; then aircraft and company; then trees,
    town and disaster. One PR per component.
-6. **Finish #153 orders, then #152 ship, in the direct form before review.** Ship
+5. **Finish #176 orders, then #152 ship, in the direct form before review.** Ship
    names orders as an ancestry dependency. Then #147 fleet replacement.
-7. **New components** (#148 town lifecycle, then #150 industry construction)
+6. **New components** (#148 town lifecycle, then #150 industry construction)
    start only once the road play saves are at or below 2.0x and #168's train
    slice is integrated. When fewer than two unstarted selections remain, a fresh
    Astra high planner replenishes whole simulation owners, which are planned in
    the direct form.
 
-The accepted #108 decision keeps canonical map arrays in C++ with direct bundled
-`noexcept` services. The 2026-10-07 profile attributes the overhead to entry and
-record-copy costs, not map access; revisit #108 only if a post-#168 profile shows
-map or pool crossings dominating.
+The #108 decision keeps C++ map arrays and direct bundled `noexcept` services.
+Revisit it only if a post-#168 profile shows map/pool crossings dominating;
+the current profile instead identifies entry and record-copy overhead.
 
 ## Resume checkpoint
 
@@ -162,16 +164,18 @@ checkout's `tools/ci.py` can request CI for any fork PR.
 
 | Issue / PR | Branch (worktree suffix), head | State and next step |
 | --- | --- | --- |
-| #136 / #145 | `aircraft-controller-ownership-136` (`aircraft-controller`), `36c923a2fb` | Fresh review resolved ABI/scope/import; native verify passed; semantic checks and idle timing running. |
-| #137 / #149 | `company-economy-ownership-137` (`company-economy`) | Reviewer owns client ID/shift fixes and base refresh; native/semantic checks pending. |
-| #139 / #151 | `cargo-storage-movement-139` (`cargo-storage`), `ff912bcfcb` | Accepted at `a25a7d41e2`; final base and CI after item 3. |
-| #138 / #153 | `order-lifecycle-ownership-138` (`order-lifecycle`) | Base joined; direct typed conversion and orders scenarios in progress. |
-| #146 / #152 | `ship-controller-ownership-146` (`ship-controller`) | Base joined; direct typed conversion in progress; follows #153. |
+| #137 / #149 | `company-economy-ownership-137` (`company-economy`), `d994ddcce3` | Reviewed, local evidence/timing and old-base full pass; refresh onto #174 and run full on its actual merge before integration. |
+| #155 | `road-direct-155` (`road-direct-155`) | Direct typed conversion and narrowed reads plus speed ratchet selected; final baseline follows #149. |
+| #139 / #151 | `cargo-storage-movement-139` (`cargo-storage`), `ff912bcfcb` | Accepted at `a25a7d41e2`; final base and CI after item 2. |
+| #138 / #176 | `orders-direct-138` (`order-lifecycle`), `6999b1dff4` local | Fresh reviewer fixed cyclic implicit deletion, conditional distance and depot argument packing; final checks/base/push/report running. |
+| #146 / #152 | `ship-controller-ownership-146` (`ship-controller`), `50266fd1df` local | Direct form passes native/water pair+soak; join orders review fixes, publish and assign fresh review. |
 | #147 | `fleet-replacement-ownership-147` (`fleet-replacement`), `68d660adc9` | State-only WIP, no PR. |
-| #173 / #174 | `validation-gaps-173` (`validation-gaps-173`) | One agent; merge-ref, post-merge and local fixes; net tooling lines must stay non-positive. |
-| #169 / #175 | `crossing-sound-169` (`crossing-sound-169`), `dc409bee71` | Four original sound arguments restored; validation, fresh review and full CI pending. |
+| #169 / #175 | `crossing-sound-169` (`crossing-sound-169`), `5370d49886` local | Reviewed; native/Cargo and default 214 scenarios pass; refresh onto #174, publish and request full. |
+| #156 | `aircraft-landing-rng-156` (`aircraft-landing-156`), `47cb78d223` local | Landing equality/mask/disabled/event checks and both sensitivity mutations pass; draft awaits push release/review. |
 
-Standing #156 work: aircraft landing RNG after #145 (plan in #156), then the
+The first live dispatched full (#145) and #174's merge-validation bootstrap passed.
+`CI_ON_DEMAND=true` is restored; both local timing and remote push holds are released.
+Standing #156 work: aircraft landing RNG (plan in #156), then the
 2026-10-07 audit list there. Preserve the pinned reference, paused curve
 worktrees and evidence branches `evidence-disaster-vehicles` (`a775543162`) and
 `evidence-water-regions` (`c752070cde`); do not reapply effect helper `73ccd511fb`.
