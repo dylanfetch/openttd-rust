@@ -313,7 +313,7 @@ static void TrainAccelerationModelChanged(int32_t)
 {
 	for (Train *t : Train::Iterate()) {
 		if (t->IsFrontEngine()) {
-			t->tcache.cached_max_curve_speed = t->GetCurveSpeedLimit();
+			t->SetCachedMaxCurveSpeed(t->GetCurveSpeedLimit());
 			t->UpdateAcceleration();
 		}
 	}

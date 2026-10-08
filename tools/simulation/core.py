@@ -21,12 +21,16 @@ import json
 import os
 import re
 import shutil
+import statistics
 import struct
 import subprocess
 import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+
+from build_identity import IDENTITY_NAME, read_identity
+from validation_execution import file_lock
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -71,6 +75,7 @@ def scenario_modules():
         economy,
         effects,
         generated,
+        industries,
         play_saves,
         rails,
         roads,
@@ -93,6 +98,7 @@ def scenario_modules():
         economy,
         roads,
         stations,
+        industries,
     )
 
 
@@ -377,7 +383,34 @@ def write_config(scenario, build, run_dir):
     (run_dir / "openttd.cfg").write_text(text)
 
 
-def run_game(scenario, binary, build, run_dir, timeout, base_env=None, desync=True):
+GAME_LOCK = None  # Set by main to the clone-wide benchmark coordination file.
+
+
+@contextlib.contextmanager
+def game_slot(isolate):
+    """Ordinary games share the lock; a timed benchmark game holds it alone."""
+    path = GAME_LOCK
+    if path is None:
+        # Fixture entry points also coordinate with benchmark runs, without
+        # requiring main() or mutable global setup.
+        import migration
+
+        path = migration.COMMON_LOCAL / "simulation-game.lock"
+    with file_lock(path, shared=not isolate, label="simulation game"):
+        yield
+
+
+def run_game(
+    scenario,
+    binary,
+    build,
+    run_dir,
+    timeout,
+    base_env=None,
+    desync=True,
+    *,
+    isolate=False,
+):
     """Run one binary on one scenario in an isolated personal directory.
 
     desync=3 writes the 32-day snapshots but also checks and rebuilds caches
@@ -423,17 +456,28 @@ def run_game(scenario, binary, build, run_dir, timeout, base_env=None, desync=Tr
         XDG_CONFIG_HOME=str(run_dir / "xdg-config"),
         XDG_CACHE_HOME=str(run_dir / "xdg-cache"),
     )
-    started = time.monotonic()
     with (
+        game_slot(isolate),
         open(run_dir / "stdout.log", "wb") as out,
         open(run_dir / "stderr.log", "wb") as err,
     ):
+        started = time.monotonic()
         try:
             code = subprocess.run(
-                command, cwd=build, env=env, stdout=out, stderr=err, timeout=timeout
+                [
+                    sys.executable,
+                    str(ROOT / "tools/simulation/game_launcher.py"),
+                    *command,
+                ],
+                cwd=build,
+                env=env,
+                stdout=out,
+                stderr=err,
+                timeout=timeout,
             ).returncode
         except subprocess.TimeoutExpired:
             code = "timeout"
+        seconds = round(time.monotonic() - started, 3)
     autosave = run_dir / "save/autosave"
     snapshots = sorted(
         path
@@ -444,7 +488,8 @@ def run_game(scenario, binary, build, run_dir, timeout, base_env=None, desync=Tr
         snapshots.append(autosave / "exit.sav")
     return {
         "exit": code,
-        "seconds": round(time.monotonic() - started, 3),
+        "seconds": seconds,
+        "command": command,
         "snapshots": snapshots,
         "log": log_lines(run_dir),
         "stdout": (run_dir / "stdout.log").read_bytes(),
@@ -459,39 +504,6 @@ def log_lines(run_dir):
         .read_text(errors="surrogateescape")
         .splitlines()
     ]
-
-
-class MachineLock:
-    """Lets a retried plain pair run with no other harness game on the machine.
-
-    A link graph job that has not finished by its join tick pauses the game, and
-    the null driver keeps counting iterations while paused. The job has only a
-    few milliseconds of wall time, so it misses that window when cores are
-    oversubscribed. Ordinary runs hold `path` shared across every harness
-    process and thread of the clone; a retry holds it exclusively. flock does
-    not favour a waiting exclusive holder, so every run first passes through a
-    gate lock that a retry keeps: once a retry waits, no new run starts and the
-    wait is bounded by the runs already in progress."""
-
-    def __init__(self, path):
-        self.path, self.gate = path, path.with_suffix(".gate")
-
-    @contextlib.contextmanager
-    def hold(self, alone):
-        try:
-            import fcntl
-        except ImportError:  # No flock (Windows): runs are not isolated.
-            yield
-            return
-        with open(self.gate, "w") as gate, open(self.path, "w") as handle:
-            fcntl.flock(gate, fcntl.LOCK_EX)
-            fcntl.flock(handle, fcntl.LOCK_EX if alone else fcntl.LOCK_SH)
-            if not alone:
-                fcntl.flock(gate, fcntl.LOCK_UN)
-            yield
-
-
-MACHINE = None  # MachineLock, set by main()
 
 
 def save_moment(path):
@@ -539,18 +551,18 @@ def field_spans(body, header):
     return spans
 
 
-def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
+def run_scenario(
+    scenario, binaries, builds, out, limit, timeout, env, benchmark_repetitions=0
+):
     """Run both binaries twice (with and without desync snapshots) and compare.
 
-    -vnull:ticks counts loop iterations, and the game pauses for iterations
-    while a threaded link graph job is late (StateGameLoop_LinkGraphPauseControl),
-    so how far a run gets depends on machine load. State at a given date is
-    deterministic: snapshots are compared by date, a longer run's extra trailing
-    snapshots and log lines are ignored, and exit saves are compared only when
-    both runs stopped at the same moment (the short plain run is retried)."""
+    The child launcher denies worker threads, selecting the original synchronous
+    fallback for link graph computation. No wall-time-dependent join pauses
+    consume null-driver iterations, so every save and complete log is compared."""
     name = scenario["name"]
     result = {
         "scenario": name,
+        "plain_speed": {"samples": [], "median_candidate_reference_ratio": None},
         "differences": [],
         "known_failures": [],
         "problems": [],
@@ -582,34 +594,37 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
                 scenario = prepare(
                     scenario, binaries, builds, out, timeout, env, result
                 )
-        for mode, desync in (("snapshots", True), ("plain", False)):
-            for attempt in range(1 if desync else 3):
-                with MACHINE.hold(alone=attempt > 0):
-                    runs = {
-                        role: run_game(
-                            scenario,
-                            binaries[role],
-                            builds[role],
-                            out / name / mode / role,
-                            timeout,
-                            env,
-                            desync,
-                        )
-                        for role in ("reference", "candidate")
-                    }
-                exits = [
-                    runs[role]["snapshots"][-1]
-                    if runs[role]["snapshots"]
-                    and runs[role]["snapshots"][-1].name == "exit.sav"
-                    else None
-                    for role in ("reference", "candidate")
-                ]
-                # Retry only a clean pair whose end moments differ; a crash, hang
-                # or missing save on any attempt is kept and reported.
-                clean = all(exits) and all(run["exit"] == 0 for run in runs.values())
-                same_end = clean and save_moment(exits[0]) == save_moment(exits[1])
-                if same_end or not clean:
-                    break
+        result["requested_ticks"] = scenario["ticks"]
+        modes = (
+            (("plain", False),) * benchmark_repetitions
+            if benchmark_repetitions
+            else (("snapshots", True), ("plain", False))
+        )
+        for mode, desync in modes:
+            runs = {
+                role: run_game(
+                    scenario,
+                    binaries[role],
+                    builds[role],
+                    out / name / mode / role,
+                    timeout,
+                    env,
+                    desync,
+                    isolate=bool(benchmark_repetitions),
+                )
+                for role in ("reference", "candidate")
+            }
+            exits = [
+                runs[role]["snapshots"][-1]
+                if runs[role]["snapshots"]
+                and runs[role]["snapshots"][-1].name == "exit.sav"
+                else None
+                for role in ("reference", "candidate")
+            ]
+            clean = all(exits) and all(run["exit"] == 0 for run in runs.values())
+            moments = [save_moment(path) if path else None for path in exits]
+            result[f"{mode}_end_moments"] = moments
+            same_end = clean and moments[0] == moments[1]
             for role, run in runs.items():
                 for module in scenario_modules():
                     if check := getattr(module, "check", None):
@@ -632,20 +647,14 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
                 [p.name for p in runs[role]["snapshots"] if p.name != "exit.sav"]
                 for role in ("reference", "candidate")
             ]
-            shorter = min(periodic, key=len)
-            if periodic[0][: len(shorter)] != periodic[1][: len(shorter)] or (
-                same_end and periodic[0] != periodic[1]
-            ):
+            if periodic[0] != periodic[1]:
                 result["problems"].append(
                     f"{mode}: snapshot dates differ: {first_difference(*periodic)}"
                 )
-            elif len(periodic[0]) != len(periodic[1]):
-                result["notes"].append(
-                    f"{mode}: runs reached different dates ({len(periodic[0])} vs {len(periodic[1])} snapshots)"
-                )
+            common = sorted(set(periodic[0]) & set(periodic[1]))
             if mode == "snapshots":
-                result["snapshots"] = len(shorter) + bool(same_end)
-                if len(shorter) < scenario.get(
+                result["snapshots"] = len(common) + bool(same_end)
+                if len(common) < scenario.get(
                     "snapshot_minimum",
                     0
                     if "effects" in scenario or scenario.get("short_checkpoint")
@@ -673,16 +682,17 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
                                 result["problems"].append(
                                     f"{role}: {key} is {saved}, not {value}, in {first.name}"
                                 )
-            for snapshot in shorter:
+            for snapshot in common:
                 compare(mode, snapshot)
                 if result["differences"]:
                     break  # Later snapshots only repeat the first divergence.
-            if same_end and not result["differences"]:
+            result[f"{mode}_exit_compared"] = bool(all(exits))
+            if all(exits):
                 compare(mode, "exit.sav")
-            elif not same_end and not desync and all(exits):
+            if not same_end and all(exits):
                 result["problems"].append(
-                    f"plain: runs ended at different moments after {attempt + 1} attempts: "
-                    f"{save_moment(exits[0])} vs {save_moment(exits[1])}"
+                    f"{mode}: runs ended at different moments: "
+                    f"{moments[0]} vs {moments[1]}"
                 )
             for label in ("log", "stdout"):
                 a, b = (
@@ -691,8 +701,6 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
                     else runs[role][label].splitlines()
                     for role in ("reference", "candidate")
                 )
-                if not same_end:
-                    a, b = a[: min(len(a), len(b))], b[: min(len(a), len(b))]
                 if a != b:
                     index, ref_line, cand_line = first_difference(a, b)
                     result["differences"].append(
@@ -705,12 +713,49 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
                             "candidate": repr(cand_line),
                         }
                     )
+            if mode == "plain":
+                reference_seconds = runs["reference"]["seconds"]
+                candidate_seconds = runs["candidate"]["seconds"]
+                ratio = (
+                    candidate_seconds / reference_seconds
+                    if (
+                        same_end
+                        and not result["differences"]
+                        and not result["known_failures"]
+                        and not result["problems"]
+                        and reference_seconds > 0
+                    )
+                    else None
+                )
+                result["plain_speed"]["samples"].append(
+                    {
+                        "reference_seconds": reference_seconds,
+                        "candidate_seconds": candidate_seconds,
+                        "candidate_reference_ratio": ratio,
+                        "same_end": same_end,
+                    }
+                )
+                if benchmark_repetitions:
+                    result["plain_commands"] = {
+                        role: run["command"] for role, run in runs.items()
+                    }
+            if benchmark_repetitions and (result["differences"] or result["problems"]):
+                break  # Preserve the first failing repetition instead of overwriting it.
     except (
         Exception
     ) as error:  # Record and continue, so the report covers every scenario.
         result["problems"].append(f"harness error: {type(error).__name__}: {error}")
+    ratios = [
+        sample["candidate_reference_ratio"]
+        for sample in result["plain_speed"]["samples"]
+        if sample["candidate_reference_ratio"] is not None
+    ]
+    if ratios:
+        result["plain_speed"]["median_candidate_reference_ratio"] = statistics.median(
+            ratios
+        )
     result["passed"] = not result["differences"] and not result["problems"]
-    if result["passed"]:
+    if result["passed"] and not benchmark_repetitions:
         if (
             "reload_input" in result
             or "town_name_input" in result
@@ -727,7 +772,24 @@ def run_scenario(scenario, binaries, builds, out, limit, timeout, env):
     return result
 
 
-def copy_runtime(build, binary, destination):
+def copy_runtime(build, binary, destination, *, candidate=False):
+    if candidate:
+        with file_lock(
+            Path(build).resolve() / ".migration.lock",
+            shared=True,
+            label="candidate capture",
+        ):
+            executable = _copy_runtime(build, binary, destination)
+            identity = read_identity(build, executable)
+            if identity is not None:
+                (destination / IDENTITY_NAME).write_text(
+                    json.dumps(identity, indent=2) + "\n"
+                )
+            return executable
+    return _copy_runtime(build, binary, destination)
+
+
+def _copy_runtime(build, binary, destination):
     """Freeze the executable and its data, including symlink targets, for one run."""
 
     def missing_links(directory, names):
@@ -784,6 +846,12 @@ def main():
     )
     parser.add_argument("--list", action="store_true")
     parser.add_argument(
+        "--benchmark",
+        type=int,
+        metavar="REPETITIONS",
+        help="repeat only plain pairs in isolation; retain final runs for profiling",
+    )
+    parser.add_argument(
         "--prepare-water-save",
         choices=("ferry", "structures"),
         help="build a committed ship fixture using only the pinned reference",
@@ -795,8 +863,20 @@ def main():
     )
     args = parser.parse_args()
 
+    if args.jobs < 1:
+        parser.error("--jobs must be positive")
+    if args.benchmark is not None and args.benchmark < 1:
+        parser.error("--benchmark repetitions must be positive")
+    if args.benchmark and args.jobs != 1:
+        parser.error("--benchmark requires --jobs 1")
+
     every = scenario_list(args.soak)
     # An exact scenario name selects only that scenario; anything else is a substring filter.
+    unmatched = [
+        name for name in args.names if not any(name in s["name"] for s in every)
+    ]
+    if unmatched:
+        parser.error(f"no scenario matches selectors {unmatched}; see --list")
     scenarios = [
         s
         for s in every
@@ -815,10 +895,10 @@ def main():
     out = (
         migration.LOCAL / "simulation" / f"{stamp}-{os.getpid()}"
     )  # concurrent runs never share
-    global MACHINE
-    migration.COMMON_LOCAL.mkdir(parents=True, exist_ok=True)
-    MACHINE = MachineLock(migration.COMMON_LOCAL / "simulation.lock")
     out.mkdir(parents=True)
+    global GAME_LOCK
+    migration.COMMON_LOCAL.mkdir(parents=True, exist_ok=True)
+    GAME_LOCK = migration.COMMON_LOCAL / "simulation-game.lock"
     if args.prepare_water_save:
         from .ships import prepare_water_save
 
@@ -853,7 +933,7 @@ def main():
             )
         sources["candidate"] = candidate
         binaries["candidate"] = copy_runtime(
-            candidate.parent, candidate, builds["candidate"]
+            candidate.parent, candidate, builds["candidate"], candidate=True
         )
     binary_evidence = {
         role: {
@@ -863,6 +943,11 @@ def main():
         }
         for role, path in binaries.items()
     }
+
+    if not args.self and (builds["candidate"] / IDENTITY_NAME).is_file():
+        identity = json.loads((builds["candidate"] / IDENTITY_NAME).read_text())
+        if identity["binary_sha256"] == binary_evidence["candidate"]["sha256"]:
+            binary_evidence["candidate"]["build_identity"] = identity
 
     # Freeze the two scenario AIs before workers launch; both roles install the
     # same immutable script bytes while command parameters remain per-run.
@@ -896,7 +981,15 @@ def main():
         env = migration.environment()
         futures = {
             pool.submit(
-                run_scenario, s, binaries, builds, out, args.limit, args.timeout, env
+                run_scenario,
+                s,
+                binaries,
+                builds,
+                out,
+                args.limit,
+                args.timeout,
+                env,
+                args.benchmark or 0,
             ): s
             for s in scenarios
         }
@@ -909,9 +1002,11 @@ def main():
                 if result["known_failures"]
                 else ""
             )
+            ratio = result["plain_speed"]["median_candidate_reference_ratio"]
+            speed = f", plain {ratio:.3f}x" if ratio is not None else ""
             print(
                 f"{status} {result['scenario']}: {result['snapshots']} snapshots, "
-                f"{result['stats']['chunks']} chunks, {result['stats']['elements']} elements{known}",
+                f"{result['stats']['chunks']} chunks, {result['stats']['elements']} elements{known}{speed}",
                 flush=True,
             )
             for problem in result["problems"]:
@@ -924,8 +1019,12 @@ def main():
                 )
     results.sort(key=lambda r: r["scenario"])
     report = {
+        "schema_version": 1,
         "mode": "reference-vs-reference" if args.self else "reference-vs-candidate",
+        "execution": "Linux child RLIMIT_NPROC=0; original synchronous thread-failure fallback",
         "started_at": stamp,
+        "benchmark_repetitions": args.benchmark or 0,
+        "jobs": args.jobs,
         "candidate_commit": candidate_commit,
         "candidate_status": candidate_status,
         "binaries": binary_evidence,
@@ -943,8 +1042,9 @@ def main():
         "passed": all(r["passed"] for r in results),
     }
     (out / "report.json").write_text(json.dumps(report, indent=2) + "\n")
-    for build in set(builds.values()):
-        shutil.rmtree(build, ignore_errors=True)
+    if not args.benchmark:
+        for build in set(builds.values()):
+            shutil.rmtree(build, ignore_errors=True)
     passed = sum(r["passed"] for r in results)
     print(
         f"Simulation: {passed}/{len(results)} scenarios equal, "

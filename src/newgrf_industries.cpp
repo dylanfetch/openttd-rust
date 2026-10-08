@@ -604,6 +604,36 @@ uint32_t GetIndustryProbabilityCallback(IndustryType type, IndustryAvailabilityC
  */
 void IndustryProductionCallback(Industry *ind, int reason)
 {
+#ifdef WITH_RUST
+	const IndustrySpec *spec = GetIndustrySpec(ind->type);
+	IndustriesResolverObject object(ind->location.tile, ind, ind->type);
+	/* Resolution is bounded and does not run scripts/commands. Rust owns random,
+	 * repeat limit, version policy and all slot mutations; this leaf only resolves
+	 * and copies register values while the native resolver context is live. */
+	openttd_rust_industry_production_callback(ind, &object, spec->behaviour.base(), reason,
+		[](void *context, uint32_t random, uint32_t parameter, OpenTTDIndustryProductionResult *out) noexcept {
+			auto &object = *static_cast<IndustriesResolverObject *>(context);
+			object.callback_param1 = random;
+			object.callback_param2 = parameter;
+			const auto *group = object.Resolve<IndustryProductionSpriteGroup>();
+			out->present = group != nullptr;
+			if (group == nullptr) return;
+			out->version = group->version;
+			if (group->version == 0xFF) return;
+			out->num_input = group->num_input;
+			out->num_output = group->num_output;
+			auto deref = [&](int field) { return group->version >= 1 ? object.GetRegister(field) : field; };
+			for (size_t n = 0; n < group->num_input; n++) {
+				out->subtract[n] = deref(group->subtract_input[n]);
+				if (group->version >= 2) out->cargo_input[n] = group->cargo_input[n];
+			}
+			for (size_t n = 0; n < group->num_output; n++) {
+				out->add[n] = deref(group->add_output[n]);
+				if (group->version >= 2) out->cargo_output[n] = group->cargo_output[n];
+			}
+			out->again = deref(group->again);
+		}, &GetIndustryRustServices());
+#else
 	const IndustrySpec *spec = GetIndustrySpec(ind->type);
 	IndustriesResolverObject object(ind->location.tile, ind, ind->type);
 	if (spec->behaviour.Test(IndustryBehaviour::ProdCallbackRandom)) object.callback_param1 = Random();
@@ -675,6 +705,7 @@ void IndustryProductionCallback(Industry *ind, int reason)
 	}
 
 	SetWindowDirty(WC_INDUSTRY_VIEW, ind->index);
+#endif
 }
 
 /**

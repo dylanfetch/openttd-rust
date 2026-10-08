@@ -4,50 +4,67 @@ Root owns this file and updates it when a phase completes or priorities change.
 `AGENTS.md` and `docs/rust-migration.md` define the rules; this file decides what
 to work on next. If an issue conflicts with this roadmap, follow the roadmap;
 a subagent stops and reports the conflict in its hand-off to root. Keep this
-file forward-looking: completed work is one table row, and its evidence stays in
-the PR (`AGENTS.md`, "Evidence budget").
+file forward-looking and under about 200 lines: completed work is one table
+row, and its evidence stays in the PR (`AGENTS.md`, "Evidence budget").
 
-## Where the fork stands (2026-10-04, integration `320711cccd`)
+## Where the fork stands (2026-10-07, `be87a84a78`)
 
-- Seven ownership ports retired 8,698 original C++ lines, about 2.3% of roughly
-  384k non-vendored `src/` lines. Town names account for 3,848, mostly data;
-  the other six account for 4,850 lines of game components.
-- The last two integrations were disaster scheduling/control (968 retired) and
-  the authorized aircraft fixture (347 tooling, no game retirement). Eight
-  integrations since steering include two new owners; evidence and moved code
-  do not count as simulation retirement.
-- Landed overruns: effects originally added 965 glue/tooling for 548 retired;
-  water adds 883 for 407, including the reusable ship corpus and visitor probes;
-  disasters adds 1,101 for 968. Pending cargo adds 960 for 315. Each PR names its
-  concrete evidence cost; do not expand generic tooling to improve a metric.
-- The accepted cargo/ship/town/road batch retires 5,351 lines against 4,463
-  glue/tooling, including 1,475 road movement table lines. These remain pending
-  until the combined PR passes CI. Ship, town and road each retire more than
-  their glue/tooling; cargo is an explicit overrun. Larger owners are now ready
-  for integration, while station, industry and vehicle controllers are active.
-- Reuse current fixtures and component scenario modules. Preserve one authority
-  for each owned component; shared packet/map/pool storage remains deliberate.
-  Utility work and already accepted evidence are not substitutes for these loops.
+- Sixteen ownership ports retire 20,947 original C++ lines, about 5.5% of roughly
+  384k non-vendored `src/` lines (15,624 excluding town-name and road-movement
+  data). No game logic moved since the third review. Main CI is green.
+- The play saves run **2.54x** slower than the original (play-opus-55-167-002
+  2.54x, play-grok-159-001 2.55x, padhattan 2.17x, generate-tgp-256-1 1.41x).
+  Road is 87% of the gap, and most of it is boundary overhead, not game logic
+  (#155, #168).
+- CI is on demand (#171). An ordinary PR push costs about 2 job-minutes instead
+  of 80. A full run costs about 104 job-minutes and 30 minutes wall time, once per
+  final head.
+- Six component branches are unintegrated (#157 cap): #145, #149, #151, #152,
+  #153, #147. All six conflict with the base (pre-existing conflicts, none from
+  #171). Merging the base brings in #171's workflows.
 
-## Steering review (2026-10-04)
+## Fourth steering review (2026-10-07)
 
-A user-directed review (Claude Code, `claude-opus-5-5`) found the direction right
-and made these changes, now reflected in `AGENTS.md` and the phases below:
+A user-directed review (Claude Code, `claude-opus-5-5`) audited #170/#171, which
+a user-directed `gpt-6.1-sol` root session selected and integrated. Independent
+audits covered the CI workflows and local tools. There were no port audits and
+no profile, because no game code or branch head changed since the third review.
 
-1. **Call shared services directly.** Trees, effects and the #103 WIP return to
-   C++ before every `Random()` draw (task state machines or async/await), solely
-   because `RANDOM_DEBUG` log I/O could throw. The user ruled environmental
-   failures out of fidelity scope. Ports call `noexcept` service wrappers and
-   mirror the original control flow (#107). This must land before vehicles,
-   pathfinding and economy, where the state-machine style would not scale.
-2. **Decide map access before tile-heavy ports** (#108), from measurements.
-3. **Keep tooling proportionate.** `tools/simulate.py` grew to 2,247 lines, about
-   550 per recent port; split it into per-component modules (#109). Effects added
-   965 glue+tooling lines to retire 548.
-4. **Move to core game logic.** The self-contained leaf components are done.
-   After #103/#104, select economy, then vehicles; start #86's rail/aircraft
-   scenarios now, since they gate vehicle controllers.
-5. **Fresh agents per task and per PR review**, named for their task.
+The CI change is sound and stays. Its gate refuses partial, skipped, cancelled
+and stale runs, and the harness and benchmark timing are unchanged. But #171 is
+the fork's largest tooling addition (0 / 3267 / 0 / 0), and #173 now tracks its
+gaps: full validation tests the head, not the merge; a docs-only push can cancel
+a merged PR's post-merge run; dispatched `full` has never run live; preflight
+fails every full build (the original alone gives 124 GCC 15 warnings); a killed
+driver orphans its builds; and archives hold 103 GB. Actions:
+
+1. **Resume Phase 2 at item 1 (#145).** The CI maintenance is finished. More
+   process tooling is not a fallback; only #173 is selected.
+2. **#173 runs alongside, with one agent and net non-positive lines** in `tools/`
+   and `.github/`. Until its merge-ref fix lands, merge the base into a branch
+   immediately before requesting that branch's final full run.
+3. **The first dispatched `full` run is a live test.** If it fails for a workflow
+   reason, fix that under #173 before other integrations. A workflow-changing PR
+   may unset `CI_ON_DEMAND` to use the `ci:full` label path. Restore it to `true`
+   after merge and record both changes in the PR. Never use `--admin`.
+4. **Until #173 lands**, use preflight for the commit checker only, without
+   cleaning up the pre-existing warnings. After a killed or timed-out driver,
+   stop leftover cmake, cargo or openttd processes in that worktree before
+   rebuilding.
+
+## Earlier steering, still in force
+
+First review (10-04): call shared services directly (#107); measure before map
+decisions (#108); keep tooling proportionate (#109); prioritize core simulation.
+Second (10-04): harness end moments (#154, done); speed report (#155); coverage
+gaps (#156); WIP cap of six branches (#157). Third (10-07):
+- per-call task/future/`Rc` boundaries, opcode dispatch and whole-record reads
+  are the speed problem; convert to direct typed calls (#168);
+- the road conversion narrows RoadObserve (#155);
+- the speed budget is a ratchet;
+- the benchmark needs a non-road save (#156);
+- reviews use `gpt-6.1-sol` high, with a fresh reviewer each round that fixes its
+  own findings; close finished agents.
 
 ## Completed ownership ports
 
@@ -62,167 +79,109 @@ Metrics are `tools/port-metrics.py`: Rust / tooling / C++ glue / C++ retired.
 | #101 | Effect vehicles | #105 | `f6a0d66b63` | 494 / 553 / 412 / 548 |
 | #104 | Water-region cache and graph service | #114 | `9732d8bfa2` | 459 / 610 / 273 / 407 |
 | #103 | Disaster scheduling, vehicles and event control | #118 | `d5edfcb4c5` | 1404 / 795 / 306 / 968 |
+| #117 | Cargo payment and delivery | #123 via #134 | `adbe063372` | 396 / 618 / 370 / 315 |
+| #119 | Ship YAPF and canonical path cache | #126 via #134 | `adbe063372` | 881 / 54 / 506 / 646 |
+| #120 | Town growth and private state | #127 via #134 | `adbe063372` | 1430 / 668 / 625 / 1548 |
+| #121 | Road controller/private state (includes 1475 movement-data lines) | #128 via #134 | `adbe063372` | 3159 / 471 / 1188 / 2842 |
+| #122 | Rail YAPF search, cache and reservation | #133 via #141 | `ea80a746a3` | 1704 / 144 / 595 / 1517 |
+| #124 | Road YAPF search and path construction | #135 via #141 | `ea80a746a3` | 663 / 55 / 329 / 532 |
+| #125 | Station cargo-service control and state | #142 | `ba920555ca` | 1516 / 241 / 1022 / 1332 |
+| #130 | Rail controller, reservation and private state | #143 via #166 | `dace87c9b1` | 4087 / 613 / 1660 / 2585 |
+| #129 | Industry production, histories and builder state | #144 via #166 | `dace87c9b1` | 1508 / 474 / 678 / 932 |
 
 Harness and process: #72 harness (#85), #84 play saves (#87), #97 provenance
 freeze (#100), #88 Ruff (#92), #75 partial-pixel fidelity (#91), #90 world-state
 design (`docs/design/world-state.md`).
 
-| Issue | Completed maintenance | PR | Commit | Metrics (Rust / tooling / glue / retired) |
-| --- | --- | --- | --- | --- |
-| #109 | Component scenario modules | #112 | `9e1e5d175d` | 0 / 2414 / 0 / 0; moved code, net +190 lines |
-| #107 (trees) | Direct shared services | #113 | `c00402350b` | 640 / 22 / 149 / 22; old glue retired, no new game logic |
-| #107 (effects) | Direct shared services | #115 | `e702c4724e` | 241 / 4 / 155 / 86; old glue retired, net +65 lines |
-| #86 (rail/ship slice) | Owner-provided transport save | #110 | `350aec9e30` | 0 / 141 / 0 / 0 |
-| #108 | Map measurements and direct-service decision | #116 | `15bef07bde` | 0 / 65 / 81 / 0 |
-| #86 (aircraft slice) | Authorized reference-built aircraft fixture | #132 | `320711cccd` | 0 / 347 / 0 / 0 |
+Maintenance (issue, PR, tooling lines): #109 scenario modules #112 (2414, moved
+code); #107 direct services #113, #115; #86 transport save #110 (141) and
+aircraft fixture #132 (347); #108 map decision #116; #154 harness endpoints #160
+(277); #158 MinGW nightly #159; #155 speed report #163 (212); #156 road witnesses
+#161, #162, #164, #167 (581); #170 on-demand CI and validation tools #171 (3267,
+no game logic). CI-capacity batches #134, #141 and #166 integrated owners above.
 
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
-## Phase 1: harness maintenance
+## Phase 1: harness and speed maintenance
 
 The harness is `python3 tools/migration.py simulate` (`docs/rust-migration.md`,
 "Simulation comparison"); its default set runs in CI. Harness regressions are
 always the first priority. Port differences go in `KNOWN_FAILURES` with an issue,
 never in masks.
 
-The #86 rail/aircraft fixture gate is complete. Controller ports still require
-component-specific branch witnesses; extend the existing scenario modules and
-reuse the supplied rail/ship save and authorized aircraft setup AI.
+1. **Speed ratchet (#155).** Commit a per-scenario budget of best-known
+   candidate/reference ratios, with today's figures above as the starting values.
+   Benchmark both road play saves, padhattan and generate-tgp-256-1 with
+   `simulate <name> --benchmark 3 --jobs 2` on an idle host. A PR may not exceed
+   the budget by more than 3% without a stated reason accepted by root, and
+   improvements lower the budget. Targets: <=1.9x on the road play saves after
+   road conversion; <=1.5x on play saves and <=1.15x on generation when #168 closes.
+2. **#156 coverage, standing capacity.** Random and crash branches first. A mixed
+   save with trains (PBS junctions, crossings), ships, aircraft and subsidies
+   closes many gaps and gives the speed budget a non-road benchmark. Ask the user
+   for one through the play-save pipeline before building more per-branch fixtures.
+3. **Validation gaps (#173).** Bounded fixes to #171 only; see the fourth steering
+   review. Avoid merges whose only purpose is dependency ancestry.
 
-## Phase 3: current ownership work, in order
+## Phase 2: current work, in order
 
-CI capacity requires one integration batch (#131) for accepted component PRs
-#123/#126/#127/#128. Keep their component reviews/evidence; require independent
-review of the combined resolutions and all required CI on the integration PR.
-The following batch #140 combines accepted searches #133/#135 using actual #134
-ancestry; #134 must integrate first, and #140 has its own review and required CI.
+Integration of reviewed work comes before new starts. Never hold more than six
+unintegrated component branches (#157). Independent items (#169, #156 slices)
+may run in parallel with this list.
 
-1. **#117 Cargo payment and delivery ownership.** Selected after a fresh Astra
-   high comparison with station ratings and industry production. Own CargoPayment
-   state and lifetime, delivery acceptance/payment control, destination collection
-   and the complete production-flush loop. Preserve Money saturation, native-width
-   intermediates and CAPY lifecycle. Loading/reservation and shared industry state
-   remain C++; this is not an income-formula extraction. Begin while earlier PRs
-   are in review/CI, using the existing road scenarios and #107/#109 interfaces.
-2. **#119 Complete ship YAPF and path cache ownership.** Own both search levels,
-   their queues/arenas/corridor/retries and canonical `Ship::path`, including all
-   controller and save adapters. Reuse #104's corpus; no separate comparison tool.
-   Use integrated #104 and its real dependency ancestry.
-3. **#120 Complete town-growth control and private state.** Own tick traversal,
-   growth road walking/build choices, house selection and placement control,
-   growth-rate/funding transitions and canonical counters/flags with CITY and
-   legacy adapters. Keep unrelated town accounting and shared world state in C++.
-   Add actual growth witnesses to the existing towns module.
-4. **#121 Complete road vehicle control and private state.** Own consist/tick
-   movement, blocking/overtaking/crash/servicing and day handling, canonical road
-   counters and path cache, plus save/legacy/external mutation adapters. Existing
-   road YAPF may return a temporary result for transfer to the empty Rust cache.
-5. **#122 Complete rail YAPF search, caches and reservation.** Own all four
-   searches, six specialization-specific global cache banks, rail-change
-   invalidation, reservation traversal and rollback. Reuse the rail corpus and
-   ship search machinery only where ordering matches; require branch witnesses.
-6. **#124 Complete road YAPF search and path construction.** Own both track and
-   depot searches, all node/queue/segment state and reconstruction. Replace
-   #121's temporary result bridge using its canonical path cache; do not claim
-   the cache twice. Reuse road scenarios and compatible search support.
-7. **#125 Complete station cargo-service control and state.** Own loading order,
-   service/cargo metadata, full loading/reservation/refit policy, acceptance,
-   ratings/distribution and periodic service loops. Preserve #117's payment and
-   production-flush owner and shared packet/flow/map storage. Reuse its fixtures.
-8. **#129 Complete industry periodic production and builder ownership.** Own
-   canonical cargo slots/histories, production and transport control, daily/monthly
-   closure, farm/lumber loops, NewGRF production repeat/apply policy and weighted
-   builder targets/retries/backoff. Reuse #117 and #125 boundaries and fixtures.
-9. **#130 Complete rail vehicle control and private state.** Own consist/tick
-   movement, reversal/crossings/crash, speed/service/day loops and controller
-   reservation extension/rollback, with canonical train-private state and adapters.
-   #122 search reservation does not cover controller rollback. Establish missing
-   collision/crossing/reversal witnesses as part of the port before integration.
-10. **#136 Complete aircraft control and airport movement ownership.** Own both
-    controller passes, FTA traversal, terminal/helipad/block allocation, private
-    aircraft state and canonical station airport masks, plus service/diversion/
-    crash and save adapters. Reuse #132; add actual contention, dedicated helipad,
-    closure/removal and crash witnesses. Coordinate #125's station lifetime.
-11. **#137 Complete company financial and economy lifecycle ownership.** Own
-    canonical finances/histories, bankruptcy/offer/acquisition/deletion control,
-    world ownership-transfer traversal, periodic economy/prices and financial
-    commands. Preserve real VM/deletion reentry and #129 ECMY fields. Require
-    multiple-company recovery/transfer/deletion evidence, not only profitable play.
-12. **#138 Complete orders, shared lists, backups and timetable ownership.** Own
-    canonical vectors/current orders/shared links/backups, editing/validation/
-    execution/destination resolution, timetable and depot-unbunching control.
-    Preserve controller reentry, save formats and #83 unmasked timing evidence.
-13. **#139 Complete cargo packet, list, flow and movement ownership.** Own packet
-    contents, ordered station/vehicle containers, actions/caches/flows and the
-    completed-link-job live-flow application. Preserve #117/#125/#74 policy
-    boundaries, stable identity/iteration and shared pool-shell allocation.
-14. **#146 Complete ship control and private-state ownership.** Own movement,
-    locks, rotation/reversal, day/service/build policy and nearest-depot regional
-    BFS with canonical state/rotation coordinates. Preserve #119's path owner;
-    adapt every save/external writer and reuse the water corpus for real witnesses.
-15. **#147 Complete fleet grouping and replacement lifecycle ownership.** Own
-    group hierarchy/membership/statistics, ordered renewal rules, complete
-    replacement transactions/rollback and the ordered tick-end replacement drain.
-    Preserve #137 finances, #138 orders and #139 cargo at original mutation points.
-16. **Following selections:** remaining simulation components and commands that
-    change them, guided by canonical state and complete control-loop ownership.
+1. **Integrate #145 aircraft.** Resolve the `abi.rs` conflict (the reviewer checks
+   it), restore the `PerformanceAccumulator` order, re-measure metrics and
+   ratio, then pass CI.
+2. **Integrate #149 company.** Fix client ID 0 and the u16 shift, get re-review,
+   update the base (conflict only in `tools/`), then pass CI.
+3. **#155 road conversion.** Remove the Task/Future/Rc protocol for all 22
+   services and 14 entries, and narrow RoadObserve: field getters or a hot
+   record, no `IsBus` in the view, type-filter in `close`, single-pass `nearby`,
+   owner resolved once per entry, and nested `GetCurrentMaxSpeed`. Add the ratchet.
+   The expected result is about 1.7-1.9x.
+4. **Integrate #151 cargo storage** (already direct) on the fresh baseline.
+5. **#168 train and train-reservation conversion**, including the O(n^2) consist
+   walk and the per-step `nearby` Vec; then aircraft and company; then trees,
+   town and disaster. One PR per component.
+6. **Finish #153 orders, then #152 ship, in the direct form before review.** Ship
+   names orders as an ancestry dependency. Then #147 fleet replacement.
+7. **New components** (#148 town lifecycle, then #150 industry construction)
+   start only once the road play saves are at or below 2.0x and #168's train
+   slice is integrated. When fewer than two unstarted selections remain, a fresh
+   Astra high planner replenishes whole simulation owners, which are planned in
+   the direct form.
 
 The accepted #108 decision keeps canonical map arrays in C++ with direct bundled
-`noexcept` services. Counts establish crossing density, not a bottleneck; no raw
-view or allocation transfer is selected. Storage transfers still require explicit
-selection following `docs/design/world-state.md`.
+`noexcept` services. The 2026-10-07 profile attributes the overhead to entry and
+record-copy costs, not map access; revisit #108 only if a post-#168 profile shows
+map or pool crossings dominating.
 
-## Resume checkpoint (2026-10-04)
+## Resume checkpoint
 
-Root: `/root` (gpt-6-astra, ultra). Integration base `320711cccd`; eight
-integrations since steering. Stocktake covers the eighth; update after two more
-integrations. All rows below are active, not integrated completion.
-Worktrees are siblings of the main checkout unless a path says otherwise.
+Every branch below must merge the base before its next push; the primary
+checkout's `tools/ci.py` can request CI for any fork PR.
 
-| Issue / owner | Branch and checkpoint commit | Worktree | Next step |
-| --- | --- | --- | --- |
-| #131 `/root` (Astra ultra) | `integrate-reviewed-owners` at `8d34af0093`, PR #134 | `openttd-rust-owner-batch` | Prior aba408d3e8 passes 12/13 required checks; compare fails only stockpile fixture window. Includes already-reviewed f224 input fix through actual cargo ancestry. Focused self/pair and final CI next; previous combined source review remains accepted. |
-| #117 `/root/cargo_payment_delivery` (Sol high), root owns final fix | `cargo-payment-delivery-117` at `f903cb11c7`, PR #123 | `openttd-rust-cargo-payment` | Production 2abf956bdf accepted; stockpile input-only fix copied from reviewed station branch after CI reproduction. Same-PR delta review next; included in #131. ABI 49-51. |
-| #119 `/root/ship_yapf_ownership` (Sol high) | `ship-yapf-ownership-119` at `46aa3efa59`, PR #126 | `openttd-rust-ship-yapf` | Final diagnostic and explicit test-initializer fixes accepted by same reviewer. Exact verify97/118 and diagnostic water6/6 pass; actual head included in both batches. ABI 52-56. |
-| #120 `/root/town_growth_ownership` (Sol high) | `town-growth-ownership-120` at `9fbeaa00d1`, PR #127 | `openttd-rust-town-growth` | Final source/evidence independently accepted; verify and soak10/10 pass. Actual accepted ancestry included in #131. ABI 60/61. |
-| #121 `/root/road_vehicle_ownership` (Sol high) | `road-vehicle-ownership-121` at `682a8151f3`, PR #128 | `openttd-rust-road-vehicles` | Final owner, current-depot shortcut and Windows test conversion accepted. Verify, pair10/10 and soak10/10 pass. Included in #131. ABI 80-83. |
-| #122 `/root/rail_yapf_ownership` (Sol high) | `rail-yapf-ownership-122` at `ef1b981101`, PR #133 | `openttd-rust-rail-yapf` | Verify97/120, six-year soak6/6, independent review and all 13 standalone CI checks pass. Included in #141; combined CI gates integration after #134. ABI 90-95/97. |
-| #124 `/root/road_yapf_ownership` (Sol high), root owns final fix | `road-yapf-ownership-124` at `453f249c5f`, PR #135 | `openttd-rust-road-yapf` | Production ab09ce9306 accepted with pair/self9/9 and soak12/12. Two explicit uint8 test conversions fix Windows annotations reproduced in #141. Same-PR delta review and final combined verify/CI next. ABI 100-109. |
-| #125 `/root/station_service_ownership` (Sol high), root coordinates | `station-service-ownership-125` at `d277a54c10`, PR #142 | `openttd-rust-station-service` | Final source, actual #134/#141 joins and short-input fixes independently accepted. Combined verify97/136; final economy/stations self and pair11/11 pass. Required CI running. ABI 110-129. |
-| #129 `/root/industry_periodic_ownership` (Sol high), root coordinates | `industry-periodic-ownership-129` at `4ff6a1a1ab`, PR #144 | `openttd-rust-industry-periodic` | Final combined owner accepted; introducing-commit preprocessor tab corrected with same-reviewer acceptance. Exact verify passes; unchanged production pair17/17, self17/17, soak17/17 and 4480 native gap cases pass. Required CI running. Component metrics1508/474/676/924 explicitly exceed retirement in glue/tooling. ABI 130-149. |
-| #130 `/root/rail_vehicle_ownership` (Sol high), root coordinates | `rail-vehicle-ownership-130` at `b94694ec9d`, PR #143 | `openttd-rust-rail-vehicles` | Full owner and actual #141 conflict resolutions independently accepted. Exact combined verify97/133 and pair24/24 pass; prior soak and actual collision/crossing/rollback witnesses pass, plus unchanged curve/reversal gap. Required CI running. ABI 150-179. |
-| #136 `/root/aircraft_controller_ownership` (Sol high), root coordinates | `aircraft-controller-ownership-136` at `46220952a0`, PR #145 | `openttd-rust-aircraft-controller` | Same reviewer accepts OWNER_NONE=16 and explicit C++ typed-lifetime fixes. Exact verify and final pair9/9 pass, including reference-built oilrig descent; prior soak8/8 and finite-range native gap pass. Required CI running; join station lifetime carefully when base updates. ABI 180-209. |
-| #137 `/root/company_economy_ownership` (Sol high) | `company-economy-ownership-137` at `c81fe77472`, uncommitted full owner | `openttd-rust-company-economy` | Whole state/loops/commands build; native financial gap passes17640. `/root/company_lifecycle_scenarios` (Sol high) committed twelve real company cases; self12/12 passes, candidate pairs underway. Merge actual accepted #129 for ECMY layout, finish verify and draft PR. ABI 210-239. |
-| #138 `/root/order_lifecycle_ownership` (Sol high) | `order-lifecycle-ownership-138` at `5ac057aa16`, uncommitted owner | `openttd-rust-order-lifecycle` | Actual #141 dependency included. Canonical vectors/current/shared/backups and full list operations implemented; complete commands/controllers/timetable next. Preserve typed lifetimes and separate unmasked #83 evidence. ABI 240-279. |
-| #139 `/root/cargo_storage_movement_ownership` (Sol high) | `cargo-storage-movement-139` at `22228dd59c`, uncommitted owner | `openttd-rust-cargo-storage` | Actual accepted station dependency included. Implement canonical packets/lists/actions/flows and job application; fresh helper owns flow slice. Coordinate orders/company and widen shared ABI type-id registry consistently to u16 for IDs280-319. |
-| #140 `/root` (Astra ultra) | `integrate-reviewed-pathfinding`, updated from `5457068fc3`, PR #141 | `openttd-rust-pathfinding-batch` | Prior head passes compare and every platform build; annotations fail two road uint8/bool tests. Actual fixes from #134/#135 merged cleanly; final verify running, component delta review then required CI. Integrate after #134. |
-| #146 fresh `/root/ship_controller_ownership` (Sol high) | Not started | To create `openttd-rust-ship-controller` | Selected after cargo; complete private owner/controller/depot BFS, actual #119/#125/#138 dependencies. |
-| #147 fresh `/root/fleet_replacement_ownership` (Sol high) | Not started | To create `openttd-rust-fleet-replacement` | Selected after ship; complete groups/rules/transactions/drain with actual company/order/cargo/controller dependencies. |
+| Issue / PR | Branch (worktree suffix), head | State and next step |
+| --- | --- | --- |
+| #136 / #145 | `aircraft-controller-ownership-136` (`aircraft-controller`), `dd0f2f0475` | Source accepted; base conflict in `abi.rs`; Phase 2 item 1. |
+| #137 / #149 | `company-economy-ownership-137` (`company-economy`), `5b9a005064` | Source accepted; two audit fixes need re-review; item 2. |
+| #139 / #151 | `cargo-storage-movement-139` (`cargo-storage`), `ff912bcfcb` | Accepted at `a25a7d41e2`; final base and CI after item 3. |
+| #138 / #153 | `order-lifecycle-ownership-138` (`order-lifecycle`), `ef58c967f7` | Draft checkpoint; evidence plan and #168 conversion in PR comments. |
+| #146 / #152 | `ship-controller-ownership-146` (`ship-controller`), `7ec70a1768` | Draft; join #154 launcher, convert per #168, follow #153. |
+| #147 | `fleet-replacement-ownership-147` (`fleet-replacement`), `68d660adc9` | State-only WIP, no PR. |
 
-Preserved evidence branches: `evidence-disaster-vehicles` at `a775543162`
-(`openttd-rust-disasters-evidence`) and `evidence-water-regions` at `c752070cde`
-(`openttd-rust-water-evidence`). Their useful source inputs are incorporated;
-do not reapply borrowed effect helper `73ccd511fb`. Build/test with `--jobs 2`;
-required CI supplies default/all-comparison checks where local component evidence
-already covers the change. Keep long-running checks in an active agent session:
-ending and recycling a task thread has killed unfinished background processes.
-Next free review slots: same-PR cargo input and road-search test-width deltas;
-then fresh company review when its final evidence is ready. Source fixes from
-shared dependencies must reach later branches before their integration.
-
-Fresh Astra high planning selected the current queue. Latest planner
-`/root/plan_after_orders_and_cargo` supplied #146 then #147; root accepted both.
-Company, orders and cargo are active; ship controller and fleet replacement are
-unstarted. Replenish when fewer than two are ahead of active work. Preserve
-complete owners, native-width behavior and explicit reentry boundaries;
-CI/review runs concurrently with later implementation.
+Standing #156 work: aircraft landing RNG after #145 (plan in #156), then the
+2026-10-07 audit list there. Preserve the pinned reference, paused curve
+worktrees and evidence branches `evidence-disaster-vehicles` (`a775543162`) and
+`evidence-water-regions` (`c752070cde`); do not reapply effect helper `73ccd511fb`.
+Build and test with `--jobs 2`; standalone fixture games share the benchmark lock.
 
 ## Choosing the next task
 
-Take the first unblocked item above. Work in CI or review is not blocking: start
-the next item while it runs. Keep spare capacity on scenarios (#86) and
-independent review. Paused, deferred and out-of-scope issues are not fallbacks.
-Root selects further ownership work here before implementation starts.
+Take the first unblocked item above. Fill idle capacity in this order: review and
+integration of finished work, Phase 1 items, then Phase 2 in order. Paused,
+deferred and out-of-scope issues are not fallbacks. Root selects further
+ownership work here before implementation starts.
 
 ## Out of scope for the near term
 

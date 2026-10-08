@@ -93,7 +93,7 @@ void CheckCaches()
 			switch (u->type) {
 				case VEH_TRAIN:
 					gro_cache.emplace_back(Train::From(u)->gcache);
-					tra_cache.emplace_back(Train::From(u)->tcache);
+					tra_cache.emplace_back(Train::From(u)->CopyTrainCache());
 					break;
 				case VEH_ROAD:
 					gro_cache.emplace_back(RoadVehicle::From(u)->gcache);
@@ -125,7 +125,7 @@ void CheckCaches()
 					if (gro_cache[length] != Train::From(u)->gcache) {
 						Debug(desync, 2, "warning: train ground vehicle cache mismatch: vehicle {}, company {}, unit number {}, wagon {}", v->index, v->owner, v->unitnumber, length);
 					}
-					if (tra_cache[length] != Train::From(u)->tcache) {
+					if (tra_cache[length] != Train::From(u)->CopyTrainCache()) {
 						Debug(desync, 2, "warning: train cache mismatch: vehicle {}, company {}, unit number {}, wagon {}", v->index, v->owner, v->unitnumber, length);
 					}
 					break;

@@ -1,0 +1,191 @@
+name: Requested validation
+run-name: CI ${{ inputs.profile || 'full' }} PR ${{ inputs.pr || github.event.pull_request.number }} ${{ inputs.request || format('bootstrap-{0}', github.run_id) }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Pull request number
+        required: true
+        type: string
+      head:
+        description: Captured immutable pull request head SHA
+        required: true
+        type: string
+      profile:
+        description: Validation scope (only full can satisfy the merge gate)
+        required: true
+        type: choice
+        options: [rust, native, platform, full]
+      request:
+        description: Unique request identifier from tools/ci.py
+        required: true
+        type: string
+  # One-time bootstrap: root reviews this workflow before applying the label.
+  # Disabled permanently once CI_ON_DEMAND is enabled.
+  pull_request:
+    branches: [rust-migration]
+    types: [labeled]
+
+permissions:
+  contents: read
+  actions: read
+  checks: read
+  pull-requests: read
+
+concurrency:
+  group: requested-ci-${{ inputs.pr || github.event.pull_request.number }}-${{ inputs.profile || 'full' }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/rust-migration') ||
+      (github.event_name == 'pull_request' && vars.CI_ON_DEMAND != 'true' &&
+       github.event.label.name == 'ci:full' &&
+       github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    # Serialize status reads/writes with earlier publishers for this PR. Native
+    # and platform jobs remain independent across requested profiles.
+    concurrency:
+      group: validation-status-${{ inputs.pr || github.event.pull_request.number }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
+    outputs:
+      head: ${{ steps.plan.outputs.head }}
+      base: ${{ steps.plan.outputs.base }}
+      profile: ${{ steps.plan.outputs.profile }}
+      pr: ${{ steps.plan.outputs.pr }}
+    steps:
+    # No checkout: this publisher executes only the reviewed workflow definition.
+    - id: plan
+      uses: actions/github-script@v7
+      env:
+        PR: ${{ inputs.pr || github.event.pull_request.number }}
+        HEAD: ${{ inputs.head || github.event.pull_request.head.sha }}
+        PROFILE: ${{ inputs.profile || 'full' }}
+      with:
+        script: |
+          const pr = Number(process.env.PR);
+          const profile = process.env.PROFILE;
+          const head = process.env.HEAD;
+          if (!Number.isSafeInteger(pr) || pr <= 0 || !/^[0-9a-f]{40}$/.test(head) ||
+              !['rust', 'native', 'platform', 'full'].includes(profile)) {
+            throw new Error('Invalid validation request');
+          }
+          const actor = await github.rest.repos.getCollaboratorPermissionLevel({
+            ...context.repo, username: context.actor
+          });
+          if (!['admin', 'maintain', 'write'].includes(actor.data.permission)) {
+            throw new Error('Validation requests require repository write permission');
+          }
+          const {data: pull} = await github.rest.pulls.get({...context.repo, pull_number: pr});
+          if (pull.state !== 'open' || pull.base.ref !== 'rust-migration' || pull.head.sha !== head) {
+            throw new Error('Pull request is closed, targets another branch, or its head changed');
+          }
+          for (const [key, value] of Object.entries({head, base: pull.base.sha, profile, pr})) {
+            core.setOutput(key, String(value));
+          }
+          if (profile === 'full') {
+            await github.rest.repos.createCommitStatus({
+              ...context.repo, sha: head, context: 'Full validation', state: 'pending',
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              description: `Full validation requested for PR #${pr}`
+            });
+          }
+
+  quick:
+    needs: plan
+    uses: ./.github/workflows/ci-quick.yml
+    with:
+      checkout-ref: ${{ needs.plan.outputs.head }}
+      base-ref: ${{ needs.plan.outputs.base }}
+
+  rust:
+    needs: plan
+    if: needs.plan.outputs.profile == 'rust'
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        ref: ${{ needs.plan.outputs.head }}
+        persist-credentials: false
+    - name: Install pinned Rust compiler
+      run: |
+        channel=$(python3 -c 'import tomllib; print(tomllib.load(open("rust-toolchain.toml", "rb"))["toolchain"]["channel"])')
+        rustup toolchain install "$channel" --profile minimal --component rustfmt,clippy
+    - name: Rust workspace checks
+      run: |
+        cargo fmt --all -- --check
+        cargo check --workspace --all-targets --locked
+        cargo clippy --workspace --all-targets --locked -- -D warnings
+        cargo test --workspace --locked
+
+  native:
+    needs: plan
+    if: needs.plan.outputs.profile == 'native' || needs.plan.outputs.profile == 'full'
+    uses: ./.github/workflows/rust-migration.yml
+    with:
+      checkout-ref: ${{ needs.plan.outputs.head }}
+
+  platform:
+    needs: plan
+    if: needs.plan.outputs.profile != 'rust'
+    uses: ./.github/workflows/ci-build.yml
+    with:
+      checkout-ref: ${{ needs.plan.outputs.head }}
+      profile: ${{ needs.plan.outputs.profile }}
+
+  annotations:
+    name: Requested Check Annotations
+    needs: [plan, quick, rust, native, platform]
+    if: always() && needs.plan.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: OpenTTD/actions/annotation-check@v6
+
+  publish:
+    name: Publish validation result
+    needs: [plan, quick, native, platform, annotations]
+    if: always() && needs.plan.result == 'success' && needs.plan.outputs.profile == 'full'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: validation-status-${{ inputs.pr || github.event.pull_request.number }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
+    steps:
+    # No candidate checkout, artifacts, or candidate-controlled executable input.
+    - uses: actions/github-script@v7
+      env:
+        RESULTS: ${{ toJSON(needs) }}
+      with:
+        script: |
+          const needs = JSON.parse(process.env.RESULTS);
+          const head = needs.plan.outputs.head;
+          const pr = Number(needs.plan.outputs.pr);
+          const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+          const {data: combined} = await github.rest.repos.getCombinedStatusForRef({...context.repo, ref: head});
+          const latest = combined.statuses.find(status => status.context === 'Full validation');
+          if (latest?.target_url !== runUrl) {
+            core.setFailed('This full request was superseded; preserve the newer request status');
+            return;
+          }
+          const {data: pull} = await github.rest.pulls.get({...context.repo, pull_number: pr});
+          const current = pull.state === 'open' && pull.base.ref === 'rust-migration' && pull.head.sha === head;
+          const complete = ['plan', 'quick', 'native', 'platform', 'annotations'].every(
+            name => needs[name]?.result === 'success') &&
+            needs.native?.outputs?.validated === 'true' && needs.platform?.outputs?.validated === 'true';
+          const passed = current && complete;
+          await github.rest.repos.createCommitStatus({
+            ...context.repo, sha: head, context: 'Full validation', state: passed ? 'success' : 'failure',
+            target_url: runUrl,
+            description: passed ? 'All required validation passed for this PR head' :
+              current ? 'Required validation failed, skipped, or was cancelled' : 'PR head changed; request validation again'
+          });
+          if (!passed) core.setFailed('Full validation did not pass for the current PR head');

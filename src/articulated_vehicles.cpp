@@ -362,8 +362,8 @@ void AddArticulatedParts(Vehicle *first)
 				v = t;
 
 				t->subtype = 0;
-				t->track = front->track;
-				t->railtypes = front->railtypes;
+				t->SetTrack(front->GetTrack());
+				t->SetRailTypes(front->GetRailTypes());
 
 				t->spritenum = e_artic->VehInfo<RailVehicleInfo>().image_index;
 				if (e_artic->CanCarryCargo()) {
@@ -432,7 +432,7 @@ void AddArticulatedParts(Vehicle *first)
 
 		if (v->type == VEH_TRAIN) {
 			auto prob = TestVehicleBuildProbability(v, v->engine_type, BuildProbabilityType::Reversed);
-			if (prob.has_value()) Train::From(v)->flags.Set(VehicleRailFlag::Flipped, prob.value());
+			if (prob.has_value()) Train::From(v)->SetTrainFlag(VehicleRailFlag::Flipped, prob.value());
 		}
 		v->UpdatePosition();
 	}

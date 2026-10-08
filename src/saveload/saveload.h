@@ -1378,7 +1378,7 @@ extern bool _do_autosave;
  * @tparam TElementType The type of the elements contained within the vector.
  * @tparam MAX_LENGTH maximum number of elements to load.
  */
-template <class TImpl, class TObject, class TElementType, size_t MAX_LENGTH = UINT32_MAX>
+template <class TImpl, class TObject, class TElementType, size_t MAX_LENGTH = UINT32_MAX, class TContainer = std::vector<TElementType>>
 class VectorSaveLoadHandler : public DefaultSaveLoadHandler<TImpl, TObject> {
 public:
 	/**
@@ -1386,7 +1386,7 @@ public:
 	 * @param object Object containing vector.
 	 * @returns Vector to load/save.
 	 */
-	virtual std::vector<TElementType> &GetVector(TObject *object) const = 0;
+	virtual TContainer &GetVector(TObject *object) const = 0;
 
 	/**
 	 * Get number of elements to load into vector.

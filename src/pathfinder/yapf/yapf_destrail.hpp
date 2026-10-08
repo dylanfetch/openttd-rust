@@ -22,8 +22,8 @@ protected:
 public:
 	void SetDestination(const Train *v, bool override_rail_type = false)
 	{
-		this->compatible_railtypes = v->compatible_railtypes;
-		if (override_rail_type) this->compatible_railtypes.Set(GetAllCompatibleRailTypes(v->railtypes));
+		this->compatible_railtypes = v->GetCompatibleRailTypes();
+		if (override_rail_type) this->compatible_railtypes.Set(GetAllCompatibleRailTypes(v->GetRailTypes()));
 	}
 
 	bool IsCompatibleRailType(RailType rt)
