@@ -123,13 +123,12 @@ def merged(root, head, integration):
     commit = git(
         root, "rev-parse", "--verify", "--end-of-options", f"{integration}^{{commit}}"
     )
-    result = subprocess.run(
-        ["git", "-C", str(root), "merge-base", "--is-ancestor", head, commit.strip()],
-        capture_output=True,
-        check=False,
-    )
-    if result.returncode:
-        raise ArchiveError(f"expected head is not merged into {integration}: {head}")
+    try:
+        git(root, "merge-base", "--is-ancestor", head, commit.strip())
+    except ArchiveError as error:
+        raise ArchiveError(
+            f"expected head is not merged into {integration}: {head}"
+        ) from error
 
 
 def clean(worktree, head):
@@ -186,13 +185,7 @@ def context(repo, worktree, head, integration):
     return root, source, archive, records, integration
 
 
-def plan(repo, worktree, head, integration):
-    root, source, archive, records, integration = context(
-        repo, worktree, head, integration
-    )
-    if not any(record["path"] == str(source) for record in records):
-        raise ArchiveError("source is not a registered worktree")
-    clean(source, head)
+def ignored(source):
     paths = git(
         source,
         "ls-files",
@@ -202,6 +195,29 @@ def plan(repo, worktree, head, integration):
         "--directory",
         "-z",
     ).split("\0")
+    if ".local/" in paths and not (source / ".local").is_symlink():
+        paths.remove(".local/")
+        paths.extend(
+            str(path.relative_to(source)) for path in (source / ".local").iterdir()
+        )
+    return [
+        name
+        for name in paths
+        if name
+        and Path(name).parts[:1] != ("build-rust",)
+        and Path(name).parts[:2]
+        not in ((".local", "build-tools-rust"), (".local", "build-reference"))
+    ]
+
+
+def plan(repo, worktree, head, integration):
+    root, source, archive, records, integration = context(
+        repo, worktree, head, integration
+    )
+    if not any(record["path"] == str(source) for record in records):
+        raise ArchiveError("source is not a registered worktree")
+    clean(source, head)
+    paths = ignored(source)
     storage = archive.parent
     while not storage.exists():
         storage = storage.parent
@@ -315,18 +331,9 @@ def apply(repo, worktree, head, integration, resume=False):
         if data["stage"] != "removed":
             if registered:
                 clean(source, head)
-                remaining = git(
-                    source,
-                    "ls-files",
-                    "--others",
-                    "--ignored",
-                    "--exclude-standard",
-                    "--directory",
-                    "-z",
-                )
-                if remaining:
+                if ignored(source):
                     raise ArchiveError("new ignored files remain; refusing removal")
-                git(root, "worktree", "remove", str(source))
+                git(root, "worktree", "remove", "--force", str(source))
             elif source.exists():
                 raise ArchiveError(
                     "unregistered source still exists; manual inspection required"

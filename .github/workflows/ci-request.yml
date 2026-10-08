@@ -122,10 +122,7 @@ jobs:
         rustup toolchain install "$channel" --profile minimal --component rustfmt,clippy
     - name: Rust workspace checks
       run: |
-        cargo fmt --all -- --check
-        cargo check --workspace --all-targets --locked
-        cargo clippy --workspace --all-targets --locked -- -D warnings
-        cargo test --workspace --locked
+        python3 tools/migration.py rust-checks --jobs 2
 
   native:
     needs: plan

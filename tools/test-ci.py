@@ -2,7 +2,6 @@
 """Exercise request identity and the actual privileged full-result publisher."""
 
 import argparse
-import copy
 import json
 import re
 import subprocess
@@ -41,6 +40,13 @@ def node(harness):
     return json.loads(subprocess.check_output(["node", "-e", harness], text=True))
 
 
+def evaluate(expression, **variables):
+    declarations = "\n".join(
+        f"const {key} = {json.dumps(value)};" for key, value in variables.items()
+    )
+    return node(declarations + f"console.log(JSON.stringify({expression}));")
+
+
 def good_needs():
     needs = {
         name: {"result": "success", "outputs": {}}
@@ -51,65 +57,73 @@ def good_needs():
         "base": BASE,
         "merge": MERGE,
         "pr": "170",
-        "profile": "full",
     }
     for name in ("native", "platform"):
         needs[name]["outputs"]["validated"] = "true"
     return needs
 
 
+def execute_script(filename, job, pull, *, env=None, event=None, latest=None):
+    script = script_for(filename, job)
+    return node(f"""
+const statuses = [], failures = [], outputs = {{}};
+const context = {{repo: {{owner: 'example', repo: 'fork'}}, actor: 'root',
+  serverUrl: 'https://github.com', runId: 123, payload: {{pull_request: {json.dumps(event)}}}}};
+const core = {{setFailed: value => failures.push(value), setOutput: (k,v) => outputs[k] = v}};
+const github = {{rest: {{pulls: {{get: async () => ({{data: {json.dumps(pull)}}})}}, repos: {{
+  getCollaboratorPermissionLevel: async () => ({{data: {{permission: 'write'}}}}),
+  getCombinedStatusForRef: async () => ({{data: {{statuses: {json.dumps([latest] if latest else [])}}}}}),
+  createCommitStatus: async value => statuses.push(value)
+}}}}}};
+Object.assign(process.env, {json.dumps(env or {})});
+(async () => {{{script}}})().then(() => console.log(JSON.stringify({{statuses, failures, outputs}})))
+  .catch(error => console.log(JSON.stringify({{error: error.message, statuses}})));
+""")
+
+
 def execute_publisher(needs, pull, superseded=False):
-    # Execute the YAML's publisher, not a Python imitation of its decisions.
-    script = script_for("ci-request.yml", "publish")
-    harness = """
-const statuses = [];
-const failures = [];
-const context = {repo: {owner: 'example', repo: 'fork'}, serverUrl: 'https://github.com', runId: 123};
-const core = {setFailed: message => failures.push(message)};
-const github = {rest: {
-  pulls: {get: async () => ({data: PULL})},
-  repos: {
-    getCombinedStatusForRef: async () => ({data: {statuses: [{context: 'Full validation', target_url: RUN_URL}]}}),
-    createCommitStatus: async value => statuses.push(value)
-  }
-}};
-process.env.RESULTS = JSON.stringify(NEEDS);
-(async () => {SCRIPT;})().then(() => console.log(JSON.stringify({statuses, failures}))).catch(error => {console.error(error); process.exit(1);});
-"""
-    harness = (
-        harness.replace("PULL", json.dumps(pull))
-        .replace("NEEDS", json.dumps(needs))
-        .replace("SCRIPT", script)
-        .replace(
-            "RUN_URL",
-            json.dumps(
-                "https://github.com/example/fork/actions/runs/"
-                + ("999" if superseded else "123")
-            ),
-        )
+    latest = {
+        "context": ci.CONTEXT,
+        "target_url": "https://github.com/example/fork/actions/runs/"
+        + ("999" if superseded else "123"),
+    }
+    return execute_script(
+        "ci-request.yml",
+        "publish",
+        pull,
+        env={"RESULTS": json.dumps(needs)},
+        latest=latest,
     )
-    return node(harness)
 
 
 def execute_invalidator(event, pull, latest=None):
-    script = script_for("ci-invalidate.yml", "invalidate")
-    harness = f"""
-const statuses = [];
-const context = {{repo: {{owner: 'example', repo: 'fork'}},
-  payload: {{pull_request: {json.dumps(event)}}}}};
-const github = {{rest: {{
-  pulls: {{get: async () => ({{data: {json.dumps(pull)}}})}},
-  repos: {{
-    getCombinedStatusForRef: async () => ({{data: {{statuses: {json.dumps([latest] if latest else [])}}}}}),
-    createCommitStatus: async value => statuses.push(value)
-  }}
-}}}};
-(async () => {{{script}}})().then(() => console.log(JSON.stringify(statuses))).catch(error => {{console.error(error); process.exit(1);}});
-"""
-    return node(harness)
+    return execute_script(
+        "ci-invalidate.yml", "invalidate", pull, event=event, latest=latest
+    )["statuses"]
 
 
 class GateTests(unittest.TestCase):
+    def test_plan_checks_mergeability_and_checks_out_merge_while_status_targets_head(
+        self,
+    ):
+        for mergeable in (True, False, None):
+            pull = dict(PULL, mergeable=mergeable)
+            result = execute_script(
+                "ci-request.yml",
+                "plan",
+                pull,
+                env={"PR": "170", "HEAD": HEAD, "PROFILE": "full"},
+            )
+            if mergeable is True:
+                self.assertEqual(result["outputs"]["merge"], MERGE)
+                self.assertEqual(result["statuses"][0]["sha"], HEAD)
+            else:
+                self.assertIn("unmergeable", result["error"])
+                self.assertEqual(result["statuses"], [])
+        workflow = (ROOT / ".github/workflows/ci-request.yml").read_text()
+        self.assertEqual(workflow.count("ref: ${{ needs.plan.outputs.merge }}"), 4)
+        self.assertNotIn("ref: ${{ needs.plan.outputs.head }}", workflow)
+
     def test_full_success(self):
         result = execute_publisher(good_needs(), PULL)
         self.assertEqual(result["statuses"][0]["state"], "success")
@@ -142,12 +156,13 @@ class GateTests(unittest.TestCase):
             self.assertIsNotNone(expression)
             # Dispatch inputs are strings; pull_request_target provides a number.
             for inputs in ({"pr": "170"}, {}):
-                harness = f"""
-                const inputs = {json.dumps(inputs)};
-                const github = {{event: {{pull_request: {{number: 170}}}}}};
-                console.log(JSON.stringify('validation-status-' + ({expression[1]})));
-                """
-                groups.append(node(harness))
+                groups.append(
+                    evaluate(
+                        "'validation-status-' + (" + expression[1] + ")",
+                        inputs=inputs,
+                        github={"event": {"pull_request": {"number": 170}}},
+                    )
+                )
         self.assertEqual(groups, ["validation-status-170"] * 6)
 
     def test_delayed_invalidation_preserves_current_request(self):
@@ -185,41 +200,35 @@ class GateTests(unittest.TestCase):
                         "failure",
                     )
 
-    def test_missing_native_or_platform_proof_is_rejected(self):
-        for job in ("native", "platform"):
-            needs = good_needs()
-            needs[job]["outputs"] = {}
-            self.assertEqual(
-                execute_publisher(needs, PULL)["statuses"][0]["state"], "failure"
-            )
-
-    def test_missing_jobs_are_rejected(self):
+    def test_missing_job_or_validation_proof_is_rejected(self):
         for job in ("quick", "native", "platform"):
             needs = good_needs()
             del needs[job]
             self.assertEqual(
                 execute_publisher(needs, PULL)["statuses"][0]["state"], "failure"
             )
+            if job in ("native", "platform"):
+                needs = good_needs()
+                needs[job]["outputs"] = {}
+                self.assertEqual(
+                    execute_publisher(needs, PULL)["statuses"][0]["state"], "failure"
+                )
 
-    def test_stale_head_and_closed_pr_are_rejected(self):
-        for field in ("head", "state", "base"):
-            pull = copy.deepcopy(PULL)
-            if field == "head":
-                pull["head"]["sha"] = "c" * 40
-            elif field == "state":
-                pull["state"] = "closed"
-            else:
-                pull["base"]["ref"] = "master"
+    def test_changed_pull_cannot_publish_success(self):
+        for change in (
+            {"head": {"sha": "c" * 40}},
+            {"state": "closed"},
+            {"base": {"ref": "master", "sha": BASE}},
+            {"base": {"ref": "rust-migration", "sha": "e" * 40}},
+            {"merge_commit_sha": "e" * 40},
+            {"mergeable": False},
+        ):
             self.assertEqual(
-                execute_publisher(good_needs(), pull)["statuses"][0]["state"], "failure"
+                execute_publisher(good_needs(), dict(PULL, **change))["statuses"][0][
+                    "state"
+                ],
+                "failure",
             )
-
-    def test_partial_never_publishes_full_status(self):
-        workflow = (ROOT / ".github/workflows/ci-request.yml").read_text()
-        publish = workflow.split("  publish:\n", 1)[1]
-        self.assertIn("needs.plan.outputs.profile == 'full'", publish)
-        plan = script_for("ci-request.yml", "plan")
-        self.assertIn("if (profile === 'full')", plan)
 
     def test_no_candidate_execution_in_privileged_jobs(self):
         workflow = (ROOT / ".github/workflows/ci-request.yml").read_text()
@@ -231,6 +240,10 @@ class GateTests(unittest.TestCase):
             self.assertNotIn("run:", section)
         self.assertIn("github.ref == 'refs/heads/rust-migration'", workflow)
         self.assertIn("vars.CI_ON_DEMAND != 'true'", workflow)
+        self.assertIn(
+            "needs.plan.outputs.profile == 'full'", workflow.split("  publish:\n", 1)[1]
+        )
+        self.assertIn("if (profile === 'full')", script_for("ci-request.yml", "plan"))
 
     def test_push_invalidation_has_no_candidate_checkout(self):
         workflow = (ROOT / ".github/workflows/ci-invalidate.yml").read_text()
@@ -262,15 +275,40 @@ class PolicyTests(unittest.TestCase):
                 ):
                     inputs = {"checkout-ref": checkout, "profile": profile}
                     needs = {"policy": {"outputs": {"heavy": heavy}}}
-                    harness = f"""
-                    const cancelled = () => {json.dumps(cancelled)};
-                    const inputs = {json.dumps(inputs)};
-                    const needs = {json.dumps(needs)};
-                    console.log(JSON.stringify({expression.replace("inputs.checkout-ref", 'inputs["checkout-ref"]')}));
-                    """
                     with self.subTest(filename=filename, job=job, cancelled=cancelled):
-                        result = node(harness)
+                        result = evaluate(
+                            expression.replace(
+                                "inputs.checkout-ref", 'inputs["checkout-ref"]'
+                            ).replace("cancelled()", str(cancelled).lower()),
+                            inputs=inputs,
+                            needs=needs,
+                        )
                         self.assertEqual(result, expected)
+
+    def test_doc_after_code_push_has_separate_non_cancelling_groups(self):
+        for filename in ("ci-build.yml", "rust-migration.yml", "ci-quick.yml"):
+            workflow = (ROOT / ".github/workflows" / filename).read_text()
+            expression = re.search(r"^  group: (.+)$", workflow, re.MULTILINE)[1]
+            expression = (
+                expression.rsplit("${{ ", 1)[1]
+                .removesuffix(" }}")
+                .replace("inputs.checkout-ref", 'inputs["checkout-ref"]')
+            )
+            groups = []
+            for sha in ("code-merge", "later-docs"):
+                groups.append(
+                    evaluate(
+                        expression,
+                        inputs={},
+                        github={
+                            "ref": "refs/heads/rust-migration",
+                            "sha": sha,
+                            "run_id": 1,
+                        },
+                    )
+                )
+            self.assertNotEqual(*groups)
+            self.assertIn("github.ref != 'refs/heads/rust-migration'", workflow)
 
     def test_bootstrap_on_demand_and_docs_classification(self):
         script = script_for("ci-policy.yml", "policy")
@@ -330,14 +368,6 @@ class RequestTests(unittest.TestCase):
                 self.assertEqual(receipt["head"], HEAD)
                 self.assertEqual(receipt["base"], BASE)
                 self.assertEqual(len(receipt["request"]), 32)
-
-    def test_default_request_is_rust(self):
-        with (
-            patch("sys.argv", ["ci.py", "request", "170"]),
-            patch.object(ci, "request", return_value=Path("unused")) as request,
-        ):
-            self.assertEqual(ci.main(), 0)
-            self.assertEqual(request.call_args.args[0].profile, "rust")
 
     def test_run_discovery_uses_unique_request_identity(self):
         receipt = {

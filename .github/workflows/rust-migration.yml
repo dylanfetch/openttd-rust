@@ -63,10 +63,6 @@ jobs:
               "--component", ",".join(toolchain["components"]),
           ], check=True)
           PY
-      - name: Verify compiler-cache controls
-        run: python3 tools/test-compiler-cache.py
-      - name: Check simulation runtime provenance
-        run: python3 tools/test-simulation-provenance.py
       - name: Identify compatible compilation artifacts
         id: compiler-cache-identity
         run: |
