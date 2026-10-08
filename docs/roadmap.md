@@ -120,7 +120,9 @@ never in masks.
    **Selected next input (#183):** the owner's 2006-09-21 Padhattan save adds
    monorail, bridges, tunnels, canal and locks. Import unchanged through existing
    rail/play scenarios, inventory presence separately from witnessed traversal,
-   and run self/pair/soak checks. Preserve the established five benchmark cases.
+   and run self/pair/soak checks. Source review and root fix verification passed
+   in #185; select its join after the four owners in #184's final capacity batch.
+   Preserve the established five benchmark cases.
 
 ## Phase 2: current work, in order
 
@@ -139,10 +141,13 @@ may run in parallel with this list.
    names orders as an ancestry dependency. Finish their final-base checks before
    starting another component. Then finish #147 fleet replacement.
    **Selected capacity batch (#182):** join #178, #151, #176 and #152 in that
-   order from integrated #181. One concrete integration PR costs about 104
-   rather than 416 full-CI job-minutes. Preserve each component's source review;
+   order from integrated #181, then join reviewed fixture #185. One concrete
+   integration PR costs about 104 rather than 520 full-CI job-minutes. Preserve
+   each component's source review;
    a fresh Sol high reviewer fixes ABI/module conflict resolutions. Widened audit
    selectors retain company registrations and orders move to free IDs 260-266.
+   Replace cargo capacity's residual pointer selector with three typed reads;
+   preserve call order and include the source delta in the fresh review.
    Run combined native/Cargo, default, affected soaks/comparisons and five idle
    three-pair benchmarks before full CI. Bisect retained joins on regressions;
    component metrics use successive joins, road retirement is old boundary glue.
