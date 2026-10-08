@@ -186,7 +186,12 @@ or complete log/stdout difference fails. Both modes compare their exit saves.
   compares the reference with itself; names filter. Extend `scenario_list()`
   for ports. The owner-built #86 save exercises signalled trains and a ship
   (`tools/simulation/rails.py`), requiring movement on every run and carried
-  cargo/delivery revenue at desync checkpoints. The supplemental reference-built
+  cargo/delivery revenue at desync checkpoints. The later owner save
+  (`play-padhattan-ridge-2000-*`, #179) retains the 1996 input
+  and adds three trains, three ships, three helicopters and a plane, with
+  movement/cargo/delivery checks and one cargodist crossing bar/release witness.
+  Saved subsidies and PBS signals do not establish all multiplier/route branches.
+  The supplemental reference-built
   aircraft fixture (`tools/simulation/aircraft.py`) observes a small plane and
   helicopter between two airports, requiring movement, loaded cargo, flying
   state and paid delivery. `tools/aircraft-scenario-ai/README.md` records its

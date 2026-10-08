@@ -1,4 +1,4 @@
-"""Owner-built rail fixture; the existing ship route is also observed (#86)."""
+"""Owner-built multimodal fixtures and rail controller evidence (#86/#179)."""
 
 import hashlib
 import json
@@ -81,6 +81,20 @@ def scenarios(soak):
                     "unpause",
                 ],
             )
+        )
+    for distribution, commands in DISTRIBUTIONS.items():
+        cases.append(
+            {
+                "name": f"play-padhattan-ridge-2000-{distribution}",
+                "kind": "save",
+                "rail_fixture": True,
+                "vehicle_heads": (8, 14, 37, 2, 25, 42, 28, 30, 44, 48),
+                "crossing_tiles": (4668, 4671),
+                "barred_crossings": (4668,) if distribution == "cargodist" else (),
+                "console": commands,
+                "save": str(ROOT / "migration/saves/padhattan-ridge-2000.sav"),
+                "ticks": (6 if soak else 2) * 365 * TICKS_PER_DAY + SNAPSHOT_TICKS,
+            }
         )
     return cases
 
@@ -316,9 +330,10 @@ def vehicle_rows(path):
     rows = {}
     for index, body in chunk["elements"]:
         fields = decode_element(chunk, body)
-        if fields["type"] not in (0, 2):
+        if fields["type"] not in (0, 2, 3):
             continue
-        prefix = "train[0]/common[0]/" if fields["type"] == 0 else "ship[0]/common[0]/"
+        kind = {0: "train", 2: "ship", 3: "aircraft"}[fields["type"]]
+        prefix = f"{kind}[0]/common[0]/"
         rows[index] = {
             name: fields[prefix + name]
             for name in (
@@ -334,6 +349,8 @@ def vehicle_rows(path):
                 "profit_last_year",
             )
         }
+        if kind == "aircraft":
+            rows[index]["airport_state"] = fields["aircraft[0]/state"]
     return rows
 
 
@@ -452,7 +469,7 @@ def check(scenario, run, mode, role, result):
     paths = [Path(scenario["save"]), *run["snapshots"]]
     observations = [vehicle_rows(path) for path in paths]
     witnesses = {}
-    for head in (8, 14, 2):  # Two train heads and the existing passenger ship.
+    for head in scenario.get("vehicle_heads", (8, 14, 2)):
         rows = [snapshot[head] for snapshot in observations]
         positions = {(row["tile"], row["x_pos"], row["y_pos"]) for row in rows}
         loaded = []
@@ -493,4 +510,37 @@ def check(scenario, run, mode, role, result):
             "cargo_counts": loaded,
             "positive_profit_deltas": paid,
         }
+        if "airport_state" in rows[0]:
+            states = sorted({row["airport_state"] for row in rows})
+            if mode == "snapshots" and 14 not in states:
+                raise RuntimeError(f"aircraft {head} lacks flying-state witness")
+            witnesses[head]["airport_states"] = states
     result[f"{mode}_{role}_rail"] = witnesses
+    if "crossing_tiles" in scenario:
+        chunks = [read_save(path) for path in paths]
+        crossings = {
+            tile: [
+                bool(chunk["MAP5"]["raw"][tile] & 32)
+                for chunk in chunks
+                if chunk["MAPT"]["raw"][tile] >> 4 == 2
+                and chunk["MAP5"]["raw"][tile] >> 6 == 1
+            ]
+            for tile in scenario["crossing_tiles"]
+        }
+        if any(len(states) != len(paths) for states in crossings.values()):
+            raise RuntimeError("owner-built crossing disappeared")
+        if mode == "snapshots" and any(
+            set(crossings[tile]) != {True, False}
+            for tile in scenario["barred_crossings"]
+        ):
+            raise RuntimeError("owner-built crossing lacks saved bar and release")
+        result[f"{mode}_{role}_crossings"] = crossings
+        # Offers/awards and reservations are observations, not witnesses of a
+        # particular subsidy multiplier or PBS search/control-flow branch.
+        result[f"{mode}_{role}_subsidies"] = [
+            {
+                index: decode_element(chunk["SUBS"], body)
+                for index, body in chunk["SUBS"]["elements"]
+            }
+            for chunk in chunks
+        ]
