@@ -924,7 +924,7 @@ NetworkRecvStatus ServerNetworkGameSocketHandler::Receive_CLIENT_IDENTIFY(Packet
 
 	/* Make sure companies to which people try to join are not autocleaned */
 	Company *c = Company::GetIfValid(playas);
-	if (c != nullptr) c->months_empty = 0;
+	if (c != nullptr) c->Finances().months_empty = 0;
 
 	return this->SendNewGRFCheck();
 }
@@ -1579,23 +1579,23 @@ static void NetworkAutoCleanCompanies()
 
 		if (!has_clients.Test(c->index)) {
 			/* The company is empty for one month more */
-			if (c->months_empty != std::numeric_limits<decltype(c->months_empty)>::max()) c->months_empty++;
+			if (c->Finances().months_empty != std::numeric_limits<decltype(c->Finances().months_empty)>::max()) c->Finances().months_empty++;
 
 			/* Is the company empty for autoclean_protected-months? */
-			if (_settings_client.network.autoclean_protected != 0 && c->months_empty > _settings_client.network.autoclean_protected) {
+			if (_settings_client.network.autoclean_protected != 0 && c->Finances().months_empty > _settings_client.network.autoclean_protected) {
 				/* Shut the company down */
 				Command<CMD_COMPANY_CTRL>::Post(CCA_DELETE, c->index, CRR_AUTOCLEAN, INVALID_CLIENT_ID);
 				IConsolePrint(CC_INFO, "Auto-cleaned company #{}.", c->index + 1);
 			}
 			/* Is the company empty for autoclean_novehicles-months, and has no vehicles? */
-			if (_settings_client.network.autoclean_novehicles != 0 && c->months_empty > _settings_client.network.autoclean_novehicles && !has_vehicles.Test(c->index)) {
+			if (_settings_client.network.autoclean_novehicles != 0 && c->Finances().months_empty > _settings_client.network.autoclean_novehicles && !has_vehicles.Test(c->index)) {
 				/* Shut the company down */
 				Command<CMD_COMPANY_CTRL>::Post(CCA_DELETE, c->index, CRR_AUTOCLEAN, INVALID_CLIENT_ID);
 				IConsolePrint(CC_INFO, "Auto-cleaned company #{} with no vehicles.", c->index + 1);
 			}
 		} else {
 			/* It is not empty, reset the date */
-			c->months_empty = 0;
+			c->Finances().months_empty = 0;
 		}
 	}
 }

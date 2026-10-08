@@ -72,6 +72,7 @@ def scenario_modules():
     """Families in scenario-list order; import after shared core initialization."""
     from . import (
         aircraft,
+        companies,
         disasters,
         economy,
         effects,
@@ -98,6 +99,7 @@ def scenario_modules():
         disasters,
         economy,
         roads,
+        companies,
         stations,
         industries,
     )
@@ -763,6 +765,7 @@ def run_scenario(
             or "tree_input" in result
             or "effect_input" in result
             or "economy_input" in result
+            or "company_input" in result
             or "station_input" in result
             or "disaster_input" in result
         ):

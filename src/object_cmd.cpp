@@ -366,7 +366,7 @@ CommandCost CmdBuildObject(DoCommandFlags flags, TileIndex tile, ObjectType type
 
 	/* Don't allow building more objects if the company has reached its limit. */
 	Company *c = Company::GetIfValid(_current_company);
-	if (c != nullptr && GB(c->build_object_limit, 16, 16) < build_object_size) {
+	if (c != nullptr && GB(c->Finances().build_object_limit, 16, 16) < build_object_size) {
 		return CommandCost(STR_ERROR_BUILD_OBJECT_LIMIT_REACHED);
 	}
 
@@ -377,7 +377,7 @@ CommandCost CmdBuildObject(DoCommandFlags flags, TileIndex tile, ObjectType type
 		if (type == OBJECT_HQ) UpdateCompanyHQ(tile, hq_score);
 
 		/* Subtract the tile from the build limit. */
-		if (c != nullptr) c->build_object_limit -= build_object_size << 16;
+		if (c != nullptr) c->Finances().build_object_limit -= build_object_size << 16;
 	}
 
 	cost.AddCost(spec->GetBuildCost() * build_object_size);
@@ -410,7 +410,7 @@ CommandCost CmdBuildObjectArea(DoCommandFlags flags, TileIndex tile, TileIndex s
 	bool had_success = false;
 
 	const Company *c = Company::GetIfValid(_current_company);
-	int limit = (c == nullptr ? INT32_MAX : GB(c->build_object_limit, 16, 16));
+	int limit = (c == nullptr ? INT32_MAX : GB(c->Finances().build_object_limit, 16, 16));
 
 	std::unique_ptr<TileIterator> iter = TileIterator::Create(tile, start_tile, diagonal);
 	for (; *iter != INVALID_TILE; ++(*iter)) {

@@ -47,6 +47,10 @@
 #include "table/strings.h"
 #include "table/company_face.h"
 
+#ifdef WITH_RUST
+#include "rust/company_adapter.h"
+#endif
+
 #include "safeguards.h"
 
 void ClearEnginesHiddenFlagOfCompany(CompanyID cid);
@@ -56,7 +60,9 @@ CompanyID _local_company;   ///< Company controlled by the human player at this 
 CompanyID _current_company; ///< Company currently doing an action.
 TypedIndexContainer<std::array<Colours, MAX_COMPANIES>, CompanyID> _company_colours; ///< NOSAVE: can be determined from company structs.
 std::string _company_manager_face; ///< for company manager face storage in openttd.cfg
+#ifndef WITH_RUST
 uint _cur_company_tick_index;             ///< used to generate a name for one company that doesn't have a name yet per tick
+#endif
 
 CompanyPool _company_pool("Company"); ///< Pool of companies.
 INSTANTIATE_POOL_METHODS(Company)
@@ -70,10 +76,14 @@ Company::Company(StringID name_1, bool is_ai)
 {
 	this->name_1 = name_1;
 	this->is_ai = is_ai;
-	this->terraform_limit    = (uint32_t)_settings_game.construction.terraform_frame_burst << 16;
-	this->clear_limit        = (uint32_t)_settings_game.construction.clear_frame_burst << 16;
-	this->tree_limit         = (uint32_t)_settings_game.construction.tree_frame_burst << 16;
-	this->build_object_limit = (uint32_t)_settings_game.construction.build_object_frame_burst << 16;
+#ifdef WITH_RUST
+	openttd_rust_company_initialize(&this->Finances(), static_cast<uint32_t>(_settings_game.construction.terraform_frame_burst), static_cast<uint32_t>(_settings_game.construction.clear_frame_burst), static_cast<uint32_t>(_settings_game.construction.tree_frame_burst), static_cast<uint32_t>(_settings_game.construction.build_object_frame_burst));
+#else
+	this->Finances().terraform_limit    = (uint32_t)_settings_game.construction.terraform_frame_burst << 16;
+	this->Finances().clear_limit        = (uint32_t)_settings_game.construction.clear_frame_burst << 16;
+	this->Finances().tree_limit         = (uint32_t)_settings_game.construction.tree_frame_burst << 16;
+	this->Finances().build_object_limit = (uint32_t)_settings_game.construction.build_object_frame_burst << 16;
+#endif
 
 	InvalidateWindowData(WC_PERFORMANCE_DETAIL, 0, CompanyID::Invalid());
 }
@@ -106,8 +116,12 @@ void Company::PostDestructor(size_t index)
  */
 Money Company::GetMaxLoan() const
 {
-	if (this->max_loan == COMPANY_MAX_LOAN_DEFAULT) return _economy.max_loan;
-	return this->max_loan;
+#ifdef WITH_RUST
+	return RunRustCompany(32, this->index.base()).b;
+#else
+	if (this->Finances().max_loan == COMPANY_MAX_LOAN_DEFAULT) return _economy.max_loan;
+	return this->Finances().max_loan;
+#endif /* WITH_RUST */
 }
 
 /**
@@ -237,9 +251,13 @@ static const IntervalTimer<TimerWindow> invalidate_company_windows_interval(std:
  */
 Money GetAvailableMoney(CompanyID company)
 {
+#ifdef WITH_RUST
+	return RunRustCompany(31, company.base()).b;
+#else
 	if (_settings_game.difficulty.infinite_money) return INT64_MAX;
 	if (!Company::IsValidID(company)) return INT64_MAX;
-	return Company::Get(company)->money;
+	return Company::Get(company)->Finances().money;
+#endif /* WITH_RUST */
 }
 
 /**
@@ -262,11 +280,17 @@ Money GetAvailableMoneyForCommand()
  */
 bool CheckCompanyHasMoney(CommandCost &cost)
 {
+#ifdef WITH_RUST
+	if (RunRustCompany(30, 0, cost.GetCost()).b != 0) return true;
+	cost.MakeError(STR_ERROR_NOT_ENOUGH_CASH_REQUIRES_CURRENCY);
+	if (IsLocalCompany()) cost.SetEncodedMessage(GetEncodedString(STR_ERROR_NOT_ENOUGH_CASH_REQUIRES_CURRENCY, cost.GetCost()));
+	return false;
+#else
 	if (cost.GetCost() <= 0) return true;
 	if (_settings_game.difficulty.infinite_money) return true;
 
 	const Company *c = Company::GetIfValid(_current_company);
-	if (c != nullptr && cost.GetCost() > c->money) {
+	if (c != nullptr && cost.GetCost() > c->Finances().money) {
 		cost.MakeError(STR_ERROR_NOT_ENOUGH_CASH_REQUIRES_CURRENCY);
 		if (IsLocalCompany()) {
 			cost.SetEncodedMessage(GetEncodedString(STR_ERROR_NOT_ENOUGH_CASH_REQUIRES_CURRENCY, cost.GetCost()));
@@ -274,6 +298,7 @@ bool CheckCompanyHasMoney(CommandCost &cost)
 		return false;
 	}
 	return true;
+#endif /* WITH_RUST */
 }
 
 /**
@@ -283,27 +308,32 @@ bool CheckCompanyHasMoney(CommandCost &cost)
  */
 static void SubtractMoneyFromAnyCompany(Company *c, const CommandCost &cost)
 {
+#ifdef WITH_RUST
+	if (cost.GetCost() != 0) assert(cost.GetExpensesType() != INVALID_EXPENSES);
+	RunRustCompany(0, c->index.base(), cost.GetCost(), cost.GetExpensesType());
+#else
 	if (cost.GetCost() == 0) return;
 	assert(cost.GetExpensesType() != INVALID_EXPENSES);
 
-	c->money -= cost.GetCost();
-	c->yearly_expenses[0][cost.GetExpensesType()] += cost.GetCost();
+	c->Finances().money -= cost.GetCost();
+	c->Finances().yearly_expenses[0][cost.GetExpensesType()] += cost.GetCost();
 
 	if (HasBit(1 << EXPENSES_TRAIN_REVENUE    |
 	           1 << EXPENSES_ROADVEH_REVENUE  |
 	           1 << EXPENSES_AIRCRAFT_REVENUE |
 	           1 << EXPENSES_SHIP_REVENUE, cost.GetExpensesType())) {
-		c->cur_economy.income -= cost.GetCost();
+		c->Finances().cur_economy.income -= cost.GetCost();
 	} else if (HasBit(1 << EXPENSES_TRAIN_RUN    |
 	                  1 << EXPENSES_ROADVEH_RUN  |
 	                  1 << EXPENSES_AIRCRAFT_RUN |
 	                  1 << EXPENSES_SHIP_RUN     |
 	                  1 << EXPENSES_PROPERTY     |
 	                  1 << EXPENSES_LOAN_INTEREST, cost.GetExpensesType())) {
-		c->cur_economy.expenses -= cost.GetCost();
+		c->Finances().cur_economy.expenses -= cost.GetCost();
 	}
 
 	InvalidateCompanyWindows(c);
+#endif /* WITH_RUST */
 }
 
 /**
@@ -323,30 +353,40 @@ void SubtractMoneyFromCompany(const CommandCost &cost)
  */
 void SubtractMoneyFromCompanyFract(CompanyID company, const CommandCost &cst)
 {
+#ifdef WITH_RUST
+	RunRustCompany(1, company.base(), cst.GetCost(), cst.GetExpensesType());
+#else
 	Company *c = Company::Get(company);
-	uint8_t m = c->money_fraction;
+	uint8_t m = c->Finances().money_fraction;
 	Money cost = cst.GetCost();
 
-	c->money_fraction = m - (uint8_t)cost;
+	c->Finances().money_fraction = m - (uint8_t)cost;
 	cost >>= 8;
-	if (c->money_fraction > m) cost++;
+	if (c->Finances().money_fraction > m) cost++;
 	if (cost != 0) SubtractMoneyFromAnyCompany(c, CommandCost(cst.GetExpensesType(), cost));
+#endif /* WITH_RUST */
 }
 
+#ifndef WITH_RUST
 static constexpr void UpdateLandscapingLimit(uint32_t &limit, uint64_t per_64k_frames, uint64_t burst)
 {
 	limit = static_cast<uint32_t>(std::min<uint64_t>(limit + per_64k_frames, burst << 16));
 }
+#endif /* !WITH_RUST */
 
 /** Update the landscaping limits per company. */
 void UpdateLandscapingLimits()
 {
+#ifdef WITH_RUST
+	RunRustCompany(2);
+#else
 	for (Company *c : Company::Iterate()) {
-		UpdateLandscapingLimit(c->terraform_limit,    _settings_game.construction.terraform_per_64k_frames,    _settings_game.construction.terraform_frame_burst);
-		UpdateLandscapingLimit(c->clear_limit,        _settings_game.construction.clear_per_64k_frames,        _settings_game.construction.clear_frame_burst);
-		UpdateLandscapingLimit(c->tree_limit,         _settings_game.construction.tree_per_64k_frames,         _settings_game.construction.tree_frame_burst);
-		UpdateLandscapingLimit(c->build_object_limit, _settings_game.construction.build_object_per_64k_frames, _settings_game.construction.build_object_frame_burst);
+		UpdateLandscapingLimit(c->Finances().terraform_limit,    _settings_game.construction.terraform_per_64k_frames,    _settings_game.construction.terraform_frame_burst);
+		UpdateLandscapingLimit(c->Finances().clear_limit,        _settings_game.construction.clear_per_64k_frames,        _settings_game.construction.clear_frame_burst);
+		UpdateLandscapingLimit(c->Finances().tree_limit,         _settings_game.construction.tree_per_64k_frames,         _settings_game.construction.tree_frame_burst);
+		UpdateLandscapingLimit(c->Finances().build_object_limit, _settings_game.construction.build_object_per_64k_frames, _settings_game.construction.build_object_frame_burst);
 	}
+#endif /* WITH_RUST */
 }
 
 /**
@@ -597,6 +637,10 @@ void ResetCompanyLivery(Company *c)
  */
 Company *DoStartupNewCompany(bool is_ai, CompanyID company = CompanyID::Invalid())
 {
+#ifdef WITH_RUST
+	uint32_t id = static_cast<uint32_t>(RunRustCompany(15, company.base(), is_ai).b);
+	return id == UINT32_MAX ? nullptr : Company::Get(id);
+#else
 	if (!Company::CanAllocateItem()) return nullptr;
 
 	/* we have to generate colour before this company is valid */
@@ -616,7 +660,7 @@ Company *DoStartupNewCompany(bool is_ai, CompanyID company = CompanyID::Invalid(
 	_company_colours[c->index] = c->colour;
 
 	/* Scale the initial loan based on the inflation rounded down to the loan interval. The maximum loan has already been inflation adjusted. */
-	c->money = c->current_loan = std::min<int64_t>((INITIAL_LOAN * _economy.inflation_prices >> 16) / LOAN_INTERVAL * LOAN_INTERVAL, _economy.max_loan);
+	c->Finances().money = c->Finances().current_loan = std::min<int64_t>((INITIAL_LOAN * _economy.inflation_prices >> 16) / LOAN_INTERVAL * LOAN_INTERVAL, _economy.max_loan);
 
 	c->avail_railtypes = GetCompanyRailTypes(c->index);
 	c->avail_roadtypes = GetCompanyRoadTypes(c->index);
@@ -652,10 +696,14 @@ Company *DoStartupNewCompany(bool is_ai, CompanyID company = CompanyID::Invalid(
 	Game::NewEvent(new ScriptEventCompanyNew(c->index));
 
 	return c;
+#endif /* WITH_RUST */
 }
 
 /** Start a new competitor company if possible. */
 TimeoutTimer<TimerGameTick> _new_competitor_timeout({ TimerGameTick::Priority::COMPETITOR_TIMEOUT, 0 }, []() {
+#ifdef WITH_RUST
+	RunRustCompany(16);
+#else
 	if (_game_mode == GM_MENU || !AI::CanStartNew()) return;
 	if (_networking && Company::GetNumItems() >= _settings_client.network.max_companies) return;
 	if (_settings_game.difficulty.competitors_interval == 0) return;
@@ -671,19 +719,28 @@ TimeoutTimer<TimerGameTick> _new_competitor_timeout({ TimerGameTick::Priority::C
 	/* Send a command to all clients to start up a new AI.
 	 * Works fine for Multiplayer and Singleplayer */
 	Command<CMD_COMPANY_CTRL>::Post(CCA_NEW_AI, CompanyID::Invalid(), CRR_NONE, INVALID_CLIENT_ID);
+#endif /* WITH_RUST */
 });
 
 /** Start of a new game. */
 void StartupCompanies()
 {
+#ifdef WITH_RUST
+	RunRustCompany(34);
+#else
 	/* Ensure the timeout is aborted, so it doesn't fire based on information of the last game. */
 	_new_competitor_timeout.Abort();
+#endif
 }
 
 /** Initialize the pool of companies. */
 void InitializeCompanies()
 {
+#ifdef WITH_RUST
+	RunRustCompany(29);
+#else
 	_cur_company_tick_index = 0;
+#endif /* WITH_RUST */
 }
 
 /**
@@ -694,6 +751,9 @@ void InitializeCompanies()
  */
 bool CheckTakeoverVehicleLimit(CompanyID cbig, CompanyID csmall)
 {
+#ifdef WITH_RUST
+	return RunRustCompany(19, cbig.base(), csmall.base()).b != 0;
+#else
 	const Company *c1 = Company::Get(cbig);
 	const Company *c2 = Company::Get(csmall);
 
@@ -702,6 +762,7 @@ bool CheckTakeoverVehicleLimit(CompanyID cbig, CompanyID csmall)
 		c1->group_all[VEH_ROAD].num_vehicle     + c2->group_all[VEH_ROAD].num_vehicle     <= _settings_game.vehicle.max_roadveh &&
 		c1->group_all[VEH_SHIP].num_vehicle     + c2->group_all[VEH_SHIP].num_vehicle     <= _settings_game.vehicle.max_ships &&
 		c1->group_all[VEH_AIRCRAFT].num_vehicle + c2->group_all[VEH_AIRCRAFT].num_vehicle <= _settings_game.vehicle.max_aircraft;
+#endif /* WITH_RUST */
 }
 
 /**
@@ -713,6 +774,7 @@ bool CheckTakeoverVehicleLimit(CompanyID cbig, CompanyID csmall)
  *
  * @param c the company that is going bankrupt.
  */
+#ifndef WITH_RUST
 static void HandleBankruptcyTakeover(Company *c)
 {
 	/* Amount of time out for each company to take over a company;
@@ -722,59 +784,63 @@ static void HandleBankruptcyTakeover(Company *c)
 	 * Note that the company going bankrupt can't buy itself. */
 	static const int TAKE_OVER_TIMEOUT = 3 * 30 * Ticks::DAY_TICKS / (MAX_COMPANIES - 1);
 
-	assert(c->bankrupt_asked.Any());
+	assert(c->Finances().bankrupt_asked.Any());
 
 	/* We're currently asking some company to buy 'us' */
-	if (c->bankrupt_timeout != 0) {
-		c->bankrupt_timeout -= MAX_COMPANIES;
-		if (c->bankrupt_timeout > 0) return;
-		c->bankrupt_timeout = 0;
+	if (c->Finances().bankrupt_timeout != 0) {
+		c->Finances().bankrupt_timeout -= MAX_COMPANIES;
+		if (c->Finances().bankrupt_timeout > 0) return;
+		c->Finances().bankrupt_timeout = 0;
 
 		return;
 	}
 
 	/* Did we ask everyone for bankruptcy? If so, bail out. */
-	if (c->bankrupt_asked.All()) return;
+	if (c->Finances().bankrupt_asked.All()) return;
 
 	Company *best = nullptr;
 	int32_t best_performance = -1;
 
 	/* Ask the company with the highest performance history first */
 	for (Company *c2 : Company::Iterate()) {
-		if (c2->bankrupt_asked.None() && // Don't ask companies going bankrupt themselves
-				!c->bankrupt_asked.Test(c2->index) &&
-				best_performance < c2->old_economy[1].performance_history &&
+		if (c2->Finances().bankrupt_asked.None() && // Don't ask companies going bankrupt themselves
+				!c->Finances().bankrupt_asked.Test(c2->index) &&
+				best_performance < c2->Finances().old_economy[1].performance_history &&
 				CheckTakeoverVehicleLimit(c2->index, c->index)) {
-			best_performance = c2->old_economy[1].performance_history;
+			best_performance = c2->Finances().old_economy[1].performance_history;
 			best = c2;
 		}
 	}
 
 	/* Asked all companies? */
 	if (best_performance == -1) {
-		c->bankrupt_asked.Set();
+		c->Finances().bankrupt_asked.Set();
 		return;
 	}
 
-	c->bankrupt_asked.Set(best->index);
+	c->Finances().bankrupt_asked.Set(best->index);
 
-	c->bankrupt_timeout = TAKE_OVER_TIMEOUT;
+	c->Finances().bankrupt_timeout = TAKE_OVER_TIMEOUT;
 
-	AI::NewEvent(best->index, new ScriptEventCompanyAskMerger(c->index, c->bankrupt_value));
+	AI::NewEvent(best->index, new ScriptEventCompanyAskMerger(c->index, c->Finances().bankrupt_value));
 	if (IsInteractiveCompany(best->index)) {
 		ShowBuyCompanyDialog(c->index, false);
 	}
 }
+#endif /* !WITH_RUST */
 
 /** Called every tick for updating some company info. */
 void OnTick_Companies()
 {
+#ifdef WITH_RUST
+	RunRustCompany(17);
+#else
 	if (_game_mode == GM_EDITOR) return;
 
 	Company *c = Company::GetIfValid(_cur_company_tick_index);
 	if (c != nullptr) {
 		if (c->name_1 != 0) GenerateCompanyName(c);
-		if (c->bankrupt_asked.Any()) HandleBankruptcyTakeover(c);
+		if (c->Finances().bankrupt_asked.Any()) HandleBankruptcyTakeover(c);
 	}
 
 	if (_new_competitor_timeout.HasFired() && _game_mode != GM_MENU && AI::CanStartNew()) {
@@ -802,6 +868,7 @@ void OnTick_Companies()
 	}
 
 	_cur_company_tick_index = (_cur_company_tick_index + 1) % MAX_COMPANIES;
+#endif /* WITH_RUST */
 }
 
 /**
@@ -810,23 +877,27 @@ void OnTick_Companies()
  */
 static const IntervalTimer<TimerGameEconomy> _economy_companies_yearly({TimerGameEconomy::YEAR, TimerGameEconomy::Priority::COMPANY}, [](auto)
 {
+#ifdef WITH_RUST
+	RunRustCompany(18);
+#else
 	/* Copy statistics */
 	for (Company *c : Company::Iterate()) {
 		/* Move expenses to previous years. */
-		std::rotate(std::rbegin(c->yearly_expenses), std::rbegin(c->yearly_expenses) + 1, std::rend(c->yearly_expenses));
-		c->yearly_expenses[0].fill(0);
+		std::rotate(std::rbegin(c->Finances().yearly_expenses), std::rbegin(c->Finances().yearly_expenses) + 1, std::rend(c->Finances().yearly_expenses));
+		c->Finances().yearly_expenses[0].fill(0);
 		InvalidateWindowData(WC_FINANCES, c->index);
 	}
 
 	if (_settings_client.gui.show_finances && _local_company != COMPANY_SPECTATOR) {
 		ShowCompanyFinances(_local_company);
 		Company *c = Company::Get(_local_company);
-		if (c->num_valid_stat_ent > 5 && c->old_economy[0].performance_history < c->old_economy[4].performance_history) {
+		if (c->Finances().num_valid_stat_ent > 5 && c->Finances().old_economy[0].performance_history < c->Finances().old_economy[4].performance_history) {
 			if (_settings_client.sound.new_year) SndPlayFx(SND_01_BAD_YEAR);
 		} else {
 			if (_settings_client.sound.new_year) SndPlayFx(SND_00_GOOD_YEAR);
 		}
 	}
+#endif /* WITH_RUST */
 });
 
 /**
@@ -880,6 +951,9 @@ void CompanyAdminRemove(CompanyID company_id, CompanyRemoveReason reason)
  */
 CommandCost CmdCompanyCtrl(DoCommandFlags flags, CompanyCtrlAction cca, CompanyID company_id, CompanyRemoveReason reason, ClientID client_id)
 {
+#ifdef WITH_RUST
+	return RustCompanyCost(RunRustCompany(20, company_id.base(), cca, flags.Test(DoCommandFlag::Execute), reason, client_id));
+#else
 	InvalidateWindowData(WC_COMPANY_LEAGUE, 0, 0);
 
 	switch (cca) {
@@ -997,6 +1071,7 @@ CommandCost CmdCompanyCtrl(DoCommandFlags flags, CompanyCtrlAction cca, CompanyI
 	InvalidateWindowClassesData(WC_SCRIPT_LIST);
 
 	return CommandCost();
+#endif /* WITH_RUST */
 }
 
 static bool ExecuteAllowListCtrlAction(CompanyAllowListCtrlAction action, Company *c, const std::string &public_key)
@@ -1315,13 +1390,16 @@ uint32_t CompanyInfrastructure::GetRoadTramTotal(RoadTramType rtt) const
  */
 CommandCost CmdGiveMoney(DoCommandFlags flags, Money money, CompanyID dest_company)
 {
+#ifdef WITH_RUST
+	return RustCompanyCost(RunRustCompany(21, dest_company.base(), money, flags.Test(DoCommandFlag::Execute)));
+#else
 	if (!_settings_game.economy.give_money) return CMD_ERROR;
 
 	const Company *c = Company::Get(_current_company);
 	CommandCost amount(EXPENSES_OTHER, std::min<Money>(money, 20000000LL));
 
 	/* You can only transfer funds that is in excess of your loan */
-	if (c->money - c->current_loan < amount.GetCost() || amount.GetCost() < 0) return CommandCost(STR_ERROR_INSUFFICIENT_FUNDS);
+	if (c->Finances().money - c->Finances().current_loan < amount.GetCost() || amount.GetCost() < 0) return CommandCost(STR_ERROR_INSUFFICIENT_FUNDS);
 	if (!Company::IsValidID(dest_company)) return CMD_ERROR;
 
 	if (flags.Test(DoCommandFlag::Execute)) {
@@ -1340,6 +1418,7 @@ CommandCost CmdGiveMoney(DoCommandFlags flags, Money money, CompanyID dest_compa
 
 	/* Subtract money from local-company */
 	return amount;
+#endif /* WITH_RUST */
 }
 
 /**
@@ -1523,3 +1602,53 @@ std::optional<CompanyManagerFace> ParseCompanyManagerFaceCode(std::string_view s
 
 	return cmf;
 }
+
+#ifdef WITH_RUST
+/** Identity/appearance and networking primitives, outside financial policy. */
+int64_t RustCompanyIdentity(uint32_t op, uint32_t id, int64_t a, int64_t b)
+{
+	Company *c = Company::GetIfValid(id);
+	switch (op) {
+		case 0: GenerateCompanyName(c); break;
+		case 1: return GenerateCompanyColour();
+		case 2:
+			c->colour = static_cast<Colours>(a); ResetCompanyLivery(c); _company_colours[c->index] = c->colour; break;
+		case 3:
+			c->avail_railtypes = GetCompanyRailTypes(c->index); c->avail_roadtypes = GetCompanyRoadTypes(c->index);
+			c->inaugurated_year = TimerGameEconomy::year; c->inaugurated_year_calendar = TimerGameCalendar::year; break;
+		case 4: {
+			bool randomise_face = true;
+			if (!_company_manager_face.empty() && a == 0 && !_networking) {
+				auto cmf = ParseCompanyManagerFaceCode(_company_manager_face);
+				if (cmf.has_value()) { randomise_face = false; c->face = std::move(*cmf); }
+			}
+			if (randomise_face) RandomiseCompanyManagerFace(c->face, _random);
+			break;
+		}
+		case 5: SetDefaultCompanySettings(c->index); ClearEnginesHiddenFlagOfCompany(c->index); GeneratePresidentName(c); break;
+		case 6:
+			SetWindowDirty(WC_GRAPH_LEGEND, 0); InvalidateWindowData(WC_CLIENT_LIST, 0); InvalidateWindowData(WC_LINKGRAPH_LEGEND, 0);
+			BuildOwnerLegend(); InvalidateWindowData(WC_SMALLMAP, 0, 1); break;
+		case 7:
+			NetworkAdminCompanyNew(c); NetworkServerNewCompany(c, a == -1 ? nullptr : NetworkClientInfo::GetByClientID(ClientID(static_cast<uint32_t>(a)))); break;
+		case 8: {
+			NetworkClientInfo *ci = NetworkClientInfo::GetByClientID(ClientID(static_cast<uint32_t>(a)));
+			if (_network_server && ci != nullptr) { ci->client_playas = COMPANY_SPECTATOR; NetworkUpdateClientInfo(ci->client_id); }
+			break;
+		}
+		case 9:
+			if (ClientID(static_cast<uint32_t>(a)) == _network_own_client_id) {
+				assert(_local_company == COMPANY_SPECTATOR); SetLocalCompany(c->index);
+				if (!_company_manager_face.empty()) {
+					auto cmf = ParseCompanyManagerFaceCode(_company_manager_face);
+					if (cmf.has_value()) Command<CMD_SET_COMPANY_MANAGER_FACE>::SendNet(STR_NULL, c->index, cmf->style, cmf->bits);
+				}
+				SyncCompanySettings(); MarkWholeScreenDirty();
+			}
+			break;
+		default: NOT_REACHED();
+	}
+	(void)b;
+	return 0;
+}
+#endif /* WITH_RUST */
