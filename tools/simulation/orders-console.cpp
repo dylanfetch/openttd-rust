@@ -113,16 +113,17 @@ static bool OrdersScenario(std::span<std::string_view> args)
 		fmt::print(stderr, "ORDERS backups captured {}\n", BackupCount());
 		if (args.size() >= 3) {
 			bool shared = args.size() == 4 && args[3] == "shared";
+			bool multi = args.size() == 4 && args[3] == "multi";
 			/* Exercise each serialized form at index zero: the pinned original's
 			 * value-initialized load constructor loses nonzero pool indices. */
 			if (shared) {
 				OrderBackup::ResetOfUser(INVALID_TILE, 101);
 				OrderBackup::ResetOfUser(INVALID_TILE, 102);
 				OrderBackup::Backup(v, 102);
-			} else {
+			} else if (!multi) {
 				OrderBackup::ResetOfUser(INVALID_TILE, 102);
 			}
-			fmt::print(stderr, "ORDERS backups serialized {} {}\n", shared ? "shared" : "unique", BackupCount());
+			fmt::print(stderr, "ORDERS backups serialized {} {}\n", multi ? "multi" : shared ? "shared" : "unique", BackupCount());
 			Backup<bool> networking(_networking, true);
 			Backup<bool> server(_network_server, true);
 			if (SaveOrLoad(args[2], SLO_SAVE, DFT_GAME_FILE, NO_DIRECTORY, false) != SL_OK) std::abort();
