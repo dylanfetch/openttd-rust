@@ -4,54 +4,68 @@ Root owns selection here; `AGENTS.md` and `docs/rust-migration.md` define proces
 If an issue conflicts, follow this roadmap and report it to root. Keep this
 forward-looking, about 200 lines; completed work is one row, with evidence in PRs.
 
-## Where the fork stands (2026-10-08, `f604e30d50`)
+## Where the fork stands (2026-10-08, `3998946846`)
 
 - Eighteen ownership ports retire 24,221 original C++ lines, about 6.3% of roughly
   384k non-vendored `src/` lines (18,898 excluding town-name and road-movement
-  data). The last two integrations retire 1,394 lines for 1,052 glue + 895 net
-  tooling. Company's canonical save/writer adapters explain the cost; its
-  allocating boundary still needs #168. Company's post-merge checks passed.
-- Reviewed road conversion lowers idle play-opus from **2.601x to 1.415x**, Grok
-  2.503x to 1.405x, Padhattan 1996 2.264x to 1.678x, and mixed 2000 2.401x to
-  1.911x. Ratchet caps are 1.415444x, 1.405295x, 1.678295x and 1.910615x.
-  Generation remains about 1.55x; its cap stays **1.41x**. Root accepts only
-  company's temporary allocating-boundary exception (#149/#168), with 50 ms
-  process-wait resolution limiting attribution. The separate road profile
-  identifies remaining pathfinding, typed service and original clock costs.
-- CI is on demand (#171). An ordinary PR push costs about 2 job-minutes instead
-  of 80. A full run costs about 104 job-minutes and 30 minutes wall time, once per
+  data). Batch #184 (road conversion, cargo, orders, ship) would retire 6,069 more
+  for 4,964 glue: glue is rising toward parity, mostly typed-boundary tables.
+- Speed, measured exactly (#186) at the road-only join: Opus 1.419x and
+  Padhattan-2000 2.036x. Generation is about 1.41x. The committed caps were read
+  through 50 ms rounding, so the Padhattan caps are unreliable until #186
+  re-measures them. #184 regresses Opus by a real 5.4%: about 63% from orders
+  and 25% from cargo.
+- Mixed-save profile, as extra candidate time relative to the reference:
+  aircraft +27%, train +25%, window drawing and string formatting +18%, road +11%, trees +8%.
+- CI is green and on demand. A full run costs about 104 job-minutes, once per
   final head.
-- Five component branches are unintegrated (#157 cap): #151, #152, #176, #147
-  and #178's road conversion. #176 replaces closed #153. Road, cargo, orders and
-  ship have accepted source reviews; #182 selects their capacity integration.
+- Unintegrated branches (#157 cap of six): #178, #151, #176 and #152 inside
+  #184, plus #147 WIP.
 
-## Fourth steering review (2026-10-07)
+## Fifth steering review (2026-10-08)
 
-A user-directed review (Claude Code, `claude-opus-5-5`) audited #170/#171, which
-a user-directed `gpt-6.1-sol` root session selected and integrated. Independent
-audits covered the CI workflows and local tools. There were no port audits and
-no profile, because no game code or branch head changed since the third review.
+A Claude Code review (`claude-opus-5-5`) audited the first `gpt-6.1-sol` xhigh
+root session. It ran four independent port audits (aircraft, company, cargo,
+orders) and a perf bisection and profile of #184. No reachable divergence was
+found. Root integrated #145, #149, #174 and #181 cleanly and correctly held #184
+at the ratchet. The user keeps Sol xhigh as root and Astra high for planning.
 
-The CI change stays; harness and benchmark timing are unchanged. #173/#174
-repaired actual-merge validation, protected-push cancellation, warning baselines,
-orphaned builds and future archive exclusions with net non-positive tooling.
-Live full requests passed. Keep `CI_ON_DEMAND=true`, enforce exact-head full
-validation, and never merge with `--admin`. More process tooling is not a
-fallback; resume the selected simulation queue. Earlier 103 GB archives remain.
+Corrections, in order:
+1. **Root is `gpt-6.1-sol` xhigh** (AGENTS.md, `/start-development`). Attribute
+   root artifacts with the effort actually used: several xhigh root comments
+   said "medium". Change `.codex/config.toml` root to `gpt-6.1-sol` in a small
+   PR; it may share #186's full run.
+2. **Fix the timer before trusting the ratchet (#186).** `subprocess.run(timeout=)`
+   rounds each game up to 50 ms. That is about 7.5% on a 0.65 s case, against a
+   3% tolerance. Root had noted this limit and still blocked on it. Re-measure
+   all caps once, exactly, then judge #184 against them.
+3. **#184 fixes its hot paths before integrating**, per its PR comment. Orders
+   must look up each record once per entry, not through about 17 indirect calls
+   per vehicle per tick. Cargo needs typed single-field getters, no `CargoNext`
+   vector, and no `Packets()` copy. Then a fresh review, the Opus/Grok caps, and
+   full CI.
+4. **No boundary exceptions at integration** (new AGENTS.md rule). Company's
+   accepted Task/Future exception also covered a 66-service switch, positional
+   `[i64; 32]` reads and reentry-only action services. All of these are now
+   listed in #168.
+5. **#168 order is confirmed**: train or aircraft first, then company, trees and
+   station/town. #168 also lists the per-character `DecodeUtf8`/string-consumer
+   crossings (+9% on Padhattan) as a separate small PR.
+6. **Coverage gaps**: new aircraft-breakdown, cargo forced-transfer/GetVia,
+   conditional-order and loan-arm gaps go to #156.
 
 ## Earlier steering, still in force
 
 First review (10-04): call shared services directly (#107); measure before map
 decisions (#108); keep tooling proportionate (#109); prioritize core simulation.
 Second (10-04): harness end moments (#154, done); speed report (#155); coverage
-gaps (#156); WIP cap of six branches (#157). Third (10-07):
-- per-call task/future/`Rc` boundaries, opcode dispatch and whole-record reads
-  are the speed problem; convert to direct typed calls (#168);
-- the road conversion narrows RoadObserve (#155);
-- the speed budget is a ratchet;
-- the benchmark needs a non-road save (#156);
-- reviews use `gpt-6.1-sol` high, with a fresh reviewer each round that fixes its
-  own findings; close finished agents.
+gaps (#156); WIP cap of six branches (#157). Third (10-07): convert per-call
+task/future/`Rc` boundaries, opcode dispatch and whole-record reads to direct
+typed calls (#168); the speed budget is a ratchet; reviews use `gpt-6.1-sol` high
+with a fresh reviewer each round who fixes its own findings; close finished agents.
+Fourth (10-07): on-demand CI stays (#171, gaps closed by #173/#174). Keep
+`CI_ON_DEMAND=true`, require exact-head full validation, never merge with
+`--admin`, and treat more process tooling as no fallback.
 
 ## Completed ownership ports
 
@@ -103,94 +117,57 @@ The harness is `python3 tools/migration.py simulate` (`docs/rust-migration.md`,
 always the first priority. Port differences go in `KNOWN_FAILURES` with an issue,
 never in masks.
 
-1. **Speed ratchet (#155).** Commit a per-scenario budget of best-known
-   candidate/reference ratios, with today's figures above as the starting values.
-   Benchmark both road play saves, both Padhattan saves and generate-tgp-256-1 with
-   `simulate <name> --benchmark 3 --jobs 2` on an idle host. A PR may not exceed
-   the budget by more than 3% without a stated reason accepted by root, and
-   improvements lower the budget. Targets: <=1.9x on the road play saves after
-   road conversion; <=1.5x on play saves and <=1.15x on generation when #168 closes.
-2. **#156 coverage, standing capacity.** Random and crash branches first. A mixed
-   save with trains (PBS junctions, crossings), ships, aircraft and subsidies
-   closes many gaps and gives the speed budget a non-road benchmark. The user
-   supplied the later Padhattan save (#179/#180), integrated via #181. Defaults,
-   six-year soaks and idle three-pair comparisons pass. Presence of PBS signals,
-   buoys and subsidies does not establish every route, traversal or multiplier;
-   remaining branches stay in #156.
-   **Selected next input (#183):** the owner's 2006-09-21 Padhattan save adds
-   monorail, bridges, tunnels, canal and locks. Import unchanged through existing
-   rail/play scenarios, inventory presence separately from witnessed traversal,
-   and run self/pair/soak checks. Source review and root fix verification passed
-   in #185; select its join after the four owners in #184's final capacity batch.
-   Preserve the established five benchmark cases.
+1. **Exact benchmark timing (#186), then the speed ratchet (#155).** The budget
+   covers both road play saves, both Padhattan saves and generate-tgp-256-1, run
+   with `simulate <name> --benchmark 3 --jobs 2` on an idle host. A PR may exceed
+   a cap by at most 3%, unless root accepts a stated reason that is not a
+   boundary-rule exception. Improvements lower the caps. Targets: <=1.5x on play
+   saves and <=1.15x on generation when #168 closes.
+2. **#156 coverage, standing capacity.** Random and crash branches first. The
+   2000 and 2006 Padhattan saves are imported (#181, #185 in #184). The presence
+   of PBS signals, locks or subsidies in a save does not show that every route or
+   multiplier was exercised. Remaining branches stay in #156.
 
 ## Phase 2: current work, in order
 
 Integration of reviewed work comes before new starts. Never hold more than six
-unintegrated component branches (#157). Independent items (#169, #156 slices)
-may run in parallel with this list.
-**#184 is blocked by the speed ratchet:** final Opus/Grok/mixed-2000 timings
-exceed cap plus 3%. Isolate the regression using its retained joins before full
-CI or another component start; keep the budgets unchanged.
+unintegrated component branches (#157). Independent items (#156 slices) may run
+in parallel with this list.
 
-1. **#155 road conversion (#178).** Remove the Task/Future/Rc protocol for all 22
-   services and 14 entries, and narrow RoadObserve: field getters or a hot
-   record, no `IsBus` in the view, type-filter in `close`, single-pass `nearby`,
-   owner resolved once per entry, and nested `GetCurrentMaxSpeed`. Add the ratchet.
-   Accepted source and final native checks pass; whole harness 233/233, road
-   soaks 58/58 and five idle benchmarks pass. Ratchet is committed in #178.
-2. **Integrate #151 cargo storage** (already direct) on the fresh baseline.
-3. **Integrate reviewed #176 orders, then #152 ship.** Both are direct; ship
-   names orders as an ancestry dependency. Finish their final-base checks before
-   starting another component. Then finish #147 fleet replacement.
-   **Selected capacity batch (#182):** join #178, #151, #176 and #152 in that
-   order from integrated #181, then join reviewed fixture #185. One concrete
-   integration PR costs about 104 rather than 520 full-CI job-minutes. Preserve
-   each component's source review;
-   a fresh Sol high reviewer fixes ABI/module conflict resolutions. Widened audit
-   selectors retain company registrations and orders move to free IDs 260-266.
-   Replace cargo capacity's residual pointer selector with three typed reads;
-   preserve call order and include the source delta in the fresh review.
-   Run combined native/Cargo, default, affected soaks/comparisons and five idle
-   three-pair benchmarks before full CI. Bisect retained joins on regressions;
-   component metrics use successive joins, road retirement is old boundary glue.
-4. **#168 train and train-reservation conversion**, including the O(n^2) consist
-   walk and the per-step `nearby` Vec; then aircraft and company; then trees,
-   town and disaster. One PR per component.
+1. **#186 exact timing and re-measured caps**, with the `.codex/config.toml`
+   root-model change.
+2. **#184 batch (#178 road conversion, #151 cargo, #176 orders, #152 ship, #185
+   save).** First the hot-path fixes in its steering comment, then a fresh Sol
+   high review of the fix delta, the re-measured caps, latest base and full CI.
+   Component source reviews stand.
+3. **Finish #147 fleet replacement** in the direct form.
+4. **#168 conversions, one PR per component:** train and train reservation
+   (O(n^2) consist walk, per-step `nearby` Vec) or aircraft first, then company
+   with its widened scope, then trees, town and disaster, then the cold cargo
+   and orders opcodes. The UTF-8/string-consumer support fix is a separate small
+   PR at any point.
 5. **New components** (#148 town lifecycle, then #150 industry construction)
-   start only once the road play saves are at or below 2.0x and #168's train
-   slice is integrated. When fewer than two unstarted selections remain, a fresh
-   Astra high planner replenishes whole simulation owners, which are planned in
-   the direct form.
+   start only once the road play saves are at or below 2.0x (they are) and #168's
+   train slice is integrated. When fewer than two unstarted selections remain, a
+   fresh Astra high planner replenishes whole simulation owners, planned in the
+   direct form.
 
 The #108 decision keeps C++ map arrays and direct bundled `noexcept` services.
-Revisit it only if a post-#168 profile shows map/pool crossings dominating;
-the current profile instead identifies entry and record-copy overhead.
+Revisit it only if a post-#168 profile shows map/pool crossings dominating.
 
 ## Resume checkpoint
 
-Active checks finished after the user's wind-down request.
-Resume with reviewed #184's speed regression before CI/integration or new starts.
-Its source review is accepted; a later source fix needs fresh review. Merge the
-latest base before full CI; conflict-free docs refreshes need no new source review.
-
 | Issue / PR | Branch (worktree suffix), head | State and next step |
 | --- | --- | --- |
-| #155 / #178 | `road-direct-155` (`road-direct-155`), `636be8104f` | Reviewed source and ratchet joined into #184. |
-| #139 / #151 | `cargo-storage-movement-139` (`cargo-storage`), `ff912bcfcb` | Accepted source joined #184; its typed capacity delta has fresh review there. |
-| #138 / #176 | `orders-direct-138` (`order-lifecycle`), `3ef37bc4fc` | Reviewed fixes verified; joined #184. |
-| #146 / #152 | `ship-controller-ownership-146` (`ship-controller`), `df7a1d4d2e` | Reviewed with accepted orders; joined #184, including natural lock checks. |
+| #186 | none | Not started; first. |
+| #182 / #184 | `reviewed-owner-batch-182` (`reviewed-owners-182`), `fa0baea911` | Semantics pass. Apply the steering hot-path fixes, fresh review, re-check caps, full CI. |
+| #155 / #178, #139 / #151, #138 / #176, #146 / #152, #183 / #185 | joined in #184 | Reviewed sources; close with #184. |
 | #147 | `fleet-replacement-ownership-147` (`fleet-replacement`), `68d660adc9` | State-only WIP, no PR. |
-| #182 / #184 | `reviewed-owner-batch-182` (`reviewed-owners-182`), `fa0baea911` | Review/native/affected semantics pass; timing blocked on Opus 1.479898x, Grok 1.448534x and mixed 2.052632x. Full CI not requested. |
-| #183 / #185 | `import/padhattan-ridge-2006` (`padhattan-2006`), `d287c8e882` | Fresh review and root doc-fix verification pass; unchanged save joined #184. |
 
-The first dispatched full (#145), #174 bootstrap, #149 and #181 actual merges passed.
-`CI_ON_DEMAND=true` is restored; both local timing and remote push holds are released.
-Standing #156 work follows the remaining 2026-10-07 audit list there; landing
-RNG and the mixed save are integrated. Preserve the pinned reference, paused curve
-worktrees and evidence branches `evidence-disaster-vehicles` (`a775543162`) and
-`evidence-water-regions` (`c752070cde`); do not reapply effect helper `73ccd511fb`.
-Build and test with `--jobs 2`; standalone fixture games share the benchmark lock.
+Preserve the pinned reference, paused curve worktrees and evidence branches
+`evidence-disaster-vehicles` (`a775543162`) and `evidence-water-regions`
+(`c752070cde`); do not reapply effect helper `73ccd511fb`. Build and test with
+`--jobs 2`; standalone fixture games share the benchmark lock.
 
 ## Choosing the next task
 

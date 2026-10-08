@@ -337,7 +337,7 @@ generators after deleting previous outputs.
 
 `AGENTS.md` is authoritative for agent roles, models and reasoning effort,
 attribution, the issue/PR/review flow, and the evidence budget. This section adds
-only repository facts. `.codex/config.toml` sets root to `gpt-6-astra` xhigh and
+only repository facts. `.codex/config.toml` sets root to `gpt-6.1-sol` xhigh and
 spawned agents to `gpt-6.1-sol` high by default, with at most five spawned threads;
 explicit spawn settings select the required role, and a running host may impose a
 lower limit.

@@ -1,17 +1,17 @@
 ---
 name: steer
-description: Steering review of Astra's autonomous migration work since the last steering commit; audits, corrects docs/issues, refreshes /start-development.
+description: Steering review of root's autonomous migration work since the last steering commit; audits, corrects docs/issues, refreshes /start-development.
 disable-model-invocation: true
 ---
 
 # Steer the OpenTTD-Rust migration
 
-The user runs Astra (`gpt-6-astra`, Codex) as root for long autonomous sessions,
-and runs this review in Claude Code between them. Your job is to check that
-Astra is still on the path to a game whose simulation runs in Rust, find what it
+The user runs root (`gpt-6.1-sol` xhigh in Codex; Astra before 2026-10-08) for
+long autonomous sessions, and runs this review in Claude Code between them. Your
+job is to check that root is still on the path to a game whose simulation runs in Rust, find what it
 cannot see in its own work, and correct the *system*: rules, roadmap order,
-issues and PR comments. Astra does the implementation. You edit docs,
-issues and PR comments, and you leave code changes to Astra's PR process.
+issues and PR comments. Root's team does the implementation. You edit docs,
+issues and PR comments, and you leave code changes to root's PR process.
 
 User focus for this run, if any: $ARGUMENTS
 
@@ -25,15 +25,17 @@ Attribution on every issue, comment and commit body you write:
    corrections.
 2. Read the last steering session's transcript. `python3 docs/skills/steer/transcript.py`
    lists sessions newest first. The steering ones open with `/steer` or a request
-   to review Astra. Skip unrelated sessions, but read the conclusion of any session
-   in between that changed a rule. `transcript.py <id>` prints one session; read
+   to review root (Astra or Sol). Skip unrelated sessions, but read the conclusion
+   of any session in between that changed a rule. `transcript.py <id>` prints one session; read
    its final messages first.
-3. Read `docs/skills/start-development/SKILL.md`, the restart prompt Astra
-   last ran, and `AGENTS.md`.
+3. Read `docs/skills/start-development/SKILL.md`, the restart prompt root
+   last ran, and `AGENTS.md`. Root's own Codex sessions are under
+   `~/.codex/sessions/YYYY/MM/DD/`; its session opens with `$start-development`.
+   Read the user's messages to it, and how it ended.
 
 Done when you can list each standing correction and the issue that tracks it.
 
-## 2. Survey Astra's work since then
+## 2. Survey root's work since then
 
 Run these together:
 
@@ -50,7 +52,7 @@ Run these together:
 Then post a short status line to the user and continue.
 
 Judge each standing correction: applied, slipped, or reinterpreted. Watch for the
-patterns Astra has repeated before:
+patterns root has repeated before:
 
 - **Wheel-spinning**: evidence, tooling or process growing faster than retired game logic.
 - **Sediment**: roadmap and docs turning into logs (run IDs, hashes, probe values).
@@ -61,7 +63,7 @@ patterns Astra has repeated before:
 
 ## 3. Audit independently
 
-Astra's reviewers share its model family and usually report "Findings: none".
+Root's reviewers share its model family and usually report "Findings: none".
 The value of this session is an audit that does not depend on them. Launch these
 in one message as background read-only subagents (Claude Opus):
 
@@ -108,7 +110,7 @@ a one-off finding. Each correction lands in exactly one authoritative place:
 - **New coverage gaps** go in a comment on the coverage tracker (#156).
 - **Roadmap**: rewrite "Where the fork stands" and the work order. Add an "Nth
   steering review" section with findings and corrections. `/start-development`
-  tells Astra to apply that section first, so state each action plainly. Fold
+  tells root to apply that section first, so state each action plainly. Fold
   older steering sections into the compact "still in force" paragraph. Keep the
   file under the `AGENTS.md` budget, moving per-PR plans to their PRs or issues.
 
@@ -119,10 +121,10 @@ landed the same way. Confirm `origin/rust-migration` has it.
 
 ## 5. Check /start-development
 
-`docs/skills/start-development/SKILL.md` is Astra's restart prompt. It stays
-unchanged by default: it sends Astra to the roadmap's latest steering review,
+`docs/skills/start-development/SKILL.md` is root's restart prompt. It stays
+unchanged by default: it sends root to the roadmap's latest steering review,
 and that section carries this review's corrections. Edit the prompt only when
-this review shows it needs improving, for example because Astra stopped early,
+this review shows it needs improving, for example because root stopped early,
 misread it, or needs a new standing step in its work loop. Keep it open-ended:
 finishing the listed items triggers planning the next work, and only the user
 ends the assignment. Include any edit in the step 4 commit.
@@ -131,10 +133,10 @@ ends the assignment. Include any edit in the step 4 commit.
 
 Tell the user:
 
-- the verdict on Astra's track;
+- the verdict on root's track;
 - what the audits found, with numbers;
 - what you changed, with issue and commit links;
 - anything only the user can supply, such as a new play save or a policy decision.
 
-Finish by telling them to start Astra with `/start-development` in Codex, and
+Finish by telling them to start root with `/start-development` in Codex, and
 whether this review changed it. The prompt lives in the skill, not in your reply.

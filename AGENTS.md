@@ -49,7 +49,9 @@ fork; the remaining upstream documentation explains behavior and architecture.
   no per-call heap allocation and no async, future, task or mailbox machinery.
   Each service is its own typed `noexcept` function, not an opcode switch or
   positional array, and hot reads fetch only the fields they use rather than
-  whole-record views. Existing ports convert under #168.
+  whole-record views. Existing ports convert under #168. Root grants no
+  exceptions at integration: a port whose hot path allocates per call, dispatches
+  by opcode or copies whole records is fixed before it integrates.
 - Evidence for game-logic ports is the semantic simulation harness (`python3
   tools/migration.py simulate`, #72) plus the existing tests; a new game-logic
   port integrates only after the harness exists and its scenarios exercise the
@@ -99,10 +101,11 @@ checks that run; do not restate them in paragraphs.
 
 ## Agent team and review
 
-The root agent orchestrates and delegates heavily, owns component selection and
-integration, and verifies delegated diffs and evidence. Target concurrency is six
-agents total: the root plus five subagents, matching `.codex/config.toml`. Respect
-the running host's actual limit; this document cannot raise a session limit.
+The root agent (`gpt-6.1-sol`, xhigh effort) orchestrates and delegates heavily,
+owns component selection and integration, and verifies delegated diffs and
+evidence. Target concurrency is six agents total: the root plus five subagents,
+matching `.codex/config.toml`. Respect the running host's actual limit; this
+document cannot raise a session limit.
 
 Every spawn must specify a model and reasoning effort rather than inherit them:
 
@@ -110,8 +113,9 @@ Every spawn must specify a model and reasoning effort rather than inherit them:
   high effort by default. Use lower effort only for a clearly bounded task that
   justifies it.
 - `gpt-6-luna`: bounded mechanical work; low or medium effort.
-- `gpt-6-astra`: all delegated planning at high effort. Root uses xhigh effort
-  so every Astra subagent has strictly lower effort than root.
+- `gpt-6-astra`: all delegated planning at high effort.
+
+Every subagent runs at lower effort than root's xhigh.
 
 Every agent-authored GitHub issue, PR, comment, and review report must identify
 the agent, exact model, and reasoning effort, including artifacts authored by root.
