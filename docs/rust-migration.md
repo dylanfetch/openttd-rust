@@ -1371,7 +1371,8 @@ depot reversals and reference-produced live-path reload. Native checks compare
 reversal and fixed/map-derived limit control against unchanged CYapfBaseT.
 Each candidate run requires alternate docking, retries and cache/reversal
 witnesses (`ship-yapf-profile.json`); node limits use injected graphs, not
-reachable-map claims. Arbitrary maps/NewGRFs and complete legacy saves are not exhaustive.
+reachable-map claims. Arbitrary maps/NewGRFs and complete legacy saves are not
+exhaustive.
 
 ### Town growth control and private state
 
@@ -1573,9 +1574,10 @@ Unexpected environmental exceptions terminate inside their wrappers; Rust panics
 `python3 tools/migration.py verify --jobs 2` includes the four Cargo checks and
 native ABI checks for scalar widths, native C++ transient coordinate narrowing,
 direct callback order and nested owner mutation. `python3 tools/migration.py
-simulate water --jobs 2` (also `--self`/`--soak`) requires the candidate's
-`ship-control-profile.json` branches in the water corpus for locks, aqueducts, rotation/reload, service, buoy/loading, depot restart,
-and moving build/sell/ID-reuse owners. The class case changes one existing clear
+simulate water --jobs 2` (also `--soak`; `--self` counts nothing) requires the
+candidate's `ship-control-profile.json` branches in the water corpus for locks,
+aqueducts, rotation/reload, service, buoy/loading, depot restart, and moving
+build/sell/ID-reuse owners. The class case changes one existing clear
 canal input byte to `MakeRiver` class/owner encoding for both games and requires an
 actual cache-update branch. Legacy save versions, viewport pixels and arbitrary
 custom NewGRF combinations remain coverage limits; final independent review and CI gate integration.
