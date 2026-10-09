@@ -76,10 +76,12 @@ bool IsValidImageIndex<VEH_SHIP>(uint8_t image_index)
 	return image_index < lengthof(_ship_sprites);
 }
 
+#ifndef WITH_RUST
 static inline TrackBits GetTileShipTrackStatus(TileIndex tile)
 {
 	return TrackStatusToTrackBits(GetTileTrackStatus(tile, TRANSPORT_WATER, 0));
 }
+#endif
 
 static void GetShipIcon(EngineID engine, EngineImageType image_type, VehicleSpriteSeq *result)
 {

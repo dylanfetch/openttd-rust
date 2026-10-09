@@ -587,7 +587,7 @@ extern "C" void openttd_orders_order_news(void *ctx, uint32_t message) noexcept
 	{ static const StringID messages[] = {INVALID_STRING_ID, STR_NEWS_VEHICLE_HAS_VOID_ORDER, STR_NEWS_VEHICLE_HAS_INVALID_ENTRY, STR_NEWS_PLANE_USES_TOO_SHORT_RUNWAY, STR_NEWS_VEHICLE_HAS_DUPLICATE_ENTRY, STR_NEWS_VEHICLE_HAS_TOO_FEW_ORDERS}; const Vehicle *vehicle = static_cast<const Vehicle *>(ctx); AddVehicleAdviceNewsItem(AdviceType::Order, GetEncodedString(messages[message], vehicle->index), vehicle->index);  }
 }
 
-extern "C" void openttd_orders_debug_list(void *ctx) noexcept
+extern "C" void openttd_orders_debug_list([[maybe_unused]] void *ctx) noexcept
 {
 #ifdef WITH_ASSERT
 			if (static_cast<Vehicle *>(ctx)->orders != nullptr) static_cast<Vehicle *>(ctx)->orders->DebugCheckSanity();
@@ -595,7 +595,7 @@ extern "C" void openttd_orders_debug_list(void *ctx) noexcept
 
 }
 
-extern "C" void openttd_orders_assert_departure_range(int32_t lower, int32_t upper) noexcept
+extern "C" void openttd_orders_assert_departure_range([[maybe_unused]] int32_t lower, [[maybe_unused]] int32_t upper) noexcept
 {
 	assert(static_cast<int32_t>(lower) <= static_cast<int32_t>(upper));
 }
