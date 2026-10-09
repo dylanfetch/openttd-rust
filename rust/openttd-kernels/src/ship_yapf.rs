@@ -16,9 +16,9 @@
     clippy::similar_names,
     clippy::too_many_lines
 )]
+use crate::node_hash::NodeMap;
 use crate::services::Services;
 use crate::water_regions::Patch;
-use std::collections::HashMap;
 use std::ffi::c_void;
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -99,12 +99,12 @@ struct Node {
     cost: i32,
     estimate: i32,
 }
-// Maps are lookup-only: their randomized bucket/iteration order never selects a
-// node. Keys are the original tile/exit-dir or CalculateWaterRegionPatchHash bits.
+// Maps are lookup-only (never iterated): bucket/iteration order never selects a
+// node, so the fixed NodeMap hasher cannot change results. Keys are the original tile/exit-dir or CalculateWaterRegionPatchHash bits.
 struct Search {
     arena: Vec<Node>,
-    open: HashMap<u32, usize>,
-    closed: HashMap<u32, usize>,
+    open: NodeMap<u32, usize>,
+    closed: NodeMap<u32, usize>,
     heap: Vec<usize>,
     limit: i32,
 }
@@ -112,8 +112,8 @@ impl Search {
     fn new(limit: i32) -> Self {
         Self {
             arena: Vec::new(),
-            open: HashMap::new(),
-            closed: HashMap::new(),
+            open: NodeMap::default(),
+            closed: NodeMap::default(),
             heap: vec![usize::MAX],
             limit,
         }
