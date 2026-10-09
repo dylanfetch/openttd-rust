@@ -236,53 +236,126 @@ pub struct Observation {
     pub down_text: u32,
     pub closure_text: u32,
 }
+/// Map facts constant for one entry.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct Map {
+    pub size_x: u32,
+    pub size_y: u32,
+    pub landscape: u8,
+}
+/// Values the original tick reads inline; constant for the whole tick.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct TickRecord {
+    pub counter: u64,
+    pub map: Map,
+    pub interval: u32,
+    pub ambient: u8,
+    pub editor: u8,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct Entry {
+    pub industry: *mut c_void,
+    pub owner: *mut Industry,
+    pub id: u16,
+    pub callbacks: u16,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct Location {
+    pub tile: u32,
+    pub width: u16,
+    pub height: u16,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct FarmTile {
+    pub kind: u8,
+    pub snow: u8,
+    pub ground: u8,
+    pub grown: u8,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct Change {
+    pub result: u16,
+    pub reg: i32,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct TypeInfo {
+    pub behaviour: u32,
+    pub enabled: bool,
+    pub layouts: bool,
+    pub appear: u8,
+}
+/// Typed `noexcept` C++ services in `industry_ffi.h` order. Each is a world leaf;
+/// construction and commands return values at the original call site.
 #[repr(C)]
 pub struct Services {
+    pub next_tick: unsafe extern "C" fn(u32) -> Entry,
+    pub sound_count: unsafe extern "C" fn(*mut c_void) -> u16,
+    pub behaviour: unsafe extern "C" fn(*mut c_void) -> u32,
+    pub location: unsafe extern "C" fn(*mut c_void) -> Location,
+    pub industry_sound: unsafe extern "C" fn(*mut c_void, u32),
+    pub play_sound: unsafe extern "C" fn(u16, u32),
+    pub special_effect: unsafe extern "C" fn(*mut c_void, u32, u32) -> u16,
+    pub tick_trigger: unsafe extern "C" fn(*mut c_void),
+    pub production_callback: unsafe extern "C" fn(*mut c_void, u8),
+    pub scale_cargo: unsafe extern "C" fn(u32) -> u32,
+    pub random: unsafe extern "C" fn() -> u32,
+    pub random_range: unsafe extern "C" fn(u32) -> u32,
+    pub move_goods: unsafe extern "C" fn(*mut c_void, u32, u32) -> u32,
+    pub tile_add_wrap: unsafe extern "C" fn(u32, i32, i32) -> u32,
+    pub farm_tile: unsafe extern "C" fn(u32) -> FarmTile,
+    pub tile_z: unsafe extern "C" fn(u32) -> i32,
+    pub snow_line: unsafe extern "C" fn() -> u8,
+    pub make_field: unsafe extern "C" fn(u32, u8, u8, u16),
+    pub fence_wanted: unsafe extern "C" fn(u32, u8) -> bool,
+    pub set_fence: unsafe extern "C" fn(u32, u8, u8),
+    pub tile_completed: unsafe extern "C" fn(*mut c_void, u32) -> bool,
+    pub harvest: unsafe extern "C" fn(u32),
     pub observe: unsafe extern "C" fn(*mut c_void, *mut Observation),
-    pub next: unsafe extern "C" fn(u32) -> *mut c_void,
-    pub setting: unsafe extern "C" fn(u8) -> u32,
-    pub world: unsafe extern "C" fn(u8, *mut c_void, u32, u32, u32) -> u64,
+    pub production_rate: unsafe extern "C" fn(*mut c_void, u32) -> u8,
+    pub change_callback: unsafe extern "C" fn(*mut c_void, bool, u32) -> Change,
+    pub custom_text: unsafe extern "C" fn(*mut c_void, u16) -> u32,
+    pub news: unsafe extern "C" fn(*mut c_void, u32, bool),
+    pub rate_news: unsafe extern "C" fn(*mut c_void, u8, i32),
+    pub callback_error: unsafe extern "C" fn(*mut c_void, bool),
+    pub set_dirty: unsafe extern "C" fn(*mut c_void),
+    pub destroy: unsafe extern "C" fn(*mut c_void),
+    pub advertise: unsafe extern "C" fn(*mut c_void),
+    pub create: unsafe extern "C" fn(u8, u8) -> *mut c_void,
+    pub random_industry: unsafe extern "C" fn() -> *mut c_void,
+    pub get: unsafe extern "C" fn(u16) -> *mut c_void,
+    pub type_count: unsafe extern "C" fn(u8) -> u16,
+    pub total: unsafe extern "C" fn() -> u32,
+    pub type_info: unsafe extern "C" fn(u8) -> TypeInfo,
+    pub probability_callback: unsafe extern "C" fn(u8, u32) -> u32,
+    pub scale_by_map_size: unsafe extern "C" fn(u32) -> u32,
+    pub company_none: unsafe extern "C" fn() -> u8,
+    pub restore_company: unsafe extern "C" fn(u8),
+    pub directory_dirty: unsafe extern "C" fn(),
+    pub recession: unsafe extern "C" fn() -> bool,
+    pub economy_month: unsafe extern "C" fn() -> u8,
+    pub economy_year: unsafe extern "C" fn() -> i32,
+    pub days_since_last_month: unsafe extern "C" fn() -> u32,
+    pub landscape: unsafe extern "C" fn() -> u8,
+    pub economy_type: unsafe extern "C" fn() -> u8,
+    pub passengers: unsafe extern "C" fn() -> u8,
+    pub fund_only: unsafe extern "C" fn() -> bool,
+    pub calendar_year: unsafe extern "C" fn() -> i32,
+    pub deity: unsafe extern "C" fn() -> bool,
 }
-// Named operations shared with industry_cmd.cpp. They are world leaves, not
-// continuations: construction and commands return values at the source call site.
-const RANDOM: u8 = 0;
-const RANGE: u8 = 1;
-const SCALE: u8 = 2;
-const INVERSE: u8 = 3;
-const SOUND: u8 = 4;
-const SPECIAL: u8 = 5;
-const TRIGGER: u8 = 6;
-const PRODUCTION: u8 = 7;
-const MOVE: u8 = 8;
-const RATE: u8 = 9;
-const TYPE_COUNT: u8 = 11;
-const TOTAL: u8 = 12;
-const MAP_SCALE: u8 = 13;
-const CREATE: u8 = 14;
-const ADVERTISE: u8 = 15;
-const RANDOM_INDUSTRY: u8 = 16;
-const DESTROY: u8 = 17;
-const DIRTY: u8 = 18;
-const DIRECTORY: u8 = 19;
-const COMPANY: u8 = 20;
-const CHANGE_CALLBACK: u8 = 21;
-const CUSTOM_TEXT: u8 = 22;
-const NEWS: u8 = 23;
-const RATE_NEWS: u8 = 24;
-const MAP_TILE: u8 = 25;
-const FIELD_WRITE: u8 = 26;
-const FENCE: u8 = 27;
-const COMPLETED: u8 = 28;
-const HARVEST: u8 = 29;
-const CALLBACK_ERROR: u8 = 30;
-const ENABLED: u8 = 31;
-const PROB_CALLBACK: u8 = 32;
-fn world(s: &Services, op: u8, i: *mut c_void, a: u32, b: u32, c: u32) -> u64 {
-    unsafe { (s.world)(op, i, a, b, c) }
-}
-fn setting(s: &Services, n: u8) -> u32 {
-    unsafe { (s.setting)(n) }
-}
+const SND_36_LUMBER_MILL_3: u16 = 0x36;
+const SND_37_LUMBER_MILL_2: u16 = 0x37;
+const LANDSCAPE_ARCTIC: u8 = 1;
+const LANDSCAPE_TROPIC: u8 = 2;
+const MP_CLEAR: u8 = 0;
+const MP_TREES: u8 = 4;
+const INVALID_TILE: u32 = u32::MAX;
 fn observe(s: &Services, i: *mut c_void) -> Observation {
     let mut o = Observation::default();
     unsafe {
@@ -291,10 +364,10 @@ fn observe(s: &Services, i: *mut c_void) -> Observation {
     o
 }
 fn rand(s: &Services) -> u32 {
-    world(s, RANDOM, ptr::null_mut(), 0, 0, 0) as u32
+    unsafe { (s.random)() }
 }
 fn range(s: &Services, n: u32) -> u32 {
-    world(s, RANGE, ptr::null_mut(), n, 0, 0) as u32
+    unsafe { (s.random_range)(n) }
 }
 fn chance_value(a: u32, b: u32, value: u32) -> bool {
     (((value & 0xffff).wrapping_mul(b).wrapping_add(b / 2)) >> 16) < a
@@ -302,20 +375,20 @@ fn chance_value(a: u32, b: u32, value: u32) -> bool {
 fn chance(s: &Services, a: u32, b: u32) -> bool {
     chance_value(a, b, rand(s))
 }
-fn fields(o: Observation) -> *mut Fields {
-    unsafe { ptr::addr_of_mut!((*o.owner).fields) }
+fn fields(owner: *mut Industry) -> *mut Fields {
+    unsafe { ptr::addr_of_mut!((*owner).fields) }
 }
-fn produced(o: Observation, slot: usize) -> *mut Produced {
-    unsafe { (*o.owner).produced.as_mut_ptr().add(slot) }
+fn produced(owner: *mut Industry, slot: usize) -> *mut Produced {
+    unsafe { (*owner).produced.as_mut_ptr().add(slot) }
 }
-fn accepted(o: Observation, slot: usize) -> *mut Accepted {
-    unsafe { (*o.owner).accepted.as_mut_ptr().add(slot) }
+fn accepted(owner: *mut Industry, slot: usize) -> *mut Accepted {
+    unsafe { (*owner).accepted.as_mut_ptr().add(slot) }
 }
-fn produced_count(o: Observation) -> usize {
-    unsafe { (*o.owner).produced.len() }
+fn produced_count(owner: *mut Industry) -> usize {
+    unsafe { (*owner).produced.len() }
 }
-fn accepted_count(o: Observation) -> usize {
-    unsafe { (*o.owner).accepted.len() }
+fn accepted_count(owner: *mut Industry) -> usize {
+    unsafe { (*owner).accepted.len() }
 }
 fn valid(cargo: u8) -> bool {
     cargo != 255
@@ -327,10 +400,9 @@ fn transported(p: Pair) -> u32 {
         (u32::from(p.second) * 256 / u32::from(p.first)).min(255)
     }
 }
-fn helper(i: *mut c_void, s: &Services, scale: bool) {
-    let o = observe(s, i);
-    for n in 0..produced_count(o) {
-        let p = produced(o, n);
+fn helper(owner: *mut Industry, s: &Services, scale: bool) {
+    for n in 0..produced_count(owner) {
+        let p = produced(owner, n);
         unsafe {
             if !valid((*p).cargo) {
                 continue;
@@ -338,55 +410,51 @@ fn helper(i: *mut c_void, s: &Services, scale: bool) {
         }
         let mut amount = unsafe { u32::from((*p).rate) };
         if scale {
-            amount = u32::from(world(s, SCALE, i, amount, 0, 0) as u16);
+            amount = u32::from(unsafe { (s.scale_cargo)(amount) } as u16);
         }
         unsafe {
             (*p).waiting = (u32::from((*p).waiting) + amount).min(65535) as u16;
         }
     }
 }
-fn produce(i: *mut c_void, s: &Services, builder: *mut Builder) {
-    let o = observe(s, i);
-    let f = fields(o);
+fn produce(e: Entry, t: &TickRecord, s: &Services, builder: *mut Builder) {
+    let (i, owner) = (e.industry, e.owner);
+    let f = fields(owner);
     if unsafe { (*f).counter.is_multiple_of(64) } {
         let r = rand(s);
-        if chance_value(1, 14, r)
-            && o.sound_count != 0
-            && setting(s, 0) != 0
-            && (0..produced_count(o)).any(|n| unsafe { (*produced(o, n)).history[1].first > 0 })
-        {
-            world(
-                s,
-                SOUND,
-                i,
-                0,
-                ((r >> 16) * u32::from(o.sound_count)) >> 16,
-                o.tile,
-            );
+        if chance_value(1, 14, r) {
+            let sounds = unsafe { (s.sound_count)(i) };
+            if sounds != 0
+                && t.ambient != 0
+                && (0..produced_count(owner))
+                    .any(|n| unsafe { (*produced(owner, n)).history[1].first > 0 })
+            {
+                unsafe { (s.industry_sound)(i, ((r >> 16) * u32::from(sounds)) >> 16) };
+            }
         }
     }
     unsafe {
         (*f).counter = (*f).counter.wrapping_sub(1);
     }
-    if o.callbacks & 4 != 0
-        && unsafe { u32::from((*f).counter) % world(s, INVERSE, i, 256, 0, 0) as u32 == 0 }
-    {
-        world(s, PRODUCTION, i, 1, 0, 0);
-        helper(i, s, false);
+    let callback = e.callbacks & 4 != 0;
+    if callback && unsafe { u32::from((*f).counter) % t.interval == 0 } {
+        unsafe { (s.production_callback)(i, 1) };
+        helper(owner, s, false);
     }
     if unsafe { !(*f).counter.is_multiple_of(256) } {
         return;
     }
-    if o.callbacks & 4 == 0 {
-        helper(i, s, true);
+    if !callback {
+        helper(owner, s, true);
     }
+    let behaviour = unsafe { (s.behaviour)(i) };
     for (flag, parameter) in [(1, 0), (2, 1)] {
-        if o.behaviour & flag == 0 {
+        if behaviour & flag == 0 {
             continue;
         }
-        let cb = if o.callbacks & (1 << 9) != 0 {
+        let cb = if e.callbacks & (1 << 9) != 0 {
             let random = rand(s);
-            world(s, SPECIAL, i, random, parameter, 0) as u32
+            unsafe { (s.special_effect)(i, random, parameter) }
         } else {
             0xffff
         };
@@ -399,55 +467,56 @@ fn produce(i: *mut c_void, s: &Services, builder: *mut Builder) {
         };
         if act {
             if parameter == 0 {
-                farm(i, s);
+                farm(i, e.id, t.map, s);
             } else {
-                chop(i, s, builder);
+                chop(i, owner, t.map, s, builder);
             }
         }
     }
-    world(s, TRIGGER, i, 0, 0, 0);
+    unsafe { (s.tick_trigger)(i) };
 }
 /// # Safety
-/// Live builder and synchronous services; C++ supplies raw records, serial world
-/// access, and terminating noexcept environmental failures. No borrowed owner
+/// Live builder, tick record and synchronous services; C++ supplies serial world
+/// access and terminating noexcept environmental failures. No borrowed owner
 /// reference survives a service, including recursive production on construction.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_industry_tick(
     builder: *mut Builder,
+    record: *const TickRecord,
     services: *const Services,
 ) {
     let s = unsafe { &*services };
-    let b = unsafe { ptr::addr_of_mut!((*builder).fields) };
+    let t = unsafe { *record };
+    let b = build_fields(builder);
     unsafe {
         if (*b).sound_ctr != 0 {
             (*b).sound_ctr = (*b).sound_ctr.wrapping_add(1);
             if (*b).sound_ctr == 75 {
-                if setting(s, 0) != 0 {
-                    world(s, SOUND, ptr::null_mut(), 1, 0, (*b).sound_tile);
+                if t.ambient != 0 {
+                    (s.play_sound)(SND_37_LUMBER_MILL_2, (*b).sound_tile);
                 }
             } else if (*b).sound_ctr == 160 {
                 (*b).sound_ctr = 0;
-                if setting(s, 0) != 0 {
-                    world(s, SOUND, ptr::null_mut(), 2, 0, (*b).sound_tile);
+                if t.ambient != 0 {
+                    (s.play_sound)(SND_36_LUMBER_MILL_3, (*b).sound_tile);
                 }
             }
         }
     }
-    if setting(s, 1) != 0 {
+    if t.editor != 0 {
         return;
     }
     let mut from = 0;
     loop {
-        let i = unsafe { (s.next)(from) };
-        if i.is_null() {
+        let e = unsafe { (s.next_tick)(from) };
+        if e.industry.is_null() {
             break;
         }
-        let o = observe(s, i);
-        from = u32::from(o.id) + 1;
-        produce(i, s, builder);
-        if world(s, 33, ptr::null_mut(), 0, 0, 0).wrapping_add(u64::from(o.id)) % 74 == 0 {
-            for n in 0..accepted_count(o) {
-                let a = accepted(o, n);
+        from = u32::from(e.id) + 1;
+        produce(e, &t, s, builder);
+        if t.counter.wrapping_add(u64::from(e.id)) % 74 == 0 {
+            for n in 0..accepted_count(e.owner) {
+                let a = accepted(e.owner, n);
                 unsafe {
                     (*a).accumulated_waiting = (*a)
                         .accumulated_waiting
@@ -458,55 +527,60 @@ pub unsafe extern "C" fn openttd_rust_industry_tick(
     }
 }
 /// # Safety
-/// Industry and services follow the tick contract; distribution can reenter
+/// Industry, owner and services follow the tick contract; distribution can reenter
 /// industry access, so history/waiting writes occur before/after with raw fields.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_industry_transport(
     i: *mut c_void,
+    owner: *mut Industry,
+    minimal_cargo: u8,
+    recession: bool,
     services: *const Services,
-) -> u8 {
+) -> bool {
     let s = unsafe { &*services };
-    let o = observe(s, i);
     let mut moved = false;
-    for n in 0..produced_count(o) {
-        let p = produced(o, n);
+    for n in 0..produced_count(owner) {
+        let p = produced(owner, n);
         let mut cw = unsafe { u32::from((*p).waiting).min(255) };
-        if cw <= u32::from(o.minimal_cargo) || unsafe { !valid((*p).cargo) } {
+        if cw <= u32::from(minimal_cargo) || unsafe { !valid((*p).cargo) } {
             continue;
         }
         unsafe {
             (*p).waiting = (*p).waiting.wrapping_sub(cw as u16);
         }
-        if setting(s, 3) != 0 {
+        if recession {
             cw = cw.div_ceil(2);
         }
         unsafe {
             (*p).history[0].first = (*p).history[0].first.wrapping_add(cw as u16);
         }
-        let am = world(s, MOVE, i, n as u32, cw, 0) as u16;
+        let am = unsafe { (s.move_goods)(i, n as u32, cw) };
         unsafe {
-            (*p).history[0].second = (*p).history[0].second.wrapping_add(am);
+            (*p).history[0].second = (*p).history[0].second.wrapping_add(am as u16);
         }
         moved |= am != 0;
     }
-    u8::from(moved)
+    moved
 }
-fn recompute(i: *mut c_void, s: &Services) {
-    let o = observe(s, i);
-    let f = fields(o);
-    for n in 0..produced_count(o) {
-        let rate = world(s, RATE, i, n as u32, 0, 0) as u32;
+fn recompute(i: *mut c_void, owner: *mut Industry, s: &Services) {
+    let f = fields(owner);
+    for n in 0..produced_count(owner) {
+        let rate = u32::from(unsafe { (s.production_rate)(i, n as u32) });
         let value = rate * unsafe { u32::from((*f).prod_level) };
         unsafe {
-            (*produced(o, n)).rate = value.div_ceil(16).min(255) as u8;
+            (*produced(owner, n)).rate = value.div_ceil(16).min(255) as u8;
         }
     }
 }
 /// # Safety
-/// Live industry; the original `UsesOriginalEconomy` precondition applies.
+/// Live industry and its owner; the original `UsesOriginalEconomy` precondition applies.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_industry_recompute(i: *mut c_void, s: *const Services) {
-    recompute(i, unsafe { &*s });
+pub unsafe extern "C" fn openttd_rust_industry_recompute(
+    i: *mut c_void,
+    owner: *mut Industry,
+    s: *const Services,
+) {
+    recompute(i, owner, unsafe { &*s });
 }
 fn update_history(mask: &mut u64, month: u32) {
     for (first, last, division, total) in [(1, 25, 1, 1), (25, 42, 3, 3), (42, 61, 4, 12)] {
@@ -543,49 +617,47 @@ fn rotate(history: &mut [Pair; RECORDS], mask: u64, month: u32) {
         }
     }
 }
-fn statistics(i: *mut c_void, s: &Services) {
-    let o = observe(s, i);
-    let f = fields(o);
-    let month = setting(s, 4);
+fn statistics(owner: *mut Industry, s: &Services) {
+    let f = fields(owner);
+    let month = u32::from(unsafe { (s.economy_month)() });
     unsafe {
         update_history(&mut (*f).valid_history, month);
     }
-    for n in 0..produced_count(o) {
-        let p = produced(o, n);
+    for n in 0..produced_count(owner) {
+        let p = produced(owner, n);
         unsafe {
             if !valid((*p).cargo) {
                 continue;
             }
             if (*p).history[0].first != 0 {
-                (*f).last_prod_year = setting(s, 5) as i32;
+                (*f).last_prod_year = (s.economy_year)();
             }
             rotate(&mut (*p).history, (*f).valid_history, month);
         }
     }
-    for n in 0..accepted_count(o) {
-        let a = accepted(o, n);
+    for n in 0..accepted_count(owner) {
+        let a = accepted(owner, n);
         unsafe {
             if !valid((*a).cargo) || (*a).history.is_null() {
                 continue;
             }
             let history = (*a).history;
             (*history)[0].second =
-                ((*a).accumulated_waiting / setting(s, 6).max(1)).min(65535) as u16;
+                ((*a).accumulated_waiting / (s.days_since_last_month)().max(1)).min(65535) as u16;
             (*a).accumulated_waiting = 0;
             rotate(&mut *history, (*f).valid_history, month);
         }
     }
 }
 fn protected(o: Observation, s: &Services) -> bool {
-    if o.behaviour & (1 << 7) != 0 && setting(s, 7) == 0 {
+    if o.behaviour & (1 << 7) != 0 && unsafe { (s.landscape)() } == 0 {
         return false;
     }
-    o.behaviour & (1 << 17) == 0
-        && world(s, TYPE_COUNT, ptr::null_mut(), u32::from(o.kind), 0, 0) <= 1
+    o.behaviour & (1 << 17) == 0 && unsafe { (s.type_count)(o.kind) } <= 1
 }
 fn change(i: *mut c_void, s: &Services, monthly: bool) {
     let o = observe(s, i);
-    let f = fields(o);
+    let f = fields(o.owner);
     let mut str = 0;
     let mut close = false;
     let mut standard = false;
@@ -598,12 +670,12 @@ fn change(i: *mut c_void, s: &Services, monthly: bool) {
     let callback = o.callbacks & (1 << if monthly { 5 } else { 4 }) != 0;
     if callback {
         let random = rand(s);
-        let result = world(s, CHANGE_CALLBACK, i, u32::from(monthly), random, 0);
-        let mut res = result as u16;
+        let result = unsafe { (s.change_callback)(i, monthly, random) };
+        let mut res = result.result;
         if res != 0xffff {
             suppress = res & 128 != 0;
             if res & 256 != 0 {
-                str = world(s, CUSTOM_TEXT, i, (result >> 16) as u32 & 0xffff, 0, 0) as u32;
+                str = unsafe { (s.custom_text)(i, result.reg as u16) };
             }
             res &= 15;
             match res {
@@ -618,22 +690,25 @@ fn change(i: *mut c_void, s: &Services, monthly: bool) {
                 14 => increment = 1,
                 15 => {
                     unsafe {
-                        (*f).prod_level = ((result >> 32) & 255).clamp(4, 128) as u8;
+                        (*f).prod_level = ((result.reg as u32 >> 16) & 255).clamp(4, 128) as u8;
                     }
                     recalc = true;
                 }
                 _ => unreachable!(),
             }
         }
-    } else if monthly == original || (!original && setting(s, 8) == 2) || o.life == 0 {
+    } else if monthly == original
+        || (!original && unsafe { (s.economy_type)() } == 2)
+        || o.life == 0
+    {
         return;
     }
     if standard || (!callback && o.life & 3 != 0) {
-        let only_decrease = o.behaviour & (1 << 7) != 0 && setting(s, 7) == 0;
+        let only_decrease = o.behaviour & (1 << 7) != 0 && unsafe { (s.landscape)() } == 0;
         if original {
             if only_decrease || chance(s, 1, 3) {
-                let pct = if produced_count(o) > 0 {
-                    unsafe { transported((*produced(o, 0)).history[1]) }
+                let pct = if produced_count(o.owner) > 0 {
+                    unsafe { transported((*produced(o.owner, 0)).history[1]) }
                 } else {
                     0
                 };
@@ -643,10 +718,10 @@ fn change(i: *mut c_void, s: &Services, monthly: bool) {
                     div = 1;
                 }
             }
-        } else if setting(s, 8) == 1 {
+        } else if unsafe { (s.economy_type)() } == 1 {
             close = unsafe { (*f).ctlflags & 5 == 0 };
-            for n in 0..produced_count(o) {
-                let p = produced(o, n);
+            for n in 0..produced_count(o.owner) {
+                let p = produced(o.owner, n);
                 if unsafe { !valid((*p).cargo) } {
                     continue;
                 }
@@ -666,7 +741,7 @@ fn change(i: *mut c_void, s: &Services, monthly: bool) {
                     );
                 }
                 new = new.clamp(1, 255);
-                if unsafe { (*p).cargo == setting(s, 9) as u8 } && o.behaviour & (1 << 19) == 0 {
+                if unsafe { (*p).cargo == (s.passengers)() } && o.behaviour & (1 << 19) == 0 {
                     new = new.clamp(0, 16);
                 }
                 if unsafe {
@@ -686,14 +761,7 @@ fn change(i: *mut c_void, s: &Services, monthly: bool) {
                     close = false;
                 }
                 if percent.abs() >= 10 {
-                    world(
-                        s,
-                        RATE_NEWS,
-                        i,
-                        unsafe { u32::from((*p).cargo) },
-                        percent as u32,
-                        0,
-                    );
+                    unsafe { (s.rate_news)(i, (*p).cargo, percent) };
                 }
             }
         }
@@ -711,7 +779,7 @@ fn change(i: *mut c_void, s: &Services, monthly: bool) {
     }
     if !callback
         && o.life & 4 != 0
-        && unsafe { (setting(s, 5) as i32).wrapping_sub((*f).last_prod_year) >= 5 }
+        && unsafe { (s.economy_year)().wrapping_sub((*f).last_prod_year) >= 5 }
         && chance(s, 1, if original { 2 } else { 180 })
     {
         close = true;
@@ -752,17 +820,17 @@ fn change(i: *mut c_void, s: &Services, monthly: bool) {
         }
     }
     if recalc {
-        recompute(i, s);
+        recompute(i, o.owner, s);
     }
     if close && !protected(o, s) && unsafe { (*f).ctlflags & 4 == 0 } {
         unsafe {
             (*f).prod_level = 0;
+            (s.set_dirty)(i);
         }
-        world(s, DIRTY, i, 0, 0, 0);
         str = o.closure_text;
     }
     if !suppress && str != 0 {
-        world(s, NEWS, i, str, u32::from(close), 0);
+        unsafe { (s.news)(i, str, close) };
     }
 }
 /// # Safety
@@ -788,27 +856,20 @@ fn type_data(f: *mut BuildFields, kind: u8, s: &Services) -> bool {
     }
 }
 fn game_probability(kind: u8, s: &Services) -> u64 {
-    if setting(s, 10) != 0 {
+    if unsafe { (s.fund_only)() } {
         return 0;
     }
-    let info = world(s, ENABLED, ptr::null_mut(), u32::from(kind), 0, 0);
-    let behavior = (info >> 32) as u32;
-    let year = setting(s, 11) as i32;
-    if info & 1 == 0
-        || info & 2 == 0
+    let info = unsafe { (s.type_info)(kind) };
+    let behavior = info.behaviour;
+    let year = unsafe { (s.calendar_year)() };
+    if !info.enabled
+        || !info.layouts
         || (behavior & (1 << 8) != 0 && year > 1950)
         || (behavior & (1 << 9) != 0 && year < 1960)
     {
         return 0;
     }
-    let probability = world(
-        s,
-        PROB_CALLBACK,
-        ptr::null_mut(),
-        u32::from(kind),
-        ((info >> 8) & 255) as u32,
-        0,
-    ) as u8;
+    let probability = unsafe { (s.probability_callback)(kind, u32::from(info.appear)) } as u8;
     if probability == 0 {
         return 0;
     }
@@ -833,7 +894,7 @@ fn build_type(b: *mut BuilderFields, n: usize) -> *mut BuildFields {
 fn build_reset(builder: *mut Builder, s: &Services) {
     let b = build_fields(builder);
     unsafe {
-        (*b).wanted_inds = (world(s, TOTAL, ptr::null_mut(), 0, 0, 0) as u32).wrapping_shl(16);
+        (*b).wanted_inds = (s.total)().wrapping_shl(16);
         for n in 0..TYPES {
             *build_type(b, n) = BuildFields {
                 max_wait: 1,
@@ -849,15 +910,13 @@ pub unsafe extern "C" fn openttd_rust_industry_build_reset(b: *mut Builder, s: *
     build_reset(b, unsafe { &*s });
 }
 fn build_monthly(builder: *mut Builder, s: &Services) {
-    if setting(s, 10) != 0 {
+    if unsafe { (s.fund_only)() } {
         return;
     }
     let b = build_fields(builder);
-    let max = 1 + (world(s, MAP_SCALE, ptr::null_mut(), 3, 0, 0) as u32).min(99);
-    if (world(s, TOTAL, ptr::null_mut(), 0, 0, 0) as u32).wrapping_add(max)
-        >= unsafe { (*b).wanted_inds >> 16 }
-    {
-        let increment = world(s, MAP_SCALE, ptr::null_mut(), 0x38000 / (10 * 12), 0, 0) as u32;
+    let max = 1 + unsafe { (s.scale_by_map_size)(3) }.min(99);
+    if unsafe { (s.total)() }.wrapping_add(max) >= unsafe { (*b).wanted_inds >> 16 } {
+        let increment = unsafe { (s.scale_by_map_size)(0x38000 / (10 * 12)) };
         unsafe {
             (*b).wanted_inds = (*b).wanted_inds.wrapping_add(increment);
         }
@@ -917,18 +976,11 @@ pub unsafe extern "C" fn openttd_rust_industry_build_targets(b: *mut Builder, s:
     targets(b, unsafe { &*s });
 }
 fn count(s: &Services, n: usize) -> i32 {
-    world(s, TYPE_COUNT, ptr::null_mut(), n as u32, 0, 0) as i32
+    i32::from(unsafe { (s.type_count)(n as u8) })
 }
 fn place(kind: u8, creation: u8, hard: bool, s: &Services) -> *mut c_void {
     for _ in 0..if hard { 10000 } else { 2000 } {
-        let i = world(
-            s,
-            CREATE,
-            ptr::null_mut(),
-            u32::from(kind),
-            u32::from(creation),
-            0,
-        ) as usize as *mut c_void;
+        let i = unsafe { (s.create)(kind, creation) };
         if !i.is_null() {
             return i;
         }
@@ -975,7 +1027,7 @@ fn build_try(builder: *mut Builder, s: &Services) {
             eligible += 1;
         }
     }
-    if setting(s, 3) != 0 || (forced == TYPES && (missing <= 0 || probability == 0)) {
+    if unsafe { (s.recession)() } || (forced == TYPES && (missing <= 0 || probability == 0)) {
         eligible = 0;
     }
     if eligible >= 1 {
@@ -1010,7 +1062,7 @@ fn build_try(builder: *mut Builder, s: &Services) {
                 (*f).max_wait = (u32::from((*f).max_wait) + 2).min(1000) as u16;
             }
         } else {
-            world(s, ADVERTISE, i, 0, 0, 0);
+            unsafe { (s.advertise)(i) };
             unsafe {
                 (*f).max_wait = ((*f).max_wait / 2).max(1);
             }
@@ -1033,8 +1085,8 @@ pub unsafe extern "C" fn openttd_rust_industry_build_try(b: *mut Builder, s: *co
     build_try(b, unsafe { &*s });
 }
 /// # Safety
-/// Live builder and original ordered daily timer invocation. The company service
-/// temporarily changes and restores the original current company.
+/// Live builder and original ordered daily timer invocation. The company services
+/// temporarily change and restore the original current company.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_industry_daily(
     builder: *mut Builder,
@@ -1052,26 +1104,27 @@ pub unsafe extern "C" fn openttd_rust_industry_daily(
     if loops == 0 {
         return;
     }
-    let company = world(s, COMPANY, ptr::null_mut(), 0, 0, 0) as u32;
+    let company = unsafe { (s.company_none)() };
     let mut percentage = 3;
     let wanted = unsafe { (*b).wanted_inds >> 16 };
-    if wanted > world(s, TOTAL, ptr::null_mut(), 0, 0, 0) as u32 {
-        percentage =
-            (percentage + wanted - world(s, TOTAL, ptr::null_mut(), 0, 0, 0) as u32).min(9);
+    if wanted > unsafe { (s.total)() } {
+        percentage = (percentage + wanted - unsafe { (s.total)() }).min(9);
     }
     for _ in 0..loops {
         if chance(s, percentage, 100) {
             build_try(builder, s);
         } else {
-            let i = world(s, RANDOM_INDUSTRY, ptr::null_mut(), 0, 0, 0) as usize as *mut c_void;
+            let i = unsafe { (s.random_industry)() };
             if !i.is_null() {
                 change(i, s, false);
-                world(s, DIRTY, i, 0, 0, 0);
+                unsafe { (s.set_dirty)(i) };
             }
         }
     }
-    world(s, COMPANY, ptr::null_mut(), 1, company, 0);
-    world(s, DIRECTORY, ptr::null_mut(), 0, 0, 0);
+    unsafe {
+        (s.restore_company)(company);
+        (s.directory_dirty)();
+    }
 }
 /// # Safety
 /// Live builder and original ordered monthly invocation. Destruction happens only
@@ -1082,26 +1135,27 @@ pub unsafe extern "C" fn openttd_rust_industry_monthly(
     services: *const Services,
 ) {
     let s = unsafe { &*services };
-    let company = world(s, COMPANY, ptr::null_mut(), 0, 0, 0) as u32;
+    let company = unsafe { (s.company_none)() };
     build_monthly(builder, s);
     let mut from = 0;
     loop {
-        let i = unsafe { (s.next)(from) };
-        if i.is_null() {
+        let e = unsafe { (s.next_tick)(from) };
+        if e.industry.is_null() {
             break;
         }
-        let o = observe(s, i);
-        from = u32::from(o.id) + 1;
-        statistics(i, s);
-        if unsafe { (*fields(o)).prod_level == 0 } {
-            world(s, DESTROY, i, 0, 0, 0);
+        from = u32::from(e.id) + 1;
+        statistics(e.owner, s);
+        if unsafe { (*fields(e.owner)).prod_level == 0 } {
+            unsafe { (s.destroy)(e.industry) };
         } else {
-            change(i, s, true);
-            world(s, DIRTY, i, 0, 0, 0);
+            change(e.industry, s, true);
+            unsafe { (s.set_dirty)(e.industry) };
         }
     }
-    world(s, COMPANY, ptr::null_mut(), 1, company, 0);
-    world(s, DIRECTORY, ptr::null_mut(), 0, 0, 0);
+    unsafe {
+        (s.restore_company)(company);
+        (s.directory_dirty)();
+    }
 }
 /// # Safety
 /// Live industry with no outstanding iterators. Rust owns removal/history freeing.
@@ -1130,48 +1184,48 @@ pub unsafe extern "C" fn openttd_rust_industry_set_production(
     let s = unsafe { &*s };
     let o = observe(s, i);
     unsafe {
-        (*fields(o)).ctlflags |= 8;
-        (*fields(o)).prod_level = level;
+        (*fields(o.owner)).ctlflags |= 8;
+        (*fields(o.owner)).prod_level = level;
     }
-    recompute(i, s);
+    recompute(i, o.owner, s);
 }
 
-fn tile_xy(x: u32, y: u32, s: &Services) -> u32 {
-    y.wrapping_mul(setting(s, 13)).wrapping_add(x)
+fn tile_xy(x: u32, y: u32, map: Map) -> u32 {
+    y.wrapping_mul(map.size_x).wrapping_add(x)
 }
 fn suitable(tile: u32, fields: bool, rough: bool, s: &Services) -> bool {
-    let info = world(s, MAP_TILE, ptr::null_mut(), tile, 0, 0) as u32;
-    match info & 15 {
-        0 => {
-            if info & 16 != 0 {
+    let info = unsafe { (s.farm_tile)(tile) };
+    match info.kind {
+        MP_CLEAR => {
+            if info.snow != 0 {
                 return false;
             }
-            match (info >> 8) & 7 {
+            match info.ground {
                 5 => false,
                 1 => rough,
                 3 => fields,
                 _ => true,
             }
         }
-        4 => {
-            let ground = (info >> 8) & 7;
-            ground != 3 && (rough || ground != 1)
-        }
+        MP_TREES => info.ground != 3 && (rough || info.ground != 1),
         _ => false,
     }
 }
-fn fence(mut tile: u32, mut size: u32, kind: u32, side: u32, s: &Services) {
-    let width = setting(s, 13);
-    let stride = if side == 0 || side == 2 { width } else { 1 };
+fn fence(mut tile: u32, mut size: u32, kind: u8, side: u8, map: Map, s: &Services) {
+    let stride = if side == 0 || side == 2 {
+        map.size_x
+    } else {
+        1
+    };
+    let mask = map.size_x.wrapping_mul(map.size_y).wrapping_sub(1);
     loop {
-        tile &= setting(s, 13).wrapping_mul(setting(s, 14)).wrapping_sub(1);
-        let info = world(s, FENCE, ptr::null_mut(), tile, side, 0) as u32;
-        if info != 0 {
+        tile &= mask;
+        if unsafe { (s.fence_wanted)(tile, side) } {
             let mut kind = kind;
             if kind == 1 && chance(s, 1, 7) {
                 kind = 2;
             }
-            world(s, FENCE, ptr::null_mut(), tile, side, kind);
+            unsafe { (s.set_fence)(tile, side, kind) };
         }
         tile = tile.wrapping_add(stride);
         size -= 1;
@@ -1180,19 +1234,17 @@ fn fence(mut tile: u32, mut size: u32, kind: u32, side: u32, s: &Services) {
         }
     }
 }
-fn plant(tile: u32, industry: u16, s: &Services) {
-    let climate = setting(s, 7);
-    if climate == 1
-        && ((world(s, MAP_TILE, ptr::null_mut(), tile, 0, 0) >> 16) as u32 + 2) >= setting(s, 15)
+fn plant(tile: u32, industry: u16, map: Map, s: &Services) {
+    if map.landscape == LANDSCAPE_ARCTIC
+        && unsafe { (s.tile_z)(tile) + 2 >= i32::from((s.snow_line)()) }
     {
         return;
     }
     let mut r = (rand(s) & 0x303) + 0x404;
-    if climate == 1 {
+    if map.landscape == LANDSCAPE_ARCTIC {
         r += 0x404;
     }
-    let width = setting(s, 13);
-    let height = setting(s, 14);
+    let (width, height) = (map.size_x, map.size_y);
     let sx = r & 255;
     let sy = (r >> 8) & 255;
     let x = tile % width;
@@ -1207,91 +1259,88 @@ fn plant(tile: u32, industry: u16, s: &Services) {
     let mut count = 0;
     for yy in y..y + sy {
         for xx in x..x + sx {
-            count += u32::from(suitable(tile_xy(xx, yy, s), false, false, s));
+            count += u32::from(suitable(tile_xy(xx, yy, map), false, false, s));
         }
     }
     if count * 2 < sx * sy {
         return;
     }
     r = rand(s);
-    let counter = (r >> 5) & 7;
-    let field = (((r >> 8) & 255) * 9) >> 8;
+    let counter = ((r >> 5) & 7) as u8;
+    let field = ((((r >> 8) & 255) * 9) >> 8) as u8;
     for yy in y..y + sy {
         for xx in x..x + sx {
-            let tile = tile_xy(xx, yy, s);
+            let tile = tile_xy(xx, yy, map);
             if suitable(tile, true, true, s) {
-                world(
-                    s,
-                    FIELD_WRITE,
-                    ptr::null_mut(),
-                    tile,
-                    field | (counter << 8),
-                    u32::from(industry),
-                );
+                unsafe { (s.make_field)(tile, field, counter, industry) };
             }
         }
     }
     let mut kind = 3;
-    if climate != 1 && climate != 2 {
+    if map.landscape != LANDSCAPE_ARCTIC && map.landscape != LANDSCAPE_TROPIC {
         kind = [1, 1, 1, 1, 1, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6][(rand(s) & 15) as usize];
     }
-    fence(tile_xy(x, y, s), sy, kind, 0, s);
-    fence(tile_xy(x, y, s), sx, kind, 3, s);
-    fence(tile_xy(x + sx - 1, y, s), sy, kind, 2, s);
-    fence(tile_xy(x, y + sy - 1, s), sx, kind, 1, s);
+    fence(tile_xy(x, y, map), sy, kind, 0, map, s);
+    fence(tile_xy(x, y, map), sx, kind, 3, map, s);
+    fence(tile_xy(x + sx - 1, y, map), sy, kind, 2, map, s);
+    fence(tile_xy(x, y + sy - 1, map), sx, kind, 1, map, s);
 }
-fn farm(i: *mut c_void, s: &Services) {
-    let o = observe(s, i);
-    let x = (u32::from(o.width) / 2)
+fn farm(i: *mut c_void, id: u16, map: Map, s: &Services) {
+    let l = unsafe { (s.location)(i) };
+    let x = (u32::from(l.width) / 2)
         .wrapping_add(rand(s) % 31)
-        .wrapping_sub(16);
-    let y = (u32::from(o.height) / 2)
+        .wrapping_sub(16) as i32;
+    let y = (u32::from(l.height) / 2)
         .wrapping_add(rand(s) % 31)
-        .wrapping_sub(16);
-    let tile = world(s, MAP_TILE, i, o.tile, x, y) as u32;
-    if tile != u32::MAX {
-        plant(tile, o.id, s);
+        .wrapping_sub(16) as i32;
+    let tile = unsafe { (s.tile_add_wrap)(l.tile, x, y) };
+    if tile != INVALID_TILE {
+        plant(tile, id, map, s);
     }
 }
 /// # Safety
 /// Live industry, synchronous map/RNG services. No owner references cross calls.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_industry_farm(i: *mut c_void, s: *const Services) {
-    farm(i, unsafe { &*s });
+pub unsafe extern "C" fn openttd_rust_industry_farm(
+    i: *mut c_void,
+    id: u16,
+    map: Map,
+    s: *const Services,
+) {
+    farm(i, id, map, unsafe { &*s });
 }
-fn chop(i: *mut c_void, s: &Services, builder: *mut Builder) {
-    let o = observe(s, i);
-    if produced_count(o) == 0 || unsafe { !valid((*produced(o, 0)).cargo) } {
+fn chop(i: *mut c_void, owner: *mut Industry, map: Map, s: &Services, builder: *mut Builder) {
+    if produced_count(owner) == 0 || unsafe { !valid((*produced(owner, 0)).cargo) } {
         return;
     }
-    let width = setting(s, 13);
-    for y in o.tile / width..o.tile / width + u32::from(o.height) {
-        for x in o.tile % width..o.tile % width + u32::from(o.width) {
-            if world(s, COMPLETED, i, tile_xy(x, y, s), 0, 0) == 0 {
+    let l = unsafe { (s.location)(i) };
+    let width = map.size_x;
+    for y in l.tile / width..l.tile / width + u32::from(l.height) {
+        for x in l.tile % width..l.tile % width + u32::from(l.width) {
+            if unsafe { !(s.tile_completed)(i, tile_xy(x, y, map)) } {
                 return;
             }
         }
     }
-    let mut spiral =
-        crate::spiral::square(o.tile % width, o.tile / width, 40, width, setting(s, 14));
+    let mut spiral = crate::spiral::square(l.tile % width, l.tile / width, 40, width, map.size_y);
     while !spiral.is_end() {
-        let tile = tile_xy(spiral.x, spiral.y, s);
-        let info = world(s, MAP_TILE, ptr::null_mut(), tile, 0, 0) as u32;
-        if info & 15 == 4 && info & 32 != 0 {
+        let tile = tile_xy(spiral.x, spiral.y, map);
+        let info = unsafe { (s.farm_tile)(tile) };
+        if info.kind == MP_TREES && info.grown != 0 {
             let b = build_fields(builder);
             unsafe {
                 (*b).sound_ctr = 1;
                 (*b).sound_tile = tile;
+                (s.harvest)(tile);
             }
-            world(s, HARVEST, i, tile, 0, 0);
-            let amount = world(s, SCALE, i, 45, 0, 0) as u32;
+            let amount = unsafe { (s.scale_cargo)(45) };
             unsafe {
-                let p = produced(o, 0);
+                let p = produced(owner, 0);
                 (*p).waiting = (u32::from((*p).waiting) + amount).min(65535) as u16;
             }
             break;
         }
-        spiral = spiral.advance(width, setting(s, 14));
+        spiral = spiral.advance(width, map.size_y);
     }
 }
 #[repr(C)]
@@ -1314,6 +1363,7 @@ pub type Resolve = unsafe extern "C" fn(*mut c_void, u32, u32, *mut ProductionRe
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_industry_production_callback(
     i: *mut c_void,
+    owner: *mut Industry,
     context: *mut c_void,
     behaviour: u32,
     reason: u8,
@@ -1321,21 +1371,20 @@ pub unsafe extern "C" fn openttd_rust_industry_production_callback(
     services: *const Services,
 ) {
     let s = unsafe { &*services };
-    let o = observe(s, i);
     let random = if behaviour & (1 << 15) != 0 {
         rand(s)
     } else {
         0
     };
     let multiplier = if behaviour & (1 << 14) != 0 {
-        unsafe { i32::from((*fields(o)).prod_level) }
+        unsafe { i32::from((*fields(owner)).prod_level) }
     } else {
         1
     };
     let mut parameter = u32::from(reason);
     for n in 0..=65536 {
         if n == 65536 {
-            world(s, CALLBACK_ERROR, i, 0, 0, 0);
+            unsafe { (s.callback_error)(i, false) };
             break;
         }
         parameter = (parameter & !0x00ff_ff00) | (n << 8);
@@ -1357,12 +1406,12 @@ pub unsafe extern "C" fn openttd_rust_industry_production_callback(
             break;
         }
         if result.version == 255 {
-            world(s, CALLBACK_ERROR, i, 1, 0, 0);
+            unsafe { (s.callback_error)(i, true) };
             break;
         }
         for n in 0..usize::from(result.num_input) {
             let slot = if result.version < 2 {
-                if n >= accepted_count(o) {
+                if n >= accepted_count(owner) {
                     break;
                 }
                 Some(n)
@@ -1371,11 +1420,12 @@ pub unsafe extern "C" fn openttd_rust_industry_production_callback(
                 if !valid(cargo) {
                     None
                 } else {
-                    (0..accepted_count(o)).find(|&n| unsafe { (*accepted(o, n)).cargo == cargo })
+                    (0..accepted_count(owner))
+                        .find(|&n| unsafe { (*accepted(owner, n)).cargo == cargo })
                 }
             };
             if let Some(nslot) = slot {
-                let a = accepted(o, nslot);
+                let a = accepted(owner, nslot);
                 unsafe {
                     if result.version < 2 && !valid((*a).cargo) {
                         continue;
@@ -1388,7 +1438,7 @@ pub unsafe extern "C" fn openttd_rust_industry_production_callback(
         }
         for n in 0..usize::from(result.num_output) {
             let slot = if result.version < 2 {
-                if n >= produced_count(o) {
+                if n >= produced_count(owner) {
                     break;
                 }
                 Some(n)
@@ -1397,11 +1447,12 @@ pub unsafe extern "C" fn openttd_rust_industry_production_callback(
                 if !valid(cargo) {
                     None
                 } else {
-                    (0..produced_count(o)).find(|&n| unsafe { (*produced(o, n)).cargo == cargo })
+                    (0..produced_count(owner))
+                        .find(|&n| unsafe { (*produced(owner, n)).cargo == cargo })
                 }
             };
             if let Some(nslot) = slot {
-                let p = produced(o, nslot);
+                let p = produced(owner, nslot);
                 unsafe {
                     if result.version < 2 && !valid((*p).cargo) {
                         continue;
@@ -1417,7 +1468,7 @@ pub unsafe extern "C" fn openttd_rust_industry_production_callback(
         }
         parameter = (parameter & 0x00ff_ffff) | ((result.again as u32 & 255) << 24);
     }
-    world(s, DIRTY, i, 0, 0, 0);
+    unsafe { (s.set_dirty)(i) };
 }
 
 /// # Safety
@@ -1443,13 +1494,13 @@ pub unsafe extern "C" fn openttd_rust_industry_command(
     services: *const Services,
 ) -> u8 {
     let s = unsafe { &*services };
-    if setting(s, 16) == 0 {
+    if unsafe { !(s.deity)() } {
         return 0;
     }
     if production != 0 && !(4..=128).contains(&value) {
         return 0;
     }
-    let i = world(s, 34, ptr::null_mut(), u32::from(id), 0, 0) as usize as *mut c_void;
+    let i = unsafe { (s.get)(id) };
     if i.is_null() || (production == 0 && value & !15 != 0) {
         return 0;
     }
@@ -1461,7 +1512,7 @@ pub unsafe extern "C" fn openttd_rust_industry_command(
         } else {
             let o = observe(s, i);
             unsafe {
-                (*fields(o)).ctlflags = value;
+                (*fields(o.owner)).ctlflags = value;
             }
         }
     }

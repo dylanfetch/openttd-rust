@@ -263,9 +263,22 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         136 => {
             layout!(crate::industry::Observation, item; owner, tile, behaviour, id, width, height, callbacks, sound_count, life, original, minimal_cargo, kind, up_text, down_text, closure_text)
         }
-        137 => layout!(crate::industry::Services, item; observe, next, setting, world),
+        137 => {
+            layout!(crate::industry::Services, item; next_tick, sound_count, behaviour, location, industry_sound, play_sound, special_effect, tick_trigger, production_callback, scale_cargo, random, random_range, move_goods, tile_add_wrap, farm_tile, tile_z, snow_line, make_field, fence_wanted, set_fence, tile_completed, harvest, observe, production_rate, change_callback, custom_text, news, rate_news, callback_error, set_dirty, destroy, advertise, create, random_industry, get, type_count, total, type_info, probability_callback, scale_by_map_size, company_none, restore_company, directory_dirty, recession, economy_month, economy_year, days_since_last_month, landscape, economy_type, passengers, fund_only, calendar_year, deity)
+        }
         138 => {
             layout!(crate::industry::ProductionResult, item; subtract, add, again, cargo_input, cargo_output, version, num_input, num_output, present)
+        }
+        139 => layout!(crate::industry::Map, item; size_x, size_y, landscape),
+        140 => {
+            layout!(crate::industry::TickRecord, item; counter, map, interval, ambient, editor)
+        }
+        141 => layout!(crate::industry::Entry, item; industry, owner, id, callbacks),
+        142 => layout!(crate::industry::Location, item; tile, width, height),
+        143 => layout!(crate::industry::FarmTile, item; kind, snow, ground, grown),
+        144 => layout!(crate::industry::Change, item; result, reg),
+        145 => {
+            layout!(crate::industry::TypeInfo, item; behaviour, enabled, layouts, appear)
         }
 
         180 => {
