@@ -215,7 +215,13 @@ struct ORDRChunkHandler : ChunkHandler {
 };
 
 template <typename T>
-class SlOrders : public VectorSaveLoadHandler<SlOrders<T>, T, Order> {
+class SlOrders : public
+#ifdef WITH_RUST
+	DefaultSaveLoadHandler<SlOrders<T>, T>
+#else
+	VectorSaveLoadHandler<SlOrders<T>, T, Order>
+#endif
+{
 public:
 	static inline const SaveLoad description[] = {
 		SLE_VAR(Order, type,        SLE_UINT8),
@@ -228,7 +234,25 @@ public:
 	};
 	static inline const SaveLoadCompatTable compat_description = {};
 
+#ifdef WITH_RUST
+	void Save(T *container) const override
+	{
+		SlSetStructListLength(container->orders.size());
+		for (Order &order : container->orders) SlObject(&order, this->GetDescription());
+	}
+	void Load(T *container) const override
+	{
+		size_t count = SlGetStructListLength(UINT32_MAX);
+		while (count-- > 0) {
+			/* Growth returns before SlObject can throw; partial order state stays
+			 * committed exactly like the original emplace-before-load path. */
+			Order &order = container->orders.emplace_back();
+			SlObject(&order, this->GetLoadDescription());
+		}
+	}
+#else
 	std::vector<Order> &GetVector(T *container) const override { return container->orders; }
+#endif
 
 	void LoadCheck(T *container) const override { this->Load(container); }
 };

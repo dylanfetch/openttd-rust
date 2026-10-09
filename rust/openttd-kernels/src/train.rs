@@ -1161,7 +1161,7 @@ impl Game {
             u = self.read(u).next;
         }
         if crossing != INVALID {
-            self.update_crossing(crossing, false, false);
+            self.update_crossing(crossing, true, false);
         }
         let crossing = self.approaching_crossing(id);
         if crossing != INVALID {
@@ -1687,7 +1687,7 @@ impl Game {
             if self.read(id).next == INVALID {
                 self.moved_signals(id, old, entered ^ 2);
                 if self.tile_op(IS_CROSSING, old) != 0 {
-                    self.update_crossing(old, false, false);
+                    self.update_crossing(old, true, false);
                 }
             }
         }
@@ -1779,7 +1779,7 @@ impl Game {
             }
             let crossing = self.approaching_crossing(id);
             if crossing != INVALID {
-                self.update_crossing(crossing, false, false);
+                self.update_crossing(crossing, true, false);
             }
             self.op(HIDE_FILL, id);
         }
@@ -1926,7 +1926,7 @@ impl Game {
             }
         }
         if self.tile_op(IS_CROSSING, tile) != 0 {
-            self.update_crossing(tile, false, false);
+            self.update_crossing(tile, true, false);
         }
         if self.tile_op(IS_STATION, tile) != 0 {
             let occupied = self.platform_occupied(tile);

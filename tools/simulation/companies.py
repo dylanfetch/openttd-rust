@@ -7,7 +7,6 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from . import core
 from .core import ROOT, SNAPSHOT_TICKS, decode_element, read_save, run_game
 from .disasters import patch
 
@@ -170,16 +169,15 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
             "unpause",
         ],
     )
-    with core.MACHINE.hold(alone=False):
-        built = run_game(
-            setup,
-            binaries["reference"],
-            builds["reference"],
-            folder / "setup",
-            timeout,
-            env,
-            False,
-        )
+    built = run_game(
+        setup,
+        binaries["reference"],
+        builds["reference"],
+        folder / "setup",
+        timeout,
+        env,
+        False,
+    )
     assets = [
         line.split("COMPANY-ASSETS ", 1)[1]
         for line in built["log"]
@@ -290,16 +288,15 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
         console=scenario["console"],
     )
     if operation == "reload":
-        with core.MACHINE.hold(alone=False):
-            live = run_game(
-                dict(scenario, save=str(prepared), ticks=120),
-                binaries["reference"],
-                builds["reference"],
-                folder / "reload",
-                timeout,
-                env,
-                False,
-            )
+        live = run_game(
+            dict(scenario, save=str(prepared), ticks=120),
+            binaries["reference"],
+            builds["reference"],
+            folder / "reload",
+            timeout,
+            env,
+            False,
+        )
         if live["exit"] or not live["snapshots"]:
             raise RuntimeError("company reference reload failed")
         prepared = folder / "reload-input.sav"

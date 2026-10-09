@@ -103,7 +103,7 @@ static OpenTTDShipYapfInput ShipInput(const Ship *v, bool blocked = false)
 	const bool station = v->current_order.IsType(OT_GOTO_STATION);
 	TrackdirBits reverse_dirs = TRACKDIR_BIT_NONE;
 	if (blocked) {
-		const DiagDirection entry = ReverseDiagDir(VehicleExitDir(v->direction, v->state));
+		const DiagDirection entry = ReverseDiagDir(VehicleExitDir(v->direction, v->GetState()));
 		reverse_dirs = DiagdirReachesTrackdirs(entry) & TrackStatusToTrackdirBits(GetTileTrackStatus(v->tile, TRANSPORT_WATER, 0, entry));
 	}
 	return {Map::SizeX(), Map::SizeY(), v->tile.base(), v->dest_tile.base(), static_cast<int32_t>(_settings_game.pf.yapf.ship_curve90_penalty),
@@ -436,7 +436,7 @@ public:
 			return path_found && best_origin_dir == reverse_dir;
 		} else {
 			/* This gets called when a ship suddenly can't move forward, e.g. due to terraforming. */
-			const DiagDirection entry = ReverseDiagDir(VehicleExitDir(v->direction, v->state));
+			const DiagDirection entry = ReverseDiagDir(VehicleExitDir(v->direction, v->GetState()));
 			const TrackdirBits reverse_dirs = DiagdirReachesTrackdirs(entry) & TrackStatusToTrackdirBits(GetTileTrackStatus(v->tile, TRANSPORT_WATER, 0, entry));
 			(void)ChooseShipTrack(v, v->tile, TRACKDIR_BIT_NONE, reverse_dirs, path_found, dummy_cache, best_origin_dir);
 			*trackdir = path_found && best_origin_dir != INVALID_TRACKDIR ? best_origin_dir : GetRandomTrackdir(reverse_dirs);

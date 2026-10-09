@@ -6,7 +6,6 @@ import shutil
 import struct
 from pathlib import Path
 
-from . import core
 from .core import (
     FILE_TYPES,
     ROOT,
@@ -55,7 +54,7 @@ def scenarios(soak):
                 "ticks": 200000 if soak else 100000,
             }
         )
-    for operation in ("route", "mutate", "depot", "reload"):
+    for operation in ("route", "mutate", "depot", "reload", "lifecycle", "class"):
         scenarios.append(
             {
                 "name": f"water-structures-{operation}",
@@ -139,14 +138,42 @@ def check_water(scenario, run, desync):
                 if operation == "mutate"
                 else ["send-depot", "depot-arrival", "restart", "depot-recovered"]
                 if operation == "depot"
+                else [
+                    "build",
+                    "sell",
+                    "reuse",
+                    "reuse-order-a",
+                    "reuse-order-b",
+                    "reuse-start",
+                    "reuse-moved",
+                ]
+                if operation == "lifecycle"
                 else []
             )
             + ["complete"]
         )
         if [row[0] for row in markers] != expected:
             raise RuntimeError("water command/lost/recovery witnesses are incomplete")
+    lifecycle = None
+    if operation == "lifecycle":
+        ids = [
+            int(row[1])
+            for row in markers
+            if row[0] in ("build", "sell", "reuse", "reuse-moved")
+        ]
+        if len(ids) != 4 or len(set(ids)) != 1 or ids[0] == ship:
+            raise RuntimeError("ship build/sell/reuse markers lack actual ID reuse")
+        chunk = read_save(run["snapshots"][-1])["VEHS"]
+        reused = decode_element(chunk, dict(chunk["elements"])[ids[0]])
+        if reused["type"] != 2 or reused["ship[0]/common[0]/motion_counter"] == 0:
+            raise RuntimeError("rebuilt ship owner did not drive a moving ship")
+        lifecycle = {
+            "reused_id": ids[0],
+            "motion_counter": reused["ship[0]/common[0]/motion_counter"],
+        }
     return {
         "input": receipt,
+        "lifecycle": lifecycle,
         "elapsed_ticks": elapsed,
         "observations": rows,
         "loaded": loaded,
@@ -156,18 +183,44 @@ def check_water(scenario, run, desync):
 
 
 def prepare(scenario, binaries, builds, out, timeout, env, result):
+    if scenario.get("water_operation") == "class":
+        # MakeRiver differs from the existing flat clear canal only in m1:
+        # WaterClass::River (2 << 5) and OWNER_WATER (17). Both roles load this
+        # explicit source input, so the controller crosses canal/river boundaries.
+        source = Path(scenario["save"])
+        data, chunks = bytearray(source.read_bytes()), read_save(source)
+        tile = 190 * 256 + 163
+        if (
+            chunks["MAPT"]["raw"][tile] != 96
+            or chunks["MAP5"]["raw"][tile] != 0
+            or chunks["MAPO"]["raw"][tile] != 33
+        ):
+            raise RuntimeError("water-class input is not the expected flat clear canal")
+        offset = chunks["MAPO"]["span"][1] - len(chunks["MAPO"]["raw"]) + tile
+        data[offset] = 81
+        folder = out / scenario["name"] / "input"
+        folder.mkdir(parents=True, exist_ok=True)
+        prepared = folder / "river-input.sav"
+        prepared.write_bytes(data)
+        receipt = {
+            "ship": 22,
+            "reference_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+            "normalized_sha256": hashlib.sha256(data).hexdigest(),
+            "changed": {"chunk": "MAPO", "tile": tile, "old": 33, "new": 81},
+        }
+        result["water_class_input"] = receipt
+        return dict(scenario, save=str(prepared), water_receipt=receipt)
     if scenario.get("water_operation") != "reload":
         return scenario
     setup = dict(scenario, water_operation="route", ticks=3 * SNAPSHOT_TICKS)
-    with core.MACHINE.hold(alone=False):
-        run = run_game(
-            setup,
-            binaries["reference"],
-            builds["reference"],
-            out / scenario["name"] / "prepare",
-            timeout,
-            env,
-        )
+    run = run_game(
+        setup,
+        binaries["reference"],
+        builds["reference"],
+        out / scenario["name"] / "prepare",
+        timeout,
+        env,
+    )
     if run["exit"] != 0:
         raise RuntimeError("ship reload preparation failed")
     ship = json.loads(Path(scenario["save"]).with_suffix(".json").read_text())["ship"]
@@ -210,6 +263,30 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
 
 def check(scenario, run, mode, role, result):
     if "water" in scenario:
+        profile = run["snapshots"][-1].parents[2] / "ship-control-profile.json"
+        if profile.is_file():
+            branches = json.loads(profile.read_text())
+            required = ["economy_day", "path_cache", "reverse", "rotate", "buoy"]
+            required += (
+                ["loading", "auto_service", "rotation_reload"]
+                if scenario["water"] == "ferry"
+                else ["lock_up", "lock_down", "aqueduct"]
+            )
+            if scenario.get("water_operation") == "depot":
+                required += ["depot_search", "depot_leave", "depot_enter"]
+            if scenario.get("water_operation") == "class":
+                required += ["water_change"]
+            if scenario.get("water_operation") == "lifecycle":
+                required += ["build", "depot_leave"]
+                if branches["build"] < 2:
+                    raise RuntimeError(
+                        "ship controller did not initialize both build/reuse owners"
+                    )
+            if any(not branches[key] for key in required):
+                raise RuntimeError(
+                    f"ship controller branch witnesses missing: {required}; {branches}"
+                )
+            result[f"{mode}_{role}_ship_control_profile"] = branches
         result[f"{mode}_{role}_water"] = check_water(scenario, run, mode == "snapshots")
         profile = run["snapshots"][-1].parents[2] / "water-profile.json"
         if profile.is_file():
@@ -249,16 +326,15 @@ def prepare_water_save(layout, migration, out, timeout):
         "ticks": 1,
         "console": ["unpause"],
     }
-    with core.MACHINE.hold(alone=False):
-        initial = run_game(
-            scenario,
-            binary,
-            runtime,
-            out / "initial",
-            timeout,
-            migration.environment(),
-            False,
-        )
+    initial = run_game(
+        scenario,
+        binary,
+        runtime,
+        out / "initial",
+        timeout,
+        migration.environment(),
+        False,
+    )
     if initial["exit"] != 0 or not initial["snapshots"]:
         raise RuntimeError("water preparation could not emit the original save")
     emitted = initial["snapshots"][-1]
@@ -314,16 +390,15 @@ def prepare_water_save(layout, migration, out, timeout):
         f'WATER_SETUP <- "{layout}";\n'
     )
     scenario.update(save=str(funded), ticks=6000)
-    with core.MACHINE.hold(alone=False):
-        built = run_game(
-            scenario,
-            binary,
-            runtime,
-            out / "built",
-            timeout,
-            migration.environment(),
-            False,
-        )
+    built = run_game(
+        scenario,
+        binary,
+        runtime,
+        out / "built",
+        timeout,
+        migration.environment(),
+        False,
+    )
     markers = [
         line.split("WATER-SETUP-END ", 1)[1]
         for line in built["log"]

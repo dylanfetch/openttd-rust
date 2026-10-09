@@ -23,6 +23,13 @@ from .play_saves import DISTRIBUTIONS
 
 AI_FOLDER = "aircraft-controller-ai"
 LOCK = threading.Lock()
+LANDING_SEEDS = {
+    "equal": (2443390976, 1012692424),
+    "above": (2443382784, 1011643848),
+    "masked": (2443390968, 1012691400),
+    "disabled": (2443390976, 1012692424),
+    "event": (2443390976, 1012692424),
+}
 
 
 def scenarios(soak):
@@ -58,6 +65,20 @@ def scenarios(soak):
             "reload",
             "ownerless",
         )
+    ]
+    cases += [
+        {
+            "name": f"aircraft-controller-landing-{kind}",
+            "kind": "save",
+            "aircraft_control": f"landing-{kind}",
+            "ticks": 16 if kind == "event" else 1,
+            "short_checkpoint": True,
+            "console": [
+                f"setting vehicle.plane_crashes {0 if kind == 'disabled' else 1}",
+                "unpause",
+            ],
+        }
+        for kind in LANDING_SEEDS
     ]
     return cases
 
@@ -120,16 +141,15 @@ def prepare_aircraft_save(migration, out, timeout):
             "economy": {"initial_city_size": 4},
         },
     }
-    with core.MACHINE.hold(alone=False):
-        run = run_game(
-            setup,
-            binary,
-            runtime,
-            out / "built",
-            timeout,
-            migration.environment(),
-            False,
-        )
+    run = run_game(
+        setup,
+        binary,
+        runtime,
+        out / "built",
+        timeout,
+        migration.environment(),
+        False,
+    )
     markers = [
         line.split("AIRCRAFT-SETUP-END ", 1)[1]
         for line in run["log"]
@@ -340,16 +360,15 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
             if kind == "ownerless":
                 setup["settings"]["difficulty"]["quantity_sea_lakes"] = 2
                 setup["settings"]["construction"] = {"raw_industry_construction": 1}
-            with core.MACHINE.hold(alone=False):
-                trial = run_game(
-                    setup,
-                    binaries["reference"],
-                    builds["reference"],
-                    folder,
-                    timeout,
-                    env,
-                    False,
-                )
+            trial = run_game(
+                setup,
+                binaries["reference"],
+                builds["reference"],
+                folder,
+                timeout,
+                env,
+                False,
+            )
             if trial["exit"] or not any(
                 "AIRCRAFT-CONTROL-END" in line for line in trial["log"]
             ):
@@ -372,21 +391,20 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
                 )
                 if landing is not None:
                     break
-                with core.MACHINE.hold(alone=False):
-                    trial = run_game(
-                        {
-                            "kind": "save",
-                            "save": str(source),
-                            "ticks": 64,
-                            "console": ["unpause"],
-                        },
-                        binaries["reference"],
-                        builds["reference"],
-                        folder / f"landing-{attempt}",
-                        timeout,
-                        env,
-                        False,
-                    )
+                trial = run_game(
+                    {
+                        "kind": "save",
+                        "save": str(source),
+                        "ticks": 64,
+                        "console": ["unpause"],
+                    },
+                    binaries["reference"],
+                    builds["reference"],
+                    folder / f"landing-{attempt}",
+                    timeout,
+                    env,
+                    False,
+                )
                 if trial["exit"]:
                     raise RuntimeError("reference landing preparation failed")
                 source = trial["snapshots"][-1]
@@ -405,21 +423,20 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
                     for row in current.values()
                 ):
                     break
-                with core.MACHINE.hold(alone=False):
-                    trial = run_game(
-                        {
-                            "kind": "save",
-                            "save": str(source),
-                            "ticks": 128,
-                            "console": ["unpause"],
-                        },
-                        binaries["reference"],
-                        builds["reference"],
-                        folder / f"airborne-{attempt}",
-                        timeout,
-                        env,
-                        False,
-                    )
+                trial = run_game(
+                    {
+                        "kind": "save",
+                        "save": str(source),
+                        "ticks": 128,
+                        "console": ["unpause"],
+                    },
+                    binaries["reference"],
+                    builds["reference"],
+                    folder / f"airborne-{attempt}",
+                    timeout,
+                    env,
+                    False,
+                )
                 if trial["exit"]:
                     raise RuntimeError("reference airborne removal preparation failed")
                 source = trial["snapshots"][-1]
@@ -481,28 +498,36 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
             edits["STNN"] = {
                 target: {"normal[0]/airport.flags": flags | (1 << 62) | (1 << 8)}
             }
-        elif kind == "reload":
+        elif kind == "reload" or kind.startswith("landing-"):
             # A second reference run produces a live rotor/FTA reload, rather than
             # changing candidate fields or expectations together.
             resumed = folder / "reload"
-            with core.MACHINE.hold(alone=False):
-                trial = run_game(
-                    {
-                        "kind": "save",
-                        "save": str(source),
-                        "ticks": 411,
-                        "console": ["unpause"],
-                    },
-                    binaries["reference"],
-                    builds["reference"],
-                    resumed,
-                    timeout,
-                    env,
-                    False,
-                )
+            trial = run_game(
+                {
+                    "kind": "save",
+                    "save": str(source),
+                    "ticks": 411,
+                    "console": ["unpause"],
+                },
+                binaries["reference"],
+                builds["reference"],
+                resumed,
+                timeout,
+                env,
+                False,
+            )
             if trial["exit"]:
                 raise RuntimeError("reference live aircraft reload failed")
             source = trial["snapshots"][-1]
+            if kind.startswith("landing-"):
+                flight = 2
+                target = rows(source)[flight]["aircraft[0]/targetairport"]
+                seeds = LANDING_SEEDS[kind.removeprefix("landing-")]
+                edits["DATE"] = {
+                    0: {f"random_state[{i}]": seed for i, seed in enumerate(seeds)}
+                }
+                if kind == "landing-event":
+                    action = {"aircraft_action": "landing-event"}
         destination = out / scenario["name"] / "input.sav"
         destination.parent.mkdir(parents=True, exist_ok=True)
         receipt = patch(source, destination, edits)
@@ -537,7 +562,104 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
         )
 
 
+def check_landing(scenario, run, mode, role, result):
+    """Ordinary valid-station MaybeCrash: threshold, mask, draw and side effects."""
+    kind = scenario["aircraft_control"].removeprefix("landing-")
+    source, final = Path(scenario["save"]), run["snapshots"][-1]
+    before, after = rows(source), rows(final)
+    plane, common = "aircraft[0]/", "aircraft[0]/common[0]/"
+    a, b = before[2], after[2]
+    target = a[plane + "targetairport"]
+    station_a, station_b = rows(source, "STNN")[target], rows(final, "STNN")[target]
+    if (
+        [
+            a[plane + field]
+            for field in ("state", "pos", "previous_pos", "targetairport")
+        ]
+        != [16, 34, 33, 0]
+        or a[common + "cur_speed"] != 293
+        or a[common + "vehstatus"] != 8
+        or a[plane + "crashed_counter"] != 0
+        or station_a["normal[0]/airport.type"] != 4
+    ):
+        raise RuntimeError("reference reload lacks the actual landing brake boundary")
+    shadow = a[common + "next"] - 1
+    for head in (2, shadow):
+        if not before[head][common + "cargo.packets"]:
+            raise RuntimeError("landing input lacks plane passenger/mail cargo")
+    cargo = {
+        key: value
+        for key, value in station_a.items()
+        if "/cargo[" in key and key.endswith("/second")
+    }
+    if not all(station_a[f"normal[0]/goods[{i}]/cargo[0]/second"] for i in (0, 2)):
+        raise RuntimeError("landing input lacks target-station passenger/mail cargo")
+    crash = kind in ("equal", "masked", "event")
+    if b[common + "vehstatus"] != (138 if crash else 8) or b[
+        plane + "crashed_counter"
+    ] != (93 if kind == "event" else 3 if crash else 0):
+        raise RuntimeError(f"landing {kind} crash status/counter differs from original")
+    for head in (2, shadow):
+        for field in ("cargo.packets", "cargo.action_counts"):
+            expected = (
+                (() if field.endswith("packets") else (0,) * 4)
+                if crash
+                else before[head][common + field]
+            )
+            if after[head][common + field] != expected:
+                raise RuntimeError(f"landing {kind} passenger/mail cleanup differs")
+    if crash:
+        if any("/cargo[" in key for key in station_b):
+            raise RuntimeError("landing crash did not clear all target-station cargo")
+        for i in range(64):
+            # MaybeCrash sets every rating to 1, then CrashAirplane's surrounding
+            # station penalty lowers ratings with nonzero goods status to zero.
+            if station_b[f"normal[0]/goods[{i}]/rating"] != (
+                0 if i in (0, 2, 5) else 1
+            ):
+                raise RuntimeError("landing crash rating reset/nearby penalty differs")
+    elif any(station_b.get(key) != value for key, value in cargo.items()) or any(
+        station_b[f"normal[0]/goods[{i}]/rating"]
+        != station_a[f"normal[0]/goods[{i}]/rating"]
+        for i in range(64)
+    ):
+        raise RuntimeError("surviving landing changed target-station cargo/ratings")
+    mask = station_b["normal[0]/airport.flags"]
+    if mask != (2304 if kind == "event" else 3328):
+        raise RuntimeError("landing airport reservation mask differs")
+    rng = [rows(final, "DATE")[0][f"random_state[{i}]"] for i in (0, 1)]
+    expected_rng = {
+        "equal": [3963465306, 766842487],
+        "above": [1772663753, 1476991553],
+        "masked": [3996593850, 770979447],
+        "disabled": [3995363677, 21],
+        "event": [3455259752, 4266961540],
+    }
+    if rng != expected_rng[kind]:
+        raise RuntimeError(f"landing {kind} shared RNG {rng} differs from original")
+    events = [
+        line.split("LANDING-EVENT ", 1)[1]
+        for line in run["log"]
+        if "LANDING-EVENT " in line
+    ]
+    if events != (["2 10064 3 10"] if kind == "event" else []):
+        raise RuntimeError(
+            "landing crash event/site/reason/victims missing or repeated"
+        )
+    result[f"{mode}_{role}_landing"] = {
+        "crashed": crash,
+        "counter": b[plane + "crashed_counter"],
+        "status": b[common + "vehstatus"],
+        "shared_rng": rng,
+        "airport_blocks": mask,
+        "events": events,
+    }
+
+
 def check_control(scenario, run, mode, role, result):
+    if scenario["aircraft_control"].startswith("landing-"):
+        check_landing(scenario, run, mode, role, result)
+        return
     if scenario.get("aircraft_action") and not any(
         f"AIRCRAFT-ACTION {scenario['aircraft_action']} true" in line
         for line in run["log"]

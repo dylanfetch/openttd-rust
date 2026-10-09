@@ -1,4 +1,4 @@
-"""Owner-built rail fixture; the existing ship route is also observed (#86)."""
+"""Owner-built multimodal fixtures and rail controller evidence (#86/#179/#183)."""
 
 import hashlib
 import json
@@ -82,6 +82,64 @@ def scenarios(soak):
                 ],
             )
         )
+    for distribution, commands in DISTRIBUTIONS.items():
+        cases.append(
+            {
+                "name": f"play-padhattan-ridge-2000-{distribution}",
+                "kind": "save",
+                "rail_fixture": True,
+                "vehicle_heads": (8, 14, 37, 2, 25, 42, 28, 30, 44, 48),
+                "crossing_tiles": (4668, 4671),
+                "barred_crossings": (4668,) if distribution == "cargodist" else (),
+                "console": commands,
+                "save": str(ROOT / "migration/saves/padhattan-ridge-2000.sav"),
+                "ticks": (6 if soak else 2) * 365 * TICKS_PER_DAY + SNAPSHOT_TICKS,
+            }
+        )
+    for distribution, commands in DISTRIBUTIONS.items():
+        cases.append(
+            {
+                "name": f"play-padhattan-ridge-2006-{distribution}",
+                "kind": "save",
+                "rail_fixture": True,
+                "owner_structures": True,
+                "vehicle_heads": (
+                    37,
+                    43,
+                    45,
+                    2,
+                    25,
+                    42,
+                    65,
+                    3,
+                    28,
+                    30,
+                    44,
+                    48,
+                    57,
+                    62,
+                ),
+                "console": commands,
+                "save": str(ROOT / "migration/saves/padhattan-ridge-2006.sav"),
+                "ticks": (6 if soak else 2) * 365 * TICKS_PER_DAY + SNAPSHOT_TICKS,
+            }
+        )
+    base = cases[-2]  # Manual 2006 input; both distribution plays remain intact.
+    for name, ticks, tile, y, z in (
+        ("canal", 30, 12192, 1529, 8),
+        ("lock-lowering", 120, 12448, 1560, 3),
+        ("lock-exit", 240, 12576, 1579, 0),
+    ):
+        cases.append(
+            dict(
+                base,
+                name=f"rail-owner-2006-{name}",
+                owner_structure_reload=True,
+                structure_checkpoint=(tile, y, z),
+                ticks=ticks,
+                short_checkpoint=True,
+            )
+        )
     return cases
 
 
@@ -129,22 +187,60 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
     directory = out / scenario["name"] / "prepare"
     normalized, receipt = normalize(Path(scenario["save"]), directory)
     result["rail_input"] = receipt
+    if scenario.get("owner_structures"):
+        result["owner_structure_inventory"] = structure_inventory(normalized)
+        vehicles = vehicle_rows(normalized)
+        followers = {row["next"] - 1 for row in vehicles.values() if row["next"]}
+        result["owner_transport_heads"] = {
+            kind: sorted(
+                index
+                for index, row in vehicles.items()
+                if row["type"] == kind and index not in followers
+            )
+            for kind in range(4)
+        }
     scenario = dict(scenario, save=str(normalized))
     if "rail_control" in scenario:
         normalized, receipt = controller_input(normalized, directory, scenario)
         result["rail_controller_input"] = receipt
         scenario = dict(scenario, save=str(normalized))
+    if scenario.get("owner_structure_reload"):
+        # Reach this actual upper-lock pose from the immutable owner save.
+        # No position, height, map, RNG or expected-result input is patched.
+        warm = run_game(
+            dict(scenario, ticks=47000),
+            binaries["reference"],
+            builds["reference"],
+            directory / "warm",
+            timeout,
+            env,
+        )
+        fixture = next(
+            (
+                path
+                for path in warm["snapshots"]
+                if all(
+                    vehicle_rows(path)[65][key] == value
+                    for key, value in (("tile", 12064), ("y_pos", 1515), ("z_pos", 8))
+                )
+            ),
+            None,
+        )
+        if warm["exit"] != 0 or fixture is None:
+            raise RuntimeError("owner structure reload lacks reference upper-lock pose")
+        normalized, receipt = normalize(fixture, directory / "reload")
+        result["owner_structure_reload_input"] = receipt
+        scenario = dict(scenario, save=str(normalized))
     if scenario.get("rail_reload"):
         setup = dict(scenario, ticks=8 * SNAPSHOT_TICKS)
-        with core.MACHINE.hold(alone=False):
-            run = run_game(
-                setup,
-                binaries["reference"],
-                builds["reference"],
-                directory / "warm",
-                timeout,
-                env,
-            )
+        run = run_game(
+            setup,
+            binaries["reference"],
+            builds["reference"],
+            directory / "warm",
+            timeout,
+            env,
+        )
         if run["exit"] != 0:
             raise RuntimeError("rail reload preparation failed")
         fixture = next(
@@ -317,9 +413,10 @@ def vehicle_rows(path):
     rows = {}
     for index, body in chunk["elements"]:
         fields = decode_element(chunk, body)
-        if fields["type"] not in (0, 2):
+        if fields["type"] not in (0, 1, 2, 3):
             continue
-        prefix = "train[0]/common[0]/" if fields["type"] == 0 else "ship[0]/common[0]/"
+        kind = {0: "train", 1: "roadveh", 2: "ship", 3: "aircraft"}[fields["type"]]
+        prefix = f"{kind}[0]/common[0]/"
         rows[index] = {
             name: fields[prefix + name]
             for name in (
@@ -327,6 +424,7 @@ def vehicle_rows(path):
                 "tile",
                 "x_pos",
                 "y_pos",
+                "z_pos",
                 "last_station_visited",
                 "motion_counter",
                 "cargo.packets",
@@ -335,7 +433,91 @@ def vehicle_rows(path):
                 "profit_last_year",
             )
         }
+        rows[index]["type"] = fields["type"]
+        if kind == "roadveh":
+            rows[index]["state"] = fields["roadveh[0]/state"]
+        if kind == "train":
+            rows[index]["track"] = fields["train[0]/track"]
+        if kind == "aircraft":
+            rows[index]["airport_state"] = fields["aircraft[0]/state"]
     return rows
+
+
+def structure_inventory(path):
+    """Decode native map accessors; presence is independent of vehicle use."""
+    chunks = read_save(path)
+    types, m5 = chunks["MAPT"]["raw"], chunks["MAP5"]["raw"]
+    m1, m8 = chunks["MAPO"]["raw"], chunks["MAP8"]["raw"]
+    # rail_map.h: m8 bits0..5; tunnelbridge_map.h: m5 bit7/type bits2..3.
+    # water_map.h: m5 subtype bits4..7, m1 waterclass bits5..6.
+    return {
+        "monorail": [
+            tile
+            for tile, kind in enumerate(types)
+            if kind >> 4 == 1
+            and int.from_bytes(m8[2 * tile : 2 * tile + 2], "big") & 63 == 2
+        ],
+        "bridges": [
+            tile for tile, kind in enumerate(types) if kind >> 4 == 9 and m5[tile] & 128
+        ],
+        "tunnels": [
+            tile
+            for tile, kind in enumerate(types)
+            if kind >> 4 == 9 and not m5[tile] & 128
+        ],
+        "canals": [
+            tile
+            for tile, kind in enumerate(types)
+            if kind >> 4 == 6 and m5[tile] >> 4 == 0 and m1[tile] >> 5 & 3 == 1
+        ],
+        "locks": [
+            tile
+            for tile, kind in enumerate(types)
+            if kind >> 4 == 6 and m5[tile] >> 4 == 2
+        ],
+    }
+
+
+def structure_witnesses(paths, observations, mode):
+    """Record actual poses on structures, separately from saved inventory."""
+    inventory = structure_inventory(paths[0])
+    if any(not tiles for tiles in inventory.values()):
+        raise RuntimeError("owner save lacks declared structure inventory")
+    witnessed = {name: [] for name in inventory}
+    for checkpoint, (path, vehicles) in enumerate(
+        zip(paths, observations, strict=True)
+    ):
+        chunks = read_save(path)
+        for vehicle, row in vehicles.items():
+            tile = row["x_pos"] // 16 + 128 * (row["y_pos"] // 16)
+            for name in ("monorail", "canals", "locks"):
+                if tile in inventory[name] and row["type"] == (
+                    0 if name == "monorail" else 2
+                ):
+                    witnessed[name].append([checkpoint, vehicle, tile, row["z_pos"]])
+            # Native train wormhole track0x40 plus a tunnel-entry tile proves
+            # tunnel occupancy; coordinates advance while the tile stays at entry.
+            if (
+                row["type"] == 0
+                and row["track"] == 64
+                and row["tile"] in inventory["tunnels"]
+            ):
+                witnessed["tunnels"].append(
+                    [checkpoint, vehicle, row["tile"], row["x_pos"], row["y_pos"]]
+                )
+            # Road bridges use state255; compare physical position with the
+            # saved bridge-above axis bits (tile_map/bridge_map.h).
+            if (
+                row["type"] == 1
+                and row["state"] == 255
+                and chunks["MAPT"]["raw"][tile] & 12
+            ):
+                witnessed["bridges"].append([checkpoint, vehicle, tile, row["z_pos"]])
+    if mode == "snapshots" and any(
+        not witnessed[name] for name in ("monorail", "bridges", "tunnels", "locks")
+    ):
+        raise RuntimeError(f"owner save lacks reachable structure poses: {witnessed}")
+    return witnessed
 
 
 def controller_witnesses(scenario, run, mode):
@@ -440,6 +622,21 @@ def controller_witnesses(scenario, run, mode):
 def check(scenario, run, mode, role, result):
     if not scenario.get("rail_fixture"):
         return
+    if scenario.get("owner_structure_reload"):
+        if run["exit"] != 0 or not run["snapshots"]:
+            raise RuntimeError("owner structure window lacks exit checkpoint")
+        before = vehicle_rows(Path(scenario["save"]))[65]
+        after = vehicle_rows(run["snapshots"][-1])[65]
+        actual = tuple(after[key] for key in ("tile", "y_pos", "z_pos"))
+        if actual != scenario["structure_checkpoint"]:
+            raise RuntimeError(
+                f"owner structure checkpoint {actual} != {scenario['structure_checkpoint']}"
+            )
+        result[f"{mode}_{role}_owner_structure_window"] = {
+            "before": before,
+            "after": after,
+        }
+        return
     if "rail_control" in scenario:
         # Controller cases can intentionally stop or delete the original heads.
         result[f"{mode}_{role}_rail_control"] = controller_witnesses(
@@ -453,7 +650,7 @@ def check(scenario, run, mode, role, result):
     paths = [Path(scenario["save"]), *run["snapshots"]]
     observations = [vehicle_rows(path) for path in paths]
     witnesses = {}
-    for head in (8, 14, 2):  # Two train heads and the existing passenger ship.
+    for head in scenario.get("vehicle_heads", (8, 14, 2)):
         rows = [snapshot[head] for snapshot in observations]
         positions = {(row["tile"], row["x_pos"], row["y_pos"]) for row in rows}
         loaded = []
@@ -494,4 +691,41 @@ def check(scenario, run, mode, role, result):
             "cargo_counts": loaded,
             "positive_profit_deltas": paid,
         }
+        if "airport_state" in rows[0]:
+            states = sorted({row["airport_state"] for row in rows})
+            if mode == "snapshots" and 14 not in states:
+                raise RuntimeError(f"aircraft {head} lacks flying-state witness")
+            witnesses[head]["airport_states"] = states
     result[f"{mode}_{role}_rail"] = witnesses
+    if scenario.get("owner_structures"):
+        result[f"{mode}_{role}_owner_structures"] = structure_witnesses(
+            paths, observations, mode
+        )
+    if "crossing_tiles" in scenario:
+        chunks = [read_save(path) for path in paths]
+        crossings = {
+            tile: [
+                bool(chunk["MAP5"]["raw"][tile] & 32)
+                for chunk in chunks
+                if chunk["MAPT"]["raw"][tile] >> 4 == 2
+                and chunk["MAP5"]["raw"][tile] >> 6 == 1
+            ]
+            for tile in scenario["crossing_tiles"]
+        }
+        if any(len(states) != len(paths) for states in crossings.values()):
+            raise RuntimeError("owner-built crossing disappeared")
+        if mode == "snapshots" and any(
+            set(crossings[tile]) != {True, False}
+            for tile in scenario["barred_crossings"]
+        ):
+            raise RuntimeError("owner-built crossing lacks saved bar and release")
+        result[f"{mode}_{role}_crossings"] = crossings
+        # Offers/awards and reservations are observations, not witnesses of a
+        # particular subsidy multiplier or PBS search/control-flow branch.
+        result[f"{mode}_{role}_subsidies"] = [
+            {
+                index: decode_element(chunk["SUBS"], body)
+                for index, body in chunk["SUBS"]["elements"]
+            }
+            for chunk in chunks
+        ]

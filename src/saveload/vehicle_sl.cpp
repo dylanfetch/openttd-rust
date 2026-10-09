@@ -277,7 +277,13 @@ void AfterLoadVehiclesPhase1(bool part_of_load)
 		std::map<uint32_t, OrderList *> mapping;
 
 		for (Vehicle *v : Vehicle::Iterate()) {
-			if (v->orders != nullptr) {
+			if (
+#ifdef WITH_RUST
+				IsSavegameVersionBefore(SLV_105) ? v->old_orders != 0 : v->orders != nullptr
+#else
+				v->orders != nullptr
+#endif
+			) {
 				if (IsSavegameVersionBefore(SLV_105)) { // Pre-105 didn't save an OrderList
 					if (mapping[v->old_orders] == nullptr) {
 						/* This adds the whole shared vehicle chain for case b */
@@ -381,17 +387,20 @@ void AfterLoadVehiclesPhase1(bool part_of_load)
 		if (IsSavegameVersionBefore(SLV_SHIP_ROTATION)) {
 			/* Ship rotation added */
 			for (Ship *s : Ship::Iterate()) {
-				s->rotation = s->direction;
+				s->SetRotation(s->direction);
 			}
 		} else {
 			for (Ship *s : Ship::Iterate()) {
-				if (s->rotation == s->direction) continue;
+				if (s->GetRotation() == s->direction) continue;
+#ifdef WITH_RUST
+				openttd_rust_ship_control_reload_rotation();
+#endif
 				/* In case we are rotating on gameload, set the rotation position to
 				 * the current position, otherwise the applied workaround offset would
 				 * be with respect to 0,0.
 				 */
-				s->rotation_x_pos = s->x_pos;
-				s->rotation_y_pos = s->y_pos;
+				s->SetRotationX(s->x_pos);
+				s->SetRotationY(s->y_pos);
 			}
 		}
 
@@ -1047,22 +1056,36 @@ public:
 
 	static inline const SaveLoad description[] = {
 		  SLEG_STRUCT("common", SlVehicleCommon),
+#ifdef WITH_RUST
+		     SLEG_VAR("state", ShipStateScope::State(), SLE_UINT8),
+#else
 		      SLE_VAR(Ship, state,                     SLE_UINT8),
+#endif
 		SLEG_CONDVECTOR("path", ship_path_td, SLE_UINT8, SLV_SHIP_PATH_CACHE, SLV_PATH_CACHE_FORMAT),
 		SLEG_CONDSTRUCTLIST("path", SlVehicleShipPath, SLV_PATH_CACHE_FORMAT, SL_MAX_VERSION),
+#ifdef WITH_RUST
+		 SLEG_CONDVAR("rotation", ShipStateScope::Rotation(), SLE_UINT8, SLV_SHIP_ROTATION, SL_MAX_VERSION),
+#else
 		  SLE_CONDVAR(Ship, rotation,                  SLE_UINT8,                  SLV_SHIP_ROTATION, SL_MAX_VERSION),
+#endif
 	};
 	static inline const SaveLoadCompatTable compat_description = _vehicle_ship_sl_compat;
 
 	void Save(Vehicle *v) const override
 	{
 		if (v->type != VEH_SHIP) return;
+#ifdef WITH_RUST
+		ShipStateScope scope(Ship::From(v), false);
+#endif
 		SlObject(v, this->GetDescription());
 	}
 
 	void Load(Vehicle *v) const override
 	{
 		if (v->type != VEH_SHIP) return;
+#ifdef WITH_RUST
+		ShipStateScope scope(Ship::From(v), true);
+#endif
 		SlObject(v, this->GetLoadDescription());
 
 		if (IsSavegameVersionBefore(SLV_PATH_CACHE_FORMAT)) {
@@ -1079,6 +1102,9 @@ public:
 	void FixPointers(Vehicle *v) const override
 	{
 		if (v->type != VEH_SHIP) return;
+#ifdef WITH_RUST
+		ShipStateScope scope(Ship::From(v), false);
+#endif
 		SlObject(v, this->GetDescription());
 	}
 };

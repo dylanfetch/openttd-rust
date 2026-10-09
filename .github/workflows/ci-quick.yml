@@ -1,0 +1,69 @@
+name: Quick validation
+
+on:
+  pull_request:
+    branches: [rust-migration]
+  push:
+    branches: [rust-migration]
+  workflow_call:
+    inputs:
+      checkout-ref:
+        required: true
+        type: string
+      base-ref:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quick-ci-${{ inputs.checkout-ref && github.run_id || github.ref == 'refs/heads/rust-migration' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/rust-migration' }}
+
+jobs:
+  quick:
+    name: Quick validation
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        ref: ${{ inputs.checkout-ref || github.event.pull_request.head.sha || github.sha }}
+        fetch-depth: 0
+        persist-credentials: false
+    - uses: astral-sh/setup-uv@v10.2.0
+      with:
+        version: "0.12.18"
+    - name: Python formatting, lint and maintenance regression checks
+      run: |
+        uvx --from ruff==0.16.8 ruff check tools/
+        uvx --from ruff==0.16.8 ruff format --check tools/
+        python3 - <<'PY'
+        from pathlib import Path
+        import subprocess
+        for test in sorted(Path('tools').glob('test-*.py')):
+            print(f'Running {test}', flush=True)
+            subprocess.run(['python3', str(test)], check=True)
+        PY
+    - name: Check strings and script mode enforcement
+      run: |
+        python3 .github/unused-strings.py
+        python3 .github/script-missing-mode-enforcement.py
+    - name: Checkout inherited commit hooks
+      if: inputs.base-ref != ''
+      uses: actions/checkout@v6
+      with:
+        repository: OpenTTD/OpenTTD-git-hooks
+        ref: eeb3791aadf0aded5a7cd634c80823f17e87af9c
+        path: .local/commit-hooks
+        persist-credentials: false
+    - name: Check every introduced commit against captured base
+      if: inputs.base-ref != ''
+      env:
+        BASE: ${{ inputs.base-ref }}
+        HEAD: ${{ inputs.checkout-ref }}^2
+      run: |
+        hooks="$GITHUB_WORKSPACE/.local/commit-hooks"
+        echo "::add-matcher::$hooks/action/check-diff-matcher.json"
+        echo "::add-matcher::$hooks/action/check-message-matcher.json"
+        HOOKS_DIR="$hooks/hooks" GIT_DIR="$(git rev-parse --absolute-git-dir)" sh "$hooks/hooks/check-commits.sh" "$BASE..$HEAD"

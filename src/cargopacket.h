@@ -98,7 +98,7 @@ public:
 	void OnCleanPool();
 	std::unique_ptr<const Tcont> Packets() const;
 	void ImportPackets(const Tcont &packets);
-	uint PeriodsInTransit() const { auto f = this->Export(); return f.count == 0 ? 0 : f.cargo_periods_in_transit / f.count; }
+	uint PeriodsInTransit() const { return openttd_rust_cargo_list_periods(this->state); }
 	OpenTTDCargoListFields Export() const;
 	void ImportMeta(const OpenTTDCargoListFields &fields);
 	void InvalidateCache();
@@ -107,13 +107,13 @@ public:
 class VehicleCargoList : public CargoList<VehicleCargoList, CargoPacketList> {
 public:
 	StationID GetFirstStation() const;
-	Money GetFeederShare() const { return this->Export().feeder_share; }
-	uint ActionCount(MoveToAction action) const { return this->Export().action_counts[action]; }
-	uint StoredCount() const { auto f = this->Export(); return f.count - f.action_counts[MTA_LOAD]; }
-	uint TotalCount() const { return this->Export().count; }
+	Money GetFeederShare() const { return openttd_rust_cargo_list_feeder(this->state); }
+	uint ActionCount(MoveToAction action) const { return openttd_rust_cargo_list_action_count(this->state, action); }
+	uint StoredCount() const { return openttd_rust_cargo_list_stored(this->state); }
+	uint TotalCount() const { return openttd_rust_cargo_list_count(this->state); }
 	uint ReservedCount() const { return this->ActionCount(MTA_LOAD); }
-	uint UnloadCount() const { auto f = this->Export(); return f.action_counts[MTA_TRANSFER] + f.action_counts[MTA_DELIVER]; }
-	uint RemainingCount() const { auto f = this->Export(); return f.action_counts[MTA_KEEP] + f.action_counts[MTA_LOAD]; }
+	uint UnloadCount() const { return openttd_rust_cargo_list_unload(this->state); }
+	uint RemainingCount() const { return openttd_rust_cargo_list_remaining(this->state); }
 	void Append(CargoPacket *cp, MoveToAction action = MTA_KEEP);
 	void AgeCargo();
 	bool Stage(bool accepted, StationID station, std::span<const StationID> next, OrderUnloadType unload, const GoodsEntry *ge, CargoType cargo, CargoPayment *payment, TileIndex tile);
@@ -132,10 +132,11 @@ public:
 	void Append(CargoPacket *cp, StationID next);
 	bool HasCargoFor(std::span<const StationID> next) const;
 	StationID GetFirstStation() const;
-	uint AvailableCount() const { return this->Export().count; }
-	uint ReservedCount() const { return this->Export().reserved_count; }
-	void SetReservedCount(uint count) { auto f = this->Export(); f.reserved_count = count; this->ImportMeta(f); }
-	uint TotalCount() const { auto f = this->Export(); return f.count + f.reserved_count; }
+	size_t MapSize() const { return openttd_rust_cargo_list_key_count(this->state); }
+	uint AvailableCount() const { return openttd_rust_cargo_list_count(this->state); }
+	uint ReservedCount() const { return openttd_rust_cargo_list_reserved(this->state); }
+	void SetReservedCount(uint count) { openttd_rust_cargo_list_set_reserved(this->state, count); }
+	uint TotalCount() const { return openttd_rust_cargo_list_station_total(this->state); }
 	uint Reserve(uint amount, VehicleCargoList *dest, std::span<const StationID> next, TileIndex tile);
 	uint Load(uint amount, VehicleCargoList *dest, std::span<const StationID> next, TileIndex tile);
 	uint Truncate(uint amount = UINT_MAX, StationCargoAmountMap *origins = nullptr);

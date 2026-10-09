@@ -1,0 +1,30 @@
+{
+  "source_sha256": "7987bd79dc51e7a9a37947f756d371c1bff9040a9b39c00c5774fd0a57e5625f",
+  "sha256": "8c2cd0c993332b8d668cf90711d87442b624d587437d5b53d509bfd6c10dd9a7",
+  "assignments": [],
+  "removed_chunk": "GLOG",
+  "raw_sha256": "7fc649e03f7fc8debc775129b4c39ad56c125cd0f8d9c4315cb9dbdf83970531",
+  "baseline": {
+    "repository": "https://github.com/OpenTTD/OpenTTD.git",
+    "tag": "15.3",
+    "commit": "14ec60f248547d4d062a1160f0fc26d742319888"
+  },
+  "committed_source": "migration/saves/water-ferry.sav",
+  "reference_binary_sha256": "5d22b1015057d280fcd4a81501fb67507b6490be9567222931fd1a32e17dcafe",
+  "setup_files": {
+    "info.nut": "35dee1d59d876aa337a2080caa61327c47f7261ba7e42aa164c0a5d6b0388cac",
+    "main.nut": "b0a7d817f29dbea58f34b8c4b802c7313b4b464d1ce870530415722a09eaf7ec",
+    "setup.nut": "9cec155bfd1e93eeb416f7729ab8b7e754919aba84aaad39ec938bb2523029dd"
+  },
+  "setup": {
+    "kind": "save",
+    "ticks": 1000,
+    "road_setup": true,
+    "console": [
+      "unpause"
+    ]
+  },
+  "setup_markers": [
+    "10005 1"
+  ]
+}

@@ -624,7 +624,7 @@ static uint32_t RustStationRead(void *handle, uint8_t field, uint32_t arg) noexc
 		case 12: return Station::From(bst)->goods[arg].AvailableCount();
 		case 13: {
 			GoodsEntry &ge = Station::From(bst)->goods[arg];
-			return ge.HasData() ? static_cast<uint32_t>(ge.GetData().cargo.Packets()->MapSize()) : 0;
+			return ge.HasData() ? static_cast<uint32_t>(ge.GetData().cargo.MapSize()) : 0;
 		}
 		case 17: return bst->town->exclusive_counter;
 		case 18: return bst->town->exclusivity.base();

@@ -19,7 +19,7 @@
     clippy::too_many_arguments,
     clippy::too_many_lines
 )]
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::c_void;
 
 #[repr(C)]
@@ -65,16 +65,45 @@ pub struct Services {
 }
 #[derive(Clone, Copy)]
 struct Node {
-    token: u64,
+    token: usize,
     key: u16,
     shell: *mut c_void,
+    previous: Option<usize>,
+    next: Option<usize>,
+}
+#[derive(Clone, Copy)]
+struct Ends {
+    first: usize,
+    last: usize,
 }
 pub struct List {
     fields: Fields,
-    nodes: Vec<Node>,
+    // Slots never move relative to their indices. Reuse happens only after erase,
+    // when no source iterator can still refer to that node. Traversal follows
+    // links, never arena allocation order; same-list insertion keeps existing
+    // iterators valid even if growing the arena reallocates its backing storage.
+    nodes: Vec<Option<Node>>,
+    free: Vec<usize>,
+    first: Option<usize>,
+    last: Option<usize>,
+    destinations: BTreeMap<u16, Ends>,
     keys: BTreeSet<u16>,
-    serial: u64,
     vehicle: bool,
+}
+// Native next-hop spans can alias C++ storage. Read individual uint16_t fields;
+// never build a Rust slice/reference that would survive a reentering callback.
+#[derive(Clone, Copy)]
+struct NextHops {
+    data: *const u16,
+    length: usize,
+}
+impl NextHops {
+    unsafe fn at(self, index: usize) -> u16 {
+        unsafe { self.data.add(index).read() }
+    }
+    unsafe fn contains(self, key: u16) -> bool {
+        (0..self.length).any(|index| unsafe { self.at(index) } == key)
+    }
 }
 const TRANSFER: usize = 0;
 const DELIVER: usize = 1;
@@ -135,51 +164,124 @@ unsafe fn tile(p: *mut Packet, s: Services, at: u32, loading: bool) {
 unsafe fn fields(l: *const List) -> Fields {
     unsafe { (*l).fields }
 }
+#[cfg(test)]
 unsafe fn nodes(l: *const List) -> Vec<Node> {
-    unsafe { (*l).nodes.clone() }
+    let mut result = Vec::new();
+    let mut node = unsafe { first(l) };
+    while let Some(current) = node {
+        result.push(current);
+        node = unsafe { after(l, current.token) };
+    }
+    result
 }
 unsafe fn first(l: *const List) -> Option<Node> {
-    unsafe { (*l).nodes.first().copied() }
+    unsafe { (*l).first.map(|token| (&(*l).nodes)[token].unwrap()) }
 }
-unsafe fn after(l: *const List, token: u64) -> Option<Node> {
+unsafe fn last(l: *const List) -> Option<Node> {
+    unsafe { (*l).last.map(|token| (&(*l).nodes)[token].unwrap()) }
+}
+unsafe fn after(l: *const List, token: usize) -> Option<Node> {
     unsafe {
-        let l = &*l;
-        l.nodes
-            .iter()
-            .position(|n| n.token == token)
-            .and_then(|i| l.nodes.get(i + 1).copied())
+        (&(*l).nodes)[token]
+            .unwrap()
+            .next
+            .map(|token| (&(*l).nodes)[token].unwrap())
     }
 }
-unsafe fn erase(l: *mut List, token: u64) {
+unsafe fn before(l: *const List, token: usize) -> Option<Node> {
+    unsafe {
+        (&(*l).nodes)[token]
+            .unwrap()
+            .previous
+            .map(|token| (&(*l).nodes)[token].unwrap())
+    }
+}
+unsafe fn destination(l: *const List, key: u16, reverse: bool) -> Option<Node> {
+    unsafe {
+        (*l).destinations
+            .get(&key)
+            .map(|ends| (&(*l).nodes)[if reverse { ends.last } else { ends.first }].unwrap())
+    }
+}
+unsafe fn erase(l: *mut List, token: usize) {
     unsafe {
         let l = &mut *l;
-        let i = l.nodes.iter().position(|n| n.token == token).unwrap();
-        let removed = l.nodes.remove(i);
-        if !l.vehicle && !l.nodes.iter().any(|n| n.key == removed.key) {
-            l.keys.remove(&removed.key);
+        let removed = l.nodes[token].take().unwrap();
+        if let Some(previous) = removed.previous {
+            l.nodes[previous].as_mut().unwrap().next = removed.next;
+        } else {
+            l.first = removed.next;
         }
-    }
-}
-unsafe fn insert(l: *mut List, shell: *mut c_void, key: u16, before: Option<u64>, front: bool) {
-    unsafe {
-        let l = &mut *l;
+        if let Some(next) = removed.next {
+            l.nodes[next].as_mut().unwrap().previous = removed.previous;
+        } else {
+            l.last = removed.previous;
+        }
         if !l.vehicle {
-            l.keys.insert(key);
+            let ends = l.destinations.get_mut(&removed.key).unwrap();
+            if ends.first == token && ends.last == token {
+                l.destinations.remove(&removed.key);
+                l.keys.remove(&removed.key);
+            } else {
+                if ends.first == token {
+                    ends.first = removed.next.unwrap();
+                }
+                if ends.last == token {
+                    ends.last = removed.previous.unwrap();
+                }
+            }
         }
-        l.serial = l.serial.wrapping_add(1);
+        l.free.push(token);
+    }
+}
+unsafe fn insert(l: *mut List, shell: *mut c_void, key: u16, before: Option<usize>, front: bool) {
+    unsafe {
+        let l = &mut *l;
+        let next = if before.is_some() {
+            before
+        } else if l.vehicle {
+            if front { l.first } else { None }
+        } else if let Some(ends) = l.destinations.get(&key) {
+            l.nodes[ends.last].unwrap().next
+        } else {
+            l.destinations
+                .range(key..)
+                .next()
+                .map(|(_, ends)| ends.first)
+        };
+        let previous = next.map_or(l.last, |token| l.nodes[token].unwrap().previous);
+        let token = l.free.pop().unwrap_or_else(|| {
+            l.nodes.push(None);
+            l.nodes.len() - 1
+        });
         let n = Node {
-            token: l.serial,
+            token,
             key,
             shell,
+            previous,
+            next,
         };
-        let i = if let Some(token) = before {
-            l.nodes.iter().position(|n| n.token == token).unwrap()
-        } else if l.vehicle {
-            if front { 0 } else { l.nodes.len() }
+        l.nodes[token] = Some(n);
+        if let Some(previous) = previous {
+            l.nodes[previous].as_mut().unwrap().next = Some(token);
         } else {
-            l.nodes.partition_point(|n| n.key <= key)
-        };
-        l.nodes.insert(i, n);
+            l.first = Some(token);
+        }
+        if let Some(next) = next {
+            l.nodes[next].as_mut().unwrap().previous = Some(token);
+        } else {
+            l.last = Some(token);
+        }
+        if !l.vehicle {
+            l.keys.insert(key);
+            l.destinations
+                .entry(key)
+                .and_modify(|ends| ends.last = token)
+                .or_insert(Ends {
+                    first: token,
+                    last: token,
+                });
+        }
     }
 }
 unsafe fn add_cache(l: *mut List, p: Packet, action: Option<usize>) {
@@ -249,10 +351,12 @@ unsafe fn append(l: *mut List, s: Services, shell: *mut c_void, key: u16) {
         return;
     }
     let mut sum = u32::from(p.count);
-    for n in unsafe { nodes(l) }.into_iter().rev() {
-        if !vehicle && n.key != key {
-            continue;
-        }
+    let mut node = if vehicle {
+        unsafe { last(l) }
+    } else {
+        unsafe { destination(l, key, true) }
+    };
+    while let Some(n) = node {
         let existing = unsafe { packet(s, n.shell) };
         if mergeable(existing, p) {
             unsafe {
@@ -266,6 +370,10 @@ unsafe fn append(l: *mut List, s: Services, shell: *mut c_void, key: u16) {
                 break;
             }
         }
+        node = unsafe { before(l, n.token) };
+        if !vehicle && node.is_some_and(|n| n.key != key) {
+            break;
+        }
     }
     unsafe {
         insert(l, shell, key, None, false);
@@ -276,7 +384,7 @@ unsafe fn forced_flow(
     ge: *const c_void,
     origin: u16,
     station: u16,
-    next: &[u16],
+    next: NextHops,
 ) -> u16 {
     use crate::cargo_flow::{
         openttd_rust_flow_change, openttd_rust_flow_clone, openttd_rust_flow_destroy,
@@ -290,7 +398,8 @@ unsafe fn forced_flow(
     unsafe {
         openttd_rust_flow_change(flow, 0, station, i32::MIN as u32);
     }
-    for &station in next.iter().rev() {
+    for index in (0..next.length).rev() {
+        let station = unsafe { next.at(index) };
         if unsafe { openttd_rust_flow_read(flow, 2, 0) } == 0 {
             break;
         }
@@ -309,7 +418,7 @@ unsafe fn forced_flow(
     }
     via
 }
-fn choose(p: Packet, via: u16, station: u16, accepted: bool, next: &[u16]) -> usize {
+fn choose(p: Packet, via: u16, station: u16, accepted: bool, next: NextHops) -> usize {
     if via == INVALID {
         if accepted && p.first_station != station {
             DELIVER
@@ -318,7 +427,7 @@ fn choose(p: Packet, via: u16, station: u16, accepted: bool, next: &[u16]) -> us
         }
     } else if via == station {
         DELIVER
-    } else if next.contains(&via) {
+    } else if unsafe { next.contains(via) } {
         KEEP
     } else {
         TRANSFER
@@ -472,16 +581,21 @@ pub extern "C" fn openttd_rust_cargo_list_new(vehicle: u8) -> *mut List {
     Box::into_raw(Box::new(List {
         fields: Fields::default(),
         nodes: Vec::new(),
+        free: Vec::new(),
+        first: None,
+        last: None,
+        destinations: BTreeMap::new(),
         keys: BTreeSet::new(),
-        serial: 0,
         vehicle: vehicle != 0,
     }))
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_cargo_list_destroy(l: *mut List, s: *const Services) {
     let s = unsafe { *s };
-    for n in unsafe { nodes(l) } {
-        (s.destroy)(n.shell);
+    let mut node = unsafe { first(l) };
+    while let Some(current) = node {
+        node = unsafe { after(l, current.token) };
+        (s.destroy)(current.shell);
     }
     unsafe {
         drop(Box::from_raw(l));
@@ -491,6 +605,10 @@ pub unsafe extern "C" fn openttd_rust_cargo_list_destroy(l: *mut List, s: *const
 pub unsafe extern "C" fn openttd_rust_cargo_list_clear(l: *mut List) {
     unsafe {
         (*l).nodes.clear();
+        (*l).free.clear();
+        (*l).first = None;
+        (*l).last = None;
+        (*l).destinations.clear();
         (*l).keys.clear();
     }
 }
@@ -506,6 +624,68 @@ pub unsafe extern "C" fn openttd_rust_cargo_list_import(l: *mut List, input: *co
         (*l).fields = *input;
     }
 }
+// Scalar queries read only the canonical fields they need. All arithmetic
+// follows the original unsigned C++ widths, including metadata loaded from saves.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_cargo_list_count(l: *const List) -> u32 {
+    unsafe { (*l).fields.count }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_cargo_list_reserved(l: *const List) -> u32 {
+    unsafe { (*l).fields.reserved_count }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_cargo_list_set_reserved(l: *mut List, count: u32) {
+    unsafe {
+        (*l).fields.reserved_count = count;
+    }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_cargo_list_station_total(l: *const List) -> u32 {
+    unsafe { (*l).fields.count.wrapping_add((*l).fields.reserved_count) }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_cargo_list_periods(l: *const List) -> u32 {
+    let count = unsafe { (*l).fields.count };
+    if count == 0 {
+        0
+    } else {
+        (unsafe { (*l).fields.cargo_periods_in_transit } / u64::from(count)) as u32
+    }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_cargo_list_feeder(l: *const List) -> i64 {
+    unsafe { (*l).fields.feeder_share }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_cargo_list_action_count(l: *const List, action: u8) -> u32 {
+    unsafe {
+        (&raw const (*l).fields.action_counts)
+            .cast::<u32>()
+            .add(usize::from(action))
+            .read()
+    }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_cargo_list_stored(l: *const List) -> u32 {
+    unsafe {
+        (*l).fields
+            .count
+            .wrapping_sub((*l).fields.action_counts[LOAD])
+    }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_cargo_list_unload(l: *const List) -> u32 {
+    unsafe { (*l).fields.action_counts[TRANSFER].wrapping_add((*l).fields.action_counts[DELIVER]) }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_cargo_list_remaining(l: *const List) -> u32 {
+    unsafe { (*l).fields.action_counts[KEEP].wrapping_add((*l).fields.action_counts[LOAD]) }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_cargo_list_key_count(l: *const List) -> usize {
+    unsafe { (*l).keys.len() }
+}
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_cargo_list_snapshot(
     l: *const List,
@@ -516,14 +696,16 @@ pub unsafe extern "C" fn openttd_rust_cargo_list_snapshot(
         (*l).keys
             .iter()
             .copied()
-            .filter(|key| !(*l).nodes.iter().any(|n| n.key == *key))
+            .filter(|key| !(*l).destinations.contains_key(key))
             .collect()
     };
     for key in empty {
         output(context, key, std::ptr::null_mut());
     }
-    for n in unsafe { nodes(l) } {
-        output(context, n.key, n.shell);
+    let mut node = unsafe { first(l) };
+    while let Some(current) = node {
+        node = unsafe { after(l, current.token) };
+        output(context, current.key, current.shell);
     }
 }
 #[unsafe(no_mangle)]
@@ -548,9 +730,11 @@ pub unsafe extern "C" fn openttd_rust_cargo_list_rebuild(l: *mut List, s: *const
         (*l).fields.cargo_periods_in_transit = 0;
         (*l).fields.feeder_share = 0;
     }
-    for n in unsafe { nodes(l) } {
+    let mut node = unsafe { first(l) };
+    while let Some(current) = node {
+        node = unsafe { after(l, current.token) };
         unsafe {
-            add_cache(l, packet(s, n.shell), None);
+            add_cache(l, packet(s, current.shell), None);
         }
     }
 }
@@ -579,22 +763,20 @@ pub unsafe extern "C" fn openttd_rust_cargo_list_has(
     next: *const u16,
     length: usize,
 ) -> u8 {
-    let next = if length == 0 {
-        &[]
-    } else {
-        unsafe { std::slice::from_raw_parts(next, length) }
-    };
+    let next = NextHops { data: next, length };
+    let keys = unsafe { &(*l).keys };
     u8::from(
-        unsafe { &(*l).keys }
-            .iter()
-            .any(|key| *key == INVALID || next.contains(key)),
+        (0..length).any(|index| keys.contains(&unsafe { next.at(index) }))
+            || keys.contains(&INVALID),
     )
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_cargo_list_age(l: *mut List, s: *const Services) {
     let s = unsafe { *s };
-    for n in unsafe { nodes(l) } {
-        let p = (s.packet)(n.shell);
+    let mut node = unsafe { first(l) };
+    while let Some(current) = node {
+        node = unsafe { after(l, current.token) };
+        let p = (s.packet)(current.shell);
         let old = unsafe { read(p) };
         if old.periods_in_transit == u16::MAX {
             continue;
@@ -640,11 +822,7 @@ pub unsafe extern "C" fn openttd_rust_cargo_list_stage(
     at: u32,
 ) -> u8 {
     let s = unsafe { *s };
-    let next_slice = if length == 0 {
-        &[]
-    } else {
-        unsafe { std::slice::from_raw_parts(next, length) }
-    };
+    let next_slice = NextHops { data: next, length };
     unsafe {
         (*l).fields.action_counts[TRANSFER] = 0;
         (*l).fields.action_counts[DELIVER] = 0;
@@ -712,7 +890,7 @@ pub unsafe extern "C" fn openttd_rust_cargo_list_stage(
                     insert(l, current.shell, 0, None, false);
                 }
                 if deliver.is_none() {
-                    deliver = unsafe { (*l).nodes.last().map(|n| n.token) };
+                    deliver = unsafe { last(l).map(|n| n.token) };
                 }
             }
             DELIVER => unsafe {
@@ -913,9 +1091,9 @@ unsafe fn walk(
 ) {
     let reverse = mode == 0 || mode == 3 || mode == 4;
     let mut n = if reverse {
-        unsafe { (*src).nodes.last().copied() }
+        unsafe { last(src) }
     } else if let Some(key) = key {
-        unsafe { (*src).nodes.iter().find(|n| n.key == key).copied() }
+        unsafe { destination(src, key, false) }
     } else {
         unsafe { first(src) }
     };
@@ -927,15 +1105,7 @@ unsafe fn walk(
             break;
         }
         let next = if reverse {
-            unsafe {
-                let list = &*src;
-                let i = list
-                    .nodes
-                    .iter()
-                    .position(|n| n.token == current.token)
-                    .unwrap();
-                i.checked_sub(1).and_then(|i| list.nodes.get(i).copied())
-            }
+            unsafe { before(src, current.token) }
         } else {
             unsafe { after(src, current.token) }
         };
@@ -1110,12 +1280,9 @@ pub unsafe extern "C" fn openttd_rust_cargo_list_move(
                 );
             }
         } else {
-            let next = if length == 0 {
-                &[]
-            } else {
-                unsafe { std::slice::from_raw_parts(next, length) }
-            };
-            for &key in next.iter().rev() {
+            let next = NextHops { data: next, length };
+            for index in (0..length).rev() {
+                let key = unsafe { next.at(index) };
                 unsafe {
                     walk(
                         src,
@@ -1219,7 +1386,9 @@ pub struct Vehicle {
 #[derive(Clone, Copy)]
 pub struct CapacityServices {
     pub(crate) read: extern "C" fn(*mut c_void, *mut Vehicle),
-    pub(crate) pointer: extern "C" fn(*mut c_void, u8) -> *mut c_void,
+    pub(crate) next_part: extern "C" fn(*mut c_void) -> *mut c_void,
+    pub(crate) last_engine_part: extern "C" fn(*mut c_void) -> *mut c_void,
+    pub(crate) other_multiheaded_part: extern "C" fn(*mut c_void) -> *mut c_void,
     pub(crate) cargo: *const Services,
 }
 fn vehicle(services: CapacityServices, shell: *mut c_void) -> Vehicle {
@@ -1248,16 +1417,16 @@ pub unsafe extern "C" fn openttd_rust_cargo_capacity(
             && part_chain == 0
             && source.train != 0
             && src != old
-            && src != (services.pointer)(old, 2)
+            && src != (services.other_multiheaded_part)(old)
             && source.articulated == 0
         {
-            src = (services.pointer)((services.pointer)(src, 1), 0);
+            src = (services.next_part)((services.last_engine_part)(src));
             continue;
         }
         if (!transfer && count <= u32::from(source.capacity))
             || (transfer && (source.cargo >= 64 || count == 0))
         {
-            src = (services.pointer)(src, 0);
+            src = (services.next_part)(src);
             continue;
         }
         let mut spread = count.wrapping_sub(u32::from(source.capacity));
@@ -1274,10 +1443,10 @@ pub unsafe extern "C" fn openttd_rust_cargo_capacity(
                 && part_chain == 0
                 && destination.train != 0
                 && dest != new
-                && dest != (services.pointer)(new, 2)
+                && dest != (services.other_multiheaded_part)(new)
                 && destination.articulated == 0
             {
-                dest = (services.pointer)((services.pointer)(dest, 1), 0);
+                dest = (services.next_part)((services.last_engine_part)(dest));
                 continue;
             }
             let held = unsafe { fields(destination.list) }.count;
@@ -1313,7 +1482,7 @@ pub unsafe extern "C" fn openttd_rust_cargo_capacity(
                     }
                 }
             }
-            dest = (services.pointer)(dest, 0);
+            dest = (services.next_part)(dest);
         }
         if !transfer {
             let count = unsafe { fields(source.list) }.count;
@@ -1337,7 +1506,7 @@ pub unsafe extern "C" fn openttd_rust_cargo_capacity(
                 }
             }
         }
-        src = (services.pointer)(src, 0);
+        src = (services.next_part)(src);
     }
     u8::from(transfer && part_chain != 0 && vehicle(services, new).train != 0)
 }
@@ -1347,6 +1516,7 @@ mod tests {
     use super::*;
     use std::cell::{Cell, RefCell};
     thread_local! {
+        static CAPACITY_CALLS: RefCell<Vec<(&'static str, u8)>> = const { RefCell::new(Vec::new()) };
         static ALLOCATE: Cell<bool> = const { Cell::new(true) };
         static POOL: RefCell<Vec<*mut c_void>> = const { RefCell::new(Vec::new()) };
         static PAYMENT_LIST: Cell<*mut List> = const { Cell::new(std::ptr::null_mut()) };
@@ -1410,7 +1580,7 @@ mod tests {
         // Reentry observes the list before Stage's action count commit, and after
         // final delivery's metadata removal, exactly like native payment getters.
         let list = PAYMENT_LIST.with(Cell::get);
-        let held = unsafe { fields(list) }.count;
+        let held = unsafe { openttd_rust_cargo_list_count(list) };
         PAYMENTS.with(|payments| payments.borrow_mut().push((final_delivery, amount, held)));
         7
     }
@@ -1763,6 +1933,7 @@ mod tests {
     }
 
     struct Part {
+        id: u8,
         next: *mut Part,
         last: *mut Part,
         other: *mut Part,
@@ -1774,6 +1945,7 @@ mod tests {
     }
     extern "C" fn capacity_read(shell: *mut c_void, output: *mut Vehicle) {
         let part = unsafe { &*shell.cast::<Part>() };
+        CAPACITY_CALLS.with(|calls| calls.borrow_mut().push(("read", part.id)));
         unsafe {
             output.write(Vehicle {
                 list: part.list,
@@ -1784,17 +1956,24 @@ mod tests {
             });
         }
     }
-    extern "C" fn capacity_pointer(shell: *mut c_void, selector: u8) -> *mut c_void {
+    extern "C" fn capacity_next_part(shell: *mut c_void) -> *mut c_void {
         let part = unsafe { &*shell.cast::<Part>() };
-        match selector {
-            0 => part.next.cast(),
-            1 => part.last.cast(),
-            2 => part.other.cast(),
-            _ => unreachable!(),
-        }
+        CAPACITY_CALLS.with(|calls| calls.borrow_mut().push(("next", part.id)));
+        part.next.cast()
+    }
+    extern "C" fn capacity_last_engine_part(shell: *mut c_void) -> *mut c_void {
+        let part = unsafe { &*shell.cast::<Part>() };
+        CAPACITY_CALLS.with(|calls| calls.borrow_mut().push(("last", part.id)));
+        part.last.cast()
+    }
+    extern "C" fn capacity_other_multiheaded_part(shell: *mut c_void) -> *mut c_void {
+        let part = unsafe { &*shell.cast::<Part>() };
+        CAPACITY_CALLS.with(|calls| calls.borrow_mut().push(("other", part.id)));
+        part.other.cast()
     }
     fn part(cap: u16) -> Part {
         Part {
+            id: 0,
             next: std::ptr::null_mut(),
             last: std::ptr::null_mut(),
             other: std::ptr::null_mut(),
@@ -1806,11 +1985,137 @@ mod tests {
         }
     }
     #[test]
+    fn destination_count_keeps_empty_imported_keys() {
+        unsafe {
+            let station = list(false);
+            openttd_rust_cargo_list_insert(station, 100, std::ptr::null_mut());
+            openttd_rust_cargo_list_insert(station, 200, std::ptr::null_mut());
+            openttd_rust_cargo_list_insert(station, 100, std::ptr::null_mut());
+            assert_eq!(openttd_rust_cargo_list_key_count(station), 2);
+            assert_eq!(openttd_rust_cargo_list_count(station), 0);
+            assert_eq!(openttd_rust_cargo_list_has(station, std::ptr::null(), 0), 0);
+            let next = [200, 100];
+            assert_eq!(
+                openttd_rust_cargo_list_has(station, next.as_ptr(), next.len()),
+                1
+            );
+            openttd_rust_cargo_list_insert(station, INVALID, std::ptr::null_mut());
+            assert_eq!(openttd_rust_cargo_list_key_count(station), 3);
+            assert_eq!(openttd_rust_cargo_list_has(station, std::ptr::null(), 0), 1);
+            openttd_rust_cargo_list_clear(station);
+            assert_eq!(openttd_rust_cargo_list_key_count(station), 0);
+            clean(station);
+        }
+    }
+
+    #[test]
+    fn capacity_autoreplace_single_engine_skips_foreign_parts_in_order() {
+        let service = services();
+        let capacity = CapacityServices {
+            read: capacity_read,
+            next_part: capacity_next_part,
+            last_engine_part: capacity_last_engine_part,
+            other_multiheaded_part: capacity_other_multiheaded_part,
+            cargo: &raw const service,
+        };
+        let mut source = std::array::from_fn::<_, 5, _>(|_| part(1));
+        let mut destination = std::array::from_fn::<_, 5, _>(|_| part(1));
+        for parts in [&mut source, &mut destination] {
+            let base = parts.as_mut_ptr();
+            for (index, entry) in parts.iter_mut().enumerate() {
+                entry.id = index as u8 + 1;
+                if index < 4 {
+                    entry.next = unsafe { base.add(index + 1) };
+                }
+            }
+            parts[0].other = unsafe { base.add(4) };
+            parts[1].articulated = 1;
+            parts[2].last = unsafe { base.add(3) };
+            parts[3].articulated = 1;
+        }
+        for entry in &mut destination {
+            entry.id += 10;
+        }
+        unsafe {
+            for (index, entry) in source.iter().enumerate() {
+                append(
+                    entry.list,
+                    service,
+                    cargo(1, index as u16 + 10, 0),
+                    KEEP as u16,
+                );
+            }
+            CAPACITY_CALLS.with(|calls| calls.borrow_mut().clear());
+            assert_eq!(
+                openttd_rust_cargo_capacity(
+                    &raw const capacity,
+                    source.as_mut_ptr().cast(),
+                    destination.as_mut_ptr().cast(),
+                    1,
+                    0,
+                ),
+                0
+            );
+            assert_eq!(
+                source.each_ref().map(|entry| fields(entry.list).count),
+                [0, 0, 1, 1, 0]
+            );
+            assert_eq!(
+                destination.each_ref().map(|entry| fields(entry.list).count),
+                [1, 1, 0, 0, 1]
+            );
+            CAPACITY_CALLS.with(|calls| {
+                assert_eq!(
+                    *calls.borrow(),
+                    vec![
+                        ("read", 1),
+                        ("read", 11),
+                        ("next", 11),
+                        ("next", 1),
+                        ("read", 2),
+                        ("other", 1),
+                        ("read", 11),
+                        ("next", 11),
+                        ("read", 12),
+                        ("other", 11),
+                        ("next", 12),
+                        ("next", 2),
+                        ("read", 3),
+                        ("other", 1),
+                        ("last", 3),
+                        ("next", 4),
+                        ("read", 5),
+                        ("other", 1),
+                        ("read", 11),
+                        ("next", 11),
+                        ("read", 12),
+                        ("other", 11),
+                        ("next", 12),
+                        ("read", 13),
+                        ("other", 11),
+                        ("last", 13),
+                        ("next", 14),
+                        ("read", 15),
+                        ("other", 11),
+                        ("next", 15),
+                        ("next", 5),
+                    ]
+                );
+            });
+            for entry in source.iter().chain(&destination) {
+                clean(entry.list);
+            }
+        }
+    }
+
+    #[test]
     fn capacity_shrink_and_autoreplace_consist_transfer() {
         let service = services();
         let capacity = CapacityServices {
             read: capacity_read,
-            pointer: capacity_pointer,
+            next_part: capacity_next_part,
+            last_engine_part: capacity_last_engine_part,
+            other_multiheaded_part: capacity_other_multiheaded_part,
             cargo: &raw const service,
         };
         let mut source = part(3);

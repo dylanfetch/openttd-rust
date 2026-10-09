@@ -3,6 +3,10 @@ name: CI (Linux)
 on:
   workflow_call:
     inputs:
+      checkout-ref:
+        required: false
+        type: string
+        default: ""
       compiler:
         required: true
         type: string
@@ -31,6 +35,9 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v6
+      with:
+        ref: ${{ inputs.checkout-ref }}
+        persist-credentials: false
 
     - name: Setup vcpkg
       id: vcpkg

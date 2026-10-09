@@ -34,6 +34,10 @@ networking, saves, NewGRF mods, graphics, and shared random-number behavior.
 
 ## Build and verification
 
+The CI-policy regression suite additionally uses Node.js to execute the actual
+workflow scripts; CI requests use an authenticated `gh` CLI. The maintenance
+tools work independently of the Codex host or T3 Code.
+
 The current verification setup targets native Linux and needs a C++20 compiler,
 CMake, Ninja, Python 3.11 or newer, SDL2 development files, and the normal OpenTTD
 libraries described in `COMPILING.md`. OpenGFX supplies free graphics for regression
@@ -79,8 +83,9 @@ bootstrapped toolchain when present. `tools/run-comparisons.py` then runs every
 reference comparison tool in parallel; CI runs all three steps.
 
 ```sh
-python3 tools/migration.py build --jobs 6
-python3 tools/migration.py verify --jobs 6
+python3 tools/migration.py rust-checks --jobs 2
+python3 tools/migration.py build --jobs 2
+python3 tools/migration.py verify --jobs 2
 python3 tools/migration.py tools
 python3 tools/run-comparisons.py
 ```
@@ -89,6 +94,18 @@ Each driver invocation retains command logs, test reports, executable hashes,
 source revision, and local changes under `.local/verification/<timestamp>/`.
 Passing establishes only covered behavior. The driver does not itself compare
 every game state or prove full game equivalence.
+
+`rust-checks` runs the four Cargo checks without creating or building the
+reference. The default `--jobs 2` also limits Cargo invoked by CMake. Every logged
+command reports its phase, elapsed time and output path, with periodic updates;
+lock waits identify live holders. POSIX commands run under a pipe supervisor;
+driver death (including SIGKILL) closes the pipe and kills the command session. Reference and candidate configure/build/test
+operations use separate locks, and simulation captures immutable runtime copies
+under those locks. Standalone fixture games share the benchmark coordination lock.
+Successful candidate game builds write a versioned executable identity containing
+source and configuration digests plus the executable hash. Receipts associate
+that identity only with a matching executable and configuration; external or
+otherwise unrecorded builds retain unknown provenance.
 
 The inherited platform CI also remains in place. Windows CI uses Windows 2022 and
 Visual Studio 2022 because the pinned breakpad dependency uses
@@ -158,8 +175,8 @@ and plainly, because desync mode also rebuilds caches every tick and takes
 YAPF's uncached rail path. Both write an exit save. Every chunk is decoded
 (tables field by field from the stored header, other chunks byte by byte) and
 the first differences are reported as `chunk/element/field: ref -> cand`.
-Any `[desync:` warning (a cache mismatch) and any log or stdout difference fail
-(cut to the shorter run when end moments differ; the plain run is always full).
+Any `[desync:` warning (a cache mismatch), snapshot-list/end-moment mismatch,
+or complete log/stdout difference fails. Both modes compare their exit saves.
 
 - Scenarios: both regression saves with their AIs; generated maps (TGP and
   original, sizes, seeds, disasters on); and `play-*`, road networks built by
@@ -169,7 +186,12 @@ Any `[desync:` warning (a cache mismatch) and any log or stdout difference fail
   compares the reference with itself; names filter. Extend `scenario_list()`
   for ports. The owner-built #86 save exercises signalled trains and a ship
   (`tools/simulation/rails.py`), requiring movement on every run and carried
-  cargo/delivery revenue at desync checkpoints. The supplemental reference-built
+  cargo/delivery revenue at desync checkpoints. The later owner save
+  (`play-padhattan-ridge-2000-*`, #179) retains the 1996 input
+  and adds three trains, three ships, three helicopters and a plane, with
+  movement/cargo/delivery checks and one cargodist crossing bar/release witness.
+  Saved subsidies and PBS signals do not establish all multiplier/route branches.
+  The supplemental reference-built
   aircraft fixture (`tools/simulation/aircraft.py`) observes a small plane and
   helicopter between two airports, requiring movement, loaded cargo, flying
   state and paid delivery. `tools/aircraft-scenario-ai/README.md` records its
@@ -178,13 +200,14 @@ Any `[desync:` warning (a cache mismatch) and any log or stdout difference fail
   id, build revision/NewGRF version, and `round_trip_time`, which the original
   saves uninitialized (#83); ports touching it need their own check.
 - Port divergences go in `KNOWN_FAILURES` by first divergence and issue.
-- `-vnull:ticks` counts loop iterations and a late threaded link graph job
-  pauses the game, so run length varies with load. Snapshots compare by date;
-  exit saves only when both runs stopped at the same tick. A clean plain pair
-  that stopped at different ticks is retried with no other harness game
-  running (a lock shared by all worktrees); a consistently slower link graph
-  job fails on timing, not state.
-  GameScripts run while paused, so scenarios must not use an active one.
+- Games launch on Linux as an unprivileged user with child-only
+  `RLIMIT_NPROC=0`. The original `StartNewThread` failure paths compute link
+  graphs and write saves synchronously; graph scheduling, join dates and loaded
+  LGRJ jobs remain unchanged. This prevents late workers from consuming null
+  driver iterations while the simulation is paused. A thread-creation probe
+  rejects hosts where privileges bypass the limit. Other platforms are not
+  supported by this offline comparison policy. There are no timing retries or
+  truncated logs. Active GameScripts remain outside the corpus.
 - Both executable/runtime trees are copied before scenarios, dereferencing data
   symlinks; the reference copy holds its shared build lock. Keep the candidate
   build idle during its initial copy; later builds cannot change the test run.
@@ -192,6 +215,31 @@ Any `[desync:` warning (a cache mismatch) and any log or stdout difference fail
   copies before running; `candidate_commit`/`candidate_status` describe the
   initial checkout, not proof of an arbitrary binary's source revision (#97).
   Evidence: `.local/simulation/<time>-<pid>/report.json`.
+
+Simulation speed (#155) is reported for every scenario as `plain_speed`:
+paired process wall seconds and candidate/reference ratios, plus their median.
+Ratios are null when exit saves are missing, runs fail, end moments differ, or
+semantic differences remain; timing never changes the pass/fail result.
+Parallel runs are noisy. Use an idle host, profiling counters off, the same
+build settings and pinned manual-distribution play save:
+
+```sh
+python3 tools/migration.py simulate play-opus-55-167-002-manual --benchmark 3 --jobs 2
+```
+
+The driver builds with two jobs, then runs one scenario worker. Benchmark mode
+runs only plain pairs, isolates each timed game from other clone-wide harness
+games, and compares each exit save and full logs. Both roles use #154's serial
+offline thread-failure fallback, recorded as `execution` in the report. These
+are total offline times, not normal threaded frame latency. It retains the final
+pair and runtimes; `plain_commands` supplies arguments for optional `perf record`
+replay through `tools/simulation/game_launcher.py`. Preserve the run's HOME/XDG
+directories and runtime libraries; keep profiling separate from timing samples.
+Timings include startup, loading, serial link-graph work and save I/O. Benchmark
+games wait directly for child exit with a timeout watchdog; ordinary runs retain
+subprocess timeout polling, which can add about 50 ms.
+The lock excludes harness games, not unrelated host activity. Port PRs record
+before/after ratios and commits; the roadmap sets the regression budget.
 
 Tree map-access measurements (#108) use the same scenarios and comparisons:
 `OPENTTD_TREE_PROFILE=1 python3 tools/migration.py simulate trees --jobs 1`;
@@ -290,10 +338,15 @@ generators after deleting previous outputs.
 
 `AGENTS.md` is authoritative for agent roles, models and reasoning effort,
 attribution, the issue/PR/review flow, and the evidence budget. This section adds
-only repository facts. `.codex/config.toml` sets root to `gpt-6-astra` xhigh and
+only repository facts. `.codex/config.toml` sets root to `gpt-6.1-sol` xhigh and
 spawned agents to `gpt-6.1-sol` high by default, with at most five spawned threads;
 explicit spawn settings select the required role, and a running host may impose a
 lower limit.
+
+`docs/skills/` holds two user-invoked skills: `/steer`, the user's Claude Code
+steering review, and `/start-development`, root's restart prompt. Steering reviews
+put their corrections in the roadmap and edit `/start-development` only to improve
+it; root follows it and leaves both skills unedited.
 
 The driver and CI enforce native build/tests, nonempty test inventories, reference
 test-name preservation, and these Cargo checks:
@@ -305,15 +358,69 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
 ```
 
-Server-side protection on `rust-migration` requires the platform matrix, native
-comparison, commit, and annotation checks, plus resolved conversations. Required
-checks must pass on the PR head; branches need not be up to date with the base.
-Platform CI also runs after each merge into `rust-migration`, and a post-merge
+Server-side protection on `rust-migration` requires `Full validation`, the cheap
+commit/string/script-mode checks, and resolved conversations. Full validation is
+an explicit commit status, published only after the native comparisons, simulation,
+entire platform matrix, quick checks and annotation checks succeed for a captured
+PR merge commit, with the status published on its head. Skipped or cancelled jobs cannot satisfy it. Workflow dispatch runs the
+controller from protected `rust-migration`; candidate test jobs have read-only
+permissions and the status publishers never execute candidate code.
+
+Ordinary PR pushes run cheap checks. With `gh` authenticated to the fork, use:
+
+```sh
+python3 tools/ci.py request 123 --profile rust
+python3 tools/ci.py request 123 --profile native
+python3 tools/ci.py request 123 --profile platform
+python3 tools/ci.py request 123 --profile full
+python3 tools/ci.py wait .local/ci-requests/REQUEST.json
+```
+
+`rust` runs four Cargo checks; `native` adds the Linux matrix and full migration
+comparison; `platform` runs the platform matrix. All include quick checks.
+Only `full` satisfies the merge gate. Unmergeable or pending-mergeability PRs
+are refused; a changed PR head or base needs a new full request.
+The CLI records the SHA and request/run identity and refuses a changed PR head.
+`CI_ON_DEMAND=true` enables this scheduling after root installs and verifies the
+required status. With the variable absent, automatic full CI remains as a safe
+bootstrap. For a workflow-changing PR, root reviews its workflow definitions,
+temporarily unsets `CI_ON_DEMAND`, and requests `--profile full --bootstrap`
+(the `ci:full` label path tests the PR definitions). Root restores the variable
+to `true` after merge and records both changes in the PR; never use `--admin`.
+For capacity batching, test a concrete integration PR and merge it once. A stack
+organizes dependent PRs but does not itself combine validation runs.
+
+Required checks must pass on the PR head; branches need not be up to date with the
+base; the captured merge commit must still match when validation publishes.
+Protected pushes have per-SHA concurrency, so a later docs push cannot cancel
+the code merge run. Platform CI also runs after code merges into `rust-migration`; markdown-only
+pushes skip heavy builds after complete file classification. A post-merge
 failure is fixed forward first. Force pushes and branch deletion are disallowed,
 including for administrators. The approving-review count is zero because agents
 share credentials; the attributed independent review report is the process gate
 before root integrates. Repository controls are enforced separately from these
 documents.
+
+`python3 tools/preflight.py --base origin/rust-migration --verification REPORT`
+runs the pinned inherited commit checker and checks explicit candidate compiler
+logs for warnings in branch-changed files and diagnostics without source locations;
+unchanged upstream warnings remain outside this scan. Its first run downloads the pinned hooks into ignored shared storage;
+`--hooks PATH` uses an existing clean pinned checkout offline. Without supplied
+logs it explicitly leaves warnings unchecked. `tools/evidence.py` exports explicit
+verification and optional repeated simulation receipts with committed port metrics
+and agent attribution; unsupported, failed or mismatched receipts fail. Narrow
+checks, legacy receipts, dirty source and unknown provenance remain labelled.
+
+After a clean task head has merged, `tools/worktrees.py plan|archive|resume
+/absolute/task --repo /surviving/clone --expected-head FULL_COMMIT` preserves
+ignored evidence, checksums and raw symlinks in a versioned journal before removing
+the worktree. Rebuildable `build-rust`, `.local/build-tools-rust` and
+`.local/build-reference` output is discarded. Lock paused and evidence worktrees
+with `git worktree lock --reason REASON PATH`. `plan` is read-only. `resume` continues the same journal after
+interruption. The helper protects the main/reference/locked worktrees and rejects
+dirty or unmerged heads. It requires POSIX locking and a single filesystem;
+an interrupted removal leaving an unregistered directory needs manual inspection.
+These tools require no T3 Code or host lifecycle API.
 
 Preserve OpenTTD copyright notices, credits, and GPLv2. Agent-generated work is welcome
 in this fork; upstream submission policies govern contributions to OpenTTD itself.
@@ -1291,28 +1398,30 @@ real custom NewGRF callbacks and complete historical saves remain evidence limit
 
 ### Road vehicle control and private state
 
-Issue #121 moves road consist/tick/day control, movement, blocking/overtaking,
-reversal, station/depot transitions, crash expiry, service, speed/cache policy and
-turn commands into Rust. Rust owns seven private scalars and the ordered path;
-modern, historical split-vector and TTD/TTO save adapters stage them in C++.
-Original algorithms and road/tram movement data compile only in portable builds.
-Shared Vehicle/GroundVehicle physics, pools, orders/loading, map/road stops,
-construction and rendering remain C++. Road YAPF uses the same canonical path
-through #124; there is no temporary C++ search result cache.
+Issue #121 moves road tick/day control, movement, blocking/overtaking, reversal,
+station/depot transitions, crash expiry, service, speed/cache policy and turns to
+Rust. Each shell owns seven scalars and the canonical path; modern, split-vector
+and TTD/TTO adapters stage them in C++. Original algorithms/data stay portable.
+C++ keeps shared physics, map/pools, orders/loading, construction and rendering;
+#124 YAPF writes the same canonical path.
 
-Rust uses copied IDs/observations and direct noexcept services, including shared
-RNG. Actions return to C++ for owner reentry, commands, NewGRF callbacks, viewport
-sprite updates and destruction; no world reference survives them. Canonical
-state outlives active calls and is released after PreDestructor; panics abort.
-`python3 tools/migration.py simulate roads` witnesses both acceleration models,
-cache consumption/invalidation, blocking escape, overtake initiation/timeout,
-depot service/departure and path/counter reload, with loaded link jobs postponed
-32 days in typed inputs. Road/multimodal/disaster cases compare all fields/logs.
-Native fixtures compare all movement/stop data against unchanged C++ tables and
-exercise widths, ordered paths, nested save staging, partial-load unwind, indexed
-pool reuse and reentry. These establish covered behavior; actual legacy saves,
-NewGRFs, articulated/tram turns, level-crossing collisions, sounds and viewport
-pixels remain unexercised controller domains.
+#155 replaces all fourteen allocated invocation kinds and twenty-two actions
+with typed synchronous entries/services. Native tables are borrowed; reads return
+only consumed fields, and nearby visitors traverse once without an ID vector.
+Bus classification runs only where needed; each entry resolves its owner once.
+No owner/path/world borrow spans callbacks, including nested cache, destination,
+speed, slope and trackdir calls. Deletion follows PreDestructor and returns a
+copied result. Commands return CommandCost, NewGRF resolution is bounded, and
+AI/Game events enqueue. Wrappers are noexcept; panic and escaping exceptions abort.
+
+Paired `simulate roads` and soak runs compare saved fields/logs for acceleration,
+service, blocking/overtaking, path, RNG, crossing/flooding, crash expiry and reload;
+`--self` controls reference determinism. Native checks cover typed ABI, nested
+getter/cache/destination/path mutation, destruction, movement data and save staging.
+Five idle exact benchmarks pass current caps +3% (#155/#186); CI timings are
+reporting only. Remaining boundary cleanup stays in #168 without integration exceptions.
+Actual legacy saves, NewGRFs, articulated/tram turns, sounds and viewport pixels
+remain unexercised domains tracked by #156.
 
 ### Company finances and economy lifecycle
 
@@ -1347,7 +1456,9 @@ node/segment arenas, exact-order heap, costs, lookahead, limits and reconstructi
 into Rust. Rust owns six specialization-specific cache banks, rail-change
 invalidation, reservation traversal and ordered signal rollback. C++ retains
 the train controller, shared track follower, PBS and canonical world services.
-Station animation/randomisation returns to C++ with affected borrows released.
+Explicit platform/waypoint station triggers return to C++ with borrows released;
+waypoint track reservation also retains the original synchronous PBS station
+triggers while search/reservation borrows remain active, before its second trigger.
 Original search bodies remain portable-only; diagnostic dumps use temporary
 views and the original format, with no canonical C++ search mirror.
 
@@ -1384,53 +1495,31 @@ cover every field on supported hosts. Arbitrary maps/NewGRFs, articulated/tram,
 road waypoints, exhaustive occupied-stop/loop/segment-length branches and actual
 legacy saves remain limits; shared follower logic is deliberately unported.
 
-### Industry periodic production and builder ownership (#129)
+### Orders lifecycle ownership
 
-Rust owns the produced/accepted slots, optional accepted histories, production
-fields, sound countdown and industry-builder records. C++ industry shells expose
-nonowning views of these allocations; INDY, IBLD, ITBL, ECMY and TTO/TTD load
-adapters preserve the original names, widths, version gates and ordering.
-Rust controls production/transport ticks, farm fields/fences, lumber harvesting,
-NewGRF production repeats/application, production commands and trimming,
-monthly statistics/change/closure, daily changes and builder targets/retries.
-The original selected bodies remain in the portable C++ path.
-
-Pool/map/spec storage, construction and landscape-clear transactions, presentation
-and bounded NewGRF resolution remain direct `noexcept` world services. Construction,
-clearing, cargo distribution and destruction can reenter industry accessors;
-Rust retains no owner reference across them. Script events only enqueue; save/load
-errors remain native. CargoPayment delivery and its original-end flush remain #117.
-ABI IDs 130–138 cover canonical records and synchronous services.
-
-`python3 tools/migration.py simulate industry-` reuses real cargo saves, generated
-climates/economies and disaster reset/release, with explicit production-control,
-closure and builder inputs. A committed reference setup AI funds a tropical lumber
-mill; checks witness harvesting, farm growth, history and builder backoff. `--self`
-and `--soak` add determinism and yearly history evidence. `python3 -m
-tools.simulation.industries` checks absent NewGRF versions/repeat/arithmetic against
-the unchanged pinned callback body. The corpus does not exhaust legacy saves,
-NewGRF resolver programs or every industry layout; native tests check ABI/lifetimes.
-### Rail vehicles and controller state (#130)
-
-Rust owns train consist/cache/curve/speed policy, both tick passes and movement,
-reversal, crossing control, crash/deletion, servicing and day handling. It also
-owns controller reservation extension/rollback, freeing, track choice and temporary
-order lookahead/restoration; #122 retains complete YAPF search ownership.
-Each C++ train shell owns one Rust allocation for flags, track, force-proceed,
-wait/crash counters, railtype masks and scalar TrainCache fields. Shared Vehicle/
-GroundVehicle fields, pools/links, sprite override references, rendering,
-construction/arrangement and generic orders/loading stay in C++. External writes,
-modern VEHS staging, legacy loading and afterload use canonical scalar adapters.
-Original selected bodies compile only in portable builds. Copied noexcept world
-services preserve immediate reads/writes; named callback tasks release borrows
-before tile/depot entry, orders/loading, station callbacks and destruction.
-`OPENTTD_TRAIN_PROFILE=1` writes controller branch counts in `train-profile.json`;
-this includes extension rollback separately from #122's search rollback.
-Validation uses the existing Padhattan manual/cargodist, realistic acceleration,
-90-degree reservation, live reload and real command-built controller scenarios.
-A narrow unchanged-source comparison covers variable-length curve/reversal inputs
-unavailable in the stock fixture. The PR records commands and branch/NewGRF limits; passing these inputs does not prove
-exhaustive train equivalence.
+Issue #138 / PR #176 moves order vectors, list counts/durations, current orders,
+shared links, backups and consist timetable/unbunching state into Rust. Rust owns
+traversal, command validation/edit/copy/share/unshare, conditional/depot execution,
+implicit maintenance, backup capture/restoration/cleanup and timetable/unbunching
+policy. Original bodies remain portable-only. C++ retains pool shells, typed
+construction, format conversion and save/load errors, world access and GUI/news.
+ORDL/BKOR/VEHS address canonical storage; ancient ORDR uses load-only staging.
+Named synchronous entries borrow an immutable typed noexcept service table;
+there is no per-entry allocation or task/future/action protocol. Owner borrows end
+before callbacks, including nested commands and destruction. No selected service
+unwinds during ordinary play; environmental failures and Rust panics abort.
+ABI IDs 260-266 describe crossing records. Native checks cover layouts,
+full consist copies, typed defaults, overlapping edits, allocation invalidation
+and ordinary/indexed pool retirement and reuse.
+`simulate orders-` runs commands, initialized shared-depot departure, offline
+backup clearing, client-policy unique/shared restoration and conditional/implicit
+active reload. The identical orders-only console/AfterLoadGame adapter exposes
+original commands and declared typed inputs; executed adapters, frozen runtimes,
+link/compile inputs and actual BKOR saves have reproducible provenance.
+Unmasked 3000/6000-tick peer samples supplement #83's general round-trip mask.
+Network transport, historical saves and exhaustive NewGRF/error domains remain
+limits in #156. A retained pinned-original multi-row BKOR load failure requires
+separate index-zero serialized fixtures; the original source stays unchanged.
 
 ### Station cargo service
 
@@ -1457,6 +1546,84 @@ loading, rating expiry/decay/capping, stale-link refresh/removal and active relo
 queue mutation, partial/nested save failure and actual retirement/indexed reuse.
 The corpus is not exhaustive for legacy versions, NewGRF cargo callbacks,
 articulated/multiheaded refits or every transport combination.
+
+### Ship controller and private state (#146)
+
+Rust owns the complete ship tick/movement, locks, acceleration, rotation/reversal,
+track/depot/destination policy, economy-day/service/cache/build initialization,
+and nearest-depot region BFS with ordered pool selection. Four canonical scalars
+belong to each Rust ship owner; #119 remains the sole path/search owner. Original
+selected bodies compile only portably. C++ keeps shared Vehicle/map/pool storage,
+renderer bounds/sprites, allocation, Money accounting and modern/legacy save staging.
+NOSAVE signed-16-bit rotation coordinates reconstruct at the original afterload phase.
+
+Entries are synchronous typed calls without task/future/mailbox allocation or
+operation dispatch. Services are individually named `noexcept` functions; narrow
+getters fetch only used fields, typed results carry positions and search choices,
+and one reusable game-thread Rust set/deque owns depot scratch. Rust resolves its
+raw scalar owner once per entry and ends every borrow before callbacks. Tile/depot,
+orders/loading, viewport, breakdown, effect/sound, cache/YAPF and NewGRF callbacks
+remain direct: none can unwind a script VM or save/load error during ordinary play.
+Unexpected environmental exceptions terminate inside their wrappers; Rust panics abort.
+
+`python3 tools/migration.py verify --jobs 2` includes the four Cargo checks and
+native ABI checks for scalar widths, native C++ transient coordinate narrowing,
+direct callback order and nested owner mutation. `OPENTTD_SHIP_PROFILE=1 python3
+tools/migration.py simulate water --jobs 2` (also `--self`/`--soak`) reuses the water
+corpus for locks, aqueducts, rotation/reload, service, buoy/loading, depot restart,
+and moving build/sell/ID-reuse owners. The class case changes one existing clear
+canal input byte to `MakeRiver` class/owner encoding for both games and requires an
+actual cache-update branch. Legacy save versions, viewport pixels and arbitrary
+custom NewGRF combinations remain coverage limits; final independent review and CI gate integration.
+
+### Rail vehicles and controller state (#130)
+
+Rust owns train consist/cache/curve/speed policy, both tick passes and movement,
+reversal, crossing control, crash/deletion, servicing and day handling. It also
+owns controller reservation extension/rollback, freeing, track choice and temporary
+order lookahead/restoration; #122 retains complete YAPF search ownership.
+Each C++ train shell owns one Rust allocation for flags, track, force-proceed,
+wait/crash counters, railtype masks and scalar TrainCache fields. Shared Vehicle/
+GroundVehicle fields, pools/links, sprite override references, rendering,
+construction/arrangement and generic orders/loading stay in C++. External writes,
+modern VEHS staging, legacy loading and afterload use canonical scalar adapters.
+Original selected bodies compile only in portable builds. Copied noexcept world
+services preserve immediate reads/writes; named callback tasks release borrows
+before tile/depot entry, orders/loading, station callbacks and destruction.
+`OPENTTD_TRAIN_PROFILE=1` writes controller branch counts in `train-profile.json`;
+this includes extension rollback separately from #122's search rollback.
+Validation uses the existing Padhattan manual/cargodist, realistic acceleration,
+90-degree reservation, live reload and real command-built controller scenarios.
+A narrow unchanged-source comparison covers variable-length curve/reversal inputs
+unavailable in the stock fixture. The PR records commands and branch/NewGRF limits; passing these inputs does not prove
+exhaustive train equivalence.
+
+### Industry periodic production and builder ownership (#129)
+
+Rust owns the produced/accepted slots, optional accepted histories, production
+fields, sound countdown and industry-builder records. C++ industry shells expose
+nonowning views of these allocations; INDY, IBLD, ITBL, ECMY and TTO/TTD load
+adapters preserve the original names, widths, version gates and ordering.
+Rust controls production/transport ticks, farm fields/fences, lumber harvesting,
+NewGRF production repeats/application, production commands and trimming,
+monthly statistics/change/closure, daily changes and builder targets/retries.
+The original selected bodies remain in the portable C++ path.
+
+Pool/map/spec storage, construction and landscape-clear transactions, presentation
+and bounded NewGRF resolution remain direct `noexcept` world services. Construction,
+clearing, cargo distribution and destruction can reenter industry accessors;
+Rust retains no owner reference across them. Script events only enqueue; save/load
+errors remain native. CargoPayment delivery and its original-end flush remain #117.
+ABI IDs 130–138 cover canonical records and synchronous services.
+
+`python3 tools/migration.py simulate industry-` reuses real cargo saves, generated
+climates/economies and disaster reset/release, with explicit production-control,
+closure and builder inputs. A committed reference setup AI funds a tropical lumber
+mill; checks witness harvesting, farm growth, history and builder backoff. `--self`
+and `--soak` add determinism and yearly history evidence. `python3 -m
+tools.simulation.industries` checks absent NewGRF versions/repeat/arithmetic against
+the unchanged pinned callback body. The corpus does not exhaust legacy saves,
+NewGRF resolver programs or every industry layout; native tests check ABI/lifetimes.
 
 ### Aircraft controllers and airport movement
 
@@ -1488,31 +1655,30 @@ remain evidence limits. A reference-built ownerless oilrig route checks public
 helicopter landing through the ordinary FTA path.
 ### Cargo storage and movement (#139)
 
-Rust owns packet fields, ordered station destinations and vehicle cargo lists,
-count/age/feeder/action/reservation caches, cumulative flow shares and origin maps.
-It runs split/merge/reduce/aging/invalidation, append/staging/reassignment,
-reservation/load/return/transfer/delivery/shift/truncate/reroute, completed-job
-live-flow reconciliation, capacity redistribution and autoreplace cargo transfer.
-The C++ packet pool retains typed identities, first-free/indexed allocation,
-allocation limits and destruction hooks. Payment/delivery (#117), loading policy
-(#125), link-graph computation (#74), world access and thread join keep their owners.
-
-CAPA, station/vehicle references and flow fields use call-local C++ save/load
-staging; pointer fixups and save errors finish outside Rust. Readers export a
-call-local const container or borrow flow entries through scalar-key iterators.
-No canonical cargo container or field mirror remains in C++. Payment getter
-reentry occurs after packet/list borrows end; ConsistChanged runs after Rust
-returns. Portable builds compile the unchanged original bodies.
+Rust owns packet fields, ordered station/vehicle lists, count/age/feeder/action/
+reservation caches, cumulative flow shares and origin maps. It runs packet
+operations, cargo movement/staging/rerouting, live-flow reconciliation, capacity
+redistribution and autoreplace cargo transfer. Stable arena slots and linked
+ordering give constant-time list operations; destination endpoints bound station
+lookups to the selected queue. Freed slots are reused; arena capacity is retained.
+C++ retains packet pool identity/allocation/hooks, payment/delivery (#117),
+loading policy (#125), link-graph computation (#74), world access and thread join.
+CAPA/STNN/VEHS/flow adapters export call-local containers or scalar-key readers;
+pointer fixups and save errors finish outside Rust. Payment getters reenter after
+owner borrows end; ConsistChanged runs after Rust returns. Portable bodies stay.
 
 Checks: `python3 tools/migration.py verify --jobs 2`,
-`python3 tools/migration.py simulate cargo-storage economy stations play-padhattan aircraft --jobs 1`,
-`python3 tools/migration.py simulate cargo-storage --self --jobs 1`, and
-`python3 tools/migration.py simulate cargo-storage --soak --jobs 1`.
-The cargo scenario module reuses active CAPY fixtures and checks saved packet
-references/actions, aging, feeder credits and forced policies. Rust tests cover
-partial movement, payment getter reentry, same-list rerouting and capacity changes;
-`python3 tools/cargo-storage-comparison.py` checks the named unreachable pool-limit
-Split failure against the unchanged pinned body. Legacy conversions remain adapters.
+`python3 tools/migration.py simulate cargo-storage economy stations play-padhattan aircraft --jobs 2`,
+`python3 tools/migration.py simulate cargo-storage --self --jobs 2`, and
+`python3 tools/migration.py simulate cargo-storage --soak --jobs 2`.
+Active CAPY scenarios check saved packet references/actions, aging, feeder credits
+and forced policies. Rust tests cover partial movement, payment getter reentry,
+same-list rerouting and capacity changes. `python3 tools/cargo-storage-comparison.py`
+checks unreachable pool-limit Split failure against the unchanged pinned body.
+After building, `python3 -m tools.simulation.cargo_storage` probes 1k-64k queues,
+identity/order/cache preservation and bounded reads for first-hit append/keyed load;
+its synthetic timings are not whole-game speed ratios. Legacy conversions and
+complete refit/autoreplace transactions lack additional play witnesses (#156).
 
 ### Fleet state checkpoint (#147; incomplete)
 

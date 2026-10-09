@@ -1,27 +1,54 @@
 name: CI - Build
 
 on:
+  workflow_call:
+    inputs:
+      checkout-ref:
+        required: true
+        type: string
+      profile:
+        required: true
+        type: string
+    outputs:
+      validated:
+        description: All selected builds and annotation checks succeeded
+        value: ${{ jobs.complete.outputs.validated }}
   pull_request:
   push:
     branches:
     - master
     - rust-migration
 
+permissions:
+  contents: read
+  actions: read
+  checks: read
+  pull-requests: read
+
 env:
   CTEST_OUTPUT_ON_FAILURE: 1
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-build-${{ inputs.checkout-ref && github.run_id || github.ref == 'refs/heads/rust-migration' && github.sha || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/master' && github.ref != 'refs/heads/rust-migration' }}
 
 jobs:
+  policy:
+    if: inputs.checkout-ref == ''
+    uses: ./.github/workflows/ci-policy.yml
+
   emscripten:
+    needs: policy
+    if: ${{ !cancelled() && (inputs.checkout-ref != '' || needs.policy.outputs.heavy == 'true') && inputs.profile != 'native' }}
     name: Emscripten
 
     uses: ./.github/workflows/ci-emscripten.yml
-    secrets: inherit
+    with:
+      checkout-ref: ${{ inputs.checkout-ref }}
 
   linux:
+    needs: policy
+    if: ${{ !cancelled() && (inputs.checkout-ref != '' || needs.policy.outputs.heavy == 'true') }}
     strategy:
       fail-fast: false
       matrix:
@@ -44,15 +71,17 @@ jobs:
     name: Linux (${{ matrix.name }})
 
     uses: ./.github/workflows/ci-linux.yml
-    secrets: inherit
 
     with:
+      checkout-ref: ${{ inputs.checkout-ref }}
       compiler: ${{ matrix.compiler }}
       cxxcompiler: ${{ matrix.cxxcompiler }}
       libraries: ${{ matrix.libraries }}
       extra-cmake-parameters: ${{ matrix.extra-cmake-parameters }}
 
   macos:
+    needs: policy
+    if: ${{ !cancelled() && (inputs.checkout-ref != '' || needs.policy.outputs.heavy == 'true') && inputs.profile != 'native' }}
     strategy:
       fail-fast: false
       matrix:
@@ -69,15 +98,17 @@ jobs:
     name: Mac OS (${{ matrix.name }})
 
     uses: ./.github/workflows/ci-macos.yml
-    secrets: inherit
 
     with:
+      checkout-ref: ${{ inputs.checkout-ref }}
       rust: true
       arch: ${{ matrix.arch }}
       full_arch: ${{ matrix.full_arch }}
       extra-cmake-parameters: ${{ matrix.extra-cmake-parameters }}
 
   windows:
+    needs: policy
+    if: ${{ !cancelled() && (inputs.checkout-ref != '' || needs.policy.outputs.heavy == 'true') && inputs.profile != 'native' }}
     strategy:
       fail-fast: false
       matrix:
@@ -88,9 +119,9 @@ jobs:
     name: Windows (${{ matrix.arch }})
 
     uses: ./.github/workflows/ci-windows.yml
-    secrets: inherit
 
     with:
+      checkout-ref: ${{ inputs.checkout-ref }}
       rust: true
       arch: ${{ matrix.arch }}
 
@@ -102,10 +133,38 @@ jobs:
     - macos
     - windows
 
-    if: always() && github.event_name == 'pull_request'
+    if: always() && (inputs.checkout-ref != '' || (github.event_name == 'pull_request' && needs.linux.result != 'skipped'))
 
     runs-on: ubuntu-latest
 
     steps:
     - name: Check annotations
       uses: OpenTTD/actions/annotation-check@v6
+
+  complete:
+    if: always() && inputs.checkout-ref != ''
+    needs: [emscripten, linux, macos, windows, check_annotations]
+    runs-on: ubuntu-latest
+    outputs:
+      validated: ${{ steps.complete.outputs.validated }}
+    steps:
+    - id: complete
+      env:
+        PROFILE: ${{ inputs.profile }}
+        RESULTS: ${{ toJSON(needs) }}
+      run: |
+        python3 - <<'PY'
+        import json
+        import os
+        results = json.loads(os.environ['RESULTS'])
+        required = ['linux', 'check_annotations']
+        if os.environ['PROFILE'] in ('platform', 'full'):
+            required += ['emscripten', 'macos', 'windows']
+        elif os.environ['PROFILE'] != 'native':
+            raise SystemExit('Unsupported platform profile')
+        failed = [job for job in required if results.get(job, {}).get('result') != 'success']
+        if failed:
+            raise SystemExit(f'Required builds/checks did not succeed: {failed}')
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+            output.write('validated=true\n')
+        PY
