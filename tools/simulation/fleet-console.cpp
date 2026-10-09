@@ -29,6 +29,8 @@
 #include "water_map.h"
 #include "settings_type.h"
 #include "vehiclelist.h"
+#include "console_func.h"
+#include "news_gui.h"
 
 [[noreturn]] static void FixtureAbort(int line) { fmt::print(stderr, "FLEET setup-failure {}\n", line); std::fflush(stderr); std::abort(); }
 
@@ -111,10 +113,43 @@ static bool SameRandom(const SavedRandomSeeds &a, const SavedRandomSeeds &b)
 {
 	return std::equal(std::begin(a.random.state), std::end(a.random.state), std::begin(b.random.state)) && std::equal(std::begin(a.interactive_random.state), std::end(a.interactive_random.state), std::begin(b.interactive_random.state));
 }
+/** Running road vehicle 12 of padhattan-ridge-2000 heads to a service depot; the witness runs on 2001-01-01. */
+static VehicleID _drain_vehicle = VehicleID::Invalid();
+static UnitID _drain_unit = 0;
 static bool FleetScenario(std::span<std::string_view> args)
 {
 	if (args.size() != 2) return false;
 	Backup<CompanyID> company(_current_company);
+	if (args[1] == "drain" || args[1] == "drain-cash") {
+		/* Typed inputs on an ordinary save: a running vehicle past renewal age, autorenew on, and for the cash case only the reserve. */
+		Vehicle *v = Vehicle::Get(VehicleID(12));
+		if (v->type != VEH_ROAD || v->vehstatus.Test(VehState::Stopped) || !v->current_order.IsType(OT_GOTO_DEPOT) || v->owner != _local_company) FixtureAbort(__LINE__);
+		Company *c = Company::Get(v->owner);
+		c->settings.engine_renew = true;
+		v->age = TimerGameCalendar::Date(v->max_age.base() + 366);
+		if (args[1] == "drain-cash") CompanyMoney(c) = Money(c->settings.engine_renew_money);
+		_drain_vehicle = v->index;
+		_drain_unit = v->unitnumber;
+		fmt::print(stderr, "FLEET drain input {} {} {}\n", v->index, v->engine_type, CompanyMoney(c));
+		IConsoleCmdExec("schedule on-next-calendar-month fleet-drain.scr");
+		return true;
+	}
+	if (args[1] == "drain-inspect") {
+		const Vehicle *old = Vehicle::GetIfValid(_drain_vehicle);
+		fmt::print(stderr, "FLEET drain old {} {} {} money {}\n", old != nullptr, old != nullptr && old->vehstatus.Test(VehState::Stopped), old != nullptr ? old->age.base() : -1, CompanyMoney(Company::Get(_local_company)));
+		for (const Vehicle *u : Vehicle::Iterate()) {
+			if (u->type != VEH_ROAD || !u->IsPrimaryVehicle() || u->unitnumber != _drain_unit || u->index == _drain_vehicle) continue;
+			fmt::print(stderr, "FLEET drain new {} {} {} {} {}\n", u->index, u->engine_type, u->age.base(), u->vehstatus.Test(VehState::Stopped), u->IsInDepot());
+		}
+		for (const NewsItem &ni : GetNews()) {
+			if (ni.advice_type != AdviceType::AutorenewFailed) continue;
+			const VehicleID *ref = std::get_if<VehicleID>(&ni.ref1);
+			std::string text;
+			for (char ch : ni.headline.GetDecodedString()) if (ch == '\n' || (ch >= ' ' && ch <= '~')) text += ch == '\n' ? ' ' : ch;
+			fmt::print(stderr, "FLEET drain news {} {}\n", ref != nullptr ? ref->base() : -1, text);
+		}
+		return true;
+	}
 	if (args[1] == "inspect") {
 		for (Group *g : Group::Iterate()) if (GroupName(g) == "Fleet snowman \xE2\x98\x83") {
 			company.Change(g->owner);

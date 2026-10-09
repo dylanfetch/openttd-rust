@@ -22,6 +22,8 @@ def scenarios(soak):
                 / (
                     "padhattan-ridge-1996.sav"
                     if mode.startswith("train")
+                    else "padhattan-ridge-2000.sav"
+                    if mode.startswith("drain")
                     else "water-ferry.sav"
                     if mode == "ship"
                     else "aircraft-route.sav"
@@ -31,7 +33,8 @@ def scenarios(soak):
             ),
             "fleet": mode,
             "short_checkpoint": True,
-            "ticks": 74 if soak else 1,
+            # The drain cases run past the scheduled witness on 2001-01-01.
+            "ticks": 400 if mode.startswith("drain") else 74 if soak else 1,
             "console": ["fleet_scenario " + mode, "unpause"],
         }
         for mode in (
@@ -44,11 +47,18 @@ def scenarios(soak):
             "train-wagons",
             "ship",
             "aircraft",
+            "drain",
+            "drain-cash",
         )
     ]
 
     cases.append(dict(cases[0], name="fleet-reload", fleet="reload"))
     return cases
+
+
+def install(scenario, run_dir):
+    if scenario.get("fleet", "").startswith("drain"):
+        (run_dir / "fleet-drain.scr").write_text("fleet_scenario drain-inspect\n")
 
 
 def adapter(build, folder, env):
@@ -89,7 +99,7 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
     import migration
 
     folder = out / scenario["name"] / "input"
-    if scenario["fleet"].startswith("train"):
+    if scenario["fleet"].startswith(("train", "drain")):
         from .rails import normalize
 
         source, receipt = normalize(Path(scenario["save"]), folder / "normalized")
@@ -204,6 +214,19 @@ def check(scenario, run, mode, role, result):
             ]
             for operation in ("replace", "train", "ship", "aircraft")
         },
+        # Frozen from the unchanged reference: the running vehicle entered its
+        # service depot, was renewed (new ID 53, age 2 days) and left running;
+        # with only the reserve it restarted unrenewed with money-limit news.
+        "drain": [
+            "FLEET drain input 12 139 191152",
+            "FLEET drain old false false -1 money 176297",
+            "FLEET drain new 53 139 2 false false",
+        ],
+        "drain-cash": [
+            "FLEET drain input 12 139 100000",
+            "FLEET drain old true false 5860 money 101673",
+            "FLEET drain news 12 Autorenew failed on Road Vehicle #17 (money limit)",
+        ],
         "cash": [
             "FLEET test-rng true original true",
             "FLEET rollback true true true true",
