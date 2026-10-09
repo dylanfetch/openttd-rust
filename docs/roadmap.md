@@ -10,11 +10,9 @@ forward-looking, about 200 lines; completed work is one row, with evidence in PR
   384k non-vendored `src/` lines (18,898 excluding town-name and road-movement
   data). Batch #184 (road conversion, cargo, orders, ship) would retire 6,069 more
   for 4,964 glue: glue is rising toward parity, mostly typed-boundary tables.
-- Speed, measured exactly (#186) at the road-only join: Opus 1.419x and
-  Padhattan-2000 2.036x. Generation is about 1.41x. The committed caps were read
-  through 50 ms rounding, so the Padhattan caps are unreliable until #186
-  re-measures them. #184 regresses Opus by a real 5.4%: about 63% from orders
-  and 25% from cargo.
+- Exact timing (#186/#187) at the retained direct-road baseline: Opus 1.422x and
+  Padhattan-2000 1.983x. The generation cap is 1.440x. #184's hot-path fixes have
+  native/Cargo validation; final semantic checks and the corrected ratchet remain.
 - Mixed-save profile, as extra candidate time relative to the reference:
   aircraft +27%, train +25%, window drawing and string formatting +18%, road +11%, trees +8%.
 - CI is green and on demand. A full run costs about 104 job-minutes, once per
@@ -126,7 +124,18 @@ never in masks.
 2. **#156 coverage, standing capacity.** Random and crash branches first. The
    2000 and 2006 Padhattan saves are imported (#181, #185 in #184). The presence
    of PBS signals, locks or subsidies in a save does not show that every route or
-   multiplier was exercised. Remaining branches stay in #156.
+   multiplier was exercised. Next slice: #188 aircraft breakdown witnesses,
+   after the current batch frees capacity. Remaining branches stay in #156.
+
+Exact caps (three-pair medians; [samples and provenance](https://github.com/dylanfetch/openttd-rust/pull/187#issuecomment-6072318657)):
+
+| Scenario | Cap |
+| --- | ---: |
+| Opus manual | 1.422193877551 |
+| Grok manual | 1.405807365439 |
+| Padhattan 1996 manual | 1.662674650699 |
+| Padhattan 2000 manual | 1.982905982906 |
+| TGP 256 | 1.440443213296 |
 
 ## Phase 2: current work, in order
 
@@ -144,7 +153,7 @@ in parallel with this list.
    concrete full run for the batch; the timing fix precedes ratchet evaluation.
 3. **Finish #147 fleet replacement** in the direct form.
 4. **#168 conversions, one PR per component:** train and train reservation
-   (O(n^2) consist walk, per-step `nearby` Vec) or aircraft first, then company
+   first (O(n^2) consist walk, per-step `nearby` Vec), aircraft, then company
    with its widened scope, then trees, town and disaster, then the cold cargo
    and orders opcodes. The UTF-8/string-consumer support fix is a separate small
    PR at any point.
@@ -161,8 +170,8 @@ Revisit it only if a post-#168 profile shows map/pool crossings dominating.
 
 | Issue / PR | Branch (worktree suffix), head | State and next step |
 | --- | --- | --- |
-| #186 | `exact-benchmark-timing-186` (`exact-benchmark-timing-186`), `3263fe88af` | Timer/config implemented; fresh review and exact main/direct-road measurements next. Join #184 for full CI. |
-| #182 / #184 | `reviewed-owner-batch-182` (`reviewed-owners-182`), `fa0baea911` | Hot-path owner active; then fresh review, #186 join, exact caps and full CI. |
+| #186 / #187 | `exact-benchmark-timing-186` (`exact-benchmark-timing-186`), `c9b5b1c1b1` | Reviewed timer/config and exact caps; joined #184 for full CI. |
+| #182 / #184 | `reviewed-owner-batch-182` (`reviewed-owners-182`), `6e4b180e68` | Hot-path source review and combined native/Cargo pass; final affected/default semantics, caps and full CI next. |
 | #155 / #178, #139 / #151, #138 / #176, #146 / #152, #183 / #185 | joined in #184 | Reviewed sources; close with #184. |
 | #147 | `fleet-replacement-ownership-147` (`fleet-replacement`), `68d660adc9` | State-only WIP; completion plan in issue. Refresh from integrated #184 before implementation. |
 
