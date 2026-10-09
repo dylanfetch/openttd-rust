@@ -1680,22 +1680,28 @@ identity/order/cache preservation and bounded reads for first-hit append/keyed l
 its synthetic timings are not whole-game speed ratios. Legacy conversions and
 complete refit/autoreplace transactions lack additional play witnesses (#156).
 
-### Fleet state checkpoint (#147; incomplete)
+### Fleet controller checkpoint (#147; incomplete)
 
-The WIP fleet slice allocates group scalar metadata/name/ordered children,
-statistics and ordered engine-count maps, renewal-rule contents/links,
-company renewal heads and vehicle group membership in Rust. C++ pool shells
-retain typed IDs, indexed/first-free allocation, group-number allocation and
-GUI folded state. Scalar views alias canonical allocations; property copies
-construct independent owners while preserving the original shallow rule link.
-GRPS names use a call-local string adapter. GRPS/ERNW/PLYR/VEHS retain original
-field names, widths, reference fixups and legacy conversions.
+Rust owns group metadata/names/ordered children, statistics/engine counts,
+renewal rules/links, company renewal heads and vehicle group membership.
+The WIP controllers now run group commands, traversal/statistics/livery updates,
+renewal-rule changes, replacement eligibility/refits/speculative construction,
+rearrangement/rollback and an ascending VehicleID pending map. Typed synchronous
+native callbacks supply pools, world reads, commands and presentation. Native
+stack objects retain complete CommandCost values and original AddCost behavior.
+C++ retains pool identity/allocation, group numbers, GUI folding and save adapters;
+portable builds retain the original bodies. Owner operations and child iteration
+use named APIs without runtime selectors or boundary export allocations.
 
-This checkpoint does **not** complete #147: group/rule command and traversal
-policy, replacement eligibility/refits/speculative build/rearrangement/rollback,
-transaction scratch and ordered pending-map/tick-end drain remain in C++.
-No selected control-flow retirement or simulation-equivalence claim is made.
-Native fleet tests check ABI340-342, scalar alias/copy lifetimes, name/children
-storage and uint16 engine-count wrapping. Resume with the complete selected
-Rust control flow and compact fleet simulation witnesses, then full verification,
-independent review and required CI before integration.
+Checks so far: `python3 tools/migration.py build --jobs 2`,
+`python3 tools/migration.py rust-checks --jobs 2`, and fleet scenarios through
+`python3 tools/simulate.py fleet- --jobs 1` plus unchanged-reference `--self`.
+Scenario-local native fixtures cover nested groups/livery/rules, road/ship/aircraft
+renewal, insufficient funds, shared orders/cargo, train rearrangement failure and
+reload. Existing native tests cover ABI340-342 and canonical owner lifetimes.
+
+This checkpoint does **not** complete #147. New callback-table ABI/reentry and
+CommandCost fidelity tests, a final source audit, broader refit/NewGRF branches,
+full verify, soak/default evidence, independent review and required CI remain.
+The draft PR records exact passed checks and the historical-save GLOG normalization
+used by the two train comparisons. No complete-equivalence claim is made.

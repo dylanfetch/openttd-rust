@@ -40,13 +40,13 @@ struct FleetRenewFields {
 	bool replace_when_old = false;
 };
 struct EngineRenew : EngineRenewPool::PoolItem<&_enginerenew_pool> {
-	FleetOwner<FleetRenewFields, 2> state{};
+	FleetOwner<FleetRenewFields, openttd_rust_fleet_renew_create, openttd_rust_fleet_renew_destroy> state{};
 	EngineID &from = state.state->from;
 	EngineID &to = state.state->to;
 	EngineRenew *&next = state.state->next;
 	GroupID &group_id = state.state->group_id;
 	bool &replace_when_old = state.state->replace_when_old;
-	EngineRenew() = default;
+	EngineRenew() {}
 	EngineRenew(EngineID from, EngineID to, GroupID group, bool when_old, EngineRenew *next) {
 		this->from = from; this->to = to; this->group_id = group; this->replace_when_old = when_old; this->next = next;
 	}

@@ -22,6 +22,12 @@
 
 #include "table/strings.h"
 
+#ifdef WITH_RUST
+#include "rust/fleet_group_services.hpp"
+const OpenTTDFleetGroupServices &FleetGroupServices() { return _fleet_group_services; }
+static CommandCost FleetGroupResult(uint32_t error) { return error == UINT32_MAX ? CommandCost() : CommandCost(error); }
+#endif
+
 #include "safeguards.h"
 
 GroupPool _group_pool("Group");
@@ -32,6 +38,9 @@ INSTANTIATE_POOL_METHODS(Group)
  */
 void GroupStatistics::Clear()
 {
+#ifdef WITH_RUST
+	openttd_rust_fleet_stats_clear(this->state.state);
+#else
 	this->num_vehicle = 0;
 	this->profit_last_year = 0;
 	this->num_vehicle_min_age = 0;
@@ -39,10 +48,11 @@ void GroupStatistics::Clear()
 
 	/* This is also called when NewGRF change. So the number of engines might have changed. Reset. */
 #ifdef WITH_RUST
-	openttd_rust_fleet_stats_clear(this->state.state, 0);
+	openttd_rust_fleet_stats_clear(this->state.state);
 #else
 	this->num_engines.clear();
 #endif
+#endif /* WITH_RUST */
 }
 
 /**
@@ -50,6 +60,9 @@ void GroupStatistics::Clear()
  */
 void UpdateGroupChildren()
 {
+#ifdef WITH_RUST
+	openttd_rust_fleet_update_children(&_fleet_group_services);
+#else
 	for (Group *g : Group::Iterate()) {
 		if (g->parent == GroupID::Invalid()) continue;
 		Group *pg = Group::GetIfValid(g->parent);
@@ -62,6 +75,7 @@ void UpdateGroupChildren()
 			pg->children.insert(g->index);
 		}
 	}
+#endif /* WITH_RUST */
 }
 
 /**
@@ -127,6 +141,9 @@ uint16_t GroupStatistics::GetNumEngines(EngineID engine) const
  */
 /* static */ void GroupStatistics::UpdateAfterLoad()
 {
+#ifdef WITH_RUST
+	openttd_rust_fleet_update_afterload(&_fleet_group_services);
+#else
 	/* Set up the engine count for all companies */
 	for (Company *c : Company::Iterate()) {
 		for (VehicleType type = VEH_BEGIN; type < VEH_COMPANY_END; type++) {
@@ -150,6 +167,7 @@ uint16_t GroupStatistics::GetNumEngines(EngineID engine) const
 	for (const Company *c : Company::Iterate()) {
 		GroupStatistics::UpdateAutoreplace(c->index);
 	}
+#endif /* WITH_RUST */
 }
 
 /**
@@ -159,6 +177,9 @@ uint16_t GroupStatistics::GetNumEngines(EngineID engine) const
  */
 /* static */ void GroupStatistics::CountVehicle(const Vehicle *v, int delta)
 {
+#ifdef WITH_RUST
+	openttd_rust_fleet_count_vehicle(&_fleet_group_services, const_cast<Vehicle *>(v), delta);
+#else
 	assert(delta == 1 || delta == -1);
 
 	GroupStatistics &stats_all = GroupStatistics::GetAllGroup(v);
@@ -175,6 +196,7 @@ uint16_t GroupStatistics::GetNumEngines(EngineID engine) const
 		stats.num_vehicle_min_age += delta;
 		stats.profit_last_year_min_age += v->GetDisplayProfitLastYear() * delta;
 	}
+#endif /* WITH_RUST */
 }
 
 /**
@@ -184,9 +206,13 @@ uint16_t GroupStatistics::GetNumEngines(EngineID engine) const
  */
 /* static */ void GroupStatistics::CountEngine(const Vehicle *v, int delta)
 {
+#ifdef WITH_RUST
+	openttd_rust_fleet_count_engine(&_fleet_group_services, const_cast<Vehicle *>(v), delta);
+#else
 	assert(delta == 1 || delta == -1);
 	GroupStatistics::GetAllGroup(v).num_engines[v->engine_type] += delta;
 	GroupStatistics::Get(v).num_engines[v->engine_type] += delta;
+#endif /* WITH_RUST */
 }
 
 /**
@@ -194,11 +220,15 @@ uint16_t GroupStatistics::GetNumEngines(EngineID engine) const
  */
 /* static */ void GroupStatistics::AddProfitLastYear(const Vehicle *v)
 {
+#ifdef WITH_RUST
+	openttd_rust_fleet_add_profit(&_fleet_group_services, const_cast<Vehicle *>(v));
+#else
 	GroupStatistics &stats_all = GroupStatistics::GetAllGroup(v);
 	GroupStatistics &stats = GroupStatistics::Get(v);
 
 	stats_all.profit_last_year += v->GetDisplayProfitLastYear();
 	stats.profit_last_year += v->GetDisplayProfitLastYear();
+#endif /* WITH_RUST */
 }
 
 /**
@@ -206,6 +236,9 @@ uint16_t GroupStatistics::GetNumEngines(EngineID engine) const
  */
 /* static */ void GroupStatistics::VehicleReachedMinAge(const Vehicle *v)
 {
+#ifdef WITH_RUST
+	openttd_rust_fleet_min_age(&_fleet_group_services, const_cast<Vehicle *>(v));
+#else
 	GroupStatistics &stats_all = GroupStatistics::GetAllGroup(v);
 	GroupStatistics &stats = GroupStatistics::Get(v);
 
@@ -213,6 +246,7 @@ uint16_t GroupStatistics::GetNumEngines(EngineID engine) const
 	stats_all.profit_last_year_min_age += v->GetDisplayProfitLastYear();
 	stats.num_vehicle_min_age++;
 	stats.profit_last_year_min_age += v->GetDisplayProfitLastYear();
+#endif /* WITH_RUST */
 }
 
 /**
@@ -220,6 +254,9 @@ uint16_t GroupStatistics::GetNumEngines(EngineID engine) const
  */
 /* static */ void GroupStatistics::UpdateProfits()
 {
+#ifdef WITH_RUST
+	openttd_rust_fleet_update_profits(&_fleet_group_services);
+#else
 	/* Set up the engine count for all companies */
 	for (Company *c : Company::Iterate()) {
 		for (VehicleType type = VEH_BEGIN; type < VEH_COMPANY_END; type++) {
@@ -239,6 +276,7 @@ uint16_t GroupStatistics::GetNumEngines(EngineID engine) const
 			if (v->economy_age > VEHICLE_PROFIT_MIN_AGE) GroupStatistics::VehicleReachedMinAge(v);
 		}
 	}
+#endif /* WITH_RUST */
 }
 
 /**
@@ -247,6 +285,9 @@ uint16_t GroupStatistics::GetNumEngines(EngineID engine) const
  */
 /* static */ void GroupStatistics::UpdateAutoreplace(CompanyID company)
 {
+#ifdef WITH_RUST
+	openttd_rust_fleet_update_autoreplace(&_fleet_group_services, company.base());
+#else
 	/* Set up the engine count for all companies */
 	Company *c = Company::Get(company);
 	for (VehicleType type = VEH_BEGIN; type < VEH_COMPANY_END; type++) {
@@ -269,6 +310,7 @@ uint16_t GroupStatistics::GetNumEngines(EngineID engine) const
 		}
 		if (GetGroupNumEngines(company, erl->group_id, erl->from) > 0) stats.autoreplace_finished = false;
 	}
+#endif /* WITH_RUST */
 }
 
 /**
@@ -278,6 +320,7 @@ uint16_t GroupStatistics::GetNumEngines(EngineID engine) const
  * @param old_g index of the old group
  * @param new_g index of the new group
  */
+#ifndef WITH_RUST
 static inline void UpdateNumEngineGroup(const Vehicle *v, GroupID old_g, GroupID new_g)
 {
 	if (old_g != new_g) {
@@ -288,6 +331,7 @@ static inline void UpdateNumEngineGroup(const Vehicle *v, GroupID old_g, GroupID
 		GroupStatistics::Get(v->owner, new_g, v->type).num_engines[v->engine_type]++;
 	}
 }
+#endif /* !WITH_RUST */
 
 
 const Livery *GetParentLivery(const Group *g)
@@ -307,6 +351,7 @@ const Livery *GetParentLivery(const Group *g)
  * @param g Group to propagate colours to children.
  * @param reset_cache Reset colourmap of vehicles in this group.
  */
+#ifndef WITH_RUST
 static void PropagateChildLivery(const Group *g, bool reset_cache)
 {
 	if (reset_cache) {
@@ -328,6 +373,7 @@ static void PropagateChildLivery(const Group *g, bool reset_cache)
 		PropagateChildLivery(cg, reset_cache);
 	}
 }
+#endif /* !WITH_RUST */
 
 /**
  * Update group liveries for a company. This is called when the LS_DEFAULT scheme is changed, to update groups with
@@ -336,6 +382,9 @@ static void PropagateChildLivery(const Group *g, bool reset_cache)
  */
 void UpdateCompanyGroupLiveries(const Company *c)
 {
+#ifdef WITH_RUST
+	openttd_rust_fleet_company_liveries(&_fleet_group_services, c->index.base());
+#else
 	for (Group *g : Group::Iterate()) {
 		if (g->owner == c->index && g->parent == GroupID::Invalid()) {
 			if (!g->livery.in_use.Test(Livery::Flag::Primary)) g->livery.colour1 = c->livery[LS_DEFAULT].colour1;
@@ -343,6 +392,7 @@ void UpdateCompanyGroupLiveries(const Company *c)
 			PropagateChildLivery(g, false);
 		}
 	}
+#endif /* WITH_RUST */
 }
 
 
@@ -355,6 +405,11 @@ void UpdateCompanyGroupLiveries(const Company *c)
  */
 std::tuple<CommandCost, GroupID> CmdCreateGroup(DoCommandFlags flags, VehicleType vt, GroupID parent_group)
 {
+#ifdef WITH_RUST
+	uint16_t id;
+	uint32_t error = openttd_rust_fleet_create_group(&_fleet_group_services, flags.base(), vt, parent_group.base(), &id);
+	return {FleetGroupResult(error), GroupID(id)};
+#else
 	if (!IsCompanyBuildableVehicleType(vt)) return { CMD_ERROR, GroupID::Invalid() };
 
 	if (!Group::CanAllocateItem()) return { CMD_ERROR, GroupID::Invalid() };
@@ -389,6 +444,7 @@ std::tuple<CommandCost, GroupID> CmdCreateGroup(DoCommandFlags flags, VehicleTyp
 	}
 
 	return { CommandCost(), GroupID::Invalid()};
+#endif /* WITH_RUST */
 }
 
 
@@ -400,6 +456,9 @@ std::tuple<CommandCost, GroupID> CmdCreateGroup(DoCommandFlags flags, VehicleTyp
  */
 CommandCost CmdDeleteGroup(DoCommandFlags flags, GroupID group_id)
 {
+#ifdef WITH_RUST
+	return FleetGroupResult(openttd_rust_fleet_delete_group(&_fleet_group_services, flags.base(), group_id.base()));
+#else
 	Group *g = Group::GetIfValid(group_id);
 	if (g == nullptr || g->owner != _current_company) return CMD_ERROR;
 
@@ -443,6 +502,7 @@ CommandCost CmdDeleteGroup(DoCommandFlags flags, GroupID group_id)
 	}
 
 	return CommandCost();
+#endif /* WITH_RUST */
 }
 
 /**
@@ -456,6 +516,9 @@ CommandCost CmdDeleteGroup(DoCommandFlags flags, GroupID group_id)
  */
 CommandCost CmdAlterGroup(DoCommandFlags flags, AlterGroupMode mode, GroupID group_id, GroupID parent_id, const std::string &text)
 {
+#ifdef WITH_RUST
+	return FleetGroupResult(openttd_rust_fleet_alter_group(&_fleet_group_services, flags.base(), to_underlying(mode), group_id.base(), parent_id.base(), reinterpret_cast<const uint8_t *>(text.data()), text.size()));
+#else
 	Group *g = Group::GetIfValid(group_id);
 	if (g == nullptr || g->owner != _current_company) return CMD_ERROR;
 
@@ -521,6 +584,7 @@ CommandCost CmdAlterGroup(DoCommandFlags flags, AlterGroupMode mode, GroupID gro
 	}
 
 	return CommandCost();
+#endif /* WITH_RUST */
 }
 
 
@@ -529,6 +593,7 @@ CommandCost CmdAlterGroup(DoCommandFlags flags, AlterGroupMode mode, GroupID gro
  * @param v Vehicle to add.
  * @param new_g Group to add to.
  */
+#ifndef WITH_RUST
 static void AddVehicleToGroup(Vehicle *v, GroupID new_g)
 {
 	GroupStatistics::CountVehicle(v, -1);
@@ -557,6 +622,7 @@ static void AddVehicleToGroup(Vehicle *v, GroupID new_g)
 
 	GroupStatistics::CountVehicle(v, 1);
 }
+#endif /* !WITH_RUST */
 
 /**
  * Add a vehicle to a group
@@ -568,6 +634,12 @@ static void AddVehicleToGroup(Vehicle *v, GroupID new_g)
  */
 std::tuple<CommandCost, GroupID> CmdAddVehicleGroup(DoCommandFlags flags, GroupID group_id, VehicleID veh_id, bool add_shared, const VehicleListIdentifier &vli)
 {
+#ifdef WITH_RUST
+	FleetVehicleListContext context{{}, vli};
+	uint16_t id;
+	uint32_t error = openttd_rust_fleet_add_vehicle_group(&_fleet_group_services, flags.base(), group_id.base(), veh_id.base(), add_shared, &context, vli.Valid(), &id);
+	return {FleetGroupResult(error), GroupID(id)};
+#else
 	GroupID new_g = group_id;
 	if (!Group::IsValidID(new_g) && !IsDefaultGroupID(new_g) && new_g != NEW_GROUP) return { CMD_ERROR, GroupID::Invalid() };
 
@@ -622,6 +694,7 @@ std::tuple<CommandCost, GroupID> CmdAddVehicleGroup(DoCommandFlags flags, GroupI
 	}
 
 	return { CommandCost(), new_g };
+#endif /* WITH_RUST */
 }
 
 /**
@@ -633,6 +706,9 @@ std::tuple<CommandCost, GroupID> CmdAddVehicleGroup(DoCommandFlags flags, GroupI
  */
 CommandCost CmdAddSharedVehicleGroup(DoCommandFlags flags, GroupID id_g, VehicleType type)
 {
+#ifdef WITH_RUST
+	return FleetGroupResult(openttd_rust_fleet_add_shared_group(&_fleet_group_services, flags.base(), id_g.base(), type));
+#else
 	if (!Group::IsValidID(id_g) || !IsCompanyBuildableVehicleType(type)) return CMD_ERROR;
 
 	if (flags.Test(DoCommandFlag::Execute)) {
@@ -653,6 +729,7 @@ CommandCost CmdAddSharedVehicleGroup(DoCommandFlags flags, GroupID id_g, Vehicle
 	}
 
 	return CommandCost();
+#endif /* WITH_RUST */
 }
 
 
@@ -664,6 +741,9 @@ CommandCost CmdAddSharedVehicleGroup(DoCommandFlags flags, GroupID id_g, Vehicle
  */
 CommandCost CmdRemoveAllVehiclesGroup(DoCommandFlags flags, GroupID group_id)
 {
+#ifdef WITH_RUST
+	return FleetGroupResult(openttd_rust_fleet_remove_vehicles_group(&_fleet_group_services, flags.base(), group_id.base()));
+#else
 	const Group *g = Group::GetIfValid(group_id);
 
 	if (g == nullptr || g->owner != _current_company) return CMD_ERROR;
@@ -683,6 +763,7 @@ CommandCost CmdRemoveAllVehiclesGroup(DoCommandFlags flags, GroupID group_id)
 	}
 
 	return CommandCost();
+#endif /* WITH_RUST */
 }
 
 /**
@@ -694,6 +775,9 @@ CommandCost CmdRemoveAllVehiclesGroup(DoCommandFlags flags, GroupID group_id)
  */
 CommandCost CmdSetGroupLivery(DoCommandFlags flags, GroupID group_id, bool primary, Colours colour)
 {
+#ifdef WITH_RUST
+	return FleetGroupResult(openttd_rust_fleet_set_livery(&_fleet_group_services, flags.base(), group_id.base(), primary, colour));
+#else
 	Group *g = Group::GetIfValid(group_id);
 
 	if (g == nullptr || g->owner != _current_company) return CMD_ERROR;
@@ -716,6 +800,7 @@ CommandCost CmdSetGroupLivery(DoCommandFlags flags, GroupID group_id, bool prima
 	}
 
 	return CommandCost();
+#endif /* WITH_RUST */
 }
 
 /**
@@ -723,6 +808,7 @@ CommandCost CmdSetGroupLivery(DoCommandFlags flags, GroupID group_id, bool prima
  * @param g initial group.
  * @param set 1 to set or 0 to clear protection.
  */
+#ifndef WITH_RUST
 static void SetGroupFlag(Group *g, GroupFlag flag, bool set, bool children)
 {
 	if (set) {
@@ -737,6 +823,7 @@ static void SetGroupFlag(Group *g, GroupFlag flag, bool set, bool children)
 		SetGroupFlag(Group::Get(childgroup), flag, set, true);
 	}
 }
+#endif /* !WITH_RUST */
 
 /**
  * (Un)set group flag from a group
@@ -749,6 +836,9 @@ static void SetGroupFlag(Group *g, GroupFlag flag, bool set, bool children)
  */
 CommandCost CmdSetGroupFlag(DoCommandFlags flags, GroupID group_id, GroupFlag flag, bool value, bool recursive)
 {
+#ifdef WITH_RUST
+	return FleetGroupResult(openttd_rust_fleet_flag_command(&_fleet_group_services, flags.base(), group_id.base(), to_underlying(flag), value, recursive));
+#else
 	Group *g = Group::GetIfValid(group_id);
 	if (g == nullptr || g->owner != _current_company) return CMD_ERROR;
 
@@ -762,6 +852,7 @@ CommandCost CmdSetGroupFlag(DoCommandFlags flags, GroupID group_id, GroupFlag fl
 	}
 
 	return CommandCost();
+#endif /* WITH_RUST */
 }
 
 /**
@@ -772,6 +863,9 @@ CommandCost CmdSetGroupFlag(DoCommandFlags flags, GroupID group_id, GroupFlag fl
  */
 void SetTrainGroupID(Train *v, GroupID new_g)
 {
+#ifdef WITH_RUST
+	openttd_rust_fleet_set_train_group(&_fleet_group_services, v, new_g.base());
+#else
 	if (!Group::IsValidID(new_g) && !IsDefaultGroupID(new_g)) return;
 
 	assert(v->IsFrontEngine() || IsDefaultGroupID(new_g));
@@ -788,6 +882,7 @@ void SetTrainGroupID(Train *v, GroupID new_g)
 	/* Update the Replace Vehicle Windows */
 	GroupStatistics::UpdateAutoreplace(v->owner);
 	SetWindowDirty(WC_REPLACE_VEHICLE, VEH_TRAIN);
+#endif /* WITH_RUST */
 }
 
 
@@ -800,6 +895,9 @@ void SetTrainGroupID(Train *v, GroupID new_g)
  */
 void UpdateTrainGroupID(Train *v)
 {
+#ifdef WITH_RUST
+	openttd_rust_fleet_update_train_group(&_fleet_group_services, v);
+#else
 	assert(v->IsFrontEngine() || v->IsFreeWagon());
 
 	GroupID new_g = v->IsFrontEngine() ? v->group_id : (GroupID)DEFAULT_GROUP;
@@ -814,6 +912,7 @@ void UpdateTrainGroupID(Train *v)
 	/* Update the Replace Vehicle Windows */
 	GroupStatistics::UpdateAutoreplace(v->owner);
 	SetWindowDirty(WC_REPLACE_VEHICLE, VEH_TRAIN);
+#endif /* WITH_RUST */
 }
 
 /**
@@ -826,6 +925,9 @@ void UpdateTrainGroupID(Train *v)
  */
 uint GetGroupNumEngines(CompanyID company, GroupID id_g, EngineID id_e)
 {
+#ifdef WITH_RUST
+	return openttd_rust_fleet_sum_engines(&_fleet_group_services, company.base(), id_g.base(), id_e.base());
+#else
 	uint count = 0;
 
 	if (const Group *g = Group::GetIfValid(id_g); g != nullptr) {
@@ -835,6 +937,7 @@ uint GetGroupNumEngines(CompanyID company, GroupID id_g, EngineID id_e)
 	}
 
 	return count + GroupStatistics::Get(company, id_g, Engine::Get(id_e)->type).GetNumEngines(id_e);
+#endif /* WITH_RUST */
 }
 
 /**
@@ -847,6 +950,9 @@ uint GetGroupNumEngines(CompanyID company, GroupID id_g, EngineID id_e)
  */
 uint GetGroupNumVehicle(CompanyID company, GroupID id_g, VehicleType type)
 {
+#ifdef WITH_RUST
+	return openttd_rust_fleet_sum_vehicles(&_fleet_group_services, company.base(), id_g.base(), type);
+#else
 	uint count = 0;
 
 	if (const Group *g = Group::GetIfValid(id_g); g != nullptr) {
@@ -856,6 +962,7 @@ uint GetGroupNumVehicle(CompanyID company, GroupID id_g, VehicleType type)
 	}
 
 	return count + GroupStatistics::Get(company, id_g, type).num_vehicle;
+#endif /* WITH_RUST */
 }
 
 /**
@@ -868,6 +975,9 @@ uint GetGroupNumVehicle(CompanyID company, GroupID id_g, VehicleType type)
  */
 uint GetGroupNumVehicleMinAge(CompanyID company, GroupID id_g, VehicleType type)
 {
+#ifdef WITH_RUST
+	return openttd_rust_fleet_sum_min_age(&_fleet_group_services, company.base(), id_g.base(), type);
+#else
 	uint count = 0;
 
 	if (const Group *g = Group::GetIfValid(id_g); g != nullptr) {
@@ -877,6 +987,7 @@ uint GetGroupNumVehicleMinAge(CompanyID company, GroupID id_g, VehicleType type)
 	}
 
 	return count + GroupStatistics::Get(company, id_g, type).num_vehicle_min_age;
+#endif /* WITH_RUST */
 }
 
 /**
@@ -889,6 +1000,9 @@ uint GetGroupNumVehicleMinAge(CompanyID company, GroupID id_g, VehicleType type)
  */
 Money GetGroupProfitLastYearMinAge(CompanyID company, GroupID id_g, VehicleType type)
 {
+#ifdef WITH_RUST
+	return openttd_rust_fleet_sum_profit(&_fleet_group_services, company.base(), id_g.base(), type);
+#else
 	Money sum = 0;
 
 	if (const Group *g = Group::GetIfValid(id_g); g != nullptr) {
@@ -898,13 +1012,18 @@ Money GetGroupProfitLastYearMinAge(CompanyID company, GroupID id_g, VehicleType 
 	}
 
 	return sum + GroupStatistics::Get(company, id_g, type).profit_last_year_min_age;
+#endif /* WITH_RUST */
 }
 
 void RemoveAllGroupsForCompany(const CompanyID company)
 {
+#ifdef WITH_RUST
+	openttd_rust_fleet_remove_company_groups(&_fleet_group_services, company.base());
+#else
 	for (Group *g : Group::Iterate()) {
 		if (company == g->owner) delete g;
 	}
+#endif /* WITH_RUST */
 }
 
 
@@ -916,6 +1035,9 @@ void RemoveAllGroupsForCompany(const CompanyID company)
  */
 bool GroupIsInGroup(GroupID search, GroupID group)
 {
+#ifdef WITH_RUST
+	return openttd_rust_fleet_contains(&_fleet_group_services, search.base(), group.base());
+#else
 	if (!Group::IsValidID(search)) return search == group;
 
 	do {
@@ -924,4 +1046,5 @@ bool GroupIsInGroup(GroupID search, GroupID group)
 	} while (search != GroupID::Invalid());
 
 	return false;
+#endif /* WITH_RUST */
 }

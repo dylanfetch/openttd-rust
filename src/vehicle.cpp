@@ -662,12 +662,21 @@ void ResetVehicleColourMap()
  * List of vehicles that should check for autoreplace this tick.
  * Mapping of vehicle -> leave depot immediately after autoreplace.
  */
+#ifdef WITH_RUST
+#include "rust/fleet_pending_services.hpp"
+static void ClearPendingAutoreplace() { openttd_rust_fleet_pending_clear(); }
+static void RecordPendingAutoreplace(VehicleID id, bool leave) { openttd_rust_fleet_pending_add(id.base(), leave); }
+#else
 using AutoreplaceMap = std::map<VehicleID, bool>;
 static AutoreplaceMap _vehicles_to_autoreplace;
 
+static void ClearPendingAutoreplace() { _vehicles_to_autoreplace.clear(); }
+static void RecordPendingAutoreplace(VehicleID id, bool leave) { _vehicles_to_autoreplace[id] = leave; }
+#endif /* WITH_RUST */
+
 void InitializeVehicles()
 {
-	_vehicles_to_autoreplace.clear();
+	ClearPendingAutoreplace();
 	ResetVehicleHash();
 }
 
@@ -895,7 +904,7 @@ Vehicle::~Vehicle()
 static void VehicleEnteredDepotThisTick(Vehicle *v)
 {
 	/* Vehicle should stop in the depot if it was in 'stopping' state */
-	_vehicles_to_autoreplace[v->index] = !v->vehstatus.Test(VehState::Stopped);
+	RecordPendingAutoreplace(v->index, !v->vehstatus.Test(VehState::Stopped));
 
 	/* We ALWAYS set the stopped state. Even when the vehicle does not plan on
 	 * stopping in the depot, so we stop it to ensure that it will not reserve
@@ -957,7 +966,7 @@ static void RunEconomyVehicleDayProc()
 
 void CallVehicleTicks()
 {
-	_vehicles_to_autoreplace.clear();
+	ClearPendingAutoreplace();
 
 	RunEconomyVehicleDayProc();
 
@@ -1043,6 +1052,10 @@ void CallVehicleTicks()
 		}
 	}
 
+#ifdef WITH_RUST
+	CommandCost replacement_cost;
+	openttd_rust_fleet_pending_drain(&_fleet_pending_services, &replacement_cost);
+#else
 	Backup<CompanyID> cur_company(_current_company);
 	for (auto &it : _vehicles_to_autoreplace) {
 		Vehicle *v = Vehicle::Get(it.first);
@@ -1087,6 +1100,7 @@ void CallVehicleTicks()
 	}
 
 	cur_company.Restore();
+#endif /* WITH_RUST */
 }
 
 /**
@@ -1605,7 +1619,7 @@ void VehicleEnterDepot(Vehicle *v)
 			cur_company.Restore();
 
 			if (cost.Failed()) {
-				_vehicles_to_autoreplace[v->index] = false;
+				RecordPendingAutoreplace(v->index, false);
 				if (v->owner == _local_company) {
 					/* Notify the user that we stopped the vehicle */
 					AddVehicleAdviceNewsItem(AdviceType::RefitFailed, GetEncodedString(STR_NEWS_ORDER_REFIT_FAILED, v->index), v->index);
@@ -1626,7 +1640,7 @@ void VehicleEnterDepot(Vehicle *v)
 		}
 		if (v->current_order.GetDepotActionType().Test(OrderDepotActionFlag::Halt)) {
 			/* Vehicles are always stopped on entering depots. Do not restart this one. */
-			_vehicles_to_autoreplace[v->index] = false;
+			RecordPendingAutoreplace(v->index, false);
 			/* Invalidate last_loading_station. As the link from the station
 			 * before the stop to the station after the stop can't be predicted
 			 * we shouldn't construct it when the vehicle visits the next stop. */

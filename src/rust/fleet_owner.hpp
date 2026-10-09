@@ -9,26 +9,36 @@
 #ifndef RUST_FLEET_OWNER_HPP
 #define RUST_FLEET_OWNER_HPP
 #include "fleet_ffi.h"
-template <typename T, uint32_t Kind> struct FleetOwner {
+template <typename T, auto Create, auto Destroy, auto Copy = nullptr, bool Invalid = false> struct FleetOwner {
 	T *state;
-	FleetOwner() : state(static_cast<T *>(openttd_rust_fleet_state_create(Kind))) {
-		if constexpr (Kind == 4) { new (state) T(T::Invalid()); } else { new (state) T(); }
+	FleetOwner() : state(static_cast<T *>(Create())) {
+		if constexpr (Invalid) { new (state) T(T::Invalid()); } else { new (state) T(); }
 	}
-	FleetOwner(const FleetOwner &other) : FleetOwner() { openttd_rust_fleet_state_copy(Kind, state, other.state); }
-	FleetOwner &operator=(const FleetOwner &other) { openttd_rust_fleet_state_copy(Kind, state, other.state); return *this; }
-	~FleetOwner() { state->~T(); openttd_rust_fleet_state_destroy(Kind, state); }
+	FleetOwner(const FleetOwner &other) : FleetOwner() { Copy(state, other.state); }
+	FleetOwner &operator=(const FleetOwner &other) { Copy(state, other.state); return *this; }
+	~FleetOwner() { state->~T(); Destroy(state); }
 };
-/** Call-local ordered exports; WIP command traversal remains in C++. */
+/** Nonallocating ordered facade; Rust owns the selected child traversals. */
 struct FleetChildren {
 	void *owner;
 	bool empty() const { return openttd_rust_fleet_child(owner, 0) == UINT32_MAX; }
 	void insert(GroupID id) { openttd_rust_fleet_child_change(owner, id.base(), true); }
 	void erase(GroupID id) { openttd_rust_fleet_child_change(owner, id.base(), false); }
-	std::vector<GroupID> Export() const {
-		std::vector<GroupID> out;
-		for (uint32_t from = 0, id; (id = openttd_rust_fleet_child(owner, from)) != UINT32_MAX; from = id + 1) out.emplace_back(id);
-		return out;
-	}
+	struct Iterator {
+		using iterator_category = std::input_iterator_tag;
+		using value_type = GroupID;
+		using difference_type = ptrdiff_t;
+		using pointer = void;
+		using reference = GroupID;
+		void *owner;
+		uint32_t current;
+		GroupID operator*() const { return GroupID(current); }
+		Iterator &operator++() { current = openttd_rust_fleet_child(owner, current + 1); return *this; }
+		bool operator==(const Iterator &other) const { return current == other.current; }
+	};
+	Iterator begin() const { return {owner, openttd_rust_fleet_child(owner, 0)}; }
+	Iterator end() const { return {owner, UINT32_MAX}; }
+
 };
 /** Mutations alias the sole Rust engine map; entries retain original uint16 wrapping. */
 struct FleetEngineCounts {

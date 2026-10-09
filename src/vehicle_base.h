@@ -339,7 +339,7 @@ public:
 	VehicleCache vcache{}; ///< Cache of often used vehicle values.
 
 #ifdef WITH_RUST
-	FleetOwner<GroupID, 4> fleet_membership{};
+	FleetOwner<GroupID, openttd_rust_fleet_membership_create, openttd_rust_fleet_membership_destroy, nullptr, true> fleet_membership{};
 	GroupID &group_id = *fleet_membership.state;
 #else
 	GroupID group_id = GroupID::Invalid(); ///< Index of group Pool array

@@ -36,7 +36,7 @@ struct FleetStatisticsFields {
 /** Statistics and caches on the vehicles in a group. */
 struct GroupStatistics {
 #ifdef WITH_RUST
-	FleetOwner<FleetStatisticsFields, 1> state{};
+	FleetOwner<FleetStatisticsFields, openttd_rust_fleet_stats_create, openttd_rust_fleet_stats_destroy, openttd_rust_fleet_stats_copy> state{};
 	Money &profit_last_year = state.state->profit_last_year;
 	Money &profit_last_year_min_age = state.state->profit_last_year_min_age;
 	uint16_t &num_vehicle = state.state->num_vehicle;
@@ -62,16 +62,24 @@ struct GroupStatistics {
 
 	void ClearProfits()
 	{
+#ifdef WITH_RUST
+		openttd_rust_fleet_stats_clear_profits(this->state.state);
+#else
 		this->profit_last_year = 0;
 
 		this->num_vehicle_min_age = 0;
 		this->profit_last_year_min_age = 0;
+#endif
 	}
 
 	void ClearAutoreplace()
 	{
+#ifdef WITH_RUST
+		openttd_rust_fleet_stats_clear_autoreplace(this->state.state);
+#else
 		this->autoreplace_defined = false;
 		this->autoreplace_finished = false;
+#endif
 	}
 
 	uint16_t GetNumEngines(EngineID engine) const;
@@ -107,7 +115,7 @@ struct FleetGroupFields {
 	uint16_t number = 0;
 };
 struct Group : GroupPool::PoolItem<&_group_pool> {
-	FleetOwner<FleetGroupFields, 0> state{};
+	FleetOwner<FleetGroupFields, openttd_rust_fleet_group_create, openttd_rust_fleet_group_destroy> state{};
 	Owner &owner = state.state->owner;
 	VehicleType &vehicle_type = state.state->vehicle_type;
 	GroupFlags &flags = state.state->flags;
@@ -117,8 +125,8 @@ struct Group : GroupPool::PoolItem<&_group_pool> {
 	GroupStatistics statistics{};
 	FleetChildren children{state.state};
 	bool folded = false;
-	std::vector<GroupID> ChildGroups() const { return children.Export(); }
-	Group() = default;
+	FleetChildren ChildGroups() const { return children; }
+	Group() {}
 	Group(CompanyID owner, VehicleType type) { this->owner = owner; this->vehicle_type = type; }
 	std::string GetName() const {
 		std::string out(openttd_rust_fleet_name(state.state, nullptr, 0), '\0');

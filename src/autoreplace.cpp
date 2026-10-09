@@ -23,6 +23,7 @@ INSTANTIATE_POOL_METHODS(EngineRenew)
  * Retrieves the EngineRenew that specifies the replacement of the given
  * engine type from the given renewlist
  */
+#ifndef WITH_RUST
 static EngineRenew *GetEngineReplacement(EngineRenewList erl, EngineID engine, GroupID group)
 {
 	EngineRenew *er = (EngineRenew *)erl;
@@ -33,6 +34,7 @@ static EngineRenew *GetEngineReplacement(EngineRenewList erl, EngineID engine, G
 	}
 	return nullptr;
 }
+#endif /* !WITH_RUST */
 
 /**
  * Remove all engine replacement settings for the company.
@@ -41,6 +43,9 @@ static EngineRenew *GetEngineReplacement(EngineRenewList erl, EngineID engine, G
  */
 void RemoveAllEngineReplacement(EngineRenewList *erl)
 {
+#ifdef WITH_RUST
+	openttd_rust_fleet_remove_all_replacements(&FleetGroupServices(), reinterpret_cast<void **>(erl));
+#else
 	EngineRenew *er = (EngineRenew *)(*erl);
 	EngineRenew *next;
 
@@ -50,6 +55,7 @@ void RemoveAllEngineReplacement(EngineRenewList *erl)
 		er = next;
 	}
 	*erl = nullptr; // Empty list
+#endif /* WITH_RUST */
 }
 
 /**
@@ -63,6 +69,9 @@ void RemoveAllEngineReplacement(EngineRenewList *erl)
  */
 EngineID EngineReplacement(EngineRenewList erl, EngineID engine, GroupID group, bool *replace_when_old)
 {
+#ifdef WITH_RUST
+	return EngineID(openttd_rust_fleet_replacement(&FleetGroupServices(), const_cast<EngineRenew *>(erl), engine.base(), group.base(), replace_when_old));
+#else
 	const EngineRenew *er = GetEngineReplacement(erl, engine, group);
 	if (er == nullptr && (group == DEFAULT_GROUP || (Group::IsValidID(group) && !Group::Get(group)->flags.Test(GroupFlag::ReplaceProtection)))) {
 		/* We didn't find anything useful in the vehicle's own group so we will try ALL_GROUP */
@@ -81,6 +90,7 @@ EngineID EngineReplacement(EngineRenewList erl, EngineID engine, GroupID group, 
 		}
 	}
 	return er == nullptr ? EngineID::Invalid() : er->to;
+#endif /* WITH_RUST */
 }
 
 /**
@@ -95,6 +105,10 @@ EngineID EngineReplacement(EngineRenewList erl, EngineID engine, GroupID group, 
  */
 CommandCost AddEngineReplacement(EngineRenewList *erl, EngineID old_engine, EngineID new_engine, GroupID group, bool replace_when_old, DoCommandFlags flags)
 {
+#ifdef WITH_RUST
+	uint32_t error = openttd_rust_fleet_add_replacement(&FleetGroupServices(), reinterpret_cast<void **>(erl), old_engine.base(), new_engine.base(), group.base(), replace_when_old, flags.base());
+	return error == UINT32_MAX ? CommandCost() : CommandCost(error);
+#else
 	/* Check if the old vehicle is already in the list */
 	EngineRenew *er = GetEngineReplacement(*erl, old_engine, group);
 	if (er != nullptr) {
@@ -113,6 +127,7 @@ CommandCost AddEngineReplacement(EngineRenewList *erl, EngineID old_engine, Engi
 	}
 
 	return CommandCost();
+#endif /* WITH_RUST */
 }
 
 /**
@@ -125,6 +140,10 @@ CommandCost AddEngineReplacement(EngineRenewList *erl, EngineID old_engine, Engi
  */
 CommandCost RemoveEngineReplacement(EngineRenewList *erl, EngineID engine, GroupID group, DoCommandFlags flags)
 {
+#ifdef WITH_RUST
+	uint32_t error = openttd_rust_fleet_remove_replacement(&FleetGroupServices(), reinterpret_cast<void **>(erl), engine.base(), group.base(), flags.base());
+	return error == UINT32_MAX ? CommandCost() : CommandCost(error);
+#else
 	EngineRenew *er = (EngineRenew *)(*erl);
 	EngineRenew *prev = nullptr;
 
@@ -147,4 +166,5 @@ CommandCost RemoveEngineReplacement(EngineRenewList *erl, EngineID engine, Group
 	}
 
 	return CMD_ERROR;
+#endif /* WITH_RUST */
 }

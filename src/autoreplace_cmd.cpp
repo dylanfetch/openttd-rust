@@ -43,6 +43,7 @@ extern void ChangeVehicleViewWindow(VehicleID from_index, VehicleID to_index);
  * @param engine_b the other EngineID
  * @return true if they can both carry the same type of cargo (or at least one of them got no capacity at all)
  */
+#ifndef WITH_RUST
 static bool EnginesHaveCargoInCommon(EngineID engine_a, EngineID engine_b)
 {
 	CargoTypes available_cargoes_a = GetUnionOfArticulatedRefitMasks(engine_a, true);
@@ -97,6 +98,7 @@ bool CheckAutoreplaceValidity(EngineID from, EngineID to, CompanyID company)
 	/* the engines needs to be able to carry the same cargo */
 	return EnginesHaveCargoInCommon(from, to);
 }
+#endif /* !WITH_RUST */
 
 #ifdef WITH_RUST
 static void CargoCapacityRead(void *shell, OpenTTDCargoCapacityVehicle *out) noexcept
@@ -213,6 +215,7 @@ static void TransferCargo(Vehicle *old_veh, Vehicle *new_head, bool part_of_chai
  * @param engine_type The type we want to replace with
  * @return true iff all refit orders stay valid
  */
+#ifndef WITH_RUST
 static bool VerifyAutoreplaceRefitForOrders(const Vehicle *v, EngineID engine_type)
 {
 	CargoTypes union_refit_mask_a = GetUnionOfArticulatedRefitMasks(v->engine_type, false);
@@ -770,8 +773,24 @@ static CommandCost ReplaceChain(Vehicle **chain, DoCommandFlags flags, bool wago
  * @param veh_id Index of vehicle
  * @return the cost of this operation or an error
  */
+#else
+#include "rust/fleet_transaction_services.hpp"
+
+bool CheckAutoreplaceValidity(EngineID from, EngineID to, CompanyID company)
+{
+	assert(Engine::IsValidID(from) && Engine::IsValidID(to));
+	return openttd_rust_fleet_valid(&_fleet_transaction_services, &FleetGroupServices(), from.base(), to.base(), company.base());
+}
+#endif /* WITH_RUST */
+
 CommandCost CmdAutoreplaceVehicle(DoCommandFlags flags, VehicleID veh_id)
 {
+#ifdef WITH_RUST
+	NativeFleetCosts context;
+	auto costs = context.View();
+	openttd_rust_fleet_autoreplace(&_fleet_transaction_services, &FleetGroupServices(), &costs, flags.base(), veh_id.base());
+	return std::move(context.result);
+#else
 	Vehicle *v = Vehicle::GetIfValid(veh_id);
 	if (v == nullptr) return CMD_ERROR;
 
@@ -847,6 +866,7 @@ CommandCost CmdAutoreplaceVehicle(DoCommandFlags flags, VehicleID veh_id)
 
 	if (cost.Succeeded() && nothing_to_do) cost = CommandCost(STR_ERROR_AUTOREPLACE_NOTHING_TO_DO);
 	return cost;
+#endif /* WITH_RUST */
 }
 
 /**
@@ -860,6 +880,10 @@ CommandCost CmdAutoreplaceVehicle(DoCommandFlags flags, VehicleID veh_id)
  */
 CommandCost CmdSetAutoReplace(DoCommandFlags flags, GroupID id_g, EngineID old_engine_type, EngineID new_engine_type, bool when_old)
 {
+#ifdef WITH_RUST
+	uint32_t error = openttd_rust_fleet_set_rule(&_fleet_transaction_services, &FleetGroupServices(), flags.base(), id_g.base(), old_engine_type.base(), new_engine_type.base(), when_old);
+	return error == UINT32_MAX ? CommandCost() : CommandCost(error);
+#else
 	Company *c = Company::GetIfValid(_current_company);
 	if (c == nullptr) return CMD_ERROR;
 
@@ -888,5 +912,6 @@ CommandCost CmdSetAutoReplace(DoCommandFlags flags, GroupID id_g, EngineID old_e
 	if (flags.Test(DoCommandFlag::Execute) && IsLocalCompany()) InvalidateAutoreplaceWindow(old_engine_type, id_g);
 
 	return cost;
+#endif /* WITH_RUST */
 }
 
