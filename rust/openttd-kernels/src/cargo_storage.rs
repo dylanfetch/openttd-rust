@@ -90,6 +90,21 @@ pub struct List {
     keys: BTreeSet<u16>,
     vehicle: bool,
 }
+// Native next-hop spans can alias C++ storage. Read individual uint16_t fields;
+// never build a Rust slice/reference that would survive a reentering callback.
+#[derive(Clone, Copy)]
+struct NextHops {
+    data: *const u16,
+    length: usize,
+}
+impl NextHops {
+    unsafe fn at(self, index: usize) -> u16 {
+        unsafe { self.data.add(index).read() }
+    }
+    unsafe fn contains(self, key: u16) -> bool {
+        (0..self.length).any(|index| unsafe { self.at(index) } == key)
+    }
+}
 const TRANSFER: usize = 0;
 const DELIVER: usize = 1;
 const KEEP: usize = 2;
@@ -369,7 +384,7 @@ unsafe fn forced_flow(
     ge: *const c_void,
     origin: u16,
     station: u16,
-    next: &[u16],
+    next: NextHops,
 ) -> u16 {
     use crate::cargo_flow::{
         openttd_rust_flow_change, openttd_rust_flow_clone, openttd_rust_flow_destroy,
@@ -383,7 +398,8 @@ unsafe fn forced_flow(
     unsafe {
         openttd_rust_flow_change(flow, 0, station, i32::MIN as u32);
     }
-    for &station in next.iter().rev() {
+    for index in (0..next.length).rev() {
+        let station = unsafe { next.at(index) };
         if unsafe { openttd_rust_flow_read(flow, 2, 0) } == 0 {
             break;
         }
@@ -402,7 +418,7 @@ unsafe fn forced_flow(
     }
     via
 }
-fn choose(p: Packet, via: u16, station: u16, accepted: bool, next: &[u16]) -> usize {
+fn choose(p: Packet, via: u16, station: u16, accepted: bool, next: NextHops) -> usize {
     if via == INVALID {
         if accepted && p.first_station != station {
             DELIVER
@@ -411,7 +427,7 @@ fn choose(p: Packet, via: u16, station: u16, accepted: bool, next: &[u16]) -> us
         }
     } else if via == station {
         DELIVER
-    } else if next.contains(&via) {
+    } else if unsafe { next.contains(via) } {
         KEEP
     } else {
         TRANSFER
@@ -608,6 +624,68 @@ pub unsafe extern "C" fn openttd_rust_cargo_list_import(l: *mut List, input: *co
         (*l).fields = *input;
     }
 }
+// Scalar queries read only the canonical fields they need. All arithmetic
+// follows the original unsigned C++ widths, including metadata loaded from saves.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_cargo_list_count(l: *const List) -> u32 {
+    unsafe { (*l).fields.count }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_cargo_list_reserved(l: *const List) -> u32 {
+    unsafe { (*l).fields.reserved_count }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_cargo_list_set_reserved(l: *mut List, count: u32) {
+    unsafe {
+        (*l).fields.reserved_count = count;
+    }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_cargo_list_station_total(l: *const List) -> u32 {
+    unsafe { (*l).fields.count.wrapping_add((*l).fields.reserved_count) }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_cargo_list_periods(l: *const List) -> u32 {
+    let count = unsafe { (*l).fields.count };
+    if count == 0 {
+        0
+    } else {
+        (unsafe { (*l).fields.cargo_periods_in_transit } / u64::from(count)) as u32
+    }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_cargo_list_feeder(l: *const List) -> i64 {
+    unsafe { (*l).fields.feeder_share }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_cargo_list_action_count(l: *const List, action: u8) -> u32 {
+    unsafe {
+        (&raw const (*l).fields.action_counts)
+            .cast::<u32>()
+            .add(usize::from(action))
+            .read()
+    }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_cargo_list_stored(l: *const List) -> u32 {
+    unsafe {
+        (*l).fields
+            .count
+            .wrapping_sub((*l).fields.action_counts[LOAD])
+    }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_cargo_list_unload(l: *const List) -> u32 {
+    unsafe { (*l).fields.action_counts[TRANSFER].wrapping_add((*l).fields.action_counts[DELIVER]) }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_cargo_list_remaining(l: *const List) -> u32 {
+    unsafe { (*l).fields.action_counts[KEEP].wrapping_add((*l).fields.action_counts[LOAD]) }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_cargo_list_key_count(l: *const List) -> usize {
+    unsafe { (*l).keys.len() }
+}
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_cargo_list_snapshot(
     l: *const List,
@@ -685,13 +763,12 @@ pub unsafe extern "C" fn openttd_rust_cargo_list_has(
     next: *const u16,
     length: usize,
 ) -> u8 {
-    let next = if length == 0 {
-        &[]
-    } else {
-        unsafe { std::slice::from_raw_parts(next, length) }
-    };
+    let next = NextHops { data: next, length };
     let keys = unsafe { &(*l).keys };
-    u8::from(next.iter().any(|key| keys.contains(key)) || keys.contains(&INVALID))
+    u8::from(
+        (0..length).any(|index| keys.contains(&unsafe { next.at(index) }))
+            || keys.contains(&INVALID),
+    )
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_cargo_list_age(l: *mut List, s: *const Services) {
@@ -745,11 +822,7 @@ pub unsafe extern "C" fn openttd_rust_cargo_list_stage(
     at: u32,
 ) -> u8 {
     let s = unsafe { *s };
-    let next_slice = if length == 0 {
-        &[]
-    } else {
-        unsafe { std::slice::from_raw_parts(next, length) }
-    };
+    let next_slice = NextHops { data: next, length };
     unsafe {
         (*l).fields.action_counts[TRANSFER] = 0;
         (*l).fields.action_counts[DELIVER] = 0;
@@ -1207,12 +1280,9 @@ pub unsafe extern "C" fn openttd_rust_cargo_list_move(
                 );
             }
         } else {
-            let next = if length == 0 {
-                &[]
-            } else {
-                unsafe { std::slice::from_raw_parts(next, length) }
-            };
-            for &key in next.iter().rev() {
+            let next = NextHops { data: next, length };
+            for index in (0..length).rev() {
+                let key = unsafe { next.at(index) };
                 unsafe {
                     walk(
                         src,
@@ -1510,7 +1580,7 @@ mod tests {
         // Reentry observes the list before Stage's action count commit, and after
         // final delivery's metadata removal, exactly like native payment getters.
         let list = PAYMENT_LIST.with(Cell::get);
-        let held = unsafe { fields(list) }.count;
+        let held = unsafe { openttd_rust_cargo_list_count(list) };
         PAYMENTS.with(|payments| payments.borrow_mut().push((final_delivery, amount, held)));
         7
     }
@@ -1914,6 +1984,30 @@ mod tests {
             articulated: 0,
         }
     }
+    #[test]
+    fn destination_count_keeps_empty_imported_keys() {
+        unsafe {
+            let station = list(false);
+            openttd_rust_cargo_list_insert(station, 100, std::ptr::null_mut());
+            openttd_rust_cargo_list_insert(station, 200, std::ptr::null_mut());
+            openttd_rust_cargo_list_insert(station, 100, std::ptr::null_mut());
+            assert_eq!(openttd_rust_cargo_list_key_count(station), 2);
+            assert_eq!(openttd_rust_cargo_list_count(station), 0);
+            assert_eq!(openttd_rust_cargo_list_has(station, std::ptr::null(), 0), 0);
+            let next = [200, 100];
+            assert_eq!(
+                openttd_rust_cargo_list_has(station, next.as_ptr(), next.len()),
+                1
+            );
+            openttd_rust_cargo_list_insert(station, INVALID, std::ptr::null_mut());
+            assert_eq!(openttd_rust_cargo_list_key_count(station), 3);
+            assert_eq!(openttd_rust_cargo_list_has(station, std::ptr::null(), 0), 1);
+            openttd_rust_cargo_list_clear(station);
+            assert_eq!(openttd_rust_cargo_list_key_count(station), 0);
+            clean(station);
+        }
+    }
+
     #[test]
     fn capacity_autoreplace_single_engine_skips_foreign_parts_in_order() {
         let service = services();

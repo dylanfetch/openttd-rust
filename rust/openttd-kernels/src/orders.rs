@@ -73,6 +73,66 @@ pub struct Backup {
     pub clone: *const c_void,
 }
 
+// Entry-local raw handles. No owner reference or cached vector data survives a
+// callback that can mutate/reenter orders; callers reacquire after such calls.
+struct OrderAccess {
+    list: *mut List,
+    vector: *mut Vector,
+}
+impl OrderAccess {
+    fn count(&self) -> u8 {
+        if self.vector.is_null() {
+            0
+        } else {
+            unsafe { (*self.vector).length as u8 }
+        }
+    }
+    fn manual(&self) -> u8 {
+        if self.list.is_null() {
+            0
+        } else {
+            unsafe { (*self.list).manual }
+        }
+    }
+    fn order(&self, index: u8) -> Option<Order> {
+        if index >= self.count() {
+            None
+        } else {
+            unsafe { Some((*self.vector).data().add(usize::from(index)).read()) }
+        }
+    }
+    fn kind(&self, index: usize) -> u8 {
+        (unsafe { (*(*self.vector).data().add(index)).kind }) & 15
+    }
+    fn update_real(&self, state: *mut Consist) {
+        let count = self.count();
+        if unsafe { (*state).real >= count } {
+            unsafe {
+                (*state).real = 0;
+            }
+        }
+        if self.manual() > 0 {
+            while self.kind(usize::from(unsafe { (*state).real })) == 8 {
+                unsafe {
+                    (*state).real = (*state).real.wrapping_add(1);
+                    if (*state).real >= count {
+                        (*state).real = 0;
+                    }
+                }
+            }
+        } else {
+            unsafe {
+                (*state).real = 0;
+            }
+        }
+    }
+    fn valid(&self) -> bool {
+        !self.vector.is_null()
+            && (0..unsafe { (*self.vector).length })
+                .any(|index| matches!(self.kind(index), 1 | 2 | 6))
+    }
+}
+
 pub struct Vector {
     storage: Box<[MaybeUninit<Order>]>,
     length: usize,
@@ -802,6 +862,20 @@ impl Game {
     }
     fn vector(self, list: *mut c_void) -> *mut Vector {
         unsafe { ((*self.0).vector)(list) }
+    }
+    fn order_access(self, vehicle: *mut VehicleOrders) -> OrderAccess {
+        let shell = unsafe { (*vehicle).orders };
+        if shell.is_null() {
+            OrderAccess {
+                list: ptr::null_mut(),
+                vector: ptr::null_mut(),
+            }
+        } else {
+            OrderAccess {
+                list: self.list(shell),
+                vector: self.vector(shell),
+            }
+        }
     }
     fn orders(self, v: *mut c_void) -> *mut c_void {
         unsafe { (*self.vehicle(v)).orders }
@@ -1823,31 +1897,9 @@ impl Game {
         }
     }
     fn update_real(self, v: *mut c_void) {
+        let vehicle = self.vehicle(v);
         let state = self.consist(v);
-        if unsafe { (*state).real >= self.count(v) } {
-            unsafe {
-                (*state).real = 0;
-            }
-        }
-        if self.manual(v) > 0 {
-            while self
-                .vehicle_order(v, unsafe { (*state).real })
-                .unwrap()
-                .kind()
-                == 8
-            {
-                unsafe {
-                    (*state).real = (*state).real.wrapping_add(1);
-                    if (*state).real >= self.count(v) {
-                        (*state).real = 0;
-                    }
-                }
-            }
-        } else {
-            unsafe {
-                (*state).real = 0;
-            }
-        }
+        self.order_access(vehicle).update_real(state);
     }
     fn skip_real(self, v: *mut c_void) {
         let state = self.consist(v);
@@ -3135,12 +3187,6 @@ impl Game {
             u64::from(self.service_vehicle_type(v) == 3),
         ) as u32
     }
-    fn valid_orders(self, v: *mut c_void) -> bool {
-        let list = self.orders(v);
-        !list.is_null()
-            && (0..self.stored_count(list))
-                .any(|i| matches!(self.stored_order(list, i).kind(), 1 | 2 | 6))
-    }
 }
 impl Control {
     fn destination(&self, v: *mut c_void, mut order: Order, mut depth: i32, pbs: bool) -> bool {
@@ -3264,24 +3310,27 @@ impl Control {
     }
     fn process(&self, v: *mut c_void) -> bool {
         let g = self.g;
-        let current = g.current(v);
-        let kind = g.service_vehicle_type(v);
-        match current.kind() {
+        let mut vehicle = g.vehicle(v);
+        let current_ptr = unsafe { (*vehicle).current.as_ptr() };
+        // Match the source's early order-type exits before fetching anything else.
+        let order_kind = unsafe { (*current_ptr).kind } & 15;
+        match order_kind {
             2 => {
-                if current.depot_type() & 2 == 0 {
+                if (unsafe { (*current_ptr).flags } & 7) & 2 == 0 {
                     return false;
                 }
             }
             3 => return false,
             4 => {
-                if kind != 3 {
+                if g.service_vehicle_type(v) != 3 {
                     return false;
                 }
             }
             _ => {}
         }
-        let reverse = current.kind() == 0;
-        if ((current.kind() == 1 && current.non_stop() & 2 != 0) || current.kind() == 6)
+        let reverse = order_kind == 0;
+        let current = unsafe { current_ptr.read() };
+        if ((order_kind == 1 && current.non_stop() & 2 != 0) || order_kind == 6)
             && g.service_at_station(v) != 0
             && u64::from(current.destination) == g.service_tile_station(v)
         {
@@ -3289,26 +3338,33 @@ impl Control {
             g.service_last_station_write(v, u64::from(current.destination));
             g.update_timetable(v, true);
             g.increment_implicit(v);
+            // Deletion/timetable/index updates may mutate the list or reenter.
+            vehicle = g.vehicle(v);
         }
-        g.update_real(v);
-        let order = g
-            .vehicle_order(v, unsafe { (*g.consist(v)).real })
+        let state = g.consist(v);
+        let access = g.order_access(vehicle);
+        access.update_real(state);
+        let order = access
+            .order(unsafe { (*state).real })
             .filter(|o| o.kind() != 8);
-        if order.is_none() || (kind == 3 && !g.valid_orders(v)) {
+        let kind = g.service_vehicle_type(v);
+        if order.is_none() || (kind == 3 && !access.valid()) {
             if kind == 3 {
                 g.service_missing_aircraft_orders(v);
                 return false;
             }
-            let mut current = g.current(v);
+            let mut current = unsafe { (*vehicle).current.as_ptr().read() };
             current.kind = 0;
             current.flags = 0;
             current.destination = 0;
-            g.put_current(v, current);
+            unsafe {
+                (*vehicle).current.as_mut_ptr().write(current);
+            }
             g.service_set_destination(v, 0);
             return false;
         }
         let order = order.unwrap();
-        if order.equals(g.current(v))
+        if order.equals(unsafe { (*vehicle).current.as_ptr().read() })
             && (kind == 3 || g.service_destination_tile(v) != 0)
             && (kind != 2
                 || order.kind() != 1
@@ -3316,7 +3372,9 @@ impl Control {
         {
             return false;
         }
-        g.put_current(v, order);
+        unsafe {
+            (*vehicle).current.as_mut_ptr().write(order);
+        }
         g.service_invalidate_order(v, (-2i64) as u64);
         if kind == 2 || kind == 3 {
             g.service_dirty_vehicle_windows(v);
