@@ -141,9 +141,9 @@ Exact caps (three-pair medians; [samples and provenance](https://github.com/dyla
 | --- | ---: |
 | Opus manual | 1.422193877551 |
 | Grok manual | 1.405807365439 |
-| Padhattan 1996 manual | 1.662674650699 |
-| Padhattan 2000 manual | 1.982905982906 |
-| TGP 256 | 1.440443213296 |
+| Padhattan 1996 manual | 1.612704918033 |
+| Padhattan 2000 manual | 1.950450450450 |
+| TGP 256 | 1.437142857143 |
 
 ## Phase 2: current work, in order
 
