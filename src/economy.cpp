@@ -123,6 +123,13 @@ CompanyScoreParts &GetRustCompanyScores()
 	static CompanyScoreParts *scores = new (openttd_rust_company_scores()) CompanyScoreParts{};
 	return *scores;
 }
+/** Calendar year and difficulty read by inflation, price and startup entries. */
+static OpenTTDEconomySettings RustEconomySettings()
+{
+	const auto &d = _settings_game.difficulty;
+	return {.year = TimerGameCalendar::year.base(), .max_loan = d.max_loan, .initial_interest = d.initial_interest,
+		.vehicle_costs = d.vehicle_costs, .construction_cost = d.construction_cost, .inflation = _settings_game.economy.inflation};
+}
 #else
 TypedIndexContainer<std::array<std::array<int64_t, SCORE_END>, MAX_COMPANIES>, CompanyID> _score_part;
 Economy _economy;
@@ -178,7 +185,7 @@ static Money CalculateCompanyAssetValue(const Company *c)
 Money CalculateCompanyValue(const Company *c, bool including_loan)
 {
 #ifdef WITH_RUST
-	return RunRustCompany(4, c->index.base(), including_loan).b;
+	return openttd_rust_company_value(&GetRustCompanyServices(), &c->Finances(), c->index.base(), including_loan);
 #else
 	Money value = CalculateCompanyAssetValue(c);
 
@@ -209,7 +216,7 @@ Money CalculateCompanyValue(const Company *c, bool including_loan)
 Money CalculateHostileTakeoverValue(const Company *c)
 {
 #ifdef WITH_RUST
-	return RunRustCompany(5, c->index.base()).b;
+	return openttd_rust_company_hostile_takeover_value(&GetRustCompanyServices(), &c->Finances(), c->index.base());
 #else
 	Money value = CalculateCompanyAssetValue(c);
 
@@ -238,7 +245,7 @@ Money CalculateHostileTakeoverValue(const Company *c)
 int UpdateCompanyRatingAndValue(Company *c, bool update)
 {
 #ifdef WITH_RUST
-	return static_cast<int>(RunRustCompany(6, c->index.base(), update).b);
+	return openttd_rust_company_update_rating(&GetRustCompanyServices(), &c->Finances(), c->index.base(), update);
 #else
 	Owner owner = c->index;
 	int score = 0;
@@ -362,7 +369,7 @@ int UpdateCompanyRatingAndValue(Company *c, bool update)
 void ChangeOwnershipOfCompanyItems(Owner old_owner, Owner new_owner)
 {
 #ifdef WITH_RUST
-	RunRustCompany(26, old_owner.base(), new_owner.base());
+	openttd_rust_company_change_ownership(&GetRustCompanyServices(), old_owner.base(), new_owner.base());
 #else
 	/* We need to set _current_company to old_owner before we try to move
 	 * the client. This is needed as it needs to know whether "you" really
@@ -752,7 +759,7 @@ static void CompaniesGenStatistics()
 bool AddInflation(bool check_year)
 {
 #ifdef WITH_RUST
-	return RunRustCompany(8, 0, check_year).b != 0;
+	return openttd_rust_economy_add_inflation(check_year, TimerGameCalendar::year.base());
 #else
 	/* The cargo payment inflation differs from the normal inflation, so the
 	 * relative amount of money you make with a transport decreases slowly over
@@ -794,7 +801,8 @@ bool AddInflation(bool check_year)
 void RecomputePrices()
 {
 #ifdef WITH_RUST
-	RunRustCompany(9);
+	const OpenTTDEconomySettings settings = RustEconomySettings();
+	openttd_rust_economy_recompute_prices(&GetRustCompanyServices(), &settings);
 #else
 	/* Setup maximum loan as a rounded down multiple of LOAN_INTERVAL. */
 	_economy.max_loan = ((uint64_t)_settings_game.difficulty.max_loan * _economy.inflation_prices >> 16) / LOAN_INTERVAL * LOAN_INTERVAL;
@@ -930,7 +938,7 @@ static void HandleEconomyFluctuations()
 void ResetPriceBaseMultipliers()
 {
 #ifdef WITH_RUST
-	RunRustCompany(10);
+	openttd_rust_economy_reset_price_multipliers();
 #else
 	_price_base_multiplier.fill(0);
 #endif /* WITH_RUST */
@@ -947,7 +955,7 @@ void SetPriceBaseMultiplier(Price price, int factor)
 {
 #ifdef WITH_RUST
 	assert(price < PR_END);
-	RunRustCompany(11, price, factor);
+	openttd_rust_economy_set_price_multiplier(price, factor);
 #else
 	assert(price < PR_END);
 	_price_base_multiplier[price] = Clamp(factor, MIN_PRICE_MODIFIER, MAX_PRICE_MODIFIER);
@@ -984,7 +992,8 @@ void StartupIndustryDailyChanges(bool init_counter)
 void StartupEconomy()
 {
 #ifdef WITH_RUST
-	RunRustCompany(12);
+	const OpenTTDEconomySettings settings = RustEconomySettings();
+	openttd_rust_economy_startup(&GetRustCompanyServices(), &settings);
 #else
 	_economy.interest_rate = _settings_game.difficulty.initial_interest;
 	_economy.infl_amount = _settings_game.difficulty.initial_interest;
@@ -1013,7 +1022,7 @@ void StartupEconomy()
 void InitializeEconomy()
 {
 #ifdef WITH_RUST
-	RunRustCompany(13);
+	openttd_rust_economy_initialize(&GetRustCompanyServices());
 #else
 	_economy.inflation_prices = _economy.inflation_payment = 1 << 16;
 	ClearCargoPickupMonitoring();
@@ -1035,7 +1044,7 @@ Money GetPrice(Price index, uint cost_factor, const GRFFile *grf_file, int shift
 	/* GRF storage stays canonical C++; observe its scalar at the original point. */
 	if (index >= PR_END) return 0;
 	if (grf_file != nullptr) shift += grf_file->price_base_multipliers[index];
-	return RunRustCompany(14, index, cost_factor, shift).b;
+	return openttd_rust_economy_price(index, cost_factor, shift);
 #else
 	if (index >= PR_END) return 0;
 
@@ -2420,7 +2429,8 @@ void LoadUnloadStation(Station *st)
 static const IntervalTimer<TimerGameCalendar> _calendar_inflation_monthly({TimerGameCalendar::MONTH, TimerGameCalendar::Priority::COMPANY}, [](auto)
 {
 #ifdef WITH_RUST
-	RunRustCompany(35);
+	const OpenTTDEconomySettings settings = RustEconomySettings();
+	openttd_rust_economy_calendar_month(&GetRustCompanyServices(), &settings);
 #else
 	if (_settings_game.economy.inflation) {
 		AddInflation();
@@ -2435,7 +2445,11 @@ static const IntervalTimer<TimerGameCalendar> _calendar_inflation_monthly({Timer
 static const IntervalTimer<TimerGameEconomy> _economy_companies_monthly({ TimerGameEconomy::MONTH, TimerGameEconomy::Priority::COMPANY }, [](auto)
 {
 #ifdef WITH_RUST
-	RunRustCompany(7);
+	const OpenTTDEconomyMonth month{
+		.month = TimerGameEconomy::month, .infinite_money = _settings_game.difficulty.infinite_money,
+		.maintenance = _settings_game.economy.infrastructure_maintenance, .fluctuating = _settings_game.difficulty.economy,
+	};
+	openttd_rust_economy_month(&GetRustCompanyServices(), &month);
 #else
 	CompaniesGenStatistics();
 	CompaniesPayInterest();
@@ -2484,7 +2498,7 @@ static void DoAcquireCompany(Company *c, bool hostile_takeover)
 CommandCost CmdBuyCompany(DoCommandFlags flags, CompanyID target_company, bool hostile_takeover)
 {
 #ifdef WITH_RUST
-	return RustCompanyCost(RunRustCompany(27, target_company.base(), hostile_takeover, flags.Test(DoCommandFlag::Execute)));
+	return RustCompanyCost(openttd_rust_company_buy(&GetRustCompanyServices(), target_company.base(), hostile_takeover, flags.Test(DoCommandFlag::Execute)));
 #else
 	Company *c = Company::GetIfValid(target_company);
 	if (c == nullptr) return CMD_ERROR;
