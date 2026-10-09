@@ -1587,9 +1587,12 @@ wait/crash counters, railtype masks and scalar TrainCache fields. Shared Vehicle
 GroundVehicle fields, pools/links, sprite override references, rendering,
 construction/arrangement and generic orders/loading stay in C++. External writes,
 modern VEHS staging, legacy loading and afterload use canonical scalar adapters.
-Original selected bodies compile only in portable builds. Copied noexcept world
-services preserve immediate reads/writes; named callback tasks release borrows
-before tile/depot entry, orders/loading, station callbacks and destruction.
+Original selected bodies compile only in portable builds. Typed synchronous entries borrow immutable noexcept service tables. Resolved
+shell/state handles and narrow reads remove repeated pool lookups and ordinary
+Last walks; native visitors filter trains and preserve order without nearby Vecs.
+Owner accesses end before direct tile/depot, orders/loading, station and deletion
+callbacks. Nested native stack snapshots restore temporary orders once; ordered
+signal rollback scratch remains local. No ordinary-play service unwinds here.
 `OPENTTD_TRAIN_PROFILE=1` writes controller branch counts in `train-profile.json`;
 this includes extension rollback separately from #122's search rollback.
 Validation uses the existing Padhattan manual/cargodist, realistic acceleration,

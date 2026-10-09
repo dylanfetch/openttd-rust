@@ -130,7 +130,7 @@ struct Train final : public GroundVehicle<Train, VEH_TRAIN> {
 	VehicleRailFlags GetTrainFlags() const
 	{
 #ifdef WITH_RUST
-		return VehicleRailFlags(static_cast<uint16_t>(openttd_rust_train_state_get(this->rust_state.get(), 0)));
+		return VehicleRailFlags(static_cast<uint16_t>(openttd_rust_train_state_get_flags(this->rust_state.get())));
 #else
 		return this->flags;
 #endif
@@ -138,7 +138,7 @@ struct Train final : public GroundVehicle<Train, VEH_TRAIN> {
 	void SetTrainFlags(VehicleRailFlags value)
 	{
 #ifdef WITH_RUST
-		openttd_rust_train_state_set(this->rust_state.get(), 0, value.base());
+		openttd_rust_train_state_set_flags(this->rust_state.get(), value.base());
 #else
 		this->flags = value;
 #endif
@@ -147,7 +147,7 @@ struct Train final : public GroundVehicle<Train, VEH_TRAIN> {
 	uint16_t GetCrashAnimPos() const
 	{
 #ifdef WITH_RUST
-		return static_cast<uint16_t>(openttd_rust_train_state_get(this->rust_state.get(), 1));
+		return static_cast<uint16_t>(openttd_rust_train_state_get_crash_anim_pos(this->rust_state.get()));
 #else
 		return this->crash_anim_pos;
 #endif
@@ -155,7 +155,7 @@ struct Train final : public GroundVehicle<Train, VEH_TRAIN> {
 	void SetCrashAnimPos(uint16_t value)
 	{
 #ifdef WITH_RUST
-		openttd_rust_train_state_set(this->rust_state.get(), 1, value);
+		openttd_rust_train_state_set_crash_anim_pos(this->rust_state.get(), value);
 #else
 		this->crash_anim_pos = value;
 #endif
@@ -164,7 +164,7 @@ struct Train final : public GroundVehicle<Train, VEH_TRAIN> {
 	uint16_t GetWaitCounter() const
 	{
 #ifdef WITH_RUST
-		return static_cast<uint16_t>(openttd_rust_train_state_get(this->rust_state.get(), 2));
+		return static_cast<uint16_t>(openttd_rust_train_state_get_wait_counter(this->rust_state.get()));
 #else
 		return this->wait_counter;
 #endif
@@ -172,7 +172,7 @@ struct Train final : public GroundVehicle<Train, VEH_TRAIN> {
 	void SetWaitCounter(uint16_t value)
 	{
 #ifdef WITH_RUST
-		openttd_rust_train_state_set(this->rust_state.get(), 2, value);
+		openttd_rust_train_state_set_wait_counter(this->rust_state.get(), value);
 #else
 		this->wait_counter = value;
 #endif
@@ -181,7 +181,7 @@ struct Train final : public GroundVehicle<Train, VEH_TRAIN> {
 	RailTypes GetCompatibleRailTypes() const
 	{
 #ifdef WITH_RUST
-		return RailTypes(static_cast<uint64_t>(openttd_rust_train_state_get(this->rust_state.get(), 3)));
+		return RailTypes(static_cast<uint64_t>(openttd_rust_train_state_get_compatible_railtypes(this->rust_state.get())));
 #else
 		return this->compatible_railtypes;
 #endif
@@ -189,7 +189,7 @@ struct Train final : public GroundVehicle<Train, VEH_TRAIN> {
 	void SetCompatibleRailTypes(RailTypes value)
 	{
 #ifdef WITH_RUST
-		openttd_rust_train_state_set(this->rust_state.get(), 3, value.base());
+		openttd_rust_train_state_set_compatible_railtypes(this->rust_state.get(), value.base());
 #else
 		this->compatible_railtypes = value;
 #endif
@@ -198,7 +198,7 @@ struct Train final : public GroundVehicle<Train, VEH_TRAIN> {
 	RailTypes GetRailTypes() const
 	{
 #ifdef WITH_RUST
-		return RailTypes(static_cast<uint64_t>(openttd_rust_train_state_get(this->rust_state.get(), 4)));
+		return RailTypes(static_cast<uint64_t>(openttd_rust_train_state_get_railtypes(this->rust_state.get())));
 #else
 		return this->railtypes;
 #endif
@@ -206,7 +206,7 @@ struct Train final : public GroundVehicle<Train, VEH_TRAIN> {
 	void SetRailTypes(RailTypes value)
 	{
 #ifdef WITH_RUST
-		openttd_rust_train_state_set(this->rust_state.get(), 4, value.base());
+		openttd_rust_train_state_set_railtypes(this->rust_state.get(), value.base());
 #else
 		this->railtypes = value;
 #endif
@@ -215,7 +215,7 @@ struct Train final : public GroundVehicle<Train, VEH_TRAIN> {
 	TrackBits GetTrack() const
 	{
 #ifdef WITH_RUST
-		return static_cast<TrackBits>(openttd_rust_train_state_get(this->rust_state.get(), 5));
+		return static_cast<TrackBits>(openttd_rust_train_state_get_track(this->rust_state.get()));
 #else
 		return this->track;
 #endif
@@ -223,7 +223,7 @@ struct Train final : public GroundVehicle<Train, VEH_TRAIN> {
 	void SetTrack(TrackBits value)
 	{
 #ifdef WITH_RUST
-		openttd_rust_train_state_set(this->rust_state.get(), 5, value);
+		openttd_rust_train_state_set_track(this->rust_state.get(), value);
 #else
 		this->track = value;
 #endif
@@ -232,7 +232,7 @@ struct Train final : public GroundVehicle<Train, VEH_TRAIN> {
 	TrainForceProceeding GetForceProceed() const
 	{
 #ifdef WITH_RUST
-		return static_cast<TrainForceProceeding>(openttd_rust_train_state_get(this->rust_state.get(), 6));
+		return static_cast<TrainForceProceeding>(openttd_rust_train_state_get_force_proceed(this->rust_state.get()));
 #else
 		return this->force_proceed;
 #endif
@@ -240,7 +240,7 @@ struct Train final : public GroundVehicle<Train, VEH_TRAIN> {
 	void SetForceProceed(TrainForceProceeding value)
 	{
 #ifdef WITH_RUST
-		openttd_rust_train_state_set(this->rust_state.get(), 6, value);
+		openttd_rust_train_state_set_force_proceed(this->rust_state.get(), value);
 #else
 		this->force_proceed = value;
 #endif
@@ -249,7 +249,7 @@ struct Train final : public GroundVehicle<Train, VEH_TRAIN> {
 	bool GetCachedTilt() const
 	{
 #ifdef WITH_RUST
-		return static_cast<bool>(openttd_rust_train_state_get(this->rust_state.get(), 7));
+		return static_cast<bool>(openttd_rust_train_state_get_cached_tilt(this->rust_state.get()));
 #else
 		return this->tcache.cached_tilt;
 #endif
@@ -257,7 +257,7 @@ struct Train final : public GroundVehicle<Train, VEH_TRAIN> {
 	void SetCachedTilt(bool value)
 	{
 #ifdef WITH_RUST
-		openttd_rust_train_state_set(this->rust_state.get(), 7, value);
+		openttd_rust_train_state_set_cached_tilt(this->rust_state.get(), value);
 #else
 		this->tcache.cached_tilt = value;
 #endif
@@ -266,7 +266,7 @@ struct Train final : public GroundVehicle<Train, VEH_TRAIN> {
 	uint8_t GetUserDefData() const
 	{
 #ifdef WITH_RUST
-		return static_cast<uint8_t>(openttd_rust_train_state_get(this->rust_state.get(), 8));
+		return static_cast<uint8_t>(openttd_rust_train_state_get_user_def_data(this->rust_state.get()));
 #else
 		return this->tcache.user_def_data;
 #endif
@@ -274,7 +274,7 @@ struct Train final : public GroundVehicle<Train, VEH_TRAIN> {
 	void SetUserDefData(uint8_t value)
 	{
 #ifdef WITH_RUST
-		openttd_rust_train_state_set(this->rust_state.get(), 8, value);
+		openttd_rust_train_state_set_user_def_data(this->rust_state.get(), value);
 #else
 		this->tcache.user_def_data = value;
 #endif
@@ -283,7 +283,7 @@ struct Train final : public GroundVehicle<Train, VEH_TRAIN> {
 	int16_t GetCachedCurveSpeedMod() const
 	{
 #ifdef WITH_RUST
-		return static_cast<int16_t>(static_cast<uint16_t>(openttd_rust_train_state_get(this->rust_state.get(), 9)));
+		return static_cast<int16_t>(static_cast<uint16_t>(openttd_rust_train_state_get_cached_curve_speed_mod(this->rust_state.get())));
 #else
 		return this->tcache.cached_curve_speed_mod;
 #endif
@@ -291,7 +291,7 @@ struct Train final : public GroundVehicle<Train, VEH_TRAIN> {
 	void SetCachedCurveSpeedMod(int16_t value)
 	{
 #ifdef WITH_RUST
-		openttd_rust_train_state_set(this->rust_state.get(), 9, static_cast<uint16_t>(value));
+		openttd_rust_train_state_set_cached_curve_speed_mod(this->rust_state.get(), static_cast<int16_t>(static_cast<uint16_t>(value)));
 #else
 		this->tcache.cached_curve_speed_mod = value;
 #endif
@@ -300,7 +300,7 @@ struct Train final : public GroundVehicle<Train, VEH_TRAIN> {
 	uint16_t GetCachedMaxCurveSpeed() const
 	{
 #ifdef WITH_RUST
-		return static_cast<uint16_t>(openttd_rust_train_state_get(this->rust_state.get(), 10));
+		return static_cast<uint16_t>(openttd_rust_train_state_get_cached_max_curve_speed(this->rust_state.get()));
 #else
 		return this->tcache.cached_max_curve_speed;
 #endif
@@ -308,7 +308,7 @@ struct Train final : public GroundVehicle<Train, VEH_TRAIN> {
 	void SetCachedMaxCurveSpeed(uint16_t value)
 	{
 #ifdef WITH_RUST
-		openttd_rust_train_state_set(this->rust_state.get(), 10, value);
+		openttd_rust_train_state_set_cached_max_curve_speed(this->rust_state.get(), value);
 #else
 		this->tcache.cached_max_curve_speed = value;
 #endif

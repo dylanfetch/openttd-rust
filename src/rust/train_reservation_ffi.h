@@ -9,14 +9,9 @@
 #ifndef OPENTTD_RUST_TRAIN_RESERVATION_FFI_H
 #define OPENTTD_RUST_TRAIN_RESERVATION_FFI_H
 #include <stdint.h>
+#include "train_ffi.h"
 extern "C" {
 struct OpenTTDTrainState;
-struct OpenTTDTrainReservationTask;
-struct OpenTTDTrainReservationView {
-	uint32_t tile, dest, next;
-	uint16_t destination, last_station;
-	uint8_t direction, order, num_orders, order_index, suppress, nearest;
-};
 struct OpenTTDTrainReservationFollow {
 	uint32_t old_tile, new_tile;
 	int32_t skipped;
@@ -24,106 +19,157 @@ struct OpenTTDTrainReservationFollow {
 	uint8_t old_td, exitdir, tunnel, bridge, station, error;
 };
 struct OpenTTDTrainReservationPbs {
-	uint32_t tile, other;
+	uint32_t tile;
+	OpenTTDTrainHandle other;
 	uint8_t td, okay;
 };
-struct OpenTTDTrainReservationStep {
-	uint64_t value;
-	uint32_t action, id, tile, final_dest;
-	uint8_t td, dir, tracks, reserve, found, got, okay;
+struct OpenTTDTrainReservationSearch {
+	uint8_t track;
+	uint32_t tile, final_dest;
+	uint8_t td, found, okay;
 };
+struct OpenTTDTrainReservationFreeRead {
+	uint32_t tile;
+};
+struct OpenTTDTrainReservationFree1Read {
+	uint32_t tile;
+	OpenTTDTrainHandle next;
+};
+struct OpenTTDTrainReservationNewRead {
+	uint32_t dest;
+	uint16_t last_station;
+	uint8_t order_index;
+	uint8_t suppress;
+};
+struct OpenTTDTrainReservationChooseRead {
+	uint32_t tile;
+	uint32_t dest;
+	uint16_t destination;
+	uint8_t order;
+	uint8_t nearest;
+};
+struct OpenTTDTrainReservationChoose4Read {
+	uint8_t order;
+	uint8_t nearest;
+};
+struct OpenTTDTrainReservationCheckNextRead {
+	uint32_t tile;
+	uint32_t dest;
+	uint16_t destination;
+	uint8_t order;
+	uint8_t num_orders;
+};
+struct OpenTTDTrainReservationChoice { uint8_t track, reserved; };
 struct OpenTTDTrainReservationLeaves {
-	void (*observe)(uint32_t, OpenTTDTrainReservationView *) noexcept;
-	uint64_t (*leaf)(void *, uint32_t, uint32_t, uint64_t, uint64_t, uint64_t) noexcept;
-	OpenTTDTrainState *(*owner)(uint32_t) noexcept;
-	uint8_t (*follow)(uint32_t, uint64_t, OpenTTDTrainReservationFollow *) noexcept;
-	OpenTTDTrainReservationPbs (*origin)(uint32_t, uint8_t) noexcept;
+	uint32_t (*read_tile)(OpenTTDTrainHandle) noexcept;
+	OpenTTDTrainHandle (*read_next)(OpenTTDTrainHandle) noexcept;
+	uint16_t (*read_last_station)(OpenTTDTrainHandle) noexcept;
+	uint8_t (*read_direction)(OpenTTDTrainHandle) noexcept;
+	uint8_t (*read_order)(OpenTTDTrainHandle) noexcept;
+	uint8_t (*read_num_orders)(OpenTTDTrainHandle) noexcept;
+	uint8_t (*read_order_index)(OpenTTDTrainHandle) noexcept;
+	OpenTTDTrainReservationFreeRead (*read_free)(OpenTTDTrainHandle) noexcept;
+	OpenTTDTrainReservationFree1Read (*read_free_1)(OpenTTDTrainHandle) noexcept;
+	OpenTTDTrainReservationNewRead (*read_new)(OpenTTDTrainHandle) noexcept;
+	OpenTTDTrainReservationChooseRead (*read_choose)(OpenTTDTrainHandle) noexcept;
+	OpenTTDTrainReservationChoose4Read (*read_choose_4)(OpenTTDTrainHandle) noexcept;
+	OpenTTDTrainReservationCheckNextRead (*read_check_next)(OpenTTDTrainHandle) noexcept;
+
+	uint64_t (*all_compat)(void *, OpenTTDTrainHandle) noexcept;
+	uint64_t (*backoff)(void *, OpenTTDTrainHandle) noexcept;
+	uint64_t (*bits_track)(void *, OpenTTDTrainHandle, uint8_t) noexcept;
+	uint64_t (*blocking)(void *, OpenTTDTrainHandle, uint32_t, uint8_t) noexcept;
+	uint64_t (*check_reverse)(void *, OpenTTDTrainHandle) noexcept;
+	uint64_t (*compat_station)(void *, OpenTTDTrainHandle, uint32_t, uint32_t) noexcept;
+	uint64_t (*conditional)(void *, OpenTTDTrainHandle, uint8_t) noexcept;
+	void (*copy_order)(void *, OpenTTDTrainHandle, uint8_t) noexcept;
+	uint64_t (*cross_dirs)(void *, OpenTTDTrainHandle, uint8_t) noexcept;
+	uint64_t (*cross_tracks)(void *, OpenTTDTrainHandle, uint8_t) noexcept;
+	uint64_t (*depot_dir)(void *, OpenTTDTrainHandle, uint32_t) noexcept;
+	uint64_t (*depot_reserved)(void *, OpenTTDTrainHandle, uint32_t) noexcept;
+	uint64_t (*diag_reach_dirs)(void *, OpenTTDTrainHandle, uint8_t) noexcept;
+	uint64_t (*diag_track)(void *, OpenTTDTrainHandle, uint8_t) noexcept;
+	uint64_t (*enter_td)(void *, OpenTTDTrainHandle, uint8_t, uint8_t) noexcept;
+	uint64_t (*exit_dir)(void *, OpenTTDTrainHandle, uint8_t) noexcept;
+	uint64_t (*free)(void *, OpenTTDTrainHandle, uint32_t, uint8_t) noexcept;
+	uint64_t (*green)(void *, OpenTTDTrainHandle, uint32_t, uint8_t) noexcept;
+	uint64_t (*has_pbs)(void *, OpenTTDTrainHandle, uint32_t, uint8_t) noexcept;
+	uint64_t (*has_reserved)(void *, OpenTTDTrainHandle, uint32_t, uint8_t) noexcept;
+	uint64_t (*has_signal)(void *, OpenTTDTrainHandle, uint32_t, uint8_t) noexcept;
+	void (*increment_order)(void *, OpenTTDTrainHandle) noexcept;
+	uint64_t (*is_bridge)(void *, OpenTTDTrainHandle, uint32_t) noexcept;
+	uint64_t (*is_depot)(void *, OpenTTDTrainHandle, uint32_t) noexcept;
+	uint64_t (*is_pbs)(void *, OpenTTDTrainHandle, uint32_t, uint8_t) noexcept;
+	uint64_t (*is_plain)(void *, OpenTTDTrainHandle, uint32_t) noexcept;
+	uint64_t (*is_railway)(void *, OpenTTDTrainHandle, uint32_t) noexcept;
+	uint64_t (*is_station)(void *, OpenTTDTrainHandle, uint32_t) noexcept;
+	uint64_t (*is_tunnel)(void *, OpenTTDTrainHandle, uint32_t) noexcept;
+	uint64_t (*is_waypoint)(void *, OpenTTDTrainHandle, uint32_t) noexcept;
+	uint64_t (*line_reverse)(void *, OpenTTDTrainHandle) noexcept;
+	void (*mark_bridge)(void *, OpenTTDTrainHandle, uint32_t) noexcept;
+	void (*mark_tile)(void *, OpenTTDTrainHandle, uint32_t) noexcept;
+	uint64_t (*needs_service)(void *, OpenTTDTrainHandle) noexcept;
+	uint64_t (*oneway)(void *, OpenTTDTrainHandle, uint32_t, uint8_t) noexcept;
+	uint64_t (*order_service)(void *, OpenTTDTrainHandle, uint8_t) noexcept;
+	uint64_t (*order_stop)(void *, OpenTTDTrainHandle, uint16_t) noexcept;
+	uint64_t (*order_type)(void *, OpenTTDTrainHandle, uint8_t) noexcept;
+	uint64_t (*other_end)(void *, OpenTTDTrainHandle, uint32_t) noexcept;
+	uint64_t (*overlap)(void *, OpenTTDTrainHandle, uint8_t) noexcept;
+	void (*path_result)(void *, OpenTTDTrainHandle, uint8_t) noexcept;
+	void (*profile)(void *, OpenTTDTrainHandle, uint64_t) noexcept;
+	uint64_t (*rail90)(void *, OpenTTDTrainHandle, uint32_t, uint32_t) noexcept;
+	uint64_t (*reach_dirs)(void *, OpenTTDTrainHandle, uint8_t) noexcept;
+	uint64_t (*reach_tracks)(void *, OpenTTDTrainHandle, uint8_t) noexcept;
+	uint64_t (*reserved)(void *, OpenTTDTrainHandle, uint32_t) noexcept;
+	uint64_t (*reserve_paths)(void *, OpenTTDTrainHandle) noexcept;
+	void (*restore_order)(void *, OpenTTDTrainHandle) noexcept;
+	uint64_t (*safe)(void *, OpenTTDTrainHandle, uint32_t, uint8_t) noexcept;
+	void (*save_order)(void *, OpenTTDTrainHandle) noexcept;
+	void (*service)(void *, OpenTTDTrainHandle) noexcept;
+	void (*set_depot)(void *, OpenTTDTrainHandle, uint32_t, uint8_t) noexcept;
+	void (*set_depot_dest)(void *, OpenTTDTrainHandle, uint32_t) noexcept;
+	void (*set_platform)(void *, OpenTTDTrainHandle, uint32_t, uint8_t, uint8_t) noexcept;
+	void (*set_signal)(void *, OpenTTDTrainHandle, uint32_t, uint8_t, uint8_t) noexcept;
+	void (*set_tunnel)(void *, OpenTTDTrainHandle, uint32_t, uint8_t) noexcept;
+	uint64_t (*show_res)(void *, OpenTTDTrainHandle) noexcept;
+	void (*signal_buffer)(void *, OpenTTDTrainHandle, uint32_t, uint8_t) noexcept;
+	void (*start_stop)(void *, OpenTTDTrainHandle) noexcept;
+	uint64_t (*station)(void *, OpenTTDTrainHandle, uint32_t) noexcept;
+	uint64_t (*station_train)(void *, OpenTTDTrainHandle, uint16_t) noexcept;
+	uint64_t (*station_xy)(void *, OpenTTDTrainHandle, uint16_t) noexcept;
+	void (*stuck)(void *, OpenTTDTrainHandle) noexcept;
+	uint64_t (*tile_add)(void *, OpenTTDTrainHandle, uint32_t, uint8_t) noexcept;
+	uint64_t (*tile_offset)(void *, OpenTTDTrainHandle, uint8_t) noexcept;
+	uint64_t (*trackdir)(void *, OpenTTDTrainHandle) noexcept;
+	uint64_t (*track_status)(void *, OpenTTDTrainHandle, uint32_t) noexcept;
+	uint64_t (*try_track)(void *, OpenTTDTrainHandle, uint32_t, uint8_t) noexcept;
+	uint64_t (*tunnel_dir)(void *, OpenTTDTrainHandle, uint32_t) noexcept;
+	uint64_t (*tunnel_free)(void *, OpenTTDTrainHandle, uint32_t, uint32_t) noexcept;
+	void (*unreserve)(void *, OpenTTDTrainHandle, uint32_t, uint8_t) noexcept;
+	void (*update_buffer)(void *, OpenTTDTrainHandle) noexcept;
+	void (*write_dest)(void *, OpenTTDTrainHandle, uint32_t) noexcept;
+	void (*write_last)(void *, OpenTTDTrainHandle, uint16_t) noexcept;
+	void (*write_suppress)(void *, OpenTTDTrainHandle, uint8_t) noexcept;
+
+	uint8_t (*follow)(OpenTTDTrainHandle, uint64_t, OpenTTDTrainReservationFollow *) noexcept;
+	OpenTTDTrainReservationPbs (*origin)(OpenTTDTrainHandle, uint8_t) noexcept;
+	OpenTTDTrainReservationSearch (*pathfind)(OpenTTDTrainHandle, uint32_t, uint8_t, uint8_t, uint8_t, uint8_t) noexcept;
+	uint8_t (*safe_track)(OpenTTDTrainHandle, uint32_t, uint8_t, uint8_t) noexcept;
+	uint8_t (*process_orders)(OpenTTDTrainHandle) noexcept;
+	uint8_t (*update_order_dest)(OpenTTDTrainHandle, uint8_t) noexcept;
 };
-/* All callbacks operate on the serialized game thread. Rust copies private state
-	* through scalar accessors and retains no borrowed train/world state. A task
-	* yields only before the named potentially reentrant order/YAPF services.
-	* C++ preserves the generic Order snapshot; Rust owns its restoration and index.
-	* Destroy a task exactly once, before its C++ context expires, also on exceptions.
-	* Panics/allocation failure abort; environmental exceptions terminate in leaves. */
-OpenTTDTrainReservationTask *openttd_rust_train_reservation_new(uint32_t, uint32_t, uint64_t, uint64_t, uint64_t, const OpenTTDTrainReservationLeaves *, void *);
-OpenTTDTrainReservationStep openttd_rust_train_reservation_step(OpenTTDTrainReservationTask *, OpenTTDTrainReservationStep);
-void openttd_rust_train_reservation_destroy(OpenTTDTrainReservationTask *);
+/* Synchronous serialized services retain no owner/world borrow. The native stack
+ * owns temporary Order snapshots; nested entries get distinct contexts. Rust
+ * controls restoration exactly once and keeps the original ordered signal rollback
+ * scratch. Ordinary-play callbacks are direct noexcept calls; escaping exceptions
+ * and Rust panics terminate. Immutable table/context pointers live until return. */
+void openttd_rust_train_reservation_check_next(OpenTTDTrainHandle, const OpenTTDTrainReservationLeaves *, void *);
+void openttd_rust_train_reservation_clear(OpenTTDTrainHandle, uint32_t, uint8_t, const OpenTTDTrainReservationLeaves *, void *);
+void openttd_rust_train_reservation_free(OpenTTDTrainHandle, const OpenTTDTrainReservationLeaves *, void *);
+OpenTTDTrainReservationChoice openttd_rust_train_reservation_choose(OpenTTDTrainHandle, uint32_t, uint8_t, uint8_t, uint8_t, uint8_t, const OpenTTDTrainReservationLeaves *, void *);
+uint8_t openttd_rust_train_reservation_try_path(OpenTTDTrainHandle, uint8_t, uint8_t, const OpenTTDTrainReservationLeaves *, void *);
+uint8_t openttd_rust_train_reservation_check_reverse(OpenTTDTrainHandle, const OpenTTDTrainReservationLeaves *, void *);
+uint32_t openttd_rust_train_reservation_station_location(OpenTTDTrainHandle, uint16_t, const OpenTTDTrainReservationLeaves *, void *);
+void openttd_rust_train_reservation_reserve_under(OpenTTDTrainHandle, const OpenTTDTrainReservationLeaves *, void *);
 }
-constexpr uint32_t TR_BACKOFF = 0;
-constexpr uint32_t TR_RESERVE_PATHS = 1;
-constexpr uint32_t TR_FORBID90 = 2;
-constexpr uint32_t TR_LINE_REVERSE = 3;
-constexpr uint32_t TR_SHOW_RES = 4;
-constexpr uint32_t TR_IS_STATION = 5;
-constexpr uint32_t TR_IS_WAYPOINT = 6;
-constexpr uint32_t TR_IS_RAILWAY = 7;
-constexpr uint32_t TR_IS_TUNNEL = 8;
-constexpr uint32_t TR_IS_DEPOT = 9;
-constexpr uint32_t TR_IS_PLAIN = 10;
-constexpr uint32_t TR_STATION = 11;
-constexpr uint32_t TR_DEPOT_DIR = 12;
-constexpr uint32_t TR_TUNNEL_DIR = 13;
-constexpr uint32_t TR_OTHER_END = 14;
-constexpr uint32_t TR_IS_BRIDGE = 15;
-constexpr uint32_t TR_TUNNEL_FREE = 16;
-constexpr uint32_t TR_SET_TUNNEL = 17;
-constexpr uint32_t TR_MARK_BRIDGE = 18;
-constexpr uint32_t TR_MARK_TILE = 19;
-constexpr uint32_t TR_COMPAT_STATION = 20;
-constexpr uint32_t TR_SET_PLATFORM = 21;
-constexpr uint32_t TR_UNRESERVE = 22;
-constexpr uint32_t TR_RESERVED = 23;
-constexpr uint32_t TR_OVERLAP = 24;
-constexpr uint32_t TR_HAS_RESERVED = 25;
-constexpr uint32_t TR_HAS_SIGNAL = 26;
-constexpr uint32_t TR_HAS_PBS = 27;
-constexpr uint32_t TR_IS_PBS = 28;
-constexpr uint32_t TR_GREEN = 29;
-constexpr uint32_t TR_SET_SIGNAL = 30;
-constexpr uint32_t TR_ONEWAY = 31;
-constexpr uint32_t TR_BLOCKING = 32;
-constexpr uint32_t TR_SIGNAL_BUFFER = 33;
-constexpr uint32_t TR_UPDATE_BUFFER = 34;
-constexpr uint32_t TR_RAIL90 = 35;
-constexpr uint32_t TR_EXIT_DIR = 36;
-constexpr uint32_t TR_REACH_TRACKS = 37;
-constexpr uint32_t TR_REACH_DIRS = 38;
-constexpr uint32_t TR_CROSS_TRACKS = 39;
-constexpr uint32_t TR_CROSS_DIRS = 40;
-constexpr uint32_t TR_ENTER_TD = 41;
-constexpr uint32_t TR_TILE_ADD = 42;
-constexpr uint32_t TR_TILE_OFFSET = 43;
-constexpr uint32_t TR_SAFE = 44;
-constexpr uint32_t TR_FREE = 45;
-constexpr uint32_t TR_TRY_TRACK = 46;
-constexpr uint32_t TR_DEPOT_RESERVED = 47;
-constexpr uint32_t TR_SET_DEPOT = 48;
-constexpr uint32_t TR_TRACK_STATUS = 49;
-constexpr uint32_t TR_DIAG_REACH_DIRS = 50;
-constexpr uint32_t TR_TRACKDIR = 51;
-constexpr uint32_t TR_ALL_COMPAT = 52;
-constexpr uint32_t TR_ORDER_STOP = 53;
-constexpr uint32_t TR_STUCK = 54;
-constexpr uint32_t TR_START_STOP = 55;
-constexpr uint32_t TR_PATH_RESULT = 56;
-constexpr uint32_t TR_SAVE_ORDER = 57;
-constexpr uint32_t TR_RESTORE_ORDER = 58;
-constexpr uint32_t TR_WRITE_DEST = 59;
-constexpr uint32_t TR_WRITE_LAST = 60;
-constexpr uint32_t TR_WRITE_SUPPRESS = 61;
-constexpr uint32_t TR_ORDER_TYPE = 62;
-constexpr uint32_t TR_ORDER_SERVICE = 63;
-constexpr uint32_t TR_NEEDS_SERVICE = 64;
-constexpr uint32_t TR_COPY_ORDER = 65;
-constexpr uint32_t TR_SET_DEPOT_DEST = 66;
-constexpr uint32_t TR_STATION_TRAIN = 67;
-constexpr uint32_t TR_STATION_XY = 68;
-constexpr uint32_t TR_INCREMENT_ORDER = 69;
-constexpr uint32_t TR_DIAG_TRACK = 70;
-constexpr uint32_t TR_BITS_TRACK = 71;
-constexpr uint32_t TR_STATION_RAIL = 73;
-constexpr uint32_t TR_CHECK_REVERSE = 74;
-constexpr uint32_t TR_CONDITIONAL = 75;
-constexpr uint32_t TR_SERVICE = 76;
-constexpr uint32_t TR_PROFILE = 77;
 #endif
