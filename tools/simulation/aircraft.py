@@ -689,8 +689,9 @@ def check_breakdown(scenario, run, mode, role, result):
         )
     ):
         raise RuntimeError("breakdown loading boundary moved or departed")
-    # Stock engine238 is FFP Dart: max speed (74*128)/10=947. International
-    # position38 has NoSpeedClamp/SlowTurn, so neither limit selects 320 itself.
+    # Stock engine238 (aircraft 23) is Dinger 100: max speed (74*128)/10=947.
+    # International position38 has NoSpeedClamp/SlowTurn, so neither limit
+    # selects 320 itself.
     if (
         b[common + "tick_counter"] != tick + 1
         or save_moment(final)[2] != save_moment(source)[2] + 1
