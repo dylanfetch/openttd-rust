@@ -4,10 +4,10 @@ Root owns selection here; `AGENTS.md` and `docs/rust-migration.md` define proces
 If an issue conflicts, follow this roadmap and report it to root. Keep this
 forward-looking, about 200 lines; completed work is one row, with evidence in PRs.
 
-## Where the fork stands (2026-10-09, `d8aed8754f`)
+## Where the fork stands (2026-10-09, `65ff465080`)
 
-- Twenty-one ownership ports retire about 30.2k original C++ lines, about 7.9%
-  of roughly 384k non-vendored `src/` lines. Untouched simulation remains large:
+- Twenty-two ownership ports (fleet #197 added) retire about 32.5k original C++
+  lines, about 8.5% of roughly 384k non-vendored `src/` lines. Untouched simulation remains large:
   `rail_cmd`, `road_cmd`, `water_cmd`, `tunnelbridge_cmd`, `clear_cmd`, most of
   `vehicle.cpp` and `vehicle_cmd.cpp`, and the tile loops they drive.
 - Aircraft #194 integrated; with #193 it measures (paired, loaded host) Opus
@@ -18,7 +18,8 @@ forward-looking, about 200 lines; completed work is one row, with evidence in PR
   and map accessors; #199 must shrink it.
 - Witnesses: train, ship and aircraft branch witnesses now run and fail by
   default (#196, #204). Unreached branches are listed in #156.
-- Four unintegrated branches: train #195, fleet #197, trees #202, industry #203.
+- Train #195, industry #205, fleet #197 and hasher #207 integrated. Three
+  unintegrated branches: trees #208, company #209, #199 road (no PR yet).
 
 ## Sixth steering review (2026-10-09)
 
@@ -35,7 +36,7 @@ Corrections, in order:
 2. **Done:** cited train and ship witnesses run and fail by default (#204). The
    shared witness facility replacing the per-port writers (#198 remainder) is
    part of #199's first PR.
-3. **Done in #197 (not yet integrated):** fleet's `NEW_GROUP` sentinel, the
+3. **Done in #197 (integrated `a7a6e6650a`):** fleet's `NEW_GROUP` sentinel, the
    per-Vehicle `Box<u16>`, positional tables and dead wrappers are fixed, and
    `fleet-drain`/`fleet-drain-cash` witness the tick-end drain.
 4. **Done:** aircraft #194, UTF-8 #193 and train #195 are integrated. #193 is a
@@ -95,6 +96,7 @@ Metrics are `tools/port-metrics.py`: Rust / tooling / C++ glue / C++ retired.
 | #139 | Cargo storage and movement | #151 via #184 | `2a76d5f287` | 2838 / 460 / 973 / 2445 |
 | #138 | Orders lifecycle and commands | #176 via #184 | `2a76d5f287` | 4554 / 519 / 1752 / 2518 |
 | #146 | Ship controller and private state | #152 via #184 | `2a76d5f287` | 1101 / 270 / 893 / 721 |
+| #147 | Fleet groups and autoreplace | #197 | `a7a6e6650a` | 2686 / 577 / 1199 / 1454 |
 
 Harness and process: #72 harness (#85), #84 play saves (#87), #97 provenance
 freeze (#100), #88 Ruff (#92), #75 partial-pixel fidelity (#91), #90 world-state
@@ -118,6 +120,8 @@ attributed review reports retain evidence; batch totals are above.
 | #198 (enforcement) | #204 | direct | `c0c67a3dd4` | 0 / 147 / 0 / 0 |
 | #190 (#168 aircraft) | #194 | direct | `d8aed8754f` | 1279 / 352 / 1300 / 247 |
 | #189 (#168 train) | #195 | direct | `3a2e8f6a10` | 4263 / 91 / 2812 / 853 |
+| #203 (#168 industry) | #205 | direct | `9025f623e0` | 450 / 8 / 278 / 16 |
+| #206 (YAPF hasher) | #207 | direct | `65ff465080` | 95 / 0 / 0 / 0 |
 
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -148,11 +152,10 @@ Integration of reviewed work comes before new starts. Never hold more than six
 unintegrated component branches (#157). Independent items (#156 slices) may run
 in parallel with this list.
 
-1. **Integrate the drafts:** fleet #197 (base merged, ABI IDs moved to 390-396),
-   then industry #205, trees #202 and the YAPF hasher #206. Preserve fleet's
-   full native CommandCost and its quirks.
-2. **#199 shared vehicle and map layer**, one PR per vehicle type, starting once
-   train and aircraft are integrated. Report crossings per vehicle tick.
+1. **Integrate the drafts:** trees #208, then company #209 (see checkpoint).
+2. **#199 shared vehicle and map layer**, one PR per vehicle type; PR1 (road,
+   shared module, witness facility) is in progress. Report crossings per
+   vehicle tick.
 3. **#168 remaining conversions, one PR per component:** trees, industry tick
    read, company #192 (StopAI direct; only proven startup/post VM exceptions use
    stack continuation records), station tick and loading, town, disaster, then
@@ -167,18 +170,16 @@ map crossings are 5-11% of reference time. #199 decides vehicle state access.
 
 ## Resume checkpoint
 
-Sixth steering items 1-4 are applied; items 5-7 are in progress through #199,
-#202 and #203. #199 PR1 (road, shared module, witness facility) can start now
-that train is integrated, once a branch slot frees.
+A Claude Code session hit its session limit twice. The wrap-up session
+finished its interrupted integrations (#195, #205, #197, #207) and saved the
+rest as below. No agents or background runs are active. Sixth steering items
+1-4 are applied; items 5-7 continue through #199 and #168.
 
 | Issue / PR | Branch (worktree suffix), head | State and next step |
 | --- | --- | --- |
-| #147 / #197 | `fleet-replacement-ownership-147` (`fleet-replacement`), `1b58826085` | Reviewed. Base merged; root moved ABI IDs to 390-396: verify, default suite, fresh review of that fix, timing, full CI. |
-| #203 / #205 | `industry-typed-203` (`industry-typed-203`) | Under review; the reviewer splits the slot-storage opcode entry (local `e991d76622`). Then base merge, timing, full CI. |
-| #202 | `trees-direct-202` (`trees-direct-202`) | Implemented locally; rebase, evidence, draft PR. |
-| #206 | `yapf-hasher-206` (`yapf-hasher-206`) | Implemented; evidence, draft PR. Root lowers the caps from an idle run here. |
-| #192 / #168 | `company-direct-192` (`company-direct-192`) | Implementation in progress. |
-| #199 | none | PR1 plan and root decisions on the issue; starts when a slot frees. |
+| #202 / #208 | `trees-direct-202` (`trees-direct-202`), `fb06f22ddd` | Review interrupted, not concluded (PR comment lists its passing checks; gaps on #156). Fresh reviewer, base merge, timing, full CI. |
+| #192 / #209 | `company-direct-192` (`company-direct-192`), `06a219d447` | Reviewed; fix `06a219d447` verified by root. Root decides finding 2: the cited 40320-case financial probe must run by default (AGENTS witness rule) or stop being cited. #156 entry owed. Then base merge, timing, full CI. |
+| #199 PR1 | `shared-layer-road-199` (`shared-layer-road-199`), `04711fa568` | Agent stopped mid-implementation; work saved as is (issue comment). Builds; road scenarios equal. Finish, default suite, rebase, draft PR. |
 
 Preserve the pinned reference, paused curve worktrees and evidence branches
 `evidence-disaster-vehicles` (`a775543162`) and `evidence-water-regions`
