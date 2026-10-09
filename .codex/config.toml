@@ -1,5 +1,5 @@
-# Root effort keeps every delegated Astra planning/review task below root.
-model = "gpt-6-astra"
+# Root effort keeps every delegated planning/review task below root.
+model = "gpt-6.1-sol"
 model_reasoning_effort = "xhigh"
 
 # Five workers plus the orchestrator: six agents total.
