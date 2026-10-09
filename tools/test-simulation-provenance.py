@@ -289,6 +289,40 @@ class SimulationSpeedTests(unittest.TestCase):
         with self.assertRaises(ChildProcessError):
             os.waitpid(child.pid, os.WNOHANG)
 
+    def test_benchmark_reaps_child_on_wait_or_watchdog_start_failure(self):
+        for failure in (KeyboardInterrupt, RuntimeError, "start"):
+            with self.subTest(failure=failure):
+                child = subprocess.Popen(["sleep", "60"])
+                wait = child.wait
+                error = RuntimeError if failure == "start" else failure
+                interrupted = failure != "start"
+
+                def interrupted_wait(error=error, wait=wait):
+                    nonlocal interrupted
+                    if interrupted:
+                        interrupted = False
+                        raise error()
+                    return wait(timeout=1)
+
+                try:
+                    with (
+                        patch.object(simulate.subprocess, "Popen", return_value=child),
+                        patch.object(child, "wait", side_effect=interrupted_wait),
+                        patch.object(
+                            simulate.threading.Timer, "start", side_effect=error()
+                        )
+                        if failure == "start"
+                        else contextlib.nullcontext(),
+                        self.assertRaises(error),
+                    ):
+                        simulate.benchmark_run(["sleep", "60"], timeout=5)
+                    self.assertIsNotNone(child.returncode)
+                    with self.assertRaises(ChildProcessError):
+                        os.waitpid(child.pid, os.WNOHANG)
+                finally:
+                    child.kill()
+                    wait()
+
     def exercise(self, *, difference=False, exit_code=0):
         with tempfile.TemporaryDirectory() as directory:
             out = Path(directory)

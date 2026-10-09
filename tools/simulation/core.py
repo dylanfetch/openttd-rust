@@ -414,12 +414,17 @@ def benchmark_run(command, *, timeout, **kwargs):
             child.kill()
 
         watchdog = threading.Timer(timeout, kill)
-        watchdog.start()
         try:
+            watchdog.start()
             code = child.wait()
+        except BaseException:
+            child.kill()
+            child.wait()
+            raise
         finally:
             watchdog.cancel()
-            watchdog.join()
+            if watchdog.ident is not None:
+                watchdog.join()
         if expired.is_set():
             raise subprocess.TimeoutExpired(command, timeout)
         return subprocess.CompletedProcess(command, code)
