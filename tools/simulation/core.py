@@ -25,6 +25,7 @@ import statistics
 import struct
 import subprocess
 import sys
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -403,6 +404,27 @@ def game_slot(isolate):
         yield
 
 
+def benchmark_run(command, *, timeout, **kwargs):
+    """Wait without polling; the watchdog kills and the caller reaps on timeout."""
+    with subprocess.Popen(command, **kwargs) as child:
+        expired = threading.Event()
+
+        def kill():
+            expired.set()
+            child.kill()
+
+        watchdog = threading.Timer(timeout, kill)
+        watchdog.start()
+        try:
+            code = child.wait()
+        finally:
+            watchdog.cancel()
+            watchdog.join()
+        if expired.is_set():
+            raise subprocess.TimeoutExpired(command, timeout)
+        return subprocess.CompletedProcess(command, code)
+
+
 def run_game(
     scenario,
     binary,
@@ -466,7 +488,7 @@ def run_game(
     ):
         started = time.monotonic()
         try:
-            code = subprocess.run(
+            code = (benchmark_run if isolate else subprocess.run)(
                 [
                     sys.executable,
                     str(ROOT / "tools/simulation/game_launcher.py"),

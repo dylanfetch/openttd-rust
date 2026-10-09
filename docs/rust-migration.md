@@ -235,8 +235,9 @@ are total offline times, not normal threaded frame latency. It retains the final
 pair and runtimes; `plain_commands` supplies arguments for optional `perf record`
 replay through `tools/simulation/game_launcher.py`. Preserve the run's HOME/XDG
 directories and runtime libraries; keep profiling separate from timing samples.
-Timings include startup, loading, serial link-graph work and save I/O; subprocess
-timeout polling can add about 50 ms.
+Timings include startup, loading, serial link-graph work and save I/O. Benchmark
+games wait directly for child exit with a timeout watchdog; ordinary runs retain
+subprocess timeout polling, which can add about 50 ms.
 The lock excludes harness games, not unrelated host activity. Port PRs record
 before/after ratios and commits; the roadmap sets the regression budget.
 

@@ -9,6 +9,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -272,6 +273,22 @@ class SimulationProvenanceTests(unittest.TestCase):
 
 
 class SimulationSpeedTests(unittest.TestCase):
+    def test_benchmark_wait_accuracy_and_timeout_cleanup(self):
+        started = time.monotonic()
+        self.assertEqual(
+            simulate.benchmark_run(["sleep", "0.32"], timeout=5).returncode, 0
+        )
+        self.assertLess(abs(time.monotonic() - started - 0.32), 0.005)
+        child = subprocess.Popen(["sleep", "60"])
+        with (
+            patch.object(simulate.subprocess, "Popen", return_value=child),
+            self.assertRaises(subprocess.TimeoutExpired),
+        ):
+            simulate.benchmark_run(["sleep", "60"], timeout=0.02)
+        self.assertIsNotNone(child.returncode)
+        with self.assertRaises(ChildProcessError):
+            os.waitpid(child.pid, os.WNOHANG)
+
     def exercise(self, *, difference=False, exit_code=0):
         with tempfile.TemporaryDirectory() as directory:
             out = Path(directory)
