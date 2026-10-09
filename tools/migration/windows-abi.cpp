@@ -19,6 +19,7 @@
 #include "rust/trees_ffi.h"
 #include "rust/disaster_ffi.h"
 #include "rust/aircraft_ffi.h"
+#include "aircraft-boundary.hpp"
 #include "rust/townname_ffi.h"
 #include "rust/effect_ffi.h"
 #include "rust/road_ffi.h"
@@ -163,7 +164,14 @@ static void Layouts()
 	Layout(47, "OpenTTDWaterSnapshot", {sizeof(OpenTTDWaterSnapshot), alignof(OpenTTDWaterSnapshot), offsetof(OpenTTDWaterSnapshot, edges), offsetof(OpenTTDWaterSnapshot, labels), offsetof(OpenTTDWaterSnapshot, patches), offsetof(OpenTTDWaterSnapshot, aqueducts)});
 	Layout(48, "OpenTTDWaterLeaves", {sizeof(OpenTTDWaterLeaves), alignof(OpenTTDWaterLeaves), offsetof(OpenTTDWaterLeaves, tracks), offsetof(OpenTTDWaterLeaves, follow), offsetof(OpenTTDWaterLeaves, aqueduct), offsetof(OpenTTDWaterLeaves, debug)});
 	Layout(180, "OpenTTDAircraftState", {sizeof(OpenTTDAircraftState), alignof(OpenTTDAircraftState), offsetof(OpenTTDAircraftState, cached_max_range_sqr), offsetof(OpenTTDAircraftState, cached_max_range), offsetof(OpenTTDAircraftState, cache_padding), offsetof(OpenTTDAircraftState, crashed_counter), offsetof(OpenTTDAircraftState, targetairport), offsetof(OpenTTDAircraftState, pos), offsetof(OpenTTDAircraftState, previous_pos), offsetof(OpenTTDAircraftState, state), offsetof(OpenTTDAircraftState, last_direction), offsetof(OpenTTDAircraftState, number_consecutive_turns), offsetof(OpenTTDAircraftState, turn_counter), offsetof(OpenTTDAircraftState, flags)});
-	Layout(181, "OpenTTDAircraftAction", {sizeof(OpenTTDAircraftAction), alignof(OpenTTDAircraftAction), offsetof(OpenTTDAircraftAction, kind), offsetof(OpenTTDAircraftAction, id), offsetof(OpenTTDAircraftAction, other), offsetof(OpenTTDAircraftAction, a), offsetof(OpenTTDAircraftAction, b), offsetof(OpenTTDAircraftAction, c), offsetof(OpenTTDAircraftAction, d)});
+	Layout(181, "OpenTTDAircraftVehicle", {sizeof(OpenTTDAircraftVehicle), alignof(OpenTTDAircraftVehicle), offsetof(OpenTTDAircraftVehicle, handle), offsetof(OpenTTDAircraftVehicle, state), offsetof(OpenTTDAircraftVehicle, id)});
+	Layout(182, "OpenTTDAircraftNode", {sizeof(OpenTTDAircraftNode), alignof(OpenTTDAircraftNode), offsetof(OpenTTDAircraftNode, next), offsetof(OpenTTDAircraftNode, blocks), offsetof(OpenTTDAircraftNode, position), offsetof(OpenTTDAircraftNode, next_position), offsetof(OpenTTDAircraftNode, heading)});
+	Layout(183, "OpenTTDAircraftMoving", {sizeof(OpenTTDAircraftMoving), alignof(OpenTTDAircraftMoving), offsetof(OpenTTDAircraftMoving, x), offsetof(OpenTTDAircraftMoving, y), offsetof(OpenTTDAircraftMoving, flags), offsetof(OpenTTDAircraftMoving, direction)});
+	Layout(184, "OpenTTDAircraftPosition", {sizeof(OpenTTDAircraftPosition), alignof(OpenTTDAircraftPosition), offsetof(OpenTTDAircraftPosition, x), offsetof(OpenTTDAircraftPosition, y), offsetof(OpenTTDAircraftPosition, tile)});
+	Layout(185, "OpenTTDAircraftLeaves", {sizeof(OpenTTDAircraftLeaves), alignof(OpenTTDAircraftLeaves), offsetof(OpenTTDAircraftLeaves, subtype), offsetof(OpenTTDAircraftLeaves, x), offsetof(OpenTTDAircraftLeaves, set_x), offsetof(OpenTTDAircraftLeaves, y), offsetof(OpenTTDAircraftLeaves, set_y), offsetof(OpenTTDAircraftLeaves, z), offsetof(OpenTTDAircraftLeaves, set_z), offsetof(OpenTTDAircraftLeaves, tile), offsetof(OpenTTDAircraftLeaves, set_tile), offsetof(OpenTTDAircraftLeaves, direction), offsetof(OpenTTDAircraftLeaves, set_direction), offsetof(OpenTTDAircraftLeaves, tick_counter), offsetof(OpenTTDAircraftLeaves, set_tick_counter), offsetof(OpenTTDAircraftLeaves, owner), offsetof(OpenTTDAircraftLeaves, vehicle_status), offsetof(OpenTTDAircraftLeaves, set_vehicle_status), offsetof(OpenTTDAircraftLeaves, current_speed), offsetof(OpenTTDAircraftLeaves, set_current_speed), offsetof(OpenTTDAircraftLeaves, subspeed), offsetof(OpenTTDAircraftLeaves, set_subspeed), offsetof(OpenTTDAircraftLeaves, progress), offsetof(OpenTTDAircraftLeaves, set_progress), offsetof(OpenTTDAircraftLeaves, acceleration), offsetof(OpenTTDAircraftLeaves, maximum_speed), offsetof(OpenTTDAircraftLeaves, set_maximum_speed), offsetof(OpenTTDAircraftLeaves, set_breakdown_counter), offsetof(OpenTTDAircraftLeaves, order_type), offsetof(OpenTTDAircraftLeaves, order_destination), offsetof(OpenTTDAircraftLeaves, running_ticks), offsetof(OpenTTDAircraftLeaves, set_running_ticks), offsetof(OpenTTDAircraftLeaves, order_time), offsetof(OpenTTDAircraftLeaves, set_order_time), offsetof(OpenTTDAircraftLeaves, day_counter), offsetof(OpenTTDAircraftLeaves, set_day_counter), offsetof(OpenTTDAircraftLeaves, profit), offsetof(OpenTTDAircraftLeaves, set_profit), offsetof(OpenTTDAircraftLeaves, last_station), offsetof(OpenTTDAircraftLeaves, set_last_station), offsetof(OpenTTDAircraftLeaves, set_economy_service), offsetof(OpenTTDAircraftLeaves, set_calendar_service), offsetof(OpenTTDAircraftLeaves, set_breakdowns), offsetof(OpenTTDAircraftLeaves, set_reliability), offsetof(OpenTTDAircraftLeaves, set_cargo_age), offsetof(OpenTTDAircraftLeaves, next), offsetof(OpenTTDAircraftLeaves, map_size_x), offsetof(OpenTTDAircraftLeaves, map_max_x), offsetof(OpenTTDAircraftLeaves, map_max_y), offsetof(OpenTTDAircraftLeaves, plane_speed), offsetof(OpenTTDAircraftLeaves, no_jetcrash), offsetof(OpenTTDAircraftLeaves, plane_crashes), offsetof(OpenTTDAircraftLeaves, service_at_helipad), offsetof(OpenTTDAircraftLeaves, disaster_sound), offsetof(OpenTTDAircraftLeaves, economy_date), offsetof(OpenTTDAircraftLeaves, calendar_date), offsetof(OpenTTDAircraftLeaves, station), offsetof(OpenTTDAircraftLeaves, airport_tile), offsetof(OpenTTDAircraftLeaves, station_tile), offsetof(OpenTTDAircraftLeaves, rotation), offsetof(OpenTTDAircraftLeaves, airport_width), offsetof(OpenTTDAircraftLeaves, airport_height), offsetof(OpenTTDAircraftLeaves, airport_type), offsetof(OpenTTDAircraftLeaves, station_owner), offsetof(OpenTTDAircraftLeaves, has_hangar), offsetof(OpenTTDAircraftLeaves, has_airport), offsetof(OpenTTDAircraftLeaves, airport_fta), offsetof(OpenTTDAircraftLeaves, airport_blocks), offsetof(OpenTTDAircraftLeaves, had_vehicle), offsetof(OpenTTDAircraftLeaves, dummy_airport), offsetof(OpenTTDAircraftLeaves, airport_elements), offsetof(OpenTTDAircraftLeaves, helipads), offsetof(OpenTTDAircraftLeaves, airport_flags), offsetof(OpenTTDAircraftLeaves, airport_delta_z), offsetof(OpenTTDAircraftLeaves, node), offsetof(OpenTTDAircraftLeaves, fta), offsetof(OpenTTDAircraftLeaves, moving), offsetof(OpenTTDAircraftLeaves, engine_speed), offsetof(OpenTTDAircraftLeaves, engine_subtype), offsetof(OpenTTDAircraftLeaves, engine_sound), offsetof(OpenTTDAircraftLeaves, engine_reliability), offsetof(OpenTTDAircraftLeaves, vehicle_type), offsetof(OpenTTDAircraftLeaves, slope), offsetof(OpenTTDAircraftLeaves, tile_height), offsetof(OpenTTDAircraftLeaves, airport_entry), offsetof(OpenTTDAircraftLeaves, direction_towards), offsetof(OpenTTDAircraftLeaves, new_position), offsetof(OpenTTDAircraftLeaves, hangar_height), offsetof(OpenTTDAircraftLeaves, terminal_count), offsetof(OpenTTDAircraftLeaves, hangar_exit), offsetof(OpenTTDAircraftLeaves, can_use_station), offsetof(OpenTTDAircraftLeaves, service_interval), offsetof(OpenTTDAircraftLeaves, needs_service), offsetof(OpenTTDAircraftLeaves, chain_in_depot), offsetof(OpenTTDAircraftLeaves, waiting_unbunching), offsetof(OpenTTDAircraftLeaves, nearest_depot_order), offsetof(OpenTTDAircraftLeaves, part_of_orders), offsetof(OpenTTDAircraftLeaves, next_station), offsetof(OpenTTDAircraftLeaves, next_aircraft), offsetof(OpenTTDAircraftLeaves, random), offsetof(OpenTTDAircraftLeaves, update_position), offsetof(OpenTTDAircraftLeaves, rotor_image), offsetof(OpenTTDAircraftLeaves, copy_sprite), offsetof(OpenTTDAircraftLeaves, position_viewport), offsetof(OpenTTDAircraftLeaves, create_effect), offsetof(OpenTTDAircraftLeaves, dirty_start_stop), offsetof(OpenTTDAircraftLeaves, play_sound), offsetof(OpenTTDAircraftLeaves, truncate_cargo), offsetof(OpenTTDAircraftLeaves, crash_news), offsetof(OpenTTDAircraftLeaves, station_rating), offsetof(OpenTTDAircraftLeaves, landing_rating), offsetof(OpenTTDAircraftLeaves, free_order), offsetof(OpenTTDAircraftLeaves, service_in_depot), offsetof(OpenTTDAircraftLeaves, leave_unbunching), offsetof(OpenTTDAircraftLeaves, dirty_depot), offsetof(OpenTTDAircraftLeaves, first_arrival), offsetof(OpenTTDAircraftLeaves, begin_loading), offsetof(OpenTTDAircraftLeaves, dirty_details), offsetof(OpenTTDAircraftLeaves, update_delta), offsetof(OpenTTDAircraftLeaves, touchdown_animation), offsetof(OpenTTDAircraftLeaves, destination_too_far), offsetof(OpenTTDAircraftLeaves, delete_range_news), offsetof(OpenTTDAircraftLeaves, handle_breakdown), offsetof(OpenTTDAircraftLeaves, handle_loading), offsetof(OpenTTDAircraftLeaves, service_order), offsetof(OpenTTDAircraftLeaves, dummy_order), offsetof(OpenTTDAircraftLeaves, age_vehicle), offsetof(OpenTTDAircraftLeaves, economy_age), offsetof(OpenTTDAircraftLeaves, decrease_value), offsetof(OpenTTDAircraftLeaves, check_orders), offsetof(OpenTTDAircraftLeaves, check_breakdown), offsetof(OpenTTDAircraftLeaves, running_cost), offsetof(OpenTTDAircraftLeaves, subtract_cost), offsetof(OpenTTDAircraftLeaves, dirty_lists), offsetof(OpenTTDAircraftLeaves, next_stopping_station), offsetof(OpenTTDAircraftLeaves, remove_depot_orders), offsetof(OpenTTDAircraftLeaves, assert_flying), offsetof(OpenTTDAircraftLeaves, invalid_movement), offsetof(OpenTTDAircraftLeaves, invalid_position), offsetof(OpenTTDAircraftLeaves, invalid_scheme), offsetof(OpenTTDAircraftLeaves, unreachable), offsetof(OpenTTDAircraftLeaves, speed_property), offsetof(OpenTTDAircraftLeaves, cargo_age_property), offsetof(OpenTTDAircraftLeaves, range_property), offsetof(OpenTTDAircraftLeaves, start_sound), offsetof(OpenTTDAircraftLeaves, touchdown_sound), offsetof(OpenTTDAircraftLeaves, rotor_image_if_changed), offsetof(OpenTTDAircraftLeaves, update_rotor_image), offsetof(OpenTTDAircraftLeaves, process_orders), offsetof(OpenTTDAircraftLeaves, enter_depot), offsetof(OpenTTDAircraftLeaves, vehicle_crash), offsetof(OpenTTDAircraftLeaves, delete_aircraft), offsetof(OpenTTDAircraftLeaves, send_to_depot), offsetof(OpenTTDAircraftLeaves, sample_count), offsetof(OpenTTDAircraftLeaves, helicopter_sound), offsetof(OpenTTDAircraftLeaves, explosion_sound), offsetof(OpenTTDAircraftLeaves, skid_sound), offsetof(OpenTTDAircraftLeaves, ticks_per_year), offsetof(OpenTTDAircraftLeaves, fta_blocks), offsetof(OpenTTDAircraftLeaves, fta_heading), offsetof(OpenTTDAircraftLeaves, fta_next_position), offsetof(OpenTTDAircraftLeaves, fta_next), offsetof(OpenTTDAircraftLeaves, block_node), offsetof(OpenTTDAircraftLeaves, route_node), offsetof(OpenTTDAircraftLeaves, block_choice)});
+	Layout(186, "OpenTTDAircraftBlockNode", {sizeof(OpenTTDAircraftBlockNode), alignof(OpenTTDAircraftBlockNode), offsetof(OpenTTDAircraftBlockNode, blocks), offsetof(OpenTTDAircraftBlockNode, position), offsetof(OpenTTDAircraftBlockNode, next_position)});
+	Layout(187, "OpenTTDAircraftRouteNode", {sizeof(OpenTTDAircraftRouteNode), alignof(OpenTTDAircraftRouteNode), offsetof(OpenTTDAircraftRouteNode, next), offsetof(OpenTTDAircraftRouteNode, next_position), offsetof(OpenTTDAircraftRouteNode, heading)});
+	Layout(188, "OpenTTDAircraftBlockChoice", {sizeof(OpenTTDAircraftBlockChoice), alignof(OpenTTDAircraftBlockChoice), offsetof(OpenTTDAircraftBlockChoice, next), offsetof(OpenTTDAircraftBlockChoice, blocks), offsetof(OpenTTDAircraftBlockChoice, heading)});
 
 	Layout(340, "OpenTTDTrainHandle", {sizeof(OpenTTDTrainHandle), alignof(OpenTTDTrainHandle), offsetof(OpenTTDTrainHandle, shell), offsetof(OpenTTDTrainHandle, owner)});
 	Layout(341, "OpenTTDTrainConsistChangedRead", {sizeof(OpenTTDTrainConsistChangedRead), alignof(OpenTTDTrainConsistChangedRead), offsetof(OpenTTDTrainConsistChangedRead, engine), offsetof(OpenTTDTrainConsistChangedRead, front)});
@@ -1411,6 +1419,79 @@ static void ShipBoundary()
 	CHECK(openttd_rust_ship_get_rotation_x(state.get()) == 0 && openttd_rust_ship_get_rotation(state.get()) == 255);
 	std::printf("ship scalar widths, native transient narrowing, direct order and nested owner mutation passed\n");
 }
+/* Direct callbacks reenter with the same live scalar allocation. Deletion models
+ * Aircraft::PreDestructor releasing airport blocks before freeing that owner. */
+static struct AircraftBoundaryProbe {
+	OpenTTDAircraftLeaves leaves;
+	OpenTTDAircraftVehicle vehicle;
+	uint64_t blocks = UINT64_MAX;
+	unsigned orders = 0, deleted = 0;
+	uint16_t maximum_speed = 0, cargo_age = 0;
+	bool live = true;
+} aircraft_probe;
+static void AircraftDirectBoundary()
+{
+	auto &p = aircraft_probe;
+	p.leaves = AircraftTestLeaves();
+	auto &leaves = p.leaves;
+	leaves.vehicle_status = [](OpenTTDAircraftVehicle) noexcept { CHECK(aircraft_probe.live); return uint8_t{0}; };
+	leaves.order_type = [](OpenTTDAircraftVehicle) noexcept { return uint8_t{3}; };
+	leaves.handle_breakdown = [](OpenTTDAircraftVehicle) noexcept {};
+	leaves.handle_loading = [](OpenTTDAircraftVehicle, bool) noexcept {};
+	leaves.process_orders = [](OpenTTDAircraftVehicle v) noexcept {
+		CHECK(aircraft_probe.live);
+		aircraft_probe.orders++;
+		openttd_rust_aircraft_cache(&aircraft_probe.leaves, v, true);
+		v.state->pos = 19;
+	};
+	leaves.speed_property = [](OpenTTDAircraftVehicle) noexcept { return uint32_t{200}; };
+	leaves.cargo_age_property = [](OpenTTDAircraftVehicle) noexcept { return uint32_t{71}; };
+	leaves.range_property = [](OpenTTDAircraftVehicle) noexcept { return uint32_t{41}; };
+	leaves.set_maximum_speed = [](OpenTTDAircraftVehicle, uint16_t speed) noexcept { aircraft_probe.maximum_speed = speed; };
+	leaves.set_cargo_age = [](OpenTTDAircraftVehicle, uint16_t age) noexcept { aircraft_probe.cargo_age = age; };
+	leaves.next = [](OpenTTDAircraftVehicle v) noexcept { return v; };
+	p.vehicle = {&p, openttd_rust_aircraft_state_new(), 17};
+	CHECK(openttd_rust_aircraft_event(&leaves, p.vehicle, false));
+	CHECK(p.orders == 1 && p.vehicle.state->pos == 19 && p.vehicle.state->cached_max_range == 41 && p.vehicle.state->cached_max_range_sqr == 1681);
+	CHECK(p.maximum_speed == 2560 && p.cargo_age == 71);
+	leaves.vehicle_status = [](OpenTTDAircraftVehicle) noexcept { CHECK(aircraft_probe.live); return uint8_t{128}; };
+	leaves.station = [](uint16_t) noexcept -> const void * { CHECK(aircraft_probe.live); return &aircraft_probe; };
+	leaves.airport_tile = [](const void *) noexcept { return uint32_t{7}; };
+	leaves.airport_fta = [](const void *s) noexcept -> const void * { return s; };
+	leaves.airport_blocks = [](const void *) noexcept { CHECK(aircraft_probe.live); return &aircraft_probe.blocks; };
+	leaves.node = [](const void *ap, uint8_t) noexcept -> const void * { return ap; };
+	leaves.fta = [](const void *) noexcept { return OpenTTDAircraftNode{nullptr, uint64_t{1} << 9, 0, 0, 0}; };
+	leaves.fta_blocks = [](const void *) noexcept { return uint64_t{1} << 9; };
+	leaves.delete_aircraft = [](OpenTTDAircraftVehicle v) noexcept {
+		CHECK(aircraft_probe.live && v.state->crashed_counter == 10002);
+		openttd_rust_aircraft_release_blocks(&aircraft_probe.leaves, v);
+		CHECK((aircraft_probe.blocks & ((uint64_t{1} << 8) | (uint64_t{1} << 9) | (uint64_t{1} << 29))) == 0);
+		openttd_rust_aircraft_state_destroy(v.state);
+		aircraft_probe.live = false;
+		aircraft_probe.deleted++;
+	};
+	p.vehicle.state->targetairport = 7;
+	p.vehicle.state->crashed_counter = 9999;
+	CHECK(!openttd_rust_aircraft_event(&leaves, p.vehicle, false));
+	CHECK(!p.live && p.deleted == 1);
+	/* A disaster has its own flags and no Aircraft state, even with subtype zero. */
+	leaves.map_size_x = []() noexcept { return uint32_t{64}; };
+	leaves.map_max_x = leaves.map_max_y = []() noexcept { return uint32_t{63}; };
+	leaves.x = leaves.y = leaves.z = [](OpenTTDAircraftVehicle v) noexcept { CHECK(v.state == nullptr); return int32_t{0}; };
+	leaves.tile_height = [](uint32_t) noexcept { return int32_t{0}; };
+	leaves.subtype = [](OpenTTDAircraftVehicle) noexcept { return uint8_t{0}; };
+	leaves.vehicle_type = [](OpenTTDAircraftVehicle) noexcept { return uint8_t{4}; };
+	leaves.direction = [](OpenTTDAircraftVehicle) noexcept { return uint8_t{4}; };
+	leaves.maximum_speed = [](OpenTTDAircraftVehicle) noexcept { return uint16_t{1}; };
+	uint8_t disaster_flags = 0;
+	int32_t min = 0, max = 0;
+	OpenTTDAircraftVehicle disaster{&p, nullptr, 81};
+	openttd_rust_aircraft_flight_bounds(&leaves, disaster, &min, &max);
+	CHECK(min == 30 && max == 270);
+	CHECK(openttd_rust_aircraft_flight_level(&leaves, disaster, &disaster_flags, false) == 1 && disaster_flags == 4);
+	CHECK(openttd_rust_aircraft_flight_level(&leaves, disaster, &disaster_flags, true) == 2 && disaster_flags == 4);
+	std::printf("aircraft direct nested mutation, live block release/deletion and disaster flight identity passed\n");
+}
 static void AircraftOwnership()
 {
 	std::unique_ptr<OpenTTDAircraftState, decltype(&openttd_rust_aircraft_state_destroy)> state{openttd_rust_aircraft_state_new(), openttd_rust_aircraft_state_destroy};
@@ -1435,6 +1516,7 @@ int main()
 	Trees();
 	Disasters();
 	AircraftOwnership();
+	AircraftDirectBoundary();
 	/* Opaque owner, native size_t, immutable byte borrow and complete UTF-8 output. */
 	auto *townname = openttd_rust_townname_generate(1, UINT32_MAX);
 	size_t name_length;

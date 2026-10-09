@@ -49,8 +49,15 @@ class MigrationAircraftController extends AIController {
 			print("AIRCRAFT-ACTION crash true");
 			while (true) this.Sleep(1000);
 		}
+		if (AIRCRAFT_ACTION == "orphan") {
+			/* Airborne plane loses every order, then its target airport: HandleMissingAircraftOrders. */
+			foreach (vehicle, unused in AIVehicleList()) {
+				if (AIEngine.GetPlaneType(AIVehicle.GetEngineType(vehicle)) == AIAirport.PT_HELICOPTER) continue;
+				while (AIOrder.GetOrderCount(vehicle) > 0) this.Check("orphan-order", AIOrder.RemoveOrder(vehicle, 0));
+			}
+		}
 		if (AIRCRAFT_ACTION != "none") {
-			local ok = AIRCRAFT_ACTION == "removal" ? AIAirport.RemoveAirport(AIRCRAFT_TARGET) : AIStation.OpenCloseAirport(AIRCRAFT_TARGET);
+			local ok = AIRCRAFT_ACTION == "removal" || AIRCRAFT_ACTION == "orphan" ? AIAirport.RemoveAirport(AIRCRAFT_TARGET) : AIStation.OpenCloseAirport(AIRCRAFT_TARGET);
 			this.Check(AIRCRAFT_ACTION, ok);
 			print("AIRCRAFT-ACTION " + AIRCRAFT_ACTION + " " + ok);
 			while (true) this.Sleep(1000);
