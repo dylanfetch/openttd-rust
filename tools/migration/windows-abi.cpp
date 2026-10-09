@@ -117,8 +117,16 @@ static void Layouts()
 	Layout(34, "OpenTTDLinkGraphNode", {sizeof(OpenTTDLinkGraphNode), alignof(OpenTTDLinkGraphNode), offsetof(OpenTTDLinkGraphNode, supply), offsetof(OpenTTDLinkGraphNode, demand), offsetof(OpenTTDLinkGraphNode, station), offsetof(OpenTTDLinkGraphNode, x), offsetof(OpenTTDLinkGraphNode, y), offsetof(OpenTTDLinkGraphNode, edge_begin), offsetof(OpenTTDLinkGraphNode, edge_count)});
 	Layout(35, "OpenTTDLinkGraphEdge", {sizeof(OpenTTDLinkGraphEdge), alignof(OpenTTDLinkGraphEdge), offsetof(OpenTTDLinkGraphEdge, capacity), offsetof(OpenTTDLinkGraphEdge, travel_time), offsetof(OpenTTDLinkGraphEdge, dest)});
 	Layout(36, "OpenTTDLinkGraphSettings", {sizeof(OpenTTDLinkGraphSettings), alignof(OpenTTDLinkGraphSettings), offsetof(OpenTTDLinkGraphSettings, accuracy), offsetof(OpenTTDLinkGraphSettings, demand_distance), offsetof(OpenTTDLinkGraphSettings, demand_size), offsetof(OpenTTDLinkGraphSettings, saturation), offsetof(OpenTTDLinkGraphSettings, distribution), offsetof(OpenTTDLinkGraphSettings, express), offsetof(OpenTTDLinkGraphSettings, map_max_x), offsetof(OpenTTDLinkGraphSettings, map_max_y), offsetof(OpenTTDLinkGraphSettings, runtime)});
-	Layout(38, "OpenTTDTreeAction", {sizeof(OpenTTDTreeAction), alignof(OpenTTDTreeAction), offsetof(OpenTTDTreeAction, kind), offsetof(OpenTTDTreeAction, tile), offsetof(OpenTTDTreeAction, a), offsetof(OpenTTDTreeAction, b), offsetof(OpenTTDTreeAction, cost)});
-	Layout(42, "OpenTTDSharedServices", {sizeof(OpenTTDSharedServices), alignof(OpenTTDSharedServices), offsetof(OpenTTDSharedServices, context), offsetof(OpenTTDSharedServices, random), offsetof(OpenTTDSharedServices, observe_tile), offsetof(OpenTTDSharedServices, write_tile), offsetof(OpenTTDSharedServices, trig), offsetof(OpenTTDSharedServices, industry)});
+	Layout(38, "OpenTTDTreeServices", {sizeof(OpenTTDTreeServices), alignof(OpenTTDTreeServices), offsetof(OpenTTDTreeServices, plant_observation), offsetof(OpenTTDTreeServices, tree_observation), offsetof(OpenTTDTreeServices, snow_line), offsetof(OpenTTDTreeServices, sin), offsetof(OpenTTDTreeServices, cos), offsetof(OpenTTDTreeServices, make_tree), offsetof(OpenTTDTreeServices, set_ground_density), offsetof(OpenTTDTreeServices, add_count), offsetof(OpenTTDTreeServices, add_growth), offsetof(OpenTTDTreeServices, set_growth), offsetof(OpenTTDTreeServices, make_clear), offsetof(OpenTTDTreeServices, make_shore), offsetof(OpenTTDTreeServices, make_snow), offsetof(OpenTTDTreeServices, clear_neighbour_flooding), offsetof(OpenTTDTreeServices, tile_loop_water), offsetof(OpenTTDTreeServices, ambient), offsetof(OpenTTDTreeServices, play_sound), offsetof(OpenTTDTreeServices, progress), offsetof(OpenTTDTreeServices, progress_total), offsetof(OpenTTDTreeServices, clear_square), offsetof(OpenTTDTreeServices, town_rating), offsetof(OpenTTDTreeServices, command_begin), offsetof(OpenTTDTreeServices, command_tile), offsetof(OpenTTDTreeServices, command_next), offsetof(OpenTTDTreeServices, command_debit), offsetof(OpenTTDTreeServices, landscape_clear)});
+	Layout(28, "OpenTTDTreePlantObservation", {sizeof(OpenTTDTreePlantObservation), alignof(OpenTTDTreePlantObservation), offsetof(OpenTTDTreePlantObservation, tile_type), offsetof(OpenTTDTreePlantObservation, bridge), offsetof(OpenTTDTreePlantObservation, ground), offsetof(OpenTTDTreePlantObservation, density), offsetof(OpenTTDTreePlantObservation, snow), offsetof(OpenTTDTreePlantObservation, coast), offsetof(OpenTTDTreePlantObservation, zone)});
+	Layout(31, "OpenTTDTreeObservation", {sizeof(OpenTTDTreeObservation), alignof(OpenTTDTreeObservation), offsetof(OpenTTDTreeObservation, ground), offsetof(OpenTTDTreeObservation, density), offsetof(OpenTTDTreeObservation, species), offsetof(OpenTTDTreeObservation, count), offsetof(OpenTTDTreeObservation, growth), offsetof(OpenTTDTreeObservation, zone)});
+	Layout(32, "OpenTTDTreeLoopSettings", {sizeof(OpenTTDTreeLoopSettings), alignof(OpenTTDTreeLoopSettings), offsetof(OpenTTDTreeLoopSettings, tick_counter), offsetof(OpenTTDTreeLoopSettings, size_x), offsetof(OpenTTDTreeLoopSettings, climate), offsetof(OpenTTDTreeLoopSettings, extra), offsetof(OpenTTDTreeLoopSettings, ambient)});
+	Layout(33, "OpenTTDTreeTickSettings", {sizeof(OpenTTDTreeTickSettings), alignof(OpenTTDTreeTickSettings), offsetof(OpenTTDTreeTickSettings, tick_counter), offsetof(OpenTTDTreeTickSettings, size), offsetof(OpenTTDTreeTickSettings, climate), offsetof(OpenTTDTreeTickSettings, extra)});
+	Layout(43, "OpenTTDTreeGenerateSettings", {sizeof(OpenTTDTreeGenerateSettings), alignof(OpenTTDTreeGenerateSettings), offsetof(OpenTTDTreeGenerateSettings, size), offsetof(OpenTTDTreeGenerateSettings, size_x), offsetof(OpenTTDTreeGenerateSettings, size_y), offsetof(OpenTTDTreeGenerateSettings, climate), offsetof(OpenTTDTreeGenerateSettings, placer), offsetof(OpenTTDTreeGenerateSettings, height_limit), offsetof(OpenTTDTreeGenerateSettings, editor), offsetof(OpenTTDTreeGenerateSettings, freeform_edges)});
+	Layout(57, "OpenTTDTreeCommandSettings", {sizeof(OpenTTDTreeCommandSettings), alignof(OpenTTDTreeCommandSettings), offsetof(OpenTTDTreeCommandSettings, build_price), offsetof(OpenTTDTreeCommandSettings, size), offsetof(OpenTTDTreeCommandSettings, climate), offsetof(OpenTTDTreeCommandSettings, editor), offsetof(OpenTTDTreeCommandSettings, execute), offsetof(OpenTTDTreeCommandSettings, company_valid)});
+	Layout(58, "OpenTTDTreeCommandResult", {sizeof(OpenTTDTreeCommandResult), alignof(OpenTTDTreeCommandResult), offsetof(OpenTTDTreeCommandResult, cost), offsetof(OpenTTDTreeCommandResult, status), offsetof(OpenTTDTreeCommandResult, message)});
+	Layout(59, "OpenTTDTreeLandscapeClear", {sizeof(OpenTTDTreeLandscapeClear), alignof(OpenTTDTreeLandscapeClear), offsetof(OpenTTDTreeLandscapeClear, cost), offsetof(OpenTTDTreeLandscapeClear, failed)});
+	Layout(42, "OpenTTDSharedServices", {sizeof(OpenTTDSharedServices), alignof(OpenTTDSharedServices), offsetof(OpenTTDSharedServices, context), offsetof(OpenTTDSharedServices, random), offsetof(OpenTTDSharedServices, industry), offsetof(OpenTTDSharedServices, tile_type), offsetof(OpenTTDSharedServices, bridge_above), offsetof(OpenTTDSharedServices, tropic_zone), offsetof(OpenTTDSharedServices, tile_z), offsetof(OpenTTDSharedServices, tile_slope), offsetof(OpenTTDSharedServices, mark_dirty), offsetof(OpenTTDSharedServices, set_tropic_zone)});
 	Layout(37, "OpenTTDLinkGraphShare", {sizeof(OpenTTDLinkGraphShare), alignof(OpenTTDLinkGraphShare), offsetof(OpenTTDLinkGraphShare, node), offsetof(OpenTTDLinkGraphShare, origin), offsetof(OpenTTDLinkGraphShare, via), offsetof(OpenTTDLinkGraphShare, cumulative), offsetof(OpenTTDLinkGraphShare, unrestricted), offsetof(OpenTTDLinkGraphShare, has_share)});
 	Layout(39, "OpenTTDEffectView", {sizeof(OpenTTDEffectView), alignof(OpenTTDEffectView), offsetof(OpenTTDEffectView, x), offsetof(OpenTTDEffectView, y), offsetof(OpenTTDEffectView, z), offsetof(OpenTTDEffectView, sprite), offsetof(OpenTTDEffectView, progress), offsetof(OpenTTDEffectView, spritenum), offsetof(OpenTTDEffectView, subtype), offsetof(OpenTTDEffectView, ambient)});
 	Layout(41, "OpenTTDEffectLeaves", {sizeof(OpenTTDEffectLeaves), alignof(OpenTTDEffectLeaves), offsetof(OpenTTDEffectLeaves, observe), offsetof(OpenTTDEffectLeaves, write), offsetof(OpenTTDEffectLeaves, viewport), offsetof(OpenTTDEffectLeaves, sound), offsetof(OpenTTDEffectLeaves, animated)});
@@ -778,62 +786,79 @@ static void LinkGraphJob()
 	std::printf("linkgraph owned snapshot/result and cdecl abort callback passed\n");
 }
 
-// ABI/lifetime probe, not simulation evidence. The full game harness compares map/DATE.
+// ABI/reentry probe, not simulation evidence. The full game harness compares map/DATE.
 struct TreeProbe {
-	std::array<uint64_t, 12> settings{0, 15, 35, 4096, 64, 64, 10, 0, 0, 2, 15, 0};
-	std::array<uint32_t, 10> tile{7};
-	uint32_t writes = 0;
-	bool cancel = false;
+	OpenTTDTreePlantObservation plant{.tile_type = 7, .bridge = false, .ground = 0, .density = 0, .snow = false, .coast = false, .zone = 0};
+	OpenTTDTreeObservation tree{.ground = 3, .density = 3, .species = 20, .count = 2, .growth = 3, .zone = 0};
+	uint32_t writes = 0, waters = 0, clears = 0;
+	int64_t nested_cost = 0;
+	bool abort = false;
 };
-static void TreeSettings(void *context, uint64_t *out) noexcept { auto &p = *static_cast<TreeProbe *>(context); std::copy(p.settings.begin(), p.settings.end(), out); }
-static void TreeObserve(void *context, uint32_t, uint32_t *out) noexcept { auto &p = *static_cast<TreeProbe *>(context); std::copy(p.tile.begin(), p.tile.end(), out); }
-static void TreeWrite(void *context, uint32_t op, uint32_t, uint32_t a, uint32_t b, uint32_t c, uint32_t d) noexcept
+static TreeProbe tree_probe;
+template <typename Result, typename... Args>
+static Result TreeUnused(Args...) noexcept
 {
-	auto &p = *static_cast<TreeProbe *>(context);
-	++p.writes;
-	CHECK(op == 0 && a == 12 && b == 2 && c == 6 && d == (2U << 8));
+	if constexpr (!std::is_void_v<Result>) return {};
 }
-static float TreeTrig(uint32_t, float value) noexcept { return value; }
 static uint32_t TreeRandom(void *) noexcept { return UINT32_MAX; }
-static uint64_t TreeLeaf(void *context, uint32_t op, uint32_t, uint32_t, uint32_t) noexcept
-{
-	return (op == 1 || op == 2) && static_cast<TreeProbe *>(context)->cancel;
-}
+static const OpenTTDTreeServices tree_probe_services{
+	.plant_observation = [](uint32_t) noexcept { return tree_probe.plant; },
+	.tree_observation = [](uint32_t) noexcept { return tree_probe.tree; },
+	.snow_line = TreeUnused<uint8_t>,
+	.sin = [](float value) noexcept { return value; },
+	.cos = [](float value) noexcept { return value; },
+	.make_tree = [](uint32_t, uint8_t type, uint32_t count, uint8_t growth, uint8_t ground, uint32_t density) noexcept {
+		++tree_probe.writes;
+		CHECK(type == 12 && count == 2 && growth == 6 && ground == 0 && density == 2);
+	},
+	.set_ground_density = TreeUnused<void, uint32_t, uint8_t, uint32_t>,
+	.add_count = TreeUnused<void, uint32_t, int32_t>,
+	.add_growth = TreeUnused<void, uint32_t, int32_t>,
+	.set_growth = TreeUnused<void, uint32_t, uint8_t>,
+	.make_clear = TreeUnused<void, uint32_t, uint8_t, uint32_t>,
+	.make_shore = TreeUnused<void, uint32_t>,
+	.make_snow = TreeUnused<void, uint32_t, uint32_t>,
+	.clear_neighbour_flooding = TreeUnused<void, uint32_t>,
+	.tile_loop_water = [](uint32_t tile) noexcept {
+		/* Flooding reenters tree code through a nested clear of a neighbouring tile. */
+		++tree_probe.waters;
+		tree_probe.nested_cost = openttd_rust_trees_clear_tile(nullptr, tile + 1, 5, true, false, &tree_probe_services);
+	},
+	.ambient = TreeUnused<bool, uint32_t>,
+	.play_sound = TreeUnused<void, uint32_t, uint16_t>,
+	.progress = []() noexcept { return tree_probe.abort; },
+	.progress_total = TreeUnused<bool, uint32_t>,
+	.clear_square = [](uint32_t) noexcept { ++tree_probe.clears; },
+	.town_rating = TreeUnused<void, OpenTTDTreeCommand *, uint32_t, bool>,
+	.command_begin = TreeUnused<int32_t, OpenTTDTreeCommand *, uint32_t, uint32_t, bool>,
+	.command_tile = TreeUnused<uint32_t, OpenTTDTreeCommand *>,
+	.command_next = TreeUnused<uint32_t, OpenTTDTreeCommand *>,
+	.command_debit = TreeUnused<void, OpenTTDTreeCommand *>,
+	.landscape_clear = TreeUnused<OpenTTDTreeLandscapeClear, OpenTTDTreeCommand *, uint32_t>,
+};
 static void Trees()
 {
-	using Owner = std::unique_ptr<void, decltype(&openttd_rust_trees_destroy)>;
-	TreeProbe probe;
-	const OpenTTDSharedServices services{&probe, TreeRandom, TreeObserve, TreeWrite, TreeTrig, EffectTestIndustry};
-	auto make = [&](uint32_t kind, uint32_t a = 0, uint32_t b = 0, uint32_t c = 0) {
-		return Owner(openttd_rust_trees_create(kind, 1, a, b, c, &probe, TreeSettings, &services, TreeLeaf), openttd_rust_trees_destroy);
-	};
+	const OpenTTDSharedServices shared = OpenTTDFixtureSharedServices(nullptr, TreeRandom, EffectTestIndustry);
 	uint8_t *counter = openttd_rust_tree_counter();
 	openttd_rust_trees_initialize();
 	CHECK(*counter == 0);
 	*counter = 37; // Same boundary write made by DATE/TTD descriptors.
-	auto tick = make(6);
-	CHECK(openttd_rust_trees_advance(tick.get(), 0, 0).kind == 0);
+	openttd_rust_trees_tick({.tick_counter = 0, .size = 4096, .climate = 0, .extra = 2}, &tree_probe_services, &shared);
 	CHECK(*counter == 36 && counter == openttd_rust_tree_counter());
-	probe.settings[3] = 4096 * 4096; probe.settings[4] = probe.settings[5] = 4096;
-	tick = make(6);
-	CHECK(openttd_rust_trees_advance(tick.get(), 0, 0).kind == 0 && *counter == 36);
-	probe.tile = {0, 0, 0, 0, 0, 2};
-	auto plant = make(3, 12, 2, 6);
-	CHECK(openttd_rust_trees_advance(plant.get(), 0, 0).kind == 0 && probe.writes == 1);
-	probe.tile = {4, 0, 0, 0, 3, 3, 12, 1, 3};
-	auto loop = make(5);
-	CHECK(openttd_rust_trees_advance(loop.get(), 0, 0).kind == 4);
-	// Abandon a flooding action: C++ exception cleanup must not call the world.
-	loop.reset();
-	CHECK(probe.writes == 1);
+	openttd_rust_trees_tick({.tick_counter = 0, .size = 4096 * 4096, .climate = 0, .extra = 2}, &tree_probe_services, &shared);
+	CHECK(*counter == 36 && tree_probe.writes == 0);
+	tree_probe.plant = {.tile_type = 0, .bridge = false, .ground = 0, .density = 2, .snow = false, .coast = false, .zone = 0};
+	openttd_rust_trees_plant(1, 12, 2, 6, &tree_probe_services, &shared);
+	CHECK(tree_probe.writes == 1 && openttd_rust_trees_can_plant(1, false, &tree_probe_services));
+	openttd_rust_trees_tile_loop(1, {.tick_counter = 0, .size_x = 64, .climate = 0, .extra = 2, .ambient = false}, &tree_probe_services, &shared);
+	CHECK(tree_probe.waters == 1 && tree_probe.clears == 1 && tree_probe.nested_cost == 40 && tree_probe.writes == 1);
 	openttd_rust_trees_initialize();
 	CHECK(*counter == 0 && counter == openttd_rust_tree_counter());
-	probe.cancel = true; probe.settings[8] = 1;
-	auto generator = make(0);
-	CHECK(openttd_rust_trees_advance(generator.get(), 0, 0).kind == 12);
-	generator.reset(); // Abort callback and throw are handled only after Rust returns.
-	CHECK(probe.writes == 1);
-	std::printf("tree_direct_services_counter_cancel_and_reentry_lifetime passed\n");
+	tree_probe.abort = true;
+	const OpenTTDTreeGenerateSettings generate{.size = 4096, .size_x = 64, .size_y = 64, .climate = 0, .placer = 1, .height_limit = 15, .editor = false, .freeform_edges = true};
+	CHECK(openttd_rust_trees_generate(generate, &tree_probe_services, &shared));
+	CHECK(openttd_rust_trees_place_randomly(generate, &tree_probe_services, &shared) && tree_probe.writes == 1);
+	std::printf("tree_direct_services_counter_abort_and_reentry passed\n");
 }
 
 /* Complete typed tables exercise road cdecl calls without importing game globals.
@@ -1052,7 +1077,7 @@ static void RoadBoundary()
 	road_abi_probe = &probe;
 	EffectTestWorld world;
 	effect_test_world = &world;
-	const OpenTTDSharedServices services{&world, EffectTestRandom, EffectTestTile, EffectTestMapWrite, EffectTestTrig, EffectTestIndustry};
+	const OpenTTDSharedServices services = OpenTTDFixtureSharedServices(&world, EffectTestRandom, EffectTestIndustry);
 	auto leaves = RoadTestLeaves();
 	probe.leaves = &leaves;
 	probe.services = &services;
@@ -1162,7 +1187,7 @@ static void RoadServiceBoundary()
 	road_service_probe = &probe;
 	EffectTestWorld world;
 	effect_test_world = &world;
-	const OpenTTDSharedServices services{&world, EffectTestRandom, EffectTestTile, EffectTestMapWrite, EffectTestTrig, EffectTestIndustry};
+	const OpenTTDSharedServices services = OpenTTDFixtureSharedServices(&world, EffectTestRandom, EffectTestIndustry);
 	auto leaves = RoadTestLeaves();
 	leaves.owner = [](uint32_t id) noexcept { return id == 17 ? road_service_probe->head : road_service_probe->tail; };
 	leaves.read_front = [](uint32_t) noexcept -> uint32_t { return 1; };
@@ -1222,9 +1247,6 @@ static void OPENTTD_DISASTER_CALL DisasterProbeWrite(void *context, uint32_t, ui
 	static_cast<DisasterProbe *>(context)->writes++;
 }
 static uint32_t DisasterProbeRandom(void *context) noexcept { auto *probe = static_cast<DisasterProbe *>(context); probe->draws++; return probe->random; }
-static void DisasterProbeTile(void *, uint32_t, uint32_t *) noexcept {}
-static void DisasterProbeTileWrite(void *, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) noexcept {}
-static float DisasterProbeTrig(uint32_t, float value) noexcept { return value; }
 static int64_t OPENTTD_DISASTER_CALL DisasterProbeService(void *, const OpenTTDDisasterAction *) noexcept { return 0; }
 static uint32_t DisasterProbeIndustry(int32_t, int32_t, uint32_t *) noexcept { return 0; }
 static void Disasters()
@@ -1232,7 +1254,7 @@ static void Disasters()
 	using Owner = std::unique_ptr<OpenTTDDisasterRun, decltype(&openttd_rust_disaster_destroy)>;
 	using StateOwner = std::unique_ptr<OpenTTDDisasterState, decltype(&openttd_rust_disaster_state_destroy)>;
 	DisasterProbe probe;
-	const OpenTTDSharedServices services{&probe, DisasterProbeRandom, DisasterProbeTile, DisasterProbeTileWrite, DisasterProbeTrig, DisasterProbeIndustry};
+	const OpenTTDSharedServices services = OpenTTDFixtureSharedServices(&probe, DisasterProbeRandom, DisasterProbeIndustry);
 	auto make = [&](uint32_t operation, uint32_t id = 0) { return Owner(openttd_rust_disaster_create(operation, id, 0, 0, 0, 0, &probe, DisasterProbeRead, DisasterProbeWrite, &services, DisasterProbeService), openttd_rust_disaster_destroy); };
 	StateOwner state(openttd_rust_disaster_state_create(1048575), openttd_rust_disaster_state_destroy);
 	auto *address = state.get(); state->state = 65535; state->flags = 0xAB; state->image_override = UINT32_MAX;
@@ -1361,11 +1383,7 @@ static void ShipBoundary()
 	ship_probe = {};
 	ship_probe.owner = state.get();
 	ship_probe.leaves = &leaves;
-	ship_probe.services = {
-		nullptr, ShipProbeUnused<uint32_t, void *>, ShipProbeUnused<void, void *, uint32_t, uint32_t *>,
-		ShipProbeUnused<void, void *, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t>,
-		ShipProbeUnused<float, uint32_t, float>, ShipProbeUnused<uint32_t, int32_t, int32_t, uint32_t *>,
-	};
+	ship_probe.services = OpenTTDFixtureSharedServices(nullptr, ShipProbeUnused<uint32_t, void *>, ShipProbeUnused<uint32_t, int32_t, int32_t, uint32_t *>);
 	leaves.state_owner = [](uint32_t) noexcept { return ship_probe.owner; };
 	leaves.x = [](uint32_t) noexcept { return static_cast<uint32_t>(ship_probe.x); };
 	leaves.y = [](uint32_t) noexcept { return static_cast<uint32_t>(ship_probe.y); };

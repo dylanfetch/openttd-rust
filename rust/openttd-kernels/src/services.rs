@@ -14,6 +14,7 @@ use std::ffi::c_void;
 /// registration or game symbol imports are needed by standalone Cargo binaries.
 /// The context and function addresses outlive the component invocation; callbacks
 /// do not throw or reenter, and output pointers are borrowed for that call only.
+/// Map predicates take a `TileIndex` value and return the accessor's underlying type.
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct Services {
@@ -21,36 +22,65 @@ pub struct Services {
     pub context: *mut c_void,
     /// One shared game Random draw, including debug logging.
     pub random: extern "C" fn(*mut c_void) -> u32,
-    /// Copy ten tile words; output exists only during this call.
-    pub observe_tile: extern "C" fn(*mut c_void, u32, *mut u32),
-    /// Apply one map write at the original mutation point.
-    pub write_tile: extern "C" fn(*mut c_void, u32, u32, u32, u32, u32, u32),
-    /// Native sinf/cosf used by the original grove construction.
-    pub trig: extern "C" fn(u32, f32) -> f32,
     /// `TileVirtXY` query: 0 not industry, 1 industry, 2 bubble catcher; writes tile.
     pub industry: extern "C" fn(i32, i32, *mut u32) -> u32,
+    /// `GetTileType`.
+    pub tile_type: extern "C" fn(u32) -> u8,
+    /// `IsBridgeAbove`.
+    pub bridge_above: extern "C" fn(u32) -> bool,
+    /// `GetTropicZone`.
+    pub tropic_zone: extern "C" fn(u32) -> u8,
+    /// `GetTileZ`.
+    pub tile_z: extern "C" fn(u32) -> i32,
+    /// `GetTileSlope`.
+    pub tile_slope: extern "C" fn(u32) -> u8,
+    /// `MarkTileDirtyByTile` with the default bridge offset.
+    pub mark_dirty: extern "C" fn(u32),
+    /// `SetTropicZone`.
+    pub set_tropic_zone: extern "C" fn(u32, u8),
 }
 impl Services {
     /// Draw one shared random word.
     #[must_use]
-    pub fn random(self) -> u32 {
+    pub fn random(&self) -> u32 {
         (self.random)(self.context)
     }
     /// Scale one word with the original 64-bit multiply and shift.
     #[must_use]
-    pub fn random_range(self, limit: u32) -> u32 {
+    pub fn random_range(&self, limit: u32) -> u32 {
         ((u64::from(self.random()) * u64::from(limit)) >> 32) as u32
     }
-    /// Observe fields valid for this tile type as a copied record.
-    #[must_use]
-    pub fn tile(self, tile: u32) -> [u32; 10] {
-        let mut values = [0; 10];
-        (self.observe_tile)(self.context, tile, values.as_mut_ptr());
-        values
+}
+/// Standalone test table: map predicates return zero and writes do nothing.
+#[cfg(test)]
+#[must_use]
+pub fn fixture(
+    context: *mut c_void,
+    random: extern "C" fn(*mut c_void) -> u32,
+    industry: extern "C" fn(i32, i32, *mut u32) -> u32,
+) -> Services {
+    extern "C" fn byte(_: u32) -> u8 {
+        0
     }
-    /// Apply one of the header-documented scalar tile operations.
-    pub fn write(self, op: u32, tile: u32, args: [u32; 4]) {
-        (self.write_tile)(self.context, op, tile, args[0], args[1], args[2], args[3]);
+    extern "C" fn flag(_: u32) -> bool {
+        false
+    }
+    extern "C" fn height(_: u32) -> i32 {
+        0
+    }
+    extern "C" fn tile(_: u32) {}
+    extern "C" fn zone(_: u32, _: u8) {}
+    Services {
+        context,
+        random,
+        industry,
+        tile_type: byte,
+        bridge_above: flag,
+        tropic_zone: byte,
+        tile_z: height,
+        tile_slope: byte,
+        mark_dirty: tile,
+        set_tropic_zone: zone,
     }
 }
 /// Source `Chance16I` uses uint32 multiplication/addition after uint16 truncation.
