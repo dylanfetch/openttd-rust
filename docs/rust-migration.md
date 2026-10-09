@@ -1625,11 +1625,13 @@ monthly statistics/change/closure, daily changes and builder targets/retries.
 The original selected bodies remain in the portable C++ path.
 
 Pool/map/spec storage, construction and landscape-clear transactions, presentation
-and bounded NewGRF resolution remain direct `noexcept` world services. Construction,
-clearing, cargo distribution and destruction can reenter industry accessors;
-Rust retains no owner reference across them. Script events only enqueue; save/load
-errors remain native. CargoPayment delivery and its original-end flush remain #117.
-ABI IDs 130–138 cover canonical records and synchronous services.
+and bounded NewGRF resolution stay in C++ behind typed `noexcept` slots (#203).
+The tick passes one record (counter, map, scaled callback interval, ambient,
+editor); `next_tick` returns industry, owner, ID and callbacks; sound count,
+behaviour, location and `GetTileZ` are read only on original branches. Rust keeps
+no owner reference across reentrant construction, clearing, distribution or
+destruction; script events only enqueue and save/load errors stay native.
+CargoPayment delivery remains #117. ABI IDs 130–145 cover records and services.
 
 `python3 tools/migration.py simulate industry-` reuses real cargo saves, generated
 climates/economies and disaster reset/release, with explicit production-control,
