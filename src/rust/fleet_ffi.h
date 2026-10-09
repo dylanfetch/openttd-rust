@@ -20,7 +20,7 @@
  * Typed synchronous entries own group/rule/replacement and tick-end policy.
  * Native commands retain full caller-owned stack CommandCost objects and their
  * original move/AddCost behavior. No owner borrow spans reentry/destruction.
- * Panics and escaping environmental exceptions abort. ABI 340-346 pin the owner
+ * Panics and escaping environmental exceptions abort. ABI 390-396 pin the owner
  * prefixes, the three service tables and the native cost slots. */
 struct OpenTTDFleetGroupServices {
 	void * (*group)(uint16_t id) noexcept;

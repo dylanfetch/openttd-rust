@@ -37,9 +37,9 @@ static void FleetSlotsFilled(uint16_t type, const void *table, size_t functions)
 
 TEST_CASE("Fleet - canonical state layouts and independent lifetimes")
 {
-	FleetLayout(340, {sizeof(FleetGroupFields), alignof(FleetGroupFields), offsetof(FleetGroupFields, owner), offsetof(FleetGroupFields, vehicle_type), offsetof(FleetGroupFields, flags), offsetof(FleetGroupFields, livery), offsetof(FleetGroupFields, parent), offsetof(FleetGroupFields, number)});
-	FleetLayout(341, {sizeof(FleetStatisticsFields), alignof(FleetStatisticsFields), offsetof(FleetStatisticsFields, profit_last_year), offsetof(FleetStatisticsFields, profit_last_year_min_age), offsetof(FleetStatisticsFields, num_vehicle), offsetof(FleetStatisticsFields, num_vehicle_min_age), offsetof(FleetStatisticsFields, autoreplace_defined), offsetof(FleetStatisticsFields, autoreplace_finished)});
-	FleetLayout(342, {sizeof(FleetRenewFields), alignof(FleetRenewFields), offsetof(FleetRenewFields, from), offsetof(FleetRenewFields, to), offsetof(FleetRenewFields, next), offsetof(FleetRenewFields, group_id), offsetof(FleetRenewFields, replace_when_old)});
+	FleetLayout(390, {sizeof(FleetGroupFields), alignof(FleetGroupFields), offsetof(FleetGroupFields, owner), offsetof(FleetGroupFields, vehicle_type), offsetof(FleetGroupFields, flags), offsetof(FleetGroupFields, livery), offsetof(FleetGroupFields, parent), offsetof(FleetGroupFields, number)});
+	FleetLayout(391, {sizeof(FleetStatisticsFields), alignof(FleetStatisticsFields), offsetof(FleetStatisticsFields, profit_last_year), offsetof(FleetStatisticsFields, profit_last_year_min_age), offsetof(FleetStatisticsFields, num_vehicle), offsetof(FleetStatisticsFields, num_vehicle_min_age), offsetof(FleetStatisticsFields, autoreplace_defined), offsetof(FleetStatisticsFields, autoreplace_finished)});
+	FleetLayout(392, {sizeof(FleetRenewFields), alignof(FleetRenewFields), offsetof(FleetRenewFields, from), offsetof(FleetRenewFields, to), offsetof(FleetRenewFields, next), offsetof(FleetRenewFields, group_id), offsetof(FleetRenewFields, replace_when_old)});
 	/* Rust reads Livery as {in_use, colour1, colour2} bytes. */
 	static_assert(sizeof(Livery) == 3 && offsetof(Livery, colour1) == 1 && offsetof(Livery, colour2) == 2);
 	FleetOwner<FleetGroupFields, openttd_rust_fleet_group_create, openttd_rust_fleet_group_destroy> group;
@@ -88,7 +88,7 @@ TEST_CASE("Fleet - service tables match the Rust layout and fill every slot")
 	using T = OpenTTDFleetTransactionServices;
 	using C = OpenTTDFleetCosts;
 	using P = OpenTTDFleetPendingServices;
-	FleetLayout(343, {sizeof(G), alignof(G), offsetof(G, group), offsetof(G, next_group), offsetof(G, next_company), offsetof(G, next_vehicle), offsetof(G,
+	FleetLayout(393, {sizeof(G), alignof(G), offsetof(G, group), offsetof(G, next_group), offsetof(G, next_company), offsetof(G, next_vehicle), offsetof(G,
 		vehicle), offsetof(G, vehicle_id), offsetof(G, vehicle_type), offsetof(G, vehicle_owner), offsetof(G, vehicle_group), offsetof(G,
 		vehicle_engine), offsetof(G, profit), offsetof(G, old_enough), offsetof(G, primary), offsetof(G, countable), offsetof(G, ground), offsetof(G,
 		front), offsetof(G, next_part), offsetof(G, first_shared), offsetof(G, next_shared), offsetof(G, set_membership), offsetof(G,
@@ -101,7 +101,7 @@ TEST_CASE("Fleet - service tables match the Rust layout and fill every slot")
 		offsetof(G, depot_dirty), offsetof(G, close_replace), offsetof(G, screen_dirty), offsetof(G, list_generate), offsetof(G, list_push),
 		offsetof(G, list_size), offsetof(G, list_at), offsetof(G, renew_allocate), offsetof(G, renew_can_allocate), offsetof(G, renew_delete),
 		offsetof(G, recursion_error)});
-	FleetLayout(344, {sizeof(T), alignof(T), offsetof(T, cost_zero), offsetof(T, cost_vehicles), offsetof(T, cost_error), offsetof(T, cost_add), offsetof(T,
+	FleetLayout(394, {sizeof(T), alignof(T), offsetof(T, cost_zero), offsetof(T, cost_vehicles), offsetof(T, cost_error), offsetof(T, cost_add), offsetof(T,
 		cost_move), offsetof(T, cost_amount), offsetof(T, success), offsetof(T, error), offsetof(T, money), offsetof(T, ownership), offsetof(T,
 		rear), offsetof(T, articulated), offsetof(T, crashed), offsetof(T, stopped), offsetof(T, chain_depot), offsetof(T, first), offsetof(T,
 		next_unit), offsetof(T, prev_unit), offsetof(T, length), offsetof(T, flipped), offsetof(T, cargo_type), offsetof(T, can_carry), offsetof(T,
@@ -115,15 +115,15 @@ TEST_CASE("Fleet - service tables match the Rust layout and fill every slot")
 		offsetof(T, transfer_cargo), offsetof(T, capacity), offsetof(T, event), offsetof(T, save_rng), offsetof(T, restore_rng), offsetof(T,
 		rule_window), offsetof(T, assertions), offsetof(T, unavailable), offsetof(T, too_long), offsetof(T, too_long_replacement), offsetof(T,
 		nothing)});
-	FleetLayout(345, {sizeof(C), alignof(C), offsetof(C, result), offsetof(C, replace), offsetof(C, build), offsetof(C, copy), offsetof(C, temporary), offsetof(C,
+	FleetLayout(395, {sizeof(C), alignof(C), offsetof(C, result), offsetof(C, replace), offsetof(C, build), offsetof(C, copy), offsetof(C, temporary), offsetof(C,
 		seeds)});
-	FleetLayout(346, {sizeof(P), alignof(P), offsetof(P, set_current), offsetof(P, restart), offsetof(P, x), offsetof(P, y), offsetof(P, z), offsetof(P, reserve),
+	FleetLayout(396, {sizeof(P), alignof(P), offsetof(P, set_current), offsetof(P, restart), offsetof(P, x), offsetof(P, y), offsetof(P, z), offsetof(P, reserve),
 		offsetof(P, subtract), offsetof(P, command), offsetof(P, animation), offsetof(P, length_news), offsetof(P, failed_news), offsetof(P, cash),
 		offsetof(P, limit)});
 	const G &group = FleetGroupServices();
 	const T &transaction = FleetTransactionServices();
-	FleetSlotsFilled(343, &group, offsetof(G, recursion_error) / sizeof(void *));
-	FleetSlotsFilled(344, &transaction, offsetof(T, assertions) / sizeof(void *));
+	FleetSlotsFilled(393, &group, offsetof(G, recursion_error) / sizeof(void *));
+	FleetSlotsFilled(394, &transaction, offsetof(T, assertions) / sizeof(void *));
 	CHECK(group.next_part == CargoCapacityNextPart);
 	CHECK(group.recursion_error == STR_ERROR_GROUP_CAN_T_SET_PARENT_RECURSION);
 	CHECK(transaction.unavailable == STR_ERROR_RAIL_VEHICLE_NOT_AVAILABLE);

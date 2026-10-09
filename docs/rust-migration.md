@@ -1714,7 +1714,7 @@ storage that Rust reads/writes through typed services at the original points;
 company-merge rewriting (economy.cpp), train/vehicle construction and save/load
 writes of `group_id` remain C++.
 
-Three named-slot noexcept tables (ABI 343-346, with owner prefixes 340-342)
+Three named-slot noexcept tables (ABI 393-396, with owner prefixes 390-392)
 serve Rust; native stack CommandCost objects keep AddCost first-error and Money
 saturation, and original assertion sites run in assertion builds. No owner borrow
 spans a callback; nested commands reenter directly.
