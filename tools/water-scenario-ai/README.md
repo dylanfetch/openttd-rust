@@ -62,10 +62,12 @@ python3 tools/migration.py build --jobs 2
 
 This removes the source fixture's west aqueduct ramp from candidate region
 connectivity. It must break the route witness and/or produce semantic differences.
-Ship YAPF ownership reuses this corpus. Internal branch witnesses:
+Ship YAPF ownership reuses this corpus. Every water scenario enables ship
+controller and YAPF branch witnesses for a distinct candidate and fails when a
+profile is missing or a required branch is zero (not in `--self`/`--benchmark`):
 
 ```sh
-OPENTTD_SHIP_PROFILE=1 python3 tools/migration.py simulate water --soak --jobs 2
+python3 tools/migration.py simulate water --soak --jobs 2
 PYTHONPATH=tools python3 -m simulation.ships <report.json>
 ```
 

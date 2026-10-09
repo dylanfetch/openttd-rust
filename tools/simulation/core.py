@@ -524,6 +524,7 @@ def run_game(
     if (autosave / "exit.sav").is_file():
         snapshots.append(autosave / "exit.sav")
     return {
+        "dir": run_dir,
         "exit": code,
         "seconds": seconds,
         "command": command,
@@ -531,6 +532,22 @@ def run_game(
         "log": log_lines(run_dir),
         "stdout": (run_dir / "stdout.log").read_bytes(),
     }
+
+
+def branch_witnesses(scenario, run, role, name, required):
+    """Return a candidate's branch counts; a missing file or zero count fails.
+
+    Scenario modules enable counters through game_environment when
+    scenario["witnesses"] is set; the reference and --self have none."""
+    if not (scenario.get("witnesses") and role == "candidate"):
+        return None
+    path = run["dir"] / name
+    if not path.is_file():
+        raise RuntimeError(f"candidate wrote no {name}")
+    counts = json.loads(path.read_text())
+    if missing := [branch for branch in required if not counts[branch]]:
+        raise RuntimeError(f"{name} lacks required branches {missing}: {counts}")
+    return counts
 
 
 def log_lines(run_dir):
@@ -632,6 +649,13 @@ def run_scenario(
                     scenario, binaries, builds, out, timeout, env, result
                 )
         result["requested_ticks"] = scenario["ticks"]
+        # Only a distinct candidate counts branches; timed runs keep counters off.
+        executables = scenario.get("executables", binaries)
+        scenario = dict(
+            scenario,
+            witnesses=not benchmark_repetitions
+            and executables["candidate"] != executables["reference"],
+        )
         modes = (
             (("plain", False),) * benchmark_repetitions
             if benchmark_repetitions
@@ -640,7 +664,11 @@ def run_scenario(
         for mode, desync in modes:
             runs = {
                 role: run_game(
-                    dict(scenario, **scenario.get("role_inputs", {}).get(role, {})),
+                    dict(
+                        scenario,
+                        **scenario.get("role_inputs", {}).get(role, {}),
+                        witnesses=scenario["witnesses"] and role == "candidate",
+                    ),
                     scenario.get("executables", binaries)[role],
                     builds[role],
                     out / name / mode / role,
