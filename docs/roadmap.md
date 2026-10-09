@@ -20,7 +20,7 @@ forward-looking, about 200 lines; completed work is one row, with evidence in PR
 - CI is green and on demand. A full run costs about 104 job-minutes, once per
   final head.
 - Unintegrated branches (#157 cap of six): #178, #151, #176 and #152 inside
-  #184, plus #147 WIP.
+  #184, plus #147 WIP and #186 maintenance. Further starts wait for integration.
 
 ## Fifth steering review (2026-10-08)
 
@@ -135,11 +135,13 @@ unintegrated component branches (#157). Independent items (#156 slices) may run
 in parallel with this list.
 
 1. **#186 exact timing and re-measured caps**, with the `.codex/config.toml`
-   root-model change.
+   root-model change. Measure integrated main and the retained direct-road cap
+   baseline separately; the slower pre-conversion main does not loosen caps.
 2. **#184 batch (#178 road conversion, #151 cargo, #176 orders, #152 ship, #185
    save).** First the hot-path fixes in its steering comment, then a fresh Sol
    high review of the fix delta, the re-measured caps, latest base and full CI.
-   Component source reviews stand.
+   Component source reviews stand. Join independently reviewed #186 before one
+   concrete full run for the batch; the timing fix precedes ratchet evaluation.
 3. **Finish #147 fleet replacement** in the direct form.
 4. **#168 conversions, one PR per component:** train and train reservation
    (O(n^2) consist walk, per-step `nearby` Vec) or aircraft first, then company
@@ -159,10 +161,10 @@ Revisit it only if a post-#168 profile shows map/pool crossings dominating.
 
 | Issue / PR | Branch (worktree suffix), head | State and next step |
 | --- | --- | --- |
-| #186 | none | Not started; first. |
-| #182 / #184 | `reviewed-owner-batch-182` (`reviewed-owners-182`), `fa0baea911` | Semantics pass. Apply the steering hot-path fixes, fresh review, re-check caps, full CI. |
+| #186 | `exact-benchmark-timing-186` (`exact-benchmark-timing-186`), `3263fe88af` | Timer/config implemented; fresh review and exact main/direct-road measurements next. Join #184 for full CI. |
+| #182 / #184 | `reviewed-owner-batch-182` (`reviewed-owners-182`), `fa0baea911` | Hot-path owner active; then fresh review, #186 join, exact caps and full CI. |
 | #155 / #178, #139 / #151, #138 / #176, #146 / #152, #183 / #185 | joined in #184 | Reviewed sources; close with #184. |
-| #147 | `fleet-replacement-ownership-147` (`fleet-replacement`), `68d660adc9` | State-only WIP, no PR. |
+| #147 | `fleet-replacement-ownership-147` (`fleet-replacement`), `68d660adc9` | State-only WIP; completion plan in issue. Refresh from integrated #184 before implementation. |
 
 Preserve the pinned reference, paused curve worktrees and evidence branches
 `evidence-disaster-vehicles` (`a775543162`) and `evidence-water-regions`

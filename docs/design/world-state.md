@@ -51,9 +51,11 @@ for each component and release affected owner borrows before it can reenter.
 Shared services (`Random`, map and pool accessors) are `noexcept` C++ wrappers
 that Rust calls directly, so ports keep the original control flow. Environmental
 failures (allocation, debug/log I/O, developer-only defines such as `RANDOM_DEBUG`)
-terminate inside the wrapper; they are not simulation behavior. Script VMs,
-save/load errors and callbacks that run arbitrary code or mutate borrowed state
-use a return-to-C++ action protocol. Neither C++ exceptions nor Rust panics unwind
+terminate inside the wrapper; they are not simulation behavior. Script VMs and
+save/load errors use a return-to-C++ action protocol where an ordinary-play C++
+exception can unwind. Reentry or mutation alone does not require that protocol:
+end every affected Rust borrow before calling a typed service directly.
+Neither C++ exceptions nor Rust panics unwind
 across FFI; for ordinary-play failures preserve source failure order.
 
 Per-field callbacks inside tile or vehicle loops may dominate runtime. Prefer
