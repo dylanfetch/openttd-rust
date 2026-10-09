@@ -4,22 +4,21 @@ Root owns selection here; `AGENTS.md` and `docs/rust-migration.md` define proces
 If an issue conflicts, follow this roadmap and report it to root. Keep this
 forward-looking, about 200 lines; completed work is one row, with evidence in PRs.
 
-## Where the fork stands (2026-10-09, `5c7ab182b3`)
+## Where the fork stands (2026-10-09, `d8aed8754f`)
 
-- Twenty-one ownership ports retire about 29.9k original C++ lines, about 7.8%
+- Twenty-one ownership ports retire about 30.2k original C++ lines, about 7.9%
   of roughly 384k non-vendored `src/` lines. Untouched simulation remains large:
   `rail_cmd`, `road_cmd`, `water_cmd`, `tunnelbridge_cmd`, `clear_cmd`, most of
   `vehicle.cpp` and `vehicle_cmd.cpp`, and the tile loops they drive.
-- An independent profile reproduces the integrated ratios: Opus 1.42x, Grok
-  1.42x, Padhattan-1996 1.71x, Padhattan-2000 2.02x, TGP 1.44x. Glue services are
-  52% of reference time on Padhattan-2000; Rust net of replaced C++ is 26%.
-  Draft train #195 alone measures Padhattan-2000 1.77x. TGP's gap is trees,
-  industry and town during the simulated years, not generation.
-- The #168 conversions retire little and add glue: train #195 is net +1917 C++
-  lines for 853 retired, aircraft #194 net +1053 for 247. Most of it is per-port
-  copies of the same vehicle and map accessors (#199).
-- Five unintegrated branches: fleet #197, train #195, aircraft #194, UTF-8
-  #193 and breakdown coverage #196. Quick validation on `5c7ab182b3` is red.
+- Aircraft #194 integrated; with #193 it measures (paired, loaded host) Opus
+  1.44x, Grok 1.43x, Padhattan-1996 1.60x, Padhattan-2000 1.67-1.74x (was
+  1.95x), TGP 1.44x. Caps drop on the next idle-host run.
+- The #168 conversions still add glue: aircraft adds 1300 C++ glue lines for
+  247 retired, train #195 2812 for 853. Most is per-port copies of the same vehicle
+  and map accessors; #199 must shrink it.
+- Witnesses: train, ship and aircraft branch witnesses now run and fail by
+  default (#196, #204). Unreached branches are listed in #156.
+- Four unintegrated branches: train #195, fleet #197, trees #202, industry #203.
 
 ## Sixth steering review (2026-10-09)
 
@@ -33,17 +32,15 @@ divergence. Fleet has one, and coverage claims rest on opt-in profiles.
 Corrections, in order:
 1. **Done:** red Quick validation fixed by #200/#201 (`bb302706c1`). Check the
    last push's runs before reporting the branch green.
-2. **Enforce cited branch witnesses (#198)** before #195 integrates. Train and
-   ship witnesses run only when a profile environment variable is set by hand,
-   and CI never sets it. New AGENTS.md rule: cited witnesses run and fail by
-   default.
-3. **Fleet #197 must fix**, per its PR comment: the `NEW_GROUP` sentinel
-   (`u32::MAX` versus `VehicleID::Invalid()` 0xFFFFF breaks "Create group" from a
-   vehicle list), the per-Vehicle `Box<u16>` for `group_id`, positional
-   callback tables, and dead wrappers. Add the list-based scenarios.
-4. **Integrate train #195 and aircraft #194 as they stand** once their PR
-   comments' final-head evidence passes. Do not rework them in flight. #193 is
-   accepted as a support-code fast path (PR ruling), not a precedent.
+2. **Done:** cited train and ship witnesses run and fail by default (#204). The
+   shared witness facility replacing the per-port writers (#198 remainder) is
+   part of #199's first PR.
+3. **Done in #197 (not yet integrated):** fleet's `NEW_GROUP` sentinel, the
+   per-Vehicle `Box<u16>`, positional tables and dead wrappers are fixed, and
+   `fleet-drain`/`fleet-drain-cash` witness the tick-end drain.
+4. **Aircraft #194 and UTF-8 #193 are integrated.** Integrate train #195 as it
+   stands once its final-head evidence passes. #193 is a support-code fast path
+   (PR ruling), not a precedent.
 5. **Then #199: one shared typed vehicle and map service layer** with a
    crossing budget per vehicle tick. New AGENTS.md rule: resolve once per entry,
    read only the used fields once, one shared definition per accessor, real
@@ -116,7 +113,11 @@ attributed review reports retain evidence; batch totals are above.
 | Issues | Maintenance PRs | Integration | Commit | Metrics |
 | --- | --- | --- | --- | --- |
 | #169, #156, #179 | #175, #177, #180 | #181 | `f604e30d50` | 4 / 193 / 0 / 0 |
-| #200 | #201 | direct | `bb302706c1` | 0 / 0 / 0 / 0 |
+| #200 | #201 | direct | `bb302706c1` | 0 / 10 / 0 / 0 |
+| #188 | #196 | direct | `05f94f56d5` | 0 / 182 / 0 / 0 |
+| #191 | #193 | direct | `b127ffaa88` | 0 / 44 / 73 / 14 |
+| #198 (enforcement) | #204 | direct | `c0c67a3dd4` | 0 / 147 / 0 / 0 |
+| #190 (#168 aircraft) | #194 | direct | `d8aed8754f` | 1279 / 352 / 1300 / 247 |
 
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -127,13 +128,14 @@ The harness is `python3 tools/migration.py simulate` (`docs/rust-migration.md`,
 always the first priority. Port differences go in `KNOWN_FAILURES` with an issue,
 never in masks.
 
-1. **#198 witness enforcement** is a harness regression and comes first.
+1. **#198 witness enforcement** is done (#204); keep it passing.
 2. **Speed ratchet (#155).** `SPEED_BUDGETS` in `tools/simulation/roads.py` is
    the authority for the five caps, run with `simulate <name> --benchmark 3
    --jobs 2` on an idle host. A PR may exceed a cap by at most 3%, unless root
    accepts a stated reason that is not a boundary-rule exception. Improvements
    lower the caps. Targets: <=1.5x on play saves and <=1.15x on generation when
-   #168/#199 close. The null driver redraws whenever 1 ms has elapsed, so a
+   #168/#199 close. Aircraft lowered Padhattan-2000; lower its cap on the next
+   idle-host run (a tools change in the next PR). The null driver redraws whenever 1 ms has elapsed, so a
    slower candidate also draws more frames; read drawing cost with that in mind.
 3. **#156 coverage, standing capacity.** Random and crash branches first. The
    presence of PBS signals, locks or subsidies in a save does not show that every
@@ -146,9 +148,9 @@ Integration of reviewed work comes before new starts. Never hold more than six
 unintegrated component branches (#157). Independent items (#156 slices) may run
 in parallel with this list.
 
-1. **Integrate the drafts:** UTF-8 #193, train #195 (after #198), aircraft
-   #194, breakdown #196, then fleet #197 after its required fixes. Preserve
-   fleet's full native CommandCost and its quirks.
+1. **Integrate the drafts:** train #195, then fleet #197 (merge the base after
+   train and renumber fleet's ABI layout IDs 343-346 past train's 340-385).
+   Preserve fleet's full native CommandCost and its quirks.
 2. **#199 shared vehicle and map layer**, one PR per vehicle type, starting once
    train and aircraft are integrated. Report crossings per vehicle tick.
 3. **#168 remaining conversions, one PR per component:** trees, industry tick
@@ -165,18 +167,17 @@ map crossings are 5-11% of reference time. #199 decides vehicle state access.
 
 ## Resume checkpoint
 
-Apply the sixth steering review first: #198, then the drafts' PR comments.
-#193 needs a fresh review of root fix `93dd49329c` (script-list tool compiled
-reference VM copies) and a new full run; #196 is reviewed and in full CI.
+Sixth steering items 1-4 are applied; items 5-7 are in progress through #199,
+#202 and #203.
 
 | Issue / PR | Branch (worktree suffix), head | State and next step |
 | --- | --- | --- |
-| #147 / #197 | `fleet-replacement-ownership-147` (`fleet-replacement`), `32785b4631` | WIP; fix the steering PR comment's four items, then final audit, ABI/reentry/CommandCost fixtures, checks, fresh review, full CI. |
-| #189 / #195 | `train-direct-189` (`train-direct-189`), `8aa1657008` | Cargo/native pass; final-head simulation with all play/rail-owner saves under #198, used-field and duplicate fixes, timing, review, full CI. |
-| #190 / #194 | `aircraft-direct-190` (`aircraft-direct-190`), `29ff227562` | Cargo/native and 3 cases pass; final-head aircraft/disaster/default suites, timing, review, full CI. |
-| #191 / #193 | `utf8-hot-191` (`utf8-hot-191`), `cf91511991` | Reviewed; full CI failed in script-list tool; root fix `93dd49329c` needs review and full CI. |
-| #192 / #168 | none | Company direct conversion after trees and industry read. |
-| #188 / #196 | `aircraft-breakdown-188` (`aircraft-breakdown-188`), `3fa6047b09` | Sensitivity/soak pass; reviewed (fix `e52b34c2ca` verified); full CI running. |
+| #189 / #195 | `train-direct-189` (`train-direct-189`), `0818e68172` | Final head reviewed (no findings); enforced rail suite 19/19. Base merges resolved an `abi.rs` conflict: fresh review of that resolution, verify, default suite, timing, full CI. |
+| #147 / #197 | `fleet-replacement-ownership-147` (`fleet-replacement`), `20fa6e581a` | Reviewed, including drain witness. After train: base merge with ABI renumbering, timing, full CI, ready. |
+| #202 | `trees-direct-202` (`trees-direct-202`) | Implementation in progress (no PR yet). |
+| #203 | `industry-typed-203` (`industry-typed-203`) | Implementation in progress (no PR yet). |
+| #199 | none | First-PR plan in progress (road, shared module, witness facility); starts after train integrates. |
+| #192 / #168 | none | Company direct conversion after trees and industry. |
 
 Preserve the pinned reference, paused curve worktrees and evidence branches
 `evidence-disaster-vehicles` (`a775543162`) and `evidence-water-regions`
