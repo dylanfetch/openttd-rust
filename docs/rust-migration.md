@@ -1418,8 +1418,8 @@ Paired `simulate roads` and soak runs compare saved fields/logs for acceleration
 service, blocking/overtaking, path, RNG, crossing/flooding, crash expiry and reload;
 `--self` controls reference determinism. Native checks cover typed ABI, nested
 getter/cache/destination/path mutation, destruction, movement data and save staging.
-Five benchmark budgets report best-known medians without failing noisy CI;
-the unchanged generation excess is a temporary company boundary exception (#168).
+Five idle exact benchmarks pass current caps +3% (#155/#186); CI timings are
+reporting only. Remaining boundary cleanup stays in #168 without integration exceptions.
 Actual legacy saves, NewGRFs, articulated/tram turns, sounds and viewport pixels
 remain unexercised domains tracked by #156.
 

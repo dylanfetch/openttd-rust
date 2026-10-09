@@ -4,21 +4,22 @@ Root owns selection here; `AGENTS.md` and `docs/rust-migration.md` define proces
 If an issue conflicts, follow this roadmap and report it to root. Keep this
 forward-looking, about 200 lines; completed work is one row, with evidence in PRs.
 
-## Where the fork stands (2026-10-08, `3998946846`)
+## Where the fork stands (2026-10-08, `2a76d5f287`)
 
-- Eighteen ownership ports retire 24,221 original C++ lines, about 6.3% of roughly
-  384k non-vendored `src/` lines (18,898 excluding town-name and road-movement
-  data). Batch #184 (road conversion, cargo, orders, ship) would retire 6,069 more
-  for 4,964 glue: glue is rising toward parity, mostly typed-boundary tables.
-- Exact timing (#186/#187) at the retained direct-road baseline: Opus 1.422x and
-  Padhattan-2000 1.983x. The generation cap is 1.440x. #184's hot-path fixes have
-  native/Cargo validation; final semantic checks and the corrected ratchet remain.
-- Mixed-save profile, as extra candidate time relative to the reference:
+- Twenty-one ownership ports retire about 29.9k original C++ lines, about 7.8%
+  of roughly 384k non-vendored `src/` lines (24.6k excluding town-name and road
+  data). #184 totals: Rust 10166 / tooling 1918 / glue 4985 / retired 6073,
+  including direct-road/timing/save maintenance; 386 retired lines are old road
+  boundary code. Glue plus tooling exceeds retirement; next owners stay whole.
+- Exact three-pair ratios in #184: Opus 1.435x, Grok 1.419x, Padhattan-1996
+  1.704x, Padhattan-2000 2.018x, generation 1.452x. All pass current caps +3%;
+  no cap rises. The full semantic suite passes 259 cases / 1,922 snapshots.
+- Last mixed-save profile before #184's hot-path fixes, as extra candidate time:
   aircraft +27%, train +25%, window drawing and string formatting +18%, road +11%, trees +8%.
-- CI is green and on demand. A full run costs about 104 job-minutes, once per
-  final head.
-- Unintegrated branches (#157 cap of six): #178, #151, #176 and #152 inside
-  #184, plus #147 WIP and #186 maintenance. Further starts wait for integration.
+- #184 passed exact-head full validation; post-merge checks are running.
+  A full run costs about 104 job-minutes; ordinary PR pushes stay cheap.
+- One unintegrated component branch remains: #147 WIP. The next wave is fleet,
+  train #189, aircraft #190, UTF-8 #191 and coverage #188, within the cap of six.
 
 ## Fifth steering review (2026-10-08)
 
@@ -89,6 +90,9 @@ Metrics are `tools/port-metrics.py`: Rust / tooling / C++ glue / C++ retired.
 | #129 | Industry production, histories and builder state | #144 via #166 | `dace87c9b1` | 1508 / 474 / 678 / 932 |
 | #136 | Aircraft controller and airport blocks | #145 | `f0e0b3d712` | 1773 / 764 / 380 / 1880 |
 | #137 | Company finance, economy and lifecycle | #149 | `dbce82a309` | 1607 / 702 / 1052 / 1394 |
+| #139 | Cargo storage and movement | #151 via #184 | `2a76d5f287` | 2838 / 460 / 973 / 2445 |
+| #138 | Orders lifecycle and commands | #176 via #184 | `2a76d5f287` | 4554 / 519 / 1752 / 2518 |
+| #146 | Ship controller and private state | #152 via #184 | `2a76d5f287` | 1101 / 270 / 893 / 721 |
 
 Harness and process: #72 harness (#85), #84 play saves (#87), #97 provenance
 freeze (#100), #88 Ruff (#92), #75 partial-pixel fidelity (#91), #90 world-state
@@ -100,11 +104,12 @@ aircraft fixture #132 (347); #108 map decision #116; #154 harness endpoints #160
 (277); #158 MinGW nightly #159; #155 speed report #163 (212); #156 road witnesses
 #161, #162, #164, #167 (581); #170 on-demand CI and validation tools #171 (3267,
 no game logic); #173 validation repairs #174 (`cd0297938c`, net tooling -2).
+Also in #184: #155 direct road #178, #183 unchanged 2006 save #185,
+#186 exact timing/root config #187 (net tooling +78). Its component PRs and
+attributed review reports retain evidence; batch totals are above.
 | Issues | Maintenance PRs | Integration | Commit | Metrics |
 | --- | --- | --- | --- | --- |
 | #169, #156, #179 | #175, #177, #180 | #181 | `f604e30d50` | 4 / 193 / 0 / 0 |
-
-CI-capacity batches #134, #141 and #166 integrated owners above.
 
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -115,17 +120,18 @@ The harness is `python3 tools/migration.py simulate` (`docs/rust-migration.md`,
 always the first priority. Port differences go in `KNOWN_FAILURES` with an issue,
 never in masks.
 
-1. **Exact benchmark timing (#186), then the speed ratchet (#155).** The budget
+1. **Speed ratchet (#155); exact timing #186/#187 is integrated.** The budget
    covers both road play saves, both Padhattan saves and generate-tgp-256-1, run
    with `simulate <name> --benchmark 3 --jobs 2` on an idle host. A PR may exceed
    a cap by at most 3%, unless root accepts a stated reason that is not a
    boundary-rule exception. Improvements lower the caps. Targets: <=1.5x on play
    saves and <=1.15x on generation when #168 closes.
 2. **#156 coverage, standing capacity.** Random and crash branches first. The
-   2000 and 2006 Padhattan saves are imported (#181, #185 in #184). The presence
+   2000 and 2006 Padhattan saves are imported (#181, #185 via #184). The presence
    of PBS signals, locks or subsidies in a save does not show that every route or
-   multiplier was exercised. Next slice: #188 aircraft breakdown witnesses,
-   after the current batch frees capacity. Remaining branches stay in #156.
+   multiplier was exercised. Next slice: #188 aircraft breakdown witnesses.
+   Cargo-routing, conditional-order and company source plans are in #156;
+   their branches remain open until executed witnesses and sensitivity pass.
 
 Exact caps (three-pair medians; [samples and provenance](https://github.com/dylanfetch/openttd-rust/pull/187#issuecomment-6072318657)):
 
@@ -143,21 +149,15 @@ Integration of reviewed work comes before new starts. Never hold more than six
 unintegrated component branches (#157). Independent items (#156 slices) may run
 in parallel with this list.
 
-1. **#186 exact timing and re-measured caps**, with the `.codex/config.toml`
-   root-model change. Measure integrated main and the retained direct-road cap
-   baseline separately; the slower pre-conversion main does not loosen caps.
-2. **#184 batch (#178 road conversion, #151 cargo, #176 orders, #152 ship, #185
-   save).** First the hot-path fixes in its steering comment, then a fresh Sol
-   high review of the fix delta, the re-measured caps, latest base and full CI.
-   Component source reviews stand. Join independently reviewed #186 before one
-   concrete full run for the batch; the timing fix precedes ratchet evaluation.
-3. **Finish #147 fleet replacement** in the direct form.
-4. **#168 conversions, one PR per component:** train and train reservation
-   first (O(n^2) consist walk, per-step `nearby` Vec), aircraft, then company
-   with its widened scope, then trees, town and disaster, then the cold cargo
-   and orders opcodes. The UTF-8/string-consumer support fix is a separate small
-   PR at any point.
-5. **New components** (#148 town lifecycle, then #150 industry construction)
+1. **Finish #147 fleet replacement** in the direct form; refresh its state-only
+   WIP from integrated main. Preserve full native CommandCost and its quirks.
+2. **#168 conversions, one PR per component:** train/reservation #189 first
+   (O(n^2) consist walk, per-step `nearby` Vec), aircraft #190, then company #192
+   with widened scope, then trees, town and disaster, then cold cargo/orders.
+   UTF-8/string-consumer #191 is a separate selected small PR at any point.
+   #192 keeps StopAI direct; only proven startup/post VM exceptions use stack
+   continuation records. No per-call heap task, generic dispatch or hot record copy.
+3. **New components** (#148 town lifecycle, then #150 industry construction)
    start only once the road play saves are at or below 2.0x (they are) and #168's
    train slice is integrated. When fewer than two unstarted selections remain, a
    fresh Astra high planner replenishes whole simulation owners, planned in the
@@ -170,12 +170,12 @@ Revisit it only if a post-#168 profile shows map/pool crossings dominating.
 
 | Issue / PR | Branch (worktree suffix), head | State and next step |
 | --- | --- | --- |
-| #186 / #187 | `exact-benchmark-timing-186` (`exact-benchmark-timing-186`), `c9b5b1c1b1` | Reviewed timer/config and exact caps; joined #184 for full CI. |
-| #182 / #184 | `reviewed-owner-batch-182` (`reviewed-owners-182`), `b40c2073b9` | Fresh hot-path/cap reviews, native/Cargo, 26 affected cases and exact ratchet pass. Default suite running; then exact-head full CI, integration and archives. |
-| #155 / #178, #139 / #151, #138 / #176, #146 / #152, #183 / #185 | joined in #184 | Reviewed sources; close with #184. |
-| #147 | `fleet-replacement-ownership-147` (`fleet-replacement`), `68d660adc9` | State-only WIP; completion plan in issue. Refresh from integrated #184 before implementation. |
-| #168 | none | Train, aircraft, UTF-8 and company plans in issue comments. Fresh implementers after #184; StopAI direct, only proven startup/post VM exceptions retain stack protocol. |
-| #188 / #156 | none | Aircraft breakdown slice selected; cargo-routing and conditional-order source plans prepared. No coverage branches started. |
+| #147 | `fleet-replacement-ownership-147` (`fleet-replacement`), `68d660adc9` | State-only WIP; fresh completion owner next, refresh from integrated main. |
+| #189 / #168 | none | Train/reservation direct conversion selected first; scoped issue and source plan ready. |
+| #190 / #168 | none | Aircraft direct conversion selected after train in work order; scoped plan ready. |
+| #191 / #168 | none | Selected ASCII/string-consumer support fix; scoped plan ready. |
+| #192 / #168 | none | Company direct conversion after train/aircraft; exception disposition in issue. |
+| #188 / #156 | none | Aircraft breakdown slice selected; other source plans stay queued in #156. |
 
 Preserve the pinned reference, paused curve worktrees and evidence branches
 `evidence-disaster-vehicles` (`a775543162`) and `evidence-water-regions`
@@ -196,11 +196,8 @@ layout. Platform or toolchain expansion. Deferred behavior improvements stay in
 
 ## Progress metric
 
-Every port PR pastes the output of `python3 tools/port-metrics.py`: Rust added,
-tooling added, C++ glue added (new `src/` lines compiled with `WITH_RUST`), and
-C++ retired (original `src/` lines the candidate no longer compiles: deleted,
-or moved under either `WITH_RUST` guard form into the portable fallback). A
-healthy port retires more C++ than it adds as glue plus tooling; ports that
-fail this state a reason in the PR. For scale, the history port (#32) measured
-Rust 433, tooling 379, glue 203, retired 64: the kernel-extraction pattern to
-avoid. Data tables inflate retired counts; judge progress by game logic owned.
+Every port PR pastes `python3 tools/port-metrics.py`: Rust added, tooling added,
+C++ glue added (new Rust-enabled `src/` lines), and C++ retired (original lines
+deleted or excluded into portable fallback). Retire more C++ than glue plus
+tooling, or state why in the PR. Avoid utility-kernel extraction; data tables
+inflate retirement. Judge progress by game logic owned.
