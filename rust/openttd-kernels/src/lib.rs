@@ -38,6 +38,7 @@ mod town;
 mod townname;
 mod townname_data;
 mod trees;
+mod vehicle;
 mod widget_parser;
 mod witness;
 
