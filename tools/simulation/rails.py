@@ -82,6 +82,15 @@ def scenarios(soak):
                 ],
             )
         )
+    # The blocked train waits wait_for_pbs_path days, then reverses (stuck_reverse).
+    cases.append(
+        dict(
+            cases[-1],
+            name="rail-controller-reservation-reverse",
+            console=[*cases[-1]["console"][:-1], "setting pf.reverse_at_signals 1"]
+            + ["unpause"],
+        )
+    )
     for distribution, commands in DISTRIBUTIONS.items():
         cases.append(
             {
@@ -145,6 +154,47 @@ def scenarios(soak):
 
 def game_args(scenario):
     return ["-d", "yapf=3"] if scenario.get("rail_fixture") else []
+
+
+def game_environment(scenario):
+    witnessed = scenario.get("rail_fixture") and scenario.get("witnesses")
+    return {"OPENTTD_TRAIN_PROFILE": "1"} if witnessed else {}
+
+
+# TrainProfile branches each candidate run must reach, by longest name prefix.
+# Unreached (#156): wormhole_swap, unequal_before/after, red_twoway,
+# force_signal, free_wagon_delete, articulated_move, depot_reentry and
+# extension_opposing_red/extension_restore.
+TICKS = ("tick_first", "tick_second")
+PATHS = (*TICKS, "first_tile_rail", "controller_extension", "free_path")
+PATHS += ("choose_track", "order_restore")
+ROUTES = (*PATHS, "reversal", "depot_start", "red_oneway", "stuck_retry")
+ROUTES += ("order_lookahead",)
+CROSSINGS = ("cross_bar", "cross_unbar")
+BLOCKED = (*TICKS, "choose_track", "controller_extension", "stuck_retry")
+BLOCKED += ("extension_fail", "extension_rollback")
+TRAIN_BRANCHES = {
+    "play-padhattan-ridge-1996": ROUTES,
+    "rail-padhattan-ridge-1996": ROUTES,
+    "rail-reservation-": ROUTES,
+    "play-padhattan-ridge-2000": (*ROUTES, *CROSSINGS),
+    "play-padhattan-ridge-2006": (*PATHS, "reversal", "depot_start", *CROSSINGS)
+    + ("depot_service", "wormhole_exit"),
+    "rail-owner-2006": (*PATHS, "wormhole_exit"),
+    "rail-controller-reverse": ROUTES,
+    "rail-controller-service": ROUTES,
+    "rail-controller-crossing": (*ROUTES, *CROSSINGS),
+    "rail-controller-collision": (*TICKS, "free_path", "collision", "crash_delete"),
+    "rail-controller-reservation": BLOCKED,
+    "rail-controller-reservation-reverse": (*BLOCKED, "stuck_reverse", "reversal"),
+}
+
+
+def train_required(scenario):
+    name = scenario["name"]
+    return TRAIN_BRANCHES[
+        max((k for k in TRAIN_BRANCHES if name.startswith(k)), key=len)
+    ]
 
 
 def normalize(source, directory):
@@ -539,7 +589,6 @@ def controller_witnesses(scenario, run, mode):
         ]
         for head in (8, 14)
     }
-    profile = run["snapshots"][-1].parents[2] / "train-profile.json"
     crossings = [
         {
             "crossing": chunks["MAPT"]["raw"][4183] >> 4 == 2
@@ -551,16 +600,6 @@ def controller_witnesses(scenario, run, mode):
     ]
     events = [line for line in run["log"] if "RAIL-" in line]
     action = scenario["rail_control"]
-    counts = json.loads(profile.read_text()) if profile.is_file() else {}
-    required = {
-        "reverse": ("reversal",),
-        "service": ("depot_start",),
-        "crossing": ("cross_bar", "cross_unbar"),
-        "collision": ("collision", "crash_delete"),
-        "reservation": ("extension_fail", "extension_rollback"),
-    }
-    if counts and any(not counts[name] for name in required[action]):
-        raise RuntimeError(f"rail controller lacks profiled {action} branches")
     if action == "collision":
         for head in (8, 14):
             if (
@@ -578,10 +617,14 @@ def controller_witnesses(scenario, run, mode):
             for command in ("skip", "remove-signal", "pbs", "opposing-pbs")
         ):
             raise RuntimeError("rail reservation setup command failed")
-        if (
-            not observations[-1][8]["train[0]/flags"] & 256
-            or heads[8][-1]["tile"] != heads[8][0]["tile"]
-        ):
+        stopped = (
+            observations[-1][8]["train[0]/flags"] & 256
+            and heads[8][-1]["tile"] == heads[8][0]["tile"]
+        )
+        if "reverse" in scenario["name"]:
+            if heads[8][-1]["direction"] == heads[8][0]["direction"]:
+                raise RuntimeError("blocked rail controller did not reverse")
+        elif not stopped:
             raise RuntimeError(
                 "rail controller did not stop before occupied reservation"
             )
@@ -614,7 +657,6 @@ def controller_witnesses(scenario, run, mode):
     return {
         "heads": heads,
         "events": events,
-        "profile": counts,
         "crossings": crossings,
     }
 
@@ -622,6 +664,11 @@ def controller_witnesses(scenario, run, mode):
 def check(scenario, run, mode, role, result):
     if not scenario.get("rail_fixture"):
         return
+    counts = core.branch_witnesses(
+        scenario, run, role, "train-profile.json", train_required(scenario)
+    )
+    if counts is not None:
+        result[f"{mode}_{role}_train_profile"] = counts
     if scenario.get("owner_structure_reload"):
         if run["exit"] != 0 or not run["snapshots"]:
             raise RuntimeError("owner structure window lacks exit checkpoint")

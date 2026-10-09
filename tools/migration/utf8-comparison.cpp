@@ -198,6 +198,8 @@ int main()
 		Decode(trailing);
 	}
 	for (unsigned int byte = 0; byte < 256; ++byte) {
+		const char value = static_cast<char>(byte);
+		Decode({&value, 1});
 		std::cout << "part " << byte << " -> " << IsUtf8Part(static_cast<char>(byte)) << '\n';
 	}
 	const std::string_view malformed[] = {

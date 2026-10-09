@@ -17,13 +17,19 @@ The reservation case translates both real consists along their existing line,
 parks the second and copies the source TRACK_Y reservation onto occupied tiles.
 The AI skips the first train's loading order through the ordinary command and
 builds PBS signals. The first train remains blocked; every checkpoint must show
-that the corridor's partially extended reservations were cleared. With profiling
-enabled, `extension_fail` and `extension_rollback` must be positive. These are
-controller extension branches, distinct from YAPF's search rollback.
+that the corridor's partially extended reservations were cleared. Its
+`-reverse` variant also sets `pf.reverse_at_signals`, so the blocked train
+reverses after waiting. The candidate's `extension_fail` and `extension_rollback`
+must be positive. These are controller extension branches, distinct from YAPF's
+search rollback.
+
+Every rail scenario enables `train-profile.json` for a distinct candidate and
+fails when it is missing or a branch in `rails.TRAIN_BRANCHES` is zero; the
+reference, `--self` and `--benchmark` runs do not count branches.
 
 ```sh
-OPENTTD_TRAIN_PROFILE=1 python3 tools/migration.py simulate rail-controller --self --jobs 2
-OPENTTD_TRAIN_PROFILE=1 python3 tools/migration.py simulate rail-controller --jobs 2
+python3 tools/migration.py simulate rail-controller --self --jobs 2
+python3 tools/migration.py simulate rail-controller --jobs 2
 ```
 
 The inputs do not witness articulated/unequal-length trains, bridge/tunnel

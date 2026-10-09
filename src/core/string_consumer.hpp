@@ -17,6 +17,7 @@
 #include <bit>
 #include "../rust/ffi.h"
 #include "../rust/consumer_ffi.h"
+#include "utf8.hpp"
 #endif
 #include "format.hpp"
 
@@ -57,6 +58,9 @@ private:
 
 #ifdef WITH_RUST
 	static_assert(npos == SIZE_MAX);
+	std::string_view PeekClamped(size_type len) const;
+	std::string_view ReadClamped(size_type len);
+	void SkipClamped(size_type len);
 
 	OpenTTDRustConsumerByte PeekBinary(uint8_t width) const
 	{
@@ -444,7 +448,14 @@ public:
 	 * Peek UTF-8 character.
 	 * @return Length and read char, {0, 0} if no valid data.
 	 */
+#ifdef WITH_RUST
+	[[nodiscard]] std::pair<size_type, char32_t> PeekUtf8() const
+	{
+		return DecodeUtf8(this->src.substr(this->position));
+	}
+#else
 	[[nodiscard]] std::pair<size_type, char32_t> PeekUtf8() const;
+#endif
 	/**
 	 * Try to read a UTF-8 character, and then advance reader.
 	 */
@@ -574,7 +585,15 @@ public:
 	 * @param len Bytes to read, 'npos' to read all.
 	 * @return Up to 'len' bytes.
 	 */
+#ifdef WITH_RUST
+	[[nodiscard]] std::string_view Peek(size_type len) const
+	{
+		if (len <= this->GetBytesLeft()) return this->src.substr(this->position, len);
+		return this->PeekClamped(len);
+	}
+#else
 	[[nodiscard]] std::string_view Peek(size_type len) const;
+#endif
 	/**
 	 * Read the next 'len' bytes, and advance reader.
 	 * @param len Bytes to read, 'npos' to read all.
@@ -583,11 +602,12 @@ public:
 	[[nodiscard]] std::string_view Read(size_type len)
 	{
 #ifdef WITH_RUST
-		auto bounds = openttd_rust_consumer_bound(this->src.size(), this->position, len);
-		auto result = this->src.substr(this->position, bounds.length);
-		if (bounds.shortfall) LogError(fmt::format("Source buffer too short: {} > {}", len, bounds.length));
-		this->position = bounds.position; // Commit only after the original logger returns.
-		return result;
+		if (len <= this->GetBytesLeft()) {
+			auto result = this->src.substr(this->position, len);
+			this->position += len;
+			return result;
+		}
+		return this->ReadClamped(len);
 #else
 		auto result = this->Peek(len);
 		if (len != npos && len != result.size()) {
@@ -601,7 +621,18 @@ public:
 	 * Discard some bytes.
 	 * @param len Number of bytes to skip, 'npos' to skip all.
 	 */
+#ifdef WITH_RUST
+	void Skip(size_type len)
+	{
+		if (len <= this->GetBytesLeft()) {
+			this->position += len;
+		} else {
+			this->SkipClamped(len);
+		}
+	}
+#else
 	void Skip(size_type len);
+#endif
 
 	/**
 	 * Find first occurrence of 'str'.
