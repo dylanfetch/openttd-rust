@@ -1441,22 +1441,20 @@ inflation/recession, score parts and the company tick cursor. Original selected
 bodies compile only in portable builds; identity, settings, network transport,
 UI, AI objects and shared map/pools/group/infrastructure services remain C++.
 One Rust allocation per CompanyProperties holds finance/history fields with C++
-field lifetimes and stable addresses. Copies allocate; assignment keeps addresses.
-Modern/legacy descriptors keep names/widths and operate directly on that storage,
-so save errors never cross Rust. Economy/prices/scores have process lifetimes;
-ABI210-214 check layouts. Panics/OOM/environmental failures abort.
-Direct leaves are noexcept; copied IDs/scalars end all field accesses before
-company-control Post, AI start/stop, tile handlers, shared destruction, allocation
-and nested service-interval commands return to C++ for ordinary reentry.
-`python3 tools/migration.py simulate companies --jobs 1` compares all chunks/RNG
-for warning/sale/rank/tie/timeout/limit/acquisition/recovery/deletion/ID reuse,
-finance and reload; `companies-finance --soak` extends periodic accounting.
-Native CTest covers property lifetimes and network deferred deletion. `python3
--m tools.simulation.companies` compares 40,320 unchanged-reference financial
-command boundary/test/execute cases unavailable through AI scripting.
-Actual transfers cover a road bus/depot/station/group and town rating. Subsidies,
-exclusive rights, goals/story pages, hostile purchase, multiplayer runtime,
-arbitrary NewGRFs and complete historical saves remain evidence limits.
+field lifetimes and stable addresses; economy/prices/scores have process lifetimes.
+#192 makes every entry a named synchronous call taking borrowed designated tables
+(`OpenTTDCompanyFinanceServices`, `OpenTTDCompanyServices`) of typed noexcept
+services; facades resolve owners and settings once. Pool scans filter owner, then
+type, before detail reads; tile-owner changes, deletions, allocation, the nested
+service-interval command, the bankruptcy Post and `StopAI` run directly. Only
+`AI::StartNew` (script memory policy can throw before ScriptInstance's catch) and
+the `CCA_NEW_AI` Post return through caller-owned stack frames (startup, control,
+tick, competitor timeout). ABI 210-214 and 400-417 check layouts.
+`python3 tools/migration.py simulate companies economy` compares all chunks/RNG;
+`python3 -m tools.simulation.companies` runs 40,320 unchanged-reference financial
+command cases. Native CTest covers lifetimes, network deferred deletion, posting
+order and abandoned startup frames. Subsidies, exclusive rights, goals/story
+pages, hostile purchase, multiplayer runtime and NewGRFs remain evidence limits.
 ### Rail YAPF search, caches and reservation
 
 [#133](https://github.com/dylanfetch/openttd-rust/pull/133) moves all four searches,
