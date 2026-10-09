@@ -7,225 +7,225 @@
 
 /** @file train_reservation_services.h Direct map/PBS/follower services. */
 
-static uint64_t TrainReservationAllCompat(void *context, OpenTTDTrainHandle id) noexcept
+static uint64_t TrainReservationAllCompat(void *, OpenTTDTrainHandle id) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
 	return GetAllCompatibleRailTypes(v->GetRailTypes()).base();
 }
-static uint64_t TrainReservationBackoff(void *context, OpenTTDTrainHandle) noexcept
+static uint64_t TrainReservationBackoff(void *, OpenTTDTrainHandle) noexcept
 {
 	return _settings_game.pf.path_backoff_interval;
 }
-static uint64_t TrainReservationBitsTrack(void *context, OpenTTDTrainHandle, uint8_t a) noexcept
+static uint64_t TrainReservationBitsTrack(void *, OpenTTDTrainHandle, uint8_t a) noexcept
 {
 	return TrackBitsToTrack(static_cast<TrackBits>(a));
 }
-static uint64_t TrainReservationBlocking(void *context, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
+static uint64_t TrainReservationBlocking(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	return HasOnewaySignalBlockingTrackdir(t, static_cast<Trackdir>(b));
 }
-static uint64_t TrainReservationCheckReverse(void *context, OpenTTDTrainHandle id) noexcept
+static uint64_t TrainReservationCheckReverse(void *, OpenTTDTrainHandle id) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
 	return YapfTrainCheckReverse(v);
 }
-static uint64_t TrainReservationCompatStation(void *context, OpenTTDTrainHandle, uint32_t a, uint32_t b) noexcept
+static uint64_t TrainReservationCompatStation(void *, OpenTTDTrainHandle, uint32_t a, uint32_t b) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	return IsCompatibleTrainStationTile(t, TileIndex(static_cast<uint32_t>(b)));
 }
-static uint64_t TrainReservationConditional(void *context, OpenTTDTrainHandle id, uint8_t a) noexcept
+static uint64_t TrainReservationConditional(void *, OpenTTDTrainHandle id, uint8_t a) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
 	return ProcessConditionalOrder(v->GetOrder(static_cast<VehicleOrderID>(a)), v);
 }
-static void TrainReservationCopyOrder(void *context, OpenTTDTrainHandle id, uint8_t a) noexcept
+static void TrainReservationCopyOrder(void *, OpenTTDTrainHandle id, uint8_t a) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
 	v->current_order = *v->GetOrder(static_cast<VehicleOrderID>(a));
 }
-static uint64_t TrainReservationCrossDirs(void *context, OpenTTDTrainHandle, uint8_t a) noexcept
+static uint64_t TrainReservationCrossDirs(void *, OpenTTDTrainHandle, uint8_t a) noexcept
 {
 	return TrackdirCrossesTrackdirs(static_cast<Trackdir>(a));
 }
-static uint64_t TrainReservationCrossTracks(void *context, OpenTTDTrainHandle, uint8_t a) noexcept
+static uint64_t TrainReservationCrossTracks(void *, OpenTTDTrainHandle, uint8_t a) noexcept
 {
 	return TrackCrossesTracks(static_cast<Track>(a));
 }
-static uint64_t TrainReservationDepotDir(void *context, OpenTTDTrainHandle, uint32_t a) noexcept
+static uint64_t TrainReservationDepotDir(void *, OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	return GetRailDepotDirection(t);
 }
-static uint64_t TrainReservationDepotReserved(void *context, OpenTTDTrainHandle, uint32_t a) noexcept
+static uint64_t TrainReservationDepotReserved(void *, OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	return HasDepotReservation(t);
 }
-static uint64_t TrainReservationDiagReachDirs(void *context, OpenTTDTrainHandle, uint8_t a) noexcept
+static uint64_t TrainReservationDiagReachDirs(void *, OpenTTDTrainHandle, uint8_t a) noexcept
 {
 	return DiagdirReachesTrackdirs(static_cast<DiagDirection>(a));
 }
-static uint64_t TrainReservationDiagTrack(void *context, OpenTTDTrainHandle, uint8_t a) noexcept
+static uint64_t TrainReservationDiagTrack(void *, OpenTTDTrainHandle, uint8_t a) noexcept
 {
 	return DiagDirToDiagTrack(static_cast<DiagDirection>(a));
 }
-static uint64_t TrainReservationEnterTd(void *context, OpenTTDTrainHandle, uint8_t a, uint8_t b) noexcept
+static uint64_t TrainReservationEnterTd(void *, OpenTTDTrainHandle, uint8_t a, uint8_t b) noexcept
 {
 	return TrackEnterdirToTrackdir(static_cast<Track>(a), static_cast<DiagDirection>(b));
 }
-static uint64_t TrainReservationExitDir(void *context, OpenTTDTrainHandle, uint8_t a) noexcept
+static uint64_t TrainReservationExitDir(void *, OpenTTDTrainHandle, uint8_t a) noexcept
 {
 	return TrackdirToExitdir(static_cast<Trackdir>(a));
 }
-static uint64_t TrainReservationFree(void *context, OpenTTDTrainHandle id, uint32_t a, uint8_t b) noexcept
+static uint64_t TrainReservationFree(void *, OpenTTDTrainHandle id, uint32_t a, uint8_t b) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
 	TileIndex t(static_cast<uint32_t>(a));
 	return IsWaitingPositionFree(v, t, static_cast<Trackdir>(b), _settings_game.pf.forbid_90_deg);
 }
-static uint64_t TrainReservationGreen(void *context, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
+static uint64_t TrainReservationGreen(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	return GetSignalStateByTrackdir(t, static_cast<Trackdir>(b)) == SIGNAL_STATE_GREEN;
 }
-static uint64_t TrainReservationHasPbs(void *context, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
+static uint64_t TrainReservationHasPbs(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	return HasPbsSignalOnTrackdir(t, static_cast<Trackdir>(b));
 }
-static uint64_t TrainReservationHasReserved(void *context, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
+static uint64_t TrainReservationHasReserved(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	return HasReservedTracks(t, static_cast<TrackBits>(b));
 }
-static uint64_t TrainReservationHasSignal(void *context, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
+static uint64_t TrainReservationHasSignal(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	return HasSignalOnTrackdir(t, static_cast<Trackdir>(b));
 }
-static void TrainReservationIncrementOrder(void *context, OpenTTDTrainHandle id) noexcept
+static void TrainReservationIncrementOrder(void *, OpenTTDTrainHandle id) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
 	v->IncrementRealOrderIndex();
 }
-static uint64_t TrainReservationIsBridge(void *context, OpenTTDTrainHandle, uint32_t a) noexcept
+static uint64_t TrainReservationIsBridge(void *, OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	return IsBridge(t);
 }
-static uint64_t TrainReservationIsDepot(void *context, OpenTTDTrainHandle, uint32_t a) noexcept
+static uint64_t TrainReservationIsDepot(void *, OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	return IsRailDepotTile(t);
 }
-static uint64_t TrainReservationIsPbs(void *context, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
+static uint64_t TrainReservationIsPbs(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	return IsPbsSignal(GetSignalType(t, static_cast<Track>(b)));
 }
-static uint64_t TrainReservationIsPlain(void *context, OpenTTDTrainHandle, uint32_t a) noexcept
+static uint64_t TrainReservationIsPlain(void *, OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	return IsPlainRail(t);
 }
-static uint64_t TrainReservationIsRailway(void *context, OpenTTDTrainHandle, uint32_t a) noexcept
+static uint64_t TrainReservationIsRailway(void *, OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	return IsTileType(t, MP_RAILWAY);
 }
-static uint64_t TrainReservationIsStation(void *context, OpenTTDTrainHandle, uint32_t a) noexcept
+static uint64_t TrainReservationIsStation(void *, OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	return IsRailStationTile(t);
 }
-static uint64_t TrainReservationIsTunnel(void *context, OpenTTDTrainHandle, uint32_t a) noexcept
+static uint64_t TrainReservationIsTunnel(void *, OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	return IsTileType(t, MP_TUNNELBRIDGE);
 }
-static uint64_t TrainReservationIsWaypoint(void *context, OpenTTDTrainHandle, uint32_t a) noexcept
+static uint64_t TrainReservationIsWaypoint(void *, OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	return IsRailWaypointTile(t);
 }
-static uint64_t TrainReservationLineReverse(void *context, OpenTTDTrainHandle) noexcept
+static uint64_t TrainReservationLineReverse(void *, OpenTTDTrainHandle) noexcept
 {
 	return _settings_game.difficulty.line_reverse_mode;
 }
-static void TrainReservationMarkBridge(void *context, OpenTTDTrainHandle, uint32_t a) noexcept
+static void TrainReservationMarkBridge(void *, OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	MarkBridgeDirty(t);
 }
-static void TrainReservationMarkTile(void *context, OpenTTDTrainHandle, uint32_t a) noexcept
+static void TrainReservationMarkTile(void *, OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	MarkTileDirtyByTile(t);
 }
-static uint64_t TrainReservationNeedsService(void *context, OpenTTDTrainHandle id) noexcept
+static uint64_t TrainReservationNeedsService(void *, OpenTTDTrainHandle id) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
 	return v->NeedsServicing();
 }
-static uint64_t TrainReservationOneway(void *context, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
+static uint64_t TrainReservationOneway(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	return IsOnewaySignal(t, static_cast<Track>(b));
 }
-static uint64_t TrainReservationOrderService(void *context, OpenTTDTrainHandle id, uint8_t a) noexcept
+static uint64_t TrainReservationOrderService(void *, OpenTTDTrainHandle id, uint8_t a) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
 	return v->GetOrder(static_cast<VehicleOrderID>(a))->GetDepotOrderType().Test(OrderDepotTypeFlag::Service);
 }
-static uint64_t TrainReservationOrderStop(void *context, OpenTTDTrainHandle id, uint16_t a) noexcept
+static uint64_t TrainReservationOrderStop(void *, OpenTTDTrainHandle id, uint16_t a) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
 	return v->current_order.ShouldStopAtStation(v, StationID(static_cast<uint16_t>(a)));
 }
-static uint64_t TrainReservationOrderType(void *context, OpenTTDTrainHandle id, uint8_t a) noexcept
+static uint64_t TrainReservationOrderType(void *, OpenTTDTrainHandle id, uint8_t a) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
 	return v->GetOrder(static_cast<VehicleOrderID>(a))->GetType();
 }
-static uint64_t TrainReservationOtherEnd(void *context, OpenTTDTrainHandle, uint32_t a) noexcept
+static uint64_t TrainReservationOtherEnd(void *, OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	return GetOtherTunnelBridgeEnd(t).base();
 }
-static uint64_t TrainReservationOverlap(void *context, OpenTTDTrainHandle, uint8_t a) noexcept
+static uint64_t TrainReservationOverlap(void *, OpenTTDTrainHandle, uint8_t a) noexcept
 {
 	return TracksOverlap(static_cast<TrackBits>(a));
 }
-static void TrainReservationPathResult(void *context, OpenTTDTrainHandle id, uint8_t a) noexcept
+static void TrainReservationPathResult(void *, OpenTTDTrainHandle id, uint8_t a) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
 	v->HandlePathfindingResult(a != 0);
 }
-static void TrainReservationProfile(void *context, OpenTTDTrainHandle, uint64_t a) noexcept
+static void TrainReservationProfile(void *, OpenTTDTrainHandle, uint64_t a) noexcept
 {
 	if (_train_profile.enabled) ++_train_profile.counts[a];
 }
-static uint64_t TrainReservationRail90(void *context, OpenTTDTrainHandle, uint32_t a, uint32_t b) noexcept
+static uint64_t TrainReservationRail90(void *, OpenTTDTrainHandle, uint32_t a, uint32_t b) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	return Rail90DegTurnDisallowed(GetTileRailType(t), GetTileRailType(TileIndex(static_cast<uint32_t>(b))));
 }
-static uint64_t TrainReservationReachDirs(void *context, OpenTTDTrainHandle, uint8_t a) noexcept
+static uint64_t TrainReservationReachDirs(void *, OpenTTDTrainHandle, uint8_t a) noexcept
 {
 	return TrackdirReachesTrackdirs(static_cast<Trackdir>(a));
 }
-static uint64_t TrainReservationReachTracks(void *context, OpenTTDTrainHandle, uint8_t a) noexcept
+static uint64_t TrainReservationReachTracks(void *, OpenTTDTrainHandle, uint8_t a) noexcept
 {
 	return DiagdirReachesTracks(static_cast<DiagDirection>(a));
 }
-static uint64_t TrainReservationReserved(void *context, OpenTTDTrainHandle, uint32_t a) noexcept
+static uint64_t TrainReservationReserved(void *, OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	return GetReservedTrackbits(t);
 }
-static uint64_t TrainReservationReservePaths(void *context, OpenTTDTrainHandle) noexcept
+static uint64_t TrainReservationReservePaths(void *, OpenTTDTrainHandle) noexcept
 {
 	return _settings_game.pf.reserve_paths;
 }
@@ -235,7 +235,7 @@ static void TrainReservationRestoreOrder(void *context, OpenTTDTrainHandle id) n
 	auto *ctx = static_cast<TrainReservationContext *>(context);
 	v->current_order = *ctx->saved_order;
 }
-static uint64_t TrainReservationSafe(void *context, OpenTTDTrainHandle id, uint32_t a, uint8_t b) noexcept
+static uint64_t TrainReservationSafe(void *, OpenTTDTrainHandle id, uint32_t a, uint8_t b) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
 	TileIndex t(static_cast<uint32_t>(a));
@@ -247,126 +247,126 @@ static void TrainReservationSaveOrder(void *context, OpenTTDTrainHandle id) noex
 	auto *ctx = static_cast<TrainReservationContext *>(context);
 	ctx->saved_order.emplace(v->current_order);
 }
-static void TrainReservationService(void *context, OpenTTDTrainHandle id) noexcept
+static void TrainReservationService(void *, OpenTTDTrainHandle id) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
 	CheckIfTrainNeedsService(v);
 }
-static void TrainReservationSetDepot(void *context, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
+static void TrainReservationSetDepot(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	SetDepotReservation(t, b != 0);
 }
-static void TrainReservationSetDepotDest(void *context, OpenTTDTrainHandle id, uint32_t a) noexcept
+static void TrainReservationSetDepotDest(void *, OpenTTDTrainHandle id, uint32_t a) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
 	TileIndex t(static_cast<uint32_t>(a));
 	v->current_order.SetDestination(GetDepotIndex(t));
 }
-static void TrainReservationSetPlatform(void *context, OpenTTDTrainHandle, uint32_t a, uint8_t b, uint8_t c) noexcept
+static void TrainReservationSetPlatform(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b, uint8_t c) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	SetRailStationPlatformReservation(t, static_cast<DiagDirection>(b), c != 0);
 }
-static void TrainReservationSetSignal(void *context, OpenTTDTrainHandle, uint32_t a, uint8_t b, uint8_t c) noexcept
+static void TrainReservationSetSignal(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b, uint8_t c) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	SetSignalStateByTrackdir(t, static_cast<Trackdir>(b), c != 0 ? SIGNAL_STATE_GREEN : SIGNAL_STATE_RED);
 }
-static void TrainReservationSetTunnel(void *context, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
+static void TrainReservationSetTunnel(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	SetTunnelBridgeReservation(t, b != 0);
 }
-static uint64_t TrainReservationShowRes(void *context, OpenTTDTrainHandle) noexcept
+static uint64_t TrainReservationShowRes(void *, OpenTTDTrainHandle) noexcept
 {
 	return _settings_client.gui.show_track_reservation;
 }
-static void TrainReservationSignalBuffer(void *context, OpenTTDTrainHandle id, uint32_t a, uint8_t b) noexcept
+static void TrainReservationSignalBuffer(void *, OpenTTDTrainHandle id, uint32_t a, uint8_t b) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
 	TileIndex t(static_cast<uint32_t>(a));
 	AddSideToSignalBuffer(t, static_cast<DiagDirection>(b), v->owner);
 }
-static void TrainReservationStartStop(void *context, OpenTTDTrainHandle id) noexcept
+static void TrainReservationStartStop(void *, OpenTTDTrainHandle id) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
 	SetWindowWidgetDirty(WC_VEHICLE_VIEW, v->index, WID_VV_START_STOP);
 }
-static uint64_t TrainReservationStation(void *context, OpenTTDTrainHandle, uint32_t a) noexcept
+static uint64_t TrainReservationStation(void *, OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	return GetStationIndex(t).base();
 }
-static uint64_t TrainReservationStationTrain(void *context, OpenTTDTrainHandle, uint16_t a) noexcept
+static uint64_t TrainReservationStationTrain(void *, OpenTTDTrainHandle, uint16_t a) noexcept
 {
 	return Station::Get(StationID(static_cast<uint16_t>(a)))->facilities.Test(StationFacility::Train);
 }
-static uint64_t TrainReservationStationXy(void *context, OpenTTDTrainHandle, uint16_t a) noexcept
+static uint64_t TrainReservationStationXy(void *, OpenTTDTrainHandle, uint16_t a) noexcept
 {
 	return Station::Get(StationID(static_cast<uint16_t>(a)))->xy.base();
 }
-static void TrainReservationStuck(void *context, OpenTTDTrainHandle id) noexcept
+static void TrainReservationStuck(void *, OpenTTDTrainHandle id) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
 	MarkTrainAsStuck(v);
 }
-static uint64_t TrainReservationTileAdd(void *context, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
+static uint64_t TrainReservationTileAdd(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	return TileAddByDiagDir(t, static_cast<DiagDirection>(b)).base();
 }
-static uint64_t TrainReservationTileOffset(void *context, OpenTTDTrainHandle, uint8_t a) noexcept
+static uint64_t TrainReservationTileOffset(void *, OpenTTDTrainHandle, uint8_t a) noexcept
 {
 	return static_cast<uint64_t>(static_cast<int64_t>(TileOffsByDiagDir(static_cast<DiagDirection>(a))));
 }
-static uint64_t TrainReservationTrackdir(void *context, OpenTTDTrainHandle id) noexcept
+static uint64_t TrainReservationTrackdir(void *, OpenTTDTrainHandle id) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
 	return v->GetVehicleTrackdir();
 }
-static uint64_t TrainReservationTrackStatus(void *context, OpenTTDTrainHandle, uint32_t a) noexcept
+static uint64_t TrainReservationTrackStatus(void *, OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	return TrackStatusToTrackdirBits(GetTileTrackStatus(t, TRANSPORT_RAIL, 0));
 }
-static uint64_t TrainReservationTryTrack(void *context, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
+static uint64_t TrainReservationTryTrack(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	return TryReserveRailTrack(t, static_cast<Track>(b));
 }
-static uint64_t TrainReservationTunnelDir(void *context, OpenTTDTrainHandle, uint32_t a) noexcept
+static uint64_t TrainReservationTunnelDir(void *, OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	return GetTunnelBridgeDirection(t);
 }
-static uint64_t TrainReservationTunnelFree(void *context, OpenTTDTrainHandle id, uint32_t a, uint32_t b) noexcept
+static uint64_t TrainReservationTunnelFree(void *, OpenTTDTrainHandle id, uint32_t a, uint32_t b) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
 	TileIndex t(static_cast<uint32_t>(a));
 	return TunnelBridgeIsFree(t, TileIndex(static_cast<uint32_t>(b)), v).Succeeded();
 }
-static void TrainReservationUnreserve(void *context, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
+static void TrainReservationUnreserve(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	UnreserveRailTrack(t, static_cast<Track>(b));
 }
-static void TrainReservationUpdateBuffer(void *context, OpenTTDTrainHandle) noexcept
+static void TrainReservationUpdateBuffer(void *, OpenTTDTrainHandle) noexcept
 {
 	UpdateSignalsInBuffer();
 }
-static void TrainReservationWriteDest(void *context, OpenTTDTrainHandle id, uint32_t a) noexcept
+static void TrainReservationWriteDest(void *, OpenTTDTrainHandle id, uint32_t a) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
 	TileIndex t(static_cast<uint32_t>(a));
 	v->dest_tile = t;
 }
-static void TrainReservationWriteLast(void *context, OpenTTDTrainHandle id, uint16_t a) noexcept
+static void TrainReservationWriteLast(void *, OpenTTDTrainHandle id, uint16_t a) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
 	v->last_station_visited = StationID(static_cast<uint16_t>(a));
 }
-static void TrainReservationWriteSuppress(void *context, OpenTTDTrainHandle id, uint8_t a) noexcept
+static void TrainReservationWriteSuppress(void *, OpenTTDTrainHandle id, uint8_t a) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
 	AssignBit(v->gv_flags, GVF_SUPPRESS_IMPLICIT_ORDERS, a != 0);
