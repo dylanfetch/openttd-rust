@@ -29,12 +29,12 @@ isolated water patches and a cross-region aqueduct. Input/reload witnesses retai
 live ship path records. The native visitor probe covers cache mutations inside
 callbacks, which the ordinary ship AI cannot trigger during YAPF traversal.
 
-To measure map-query crossings, run with `OPENTTD_WATER_PROFILE=1`. The candidate
-writes a private `water-profile.json` into each run directory, copied into the
-harness report; the original is unchanged. Summarize the emitted report with:
+Witnessed candidate runs (not `--benchmark`) also count map-query crossings:
+the `water.*` counters of `branch-witnesses.json` are copied into the harness
+report; the original is unchanged. Summarize the emitted report with:
 
 ```sh
-OPENTTD_WATER_PROFILE=1 python3 tools/migration.py simulate water --soak --jobs 2
+python3 tools/migration.py simulate water --soak --jobs 2
 PYTHONPATH=tools python3 -m simulation.ships <report.json>
 ```
 

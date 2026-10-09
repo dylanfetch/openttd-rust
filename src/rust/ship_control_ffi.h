@@ -167,8 +167,6 @@ extern "C" {
  * Accessors retain no borrow; callers narrow exactly like C++.
  * Modern/legacy staging commits partial loads on unwind outside Rust frames.
  * Panics/OOM abort. One destruction follows PreDestructor, including pool cleanup. */
-void openttd_rust_ship_control_profile_enable();
-uint64_t openttd_rust_ship_control_profile(uint8_t);
 void openttd_rust_ship_control_reload_rotation();
 OpenTTDShipState *openttd_rust_ship_state_new();
 void openttd_rust_ship_state_destroy(OpenTTDShipState *);

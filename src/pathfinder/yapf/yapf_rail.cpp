@@ -22,7 +22,6 @@
 #ifdef WITH_RUST
 #include "../../rust/rail_yapf_ffi.h"
 #include <cstdio>
-#include <cstdlib>
 
 struct RailYapfContext {
 	const Train *train;
@@ -30,24 +29,6 @@ struct RailYapfContext {
 	PBSTileInfo *target = nullptr;
 	TileIndex *destination = nullptr;
 };
-struct RailYapfProfile {
-	bool enabled = std::getenv("OPENTTD_RAIL_PROFILE") != nullptr;
-	uint64_t counts[23]{};
-	~RailYapfProfile()
-	{
-		if (!this->enabled) return;
-		const char *personal = std::getenv("HOME");
-		if (personal == nullptr) return;
-		if (FILE *file = std::fopen(fmt::format("{}/rail-profile.json", personal).c_str(), "w")) {
-			constexpr const char *names[] = {"choose", "reverse", "depot", "safe", "cached", "uncached", "partial_paths", "bounded_depot", "found", "allow90", "forbid90", "cache_flushes", "reserve_attempts", "target_busy", "reserve_success", "rollback", "invalidations", "reverse_chosen", "depot_found", "safe_found", "limit_stops", "signals_red", "signals_restored"};
-			fmt::print(file, "{{");
-			for (size_t i = 0; i < std::size(names); ++i) fmt::print(file, "{}\"{}\":{}", i == 0 ? "" : ",", names[i], this->counts[i]);
-			fmt::print(file, "}}\n");
-			std::fclose(file);
-		}
-	}
-};
-static RailYapfProfile _rail_yapf_profile;
 static OpenTTDRailTrain RailTrain(void *context) noexcept
 {
 	const Train *v = static_cast<RailYapfContext *>(context)->train;
@@ -221,17 +202,6 @@ static void RailDebug(void *context, uint8_t kind, const uint32_t *stats, uint32
 		assert(file.has_value());
 		fwrite(dmp.m_out.data(), 1, dmp.m_out.size(), *file);
 	}
-	if (!_rail_yapf_profile.enabled) return;
-	if (kind == 1) {
-		++_rail_yapf_profile.counts[stats[0]];
-		++_rail_yapf_profile.counts[stats[1] ? 4 : 5];
-		_rail_yapf_profile.counts[6] += stats[2];
-		_rail_yapf_profile.counts[7] += stats[3];
-		_rail_yapf_profile.counts[8] += stats[4];
-		++_rail_yapf_profile.counts[stats[5] ? 10 : 9];
-	} else if (kind == 2) ++_rail_yapf_profile.counts[11];
-	else if (kind == 4) ++_rail_yapf_profile.counts[12 + stats[0]];
-	else if (kind == 5) ++_rail_yapf_profile.counts[20 + stats[0]];
 }
 static const OpenTTDRailLeaves _rail_leaves{RailTrain, RailTile, RailFollow, RailSafe, RailFree, RailCompatibleStation, RailPlatformLength, RailClosestStation, RailDestinationDirs, RailOrigin, RailWrite, RailOutput, RailDebug};
 static OpenTTDRailStep RailRun(RailYapfContext &context, uint8_t kind, TileIndex tile = INVALID_TILE, Trackdir td = INVALID_TRACKDIR, bool override_railtype = false, bool reserve = false, int max_cost = 0)
@@ -246,14 +216,7 @@ static OpenTTDRailStep RailRun(RailYapfContext &context, uint8_t kind, TileIndex
 	Owner owner{openttd_rust_rail_new(&input, &_rail_leaves), openttd_rust_rail_destroy};
 	for (;;) {
 		const auto result = openttd_rust_rail_step(owner.get());
-		if (result.action == 0) {
-			if (_rail_yapf_profile.enabled) {
-				if (kind == 1 && result.value) ++_rail_yapf_profile.counts[17];
-				if (kind == 2 && result.tile != INVALID_TILE.base()) ++_rail_yapf_profile.counts[18];
-				if (kind == 3 && result.value) ++_rail_yapf_profile.counts[19];
-			}
-			return result;
-		}
+		if (result.action == 0) return result;
 		/* These NewGRF callbacks are the only ordinary reentry boundary. Rust
 		 * returned before them, releasing owner and bank access scopes. */
 		const TileIndex trigger{result.tile};
@@ -287,7 +250,6 @@ bool YapfTrainFindNearestSafeTile(const Train *v, TileIndex tile, Trackdir td, b
 void YapfNotifyTrackLayoutChange(TileIndex, Track)
 {
 	openttd_rust_rail_invalidate();
-	if (_rail_yapf_profile.enabled) ++_rail_yapf_profile.counts[16];
 }
 #else
 

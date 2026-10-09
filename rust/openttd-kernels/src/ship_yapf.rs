@@ -712,6 +712,18 @@ unsafe fn origin_slice<'a>(p: *const u32, len: usize) -> &'a [u32] {
         unsafe { std::slice::from_raw_parts(p, len) }
     }
 }
+/// Branch witnesses: the 13 search statistics, the call kind and reverse choice.
+fn witness(result: &Result, call: usize) {
+    if crate::witness::enabled() {
+        for (index, &count) in result.stats.iter().enumerate() {
+            crate::witness::add(crate::witness::SHIP_YAPF + index, u64::from(count));
+        }
+        crate::witness::hit(crate::witness::SHIP_YAPF + call);
+        if call == 14 && result.found != 0 {
+            crate::witness::hit(crate::witness::SHIP_YAPF + 16);
+        }
+    }
+}
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_ship_choose(
     cache: *mut Path,
@@ -725,7 +737,7 @@ pub unsafe extern "C" fn openttd_rust_ship_choose(
     origins: *const u32,
     len: usize,
 ) -> Result {
-    unsafe {
+    let result = unsafe {
         choose(
             &mut *cache,
             &*input,
@@ -737,7 +749,9 @@ pub unsafe extern "C" fn openttd_rust_ship_choose(
             reverse,
             origin_slice(origins, len),
         )
-    }
+    };
+    witness(&result, 13);
+    result
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_ship_reverse(
@@ -784,6 +798,7 @@ pub unsafe extern "C" fn openttd_rust_ship_reverse(
     } else {
         result.found = u8::from(result.found != 0 && result.origin == reverse);
     }
+    witness(&result, if blocked != 0 { 15 } else { 14 });
     result
 }
 #[unsafe(no_mangle)]

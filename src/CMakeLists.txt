@@ -246,6 +246,7 @@ add_files(
     landscape.cpp
     rust/company_adapter.cpp
     rust/services.cpp
+    rust/witness.cpp
     rust/services_ffi.h
     rust/ffi.h
     landscape.h

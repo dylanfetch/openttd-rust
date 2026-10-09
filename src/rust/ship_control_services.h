@@ -6,8 +6,6 @@
  */
 
 /** @file ship_control_services.h Typed synchronous shared-world services. */
-#include <cstdio>
-#include <cstdlib>
 static_assert(MP_INDUSTRY == 8 && MP_TUNNELBRIDGE == 9 && TILE_HEIGHT == 8 && TILE_SIZE == 16);
 static_assert(TRACK_BIT_DEPOT == 128 && TRACK_BIT_WORMHOLE == 64 && HVOT_SHIP == 32);
 static_assert(to_underlying(WaterClass::Sea) == 0 && DIRDIFF_REVERSE == 4);
@@ -479,23 +477,3 @@ static const OpenTTDShipLeaves &GetShipServices()
 	};
 	return leaves;
 }
-
-/* Opt-in branch receipts are checked by ships.py alongside semantic saves. */
-struct ShipControlProfile {
-	bool enabled = std::getenv("OPENTTD_SHIP_PROFILE") != nullptr;
-	ShipControlProfile() { if (this->enabled) openttd_rust_ship_control_profile_enable(); }
-	~ShipControlProfile()
-	{
-		if (!this->enabled) return;
-		const char *personal = std::getenv("HOME");
-		if (personal == nullptr) return;
-		if (FILE *file = std::fopen(fmt::format("{}/ship-control-profile.json", personal).c_str(), "w")) {
-			constexpr const char *names[] = {"lock_up", "lock_down", "reverse", "rotate", "depot_leave", "auto_service", "buoy", "loading", "water_change", "aqueduct", "rotation_reload", "depot_search", "build", "economy_day", "path_cache", "depot_enter"};
-			fmt::print(file, "{{");
-			for (uint8_t i = 0; i < 16; ++i) fmt::print(file, "{}\"{}\":{}", i == 0 ? "" : ",", names[i], openttd_rust_ship_control_profile(i));
-			fmt::print(file, "}}\n");
-			std::fclose(file);
-		}
-	}
-};
-static ShipControlProfile _ship_control_profile;

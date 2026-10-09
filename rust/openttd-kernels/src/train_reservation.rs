@@ -185,7 +185,6 @@ pub struct Leaves {
     pub other_end: extern "C" fn(*mut std::ffi::c_void, Handle, u32) -> u64,
     pub overlap: extern "C" fn(*mut std::ffi::c_void, Handle, u8) -> u64,
     pub path_result: extern "C" fn(*mut std::ffi::c_void, Handle, u8),
-    pub profile: extern "C" fn(*mut std::ffi::c_void, Handle, u64),
     pub rail90: extern "C" fn(*mut std::ffi::c_void, Handle, u32, u32) -> u64,
     pub reach_dirs: extern "C" fn(*mut std::ffi::c_void, Handle, u8) -> u64,
     pub reach_tracks: extern "C" fn(*mut std::ffi::c_void, Handle, u8) -> u64,
@@ -401,10 +400,6 @@ impl Game<'_> {
         (self.leaves.path_result)(self.context, id, a as u8);
         0
     }
-    fn svc_profile(&self, id: Handle, a: u64) -> u64 {
-        (self.leaves.profile)(self.context, id, a);
-        0
-    }
     fn svc_rail90(&self, id: Handle, a: u64, b: u64) -> u64 {
         (self.leaves.rail90)(self.context, id, a as u32, b as u32)
     }
@@ -546,10 +541,6 @@ impl Game<'_> {
         (self.leaves.safe_track)(id, tile, td, u8::from(override_types)) != 0
     }
 
-    fn count(&self, id: Handle, index: u64) {
-        self.svc_profile(id, index);
-    }
-
     fn follow(&self, id: Handle, types: u64, ft: &mut Follow, tile: u32, td: u8) -> bool {
         ft.old_tile = tile;
         ft.old_td = td;
@@ -634,7 +625,7 @@ fn clear(g: &Game, id: Handle, tile: u32, td: u8) {
     }
 }
 fn free(g: &Game, id: Handle) {
-    g.count(id, 27);
+    crate::train::count(27);
     let v = g.read_free(id);
     let mut tile = v.tile;
     let mut td = g.td(id);
@@ -706,7 +697,7 @@ fn free(g: &Game, id: Handle) {
     g.svc_update_buffer(id);
 }
 fn extend(g: &Game, id: Handle, new_tracks: &mut u8, enterdir: &mut u8) -> Pbs {
-    g.count(id, 22);
+    crate::train::count(22);
     let origin = g.origin(id, false);
     let types = id.get_compatible_railtypes();
     let mut ft = Follow::default();
@@ -764,7 +755,7 @@ fn extend(g: &Game, id: Handle, new_tracks: &mut u8, enterdir: &mut u8) -> Pbs {
             if (g.svc_has_pbs(id, u64::from(tile), u64::from(rev)) != 0)
                 && (g.svc_green(id, u64::from(tile), u64::from(rev)) != 0)
             {
-                g.count(id, 25);
+                crate::train::count(25);
                 red.push((tile, rev));
                 g.signal(id, tile, rev, false);
                 g.svc_mark_tile(id, u64::from(tile));
@@ -782,7 +773,7 @@ fn extend(g: &Game, id: Handle, new_tracks: &mut u8, enterdir: &mut u8) -> Pbs {
         if (g.svc_has_pbs(id, u64::from(tile), u64::from(rev)) != 0)
             && (g.svc_green(id, u64::from(tile), u64::from(rev)) != 0)
         {
-            g.count(id, 25);
+            crate::train::count(25);
             red.push((tile, rev));
             g.signal(id, tile, rev, false);
             g.svc_mark_tile(id, u64::from(tile));
@@ -796,7 +787,7 @@ fn extend(g: &Game, id: Handle, new_tracks: &mut u8, enterdir: &mut u8) -> Pbs {
             other: Handle::NONE,
         };
     }
-    g.count(id, 23);
+    crate::train::count(23);
     tile = origin.tile;
     td = origin.td;
     let stopped = ft.old_tile;
@@ -810,11 +801,11 @@ fn extend(g: &Game, id: Handle, new_tracks: &mut u8, enterdir: &mut u8) -> Pbs {
         }
         tile = ft.new_tile;
         td = first(ft.dirs);
-        g.count(id, 24);
+        crate::train::count(24);
         g.unreserve(id, tile, td);
     }
     for (tile, td) in red {
-        g.count(id, 26);
+        crate::train::count(26);
         g.signal(id, tile, td, true);
     }
     Pbs::default()
@@ -843,7 +834,7 @@ impl<'a> Orders<'a> {
         }
     }
     fn restore(&mut self) {
-        self.g.count(self.id, 30);
+        crate::train::count(30);
         self.g.svc_restore_order(self.id);
         self.g.svc_write_dest(self.id, u64::from(self.dest));
         self.g.svc_write_last(self.id, u64::from(self.last));
@@ -851,7 +842,7 @@ impl<'a> Orders<'a> {
         self.restored = true;
     }
     fn next(&mut self, skip: bool) -> bool {
-        self.g.count(self.id, 29);
+        crate::train::count(29);
         let g = self.g;
         let id = self.id;
         if g.read_num_orders(id) == 0 {
@@ -915,7 +906,7 @@ fn choose(
     force: bool,
     mark: bool,
 ) -> (u8, bool) {
-    g.count(id, 28);
+    crate::train::count(28);
     let mut best = 0xff;
     let mut reserve = g.svc_reserve_paths(id) != 0 || force;
     let mut changed = false;
@@ -1448,7 +1439,6 @@ mod tests {
             other_end: unused!((*mut std::ffi::c_void, Handle, u32); u64),
             overlap: unused!((*mut std::ffi::c_void, Handle, u8); u64),
             path_result: unused!((*mut std::ffi::c_void, Handle, u8); ()),
-            profile: unused!((*mut std::ffi::c_void, Handle, u64); ()),
             rail90: unused!((*mut std::ffi::c_void, Handle, u32, u32); u64),
             reach_dirs: unused!((*mut std::ffi::c_void, Handle, u8); u64),
             reach_tracks: unused!((*mut std::ffi::c_void, Handle, u8); u64),
@@ -1536,7 +1526,6 @@ mod tests {
     extern "C" fn one_track(_: *mut std::ffi::c_void, _: Handle, _: u32, _: u8) -> u64 {
         1
     }
-    extern "C" fn profile(_: *mut std::ffi::c_void, _: Handle, _: u64) {}
     extern "C" fn origin(_: Handle, _: u8) -> Pbs {
         Pbs {
             tile: 0,
@@ -1603,7 +1592,6 @@ mod tests {
             set_signal: signal,
             unreserve,
             mark_tile: mark,
-            profile,
             origin,
             follow,
             ..leaves()
@@ -1718,7 +1706,6 @@ mod tests {
             write_dest,
             write_last,
             write_suppress,
-            profile,
             ..leaves()
         }
     }

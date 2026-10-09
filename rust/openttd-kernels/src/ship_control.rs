@@ -23,21 +23,8 @@ use crate::services::Services;
 use crate::water_regions::Patch;
 use std::cell::UnsafeCell;
 use std::collections::{HashSet, VecDeque};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-static PROFILE_ENABLED: AtomicBool = AtomicBool::new(false);
-static PROFILE: [AtomicU64; 16] = [const { AtomicU64::new(0) }; 16];
 fn witness(branch: usize) {
-    if PROFILE_ENABLED.load(Ordering::Relaxed) {
-        PROFILE[branch].fetch_add(1, Ordering::Relaxed);
-    }
-}
-#[unsafe(no_mangle)]
-pub extern "C" fn openttd_rust_ship_control_profile_enable() {
-    PROFILE_ENABLED.store(true, Ordering::Relaxed);
-}
-#[unsafe(no_mangle)]
-pub extern "C" fn openttd_rust_ship_control_profile(index: u8) -> u64 {
-    PROFILE[usize::from(index)].load(Ordering::Relaxed)
+    crate::witness::hit(crate::witness::SHIP + branch);
 }
 #[unsafe(no_mangle)]
 pub extern "C" fn openttd_rust_ship_control_reload_rotation() {

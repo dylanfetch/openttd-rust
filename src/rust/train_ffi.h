@@ -383,7 +383,6 @@ struct OpenTTDTrainServices {
 	uint64_t (*pow_wag_power)(OpenTTDTrainHandle) noexcept;
 	uint64_t (*price)(OpenTTDTrainHandle, uint32_t) noexcept;
 	uint64_t (*process_orders)(OpenTTDTrainHandle) noexcept;
-	void (*profile)(OpenTTDTrainHandle, uint64_t) noexcept;
 	uint64_t (*property)(OpenTTDTrainHandle, uint8_t, uint32_t) noexcept;
 	uint64_t (*railveh_wagon)(OpenTTDTrainHandle) noexcept;
 	uint64_t (*rail_tilt)(OpenTTDTrainHandle) noexcept;

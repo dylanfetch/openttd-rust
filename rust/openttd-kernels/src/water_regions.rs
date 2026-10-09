@@ -99,6 +99,7 @@ impl Regions {
             return index;
         }
         // SAFETY: All leaves are synchronous, noexcept and cannot reenter cache ownership.
+        crate::witness::hit(crate::witness::WATER + 3);
         unsafe {
             (leaves.debug)(0, x, y);
         }
@@ -116,6 +117,7 @@ impl Regions {
             let mut increase_label = false;
             while let Some(tile) = self.scratch.pop() {
                 // SAFETY: See leaf contract above; no live world reference is retained.
+                crate::witness::hit(crate::witness::WATER);
                 let mut dirs = unsafe { (leaves.tracks)(tile) };
                 if dirs == 0 {
                     continue;
@@ -133,6 +135,7 @@ impl Regions {
                     dirs &= dirs - 1;
                     let mut bridge = 0;
                     // SAFETY: Initialized output is call-local; follower neither borrows nor mutates cache.
+                    crate::witness::hit(crate::witness::WATER + 1);
                     let next = unsafe { (leaves.follow)(tile, dir, &raw mut bridge) };
                     if next == INVALID {
                         continue;
@@ -300,6 +303,7 @@ impl Visit {
                     continue;
                 }
                 // SAFETY: No world or cache storage is borrowed by the query.
+                crate::witness::hit(crate::witness::WATER + 2);
                 let other = unsafe { (leaves.aqueduct)(tile) };
                 if other != INVALID && regions.coords(tile) != regions.coords(other) {
                     return Some(regions.patch(other, leaves));

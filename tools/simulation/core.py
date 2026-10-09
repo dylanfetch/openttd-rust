@@ -534,19 +534,34 @@ def run_game(
     }
 
 
-def branch_witnesses(scenario, run, role, name, required):
-    """Return a candidate's branch counts; a missing file or zero count fails.
+WITNESS_ENVIRONMENT = {"OPENTTD_WITNESS": "1"}
+
+
+def witness_counts(run, prefix):
+    """A run's `prefix.*` counters, unprefixed, or None without a witness file."""
+    path = run["dir"] / "branch-witnesses.json"
+    if not path.is_file():
+        return None
+    counts = json.loads(path.read_text())
+    return {
+        name.removeprefix(f"{prefix}."): count
+        for name, count in counts.items()
+        if name.startswith(f"{prefix}.")
+    }
+
+
+def branch_witnesses(scenario, run, role, prefix, required):
+    """Return a candidate's `prefix.*` counts; a missing file or zero count fails.
 
     Scenario modules enable counters through game_environment when
     scenario["witnesses"] is set; the reference and --self have none."""
     if not (scenario.get("witnesses") and role == "candidate"):
         return None
-    path = run["dir"] / name
-    if not path.is_file():
-        raise RuntimeError(f"candidate wrote no {name}")
-    counts = json.loads(path.read_text())
+    counts = witness_counts(run, prefix)
+    if counts is None:
+        raise RuntimeError("candidate wrote no branch-witnesses.json")
     if missing := [branch for branch in required if not counts[branch]]:
-        raise RuntimeError(f"{name} lacks required branches {missing}: {counts}")
+        raise RuntimeError(f"{prefix} lacks required branches {missing}: {counts}")
     return counts
 
 

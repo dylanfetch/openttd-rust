@@ -10,6 +10,7 @@ from .core import (
     FILE_TYPES,
     ROOT,
     SNAPSHOT_TICKS,
+    WITNESS_ENVIRONMENT,
     Reader,
     branch_witnesses,
     copy_runtime,
@@ -19,6 +20,7 @@ from .core import (
     read_value,
     run_game,
     save_moment,
+    witness_counts,
 )
 from .play_saves import DISTRIBUTIONS
 
@@ -35,7 +37,7 @@ def game_args(scenario):
 
 def game_environment(scenario):
     witnessed = scenario.get("water") and scenario.get("witnesses")
-    return {"OPENTTD_SHIP_PROFILE": "1"} if witnessed else {}
+    return WITNESS_ENVIRONMENT if witnessed else {}
 
 
 def install(scenario, run_dir):
@@ -281,9 +283,7 @@ def check(scenario, run, mode, role, result):
             required += ["water_change"]
         if scenario.get("water_operation") == "lifecycle":
             required += ["build", "depot_leave"]
-        branches = branch_witnesses(
-            scenario, run, role, "ship-control-profile.json", required
-        )
+        branches = branch_witnesses(scenario, run, role, "ship", required)
         if branches is not None:
             if scenario.get("water_operation") == "lifecycle" and branches["build"] < 2:
                 raise RuntimeError(
@@ -291,9 +291,8 @@ def check(scenario, run, mode, role, result):
                 )
             result[f"{mode}_{role}_ship_control_profile"] = branches
         result[f"{mode}_{role}_water"] = check_water(scenario, run, mode == "snapshots")
-        profile = run["snapshots"][-1].parents[2] / "water-profile.json"
-        if profile.is_file():
-            result[f"{mode}_{role}_water_profile"] = json.loads(profile.read_text())
+        if (profile := witness_counts(run, "water")) is not None:
+            result[f"{mode}_{role}_water_profile"] = profile
         required = [
             "region_nodes",
             "track_nodes",
@@ -306,9 +305,7 @@ def check(scenario, run, mode, role, result):
             if scenario["water"] == "ferry"
             else ["retries", "lost", "random_draws", "blocked_calls"]
         )
-        branches = branch_witnesses(
-            scenario, run, role, "ship-yapf-profile.json", required
-        )
+        branches = branch_witnesses(scenario, run, role, "ship_yapf", required)
         if branches is not None:
             result[f"{mode}_{role}_ship_yapf_profile"] = branches
 

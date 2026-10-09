@@ -1,7 +1,6 @@
 """Owner-built multimodal fixtures and rail controller evidence (#86/#179/#183)."""
 
 import hashlib
-import json
 import lzma
 import re
 import shutil
@@ -158,10 +157,10 @@ def game_args(scenario):
 
 def game_environment(scenario):
     witnessed = scenario.get("rail_fixture") and scenario.get("witnesses")
-    return {"OPENTTD_TRAIN_PROFILE": "1"} if witnessed else {}
+    return core.WITNESS_ENVIRONMENT if witnessed else {}
 
 
-# TrainProfile branches each candidate run must reach, by longest name prefix.
+# train.* witness branches each candidate run must reach, by longest name prefix.
 # Unreached (#156): wormhole_swap, unequal_before/after, red_twoway,
 # force_signal, free_wagon_delete, articulated_move, depot_reentry and
 # extension_opposing_red/extension_restore.
@@ -665,7 +664,7 @@ def check(scenario, run, mode, role, result):
     if not scenario.get("rail_fixture"):
         return
     counts = core.branch_witnesses(
-        scenario, run, role, "train-profile.json", train_required(scenario)
+        scenario, run, role, "train", train_required(scenario)
     )
     if counts is not None:
         result[f"{mode}_{role}_train_profile"] = counts
@@ -691,9 +690,8 @@ def check(scenario, run, mode, role, result):
         )
         return
     result[f"{mode}_{role}_rail_search"] = search_witnesses(scenario, run, mode)
-    profile = run["snapshots"][-1].parents[2] / "rail-profile.json"
-    if profile.is_file():
-        result[f"{mode}_{role}_rail_profile"] = json.loads(profile.read_text())
+    if (profile := core.witness_counts(run, "rail")) is not None:
+        result[f"{mode}_{role}_rail_profile"] = profile
     paths = [Path(scenario["save"]), *run["snapshots"]]
     observations = [vehicle_rows(path) for path in paths]
     witnesses = {}
