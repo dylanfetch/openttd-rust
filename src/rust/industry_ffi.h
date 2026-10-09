@@ -36,7 +36,17 @@ typedef struct OpenTTDIndustrySlots { void *data; size_t size; } OpenTTDIndustry
 OpenTTDIndustry *openttd_rust_industry_new(void);
 void openttd_rust_industry_destroy(OpenTTDIndustry *owner);
 OpenTTDIndustryFields *openttd_rust_industry_fields(OpenTTDIndustry *owner);
-OpenTTDIndustrySlots openttd_rust_industry_slots(OpenTTDIndustry *owner, uint8_t produced, uint8_t operation, size_t count);
+/* One entry per vector operation; any mutation invalidates outstanding views. */
+OpenTTDIndustrySlots openttd_rust_industry_produced_view(OpenTTDIndustry *owner);
+OpenTTDIndustrySlots openttd_rust_industry_accepted_view(OpenTTDIndustry *owner);
+void openttd_rust_industry_produced_reserve(OpenTTDIndustry *owner, size_t count);
+void openttd_rust_industry_accepted_reserve(OpenTTDIndustry *owner, size_t count);
+void openttd_rust_industry_produced_resize(OpenTTDIndustry *owner, size_t count);
+void openttd_rust_industry_accepted_resize(OpenTTDIndustry *owner, size_t count);
+OpenTTDIndustrySlots openttd_rust_industry_produced_emplace_back(OpenTTDIndustry *owner);
+OpenTTDIndustrySlots openttd_rust_industry_accepted_emplace_back(OpenTTDIndustry *owner);
+void openttd_rust_industry_produced_shrink_to_fit(OpenTTDIndustry *owner);
+void openttd_rust_industry_accepted_shrink_to_fit(OpenTTDIndustry *owner);
 void *openttd_rust_industry_history(void *accepted);
 OpenTTDIndustryBuilder *openttd_rust_industry_builder_new(void);
 void openttd_rust_industry_builder_destroy(OpenTTDIndustryBuilder *owner);

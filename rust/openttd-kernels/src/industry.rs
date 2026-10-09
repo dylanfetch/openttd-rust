@@ -141,39 +141,93 @@ pub unsafe extern "C" fn openttd_rust_industry_destroy(owner: *mut Industry) {
 pub unsafe extern "C" fn openttd_rust_industry_fields(owner: *mut Industry) -> *mut Fields {
     unsafe { ptr::addr_of_mut!((*owner).fields) }
 }
+fn view<T>(v: &mut Vec<T>) -> Slots {
+    Slots {
+        data: v.as_mut_ptr().cast(),
+        size: v.len(),
+    }
+}
+/// `std::vector::reserve`: grow capacity to at least `count`; never shrinks.
+fn reserve<T>(v: &mut Vec<T>, count: usize) {
+    if count > v.len() {
+        v.reserve(count - v.len());
+    }
+}
+fn emplace_back<T: Default>(v: &mut Vec<T>) -> Slots {
+    v.push(T::default());
+    view(v)
+}
+// One typed entry per vector operation. Each borrows only the addressed vector
+// for its own duration; no callback runs. Mutations invalidate outstanding views.
 /// # Safety
-/// Live handle; any vector mutation invalidates outstanding views. Only the
-/// addressed vector is borrowed during its mutation; no callback runs here.
+/// Live handle; the returned view is valid until the next mutation of this vector.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_industry_slots(
+pub unsafe extern "C" fn openttd_rust_industry_produced_view(owner: *mut Industry) -> Slots {
+    unsafe { view(&mut (*owner).produced) }
+}
+/// # Safety
+/// Live handle; the returned view is valid until the next mutation of this vector.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_industry_accepted_view(owner: *mut Industry) -> Slots {
+    unsafe { view(&mut (*owner).accepted) }
+}
+/// # Safety
+/// Live handle with no outstanding C++ view of this vector.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_industry_produced_reserve(
     owner: *mut Industry,
-    produced: u8,
-    operation: u8,
     count: usize,
+) {
+    unsafe { reserve(&mut (*owner).produced, count) }
+}
+/// # Safety
+/// Live handle with no outstanding C++ view of this vector.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_industry_accepted_reserve(
+    owner: *mut Industry,
+    count: usize,
+) {
+    unsafe { reserve(&mut (*owner).accepted, count) }
+}
+/// # Safety
+/// Live handle with no outstanding C++ view of this vector.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_industry_produced_resize(owner: *mut Industry, count: usize) {
+    unsafe { (*owner).produced.resize_with(count, Produced::default) }
+}
+/// # Safety
+/// Live handle with no outstanding C++ view of this vector; removed slots free history.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_industry_accepted_resize(owner: *mut Industry, count: usize) {
+    unsafe { (*owner).accepted.resize_with(count, Accepted::default) }
+}
+/// # Safety
+/// Live handle with no outstanding C++ view of this vector. Returns the new view.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_industry_produced_emplace_back(
+    owner: *mut Industry,
 ) -> Slots {
-    fn edit<T: Default>(v: &mut Vec<T>, operation: u8, count: usize) -> Slots {
-        match operation {
-            0 => {}
-            1 => {
-                if count > v.len() {
-                    v.reserve(count - v.len());
-                }
-            }
-            2 => v.resize_with(count, T::default),
-            3 => v.push(T::default()),
-            4 => v.shrink_to_fit(),
-            _ => unreachable!(),
-        }
-        Slots {
-            data: v.as_mut_ptr().cast(),
-            size: v.len(),
-        }
-    }
-    if produced != 0 {
-        unsafe { edit(&mut (*owner).produced, operation, count) }
-    } else {
-        unsafe { edit(&mut (*owner).accepted, operation, count) }
-    }
+    unsafe { emplace_back(&mut (*owner).produced) }
+}
+/// # Safety
+/// Live handle with no outstanding C++ view of this vector. Returns the new view.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_industry_accepted_emplace_back(
+    owner: *mut Industry,
+) -> Slots {
+    unsafe { emplace_back(&mut (*owner).accepted) }
+}
+/// # Safety
+/// Live handle with no outstanding C++ view of this vector.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_industry_produced_shrink_to_fit(owner: *mut Industry) {
+    unsafe { (*owner).produced.shrink_to_fit() }
+}
+/// # Safety
+/// Live handle with no outstanding C++ view of this vector.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_industry_accepted_shrink_to_fit(owner: *mut Industry) {
+    unsafe { (*owner).accepted.shrink_to_fit() }
 }
 /// # Safety
 /// Live accepted slot with canonical layout. Existing history remains stable.

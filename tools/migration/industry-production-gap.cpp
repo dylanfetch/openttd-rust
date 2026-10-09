@@ -106,8 +106,10 @@ int main()
 				auto expected = parameters; auto expected_rng = rng; auto expected_errors = errors; auto expected_dirty = dirty;
 				Industry candidate{openttd_rust_industry_new(), {}, {}, level};
 				auto *fields = openttd_rust_industry_fields(candidate.owner); fields->prod_level = level;
-				auto a = openttd_rust_industry_slots(candidate.owner, 0, 2, 3);
-				auto p = openttd_rust_industry_slots(candidate.owner, 1, 2, 3);
+				openttd_rust_industry_accepted_resize(candidate.owner, 3);
+				openttd_rust_industry_produced_resize(candidate.owner, 3);
+				auto a = openttd_rust_industry_accepted_view(candidate.owner);
+				auto p = openttd_rust_industry_produced_view(candidate.owner);
 				for (size_t n = 0; n < 3; n++) {
 					auto *slot_a = static_cast<Accepted *>(a.data) + n; slot_a->cargo = n == 0 ? cargo : n == 1 ? 255 : 3; slot_a->waiting = n == 0 ? 65535 : n == 1 ? 15 : 1;
 					auto *slot_p = static_cast<Produced *>(p.data) + n; slot_p->cargo = n == 0 ? cargo : n == 1 ? 255 : 8; slot_p->waiting = n == 0 ? 65535 : n == 1 ? 15 : 1;
