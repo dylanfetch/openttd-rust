@@ -88,6 +88,27 @@ static OpenTTDAircraftLeaves RangeLeaves()
 	leaves.set_cargo_age = [](OpenTTDAircraftVehicle, uint16_t) noexcept {};
 	leaves.cargo_age_property = [](OpenTTDAircraftVehicle) noexcept { return uint32_t{0}; };
 	leaves.next = [](OpenTTDAircraftVehicle v) noexcept { return v; };
+	leaves.map_max_x = leaves.map_max_y = []() noexcept { return uint32_t{63}; };
+	leaves.plane_speed = []() noexcept { return uint8_t{1}; };
+	leaves.z = [](OpenTTDAircraftVehicle) noexcept { return int32_t{1}; };
+	leaves.subtype = [](OpenTTDAircraftVehicle v) noexcept { return uint8_t(v.id == 17 ? 2 : 4); };
+	leaves.vehicle_type = [](OpenTTDAircraftVehicle) noexcept { return uint8_t{3}; };
+	leaves.maximum_speed = [](OpenTTDAircraftVehicle) noexcept { return uint16_t{100}; };
+	leaves.acceleration = [](OpenTTDAircraftVehicle) noexcept { return uint8_t{8}; };
+	leaves.slope = [](int32_t, int32_t) noexcept { return int32_t{0}; };
+	leaves.tile_height = [](uint32_t) noexcept { return int32_t{0}; };
+	leaves.airport_entry = [](const void *, uint8_t) noexcept { return uint8_t{0}; };
+	leaves.set_x = leaves.set_y = leaves.set_z = [](OpenTTDAircraftVehicle, int32_t) noexcept {};
+	leaves.update_position = leaves.position_viewport = [](OpenTTDAircraftVehicle) noexcept {};
+	leaves.copy_sprite = [](OpenTTDAircraftVehicle, OpenTTDAircraftVehicle) noexcept {};
+	leaves.next = [](OpenTTDAircraftVehicle v) noexcept { if (v.id == 17) { v.id = 18; return v; } return OpenTTDAircraftVehicle{nullptr, nullptr, 1048575}; };
+	leaves.current_speed = [](OpenTTDAircraftVehicle) noexcept { return uint16_t{0}; };
+	leaves.can_use_station = [](OpenTTDAircraftVehicle, uint16_t) noexcept { return true; };
+	leaves.station_owner = [](const void *) noexcept { return uint8_t{0}; };
+	leaves.owner = [](OpenTTDAircraftVehicle) noexcept { return uint8_t{0}; };
+	leaves.helipads = [](const void *) noexcept { return uint8_t{0}; };
+	leaves.airport_flags = [](const void *) noexcept { return uint8_t{1}; };
+	leaves.waiting_unbunching = [](OpenTTDAircraftVehicle) noexcept { return false; };
 	return leaves;
 }
 int main()
