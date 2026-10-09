@@ -9,14 +9,14 @@
 #ifndef RUST_SERVICES_FFI_H
 #define RUST_SERVICES_FFI_H
 #include <cstdint>
+#include <type_traits>
 
-/* Copied immutable function table. All functions are noexcept and cannot reenter
- * Rust. Context may be null in the game; test fixtures supply their own world.
+/* Immutable function table. All functions are noexcept and cannot reenter Rust.
+ * Context may be null in the game; test fixtures supply their own world.
  * No Rust references into the map/pools survive calls. Output is call-scoped.
- * Tile observation[10]: type, bridge, tropic zone, height, ground, density,
- * tree species/count/growth, snow/coast/one-raised-corner bits. Only valid fields
- * for the tile type are read. Writes 0..9: make tree, ground/density, add count,
- * add growth, set growth, dirty, make clear, make shore, make snow, set zone.
+ * Map predicates take a TileIndex value and return the original accessor's
+ * underlying type: TileType, TropicZone and Slope are uint8_t, GetTileZ is int.
+ * mark_dirty is MarkTileDirtyByTile(tile) and set_tropic_zone is SetTropicZone.
  * Random logging still runs, but its debug source location names this wrapper.
  * Industry query returns 0 not industry,1 industry,2 bubble catcher and writes
  * TileVirtXY(x,y). It observes only type and industry graphics.
@@ -24,10 +24,36 @@
 struct OpenTTDSharedServices {
 	void *context;
 	uint32_t (*random)(void *) noexcept;
-	void (*observe_tile)(void *, uint32_t, uint32_t *) noexcept;
-	void (*write_tile)(void *, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) noexcept;
-	float (*trig)(uint32_t, float) noexcept;
 	uint32_t (*industry)(int32_t, int32_t, uint32_t *) noexcept;
+	uint8_t (*tile_type)(uint32_t) noexcept;
+	bool (*bridge_above)(uint32_t) noexcept;
+	uint8_t (*tropic_zone)(uint32_t) noexcept;
+	int32_t (*tile_z)(uint32_t) noexcept;
+	uint8_t (*tile_slope)(uint32_t) noexcept;
+	void (*mark_dirty)(uint32_t) noexcept;
+	void (*set_tropic_zone)(uint32_t, uint8_t) noexcept;
 };
 const OpenTTDSharedServices &GetRustSharedServices() noexcept;
+
+/* Standalone fixtures without a game map: map predicates return zero and writes do nothing. */
+template <typename Result, typename... Args>
+Result OpenTTDFixtureMapService(Args...) noexcept
+{
+	if constexpr (!std::is_void_v<Result>) return Result{};
+}
+inline OpenTTDSharedServices OpenTTDFixtureSharedServices(void *context, uint32_t (*random)(void *) noexcept, uint32_t (*industry)(int32_t, int32_t, uint32_t *) noexcept) noexcept
+{
+	return {
+		.context = context,
+		.random = random,
+		.industry = industry,
+		.tile_type = OpenTTDFixtureMapService<uint8_t, uint32_t>,
+		.bridge_above = OpenTTDFixtureMapService<bool, uint32_t>,
+		.tropic_zone = OpenTTDFixtureMapService<uint8_t, uint32_t>,
+		.tile_z = OpenTTDFixtureMapService<int32_t, uint32_t>,
+		.tile_slope = OpenTTDFixtureMapService<uint8_t, uint32_t>,
+		.mark_dirty = OpenTTDFixtureMapService<void, uint32_t>,
+		.set_tropic_zone = OpenTTDFixtureMapService<void, uint32_t, uint8_t>,
+	};
+}
 #endif /* RUST_SERVICES_FFI_H */

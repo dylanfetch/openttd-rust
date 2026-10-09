@@ -245,16 +245,6 @@ subprocess timeout polling, which can add about 50 ms.
 The lock excludes harness games, not unrelated host activity. Port PRs record
 before/after ratios and commits; the roadmap sets the regression budget.
 
-Tree map-access measurements (#108) use the same scenarios and comparisons:
-`OPENTTD_TREE_PROFILE=1 python3 tools/migration.py simulate trees --jobs 1`;
-`PYTHONPATH=tools python3 -m simulation.trees <report.json>` summarizes the
-profile. Repeat the scenario command without the environment variable for timing
-without counters. Counts include generation warm-up; one tile-loop batch visits
-`Map::Size()/256` tiles, so 256 batches are a full-map sweep equivalent. The table
-separates generation and tree-tile-loop calls, counts FFI calls once (not returns),
-and reports copied record bytes. Elapsed times include startup, other components
-and save I/O; they neither isolate FFI cost nor establish a raw-map speedup.
-
 ## Native macOS arm64 Rust linkage
 
 CMake verifies the pinned `rustc -vV` host against the actual C++ platform,
@@ -1223,22 +1213,23 @@ limits, costs and errors (#99/#107). Original bodies compile only in portable
 builds. Map/pools, rendering and the editor forest-brush loop remain C++; the brush
 calls Rust placement.
 
-Straight-line Rust calls shared `noexcept` RNG/map/trigonometry leaves and component
-progress, sound, town-rating, iterator and company-debit leaves. Only water flooding
-(nested clears), NewGRF ambient callbacks (arbitrary code) and landscape-clear
-commands (reentry) and progress cancellation (abort callback + throw) return to C++;
-no world borrow survives them. Environmental failures terminate; `RANDOM_DEBUG` records the wrapper location. ABI IDs 38/42
-cover actions and the copied shared-service table; no global registration is needed.
-Save/load reaches only counter-address/reset exports, with no shared callback;
-DATE/TTD/TTO keep the original byte and DATE LoadCheck omission.
+Each entry (tile loop, tick, generate, scatter, place, plant, command, clear) is one
+plain call with a by-value settings record (#202). It reads typed plant/tree records
+and calls typed `noexcept` services from a designated `OpenTTDTreeServices` table and
+the shared map predicates (`GetTileZ` only where the original calls it) at the
+original points. Water flooding, the NewGRF ambient callback and nested landscape
+clears may reenter; no Rust borrow survives them and the tile is read again
+afterwards. World-generation abort is the only handoff: the progress wrapper keeps
+the exception, Rust returns with no further draw or write, and the facade rethrows.
+Save/load reaches only counter-address/reset exports; DATE/TTD/TTO keep the
+original byte and DATE LoadCheck omission.
 
 `python3 tools/migration.py simulate trees` covers four climates, tree placers,
 extra-placement modes, growth/ground/count states, counter reloads and commands;
-`--self` and `--soak` check reproducibility and longer runs. All saved fields and
-ordered command outcomes compare against the pinned original. Rust/native ABI
-checks cover explicit/editor policy, Money bounds, bitpattern7, table/counter
-lifetime, cancellation propagation and reentry. Actual editor interaction, diagonal map
-traversal, legacy saves and custom NewGRF ambient callbacks remain evidence limits.
+`--self` and `--soak` check reproducibility and longer runs. Cargo tests and the
+native ABI probe cover explicit/editor policy, Money bounds, bitpattern 7, abort
+return order, reentry and `GetTileZ` call points. Editor interaction, diagonal
+traversal, legacy saves, NewGRF ambient callbacks and the abort rethrow are unreached.
 
 ### Effect vehicles
 

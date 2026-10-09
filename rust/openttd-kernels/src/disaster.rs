@@ -1233,11 +1233,6 @@ mod tests {
         fixture.draws += 1;
         fixture.rng
     }
-    extern "C" fn tile(_: *mut c_void, _: u32, _: *mut u32) {}
-    extern "C" fn tile_write(_: *mut c_void, _: u32, _: u32, _: u32, _: u32, _: u32, _: u32) {}
-    extern "C" fn trig(_: u32, value: f32) -> f32 {
-        value
-    }
     extern "C" fn industry(_: i32, _: i32, _: *mut u32) -> u32 {
         0
     }
@@ -1275,14 +1270,7 @@ mod tests {
                 std::ptr::from_mut(fixture).cast(),
                 read,
                 write,
-                &Services {
-                    context: std::ptr::from_mut(fixture).cast(),
-                    random,
-                    observe_tile: tile,
-                    write_tile: tile_write,
-                    trig,
-                    industry,
-                },
+                &crate::services::fixture(std::ptr::from_mut(fixture).cast(), random, industry),
                 service,
             )
         }

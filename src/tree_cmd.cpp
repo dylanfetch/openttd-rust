@@ -44,220 +44,228 @@ enum ExtraTreePlacement : uint8_t {
 #ifdef WITH_RUST
 #include "rust/trees_ffi.h"
 #include "rust/services_ffi.h"
-#include "progress.h"
-#include <cstdio>
-#include <cstdlib>
-
-/* Opt-in measurement of actual tree invocations. Simulation and generation are
- * serial; nested commands restore the active row before their caller resumes.
- * The ordinary service table is unchanged when profiling is disabled. */
-struct TreeProfile {
-	struct Row {
-		uint64_t calls = 0, random = 0, observe = 0, write = 0, trig = 0, settings = 0, leaf = 0, advance = 0;
-	};
-	bool enabled = std::getenv("OPENTTD_TREE_PROFILE") != nullptr;
-	Row rows[10]{};
-	Row *active = nullptr;
-	uint64_t tile_loop_batches = 0;
-	~TreeProfile()
-	{
-		if (!this->enabled) return;
-		const char *personal = std::getenv("HOME");
-		if (personal == nullptr) return;
-		if (FILE *file = std::fopen(fmt::format("{}/tree-profile.json", personal).c_str(), "w")) {
-			fmt::print(file, "{{\"tile_loop_batches\":{},\"kinds\":[", this->tile_loop_batches);
-			for (uint i = 0; i < lengthof(this->rows); ++i) {
-				const auto &r = this->rows[i];
-				fmt::print(file, "{}{{\"calls\":{},\"random\":{},\"observe\":{},\"write\":{},\"trig\":{},\"settings\":{},\"leaf\":{},\"advance\":{}}}",
-					i == 0 ? "" : ",", r.calls, r.random, r.observe, r.write, r.trig, r.settings, r.leaf, r.advance);
-			}
-			fmt::print(file, "]}}\n");
-			std::fclose(file);
-		}
-	}
-};
-static TreeProfile _tree_profile;
-
-void ProfileRustTreeTileLoop() noexcept
-{
-	if (_tree_profile.enabled) ++_tree_profile.tile_loop_batches;
-}
-
-struct TreeProfileScope {
-	TreeProfile::Row *previous = _tree_profile.active;
-
-	explicit TreeProfileScope(uint32_t kind)
-	{
-		if (!_tree_profile.enabled) return;
-		_tree_profile.active = &_tree_profile.rows[kind];
-		++_tree_profile.active->calls;
-	}
-	~TreeProfileScope() { _tree_profile.active = this->previous; }
-};
-
-static const OpenTTDSharedServices &ProfiledTreeServices()
-{
-	static const OpenTTDSharedServices services = [] {
-		auto result = GetRustSharedServices();
-		result.random = [](void *ctx) noexcept { ++_tree_profile.active->random; return GetRustSharedServices().random(ctx); };
-		result.observe_tile = [](void *ctx, uint32_t tile, uint32_t *v) noexcept { ++_tree_profile.active->observe; GetRustSharedServices().observe_tile(ctx, tile, v); };
-		result.write_tile = [](void *ctx, uint32_t op, uint32_t tile, uint32_t a, uint32_t b, uint32_t c, uint32_t d) noexcept {
-			++_tree_profile.active->write; GetRustSharedServices().write_tile(ctx, op, tile, a, b, c, d);
-		};
-		result.trig = [](uint32_t kind, float value) noexcept { ++_tree_profile.active->trig; return GetRustSharedServices().trig(kind, value); };
-		return result;
-	}();
-	return services;
-}
+#include <exception>
+#include <utility>
 
 static_assert(MP_CLEAR == 0 && MP_TREES == 4 && MP_WATER == 6);
-static_assert(TREE_CACTUS == 27 && TREE_INVALID == 255 && TREE_COUNT_TEMPERATE == 12);
+static_assert(TREE_RAINFOREST == 20 && TREE_CACTUS == 27 && TREE_SUB_TROPICAL == 28 && TREE_TOYLAND == 32 && TREE_INVALID == 255 && TREE_COUNT_TEMPERATE == 12);
 static_assert(to_underlying(LandscapeType::Temperate) == 0 && to_underlying(LandscapeType::Arctic) == 1 && to_underlying(LandscapeType::Tropic) == 2 && to_underlying(LandscapeType::Toyland) == 3);
 static_assert(CLEAR_GRASS == 0 && CLEAR_ROUGH == 1 && CLEAR_ROCKS == 2 && CLEAR_FIELDS == 3 && CLEAR_DESERT == 5);
 static_assert(TROPICZONE_NORMAL == 0 && TROPICZONE_DESERT == 1 && TROPICZONE_RAINFOREST == 2);
 static_assert(TP_NONE == 0 && TP_ORIGINAL == 1 && TP_IMPROVED == 2);
 static_assert(TREE_GROUND_GRASS == 0 && TREE_GROUND_ROUGH == 1 && TREE_GROUND_SNOW_DESERT == 2 && TREE_GROUND_SHORE == 3 && TREE_GROUND_ROUGH_SNOW == 4);
 static_assert(to_underlying(TreeGrowthStage::Growing1) == 0 && to_underlying(TreeGrowthStage::Grown) == 3 && to_underlying(TreeGrowthStage::Dead) == 6);
+static_assert(SND_42_RAINFOREST_1 == 66 && SND_43_RAINFOREST_2 == 67 && SND_44_RAINFOREST_3 == 68 && SND_48_RAINFOREST_4 == 72 && SND_34_ARCTIC_SNOW_1 == 52 && SND_39_ARCTIC_SNOW_2 == 57);
+static_assert(MAP_HEIGHT_LIMIT_ORIGINAL == 15 && DIR_N == 0 && DIR_NW == 7);
 static_assert(2 * (MAX_MAP_SIZE_BITS - MIN_MAP_SIZE_BITS) - 4 <= std::numeric_limits<uint8_t>::digits);
 
-struct RustTreeContext {
-	DoCommandFlags flags{};
+/** State of one CmdPlantTree or ClearTile_Trees call; Rust passes it back to the command services. */
+struct OpenTTDTreeCommand {
+	explicit OpenTTDTreeCommand(DoCommandFlags flags) : flags(flags) {}
+	DoCommandFlags flags;
 	Company *company = nullptr;
 	std::unique_ptr<TileIterator> iter;
 	CommandCost nested;
 };
 
-static void RustTreeSettings(void *opaque, uint64_t *v) noexcept
-{
-	auto &ctx = *static_cast<RustTreeContext *>(opaque);
-	v[0] = TimerGameTick::counter;
-	v[1] = static_cast<uint64_t>(static_cast<int64_t>(_price[PR_BUILD_TREES]));
-	v[2] = static_cast<uint64_t>(static_cast<int64_t>(_price[PR_CLEAR_TREES]));
-	v[3] = Map::Size(); v[4] = Map::SizeX(); v[5] = Map::SizeY();
-	v[6] = static_cast<uint64_t>(GetSnowLine());
-	v[7] = to_underlying(_settings_game.game_creation.landscape);
-	v[8] = _settings_game.game_creation.tree_placer;
-	v[9] = _settings_game.construction.extra_tree_placement;
-	v[10] = _settings_game.construction.map_height_limit;
-	v[11] = (_game_mode == GM_EDITOR) | (static_cast<uint64_t>(_settings_client.sound.ambient) << 1) |
-		(static_cast<uint64_t>(_settings_game.construction.freeform_edges) << 2) |
-		(static_cast<uint64_t>(ctx.flags.Test(DoCommandFlag::Execute)) << 3) |
-		(static_cast<uint64_t>(Company::IsValidID(_current_company)) << 4);
-}
+/** The AbortGenerateWorldSignal thrown by a progress update, held until the Rust entry returns. */
+static std::exception_ptr _tree_generation_abort;
 
-/* Direct leaves cannot run arbitrary code or reenter this Rust tree invocation. */
-static uint64_t RustTreeLeaf(void *opaque, uint32_t op, uint32_t index, uint32_t a, uint32_t b) noexcept
+static OpenTTDTreePlantObservation TreePlantObservation(uint32_t index) noexcept
 {
-	auto &ctx = *static_cast<RustTreeContext *>(opaque);
 	TileIndex tile{index};
-	switch (op) {
-		case 1:
-		case 2:
-			/* Keep the original zero-total and no-modal guards before checking
-			 * cancellation. The abort callback and throw run only in C++. */
-			if (op == 2 && a == 0) return 0;
-			if (!HasModalProgress()) return 0;
-			if (IsGeneratingWorldAborted()) return 1;
-			if (op == 1) IncreaseGeneratingWorldProgress(GWP_TREE);
-			else SetGeneratingWorldProgress(GWP_TREE, a);
-			break;
-		case 3: ClearNeighbourNonFloodingStates(tile); break;
-		case 6: {
-			static const SoundID sounds[] = {SND_42_RAINFOREST_1, SND_43_RAINFOREST_2, SND_44_RAINFOREST_3, SND_48_RAINFOREST_4, SND_34_ARCTIC_SNOW_1, SND_39_ARCTIC_SNOW_2};
-			SndPlayTileFx(sounds[a], tile); break;
-		}
-		case 7: DoClearSquare(tile); break;
-		case 8: {
-			Town *town = ClosestTownFromTile(tile, _settings_game.economy.dist_local_authority);
-			if (town != nullptr) ChangeTownRating(town, a != 0 ? RATING_TREE_UP_STEP : RATING_TREE_DOWN_STEP,
-				a != 0 ? RATING_TREE_MAXIMUM : RATING_TREE_MINIMUM, ctx.flags);
-			break;
-		}
-		case 9:
-			ctx.company = _game_mode != GM_EDITOR ? Company::GetIfValid(_current_company) : nullptr;
-			ctx.iter = TileIterator::Create(tile, TileIndex{a}, b != 0);
-			return ctx.company == nullptr ? INT32_MAX : GB(ctx.company->Finances().tree_limit, 16, 16);
-		case 10: if (ctx.company != nullptr) ctx.company->Finances().tree_limit -= 1 << 16; break;
-		case 11: if (a != 0) ++(*ctx.iter); return static_cast<TileIndex>(*ctx.iter).base();
+	OpenTTDTreePlantObservation o{};
+	o.tile_type = GetTileType(tile);
+	o.zone = GetTropicZone(tile);
+	if (o.tile_type == MP_CLEAR) {
+		o.bridge = IsBridgeAbove(tile);
+		o.ground = GetClearGround(tile);
+		o.density = GetClearDensity(tile);
+		o.snow = IsSnowTile(tile);
+	} else if (o.tile_type == MP_WATER) {
+		o.bridge = IsBridgeAbove(tile);
+		o.coast = IsCoast(tile) && !IsSlopeWithOneCornerRaised(GetTileSlope(tile));
 	}
-	return 0;
+	return o;
 }
 
-static OpenTTDTreeAction RunRustTrees(RustTreeContext &ctx, uint32_t kind, TileIndex tile = TileIndex{0}, uint32_t a = 0, uint32_t b = 0, uint32_t c = 0)
+static OpenTTDTreeObservation TreeObservation(uint32_t index) noexcept
 {
-	TreeProfileScope profile(kind);
-	auto settings = RustTreeSettings;
-	auto leaf = RustTreeLeaf;
-	if (_tree_profile.enabled) {
-		settings = [](void *opaque, uint64_t *v) noexcept { ++_tree_profile.active->settings; RustTreeSettings(opaque, v); };
-		leaf = [](void *opaque, uint32_t op, uint32_t tile, uint32_t a, uint32_t b) noexcept {
-			++_tree_profile.active->leaf; return RustTreeLeaf(opaque, op, tile, a, b);
-		};
+	TileIndex tile{index};
+	return {
+		.ground = GetTreeGround(tile),
+		.density = static_cast<uint8_t>(GetTreeDensity(tile)),
+		.species = GetTreeType(tile),
+		.count = static_cast<uint8_t>(GetTreeCount(tile)),
+		.growth = to_underlying(GetTreeGrowth(tile)),
+		.zone = GetTropicZone(tile),
+	};
+}
+
+/** Run one progress update; on world-generation abort keep the exception and return true. */
+template <typename Update>
+static bool TreeProgress(Update update) noexcept
+{
+	try {
+		update();
+	} catch (...) {
+		_tree_generation_abort = std::current_exception();
+		return true;
 	}
-	std::unique_ptr<void, decltype(&openttd_rust_trees_destroy)> owner(openttd_rust_trees_create(kind, tile.base(), a, b, c,
-		&ctx, settings, _tree_profile.enabled ? &ProfiledTreeServices() : &GetRustSharedServices(), leaf), openttd_rust_trees_destroy);
-	uint64_t response = 0;
-	int64_t cost = 0;
-	for (;;) {
-		if (_tree_profile.enabled) ++_tree_profile.active->advance;
-		auto action = openttd_rust_trees_advance(owner.get(), response, cost);
-		response = 0; cost = 0;
-		TileIndex current{action.tile};
-		switch (action.kind) {
-			case 0: return action;
-			/* Flooding can dispatch nested clear commands. NewGRF callbacks run
-			 * arbitrary callback code. No Rust borrow survives these actions. */
-			case 4: TileLoop_Water(current); break;
-			case 5: AmbientSoundEffect(current); break;
-			case 12: HandleGeneratingWorldAbortion(); break;
-			case 10:
-				ctx.nested = Command<CMD_LANDSCAPE_CLEAR>::Do(ctx.flags, current);
-				response = ctx.nested.Failed(); cost = ctx.nested.GetCost(); break;
-		}
+	return false;
+}
+
+static void TreeTownRating(OpenTTDTreeCommand *ctx, uint32_t tile, bool up) noexcept
+{
+	Town *t = ClosestTownFromTile(TileIndex{tile}, _settings_game.economy.dist_local_authority);
+	if (t == nullptr) return;
+	if (up) {
+		ChangeTownRating(t, RATING_TREE_UP_STEP, RATING_TREE_MAXIMUM, ctx->flags);
+	} else {
+		ChangeTownRating(t, RATING_TREE_DOWN_STEP, RATING_TREE_MINIMUM, ctx->flags);
 	}
+}
+
+static int32_t TreeCommandBegin(OpenTTDTreeCommand *ctx, uint32_t tile, uint32_t start_tile, bool diagonal) noexcept
+{
+	ctx->company = (_game_mode != GM_EDITOR) ? Company::GetIfValid(_current_company) : nullptr;
+	int limit = (ctx->company == nullptr ? INT32_MAX : GB(ctx->company->Finances().tree_limit, 16, 16));
+	ctx->iter = TileIterator::Create(TileIndex{tile}, TileIndex{start_tile}, diagonal);
+	return limit;
+}
+
+static OpenTTDTreeLandscapeClear TreeLandscapeClear(OpenTTDTreeCommand *ctx, uint32_t tile) noexcept
+{
+	ctx->nested = Command<CMD_LANDSCAPE_CLEAR>::Do(ctx->flags, TileIndex{tile});
+	return {.cost = ctx->nested.GetCost(), .failed = ctx->nested.Failed()};
+}
+
+static const OpenTTDTreeServices _tree_services{
+	.plant_observation = TreePlantObservation,
+	.tree_observation = TreeObservation,
+	.snow_line = []() noexcept { return GetSnowLine(); },
+	.sin = [](float v) noexcept { return sinf(v); },
+	.cos = [](float v) noexcept { return cosf(v); },
+	.make_tree = [](uint32_t tile, uint8_t type, uint32_t count, uint8_t growth, uint8_t ground, uint32_t density) noexcept {
+		MakeTree(TileIndex{tile}, static_cast<TreeType>(type), count, static_cast<TreeGrowthStage>(growth), static_cast<TreeGround>(ground), density);
+	},
+	.set_ground_density = [](uint32_t tile, uint8_t ground, uint32_t density) noexcept { SetTreeGroundDensity(TileIndex{tile}, static_cast<TreeGround>(ground), density); },
+	.add_count = [](uint32_t tile, int32_t count) noexcept { AddTreeCount(TileIndex{tile}, count); },
+	.add_growth = [](uint32_t tile, int32_t growth) noexcept { AddTreeGrowth(TileIndex{tile}, growth); },
+	.set_growth = [](uint32_t tile, uint8_t growth) noexcept { SetTreeGrowth(TileIndex{tile}, static_cast<TreeGrowthStage>(growth)); },
+	.make_clear = [](uint32_t tile, uint8_t ground, uint32_t density) noexcept { MakeClear(TileIndex{tile}, static_cast<ClearGround>(ground), density); },
+	.make_shore = [](uint32_t tile) noexcept { MakeShore(TileIndex{tile}); },
+	.make_snow = [](uint32_t tile, uint32_t density) noexcept { MakeSnow(TileIndex{tile}, density); },
+	.clear_neighbour_flooding = [](uint32_t tile) noexcept { ClearNeighbourNonFloodingStates(TileIndex{tile}); },
+	.tile_loop_water = [](uint32_t tile) noexcept { TileLoop_Water(TileIndex{tile}); },
+	.ambient = [](uint32_t tile) noexcept {
+		AmbientSoundEffect(TileIndex{tile});
+		return HasGrfMiscBit(GrfMiscBit::AmbientSoundCallback);
+	},
+	.play_sound = [](uint32_t tile, uint16_t sound) noexcept { SndPlayTileFx(sound, TileIndex{tile}); },
+	.progress = []() noexcept { return TreeProgress([] { IncreaseGeneratingWorldProgress(GWP_TREE); }); },
+	.progress_total = [](uint32_t total) noexcept { return TreeProgress([total] { SetGeneratingWorldProgress(GWP_TREE, total); }); },
+	.clear_square = [](uint32_t tile) noexcept { DoClearSquare(TileIndex{tile}); },
+	.town_rating = TreeTownRating,
+	.command_begin = TreeCommandBegin,
+	.command_tile = [](OpenTTDTreeCommand *ctx) noexcept { return static_cast<TileIndex>(*ctx->iter).base(); },
+	.command_next = [](OpenTTDTreeCommand *ctx) noexcept { return static_cast<TileIndex>(++(*ctx->iter)).base(); },
+	.command_debit = [](OpenTTDTreeCommand *ctx) noexcept { if (ctx->company != nullptr) ctx->company->Finances().tree_limit -= 1 << 16; },
+	.landscape_clear = TreeLandscapeClear,
+};
+
+/** Rethrow a world-generation abort after the Rust entry returned. */
+static void RethrowTreeGenerationAbort(bool aborted)
+{
+	if (aborted) std::rethrow_exception(std::exchange(_tree_generation_abort, nullptr));
+}
+
+static OpenTTDTreeGenerateSettings TreeGenerateSettings()
+{
+	return {
+		.size = Map::Size(), .size_x = Map::SizeX(), .size_y = Map::SizeY(),
+		.climate = to_underlying(_settings_game.game_creation.landscape),
+		.placer = _settings_game.game_creation.tree_placer,
+		.height_limit = _settings_game.construction.map_height_limit,
+		.editor = _game_mode == GM_EDITOR,
+		.freeform_edges = _settings_game.construction.freeform_edges,
+	};
 }
 
 static bool CanPlantTreesOnTile(TileIndex tile, bool allow_desert)
 {
-	uint32_t observation[10];
-	GetRustSharedServices().observe_tile(nullptr, tile.base(), observation);
-	return openttd_rust_trees_suitable(observation, allow_desert) != 0;
+	return openttd_rust_trees_can_plant(tile.base(), allow_desert, &_tree_services);
 }
 
 static void PlantTreesOnTile(TileIndex tile, TreeType type, uint count, TreeGrowthStage growth)
 {
-	RustTreeContext ctx;
-	RunRustTrees(ctx, 3, tile, type, count, to_underlying(growth));
+	openttd_rust_trees_plant(tile.base(), type, count, to_underlying(growth), &_tree_services, &GetRustSharedServices());
 }
 
 void PlaceTree(TileIndex tile, uint32_t r, bool keep_density)
 {
-	RustTreeContext ctx;
-	RunRustTrees(ctx, 2, tile, r, keep_density);
+	openttd_rust_trees_place(tile.base(), r, keep_density, to_underlying(_settings_game.game_creation.landscape), &_tree_services, &GetRustSharedServices());
 }
 
-void PlaceTreesRandomly() { RustTreeContext ctx; RunRustTrees(ctx, 1); }
-void GenerateTrees() { RustTreeContext ctx; RunRustTrees(ctx, 0); }
-
-CommandCost CmdPlantTree(DoCommandFlags flags, TileIndex tile, TileIndex start_tile, uint8_t tree, bool diagonal)
+void PlaceTreesRandomly()
 {
-	RustTreeContext ctx; ctx.flags = flags;
-	auto result = RunRustTrees(ctx, 8, tile, start_tile.base(), tree, diagonal);
-	if (result.a == 1) return CMD_ERROR;
-	if (result.a == 3) return ctx.nested;
-	static const StringID errors[] = {INVALID_STRING_ID, STR_ERROR_TREE_ALREADY_HERE, STR_ERROR_TREE_PLANT_LIMIT_REACHED,
+	RethrowTreeGenerationAbort(openttd_rust_trees_place_randomly(TreeGenerateSettings(), &_tree_services, &GetRustSharedServices()));
+}
+
+void GenerateTrees()
+{
+	RethrowTreeGenerationAbort(openttd_rust_trees_generate(TreeGenerateSettings(), &_tree_services, &GetRustSharedServices()));
+}
+
+CommandCost CmdPlantTree(DoCommandFlags flags, TileIndex tile, TileIndex start_tile, uint8_t tree_to_plant, bool diagonal)
+{
+	OpenTTDTreeCommand ctx(flags);
+	const OpenTTDTreeCommandSettings settings{
+		.build_price = static_cast<int64_t>(_price[PR_BUILD_TREES]),
+		.size = Map::Size(),
+		.climate = to_underlying(_settings_game.game_creation.landscape),
+		.editor = _game_mode == GM_EDITOR,
+		.execute = flags.Test(DoCommandFlag::Execute),
+		.company_valid = Company::IsValidID(_current_company),
+	};
+	auto result = openttd_rust_trees_cmd_plant(&ctx, tile.base(), start_tile.base(), tree_to_plant, diagonal, settings, &_tree_services, &GetRustSharedServices());
+	if (result.status == 1) return CMD_ERROR;
+	if (result.status == 2) return ctx.nested;
+	static const StringID messages[] = {INVALID_STRING_ID, STR_ERROR_TREE_ALREADY_HERE, STR_ERROR_TREE_PLANT_LIMIT_REACHED,
 		STR_ERROR_CAN_T_BUILD_ON_WATER, STR_ERROR_SITE_UNSUITABLE, STR_ERROR_TREE_WRONG_TERRAIN_FOR_TREE_TYPE};
-	return result.cost == 0 ? CommandCost(errors[result.b]) : CommandCost(EXPENSES_OTHER, Money(result.cost));
+	return result.cost == 0 ? CommandCost(messages[result.message]) : CommandCost(EXPENSES_OTHER, Money(result.cost));
 }
 
 static CommandCost ClearTile_Trees(TileIndex tile, DoCommandFlags flags)
 {
-	RustTreeContext ctx; ctx.flags = flags;
-	return CommandCost(EXPENSES_CONSTRUCTION, Money(RunRustTrees(ctx, 9, tile).cost));
+	OpenTTDTreeCommand ctx(flags);
+	return CommandCost(EXPENSES_CONSTRUCTION, Money(openttd_rust_trees_clear_tile(&ctx, tile.base(), static_cast<int64_t>(_price[PR_CLEAR_TREES]),
+		flags.Test(DoCommandFlag::Execute), Company::IsValidID(_current_company), &_tree_services)));
 }
 
-static void TileLoop_Trees(TileIndex tile) { RustTreeContext ctx; RunRustTrees(ctx, 5, tile); }
-void OnTick_Trees() { RustTreeContext ctx; RunRustTrees(ctx, 6); }
+static void TileLoop_Trees(TileIndex tile)
+{
+	const OpenTTDTreeLoopSettings settings{
+		.tick_counter = TimerGameTick::counter,
+		.size_x = Map::SizeX(),
+		.climate = to_underlying(_settings_game.game_creation.landscape),
+		.extra = _settings_game.construction.extra_tree_placement,
+		.ambient = _settings_client.sound.ambient,
+	};
+	openttd_rust_trees_tile_loop(tile.base(), settings, &_tree_services, &GetRustSharedServices());
+}
+
+void OnTick_Trees()
+{
+	const OpenTTDTreeTickSettings settings{
+		.tick_counter = TimerGameTick::counter,
+		.size = Map::Size(),
+		.climate = to_underlying(_settings_game.game_creation.landscape),
+		.extra = _settings_game.construction.extra_tree_placement,
+	};
+	openttd_rust_trees_tick(settings, &_tree_services, &GetRustSharedServices());
+}
+
 void InitializeTrees() { openttd_rust_trees_initialize(); }
 #endif /* WITH_RUST */
 
