@@ -101,13 +101,19 @@ std::optional<char> StringConsumer::PeekChar() const
 	return static_cast<char>(*result);
 }
 
+#ifndef WITH_RUST
 std::pair<StringConsumer::size_type, char32_t> StringConsumer::PeekUtf8() const
 {
 	auto buf = this->src.substr(this->position);
 	return DecodeUtf8(buf);
 }
+#endif
 
+#ifdef WITH_RUST
+std::string_view StringConsumer::PeekClamped(size_type len) const
+#else
 std::string_view StringConsumer::Peek(size_type len) const
+#endif
 {
 #ifdef WITH_RUST
 	auto bounds = openttd_rust_consumer_bound(this->src.size(), this->position, len);
@@ -123,7 +129,20 @@ std::string_view StringConsumer::Peek(size_type len) const
 #endif
 }
 
+#ifdef WITH_RUST
+std::string_view StringConsumer::ReadClamped(size_type len)
+{
+	auto bounds = openttd_rust_consumer_bound(this->src.size(), this->position, len);
+	auto result = this->src.substr(this->position, bounds.length);
+	if (bounds.shortfall) LogError(fmt::format("Source buffer too short: {} > {}", len, bounds.length));
+	this->position = bounds.position; // Commit only after the original logger returns.
+	return result;
+}
+
+void StringConsumer::SkipClamped(size_type len)
+#else
 void StringConsumer::Skip(size_type len)
+#endif
 {
 #ifdef WITH_RUST
 	auto bounds = openttd_rust_consumer_bound(this->src.size(), this->position, len);
