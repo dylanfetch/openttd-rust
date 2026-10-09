@@ -16,10 +16,12 @@ forward-looking, about 200 lines; completed work is one row, with evidence in PR
   no cap rises. The full semantic suite passes 259 cases / 1,922 snapshots.
 - Last mixed-save profile before #184's hot-path fixes, as extra candidate time:
   aircraft +27%, train +25%, window drawing and string formatting +18%, road +11%, trees +8%.
-- #184 passed exact-head full validation; post-merge checks are running.
+- #184 passed exact-head full validation and post-merge platform checks; native
+  comparisons are running.
   A full run costs about 104 job-minutes; ordinary PR pushes stay cheap.
-- One unintegrated component branch remains: #147 WIP. The next wave is fleet,
-  train #189, aircraft #190, UTF-8 #191 and coverage #188, within the cap of six.
+- Four unintegrated branches: fleet #147, train #189, aircraft #190 and UTF-8
+  #191. The host accepted three fresh workers before its thread limit; root
+  implements the bounded UTF-8 fix. Coverage #188 waits for a fresh slot.
 
 ## Fifth steering review (2026-10-08)
 
@@ -170,12 +172,12 @@ Revisit it only if a post-#168 profile shows map/pool crossings dominating.
 
 | Issue / PR | Branch (worktree suffix), head | State and next step |
 | --- | --- | --- |
-| #147 | `fleet-replacement-ownership-147` (`fleet-replacement`), `68d660adc9` | State-only WIP; fresh completion owner next, refresh from integrated main. |
-| #189 / #168 | none | Train/reservation direct conversion selected first; scoped issue and source plan ready. |
-| #190 / #168 | none | Aircraft direct conversion selected after train in work order; scoped plan ready. |
-| #191 / #168 | none | Selected ASCII/string-consumer support fix; scoped plan ready. |
+| #147 | `fleet-replacement-ownership-147` (`fleet-replacement`), `9d81c9a0e0` | Fresh Sol high owner completing controller; integrated main refreshed. |
+| #189 / #168 | `train-direct-189` (`train-direct-189`), `c28136c093` | Fresh Sol high owner converting train and reservation services. |
+| #190 / #168 | `aircraft-direct-190` (`aircraft-direct-190`), `c28136c093` | Fresh Sol high owner converting aircraft services and existing native adapters. |
+| #191 / #193 | `utf8-hot-191` (`utf8-hot-191`), `9ae81d9b25` | Root implementation; validation running, fresh Sol high review next. |
 | #192 / #168 | none | Company direct conversion after train/aircraft; exception disposition in issue. |
-| #188 / #156 | none | Aircraft breakdown slice selected; other source plans stay queued in #156. |
+| #188 / #156 | none | Aircraft breakdown slice queued for a fresh slot; other plans stay in #156. |
 
 Preserve the pinned reference, paused curve worktrees and evidence branches
 `evidence-disaster-vehicles` (`a775543162`) and `evidence-water-regions`
