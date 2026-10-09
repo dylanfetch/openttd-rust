@@ -38,9 +38,8 @@ Corrections, in order:
 3. **Done in #197 (not yet integrated):** fleet's `NEW_GROUP` sentinel, the
    per-Vehicle `Box<u16>`, positional tables and dead wrappers are fixed, and
    `fleet-drain`/`fleet-drain-cash` witness the tick-end drain.
-4. **Aircraft #194 and UTF-8 #193 are integrated.** Integrate train #195 as it
-   stands once its final-head evidence passes. #193 is a support-code fast path
-   (PR ruling), not a precedent.
+4. **Done:** aircraft #194, UTF-8 #193 and train #195 are integrated. #193 is a
+   support-code fast path (PR ruling), not a precedent.
 5. **Then #199: one shared typed vehicle and map service layer** with a
    crossing budget per vehicle tick. New AGENTS.md rule: resolve once per entry,
    read only the used fields once, one shared definition per accessor, real
@@ -118,6 +117,7 @@ attributed review reports retain evidence; batch totals are above.
 | #191 | #193 | direct | `b127ffaa88` | 0 / 44 / 73 / 14 |
 | #198 (enforcement) | #204 | direct | `c0c67a3dd4` | 0 / 147 / 0 / 0 |
 | #190 (#168 aircraft) | #194 | direct | `d8aed8754f` | 1279 / 352 / 1300 / 247 |
+| #189 (#168 train) | #195 | direct | `3a2e8f6a10` | 4263 / 91 / 2812 / 853 |
 
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -148,9 +148,9 @@ Integration of reviewed work comes before new starts. Never hold more than six
 unintegrated component branches (#157). Independent items (#156 slices) may run
 in parallel with this list.
 
-1. **Integrate the drafts:** train #195, then fleet #197 (merge the base after
-   train and renumber fleet's ABI layout IDs 343-346 past train's 340-385).
-   Preserve fleet's full native CommandCost and its quirks.
+1. **Integrate the drafts:** fleet #197 (base merged, ABI IDs moved to 390-396),
+   then industry #205, trees #202 and the YAPF hasher #206. Preserve fleet's
+   full native CommandCost and its quirks.
 2. **#199 shared vehicle and map layer**, one PR per vehicle type, starting once
    train and aircraft are integrated. Report crossings per vehicle tick.
 3. **#168 remaining conversions, one PR per component:** trees, industry tick
@@ -168,16 +168,17 @@ map crossings are 5-11% of reference time. #199 decides vehicle state access.
 ## Resume checkpoint
 
 Sixth steering items 1-4 are applied; items 5-7 are in progress through #199,
-#202 and #203.
+#202 and #203. #199 PR1 (road, shared module, witness facility) can start now
+that train is integrated, once a branch slot frees.
 
 | Issue / PR | Branch (worktree suffix), head | State and next step |
 | --- | --- | --- |
-| #189 / #195 | `train-direct-189` (`train-direct-189`), `0818e68172` | Final head reviewed (no findings); enforced rail suite 19/19. Base merges resolved an `abi.rs` conflict: fresh review of that resolution, verify, default suite, timing, full CI. |
-| #147 / #197 | `fleet-replacement-ownership-147` (`fleet-replacement`), `20fa6e581a` | Reviewed, including drain witness. After train: base merge with ABI renumbering, timing, full CI, ready. |
-| #202 | `trees-direct-202` (`trees-direct-202`) | Implementation in progress (no PR yet). |
-| #203 | `industry-typed-203` (`industry-typed-203`) | Implementation in progress (no PR yet). |
-| #199 | none | First-PR plan in progress (road, shared module, witness facility); starts after train integrates. |
-| #192 / #168 | none | Company direct conversion after trees and industry. |
+| #147 / #197 | `fleet-replacement-ownership-147` (`fleet-replacement`), `1b58826085` | Reviewed. Base merged; root moved ABI IDs to 390-396: verify, default suite, fresh review of that fix, timing, full CI. |
+| #203 / #205 | `industry-typed-203` (`industry-typed-203`) | Under review; the reviewer splits the slot-storage opcode entry (local `e991d76622`). Then base merge, timing, full CI. |
+| #202 | `trees-direct-202` (`trees-direct-202`) | Implemented locally; rebase, evidence, draft PR. |
+| #206 | `yapf-hasher-206` (`yapf-hasher-206`) | Implemented; evidence, draft PR. Root lowers the caps from an idle run here. |
+| #192 / #168 | `company-direct-192` (`company-direct-192`) | Implementation in progress. |
+| #199 | none | PR1 plan and root decisions on the issue; starts when a slot frees. |
 
 Preserve the pinned reference, paused curve worktrees and evidence branches
 `evidence-disaster-vehicles` (`a775543162`) and `evidence-water-regions`
