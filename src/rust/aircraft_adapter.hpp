@@ -774,7 +774,7 @@ static void OPENTTD_AIRCRAFT_CALL Aircraft_remove_depot_orders(uint16_t station_
 	RemoveOrderFromAllVehicles(OT_GOTO_DEPOT, StationID{static_cast<uint16_t>(station_id)}, true);
 }
 
-static void OPENTTD_AIRCRAFT_CALL Aircraft_assert_flying(OpenTTDAircraftVehicle vehicle) noexcept
+static void OPENTTD_AIRCRAFT_CALL Aircraft_assert_flying([[maybe_unused]] OpenTTDAircraftVehicle vehicle) noexcept
 {
 	assert(Aircraft::From(static_cast<Vehicle *>(vehicle.handle))->state == FLYING);
 }
