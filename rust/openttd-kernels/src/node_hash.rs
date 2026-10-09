@@ -11,6 +11,9 @@ use std::collections::HashMap;
 use std::hash::{BuildHasherDefault, Hasher};
 
 /// Fx-style multiply-rotate hasher; all arithmetic wraps by design.
+/// `finish` rotates the well-mixed high bits down, because hashbrown picks
+/// buckets from the low bits, which a multiply leaves depending only on the
+/// key's low bits (water patch keys keep their label there).
 #[derive(Default, Clone, Copy)]
 pub struct NodeHasher(u64);
 
@@ -41,9 +44,29 @@ impl Hasher for NodeHasher {
         self.add(i as u64);
     }
     fn finish(&self) -> u64 {
-        self.0
+        self.0.rotate_left(26)
     }
 }
 
 /// Lookup-only map with the fixed hasher.
 pub type NodeMap<K, V> = HashMap<K, V, BuildHasherDefault<NodeHasher>>;
+
+#[cfg(test)]
+mod tests {
+    use super::NodeHasher;
+    use std::collections::HashSet;
+    use std::hash::{BuildHasher, BuildHasherDefault};
+
+    /// Low bucket bits must spread water patch keys (label | region << 8).
+    #[test]
+    fn patch_keys_spread_over_low_bits() {
+        let build = BuildHasherDefault::<NodeHasher>::default();
+        let mut buckets = HashSet::new();
+        for region in 0..4096_u32 {
+            for label in 1..4_u32 {
+                buckets.insert(build.hash_one(label | (region << 8)) & 0x3fff);
+            }
+        }
+        assert!(buckets.len() > 8000, "{}", buckets.len());
+    }
+}
