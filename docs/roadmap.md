@@ -31,11 +31,8 @@ clean #184 integration. Train, aircraft, ship and UTF-8 show no reachable
 divergence. Fleet has one, and coverage claims rest on opt-in profiles.
 
 Corrections, in order:
-1. **Fix red Quick validation on `rust-migration` first.** The
-   `5c7ab182b3` run failed in `tools/test-validation-execution.py:137`:
-   `/proc/<pid>/stat` can vanish between `exists()` and `read_text()`. Treat the
-   vanished file as exited. Root's stop report called the branch green; check
-   the last push's runs before reporting.
+1. **Done:** red Quick validation fixed by #200/#201 (`bb302706c1`). Check the
+   last push's runs before reporting the branch green.
 2. **Enforce cited branch witnesses (#198)** before #195 integrates. Train and
    ship witnesses run only when a profile environment variable is set by hand,
    and CI never sets it. New AGENTS.md rule: cited witnesses run and fail by
@@ -119,6 +116,7 @@ attributed review reports retain evidence; batch totals are above.
 | Issues | Maintenance PRs | Integration | Commit | Metrics |
 | --- | --- | --- | --- | --- |
 | #169, #156, #179 | #175, #177, #180 | #181 | `f604e30d50` | 4 / 193 / 0 / 0 |
+| #200 | #201 | direct | `bb302706c1` | 0 / 0 / 0 / 0 |
 
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -129,8 +127,7 @@ The harness is `python3 tools/migration.py simulate` (`docs/rust-migration.md`,
 always the first priority. Port differences go in `KNOWN_FAILURES` with an issue,
 never in masks.
 
-1. **#198 witness enforcement**, then the red Quick validation fix (steering
-   item 1), are harness regressions and come first.
+1. **#198 witness enforcement** is a harness regression and comes first.
 2. **Speed ratchet (#155).** `SPEED_BUDGETS` in `tools/simulation/roads.py` is
    the authority for the five caps, run with `simulate <name> --benchmark 3
    --jobs 2` on an idle host. A PR may exceed a cap by at most 3%, unless root
@@ -168,17 +165,18 @@ map crossings are 5-11% of reference time. #199 decides vehicle state access.
 
 ## Resume checkpoint
 
-Apply the sixth steering review first: red Quick validation, #198, then the
-drafts' PR comments. Fresh Sol high review of #193 can start at once.
+Apply the sixth steering review first: #198, then the drafts' PR comments.
+#193 needs a fresh review of root fix `93dd49329c` (script-list tool compiled
+reference VM copies) and a new full run; #196 is reviewed and in full CI.
 
 | Issue / PR | Branch (worktree suffix), head | State and next step |
 | --- | --- | --- |
 | #147 / #197 | `fleet-replacement-ownership-147` (`fleet-replacement`), `32785b4631` | WIP; fix the steering PR comment's four items, then final audit, ABI/reentry/CommandCost fixtures, checks, fresh review, full CI. |
 | #189 / #195 | `train-direct-189` (`train-direct-189`), `8aa1657008` | Cargo/native pass; final-head simulation with all play/rail-owner saves under #198, used-field and duplicate fixes, timing, review, full CI. |
 | #190 / #194 | `aircraft-direct-190` (`aircraft-direct-190`), `29ff227562` | Cargo/native and 3 cases pass; final-head aircraft/disaster/default suites, timing, review, full CI. |
-| #191 / #193 | `utf8-hot-191` (`utf8-hot-191`), `cf91511991` | Default suite and timing pass; ruling accepted; fresh review and full CI remain. |
+| #191 / #193 | `utf8-hot-191` (`utf8-hot-191`), `cf91511991` | Reviewed; full CI failed in script-list tool; root fix `93dd49329c` needs review and full CI. |
 | #192 / #168 | none | Company direct conversion after trees and industry read. |
-| #188 / #196 | `aircraft-breakdown-188` (`aircraft-breakdown-188`), `3fa6047b09` | Five witnesses pass; sensitivity, soak, review, full CI remain. |
+| #188 / #196 | `aircraft-breakdown-188` (`aircraft-breakdown-188`), `3fa6047b09` | Sensitivity/soak pass; reviewed (fix `e52b34c2ca` verified); full CI running. |
 
 Preserve the pinned reference, paused curve worktrees and evidence branches
 `evidence-disaster-vehicles` (`a775543162`) and `evidence-water-regions`
