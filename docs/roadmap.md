@@ -171,9 +171,11 @@ Revisit it only if a post-#168 profile shows map/pool crossings dominating.
 | Issue / PR | Branch (worktree suffix), head | State and next step |
 | --- | --- | --- |
 | #186 / #187 | `exact-benchmark-timing-186` (`exact-benchmark-timing-186`), `c9b5b1c1b1` | Reviewed timer/config and exact caps; joined #184 for full CI. |
-| #182 / #184 | `reviewed-owner-batch-182` (`reviewed-owners-182`), `6e4b180e68` | Hot-path source review and combined native/Cargo pass; final affected/default semantics, caps and full CI next. |
+| #182 / #184 | `reviewed-owner-batch-182` (`reviewed-owners-182`), `b40c2073b9` | Fresh hot-path/cap reviews, native/Cargo, 26 affected cases and exact ratchet pass. Default suite running; then exact-head full CI, integration and archives. |
 | #155 / #178, #139 / #151, #138 / #176, #146 / #152, #183 / #185 | joined in #184 | Reviewed sources; close with #184. |
 | #147 | `fleet-replacement-ownership-147` (`fleet-replacement`), `68d660adc9` | State-only WIP; completion plan in issue. Refresh from integrated #184 before implementation. |
+| #168 | none | Train, aircraft, UTF-8 and company plans in issue comments. Fresh implementers after #184; StopAI direct, only proven startup/post VM exceptions retain stack protocol. |
+| #188 / #156 | none | Aircraft breakdown slice selected; cargo-routing and conditional-order source plans prepared. No coverage branches started. |
 
 Preserve the pinned reference, paused curve worktrees and evidence branches
 `evidence-disaster-vehicles` (`a775543162`) and `evidence-water-regions`
