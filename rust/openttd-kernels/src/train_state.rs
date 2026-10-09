@@ -17,24 +17,25 @@
 /// Train-private scalars, with exactly the original native widths.
 #[derive(Default)]
 pub struct State {
-    flags: u16,
-    crash_anim_pos: u16,
-    wait_counter: u16,
-    compatible_railtypes: u64,
-    railtypes: u64,
-    track: u8,
-    force_proceed: u8,
-    cached_tilt: bool,
-    user_def_data: u8,
-    cached_curve_speed_mod: i16,
-    cached_max_curve_speed: u16,
+    pub(crate) flags: u16,
+    pub(crate) crash_anim_pos: u16,
+    pub(crate) wait_counter: u16,
+    pub(crate) compatible_railtypes: u64,
+    pub(crate) railtypes: u64,
+    pub(crate) track: u8,
+    pub(crate) force_proceed: u8,
+    pub(crate) cached_tilt: bool,
+    pub(crate) user_def_data: u8,
+    pub(crate) cached_curve_speed_mod: i16,
+    pub(crate) cached_max_curve_speed: u16,
 }
 
 /// Read one copied scalar from a live game-thread owner.
 ///
 /// # Safety
 /// `state` must be live and `field` must be a declared selector (0..=10).
-pub(crate) unsafe fn get(state: *const State, field: u8) -> u64 {
+#[cfg(test)]
+unsafe fn get(state: *const State, field: u8) -> u64 {
     // SAFETY: The caller supplies a live owner; this scalar read ends before return.
     unsafe {
         match field {
@@ -58,7 +59,8 @@ pub(crate) unsafe fn get(state: *const State, field: u8) -> u64 {
 ///
 /// # Safety
 /// `state` must be exclusively accessible on the game thread and `field` valid.
-pub(crate) unsafe fn set(state: *mut State, field: u8, value: u64) {
+#[cfg(test)]
+unsafe fn set(state: *mut State, field: u8, value: u64) {
     // SAFETY: Exclusive game-thread access; no retained owner reference.
     unsafe {
         match field {
@@ -96,28 +98,222 @@ pub unsafe extern "C" fn openttd_rust_train_state_destroy(state: *mut State) {
     }
 }
 
-/// Copy one scalar for a C++ adapter.
-///
+/// Read the shell's canonical `flags` scalar.
 /// # Safety
-/// `state` must be live on the game thread and `field` in 0..=10.
+/// The serialized shell owns a live state; no reference escapes this call.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_train_state_get(state: *const State, field: u8) -> u64 {
-    // SAFETY: C++ supplies its live shell owner and a declared field selector.
-    unsafe { get(state, field) }
+pub unsafe extern "C" fn openttd_rust_train_state_get_flags(state: *const State) -> u16 {
+    // SAFETY: Caller supplies a live owner and this scalar read ends before return.
+    unsafe { (*state).flags }
 }
-
-/// Immediately write one scalar for a C++ adapter.
-///
+/// Write the shell's canonical `flags` scalar.
 /// # Safety
-/// `state` must be exclusively accessible on the game thread and `field` in 0..=10.
+/// The serialized shell owns this exclusively accessible live state.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_train_state_set(state: *mut State, field: u8, value: u64) {
-    // SAFETY: C++ supplies exclusive game-thread access and a declared selector.
+pub unsafe extern "C" fn openttd_rust_train_state_set_flags(state: *mut State, value: u16) {
+    // SAFETY: Exclusive scalar access, retaining no state borrow.
     unsafe {
-        set(state, field, value);
+        (*state).flags = value;
     }
 }
-
+/// Read the shell's canonical `crash_anim_pos` scalar.
+/// # Safety
+/// The serialized shell owns a live state; no reference escapes this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_train_state_get_crash_anim_pos(state: *const State) -> u16 {
+    // SAFETY: Caller supplies a live owner and this scalar read ends before return.
+    unsafe { (*state).crash_anim_pos }
+}
+/// Write the shell's canonical `crash_anim_pos` scalar.
+/// # Safety
+/// The serialized shell owns this exclusively accessible live state.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_train_state_set_crash_anim_pos(
+    state: *mut State,
+    value: u16,
+) {
+    // SAFETY: Exclusive scalar access, retaining no state borrow.
+    unsafe {
+        (*state).crash_anim_pos = value;
+    }
+}
+/// Read the shell's canonical `wait_counter` scalar.
+/// # Safety
+/// The serialized shell owns a live state; no reference escapes this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_train_state_get_wait_counter(state: *const State) -> u16 {
+    // SAFETY: Caller supplies a live owner and this scalar read ends before return.
+    unsafe { (*state).wait_counter }
+}
+/// Write the shell's canonical `wait_counter` scalar.
+/// # Safety
+/// The serialized shell owns this exclusively accessible live state.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_train_state_set_wait_counter(state: *mut State, value: u16) {
+    // SAFETY: Exclusive scalar access, retaining no state borrow.
+    unsafe {
+        (*state).wait_counter = value;
+    }
+}
+/// Read the shell's canonical `compatible_railtypes` scalar.
+/// # Safety
+/// The serialized shell owns a live state; no reference escapes this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_train_state_get_compatible_railtypes(
+    state: *const State,
+) -> u64 {
+    // SAFETY: Caller supplies a live owner and this scalar read ends before return.
+    unsafe { (*state).compatible_railtypes }
+}
+/// Write the shell's canonical `compatible_railtypes` scalar.
+/// # Safety
+/// The serialized shell owns this exclusively accessible live state.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_train_state_set_compatible_railtypes(
+    state: *mut State,
+    value: u64,
+) {
+    // SAFETY: Exclusive scalar access, retaining no state borrow.
+    unsafe {
+        (*state).compatible_railtypes = value;
+    }
+}
+/// Read the shell's canonical `railtypes` scalar.
+/// # Safety
+/// The serialized shell owns a live state; no reference escapes this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_train_state_get_railtypes(state: *const State) -> u64 {
+    // SAFETY: Caller supplies a live owner and this scalar read ends before return.
+    unsafe { (*state).railtypes }
+}
+/// Write the shell's canonical `railtypes` scalar.
+/// # Safety
+/// The serialized shell owns this exclusively accessible live state.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_train_state_set_railtypes(state: *mut State, value: u64) {
+    // SAFETY: Exclusive scalar access, retaining no state borrow.
+    unsafe {
+        (*state).railtypes = value;
+    }
+}
+/// Read the shell's canonical `track` scalar.
+/// # Safety
+/// The serialized shell owns a live state; no reference escapes this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_train_state_get_track(state: *const State) -> u8 {
+    // SAFETY: Caller supplies a live owner and this scalar read ends before return.
+    unsafe { (*state).track }
+}
+/// Write the shell's canonical `track` scalar.
+/// # Safety
+/// The serialized shell owns this exclusively accessible live state.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_train_state_set_track(state: *mut State, value: u8) {
+    // SAFETY: Exclusive scalar access, retaining no state borrow.
+    unsafe {
+        (*state).track = value;
+    }
+}
+/// Read the shell's canonical `force_proceed` scalar.
+/// # Safety
+/// The serialized shell owns a live state; no reference escapes this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_train_state_get_force_proceed(state: *const State) -> u8 {
+    // SAFETY: Caller supplies a live owner and this scalar read ends before return.
+    unsafe { (*state).force_proceed }
+}
+/// Write the shell's canonical `force_proceed` scalar.
+/// # Safety
+/// The serialized shell owns this exclusively accessible live state.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_train_state_set_force_proceed(state: *mut State, value: u8) {
+    // SAFETY: Exclusive scalar access, retaining no state borrow.
+    unsafe {
+        (*state).force_proceed = value;
+    }
+}
+/// Read the shell's canonical `cached_tilt` scalar.
+/// # Safety
+/// The serialized shell owns a live state; no reference escapes this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_train_state_get_cached_tilt(state: *const State) -> u8 {
+    // SAFETY: Caller supplies a live owner and this scalar read ends before return.
+    unsafe { u8::from((*state).cached_tilt) }
+}
+/// Write the shell's canonical `cached_tilt` scalar.
+/// # Safety
+/// The serialized shell owns this exclusively accessible live state.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_train_state_set_cached_tilt(state: *mut State, value: u8) {
+    // SAFETY: Exclusive scalar access, retaining no state borrow.
+    unsafe {
+        (*state).cached_tilt = value != 0;
+    }
+}
+/// Read the shell's canonical `user_def_data` scalar.
+/// # Safety
+/// The serialized shell owns a live state; no reference escapes this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_train_state_get_user_def_data(state: *const State) -> u8 {
+    // SAFETY: Caller supplies a live owner and this scalar read ends before return.
+    unsafe { (*state).user_def_data }
+}
+/// Write the shell's canonical `user_def_data` scalar.
+/// # Safety
+/// The serialized shell owns this exclusively accessible live state.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_train_state_set_user_def_data(state: *mut State, value: u8) {
+    // SAFETY: Exclusive scalar access, retaining no state borrow.
+    unsafe {
+        (*state).user_def_data = value;
+    }
+}
+/// Read the shell's canonical `cached_curve_speed_mod` scalar.
+/// # Safety
+/// The serialized shell owns a live state; no reference escapes this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_train_state_get_cached_curve_speed_mod(
+    state: *const State,
+) -> i16 {
+    // SAFETY: Caller supplies a live owner and this scalar read ends before return.
+    unsafe { (*state).cached_curve_speed_mod }
+}
+/// Write the shell's canonical `cached_curve_speed_mod` scalar.
+/// # Safety
+/// The serialized shell owns this exclusively accessible live state.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_train_state_set_cached_curve_speed_mod(
+    state: *mut State,
+    value: i16,
+) {
+    // SAFETY: Exclusive scalar access, retaining no state borrow.
+    unsafe {
+        (*state).cached_curve_speed_mod = value;
+    }
+}
+/// Read the shell's canonical `cached_max_curve_speed` scalar.
+/// # Safety
+/// The serialized shell owns a live state; no reference escapes this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_train_state_get_cached_max_curve_speed(
+    state: *const State,
+) -> u16 {
+    // SAFETY: Caller supplies a live owner and this scalar read ends before return.
+    unsafe { (*state).cached_max_curve_speed }
+}
+/// Write the shell's canonical `cached_max_curve_speed` scalar.
+/// # Safety
+/// The serialized shell owns this exclusively accessible live state.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_train_state_set_cached_max_curve_speed(
+    state: *mut State,
+    value: u16,
+) {
+    // SAFETY: Exclusive scalar access, retaining no state borrow.
+    unsafe {
+        (*state).cached_max_curve_speed = value;
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;

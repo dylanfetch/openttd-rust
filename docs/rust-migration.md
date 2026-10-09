@@ -1596,9 +1596,13 @@ wait/crash counters, railtype masks and scalar TrainCache fields. Shared Vehicle
 GroundVehicle fields, pools/links, sprite override references, rendering,
 construction/arrangement and generic orders/loading stay in C++. External writes,
 modern VEHS staging, legacy loading and afterload use canonical scalar adapters.
-Original selected bodies compile only in portable builds. Copied noexcept world
-services preserve immediate reads/writes; named callback tasks release borrows
-before tile/depot entry, orders/loading, station callbacks and destruction.
+Original selected bodies compile only in portable builds. Typed synchronous
+entries borrow immutable noexcept service tables. Resolved shell/state handles and
+narrow reads remove repeated pool lookups and ordinary Last walks; native visitors
+filter trains and preserve order without nearby Vecs. Owner accesses end before
+direct tile/depot, orders/loading, station and deletion callbacks. Nested native
+stack snapshots restore temporary orders once; ordered signal rollback scratch
+remains local. No ordinary-play service unwinds here.
 Validation uses the existing Padhattan manual/cargodist, realistic acceleration,
 90-degree reservation, live reload and real command-built controller scenarios;
 each candidate run requires its `rails.TRAIN_BRANCHES` counts in
@@ -1648,21 +1652,27 @@ placement-constructed trivial C++ facades retain save, legacy load and external-
 addresses. Original bodies compile only in portable builds. Shared Vehicle/pools,
 orders/loading, airport geometry/FTA records and rendering remain C++.
 
-Rust copies world/FTA observations and calls bounded noexcept services directly,
-releasing scalar access before each call. ProcessOrders/UpdateOrderDest,
-VehicleEnterDepot/refit, Vehicle::Crash, depot commands and deletion return to
-the C++ stack for actual reentry; AI/Game event insertion only queues. Owners
-survive their original destruction policies and modern/legacy descriptor access.
-Flight helpers still accept disaster vehicles. Panics/environmental failures abort;
-wrapping counters and shared RNG retain original order.
+The #190 boundary uses named synchronous entries and typed noexcept services;
+entries resolve each live vehicle and canonical State once, with field-sized raw
+access and narrow map, vehicle, airport and FTA observations. An immutable service
+table is borrowed, with no continuation, selector dispatch or per-entry allocation.
+ProcessOrders/UpdateOrderDest, depot/refit, qualified Vehicle::Crash, depot commands
+and deletion call directly after all owner accesses end. Command failures return
+native results; event insertion queues without running a script VM. PreDestructor
+releases airport blocks while state is live; the deleting caller returns immediately.
+Disaster flight helpers use their actual Vehicle and independent flags address.
+Canonical save/legacy aliases and portable bodies remain unchanged. Panics and
+environmental failures abort; wrapping counters and shared RNG retain source order.
 
 `python3 tools/migration.py simulate aircraft-route aircraft-controller disasters`
 compares every saved chunk and debug log: planes/helicopters, terminal groups,
 dedicated pads, occupied-block waits, service, closure diversion, zeppelin landing
-abort, airborne airport removal, out-of-fuel crash/destruction and live reload. `--self` and
+abort, airborne airport removal, orderless service-to-hangar diversion,
+out-of-fuel crash/destruction and live reload. `--self` and
 `--soak` check reproducibility/longer runs. A scenario-local native probe compares
 800 finite-range branches against unchanged reference helpers because supplied
-engines have unlimited range. ABI checks cover owner defaults/layout/lifetime.
+engines have unlimited range. ABI checks cover owner defaults/layout/lifetime, typed table/record offsets,
+nested same-owner mutation, live block-release/deletion and disaster flight flags.
 Full legacy files, arbitrary NewGRFs/airport rotations and viewport/sound output
 remain evidence limits. A reference-built ownerless oilrig route checks public
 helicopter landing through the ordinary FTA path.

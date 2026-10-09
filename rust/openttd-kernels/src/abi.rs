@@ -228,24 +228,6 @@ pub fn layout(type_id: u16, item: u8) -> usize {
             layout!(crate::station_service::Loading, item; read, write, next, next_stations, next_stations_destroy, cargo, load_callback, payment, effect, refit)
         }
 
-        160 => {
-            layout!(crate::train_reservation::View, item; tile, dest, next, destination, last_station, direction, order, num_orders, order_index, suppress, nearest)
-        }
-        161 => {
-            layout!(crate::train_reservation::Follow, item; old_tile, new_tile, skipped, dirs, old_td, exitdir, tunnel, bridge, station, error)
-        }
-        162 => layout!(crate::train_reservation::Pbs, item; tile, other, td, okay),
-        163 => {
-            layout!(crate::train_reservation::Step, item; value, action, id, tile, final_dest, td, dir, tracks, reserve, found, got, okay)
-        }
-        164 => {
-            layout!(crate::train_reservation::Leaves, item; observe, leaf, owner, follow, origin)
-        }
-        151 => {
-            layout!(crate::train::View, item; id,first,next,previous,next_unit,last,tile,dest,x,y,z,order_time,power,weight,length,total_length,max_speed,max_track_speed,speed,gv_flags,cargo_cap,refit_cap,engine,first_engine,order_destination,last_station,direction,status,tick,running,day,progress,subspeed,acceleration,order,nonstop,breakdown,front,free_wagon,articulated,engine_part,multiheaded,owner,vis_effect)
-        }
-        152 => layout!(crate::train::Leaves, item; observe,write,leaf,owner,nearby),
-        153 => layout!(crate::train::Action, item; op,id,a,b,c),
         130 => {
             layout!(crate::industry::Fields, item; valid_history, last_prod_year, counter, prod_level, was_cargo_delivered, ctlflags)
         }
@@ -284,7 +266,81 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         180 => {
             layout!(crate::aircraft::State, item; cached_max_range_sqr, cached_max_range, cache_padding, crashed_counter, targetairport, pos, previous_pos, state, last_direction, number_consecutive_turns, turn_counter, flags)
         }
-        181 => layout!(crate::aircraft::Action, item; kind, id, other, a, b, c, d),
+        181 => layout!(crate::aircraft::Vehicle, item; handle, state, id),
+        182 => layout!(crate::aircraft::Node, item; next, blocks, position, next_position, heading),
+        183 => layout!(crate::aircraft::Moving, item; x, y, flags, direction),
+        184 => layout!(crate::aircraft::Position, item; x, y, tile),
+        185 => {
+            layout!(crate::aircraft::Leaves, item; subtype, x, set_x, y, set_y, z, set_z, tile, set_tile, direction, set_direction, tick_counter, set_tick_counter, owner, vehicle_status, set_vehicle_status, current_speed, set_current_speed, subspeed, set_subspeed, progress, set_progress, acceleration, maximum_speed, set_maximum_speed, set_breakdown_counter, order_type, order_destination, running_ticks, set_running_ticks, order_time, set_order_time, day_counter, set_day_counter, profit, set_profit, last_station, set_last_station, set_economy_service, set_calendar_service, set_breakdowns, set_reliability, set_cargo_age, next, map_size_x, map_max_x, map_max_y, plane_speed, no_jetcrash, plane_crashes, service_at_helipad, disaster_sound, economy_date, calendar_date, station, airport_tile, station_tile, rotation, airport_width, airport_height, airport_type, station_owner, has_hangar, has_airport, airport_fta, airport_blocks, had_vehicle, dummy_airport, airport_elements, helipads, airport_flags, airport_delta_z, node, fta, moving, engine_speed, engine_subtype, engine_sound, engine_reliability, vehicle_type, slope, tile_height, airport_entry, direction_towards, new_position, hangar_height, terminal_count, hangar_exit, can_use_station, service_interval, needs_service, chain_in_depot, waiting_unbunching, nearest_depot_order, part_of_orders, next_station, next_aircraft, random, update_position, rotor_image, copy_sprite, position_viewport, create_effect, dirty_start_stop, play_sound, truncate_cargo, crash_news, station_rating, landing_rating, free_order, service_in_depot, leave_unbunching, dirty_depot, first_arrival, begin_loading, dirty_details, update_delta, touchdown_animation, destination_too_far, delete_range_news, handle_breakdown, handle_loading, service_order, dummy_order, age_vehicle, economy_age, decrease_value, check_orders, check_breakdown, running_cost, subtract_cost, dirty_lists, next_stopping_station, remove_depot_orders, assert_flying, invalid_movement, invalid_position, invalid_scheme, unreachable, speed_property, cargo_age_property, range_property, start_sound, touchdown_sound, rotor_image_if_changed, update_rotor_image, process_orders, enter_depot, vehicle_crash, delete_aircraft, send_to_depot, sample_count, helicopter_sound, explosion_sound, skid_sound, ticks_per_year, fta_blocks, fta_heading, fta_next_position, fta_next, block_node, route_node, block_choice)
+        }
+        186 => layout!(crate::aircraft::BlockNode, item; blocks, position, next_position),
+        187 => layout!(crate::aircraft::RouteNode, item; next, next_position, heading),
+        188 => layout!(crate::aircraft::BlockChoice, item; next, blocks, heading),
+        340 => layout!(crate::train::Handle, item; shell,owner),
+        341 => layout!(crate::train::TrainConsistChangedRead, item; engine,front),
+        342 => layout!(crate::train::TrainConsistChanged1Read, item; engine,engine_part),
+        343 => layout!(crate::train::TrainConsistChanged2Read, item; cargo_cap),
+        344 => layout!(crate::train::TrainCurveLimitRead, item; next,direction),
+        345 => {
+            layout!(crate::train::TrainStopLocationRead, item; length,total_length,order_destination,order)
+        }
+        346 => layout!(crate::train::TrainCurrentMaxSpeedRead, item; tile,max_track_speed,speed),
+        347 => layout!(crate::train::TrainCurrentMaxSpeed6Read, item; next,tile,status),
+        348 => layout!(crate::train::TrainUpdateAccelerationRead, item; power,weight),
+        349 => layout!(crate::train::TrainUpdateSpeedRead, item; status,acceleration),
+        350 => layout!(crate::train::TrainTrackdirRead, item; tile,direction,status),
+        351 => layout!(crate::train::TrainCanLeaveRead, item; tile,direction),
+        353 => layout!(crate::train::TrainCrossingApproachRead, item; status,front),
+        354 => layout!(crate::train::TrainNextOffsetRead, item; next,length),
+        355 => layout!(crate::train::TrainAfterSwapRead, item; tile,x,y),
+        356 => layout!(crate::train::TrainReverseSwapRead, item; tile,x,y,z,direction,status),
+        357 => layout!(crate::train::TrainApproachingEndRead, item; x,y,length,speed,direction),
+        358 => layout!(crate::train::TrainLineEndsRead, item; tile,speed,breakdown),
+        359 => layout!(crate::train::TrainSpeedZRead, item; z,max_track_speed,speed),
+        360 => {
+            layout!(crate::train::TrainMoveVehicleRead, item; tile,x,y,direction,front,articulated)
+        }
+        361 => layout!(crate::train::TrainMoveVehicle20Read, item; speed,status,front),
+        362 => layout!(crate::train::TrainCollisionOneRead, item; first,x,y,z,length,owner),
+        363 => layout!(crate::train::TrainCollisionOne22Read, item; x,y,z,length,owner),
+        364 => layout!(crate::train::TrainDeleteLastRead, item; tile,owner),
+        365 => layout!(crate::train::TrainStayDepotRead, item; tile,power),
+        366 => layout!(crate::train::TrainLocoRead, item; speed,status,order),
+        367 => layout!(crate::train::TrainLoco26Read, item; tile,order_destination,order,nonstop),
+        368 => layout!(crate::train::TrainTickRead, item; speed,status,running,front,free_wagon),
+        369 => layout!(crate::train::TrainNeedsServiceRead, item; order_destination,order),
+        370 => layout!(crate::train::TrainNextForceRead, item; tile,status),
+        371 => layout!(crate::train::TrainReverseCommandRead, item; status,breakdown,front),
+        372 => {
+            layout!(crate::train::Leaves, item; read_first,read_next,read_previous,read_next_unit,read_last,read_tile,read_dest,read_order_time,read_length,read_total_length,read_max_track_speed,read_speed,read_gv_flags,read_refit_cap,read_last_station,read_direction,read_status,read_tick,read_running,read_day,read_progress,read_order,read_front,read_articulated,read_multiheaded,read_owner,read_vis_effect,read_consist_changed,read_consist_changed_1,read_consist_changed_2,read_curve_limit,read_stop_location,read_current_max_speed,read_current_max_speed_6,read_update_acceleration,read_update_speed,read_trackdir,read_can_leave,read_crossing_approach,read_next_offset,read_after_swap,read_reverse_swap,read_approaching_end,read_line_ends,read_speed_z,read_move_vehicle,read_move_vehicle_20,read_collision_one,read_collision_one_22,read_delete_last,read_stay_depot,read_loco,read_loco_26,read_tick_state,read_needs_service,read_next_force,read_reverse_command,write_tile,write_dest,write_x,write_y,write_z,write_direction,write_speed,write_tick,write_running,write_day,write_order_time,write_progress,write_subspeed,write_gv_flags,write_acceleration,write_length,write_total_length,write_first_engine,write_max_speed,write_cargo_cap,write_refit_cap,write_cargo_age,write_last_station,write_colourmap,write_status,acceleration,acc_model,acc_type,advance_distance,age,all_powered,ambient_sound,arrival_news,arrival_triggers,axis_diag,backoff,base_viewport,begin_loading,bridge_speed,cache_override,callback_length,capacity,capacity_error,cargo_age_default,cargo_changed,chain_depot,check_breakdown,check_next,check_orders,check_reverse,choose_track,clear_reservation,compatible_rail_owner,consist_windows,cost_class,cost_default,cost_divisor,count_chain,crash_event,crash_ground,crash_news,crash_rating,crash_sound,crossing_barred,crossing_rail_axis,crossing_reserved,crossing_road_axis,crossing_sound,curve_advantage,curve_mod,day_ticks,decrease_value,delete_vehicle,depot_dir,depot_dirty,depot_index,depot_track,depot_window,diag_axis,diag_between,diag_reaches_tracks,diag_trackdir,dirty_tile,dir_diag,disaster_sound,disconnect,economy_age,engine_power,enter_depot,enter_tile,find_depot,first_track,free_reservation,grf_version,handle_breakdown,has_depot_res,has_reserved,has_signal,has_signals,has_signal_td,hide_fill,inclination,invalidate_grf,invalid_price,is_bridge,is_crossing,is_depot,is_plain_rail,is_railway,is_station,is_station_any,is_tunnelbridge,large_explosion,last_speed,leave_sound,leave_station,leave_unbunch,length_callback,length_changed,length_default,length_error,loading,local_company,lost_warn,map_size,max_depot_penalty,needs_service,no_90,oneway_blocking,order_depot_service,order_dummy,order_free,order_max_speed,order_stop,other_end,pay_running,pbs_signal_type,platform_ahead,platform_length,position,pow_wag_power)
+        }
+        373 => layout!(crate::train_reservation::TrainReservationFreeRead, item; tile),
+        374 => layout!(crate::train_reservation::TrainReservationFree1Read, item; tile,next),
+        375 => {
+            layout!(crate::train_reservation::TrainReservationNewRead, item; dest,last_station,order_index,suppress)
+        }
+        376 => {
+            layout!(crate::train_reservation::TrainReservationChooseRead, item; tile,dest,destination,order)
+        }
+        377 => layout!(crate::train_reservation::TrainReservationChoose4Read, item; order,nearest),
+        378 => {
+            layout!(crate::train_reservation::TrainReservationCheckNextRead, item; tile,dest,destination,order,num_orders)
+        }
+        379 => {
+            layout!(crate::train_reservation::Follow, item; old_tile,new_tile,skipped,dirs,old_td,exitdir,tunnel,bridge,station,error)
+        }
+        380 => layout!(crate::train_reservation::Pbs, item; tile,other,td,okay),
+        381 => {
+            layout!(crate::train_reservation::Search, item; track,tile,final_dest,td,found,okay)
+        }
+        382 => {
+            layout!(crate::train_reservation::Leaves, item; read_tile,read_next,read_last_station,read_direction,read_order,read_num_orders,read_order_index,read_free,read_free_1,read_new,read_choose,read_choose_4,read_check_next,all_compat,backoff,bits_track,blocking,check_reverse,compat_station,conditional,copy_order,cross_dirs,cross_tracks,depot_dir,depot_reserved,diag_reach_dirs,diag_track,enter_td,exit_dir,free,green,has_pbs,has_reserved,has_signal,increment_order,is_bridge,is_depot,is_pbs,is_plain,is_railway,is_station,is_tunnel,is_waypoint,line_reverse,mark_bridge,mark_tile,needs_service,oneway,order_service,order_stop,order_type,other_end,overlap,path_result,profile,rail90,reach_dirs,reach_tracks,reserved,reserve_paths,restore_order,safe,save_order,service,set_depot,set_depot_dest,set_platform,set_signal,set_tunnel,show_res,signal_buffer,start_stop,station,station_train,station_xy,stuck,tile_add,tile_offset,trackdir,track_status,try_track,tunnel_dir,tunnel_free,unreserve,update_buffer,write_dest,write_last,write_suppress,follow,origin,pathfind,safe_track,process_orders,update_order_dest)
+        }
+        383 => layout!(crate::train::Depot, item; tile,length),
+        384 => {
+            layout!(crate::train::Leaves, item; price,process_orders,profile,property,railveh_wagon,rail_tilt,rail_type,rail_types,reserve_paths,reserve_under,reset_unbunch,reverse_at_signals,reverse_single_blocked,reverse_windows,running_windows,service,servint,set_depot_res,set_next,set_platform_res,set_signal_state,set_tunnel_res,show_effect,show_reservation,signals_both,signals_update,signals_update_owner,signal_has_pbs,signal_pbs,signal_type,sigseg_full,sigseg_pbs,small_explosion,speed_default,start_stop_dirty,station,station_axis,station_compatible,station_dest,stopped_in_depot,stop_location,stuck_news,suppress_implicit,ticks_leave_depot,tile_add_diag,tile_offset_axis,tile_offset_diag,tile_owner,tile_rail_type,tile_virt,trackdir_exit,trackdir_reaches,track_bits,track_crosses,track_direction,track_status,train_list,train_visit,truncate_cargo,try_path,try_reserve,tunnel_dir,unreserve,update_delta,update_speed,user_default,veh_exit_dir,viewport,view_window,visit_type,vis_effect,wagon_override,wagon_speed_limits,wait_oneway,wait_pbs,wait_twoway,wait_unbunch,write_crossing_bar,write_crossing_res,write_visit_type,visit_tile,visit_near)
+        }
+        385 => layout!(crate::train_reservation::Choice, item; track,reserved),
         280 => {
             layout!(crate::cargo_storage::Packet, item; feeder_share, source_xy, count, periods_in_transit, first_station, next_hop, source_id, travelled_x, travelled_y, source_type, in_vehicle)
         }
