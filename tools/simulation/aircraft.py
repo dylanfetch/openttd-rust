@@ -19,6 +19,7 @@ from .core import (
     save_moment,
 )
 from .disasters import patch, rows
+from .effects import effect_rows
 from .play_saves import DISTRIBUTIONS
 
 AI_FOLDER = "aircraft-controller-ai"
@@ -29,6 +30,18 @@ LANDING_SEEDS = {
     "masked": (2443390968, 1012691400),
     "disabled": (2443390976, 1012692424),
     "event": (2443390976, 1012692424),
+}
+BREAKDOWNS = {
+    "cap-smoke": (319, 15, 320, 1),
+    "cap-quiet": (319, 14, 320, 0),
+    "gradual": (400, 14, 396, 0),
+    "landed-9": (9, 15, 9, 0),
+    "landed-10": (10, 15, 10, 1),
+}
+# Frozen from unchanged-reference self runs, in both plain and desync modes.
+BREAKDOWN_RNG = {
+    "airborne": [825328816, 2815432311],
+    "loading": [935562356, 3451540546],
 }
 
 
@@ -79,6 +92,17 @@ def scenarios(soak):
             ],
         }
         for kind in LANDING_SEEDS
+    ]
+    cases += [
+        {
+            "name": f"aircraft-breakdown-{kind}",
+            "kind": "save",
+            "aircraft_control": f"breakdown-{kind}",
+            "ticks": 1,
+            "short_checkpoint": True,
+            "console": ["unpause"],
+        }
+        for kind in BREAKDOWNS
     ]
     return cases
 
@@ -440,6 +464,41 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
                 if trial["exit"]:
                     raise RuntimeError("reference airborne removal preparation failed")
                 source = trial["snapshots"][-1]
+        loading = None
+        if kind.startswith("breakdown-landed-"):
+            cached = folder / "breakdown-loading.sav"
+            if cached.exists():
+                source = cached
+            for attempt in range(16):
+                loading = next(
+                    (
+                        index
+                        for index, row in rows(source).items()
+                        if row["type"] == 3
+                        and row["aircraft[0]/common[0]/subtype"] == 2
+                        and row["aircraft[0]/common[0]/current_order.type"] & 15 == 3
+                        and row["aircraft[0]/state"] in range(2, 8)
+                    ),
+                    None,
+                )
+                if loading is not None:
+                    if source != cached:
+                        shutil.copyfile(source, cached)
+                    break
+                trial = run_game(
+                    dict(kind="save", save=str(source), ticks=8, console=["unpause"]),
+                    binaries["reference"],
+                    builds["reference"],
+                    folder / f"breakdown-loading-{attempt}",
+                    timeout,
+                    env,
+                    False,
+                )
+                if trial["exit"]:
+                    raise RuntimeError("reference loading preparation failed")
+                source = trial["snapshots"][-1]
+            else:
+                raise RuntimeError("reference plane never started loading")
         allrows = rows(source)
         heads = [
             index
@@ -476,9 +535,33 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
             raise RuntimeError("controller input lacks an airborne plane")
         if kind == "zeppelin":
             flight = landing
+        if loading is not None:
+            flight = loading
         target = allrows[flight]["aircraft[0]/targetairport"]
         action = {}
-        if kind in ("closure", "removal"):
+        if kind.startswith("breakdown-"):
+            speed, tick, _, _ = BREAKDOWNS[kind.removeprefix("breakdown-")]
+            common = "aircraft[0]/common[0]/"
+            fields = {
+                common + "cur_speed": speed,
+                common + "subspeed": 0,
+                common + "tick_counter": tick,
+                common + "breakdown_ctr": 2,
+            }
+            if loading is not None:
+                fields.update(
+                    {
+                        common + "current_order.flags": allrows[flight][
+                            common + "current_order.flags"
+                        ]
+                        | 8,
+                        common + "current_order.wait_time": 65535,
+                        common + "current_order_time": 0,
+                        common + "lateness_counter": 0,
+                    }
+                )
+            edits["VEHS"] = {flight: fields}
+        elif kind in ("closure", "removal"):
             action = {
                 "aircraft_action": kind,
                 "aircraft_action_target": target
@@ -560,6 +643,100 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
             aircraft_target=target,
             **action,
         )
+
+
+def check_breakdown(scenario, run, mode, role, result):
+    """Declared boundary inputs enter ordinary HandleBreakdown in both passes."""
+    kind = scenario["aircraft_control"].removeprefix("breakdown-")
+    speed, tick, final_speed, smoke_count = BREAKDOWNS[kind]
+    source, final = Path(scenario["save"]), run["snapshots"][-1]
+    before, after = rows(source), rows(final)
+    selected = scenario["aircraft_selected"]
+    a, b = before[selected], after[selected]
+    plane, common = "aircraft[0]/", "aircraft[0]/common[0]/"
+    landed = kind.startswith("landed-")
+    if (
+        a[common + "cur_speed"] != speed
+        or a[common + "tick_counter"] != tick
+        or a[common + "breakdown_ctr"] != 2
+        or a[common + "vehstatus"] != 8
+        or a[common + "engine_type"] != 238
+        or rows(source, "PATS")[0]["vehicle.plane_speed"] != 4
+        or any(
+            before[head][common + "breakdown_ctr"]
+            for head in scenario["aircraft_heads"]
+            if head != selected
+        )
+        or (a[common + "current_order.type"] & 15 == 3) != landed
+    ):
+        raise RuntimeError("breakdown input lacks ordinary visible plane boundary")
+    if not landed and [
+        a[plane + field] for field in ("state", "pos", "previous_pos", "targetairport")
+    ] != [14, 38, 37, 0]:
+        raise RuntimeError("breakdown input lacks maximum-speed international FTA")
+    if rows(source, "STNN")[a[plane + "targetairport"]]["normal[0]/airport.type"] != 4:
+        raise RuntimeError("breakdown input lacks the selected international airport")
+    if a[common + "current_order.max_speed"] != 65535:
+        raise RuntimeError("breakdown input has an independent order speed limit")
+    if landed and (
+        a[common + "current_order.flags"] & 8 == 0
+        or a[common + "current_order.wait_time"] != 65535
+        or a[common + "current_order_time"] != 0
+        or a[common + "lateness_counter"] != 0
+        or b[common + "current_order.type"] & 15 != 3
+        or any(
+            a[common + key] != b[common + key] for key in ("x_pos", "y_pos", "z_pos")
+        )
+    ):
+        raise RuntimeError("breakdown loading boundary moved or departed")
+    # Stock engine238 is FFP Dart: max speed (74*128)/10=947. International
+    # position38 has NoSpeedClamp/SlowTurn, so neither limit selects 320 itself.
+    if (
+        b[common + "tick_counter"] != tick + 1
+        or save_moment(final)[2] != save_moment(source)[2] + 1
+    ):
+        raise RuntimeError("breakdown checkpoint did not advance exactly one tick")
+    cleared = kind == "landed-9"
+    if (
+        b[common + "cur_speed"] != final_speed
+        or b[common + "breakdown_ctr"] != (0 if cleared else 1)
+        or b[common + "vehstatus"] != (8 if cleared else 72)
+        or b[common + "breakdowns_since_last_service"]
+        != a[common + "breakdowns_since_last_service"] + 1
+    ):
+        raise RuntimeError("breakdown speed/clear/native entry witness differs")
+    old_effects, new_effects = effect_rows(source), effect_rows(final)
+    smoke = {
+        i: row
+        for i, row in new_effects.items()
+        if i not in old_effects and row["subtype"] == 10
+    }
+    dx, dy = ((5, 5), (6, 0), (5, -5), (0, -6), (-5, -5), (-6, 0), (-5, 5), (0, 6))[
+        a[common + "direction"]
+    ]
+    position = [
+        a[common + "x_pos"] + dx,
+        a[common + "y_pos"] + dy,
+        a[common + "z_pos"] + 2,
+    ]
+    if len(smoke) != smoke_count or any(
+        [row[key] for key in ("x_pos", "y_pos", "z_pos")] != position
+        for row in smoke.values()
+    ):
+        raise RuntimeError("breakdown smoke cadence/count/relative position differs")
+    rng = [rows(final, "DATE")[0][f"random_state[{i}]"] for i in (0, 1)]
+    if rng != BREAKDOWN_RNG["loading" if landed else "airborne"]:
+        raise RuntimeError("breakdown shared RNG differs from frozen reference")
+    result[f"{mode}_{role}_breakdown"] = {
+        "selected": selected,
+        "input_speed": speed,
+        "final_speed": b[common + "cur_speed"],
+        "tick_counter": b[common + "tick_counter"],
+        "counter": b[common + "breakdown_ctr"],
+        "status": b[common + "vehstatus"],
+        "smoke": smoke,
+        "shared_rng": rng,
+    }
 
 
 def check_landing(scenario, run, mode, role, result):
@@ -657,6 +834,9 @@ def check_landing(scenario, run, mode, role, result):
 
 
 def check_control(scenario, run, mode, role, result):
+    if scenario["aircraft_control"].startswith("breakdown-"):
+        check_breakdown(scenario, run, mode, role, result)
+        return
     if scenario["aircraft_control"].startswith("landing-"):
         check_landing(scenario, run, mode, role, result)
         return
