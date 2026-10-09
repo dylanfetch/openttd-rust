@@ -1635,13 +1635,17 @@ placement-constructed trivial C++ facades retain save, legacy load and external-
 addresses. Original bodies compile only in portable builds. Shared Vehicle/pools,
 orders/loading, airport geometry/FTA records and rendering remain C++.
 
-Rust copies world/FTA observations and calls bounded noexcept services directly,
-releasing scalar access before each call. ProcessOrders/UpdateOrderDest,
-VehicleEnterDepot/refit, Vehicle::Crash, depot commands and deletion return to
-the C++ stack for actual reentry; AI/Game event insertion only queues. Owners
-survive their original destruction policies and modern/legacy descriptor access.
-Flight helpers still accept disaster vehicles. Panics/environmental failures abort;
-wrapping counters and shared RNG retain original order.
+The #190 boundary uses named synchronous entries and typed noexcept services;
+entries resolve each live vehicle and canonical State once, with field-sized raw
+access and narrow map, vehicle, airport and FTA observations. An immutable service
+table is borrowed, with no continuation, selector dispatch or per-entry allocation.
+ProcessOrders/UpdateOrderDest, depot/refit, qualified Vehicle::Crash, depot commands
+and deletion call directly after all owner accesses end. Command failures return
+native results; event insertion queues without running a script VM. PreDestructor
+releases airport blocks while state is live; the deleting caller returns immediately.
+Disaster flight helpers use their actual Vehicle and independent flags address.
+Canonical save/legacy aliases and portable bodies remain unchanged. Panics and
+environmental failures abort; wrapping counters and shared RNG retain source order.
 
 `python3 tools/migration.py simulate aircraft-route aircraft-controller disasters`
 compares every saved chunk and debug log: planes/helicopters, terminal groups,
@@ -1649,7 +1653,8 @@ dedicated pads, occupied-block waits, service, closure diversion, zeppelin landi
 abort, airborne airport removal, out-of-fuel crash/destruction and live reload. `--self` and
 `--soak` check reproducibility/longer runs. A scenario-local native probe compares
 800 finite-range branches against unchanged reference helpers because supplied
-engines have unlimited range. ABI checks cover owner defaults/layout/lifetime.
+engines have unlimited range. ABI checks cover owner defaults/layout/lifetime, typed table/record offsets,
+nested same-owner mutation, live block-release/deletion and disaster flight flags.
 Full legacy files, arbitrary NewGRFs/airport rotations and viewport/sound output
 remain evidence limits. A reference-built ownerless oilrig route checks public
 helicopter landing through the ordinary FTA path.

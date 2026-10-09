@@ -51,42 +51,45 @@ struct Fixture {
 	uint64_t blocks = 0;
 	std::array<unsigned, 4> messages{};
 };
-static void OPENTTD_AIRCRAFT_CALL Read(void *context, uint32_t kind, uint32_t id, int64_t, int64_t, int64_t *out) noexcept
+#include "aircraft-boundary.hpp"
+static Fixture *fixture;
+static OpenTTDAircraftLeaves RangeLeaves()
 {
-	auto &f = *static_cast<Fixture *>(context);
-	switch (kind) {
-		case 0: out[0] = out[1] = 64; out[2] = out[3] = 63; out[4] = 1; break;
-		case 1:
-			out[0] = id == 17 ? 2 : 4; out[3] = 1; out[8] = f.aircraft.vehstatus.value; out[9] = id == 17 ? 18 : 1048575;
-			out[13] = 8; out[14] = 100; out[16] = f.aircraft.current_order.type; out[17] = f.aircraft.current_order.destination; out[34] = 3;
-			break;
-		case 2:
-			if (id >= 2 || !valid[id]) break;
-			out[0] = 1; out[1] = stations[id].airport.tile; out[2] = stations[id].airport.tile; out[4] = out[5] = 7; out[6] = 4; out[8] = out[9] = out[10] = 1;
-			out[11] = reinterpret_cast<intptr_t>(&f.blocks); break;
-		case 3: out[0] = out[1] = 1; out[3] = 1; break;
-		case 4: out[0] = 1; break;
-		case 5: out[3] = 1 << 30; break;
-		case 6: out[2] = 16; break;
-		case 8: out[0] = reinterpret_cast<intptr_t>(f.state.get()); break;
-		case 11: out[0] = 100; out[1] = 1; break;
-		case 18: out[0] = 1; break;
-	}
+	auto leaves = AircraftTestLeaves();
+	leaves.map_size_x = []() noexcept { return uint32_t{64}; };
+	leaves.station = [](uint16_t id) noexcept -> const void * { return Station::GetIfValid(id); };
+	leaves.airport_tile = [](const void *s) noexcept { return static_cast<const Station *>(s)->airport.tile; };
+	leaves.vehicle_status = [](OpenTTDAircraftVehicle) noexcept { return static_cast<uint8_t>(fixture->aircraft.vehstatus.value); };
+	leaves.order_type = [](OpenTTDAircraftVehicle) noexcept { return static_cast<uint8_t>(fixture->aircraft.current_order.type); };
+	leaves.order_destination = [](OpenTTDAircraftVehicle) noexcept { return fixture->aircraft.current_order.destination; };
+	leaves.handle_breakdown = [](OpenTTDAircraftVehicle) noexcept {};
+	leaves.process_orders = [](OpenTTDAircraftVehicle) noexcept {};
+	leaves.handle_loading = [](OpenTTDAircraftVehicle, bool) noexcept {};
+	leaves.dirty_start_stop = [](OpenTTDAircraftVehicle) noexcept { fixture->messages[0]++; };
+	leaves.destination_too_far = [](OpenTTDAircraftVehicle) noexcept { fixture->messages[1]++; fixture->messages[2]++; };
+	leaves.delete_range_news = [](OpenTTDAircraftVehicle) noexcept { fixture->messages[3]++; };
+	leaves.airport_fta = [](const void *) noexcept -> const void * { return &fixture->blocks; };
+	leaves.station_tile = [](const void *s) noexcept { return static_cast<const Station *>(s)->airport.tile; };
+	leaves.rotation = [](const void *) noexcept { return uint8_t{0}; };
+	leaves.airport_width = leaves.airport_height = [](const void *) noexcept { return uint16_t{7}; };
+	leaves.x = leaves.y = [](OpenTTDAircraftVehicle) noexcept { return int32_t{0}; };
+	leaves.direction = [](OpenTTDAircraftVehicle) noexcept { return uint8_t{0}; };
+	leaves.dummy_airport = []() noexcept -> const void * { return &fixture->blocks; };
+	leaves.airport_elements = [](const void *) noexcept { return uint8_t{1}; };
+	leaves.moving = [](const void *, uint8_t) noexcept { return OpenTTDAircraftMoving{0, 0, 16, 0}; };
+	leaves.set_current_speed = [](OpenTTDAircraftVehicle, uint16_t) noexcept {};
+	leaves.node = [](const void *ap, uint8_t) noexcept -> const void * { return ap; };
+	leaves.fta = [](const void *) noexcept { return OpenTTDAircraftNode{nullptr, uint64_t{1} << 30, 0, 0, 0}; };
+	leaves.airport_blocks = [](const void *) noexcept { return &fixture->blocks; };
+	leaves.set_subspeed = [](OpenTTDAircraftVehicle, uint8_t) noexcept {};
+	leaves.speed_property = [](OpenTTDAircraftVehicle) noexcept { return uint32_t{0}; };
+	leaves.engine_speed = [](OpenTTDAircraftVehicle) noexcept { return uint16_t{100}; };
+	leaves.set_maximum_speed = [](OpenTTDAircraftVehicle, uint16_t) noexcept {};
+	leaves.set_cargo_age = [](OpenTTDAircraftVehicle, uint16_t) noexcept {};
+	leaves.cargo_age_property = [](OpenTTDAircraftVehicle) noexcept { return uint32_t{0}; };
+	leaves.next = [](OpenTTDAircraftVehicle v) noexcept { return v; };
+	return leaves;
 }
-static void OPENTTD_AIRCRAFT_CALL Write(void *, uint32_t, uint32_t, int64_t) noexcept {}
-static int64_t OPENTTD_AIRCRAFT_CALL Service(void *context, const OpenTTDAircraftAction *action) noexcept
-{
-	auto &f = *static_cast<Fixture *>(context);
-	if (action->kind == 8) f.messages[0]++;
-	if (action->kind == 24) { f.messages[1]++; f.messages[2]++; }
-	if (action->kind == 25) f.messages[3]++;
-	return 0;
-}
-static uint32_t Random(void *) noexcept { std::abort(); }
-static void Observe(void *, uint32_t, uint32_t *) noexcept {}
-static void TileWrite(void *, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) noexcept {}
-static float Trig(uint32_t, float value) noexcept { return value; }
-static uint32_t Industry(int32_t, int32_t, uint32_t *) noexcept { return 0; }
 int main()
 {
 	unsigned cases = 0;
@@ -97,9 +100,9 @@ int main()
 		f.aircraft.acache.cached_max_range_sqr = range; f.aircraft.state = state; f.aircraft.flags = flag;
 		f.state->cached_max_range_sqr = range; f.state->state = state; f.state->flags = flag; f.state->targetairport = 0;
 		messages = {}; AircraftEventHandler(&f.aircraft, 0); auto expected = messages;
-		const OpenTTDSharedServices services{nullptr, Random, Observe, TileWrite, Trig, Industry};
-		std::unique_ptr<OpenTTDAircraftRun, decltype(&openttd_rust_aircraft_destroy)> run{openttd_rust_aircraft_create(18, 17, 0, 0, 0, 0, &f, Read, Write, &services, Service), openttd_rust_aircraft_destroy};
-		for (;;) { auto action = openttd_rust_aircraft_advance(run.get(), 0); if (action.kind == 0) break; if (action.kind != 100) std::abort(); }
+		fixture = &f;
+		const auto leaves = RangeLeaves();
+		openttd_rust_aircraft_event(&leaves, {&f, f.state.get(), 17}, false);
 		if ((f.state->flags & 1) != (f.aircraft.flags & 1) || f.messages != expected) { std::fprintf(stderr, "range mismatch range=%u dest=%u state=%u flags=%u validity=%u\n", range, destination, state, flag, validity); return 1; }
 		cases++;
 	}
