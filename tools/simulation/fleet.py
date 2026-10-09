@@ -36,10 +36,12 @@ def scenarios(soak):
         }
         for mode in (
             "groups",
+            "list",
             "replace",
             "cash",
             "train",
             "train-rollback",
+            "train-wagons",
             "ship",
             "aircraft",
         )
@@ -175,6 +177,17 @@ def check(scenario, run, mode, role, result):
         return
     required = {
         "reload": ["FLEET reloaded true 1 true"],
+        "list": [
+            "FLEET cost list-test true 0 65535",
+            "FLEET cost list-wide-id false 0 65535",
+            "FLEET cost list-invalid false 0 65535",
+            "FLEET list-rejected true true true true",
+            "FLEET list-group true true true",
+        ],
+        "train-wagons": [
+            "FLEET free-replaced true true true true",
+            "FLEET wagons-replaced true true true 6 true 0",
+        ],
         "groups": [
             "FLEET rule all true true",
             "FLEET rule protected true false",

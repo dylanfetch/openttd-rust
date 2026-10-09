@@ -18,6 +18,8 @@
 )]
 use std::collections::{BTreeMap, BTreeSet};
 const NONE: u32 = u32::MAX;
+/// `VehicleID::Invalid()` (`vehicle_type.h`), the list-selection sentinel.
+const INVALID_VEHICLE: u32 = 0xF_FFFF;
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct GroupFields {
@@ -128,18 +130,6 @@ pub extern "C" fn openttd_rust_fleet_head_create() -> *mut () {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_fleet_head_destroy(p: *mut ()) {
     unsafe { drop(Box::from_raw(p.cast::<*mut ()>())) }
-}
-/// Create the canonical membership allocation; C++ starts scalar prefix lifetimes.
-#[unsafe(no_mangle)]
-pub extern "C" fn openttd_rust_fleet_membership_create() -> *mut () {
-    Box::into_raw(Box::new(65535_u16)).cast()
-}
-/// Release a unique membership owner after shell/scalar accesses end.
-/// # Safety
-/// Live matching create result, destroyed once on the serial game thread.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_fleet_membership_destroy(p: *mut ()) {
-    unsafe { drop(Box::from_raw(p.cast::<u16>())) }
 }
 /// Copy detached statistics without sharing their allocation lifetime.
 /// # Safety
@@ -261,69 +251,68 @@ pub unsafe extern "C" fn openttd_rust_fleet_engine_change(p: *mut (), engine: u1
 
 #[repr(C)]
 pub struct GroupServices {
-    group: unsafe extern "C" fn(u16) -> *mut (),
-    next_group: unsafe extern "C" fn(u32) -> u32,
-    next_company: unsafe extern "C" fn(u32) -> u32,
-    next_vehicle: unsafe extern "C" fn(u32) -> *mut (),
-    vehicle: unsafe extern "C" fn(u32) -> *mut (),
-    vehicle_id: unsafe extern "C" fn(*mut ()) -> u32,
-    vehicle_type: unsafe extern "C" fn(*mut ()) -> u8,
-    vehicle_owner: unsafe extern "C" fn(*mut ()) -> u8,
-    vehicle_group: unsafe extern "C" fn(*mut ()) -> u16,
-    vehicle_engine: unsafe extern "C" fn(*mut ()) -> u16,
-    profit: unsafe extern "C" fn(*mut ()) -> i64,
-    old_enough: unsafe extern "C" fn(*mut ()) -> bool,
-    primary: unsafe extern "C" fn(*mut ()) -> bool,
-    countable: unsafe extern "C" fn(*mut ()) -> bool,
-    ground: unsafe extern "C" fn(*mut ()) -> bool,
-    front: unsafe extern "C" fn(*mut ()) -> bool,
-    free_wagon: unsafe extern "C" fn(*mut ()) -> bool,
-    next_part: unsafe extern "C" fn(*mut ()) -> *mut (),
-    first_shared: unsafe extern "C" fn(*mut ()) -> *mut (),
-    next_shared: unsafe extern "C" fn(*mut ()) -> *mut (),
-    set_membership: unsafe extern "C" fn(*mut (), u16),
-    invalidate_cache: unsafe extern "C" fn(*mut ()),
-    viewport: unsafe extern "C" fn(*mut ()),
-    stats: unsafe extern "C" fn(u8, u16, u8) -> *mut (),
-    head: unsafe extern "C" fn(u8) -> *mut (),
-    renew_state: unsafe extern "C" fn(*mut ()) -> *mut (),
-    next_renew: unsafe extern "C" fn(u32) -> *mut (),
-    renew_id: unsafe extern "C" fn(*mut ()) -> u32,
-    engine_type: unsafe extern "C" fn(u16) -> u8,
-    current_company: unsafe extern "C" fn() -> u8,
-    buildable_type: unsafe extern "C" fn(u8) -> bool,
-    can_allocate: unsafe extern "C" fn() -> bool,
-    allocate: unsafe extern "C" fn(u8, u8) -> u16,
-    use_number: unsafe extern "C" fn(u8) -> u16,
-    release_number: unsafe extern "C" fn(u8, u16),
-    company_livery: unsafe extern "C" fn(u8) -> *const u8,
-    keep_length: unsafe extern "C" fn(u8) -> bool,
-    delete_group: unsafe extern "C" fn(u16),
-    invalid_parent: unsafe extern "C" fn(u16, u16),
-    clear_backup: unsafe extern "C" fn(u16),
-    remove_rule: unsafe extern "C" fn(u8, u16, u16, u32),
-    remove_vehicles: unsafe extern "C" fn(u16, u32),
-    delete_child: unsafe extern "C" fn(u16, u32),
-    add_to_group: unsafe extern "C" fn(u16, u32, u32),
-    utf8_length: unsafe extern "C" fn(*const u8, usize) -> usize,
-    list_dirty: unsafe extern "C" fn(u8, u8),
-    list_set_dirty: unsafe extern "C" fn(u8, u8),
-    colour_dirty: unsafe extern "C" fn(u8, u8),
-    replace_dirty: unsafe extern "C" fn(u8),
-    replace_invalidate: unsafe extern "C" fn(u8),
-    alter_dirty: unsafe extern "C" fn(u8),
-    vehicle_dirty: unsafe extern "C" fn(u32),
-    depot_dirty: unsafe extern "C" fn(*mut ()),
-    close_replace: unsafe extern "C" fn(u8),
-    screen_dirty: unsafe extern "C" fn(),
-    list_generate: unsafe extern "C" fn(*mut ()) -> bool,
-    list_push: unsafe extern "C" fn(*mut (), *mut ()),
-    list_size: unsafe extern "C" fn(*mut ()) -> usize,
-    list_at: unsafe extern "C" fn(*mut (), usize) -> *mut (),
-    renew_allocate: unsafe extern "C" fn() -> *mut (),
-    renew_can_allocate: unsafe extern "C" fn() -> bool,
-    renew_delete: unsafe extern "C" fn(*mut ()),
-    recursion_error: u32,
+    pub(crate) group: unsafe extern "C" fn(u16) -> *mut (),
+    pub(crate) next_group: unsafe extern "C" fn(u32) -> u32,
+    pub(crate) next_company: unsafe extern "C" fn(u32) -> u32,
+    pub(crate) next_vehicle: unsafe extern "C" fn(u32) -> *mut (),
+    pub(crate) vehicle: unsafe extern "C" fn(u32) -> *mut (),
+    pub(crate) vehicle_id: unsafe extern "C" fn(*mut ()) -> u32,
+    pub(crate) vehicle_type: unsafe extern "C" fn(*mut ()) -> u8,
+    pub(crate) vehicle_owner: unsafe extern "C" fn(*mut ()) -> u8,
+    pub(crate) vehicle_group: unsafe extern "C" fn(*mut ()) -> u16,
+    pub(crate) vehicle_engine: unsafe extern "C" fn(*mut ()) -> u16,
+    pub(crate) profit: unsafe extern "C" fn(*mut ()) -> i64,
+    pub(crate) old_enough: unsafe extern "C" fn(*mut ()) -> bool,
+    pub(crate) primary: unsafe extern "C" fn(*mut ()) -> bool,
+    pub(crate) countable: unsafe extern "C" fn(*mut ()) -> bool,
+    pub(crate) ground: unsafe extern "C" fn(*mut ()) -> bool,
+    pub(crate) front: unsafe extern "C" fn(*mut ()) -> bool,
+    pub(crate) next_part: unsafe extern "C" fn(*mut ()) -> *mut (),
+    pub(crate) first_shared: unsafe extern "C" fn(*mut ()) -> *mut (),
+    pub(crate) next_shared: unsafe extern "C" fn(*mut ()) -> *mut (),
+    pub(crate) set_membership: unsafe extern "C" fn(*mut (), u16),
+    pub(crate) invalidate_cache: unsafe extern "C" fn(*mut ()),
+    pub(crate) viewport: unsafe extern "C" fn(*mut ()),
+    pub(crate) stats: unsafe extern "C" fn(u8, u16, u8) -> *mut (),
+    pub(crate) head: unsafe extern "C" fn(u8) -> *mut (),
+    pub(crate) renew_state: unsafe extern "C" fn(*mut ()) -> *mut (),
+    pub(crate) next_renew: unsafe extern "C" fn(u32) -> *mut (),
+    pub(crate) renew_id: unsafe extern "C" fn(*mut ()) -> u32,
+    pub(crate) engine_type: unsafe extern "C" fn(u16) -> u8,
+    pub(crate) current_company: unsafe extern "C" fn() -> u8,
+    pub(crate) buildable_type: unsafe extern "C" fn(u8) -> bool,
+    pub(crate) can_allocate: unsafe extern "C" fn() -> bool,
+    pub(crate) allocate: unsafe extern "C" fn(u8, u8) -> u16,
+    pub(crate) use_number: unsafe extern "C" fn(u8) -> u16,
+    pub(crate) release_number: unsafe extern "C" fn(u8, u16),
+    pub(crate) company_livery: unsafe extern "C" fn(u8) -> *const u8,
+    pub(crate) keep_length: unsafe extern "C" fn(u8) -> bool,
+    pub(crate) delete_group: unsafe extern "C" fn(u16),
+    pub(crate) invalid_parent: unsafe extern "C" fn(u16, u16),
+    pub(crate) clear_backup: unsafe extern "C" fn(u16),
+    pub(crate) remove_rule: unsafe extern "C" fn(u8, u16, u16, u32),
+    pub(crate) remove_vehicles: unsafe extern "C" fn(u16, u32),
+    pub(crate) delete_child: unsafe extern "C" fn(u16, u32),
+    pub(crate) add_to_group: unsafe extern "C" fn(u16, u32, u32),
+    pub(crate) utf8_length: unsafe extern "C" fn(*const u8, usize) -> usize,
+    pub(crate) list_dirty: unsafe extern "C" fn(u8, u8),
+    pub(crate) list_set_dirty: unsafe extern "C" fn(u8, u8),
+    pub(crate) colour_dirty: unsafe extern "C" fn(u8, u8),
+    pub(crate) replace_dirty: unsafe extern "C" fn(u8),
+    pub(crate) replace_invalidate: unsafe extern "C" fn(u8),
+    pub(crate) alter_dirty: unsafe extern "C" fn(u8),
+    pub(crate) vehicle_dirty: unsafe extern "C" fn(u32),
+    pub(crate) depot_dirty: unsafe extern "C" fn(*mut ()),
+    pub(crate) close_replace: unsafe extern "C" fn(u8),
+    pub(crate) screen_dirty: unsafe extern "C" fn(),
+    pub(crate) list_generate: unsafe extern "C" fn(*mut ()) -> bool,
+    pub(crate) list_push: unsafe extern "C" fn(*mut (), *mut ()),
+    pub(crate) list_size: unsafe extern "C" fn(*mut ()) -> usize,
+    pub(crate) list_at: unsafe extern "C" fn(*mut (), usize) -> *mut (),
+    pub(crate) renew_allocate: unsafe extern "C" fn() -> *mut (),
+    pub(crate) renew_can_allocate: unsafe extern "C" fn() -> bool,
+    pub(crate) renew_delete: unsafe extern "C" fn(*mut ()),
+    pub(crate) recursion_error: u32,
 }
 
 const INVALID_GROUP: u16 = 65535;
@@ -996,7 +985,7 @@ unsafe fn add_vehicle_group(
     if unsafe { group(w, new) }.is_null() && new != DEFAULT_GROUP && new != NEW_GROUP {
         return ERROR;
     }
-    if veh_id == NONE && vli_valid {
+    if veh_id == INVALID_VEHICLE && vli_valid {
         if !unsafe { (w.list_generate)(context) } || unsafe { (w.list_size)(context) } == 0 {
             return ERROR;
         }

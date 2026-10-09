@@ -106,7 +106,7 @@ static void CargoCapacityRead(void *shell, OpenTTDCargoCapacityVehicle *out) noe
 	Vehicle *v = static_cast<Vehicle *>(shell);
 	*out = {v->cargo.RustOwner(), v->cargo_cap, v->cargo_type, static_cast<uint8_t>(v->type == VEH_TRAIN), static_cast<uint8_t>(v->IsArticulatedPart())};
 }
-static void *CargoCapacityNextPart(void *shell) noexcept
+void *CargoCapacityNextPart(void *shell) noexcept
 {
 	return static_cast<Vehicle *>(shell)->Next();
 }
@@ -775,6 +775,7 @@ static CommandCost ReplaceChain(Vehicle **chain, DoCommandFlags flags, bool wago
  */
 #else
 #include "rust/fleet_transaction_services.hpp"
+const OpenTTDFleetTransactionServices &FleetTransactionServices() { return _fleet_transaction_services; }
 
 bool CheckAutoreplaceValidity(EngineID from, EngineID to, CompanyID company)
 {

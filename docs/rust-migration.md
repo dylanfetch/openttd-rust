@@ -1680,28 +1680,27 @@ identity/order/cache preservation and bounded reads for first-hit append/keyed l
 its synthetic timings are not whole-game speed ratios. Legacy conversions and
 complete refit/autoreplace transactions lack additional play witnesses (#156).
 
-### Fleet controller checkpoint (#147; incomplete)
+### Fleet grouping and replacement lifecycle (#147)
 
-Rust owns group metadata/names/ordered children, statistics/engine counts,
-renewal rules/links, company renewal heads and vehicle group membership.
-The WIP controllers now run group commands, traversal/statistics/livery updates,
-renewal-rule changes, replacement eligibility/refits/speculative construction,
-rearrangement/rollback and an ascending VehicleID pending map. Typed synchronous
-native callbacks supply pools, world reads, commands and presentation. Native
-stack objects retain complete CommandCost values and original AddCost behavior.
-C++ retains pool identity/allocation, group numbers, GUI folding and save adapters;
-portable builds retain the original bodies. Owner operations and child iteration
-use named APIs without runtime selectors or boundary export allocations.
+Rust owns group metadata/names/ordered children, group/company statistics and
+engine counts, renewal rules/links and company renewal heads, plus the pending
+tick-end map. It runs every group command, traversal/statistics/livery update,
+renewal-rule command, replacement eligibility/refit choice, speculative build,
+rearrangement, rollback, execution and the ascending-VehicleID drain. Original
+bodies compile only in portable builds. C++ keeps pool identity/allocation, group
+numbers, GUI folding, save adapters and `Vehicle::group_id`, which stays shell
+storage that Rust reads/writes through typed services at the original points;
+company-merge rewriting (economy.cpp), train/vehicle construction and save/load
+writes of `group_id` remain C++.
 
-Checks so far: `python3 tools/migration.py build --jobs 2`,
-`python3 tools/migration.py rust-checks --jobs 2`, and fleet scenarios through
-`python3 tools/simulate.py fleet- --jobs 1` plus unchanged-reference `--self`.
-Scenario-local native fixtures cover nested groups/livery/rules, road/ship/aircraft
-renewal, insufficient funds, shared orders/cargo, train rearrangement failure and
-reload. Existing native tests cover ABI340-342 and canonical owner lifetimes.
+Three named-slot noexcept tables (ABI 343-346, with owner prefixes 340-342)
+serve Rust; native stack CommandCost objects keep AddCost first-error and Money
+saturation, and original assertion sites run in assertion builds. No owner borrow
+spans a callback; nested commands reenter directly.
 
-This checkpoint does **not** complete #147. New callback-table ABI/reentry and
-CommandCost fidelity tests, a final source audit, broader refit/NewGRF branches,
-full verify, soak/default evidence, independent review and required CI remain.
-The draft PR records exact passed checks and the historical-save GLOG normalization
-used by the two train comparisons. No complete-equivalence claim is made.
+Checks: `python3 tools/migration.py verify --jobs 2`, `python3 tools/migration.py
+simulate fleet- --jobs 2` (also `--self`, `--soak`). Scenarios cover hierarchy,
+rules/protection, list-based NEW_GROUP and veh_id 0xFFFFFFFF, renewals for four
+transports, free-unit and different-engine wagon-removal replacement, cash and
+length rollback, and reload. Native tests cover layouts, slots, CommandCost and
+drain reentry. NewGRF refit/attach callbacks and articulated parts remain #156.

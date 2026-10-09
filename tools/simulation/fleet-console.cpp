@@ -28,6 +28,7 @@
 #include "road_map.h"
 #include "water_map.h"
 #include "settings_type.h"
+#include "vehiclelist.h"
 
 [[noreturn]] static void FixtureAbort(int line) { fmt::print(stderr, "FLEET setup-failure {}\n", line); std::fflush(stderr); std::abort(); }
 
@@ -125,7 +126,27 @@ static bool FleetScenario(std::span<std::string_view> args)
 	Vehicle *v = args[1] == "ship" ? BuildFixture(VEH_SHIP) : args[1] == "aircraft" ? BuildFixture(VEH_AIRCRAFT) : args[1].starts_with("train") ? BuildFixture(VEH_TRAIN) : Vehicle::Get(VehicleID(126));
 	if (!v->IsInDepot()) FixtureAbort(__LINE__);
 	company.Change(v->owner);
-	if (args[1] == "groups" || args[1] == "groups-store") {
+	if (args[1] == "list") {
+		/* "Manage list -> Create group" (vehicle_gui.cpp) posts NEW_GROUP, VehicleID::Invalid() and the window's list. */
+		VehicleListIdentifier vli(VL_STANDARD, v->type, v->owner, v->owner);
+		VehicleList list;
+		if (!GenerateVehicleSortList(&list, vli) || list.size() < 2) FixtureAbort(__LINE__);
+		size_t groups = Group::GetNumItems();
+		auto [test_cost, test_group] = Command<CMD_ADD_VEHICLE_GROUP>::Do({}, NEW_GROUP, VehicleID::Invalid(), false, vli);
+		Cost("list-test", test_cost);
+		/* A network veh_id of 0xFFFFFFFF is not VehicleID::Invalid(): no list, no vehicle. */
+		auto [wide_cost, wide_group] = Command<CMD_ADD_VEHICLE_GROUP>::Do(DoCommandFlag::Execute, NEW_GROUP, VehicleID(0xFFFFFFFF), false, vli);
+		Cost("list-wide-id", wide_cost);
+		VehicleListIdentifier invalid(VLT_END, v->type, v->owner, v->owner);
+		auto [invalid_cost, invalid_group] = Command<CMD_ADD_VEHICLE_GROUP>::Do(DoCommandFlag::Execute, NEW_GROUP, VehicleID::Invalid(), false, invalid);
+		Cost("list-invalid", invalid_cost);
+		fmt::print(stderr, "FLEET list-rejected {} {} {} {}\n", test_group == GroupID::Invalid(), wide_group == GroupID::Invalid(), invalid_group == GroupID::Invalid(), Group::GetNumItems() == groups);
+		auto [cost, group] = Command<CMD_ADD_VEHICLE_GROUP>::Do(DoCommandFlag::Execute, NEW_GROUP, VehicleID::Invalid(), false, vli);
+		Checked("list-create", cost);
+		bool members = Group::IsValidID(group);
+		for (const Vehicle *u : list) members &= u->group_id == group;
+		fmt::print(stderr, "FLEET list-group {} {} {}\n", members, GetGroupNumVehicle(v->owner, group, v->type) == list.size(), Group::GetNumItems() == groups + 1);
+	} else if (args[1] == "groups" || args[1] == "groups-store") {
 		auto [parent_cost, parent] = Command<CMD_CREATE_GROUP>::Do(DoCommandFlag::Execute, v->type, GroupID::Invalid());
 		Checked("parent", parent_cost);
 		auto [child_cost, child] = Command<CMD_CREATE_GROUP>::Do(DoCommandFlag::Execute, v->type, parent);
@@ -149,6 +170,72 @@ static bool FleetScenario(std::span<std::string_view> args)
 		Checked("delete", Command<CMD_DELETE_GROUP>::Do(DoCommandFlag::Execute, parent));
 		fmt::print(stderr, "FLEET deleted {} {} {}\n", !Group::IsValidID(parent), !Group::IsValidID(child), v->group_id == DEFAULT_GROUP);
 		}
+	} else if (args[1] == "train-wagons") {
+		/* Typed inputs: a single-headed old train holding the fixture's wagons plus one,
+		 * so it fills four tiles exactly, and a free chain whose second unit is an old engine. */
+		TileIndex tile = v->tile;
+		EngineID wagon = v->GetNextVehicle()->engine_type;
+		auto build = [&](EngineID e) {
+			auto built = Command<CMD_BUILD_VEHICLE>::Do(DoCommandFlag::Execute, tile, e, false, INVALID_CARGO, INVALID_CLIENT_ID);
+			Checked("build-extra", std::get<0>(built));
+			return std::get<1>(built);
+		};
+		auto buildable = [&](const Engine *e, RailVehicleTypes kind) {
+			return e->type == VEH_TRAIN && RailVehInfo(e->index)->railveh_type == kind && std::get<0>(Command<CMD_BUILD_VEHICLE>::Do({}, tile, e->index, false, INVALID_CARGO, INVALID_CLIENT_ID)).Succeeded();
+		};
+		EngineID engine = EngineID::Invalid();
+		EngineID multihead = EngineID::Invalid();
+		for (const Engine *e : Engine::Iterate()) {
+			if (!buildable(e, RAILVEH_SINGLEHEAD)) continue;
+			for (const Engine *m : Engine::Iterate()) if (buildable(m, RAILVEH_MULTIHEAD) && CheckAutoreplaceValidity(e->index, m->index, _current_company)) { multihead = m->index; break; }
+			if (multihead != EngineID::Invalid()) { engine = e->index; break; }
+		}
+		if (engine == EngineID::Invalid()) FixtureAbort(__LINE__);
+		VehicleID train = build(engine);
+		Checked("share-extra", Command<CMD_CLONE_ORDER>::Do(DoCommandFlag::Execute, CO_SHARE, train, v->index));
+		std::vector<VehicleID> moved;
+		for (const Vehicle *u = v; u != nullptr; u = u->Next()) if (Train::From(u)->IsWagon()) moved.push_back(u->index);
+		for (VehicleID id : moved) Checked("move-wagon", Command<CMD_MOVE_RAIL_VEHICLE>::Do(DoCommandFlag::Execute, id, train, false));
+		Checked("attach-extra", Command<CMD_MOVE_RAIL_VEHICLE>::Do(DoCommandFlag::Execute, build(wagon), train, false));
+		VehicleID free_head = build(wagon);
+		VehicleID free_engine = build(engine);
+		Checked("free-chain", Command<CMD_MOVE_RAIL_VEHICLE>::Do(DoCommandFlag::Execute, free_engine, free_head, false));
+		for (VehicleID id : {train, free_engine}) Vehicle::Get(id)->age = TimerGameCalendar::Date(Vehicle::Get(id)->max_age.base() + 366);
+		uint16_t old_length = Train::Get(train)->gcache.cached_total_length;
+		fmt::print(stderr, "FLEET wagons-input {} {}\n", moved.size() + 1, old_length);
+		auto [group_cost, group] = Command<CMD_CREATE_GROUP>::Do(DoCommandFlag::Execute, VEH_TRAIN, GroupID::Invalid());
+		Checked("wagon-group", group_cost);
+		Checked("wagon-membership", std::get<0>(Command<CMD_ADD_VEHICLE_GROUP>::Do(DoCommandFlag::Execute, group, train, false, VehicleListIdentifier{})));
+		Checked("wagon-removal", Command<CMD_SET_GROUP_FLAG>::Do(DoCommandFlag::Execute, group, GroupFlag::ReplaceWagonRemoval, true, false));
+		Checked("renew-rule", Command<CMD_SET_AUTOREPLACE>::Do(DoCommandFlag::Execute, ALL_GROUP, engine, engine, true));
+		Checked("wagon-rule", Command<CMD_SET_AUTOREPLACE>::Do(DoCommandFlag::Execute, ALL_GROUP, wagon, wagon, false));
+		Checked("engine-rule", Command<CMD_SET_AUTOREPLACE>::Do(DoCommandFlag::Execute, group, engine, multihead, false));
+		/* ReplaceFreeUnit: the engine is not a front engine, so it is replaced on its own. */
+		SavedRandomSeeds before, after;
+		SaveRandomSeeds(&before);
+		Cost("free-test", Command<CMD_AUTOREPLACE_VEHICLE>::Do({}, free_engine));
+		SaveRandomSeeds(&after);
+		bool free_rng = SameRandom(before, after);
+		Checked("free-execute", Command<CMD_AUTOREPLACE_VEHICLE>::Do(DoCommandFlag::Execute, free_engine));
+		const Train *head = Train::Get(free_head);
+		fmt::print(stderr, "FLEET free-replaced {} {} {} {}\n", free_rng, !Vehicle::IsValidID(free_engine), head->IsFreeWagon(), head->GetNextUnit() != nullptr && head->GetNextUnit()->engine_type == engine && head->GetNextUnit()->age == 0);
+		/* ReplaceChain: a different, longer engine; replaced wagons that no longer fit are sold. */
+		VehicleID original = train;
+		uint vehicles = 0;
+		for (const Vehicle *u : Vehicle::Iterate()) if (u->type == VEH_TRAIN && u->owner == _current_company) ++vehicles;
+		SaveRandomSeeds(&before);
+		Cost("wagons-test", Command<CMD_AUTOREPLACE_VEHICLE>::Do({}, original));
+		SaveRandomSeeds(&after);
+		bool chain_rng = SameRandom(before, after);
+		Checked("wagons-execute", Command<CMD_AUTOREPLACE_VEHICLE>::Do(DoCommandFlag::Execute, original));
+		const Train *replaced = nullptr;
+		for (const Train *t : Train::Iterate()) if (t->IsFrontEngine() && t->group_id == group) replaced = t;
+		if (replaced == nullptr) FixtureAbort(__LINE__);
+		uint wagons = 0;
+		for (const Train *u = replaced; u != nullptr; u = u->GetNextUnit()) if (u->IsWagon()) ++wagons;
+		uint now = 0;
+		for (const Vehicle *u : Vehicle::Iterate()) if (u->type == VEH_TRAIN && u->owner == _current_company) ++now;
+		fmt::print(stderr, "FLEET wagons-replaced {} {} {} {} {} {}\n", chain_rng, !Vehicle::IsValidID(original), replaced->engine_type == multihead, wagons, replaced->gcache.cached_total_length <= old_length, static_cast<int>(now) - static_cast<int>(vehicles));
 	} else {
 		Company *c = Company::Get(v->owner);
 		/* Typed inputs: old-enough actual command-built vehicles, carrying cargo. */

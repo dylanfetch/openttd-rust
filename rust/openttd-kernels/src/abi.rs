@@ -299,6 +299,18 @@ pub fn layout(type_id: u16, item: u8) -> usize {
             layout!(crate::fleet::StatsFields, item; profit, profit_min_age, vehicles, vehicles_min_age, defined, finished)
         }
         342 => layout!(crate::fleet::Renew, item; from, to, next, group, when_old),
+        343 => {
+            layout!(crate::fleet::GroupServices, item; group, next_group, next_company, next_vehicle, vehicle, vehicle_id, vehicle_type, vehicle_owner, vehicle_group, vehicle_engine, profit, old_enough, primary, countable, ground, front, next_part, first_shared, next_shared, set_membership, invalidate_cache, viewport, stats, head, renew_state, next_renew, renew_id, engine_type, current_company, buildable_type, can_allocate, allocate, use_number, release_number, company_livery, keep_length, delete_group, invalid_parent, clear_backup, remove_rule, remove_vehicles, delete_child, add_to_group, utf8_length, list_dirty, list_set_dirty, colour_dirty, replace_dirty, replace_invalidate, alter_dirty, vehicle_dirty, depot_dirty, close_replace, screen_dirty, list_generate, list_push, list_size, list_at, renew_allocate, renew_can_allocate, renew_delete, recursion_error)
+        }
+        344 => {
+            layout!(crate::fleet::transactions::Services, item; cost_zero, cost_vehicles, cost_error, cost_add, cost_move, cost_amount, success, error, money, ownership, rear, articulated, crashed, stopped, chain_depot, first, next_unit, prev_unit, length, flipped, cargo_type, can_carry, stopped_in_depot, max_length, check, needs_renew, engine_valid, company_valid, engine_buildable, rail_compatible, road_powered, wagon, tram, plane, refit_mask, refit_masks, vehicle_cargo, default_cargo, orders, order_count, order_count_id, order_at, order_refit, order_auto, order_cargo, local, refit_news, build, refit, subtype, reverse_probability, reverse, start_stop, move_vehicle, sell, clone_order, copy_group, copy_configuration, viewports, view_window, news, transfer_cargo, capacity, event, save_rng, restore_rng, rule_window, assertions, unavailable, too_long, too_long_replacement, nothing)
+        }
+        345 => {
+            layout!(crate::fleet::transactions::Costs, item; result, replace, build, copy, temporary, seeds)
+        }
+        346 => {
+            layout!(crate::fleet::pending::Services, item; set_current, restart, x, y, z, reserve, subtract, command, animation, length_news, failed_news, cash, limit)
+        }
         _ => usize::MAX,
     }
 }

@@ -37,7 +37,9 @@ extern "C" {
  * 264 order backup, 265 typed order services, 266 closest-depot result.
  * 320 ship position, 321 typed ship services, 322 reverse result, 323 depot,
  * 324 ship track-choice result, 325 ship depot result.
- * 340 fleet group fields, 341 statistics fields, 342 renewal fields (WIP).
+ * 340 fleet group fields, 341 statistics fields, 342 renewal fields,
+ * 343 fleet group services, 344 transaction services, 345 native costs,
+ * 346 pending services.
  * Item 0 size, 1 alignment, then every field offset in declaration order.
  * Unknown type/item returns SIZE_MAX. No memory borrow, ownership or callback.
  * Native extern-C convention (cdecl on i686 MSVC); Rust panic never unwinds.

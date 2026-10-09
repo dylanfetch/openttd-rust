@@ -1054,7 +1054,7 @@ void CallVehicleTicks()
 
 #ifdef WITH_RUST
 	CommandCost replacement_cost;
-	openttd_rust_fleet_pending_drain(&_fleet_pending_services, &replacement_cost);
+	openttd_rust_fleet_pending_drain(&_fleet_pending_services, &FleetTransactionServices(), &FleetGroupServices(), &replacement_cost);
 #else
 	Backup<CompanyID> cur_company(_current_company);
 	for (auto &it : _vehicles_to_autoreplace) {

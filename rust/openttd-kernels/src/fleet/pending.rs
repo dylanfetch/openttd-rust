@@ -6,33 +6,30 @@
  */
 
 //! Ascending `VehicleID` tick-end autoreplacement with original overwrite semantics.
+use super::GroupServices;
+use super::transactions::Services as TransactionServices;
 use std::cell::UnsafeCell;
 use std::collections::BTreeMap;
+/// Tick-end-only services; vehicle, owner, locality and cost reads reuse the
+/// group and transaction tables.
 #[repr(C)]
 pub struct Services {
-    current: unsafe extern "C" fn() -> u8,
-    set_current: unsafe extern "C" fn(u8),
-    vehicle: unsafe extern "C" fn(u32) -> *mut (),
-    owner: unsafe extern "C" fn(*mut ()) -> u8,
-    restart: unsafe extern "C" fn(*mut ()),
-    x: unsafe extern "C" fn(*mut ()) -> i32,
-    y: unsafe extern "C" fn(*mut ()) -> i32,
-    z: unsafe extern "C" fn(*mut ()) -> i32,
-    reserve: unsafe extern "C" fn(u8) -> u32,
-    subtract: unsafe extern "C" fn(i64),
-    command: unsafe extern "C" fn(*mut (), u32),
-    local: unsafe extern "C" fn() -> bool,
-    success: unsafe extern "C" fn(*mut ()) -> bool,
-    money: unsafe extern "C" fn(*mut ()) -> i64,
-    error: unsafe extern "C" fn(*mut ()) -> u32,
-    animation: unsafe extern "C" fn(i32, i32, i32, i64),
-    length_news: unsafe extern "C" fn(u32),
-    failed_news: unsafe extern "C" fn(u32, u32),
-    nothing: u32,
-    cash: u32,
-    limit: u32,
-    length: u32,
+    pub(crate) set_current: unsafe extern "C" fn(u8),
+    pub(crate) restart: unsafe extern "C" fn(*mut ()),
+    pub(crate) x: unsafe extern "C" fn(*mut ()) -> i32,
+    pub(crate) y: unsafe extern "C" fn(*mut ()) -> i32,
+    pub(crate) z: unsafe extern "C" fn(*mut ()) -> i32,
+    pub(crate) reserve: unsafe extern "C" fn(u8) -> u32,
+    pub(crate) subtract: unsafe extern "C" fn(i64),
+    pub(crate) command: unsafe extern "C" fn(*mut (), u32),
+    pub(crate) animation: unsafe extern "C" fn(i32, i32, i32, i64),
+    pub(crate) length_news: unsafe extern "C" fn(u32),
+    pub(crate) failed_news: unsafe extern "C" fn(u32, u32),
+    pub(crate) cash: u32,
+    pub(crate) limit: u32,
 }
+/// `INVALID_STRING_ID`.
+const INVALID_STRING: u32 = 0xFFFF;
 
 struct Pending(UnsafeCell<BTreeMap<u32, bool>>);
 // SAFETY: the game thread alone mutates/drains this process-lifetime map. No
@@ -60,10 +57,14 @@ pub unsafe extern "C" fn openttd_rust_fleet_pending_add(id: u32, leave: bool) {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_fleet_pending_drain(
     services: *const Services,
+    transaction: *const TransactionServices,
+    group: *const GroupServices,
     cost: *mut (),
 ) {
     let w = unsafe { &*services };
-    let previous = unsafe { (w.current)() };
+    let t = unsafe { &*transaction };
+    let g = unsafe { &*group };
+    let previous = unsafe { (g.current_company)() };
     let mut from = 0;
     loop {
         let item = unsafe {
@@ -76,8 +77,8 @@ pub unsafe extern "C" fn openttd_rust_fleet_pending_drain(
             break;
         };
         from = id + 1;
-        let v = unsafe { (w.vehicle)(id) };
-        let owner = unsafe { (w.owner)(v) };
+        let v = unsafe { (g.vehicle)(id) };
+        let owner = unsafe { (g.vehicle_owner)(v) };
         unsafe { (w.set_current)(owner) };
         if leave {
             unsafe { (w.restart)(v) };
@@ -91,22 +92,22 @@ pub unsafe extern "C" fn openttd_rust_fleet_pending_drain(
             (w.command)(cost, id);
             (w.subtract)(reserve.wrapping_neg());
         }
-        if !unsafe { (w.local)() } {
+        if !unsafe { (t.local)() } {
             continue;
         }
-        if unsafe { (w.success)(cost) } {
-            let money = unsafe { (w.money)(cost) };
+        if unsafe { (t.success)(cost) } {
+            let money = unsafe { (t.money)(cost) };
             unsafe { (w.animation)(x, y, z, money) };
             continue;
         }
-        let mut error = unsafe { (w.error)(cost) };
-        if error == w.nothing || error == 65535 {
+        let mut error = unsafe { (t.error)(cost) };
+        if error == t.nothing || error == INVALID_STRING {
             continue;
         }
         if error == w.cash {
             error = w.limit;
         }
-        if error == w.length {
+        if error == t.too_long_replacement {
             unsafe { (w.length_news)(id) };
         } else {
             unsafe { (w.failed_news)(id, error) };

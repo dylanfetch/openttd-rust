@@ -10,6 +10,8 @@ use super::{
     ALL_GROUP, DEFAULT_GROUP, ERROR, GroupFields, GroupServices, INVALID_GROUP, add_profit,
     add_replacement, group, remove_replacement, replacement, update_autoreplace,
 };
+/// `EngineID::Invalid()`; shares the 0xFFFF encoding with `GroupID::Invalid()`.
+const INVALID_ENGINE: u16 = INVALID_GROUP;
 use std::ptr;
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -23,77 +25,78 @@ pub struct Costs {
 }
 #[repr(C)]
 pub struct Services {
-    cost_zero: unsafe extern "C" fn(*mut ()),
-    cost_vehicles: unsafe extern "C" fn(*mut ()),
-    cost_error: unsafe extern "C" fn(*mut (), u32),
-    cost_add: unsafe extern "C" fn(*mut (), *mut ()),
-    cost_move: unsafe extern "C" fn(*mut (), *mut ()),
-    cost_amount: unsafe extern "C" fn(*mut (), i64),
-    success: unsafe extern "C" fn(*mut ()) -> bool,
-    error: unsafe extern "C" fn(*mut ()) -> u32,
-    money: unsafe extern "C" fn(*mut ()) -> i64,
-    ownership: unsafe extern "C" fn(*mut (), u8),
-    rear: unsafe extern "C" fn(*mut ()) -> bool,
-    articulated: unsafe extern "C" fn(*mut ()) -> bool,
-    crashed: unsafe extern "C" fn(*mut ()) -> bool,
-    stopped: unsafe extern "C" fn(*mut ()) -> bool,
-    chain_depot: unsafe extern "C" fn(*mut ()) -> bool,
-    first: unsafe extern "C" fn(*mut ()) -> *mut (),
-    next_unit: unsafe extern "C" fn(*mut ()) -> *mut (),
-    prev_unit: unsafe extern "C" fn(*mut ()) -> *mut (),
-    length: unsafe extern "C" fn(*mut ()) -> u16,
-    flipped: unsafe extern "C" fn(*mut ()) -> bool,
-    cargo_type: unsafe extern "C" fn(*mut ()) -> u8,
-    can_carry: unsafe extern "C" fn(*mut ()) -> bool,
-    x: unsafe extern "C" fn(*mut ()) -> i32,
-    y: unsafe extern "C" fn(*mut ()) -> i32,
-    z: unsafe extern "C" fn(*mut ()) -> i32,
-    needs_renew: unsafe extern "C" fn(*mut (), bool) -> bool,
-    engine_valid: unsafe extern "C" fn(u16) -> bool,
-    company_valid: unsafe extern "C" fn(u8) -> bool,
-    engine_buildable: unsafe extern "C" fn(u16, u8, u8) -> bool,
-    rail_compatible: unsafe extern "C" fn(u16) -> u64,
-    road_powered: unsafe extern "C" fn(u16) -> u64,
-    wagon: unsafe extern "C" fn(u16) -> bool,
-    tram: unsafe extern "C" fn(u16) -> bool,
-    plane: unsafe extern "C" fn(u16) -> u8,
-    refit_mask: unsafe extern "C" fn(u16, bool) -> u64,
-    refit_masks: unsafe extern "C" fn(u16, *mut u64, *mut u64),
-    vehicle_cargo: unsafe extern "C" fn(*mut (), *mut u8) -> u64,
-    default_cargo: unsafe extern "C" fn(u16) -> u64,
-    orders: unsafe extern "C" fn(*mut ()) -> *mut (),
-    order_count: unsafe extern "C" fn(*mut ()) -> usize,
-    order_count_id: unsafe extern "C" fn(*mut ()) -> u8,
-    order_at: unsafe extern "C" fn(*mut (), usize) -> *mut (),
-    order_refit: unsafe extern "C" fn(*mut ()) -> bool,
-    order_auto: unsafe extern "C" fn(*mut ()) -> bool,
-    order_cargo: unsafe extern "C" fn(*mut ()) -> u8,
-    local: unsafe extern "C" fn() -> bool,
-    refit_news: unsafe extern "C" fn(*mut (), i32),
-    build: unsafe extern "C" fn(*mut (), *mut (), u16) -> *mut (),
-    refit: unsafe extern "C" fn(*mut (), *mut (), u8, u8),
-    subtype: unsafe extern "C" fn(*mut (), *mut (), u8) -> u8,
-    reverse_probability: unsafe extern "C" fn(*mut ()) -> bool,
-    reverse: unsafe extern "C" fn(*mut ()),
-    start_stop: unsafe extern "C" fn(*mut (), *mut (), bool),
-    move_vehicle: unsafe extern "C" fn(*mut (), *mut (), *mut (), u32, bool),
-    sell: unsafe extern "C" fn(*mut (), *mut (), u32),
-    clone_order: unsafe extern "C" fn(*mut (), *mut (), *mut ()),
-    copy_group: unsafe extern "C" fn(*mut (), *mut (), *mut ()),
-    copy_configuration: unsafe extern "C" fn(*mut (), *mut ()),
-    viewports: unsafe extern "C" fn(*mut (), *mut ()),
-    view_window: unsafe extern "C" fn(*mut (), *mut ()),
-    news: unsafe extern "C" fn(*mut (), *mut ()),
-    transfer_cargo: unsafe extern "C" fn(*mut (), *mut (), bool),
-    capacity: unsafe extern "C" fn(*mut ()),
-    event: unsafe extern "C" fn(*mut (), *mut ()),
-    save_rng: unsafe extern "C" fn(*mut ()),
-    restore_rng: unsafe extern "C" fn(*mut ()),
-    rule_window: unsafe extern "C" fn(u16, u16),
-    unavailable: u32,
-    too_long: u32,
-    too_long_replacement: u32,
-    nothing: u32,
+    pub(crate) cost_zero: unsafe extern "C" fn(*mut ()),
+    pub(crate) cost_vehicles: unsafe extern "C" fn(*mut ()),
+    pub(crate) cost_error: unsafe extern "C" fn(*mut (), u32),
+    pub(crate) cost_add: unsafe extern "C" fn(*mut (), *mut ()),
+    pub(crate) cost_move: unsafe extern "C" fn(*mut (), *mut ()),
+    pub(crate) cost_amount: unsafe extern "C" fn(*mut (), i64),
+    pub(crate) success: unsafe extern "C" fn(*mut ()) -> bool,
+    pub(crate) error: unsafe extern "C" fn(*mut ()) -> u32,
+    pub(crate) money: unsafe extern "C" fn(*mut ()) -> i64,
+    pub(crate) ownership: unsafe extern "C" fn(*mut (), u8),
+    pub(crate) rear: unsafe extern "C" fn(*mut ()) -> bool,
+    pub(crate) articulated: unsafe extern "C" fn(*mut ()) -> bool,
+    pub(crate) crashed: unsafe extern "C" fn(*mut ()) -> bool,
+    pub(crate) stopped: unsafe extern "C" fn(*mut ()) -> bool,
+    pub(crate) chain_depot: unsafe extern "C" fn(*mut ()) -> bool,
+    pub(crate) first: unsafe extern "C" fn(*mut ()) -> *mut (),
+    pub(crate) next_unit: unsafe extern "C" fn(*mut ()) -> *mut (),
+    pub(crate) prev_unit: unsafe extern "C" fn(*mut ()) -> *mut (),
+    pub(crate) length: unsafe extern "C" fn(*mut ()) -> u16,
+    pub(crate) flipped: unsafe extern "C" fn(*mut ()) -> bool,
+    pub(crate) cargo_type: unsafe extern "C" fn(*mut ()) -> u8,
+    pub(crate) can_carry: unsafe extern "C" fn(*mut ()) -> bool,
+    pub(crate) stopped_in_depot: unsafe extern "C" fn(*mut ()) -> bool,
+    pub(crate) max_length: unsafe extern "C" fn() -> u8,
+    pub(crate) check: unsafe extern "C" fn(bool),
+    pub(crate) needs_renew: unsafe extern "C" fn(*mut (), bool) -> bool,
+    pub(crate) engine_valid: unsafe extern "C" fn(u16) -> bool,
+    pub(crate) company_valid: unsafe extern "C" fn(u8) -> bool,
+    pub(crate) engine_buildable: unsafe extern "C" fn(u16, u8, u8) -> bool,
+    pub(crate) rail_compatible: unsafe extern "C" fn(u16) -> u64,
+    pub(crate) road_powered: unsafe extern "C" fn(u16) -> u64,
+    pub(crate) wagon: unsafe extern "C" fn(u16) -> bool,
+    pub(crate) tram: unsafe extern "C" fn(u16) -> bool,
+    pub(crate) plane: unsafe extern "C" fn(u16) -> u8,
+    pub(crate) refit_mask: unsafe extern "C" fn(u16, bool) -> u64,
+    pub(crate) refit_masks: unsafe extern "C" fn(u16, *mut u64, *mut u64),
+    pub(crate) vehicle_cargo: unsafe extern "C" fn(*mut (), *mut u8) -> u64,
+    pub(crate) default_cargo: unsafe extern "C" fn(u16) -> u64,
+    pub(crate) orders: unsafe extern "C" fn(*mut ()) -> *mut (),
+    pub(crate) order_count: unsafe extern "C" fn(*mut ()) -> usize,
+    pub(crate) order_count_id: unsafe extern "C" fn(*mut ()) -> u8,
+    pub(crate) order_at: unsafe extern "C" fn(*mut (), usize) -> *mut (),
+    pub(crate) order_refit: unsafe extern "C" fn(*mut ()) -> bool,
+    pub(crate) order_auto: unsafe extern "C" fn(*mut ()) -> bool,
+    pub(crate) order_cargo: unsafe extern "C" fn(*mut ()) -> u8,
+    pub(crate) local: unsafe extern "C" fn() -> bool,
+    pub(crate) refit_news: unsafe extern "C" fn(*mut (), i32),
+    pub(crate) build: unsafe extern "C" fn(*mut (), *mut (), u16) -> *mut (),
+    pub(crate) refit: unsafe extern "C" fn(*mut (), *mut (), u8, u8),
+    pub(crate) subtype: unsafe extern "C" fn(*mut (), *mut (), u8) -> u8,
+    pub(crate) reverse_probability: unsafe extern "C" fn(*mut ()) -> bool,
+    pub(crate) reverse: unsafe extern "C" fn(*mut ()),
+    pub(crate) start_stop: unsafe extern "C" fn(*mut (), *mut (), bool),
+    pub(crate) move_vehicle: unsafe extern "C" fn(*mut (), *mut (), *mut (), u32, bool),
+    pub(crate) sell: unsafe extern "C" fn(*mut (), *mut (), u32),
+    pub(crate) clone_order: unsafe extern "C" fn(*mut (), *mut (), *mut ()),
+    pub(crate) copy_group: unsafe extern "C" fn(*mut (), *mut (), *mut ()),
+    pub(crate) copy_configuration: unsafe extern "C" fn(*mut (), *mut ()),
+    pub(crate) viewports: unsafe extern "C" fn(*mut (), *mut ()),
+    pub(crate) view_window: unsafe extern "C" fn(*mut (), *mut ()),
+    pub(crate) news: unsafe extern "C" fn(*mut (), *mut ()),
+    pub(crate) transfer_cargo: unsafe extern "C" fn(*mut (), *mut (), bool),
+    pub(crate) capacity: unsafe extern "C" fn(*mut ()),
+    pub(crate) event: unsafe extern "C" fn(*mut (), *mut ()),
+    pub(crate) save_rng: unsafe extern "C" fn(*mut ()),
+    pub(crate) restore_rng: unsafe extern "C" fn(*mut ()),
+    pub(crate) rule_window: unsafe extern "C" fn(u16, u16),
+    pub(crate) assertions: bool,
+    pub(crate) unavailable: u32,
+    pub(crate) too_long: u32,
+    pub(crate) too_long_replacement: u32,
+    pub(crate) nothing: u32,
 }
 
 const EXECUTE: u32 = 1;
@@ -101,6 +104,17 @@ const AUTOREPLACE: u32 = 1 << 6;
 const INVALID_CARGO: u8 = 255;
 const NO_REFIT: u8 = 254;
 const TILE_SIZE: u16 = 16;
+
+/// Original `assert` site: the condition is evaluated only in builds whose C++
+/// `assert` is active, and the native wrapper terminates exactly like it.
+macro_rules! check {
+    ($w:expr, $condition:expr) => {
+        if $w.assertions {
+            let condition = $condition;
+            unsafe { ($w.check)(condition) };
+        }
+    };
+}
 
 unsafe fn valid(w: &Services, gw: &GroupServices, from: u16, to: u16, company: u8) -> bool {
     let kind = unsafe { (gw.engine_type)(from) };
@@ -241,10 +255,11 @@ unsafe fn new_engine(
     always: bool,
     cost: *mut (),
 ) -> u16 {
-    unsafe { (w.cost_zero)(cost) };
     let kind = unsafe { (gw.vehicle_type)(v) };
+    check!(w, kind != 0 || !unsafe { (w.articulated)(v) });
+    unsafe { (w.cost_zero)(cost) };
     if kind == 0 && unsafe { (w.rear)(v) } {
-        return INVALID_GROUP;
+        return INVALID_ENGINE;
     }
     let company = unsafe { (gw.current_company)() };
     let head = unsafe { (gw.head)(company).cast::<*mut ()>().read() };
@@ -253,15 +268,15 @@ unsafe fn new_engine(
     let mut old = false;
     let mut engine = unsafe { replacement(gw, head, from, id, &raw mut old) };
     if !always && old && !unsafe { (w.needs_renew)(v, false) } {
-        engine = INVALID_GROUP;
+        engine = INVALID_ENGINE;
     }
-    if engine != INVALID_GROUP && unsafe { (w.engine_buildable)(engine, kind, company) } {
+    if engine != INVALID_ENGINE && unsafe { (w.engine_buildable)(engine, kind, company) } {
         return engine;
     }
     if unsafe { (w.needs_renew)(v, true) } {
         engine = from;
     }
-    if engine == INVALID_GROUP || unsafe { (w.engine_buildable)(engine, kind, company) } {
+    if engine == INVALID_ENGINE || unsafe { (w.engine_buildable)(engine, kind, company) } {
         return engine;
     }
     unsafe { (w.cost_error)(cost, w.unavailable + u32::from(kind)) };
@@ -277,7 +292,7 @@ unsafe fn build(
 ) -> *mut () {
     let cost = costs.build;
     let engine = unsafe { new_engine(w, gw, old, true, cost) };
-    if !unsafe { (w.success)(cost) } || engine == INVALID_GROUP {
+    if !unsafe { (w.success)(cost) } || engine == INVALID_ENGINE {
         return ptr::null_mut();
     }
     let cargo = unsafe { new_cargo(w, gw, old, engine, chain) };
@@ -298,6 +313,7 @@ unsafe fn build(
             (w.refit)(costs.temporary, new, cargo, subtype);
             (w.cost_add)(cost, costs.temporary);
         }
+        check!(w, unsafe { (w.success)(cost) });
     }
     if unsafe { (gw.vehicle_type)(new) } == 0
         && unsafe { (w.flipped)(old) }
@@ -331,6 +347,7 @@ unsafe fn copy_head(
         }
     }
     if unsafe { (w.success)(cost) } {
+        check!(w, unsafe { (w.stopped)(new) });
         unsafe {
             (w.start_stop)(costs.temporary, new, true);
             (w.cost_add)(cost, costs.temporary);
@@ -361,6 +378,10 @@ unsafe fn replace_free(
     nothing: &mut bool,
 ) {
     let old = *unit;
+    check!(
+        w,
+        !unsafe { (w.articulated)(old) } && !unsafe { (w.rear)(old) }
+    );
     let cost = costs.replace;
     unsafe { (w.cost_vehicles)(cost) };
     let new = unsafe { build(w, gw, costs, old, false, flags) };
@@ -408,6 +429,7 @@ unsafe fn replace_chain(
     nothing: &mut bool,
 ) {
     let mut old_head = *chain;
+    check!(w, unsafe { (gw.primary)(old_head) });
     let cost = costs.replace;
     unsafe { (w.cost_vehicles)(cost) };
     if unsafe { (gw.vehicle_type)(old_head) } == 0 {
@@ -452,6 +474,7 @@ unsafe fn replace_chain(
                     (w.cost_add)(cost, costs.temporary);
                 }
             }
+            check!(w, unsafe { (w.next_unit)(new_head) }.is_null());
             let mut last_engine: *mut () = ptr::null_mut();
             if unsafe { (w.success)(cost) } {
                 for item in replacements.iter().rev() {
@@ -494,18 +517,20 @@ unsafe fn replace_chain(
             }
             if unsafe { (w.success)(cost) } {
                 for item in replacements.iter().rev() {
+                    check!(w, !last_engine.is_null());
                     let append = item.vehicle();
                     let engine = unsafe { (gw.vehicle_engine)(append) };
                     if unsafe { (w.wagon)(engine) } {
                         unsafe {
                             (w.move_vehicle)(costs.temporary, append, last_engine, EXECUTE, false);
                         };
-                        let too_long = if unsafe { (w.success)(costs.temporary) } {
-                            (unsafe { (w.length)(new_head) }) > old_total_length
-                        } else {
-                            (unsafe { (w.error)(costs.temporary) }) == w.too_long
-                        };
-                        if wagon_removal && too_long {
+                        if wagon_removal
+                            && if unsafe { (w.success)(costs.temporary) } {
+                                (unsafe { (w.length)(new_head) }) > old_total_length
+                            } else {
+                                (unsafe { (w.error)(costs.temporary) }) == w.too_long
+                            }
+                        {
                             unsafe {
                                 (w.move_vehicle)(
                                     costs.temporary,
@@ -522,11 +547,17 @@ unsafe fn replace_chain(
                             break;
                         }
                     } else {
+                        check!(w, append == last_engine);
                         last_engine = unsafe { (w.prev_unit)(last_engine) };
                     }
                 }
             }
             if unsafe { (w.success)(cost) } && wagon_removal {
+                check!(
+                    w,
+                    u32::from(unsafe { (w.length)(new_head) })
+                        <= u32::from(unsafe { (w.max_length)() }) * u32::from(TILE_SIZE)
+                );
                 for item in replacements.iter_mut().skip(1) {
                     let wagon = item.new;
                     if wagon.is_null() {
@@ -535,7 +566,9 @@ unsafe fn replace_chain(
                     if unsafe { (w.first)(wagon) } == new_head {
                         break;
                     }
+                    check!(w, unsafe { (w.wagon)((gw.vehicle_engine)(wagon)) });
                     unsafe { (w.sell)(costs.temporary, wagon, EXECUTE) };
+                    check!(w, unsafe { (w.success)(costs.temporary) });
                     item.new = ptr::null_mut();
                     unsafe { (w.cost_amount)(cost, item.cost.saturating_neg()) };
                 }
@@ -587,6 +620,7 @@ unsafe fn replace_chain(
                         );
                     };
                 }
+                check!(w, unsafe { (w.next_unit)(old_head) }.is_null());
                 for item in replacements.iter().rev() {
                     unsafe {
                         (w.move_vehicle)(
@@ -597,6 +631,7 @@ unsafe fn replace_chain(
                             false,
                         );
                     };
+                    check!(w, unsafe { (w.success)(costs.temporary) });
                 }
             }
         }
@@ -686,7 +721,7 @@ unsafe fn autoreplace(w: &Services, gw: &GroupServices, costs: Costs, flags: u32
             unsafe { (w.cost_move)(cost, costs.temporary) };
             return;
         }
-        any |= engine != INVALID_GROUP;
+        any |= engine != INVALID_ENGINE;
         unit = if !free && unsafe { (gw.vehicle_type)(unit) } == 0 {
             unsafe { (w.next_unit)(unit) }
         } else {
@@ -706,6 +741,7 @@ unsafe fn autoreplace(w: &Services, gw: &GroupServices, costs: Costs, flags: u32
         if !unsafe { (w.success)(cost) } {
             return;
         }
+        check!(w, free || unsafe { (w.stopped_in_depot)(v) });
         unsafe { (w.save_rng)(costs.seeds) };
         if free {
             unsafe { replace_free(w, gw, costs, &mut v, flags & !EXECUTE, &mut nothing) };
@@ -733,6 +769,11 @@ unsafe fn autoreplace(w: &Services, gw: &GroupServices, costs: Costs, flags: u32
                 unsafe { replace_chain(w, gw, costs, &mut v, flags, wagon_removal, &mut nothing) };
             }
             // Source ret is intentionally not AddCost'ed: the test pass owns the cost.
+            check!(
+                w,
+                unsafe { (w.success)(costs.replace) }
+                    && unsafe { (w.money)(costs.replace) == (w.money)(cost) }
+            );
         }
         if !stopped {
             unsafe {
@@ -774,7 +815,7 @@ unsafe fn set_rule(
         return ERROR;
     }
     let head = unsafe { (gw.head)(company).cast::<*mut ()>() };
-    let cost = if to == INVALID_GROUP {
+    let cost = if to == INVALID_ENGINE {
         unsafe { remove_replacement(gw, head, from, id, flags) }
     } else {
         if !unsafe { (w.engine_valid)(to) } || !unsafe { valid(w, gw, from, to, company) } {

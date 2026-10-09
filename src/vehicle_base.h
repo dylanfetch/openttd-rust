@@ -20,9 +20,6 @@
 #include "order_func.h"
 #include "transport_type.h"
 #include "group_type.h"
-#ifdef WITH_RUST
-#include "rust/fleet_owner.hpp"
-#endif
 #include "base_consist.h"
 #include "network/network.h"
 #include "saveload/saveload.h"
@@ -338,12 +335,7 @@ public:
 	NewGRFCache grf_cache{}; ///< Cache of often used calculated NewGRF values
 	VehicleCache vcache{}; ///< Cache of often used vehicle values.
 
-#ifdef WITH_RUST
-	FleetOwner<GroupID, openttd_rust_fleet_membership_create, openttd_rust_fleet_membership_destroy, nullptr, true> fleet_membership{};
-	GroupID &group_id = *fleet_membership.state;
-#else
 	GroupID group_id = GroupID::Invalid(); ///< Index of group Pool array
-#endif
 
 	mutable MutableSpriteCache sprite_cache{}; ///< Cache of sprites and values related to recalculating them, see #MutableSpriteCache
 

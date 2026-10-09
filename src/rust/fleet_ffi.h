@@ -10,17 +10,18 @@
 #define RUST_FLEET_FFI_H
 #include <cstdint>
 #include <cstddef>
-/* Serial game-thread calls only. Owners are stable Rust allocations with C++
- * scalar object lifetimes in their prefix. C++ views alias canonical storage.
- * Rust access scopes end before returning; no reference into a shell spans calls.
- * GRPS/ERNW/PLYR/VEHS adapters retain widths, references and indexed pool identity.
+/* Serial game-thread calls only. Group, statistics, renewal and company-head
+ * owners are stable Rust allocations with C++ scalar object lifetimes in their
+ * prefix; C++ views alias canonical storage. Vehicle::group_id stays C++ shell
+ * storage that Rust reads and writes through vehicle_group/set_membership.
+ * GRPS/ERNW/PLYR adapters retain widths, references and indexed pool identity.
  * Name/children/engine maps and pending IDs are Rust containers. Names have
  * call-local GUI/save exports; ordered child views do not allocate.
  * Typed synchronous entries own group/rule/replacement and tick-end policy.
  * Native commands retain full caller-owned stack CommandCost objects and their
  * original move/AddCost behavior. No owner borrow spans reentry/destruction.
- * Panics and escaping environmental exceptions abort. Prefix ABI340-342 is
- * checked; new service-layout/reentry checks remain part of this WIP's validation. */
+ * Panics and escaping environmental exceptions abort. ABI 340-346 pin the owner
+ * prefixes, the three service tables and the native cost slots. */
 struct OpenTTDFleetGroupServices {
 	void * (*group)(uint16_t id) noexcept;
 	uint32_t (*next_group)(uint32_t from) noexcept;
@@ -38,7 +39,6 @@ struct OpenTTDFleetGroupServices {
 	bool (*countable)(void *shell) noexcept;
 	bool (*ground)(void *shell) noexcept;
 	bool (*front)(void *shell) noexcept;
-	bool (*free_wagon)(void *shell) noexcept;
 	void * (*next_part)(void *shell) noexcept;
 	void * (*first_shared)(void *shell) noexcept;
 	void * (*next_shared)(void *shell) noexcept;
@@ -110,9 +110,9 @@ struct OpenTTDFleetTransactionServices {
 	bool (*flipped)(void *shell) noexcept;
 	uint8_t (*cargo_type)(void *shell) noexcept;
 	bool (*can_carry)(void *shell) noexcept;
-	int32_t (*x)(void *shell) noexcept;
-	int32_t (*y)(void *shell) noexcept;
-	int32_t (*z)(void *shell) noexcept;
+	bool (*stopped_in_depot)(void *shell) noexcept;
+	uint8_t (*max_length)() noexcept;
+	void (*check)(bool condition) noexcept;
 	bool (*needs_renew)(void *shell, bool settings) noexcept;
 	bool (*engine_valid)(uint16_t id) noexcept;
 	bool (*company_valid)(uint8_t id) noexcept;
@@ -155,16 +155,14 @@ struct OpenTTDFleetTransactionServices {
 	void (*save_rng)(void *seeds) noexcept;
 	void (*restore_rng)(void *seeds) noexcept;
 	void (*rule_window)(uint16_t engine, uint16_t group) noexcept;
+	bool assertions;
 	uint32_t unavailable;
 	uint32_t too_long;
 	uint32_t too_long_replacement;
 	uint32_t nothing;
 };
 struct OpenTTDFleetPendingServices {
-	uint8_t (*current)() noexcept;
 	void (*set_current)(uint8_t company) noexcept;
-	void * (*vehicle)(uint32_t id) noexcept;
-	uint8_t (*owner)(void *shell) noexcept;
 	void (*restart)(void *shell) noexcept;
 	int32_t (*x)(void *shell) noexcept;
 	int32_t (*y)(void *shell) noexcept;
@@ -172,19 +170,16 @@ struct OpenTTDFleetPendingServices {
 	uint32_t (*reserve)(uint8_t company) noexcept;
 	void (*subtract)(int64_t amount) noexcept;
 	void (*command)(void *out, uint32_t id) noexcept;
-	bool (*local)() noexcept;
-	bool (*success)(void *cost) noexcept;
-	int64_t (*money)(void *cost) noexcept;
-	uint32_t (*error)(void *cost) noexcept;
 	void (*animation)(int32_t x, int32_t y, int32_t z, int64_t amount) noexcept;
 	void (*length_news)(uint32_t id) noexcept;
 	void (*failed_news)(uint32_t id, uint32_t error) noexcept;
-	uint32_t nothing;
 	uint32_t cash;
 	uint32_t limit;
-	uint32_t length;
 };
 const OpenTTDFleetGroupServices &FleetGroupServices();
+const OpenTTDFleetTransactionServices &FleetTransactionServices();
+/** #139 capacity traversal service, shared as the fleet next-part service. */
+void *CargoCapacityNextPart(void *shell) noexcept;
 extern "C" {
 void *openttd_rust_fleet_group_create();
 void openttd_rust_fleet_group_destroy(void *);
@@ -194,8 +189,6 @@ void *openttd_rust_fleet_renew_create();
 void openttd_rust_fleet_renew_destroy(void *);
 void *openttd_rust_fleet_head_create();
 void openttd_rust_fleet_head_destroy(void *);
-void *openttd_rust_fleet_membership_create();
-void openttd_rust_fleet_membership_destroy(void *);
 void openttd_rust_fleet_stats_copy(void *, const void *);
 void openttd_rust_fleet_head_copy(void *, const void *);
 size_t openttd_rust_fleet_name(const void *, uint8_t *, size_t);
@@ -241,6 +234,6 @@ void openttd_rust_fleet_autoreplace(const OpenTTDFleetTransactionServices *, con
 uint32_t openttd_rust_fleet_set_rule(const OpenTTDFleetTransactionServices *, const OpenTTDFleetGroupServices *, uint32_t, uint16_t, uint16_t, uint16_t, bool);
 void openttd_rust_fleet_pending_clear();
 void openttd_rust_fleet_pending_add(uint32_t, bool);
-void openttd_rust_fleet_pending_drain(const OpenTTDFleetPendingServices *, void *);
+void openttd_rust_fleet_pending_drain(const OpenTTDFleetPendingServices *, const OpenTTDFleetTransactionServices *, const OpenTTDFleetGroupServices *, void *);
 }
 #endif /* RUST_FLEET_FFI_H */

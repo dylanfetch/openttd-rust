@@ -9,11 +9,9 @@
 #ifndef RUST_FLEET_OWNER_HPP
 #define RUST_FLEET_OWNER_HPP
 #include "fleet_ffi.h"
-template <typename T, auto Create, auto Destroy, auto Copy = nullptr, bool Invalid = false> struct FleetOwner {
+template <typename T, auto Create, auto Destroy, auto Copy = nullptr> struct FleetOwner {
 	T *state;
-	FleetOwner() : state(static_cast<T *>(Create())) {
-		if constexpr (Invalid) { new (state) T(T::Invalid()); } else { new (state) T(); }
-	}
+	FleetOwner() : state(static_cast<T *>(Create())) { new (state) T(); }
 	FleetOwner(const FleetOwner &other) : FleetOwner() { Copy(state, other.state); }
 	FleetOwner &operator=(const FleetOwner &other) { Copy(state, other.state); return *this; }
 	~FleetOwner() { state->~T(); Destroy(state); }
@@ -38,7 +36,6 @@ struct FleetChildren {
 	};
 	Iterator begin() const { return {owner, openttd_rust_fleet_child(owner, 0)}; }
 	Iterator end() const { return {owner, UINT32_MAX}; }
-
 };
 /** Mutations alias the sole Rust engine map; entries retain original uint16 wrapping. */
 struct FleetEngineCounts {

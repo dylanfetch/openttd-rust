@@ -47,11 +47,7 @@ void GroupStatistics::Clear()
 	this->profit_last_year_min_age = 0;
 
 	/* This is also called when NewGRF change. So the number of engines might have changed. Reset. */
-#ifdef WITH_RUST
-	openttd_rust_fleet_stats_clear(this->state.state);
-#else
 	this->num_engines.clear();
-#endif
 #endif /* WITH_RUST */
 }
 
@@ -178,6 +174,7 @@ uint16_t GroupStatistics::GetNumEngines(EngineID engine) const
 /* static */ void GroupStatistics::CountVehicle(const Vehicle *v, int delta)
 {
 #ifdef WITH_RUST
+	assert(delta == 1 || delta == -1);
 	openttd_rust_fleet_count_vehicle(&_fleet_group_services, const_cast<Vehicle *>(v), delta);
 #else
 	assert(delta == 1 || delta == -1);
@@ -207,6 +204,7 @@ uint16_t GroupStatistics::GetNumEngines(EngineID engine) const
 /* static */ void GroupStatistics::CountEngine(const Vehicle *v, int delta)
 {
 #ifdef WITH_RUST
+	assert(delta == 1 || delta == -1);
 	openttd_rust_fleet_count_engine(&_fleet_group_services, const_cast<Vehicle *>(v), delta);
 #else
 	assert(delta == 1 || delta == -1);
@@ -301,7 +299,7 @@ uint16_t GroupStatistics::GetNumEngines(EngineID engine) const
 		g->statistics.ClearAutoreplace();
 	}
 
-	for (EngineRenewList erl = c->RenewalList(); erl != nullptr; erl = erl->next) {
+	for (EngineRenewList erl = c->engine_renew_list; erl != nullptr; erl = erl->next) {
 		const Engine *e = Engine::Get(erl->from);
 		GroupStatistics &stats = GroupStatistics::Get(company, erl->group_id, e->type);
 		if (!stats.autoreplace_defined) {
@@ -334,6 +332,7 @@ static inline void UpdateNumEngineGroup(const Vehicle *v, GroupID old_g, GroupID
 #endif /* !WITH_RUST */
 
 
+#ifndef WITH_RUST
 const Livery *GetParentLivery(const Group *g)
 {
 	if (g->parent == GroupID::Invalid()) {
@@ -344,6 +343,7 @@ const Livery *GetParentLivery(const Group *g)
 	const Group *pg = Group::Get(g->parent);
 	return &pg->livery;
 }
+#endif /* !WITH_RUST */
 
 
 /**
@@ -366,7 +366,7 @@ static void PropagateChildLivery(const Group *g, bool reset_cache)
 		}
 	}
 
-	for (const GroupID &childgroup : g->ChildGroups()) {
+	for (const GroupID &childgroup : g->children) {
 		Group *cg = Group::Get(childgroup);
 		if (!cg->livery.in_use.Test(Livery::Flag::Primary)) cg->livery.colour1 = g->livery.colour1;
 		if (!cg->livery.in_use.Test(Livery::Flag::Secondary)) cg->livery.colour2 = g->livery.colour2;
@@ -466,7 +466,7 @@ CommandCost CmdDeleteGroup(DoCommandFlags flags, GroupID group_id)
 	Command<CMD_REMOVE_ALL_VEHICLES_GROUP>::Do(flags, group_id);
 
 	/* Delete sub-groups, using a copy to avoid invalid iteration. */
-	auto children = g->ChildGroups();
+	FlatSet<GroupID> children = g->children;
 	for (const GroupID &childgroup : children) {
 		Command<CMD_DELETE_GROUP>::Do(flags, childgroup);
 	}
@@ -533,9 +533,9 @@ CommandCost CmdAlterGroup(DoCommandFlags flags, AlterGroupMode mode, GroupID gro
 		if (flags.Test(DoCommandFlag::Execute)) {
 			/* Assign the new one */
 			if (reset) {
-				g->SetName({});
+				g->name.clear();
 			} else {
-				g->SetName(text);
+				g->name = text;
 			}
 		}
 	} else if (mode == AlterGroupMode::SetParent) {
@@ -819,7 +819,7 @@ static void SetGroupFlag(Group *g, GroupFlag flag, bool set, bool children)
 
 	if (!children) return;
 
-	for (const GroupID &childgroup : g->ChildGroups()) {
+	for (const GroupID &childgroup : g->children) {
 		SetGroupFlag(Group::Get(childgroup), flag, set, true);
 	}
 }
@@ -864,6 +864,8 @@ CommandCost CmdSetGroupFlag(DoCommandFlags flags, GroupID group_id, GroupFlag fl
 void SetTrainGroupID(Train *v, GroupID new_g)
 {
 #ifdef WITH_RUST
+	/* The original asserts after its validity return; Rust repeats that return. */
+	assert(!(Group::IsValidID(new_g) || IsDefaultGroupID(new_g)) || v->IsFrontEngine() || IsDefaultGroupID(new_g));
 	openttd_rust_fleet_set_train_group(&_fleet_group_services, v, new_g.base());
 #else
 	if (!Group::IsValidID(new_g) && !IsDefaultGroupID(new_g)) return;
@@ -896,6 +898,7 @@ void SetTrainGroupID(Train *v, GroupID new_g)
 void UpdateTrainGroupID(Train *v)
 {
 #ifdef WITH_RUST
+	assert(v->IsFrontEngine() || v->IsFreeWagon());
 	openttd_rust_fleet_update_train_group(&_fleet_group_services, v);
 #else
 	assert(v->IsFrontEngine() || v->IsFreeWagon());
@@ -931,7 +934,7 @@ uint GetGroupNumEngines(CompanyID company, GroupID id_g, EngineID id_e)
 	uint count = 0;
 
 	if (const Group *g = Group::GetIfValid(id_g); g != nullptr) {
-		for (const GroupID &childgroup : g->ChildGroups()) {
+		for (const GroupID &childgroup : g->children) {
 			count += GetGroupNumEngines(company, childgroup, id_e);
 		}
 	}
@@ -956,7 +959,7 @@ uint GetGroupNumVehicle(CompanyID company, GroupID id_g, VehicleType type)
 	uint count = 0;
 
 	if (const Group *g = Group::GetIfValid(id_g); g != nullptr) {
-		for (const GroupID &childgroup : g->ChildGroups()) {
+		for (const GroupID &childgroup : g->children) {
 			count += GetGroupNumVehicle(company, childgroup, type);
 		}
 	}
@@ -981,7 +984,7 @@ uint GetGroupNumVehicleMinAge(CompanyID company, GroupID id_g, VehicleType type)
 	uint count = 0;
 
 	if (const Group *g = Group::GetIfValid(id_g); g != nullptr) {
-		for (const GroupID &childgroup : g->ChildGroups()) {
+		for (const GroupID &childgroup : g->children) {
 			count += GetGroupNumVehicleMinAge(company, childgroup, type);
 		}
 	}
@@ -1006,7 +1009,7 @@ Money GetGroupProfitLastYearMinAge(CompanyID company, GroupID id_g, VehicleType 
 	Money sum = 0;
 
 	if (const Group *g = Group::GetIfValid(id_g); g != nullptr) {
-		for (const GroupID &childgroup : g->ChildGroups()) {
+		for (const GroupID &childgroup : g->children) {
 			sum += GetGroupProfitLastYearMinAge(company, childgroup, type);
 		}
 	}
