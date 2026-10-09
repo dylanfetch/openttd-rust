@@ -1650,7 +1650,8 @@ environmental failures abort; wrapping counters and shared RNG retain source ord
 `python3 tools/migration.py simulate aircraft-route aircraft-controller disasters`
 compares every saved chunk and debug log: planes/helicopters, terminal groups,
 dedicated pads, occupied-block waits, service, closure diversion, zeppelin landing
-abort, airborne airport removal, out-of-fuel crash/destruction and live reload. `--self` and
+abort, airborne airport removal, orderless service-to-hangar diversion,
+out-of-fuel crash/destruction and live reload. `--self` and
 `--soak` check reproducibility/longer runs. A scenario-local native probe compares
 800 finite-range branches against unchanged reference helpers because supplied
 engines have unlimited range. ABI checks cover owner defaults/layout/lifetime, typed table/record offsets,

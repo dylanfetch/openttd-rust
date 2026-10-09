@@ -61,6 +61,7 @@ def scenarios(soak):
             "closure",
             "zeppelin",
             "removal",
+            "orphan",
             "crash",
             "reload",
             "ownerless",
@@ -322,7 +323,7 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
         return scenario
     with LOCK:
         kind = scenario["aircraft_control"]
-        count = 1 if kind in ("removal", "crash", "ownerless") else 8
+        count = 1 if kind in ("removal", "orphan", "crash", "ownerless") else 8
         folder = (
             out
             / f"aircraft-controller-fixture-{count}{'-oilrig' if kind == 'ownerless' else ''}"
@@ -412,7 +413,7 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
                 raise RuntimeError("reference aircraft never entered landing approach")
         original = source.read_bytes()
         ai_configuration = original[slice(*read_save(source)["AIPL"]["span"])]
-        if kind in ("removal", "crash"):
+        if kind in ("removal", "orphan", "crash"):
             for attempt in range(30):
                 current = rows(source)
                 if any(
@@ -466,7 +467,7 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
                 if (kind == "ownerless" or allrows[index]["aircraft[0]/state"] == 14)
                 and allrows[index]["aircraft[0]/common[0]/subtype"] == 2
                 and (
-                    kind not in ("removal", "crash")
+                    kind not in ("removal", "orphan", "crash")
                     or allrows[index]["aircraft[0]/targetairport"] == 1
                 )
             ),
@@ -478,7 +479,7 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
             flight = landing
         target = allrows[flight]["aircraft[0]/targetairport"]
         action = {}
-        if kind in ("closure", "removal"):
+        if kind in ("closure", "removal", "orphan"):
             action = {
                 "aircraft_action": kind,
                 "aircraft_action_target": target
@@ -809,6 +810,13 @@ def check_control(scenario, run, mode, role, result):
             or final["aircraft[0]/targetairport"] == scenario["aircraft_target"]
         ):
             raise RuntimeError("aircraft did not divert from its removed airport")
+    # HandleMissingAircraftOrders sends an orderless plane, whose target lost
+    # its airport, to a hangar (source DepotCommandFlag{} is Service).
+    if kind == "orphan" and not any(
+        snapshot.get(scenario["aircraft_selected"], {}).get("aircraft[0]/state") == 1
+        for snapshot in observations[1:]
+    ):
+        raise RuntimeError("orderless aircraft was not sent to a hangar")
     if kind == "zeppelin":
         initial = observations[0][scenario["aircraft_selected"]]
         if initial["aircraft[0]/state"] != 15 or not any(

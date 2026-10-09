@@ -1235,7 +1235,8 @@ impl World<'_> {
     }
     fn missing_orders(&self, id: Vehicle) {
         if !self.valid_airport(id) {
-            if self.send_to_depot(id, 0) != 0 {
+            // The source passes DepotCommandFlag{}, which is DepotCommandFlag::Service.
+            if self.send_to_depot(id, 1) != 0 {
                 self.crash_airplane(id);
             }
         } else if self.order_type(id) != 2 {
