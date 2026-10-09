@@ -25,6 +25,9 @@ struct OpenTTDAircraftVehicle { void *handle; OpenTTDAircraftState *state; uint3
 struct OpenTTDAircraftNode { const void *next; uint64_t blocks; uint8_t position, next_position, heading; };
 struct OpenTTDAircraftMoving { int16_t x, y; uint16_t flags; uint8_t direction; };
 struct OpenTTDAircraftPosition { int32_t x, y; uint32_t tile; };
+struct OpenTTDAircraftBlockNode { uint64_t blocks; uint8_t position, next_position; };
+struct OpenTTDAircraftRouteNode { const void *next; uint8_t next_position, heading; };
+struct OpenTTDAircraftBlockChoice { const void *next; uint64_t blocks; uint8_t heading; };
 /* Immutable callback table, borrowed for synchronous entries. Handles retain the
  * original pool identity; only raw field-sized State access occurs in Rust.
  * No borrow survives a callback, including reentry and PreDestructor deletion.
@@ -187,6 +190,13 @@ struct OpenTTDAircraftLeaves {
 	uint32_t (OPENTTD_AIRCRAFT_CALL *explosion_sound)();
 	uint32_t (OPENTTD_AIRCRAFT_CALL *skid_sound)();
 	uint32_t (OPENTTD_AIRCRAFT_CALL *ticks_per_year)();
+	uint64_t (OPENTTD_AIRCRAFT_CALL *fta_blocks)(const void *);
+	uint8_t (OPENTTD_AIRCRAFT_CALL *fta_heading)(const void *);
+	uint8_t (OPENTTD_AIRCRAFT_CALL *fta_next_position)(const void *);
+	const void * (OPENTTD_AIRCRAFT_CALL *fta_next)(const void *);
+	OpenTTDAircraftBlockNode (OPENTTD_AIRCRAFT_CALL *block_node)(const void *);
+	OpenTTDAircraftRouteNode (OPENTTD_AIRCRAFT_CALL *route_node)(const void *);
+	OpenTTDAircraftBlockChoice (OPENTTD_AIRCRAFT_CALL *block_choice)(const void *);
 };
 bool OPENTTD_AIRCRAFT_CALL openttd_rust_aircraft_tick(const OpenTTDAircraftLeaves *, OpenTTDAircraftVehicle);
 void OPENTTD_AIRCRAFT_CALL openttd_rust_aircraft_calendar_day(const OpenTTDAircraftLeaves *, OpenTTDAircraftVehicle);

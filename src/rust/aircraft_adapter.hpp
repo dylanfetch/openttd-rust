@@ -789,12 +789,12 @@ static void OPENTTD_AIRCRAFT_CALL Aircraft_invalid_position(OpenTTDAircraftVehic
 	Debug(misc, 0, "[Ap] position {} is not valid for current airport. Max position is {}", Aircraft::From(static_cast<Vehicle *>(vehicle.handle))->pos, static_cast<const AirportFTAClass *>(ap)->nofelements - 1); assert(Aircraft::From(static_cast<Vehicle *>(vehicle.handle))->pos < static_cast<const AirportFTAClass *>(ap)->nofelements);
 }
 
-static void OPENTTD_AIRCRAFT_CALL Aircraft_invalid_scheme(OpenTTDAircraftVehicle vehicle) noexcept
+static void OPENTTD_AIRCRAFT_CALL Aircraft_invalid_scheme(OpenTTDAircraftVehicle) noexcept
 {
 	FatalError("OK, you shouldn't be here, check your Airport Scheme!");
 }
 
-static void OPENTTD_AIRCRAFT_CALL Aircraft_unreachable(OpenTTDAircraftVehicle vehicle) noexcept
+static void OPENTTD_AIRCRAFT_CALL Aircraft_unreachable(OpenTTDAircraftVehicle) noexcept
 {
 	NOT_REACHED();
 }
@@ -892,6 +892,44 @@ static uint32_t OPENTTD_AIRCRAFT_CALL Aircraft_skid_sound() noexcept
 static uint32_t OPENTTD_AIRCRAFT_CALL Aircraft_ticks_per_year() noexcept
 {
 	return CalendarTime::DAYS_IN_YEAR * Ticks::DAY_TICKS;
+}
+
+static uint64_t OPENTTD_AIRCRAFT_CALL Aircraft_fta_blocks(const void *node) noexcept
+{
+	return static_cast<const AirportFTA *>(node)->blocks.base();
+}
+
+static uint8_t OPENTTD_AIRCRAFT_CALL Aircraft_fta_heading(const void *node) noexcept
+{
+	return static_cast<const AirportFTA *>(node)->heading;
+}
+
+static uint8_t OPENTTD_AIRCRAFT_CALL Aircraft_fta_next_position(const void *node) noexcept
+{
+	return static_cast<const AirportFTA *>(node)->next_position;
+}
+
+static const void * OPENTTD_AIRCRAFT_CALL Aircraft_fta_next(const void *node) noexcept
+{
+	return static_cast<const AirportFTA *>(node)->next.get();
+}
+
+static OpenTTDAircraftBlockNode OPENTTD_AIRCRAFT_CALL Aircraft_block_node(const void *node) noexcept
+{
+	const auto *n = static_cast<const AirportFTA *>(node);
+	return {n->blocks.base(), n->position, n->next_position};
+}
+
+static OpenTTDAircraftRouteNode OPENTTD_AIRCRAFT_CALL Aircraft_route_node(const void *node) noexcept
+{
+	const auto *n = static_cast<const AirportFTA *>(node);
+	return {n->next.get(), n->next_position, n->heading};
+}
+
+static OpenTTDAircraftBlockChoice OPENTTD_AIRCRAFT_CALL Aircraft_block_choice(const void *node) noexcept
+{
+	const auto *n = static_cast<const AirportFTA *>(node);
+	return {n->next.get(), n->blocks.base(), n->heading};
 }
 
 static const OpenTTDAircraftLeaves _aircraft_leaves{
@@ -1051,6 +1089,13 @@ static const OpenTTDAircraftLeaves _aircraft_leaves{
 	Aircraft_explosion_sound,
 	Aircraft_skid_sound,
 	Aircraft_ticks_per_year,
+	Aircraft_fta_blocks,
+	Aircraft_fta_heading,
+	Aircraft_fta_next_position,
+	Aircraft_fta_next,
+	Aircraft_block_node,
+	Aircraft_route_node,
+	Aircraft_block_choice,
 };
 bool Aircraft::Tick()
 {

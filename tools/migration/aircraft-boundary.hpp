@@ -170,6 +170,13 @@ static OpenTTDAircraftLeaves AircraftTestLeaves()
 	leaves.explosion_sound = AircraftUnexpectedService<decltype(leaves.explosion_sound)>::Call;
 	leaves.skid_sound = AircraftUnexpectedService<decltype(leaves.skid_sound)>::Call;
 	leaves.ticks_per_year = AircraftUnexpectedService<decltype(leaves.ticks_per_year)>::Call;
+	leaves.fta_blocks = AircraftUnexpectedService<decltype(leaves.fta_blocks)>::Call;
+	leaves.fta_heading = AircraftUnexpectedService<decltype(leaves.fta_heading)>::Call;
+	leaves.fta_next_position = AircraftUnexpectedService<decltype(leaves.fta_next_position)>::Call;
+	leaves.fta_next = AircraftUnexpectedService<decltype(leaves.fta_next)>::Call;
+	leaves.block_node = AircraftUnexpectedService<decltype(leaves.block_node)>::Call;
+	leaves.route_node = AircraftUnexpectedService<decltype(leaves.route_node)>::Call;
+	leaves.block_choice = AircraftUnexpectedService<decltype(leaves.block_choice)>::Call;
 	return leaves;
 }
 #endif /* OPENTTD_AIRCRAFT_BOUNDARY_HPP */

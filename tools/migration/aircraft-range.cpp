@@ -80,6 +80,9 @@ static OpenTTDAircraftLeaves RangeLeaves()
 	leaves.set_current_speed = [](OpenTTDAircraftVehicle, uint16_t) noexcept {};
 	leaves.node = [](const void *ap, uint8_t) noexcept -> const void * { return ap; };
 	leaves.fta = [](const void *) noexcept { return OpenTTDAircraftNode{nullptr, uint64_t{1} << 30, 0, 0, 0}; };
+	leaves.fta_blocks = [](const void *) noexcept { return uint64_t{1} << 30; };
+	leaves.fta_heading = leaves.fta_next_position = [](const void *) noexcept { return uint8_t{0}; };
+	leaves.fta_next = [](const void *) noexcept -> const void * { return nullptr; };
 	leaves.airport_blocks = [](const void *) noexcept { return &fixture->blocks; };
 	leaves.set_subspeed = [](OpenTTDAircraftVehicle, uint8_t) noexcept {};
 	leaves.speed_property = [](OpenTTDAircraftVehicle) noexcept { return uint32_t{0}; };
@@ -109,6 +112,9 @@ static OpenTTDAircraftLeaves RangeLeaves()
 	leaves.helipads = [](const void *) noexcept { return uint8_t{0}; };
 	leaves.airport_flags = [](const void *) noexcept { return uint8_t{1}; };
 	leaves.waiting_unbunching = [](OpenTTDAircraftVehicle) noexcept { return false; };
+	leaves.block_node = [](const void *) noexcept { return OpenTTDAircraftBlockNode{uint64_t{1} << 30, 0, 0}; };
+	leaves.route_node = [](const void *) noexcept { return OpenTTDAircraftRouteNode{nullptr, 0, 0}; };
+	leaves.block_choice = [](const void *) noexcept { return OpenTTDAircraftBlockChoice{nullptr, uint64_t{1} << 30, 0}; };
 	return leaves;
 }
 int main()

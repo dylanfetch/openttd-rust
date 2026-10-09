@@ -75,6 +75,27 @@ pub struct Position {
     pub y: i32,
     pub tile: u32,
 }
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct BlockNode {
+    pub blocks: u64,
+    pub position: u8,
+    pub next_position: u8,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct RouteNode {
+    pub next: *const c_void,
+    pub next_position: u8,
+    pub heading: u8,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct BlockChoice {
+    pub next: *const c_void,
+    pub blocks: u64,
+    pub heading: u8,
+}
 struct Movement {
     x: i64,
     y: i64,
@@ -244,6 +265,13 @@ pub struct Leaves {
     pub explosion_sound: unsafe extern "C" fn() -> u32,
     pub skid_sound: unsafe extern "C" fn() -> u32,
     pub ticks_per_year: unsafe extern "C" fn() -> u32,
+    pub fta_blocks: unsafe extern "C" fn(*const c_void) -> u64,
+    pub fta_heading: unsafe extern "C" fn(*const c_void) -> u8,
+    pub fta_next_position: unsafe extern "C" fn(*const c_void) -> u8,
+    pub fta_next: unsafe extern "C" fn(*const c_void) -> *const c_void,
+    pub block_node: unsafe extern "C" fn(*const c_void) -> BlockNode,
+    pub route_node: unsafe extern "C" fn(*const c_void) -> RouteNode,
+    pub block_choice: unsafe extern "C" fn(*const c_void) -> BlockChoice,
 }
 struct World<'a> {
     leaves: &'a Leaves,
@@ -420,6 +448,13 @@ impl World<'_> {
         dummy_airport(self; ) -> *const c_void => (self.leaves.dummy_airport)();
         node(self; airport: *const c_void, pos: u8) -> *const c_void => (self.leaves.node)(airport, pos);
         fta(self; node: *const c_void) -> Node => (self.leaves.fta)(node);
+        block_choice(self; node: *const c_void) -> BlockChoice => (self.leaves.block_choice)(node);
+        route_node(self; node: *const c_void) -> RouteNode => (self.leaves.route_node)(node);
+        block_node(self; node: *const c_void) -> BlockNode => (self.leaves.block_node)(node);
+        fta_blocks(self; node: *const c_void) -> u64 => (self.leaves.fta_blocks)(node);
+        fta_heading(self; node: *const c_void) -> u8 => (self.leaves.fta_heading)(node);
+        fta_next_position(self; node: *const c_void) -> u8 => (self.leaves.fta_next_position)(node);
+        fta_next(self; node: *const c_void) -> *const c_void => (self.leaves.fta_next)(node);
         random(self; ) -> u32 => (self.leaves.random)();
         update_position(self; vehicle: Vehicle) -> () => (self.leaves.update_position)(vehicle);
         rotor_image(self; vehicle: Vehicle) -> () => (self.leaves.rotor_image)(vehicle);
@@ -1238,10 +1273,10 @@ impl World<'_> {
     }
     fn has_block(&self, id: Vehicle, current: *const c_void, ap: *const c_void) -> bool {
         let reference = self.node(ap, self.pos(id));
-        let c = self.fta(current);
-        let next = self.fta(self.node(ap, c.next_position));
-        if self.fta(self.node(ap, c.position)).blocks != next.blocks {
-            let mut blocks = next.blocks;
+        let c = self.block_node(current);
+        let next = self.fta_blocks(self.node(ap, c.next_position));
+        if self.fta_blocks(self.node(ap, c.position)) != next {
+            let mut blocks = next;
             if current != reference && c.blocks != NOTHING {
                 blocks |= c.blocks;
             }
@@ -1255,25 +1290,25 @@ impl World<'_> {
     }
     fn set_block(&self, id: Vehicle, current: *const c_void, ap: *const c_void) -> bool {
         let c = self.fta(current);
-        let next = self.fta(self.node(ap, c.next_position));
+        let next = self.fta_blocks(self.node(ap, c.next_position));
         let reference = self.node(ap, self.pos(id));
-        if (self.fta(self.node(ap, c.position)).blocks & next.blocks) != next.blocks {
-            let mut blocks = next.blocks;
+        if (self.fta_blocks(self.node(ap, c.position)) & next) != next {
+            let mut blocks = next;
             let mut cursor = if current == reference {
                 c.next
             } else {
                 current
             };
             while !cursor.is_null() {
-                let node = self.fta(cursor);
+                let node = self.block_choice(cursor);
                 if node.heading == c.heading && node.blocks != 0 {
                     blocks |= node.blocks;
                     break;
                 }
                 cursor = node.next;
             }
-            if c.blocks == next.blocks {
-                blocks ^= next.blocks;
+            if c.blocks == next {
+                blocks ^= next;
             }
             let station = u32::from(self.target(id));
             if self.blocks(station) & blocks != 0 {
@@ -1281,7 +1316,7 @@ impl World<'_> {
                 self.set_subspeed(id, 0);
                 return false;
             }
-            if next.blocks != NOTHING {
+            if next != NOTHING {
                 self.reserve(station, blocks);
             }
         }
@@ -1305,14 +1340,14 @@ impl World<'_> {
         let groups = self.terminal_count(ap, 0);
         if groups > 1 {
             let station = u32::from(self.target(id));
-            let mut cursor = self.fta(self.node(ap, self.pos(id))).next;
+            let mut cursor = self.fta_next(self.node(ap, self.pos(id)));
             while !cursor.is_null() {
-                let node = self.fta(cursor);
+                let node = self.block_choice(cursor);
                 if node.heading != 255 {
                     return false;
                 }
                 if self.blocks(station) & node.blocks == 0 {
-                    let group = u32::from(node.next_position) + 1;
+                    let group = u32::from(self.fta_next_position(cursor)) + 1;
                     let mut start = 0;
                     for i in 1..group {
                         start += self.terminal_count(ap, i64::from(i));
@@ -1344,7 +1379,7 @@ impl World<'_> {
             HANGAR => {
                 if self.previous(id) != self.pos(id) {
                     self.enter_depot(id);
-                    self.set_state(id, self.fta(self.node(ap, self.pos(id))).heading);
+                    self.set_state(id, self.fta_heading(self.node(ap, self.pos(id))));
                     return;
                 }
                 if self.order_type(id) == 2 && self.vehicle_status(id) & STOPPED != 0 {
@@ -1391,7 +1426,7 @@ impl World<'_> {
             2..=9 | 19..=21 => {
                 if self.previous(id) != self.pos(id) {
                     self.terminal(id);
-                    self.set_state(id, self.fta(self.node(ap, self.pos(id))).heading);
+                    self.set_state(id, self.fta_heading(self.node(ap, self.pos(id))));
                     if self.service_at_helipad() != 0
                         && self.subtype(id) == 0
                         && self.helipads(ap) > 0
@@ -1466,9 +1501,9 @@ impl World<'_> {
                     } else {
                         LANDING
                     };
-                    let mut cursor = self.fta(self.node(ap, self.pos(id))).next;
+                    let mut cursor = self.fta_next(self.node(ap, self.pos(id)));
                     while !cursor.is_null() {
-                        let node = self.fta(cursor);
+                        let node = self.route_node(cursor);
                         if node.heading == landing {
                             let speed = self.current_speed(id);
                             let sub = self.subspeed(id);
@@ -1478,7 +1513,7 @@ impl World<'_> {
                                     self.flag(id, 3, true);
                                 }
                                 self.set_pos(id, node.next_position);
-                                self.reserve(station, self.fta(self.node(ap, self.pos(id))).blocks);
+                                self.reserve(station, self.fta_blocks(self.node(ap, self.pos(id))));
                                 return;
                             }
                             self.set_current_speed(id, speed);
@@ -1488,7 +1523,7 @@ impl World<'_> {
                     }
                 }
                 self.set_state(id, FLYING);
-                self.set_pos(id, self.fta(self.node(ap, self.pos(id))).next_position);
+                self.set_pos(id, self.fta_next_position(self.node(ap, self.pos(id))));
             }
             LANDING => {
                 self.set_state(id, ENDLANDING);
@@ -1540,7 +1575,7 @@ impl World<'_> {
             self.invalid_position(id, ap);
         }
         let mut cursor = self.node(ap, self.pos(id));
-        let current = self.fta(cursor);
+        let current = self.route_node(cursor);
         if current.heading == self.state(id) {
             let previous = self.pos(id);
             let state = self.state(id);
@@ -1562,7 +1597,7 @@ impl World<'_> {
             return false;
         }
         loop {
-            let node = self.fta(cursor);
+            let node = self.route_node(cursor);
             if node.heading == self.state(id) || node.heading == 0 {
                 if self.set_block(id, cursor, ap) {
                     self.set_pos(id, node.next_position);
@@ -1583,8 +1618,8 @@ impl World<'_> {
             return;
         }
         let ap = self.airport(id);
-        let previous = self.fta(self.node(ap, self.previous(id))).blocks;
-        let current = self.fta(self.node(ap, self.pos(id))).blocks;
+        let previous = self.fta_blocks(self.node(ap, self.previous(id)));
+        let current = self.fta_blocks(self.node(ap, self.pos(id)));
         if previous != current {
             let station = u32::from(self.target(id));
             if !(self.blocks(station) & ZEPPELIN != 0 && previous == 1 << 8) {
@@ -2163,7 +2198,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_release_blocks(leaves: *const Lea
     };
     if w.valid_airport(id) {
         let ap = w.airport(id);
-        let bits = w.fta(w.node(ap, w.previous(id))).blocks | w.fta(w.node(ap, w.pos(id))).blocks;
+        let bits = w.fta_blocks(w.node(ap, w.previous(id))) | w.fta_blocks(w.node(ap, w.pos(id)));
         w.release(u32::from(w.target(id)), bits);
     }
 }
