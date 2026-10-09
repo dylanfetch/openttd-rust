@@ -1702,3 +1702,29 @@ After building, `python3 -m tools.simulation.cargo_storage` probes 1k-64k queues
 identity/order/cache preservation and bounded reads for first-hit append/keyed load;
 its synthetic timings are not whole-game speed ratios. Legacy conversions and
 complete refit/autoreplace transactions lack additional play witnesses (#156).
+
+### Fleet grouping and replacement lifecycle (#147)
+
+Rust owns group metadata/names/ordered children, group/company statistics and
+engine counts, renewal rules/links and company renewal heads, plus the pending
+tick-end map. It runs every group command, traversal/statistics/livery update,
+renewal-rule command, replacement eligibility/refit choice, speculative build,
+rearrangement, rollback, execution and the ascending-VehicleID drain. Original
+bodies compile only in portable builds. C++ keeps pool identity/allocation, group
+numbers, GUI folding, save adapters and `Vehicle::group_id`, which stays shell
+storage that Rust reads/writes through typed services at the original points;
+company-merge rewriting (economy.cpp), train/vehicle construction and save/load
+writes of `group_id` remain C++.
+
+Three named-slot noexcept tables (ABI 393-396, with owner prefixes 390-392)
+serve Rust; native stack CommandCost objects keep AddCost first-error and Money
+saturation, and original assertion sites run in assertion builds. No owner borrow
+spans a callback; nested commands reenter directly.
+
+Checks: `python3 tools/migration.py verify --jobs 2`, `python3 tools/migration.py
+simulate fleet- --jobs 2` (also `--self`, `--soak`). Scenarios cover hierarchy,
+rules/protection, list-based NEW_GROUP and veh_id 0xFFFFFFFF, renewals for four
+transports, free-unit and different-engine wagon-removal replacement, cash and
+length rollback, reload, and the tick-end drain in play (renewal with restart;
+money-limit failure with reserve and news). Native tests cover layouts, slots, CommandCost and
+drain reentry. NewGRF refit/attach callbacks and articulated parts remain #156.

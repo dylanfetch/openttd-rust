@@ -1037,7 +1037,7 @@ bool AfterLoadGame()
 	 *  of course, we do need to initialize them for older savegames. */
 	if (IsSavegameVersionBefore(SLV_16)) {
 		for (Company *c : Company::Iterate()) {
-			c->engine_renew_list            = nullptr;
+			c->RenewalList()            = nullptr;
 			c->settings.engine_renew        = false;
 			c->settings.engine_renew_months = 6;
 			c->settings.engine_renew_money  = 100000;
