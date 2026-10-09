@@ -48,8 +48,12 @@ fork; the remaining upstream documentation explains behavior and architecture.
 - Keep the boundary cheap and typed. Entries are plain synchronous calls with
   no per-call heap allocation and no async, future, task or mailbox machinery.
   Each service is its own typed `noexcept` function, not an opcode switch or
-  positional array, and hot reads fetch only the fields they use rather than
-  whole-record views. Existing ports convert under #168. Root grants no
+  positional array. Each entry resolves its owner once and reads, once, only
+  the fields it uses: neither a whole-record view nor a call per field. A
+  shared accessor (vehicle field, map predicate, setting, constant) has one
+  typed definition used by every port, not a per-port copy; services return
+  their real types on both sides and tables use designated initializers.
+  Existing ports convert under #168 and #199. Root grants no
   exceptions at integration: a port whose hot path allocates per call, dispatches
   by opcode or copies whole records is fixed before it integrates.
 - Evidence for game-logic ports is the semantic simulation harness (`python3
@@ -59,7 +63,8 @@ fork; the remaining upstream documentation explains behavior and architecture.
   and do not wait for it. Extend the harness's scenarios rather than writing a
   new per-component comparison tool. Add a narrow comparison against unchanged
   reference bodies only for a concrete gap the harness cannot reach, and say in
-  the PR which gap.
+  the PR which gap. A branch witness that a doc or PR cites runs in the default
+  suite and fails when missing; an opt-in profile is not evidence.
 - Keep the pinned reference worktree unchanged. Never change candidate behavior
   and expected results together merely to make checks pass. Existing test success
   establishes covered behavior, not complete game equivalence.
