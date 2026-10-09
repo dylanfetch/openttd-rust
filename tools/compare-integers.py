@@ -167,6 +167,7 @@ def compare_consumers(env, binaries):
             (3, 0, b"A\x00\xff"),
             (3, maximum, b"A\x00\xff"),
             (1, 1, b"A\x00\xff"),
+            (1, 2, b"A\x00\xff"),
         ):
             corpus.append((operation, offset, requested, src))
     for operation in range(3, 12):
@@ -177,13 +178,29 @@ def compare_consumers(env, binaries):
             (1, b"X\x01\x02\x03\x04\x05\x06\x07\x80"),
         ):
             corpus.append((operation, offset, 0, src))
+    # ASCII/NUL, multi-byte, malformed and EOF transitions exercise the same
+    # public methods against the pinned body, including one-byte failed reads.
+    for operation in range(12, 16):
+        for offset, src in (
+            (0, b""),
+            (0, b"\x00A"),
+            (1, b"\x00A"),
+            (1, b"A\xc2\x80B"),
+            (3, b"A\xc2\x80B"),
+            (4, b"A\xc2\x80B"),
+            (1, b"A\xed\xa0\x80B"),
+            (1, b"A\xff\x80B"),
+            (2, b"A\xff\x80B"),
+            (1, b"A\xf1\x80\x80"),
+        ):
+            corpus.append((operation, offset, 0, src))
     records = [
         f"{operation} {offset} {requested} {src.hex() or '-'}\n".encode()
         for operation, offset, requested, src in corpus
     ]
     (OUT / "consumer-corpus.txt").write_bytes(b"".join(records))
     streams = []
-    for name in ("reference", "candidate"):
+    for name in ("reference", "candidate", "candidate-cpp"):
         result = subprocess.run(
             [str(binaries[name, False]), "--consumer"],
             input=b"".join(records),
@@ -195,7 +212,7 @@ def compare_consumers(env, binaries):
         (OUT / f"{name}-consumer.txt").write_bytes(result.stdout)
         assert len(result.stdout.splitlines()) == len(records)
         streams.append(result.stdout)
-    assert streams[0] == streams[1], (
+    assert streams[0] == streams[1] == streams[2], (
         "Consumer byte/cursor/diagnostic mismatch; retained streams in evidence"
     )
     fatal_cases = []
@@ -206,8 +223,12 @@ def compare_consumers(env, binaries):
         (4, 2, 0, b"ABC"),
         (5, 1, 0, b"ABC"),
         (6, 1, 0, b"ABC"),
+        (13, 0, 0, b""),
+        (14, 0, 0, b""),
+        (13, 3, 0, b"ABC"),
+        (14, 3, 0, b"ABC"),
     ):
-        record = f"{operation} {offset} {requested} {src.hex()}\n".encode()
+        record = f"{operation} {offset} {requested} {src.hex() or '-'}\n".encode()
         results = [
             subprocess.run(
                 [str(binaries[name, True]), "--consumer"],

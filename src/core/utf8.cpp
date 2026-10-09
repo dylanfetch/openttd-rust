@@ -57,12 +57,9 @@
  * @param buf Binary data.
  * @return Length and character. Length is zero, if the input data is invalid.
  */
+#ifndef WITH_RUST
 [[nodiscard]] std::pair<size_t, char32_t> DecodeUtf8(std::string_view buf)
 {
-#ifdef WITH_RUST
-	auto decoded = openttd_rust_decode_utf8(reinterpret_cast<const uint8_t *>(buf.data()), buf.size());
-	return {decoded.length, static_cast<char32_t>(decoded.codepoint)};
-#else
 	if (buf.size() >= 1 && !HasBit(buf[0], 7)) {
 		/* Single byte character: 0xxxxxxx */
 		char32_t c = buf[0];
@@ -87,8 +84,8 @@
 		}
 	}
 	return {};
-#endif
 }
+#endif
 
 /**
  * Create iterator pointing at codepoint, which occupies the byte position "offset".

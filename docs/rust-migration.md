@@ -567,6 +567,8 @@ substring/character-set search and membership; and separator result/consumption
 decisions. C++ keeps typed optional/default conversions, string_view construction,
 diagnostic formatting, cursor commit and trivial accessors, and preserves empty
 view pointers through the original substring at the current offset.
+In-bounds Peek/Read/Skip are header-visible C++ fast paths; npos and oversized
+requests retain Rust's bounds decisions and logging before cursor commit.
 
 `src/rust/consumer_ffi.h` returns scalar `repr(C)` metadata by value. Rust calls no
 C++ logger while borrowing. C++ logs a shortfall before applying the returned
@@ -585,7 +587,7 @@ rebuilds the consumer; no Rust borrow survives that boundary.
 Evidence: the eleven unchanged consumer cases plus four public cases (empty-prefix
 offsets, partial-width TryRead cursor preservation, multi-byte separators with
 offsets/overlap/unknown policy, overlapping byte sets). The `--consumer` mode of
-`python3 tools/compare-integers.py` compares 60 byte/offset/shortfall cases and six
+`python3 tools/compare-integers.py` compares 103 byte/offset/shortfall cases and ten
 fatal-timing checks against pinned C++; the report records `consumer_bytes`.
 
 ### Spiral tile traversal
@@ -708,8 +710,9 @@ cover the C++ side only.
 
 ### UTF-8 codec and byte positions
 
-`EncodeUtf8`, `DecodeUtf8`, `IsUtf8Part`, forward/backward iterator stepping and
-`GetIterAtByte` normalization run in Rust. The C++ view keeps its borrowed
+The full UTF-8 codec, `IsUtf8Part`, forward/backward iterator stepping and
+`GetIterAtByte` normalization run in Rust. Inline DecodeUtf8/consumer PeekUtf8
+handle leading ASCII (including NUL) without an FFI call. The C++ view keeps its borrowed
 string_view and iterator facade, pair adapters, comparison assertions, postfix
 copying and invalid-data `?` dereference. Native generators use the same codec
 through issue #5's shared target.
@@ -728,7 +731,7 @@ codepoint/byte conversions are explicitly masked or bounded.
 Evidence: the three unchanged UTF-8 view tests and consumer/builder tests, plus
 `python3 tools/utf8-comparison.py` (assertion and NDEBUG builds; encoding
 boundaries, malformed runs, embedded NUL, empty views, consumer-versus-view
-movement, and the `offset >= size` end branch including SIZE_MAX). Game logging
+movement, all single bytes, and the `offset >= size` end branch including SIZE_MAX). Game logging
 and Unicode rendering are outside it.
 
 ### Rounded square root and runtime integer saturation
