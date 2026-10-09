@@ -200,6 +200,10 @@ or complete log/stdout difference fails. Both modes compare their exit saves.
   id, build revision/NewGRF version, and `round_trip_time`, which the original
   saves uninitialized (#83); ports touching it need their own check.
 - Port divergences go in `KNOWN_FAILURES` by first divergence and issue.
+- Cited branch witnesses (#198): a module's `game_environment` enables its
+  counters when `scenario["witnesses"]` is set (distinct candidate, not
+  `--benchmark`), and its `check` calls `core.branch_witnesses`, which fails on
+  a missing profile or a zero required branch. Rail and water scenarios do so.
 - Games launch on Linux as an unprivileged user with child-only
   `RLIMIT_NPROC=0`. The original `StartNewThread` failure paths compute link
   graphs and write saves synchronously; graph scheduling, join dates and loaded
@@ -1368,9 +1372,10 @@ all chunks for ferry manual/cargodist, canal/lock loss and recovery, aqueducts,
 depot reversals and reference-produced live-path reload. Native checks compare
 2,000 heap operations to unchanged CBinaryHeapT and check path copy/lifetime and
 reversal and fixed/map-derived limit control against unchanged CYapfBaseT.
-`OPENTTD_SHIP_PROFILE=1` records alternate docking, retries and cache/reversal
-witnesses in scenario reports; node limits use injected graphs, not reachable-map
-claims. Arbitrary maps/NewGRFs and complete legacy saves are not exhaustive.
+Each candidate run requires alternate docking, retries and cache/reversal
+witnesses (`ship-yapf-profile.json`); node limits use injected graphs, not
+reachable-map claims. Arbitrary maps/NewGRFs and complete legacy saves are not
+exhaustive.
 
 ### Town growth control and private state
 
@@ -1571,10 +1576,11 @@ Unexpected environmental exceptions terminate inside their wrappers; Rust panics
 
 `python3 tools/migration.py verify --jobs 2` includes the four Cargo checks and
 native ABI checks for scalar widths, native C++ transient coordinate narrowing,
-direct callback order and nested owner mutation. `OPENTTD_SHIP_PROFILE=1 python3
-tools/migration.py simulate water --jobs 2` (also `--self`/`--soak`) reuses the water
-corpus for locks, aqueducts, rotation/reload, service, buoy/loading, depot restart,
-and moving build/sell/ID-reuse owners. The class case changes one existing clear
+direct callback order and nested owner mutation. `python3 tools/migration.py
+simulate water --jobs 2` (also `--soak`; `--self` counts nothing) requires the
+candidate's `ship-control-profile.json` branches in the water corpus for locks,
+aqueducts, rotation/reload, service, buoy/loading, depot restart, and moving
+build/sell/ID-reuse owners. The class case changes one existing clear
 canal input byte to `MakeRiver` class/owner encoding for both games and requires an
 actual cache-update branch. Legacy save versions, viewport pixels and arbitrary
 custom NewGRF combinations remain coverage limits; final independent review and CI gate integration.
@@ -1593,10 +1599,12 @@ modern VEHS staging, legacy loading and afterload use canonical scalar adapters.
 Original selected bodies compile only in portable builds. Copied noexcept world
 services preserve immediate reads/writes; named callback tasks release borrows
 before tile/depot entry, orders/loading, station callbacks and destruction.
-`OPENTTD_TRAIN_PROFILE=1` writes controller branch counts in `train-profile.json`;
-this includes extension rollback separately from #122's search rollback.
 Validation uses the existing Padhattan manual/cargodist, realistic acceleration,
-90-degree reservation, live reload and real command-built controller scenarios.
+90-degree reservation, live reload and real command-built controller scenarios;
+each candidate run requires its `rails.TRAIN_BRANCHES` counts in
+`train-profile.json` (extension rollback is distinct from #122's search rollback).
+Unreached branches (wormhole swap, unequal/articulated moves, red two-way,
+force-signal, free-wagon deletion, depot re-entry, opposing PBS restore) are #156.
 A narrow unchanged-source comparison covers variable-length curve/reversal inputs
 unavailable in the stock fixture. The PR records commands and branch/NewGRF limits; passing these inputs does not prove
 exhaustive train equivalence.
