@@ -266,11 +266,6 @@ pub struct TrainCanLeaveRead {
 }
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct TrainApproachingCrossingRead {
-    pub tile: u32,
-}
-#[repr(C)]
-#[derive(Clone, Copy)]
 pub struct TrainCrossingApproachRead {
     pub status: u8,
     pub front: u8,
@@ -372,12 +367,9 @@ pub struct TrainStayDepotRead {
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct TrainLocoRead {
-    pub tile: u32,
     pub speed: u16,
-    pub order_destination: u16,
     pub status: u8,
     pub order: u8,
-    pub nonstop: u8,
 }
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -456,7 +448,6 @@ pub struct Leaves {
     pub read_update_speed: extern "C" fn(Handle) -> TrainUpdateSpeedRead,
     pub read_trackdir: extern "C" fn(Handle) -> TrainTrackdirRead,
     pub read_can_leave: extern "C" fn(Handle) -> TrainCanLeaveRead,
-    pub read_approaching_crossing: extern "C" fn(Handle) -> TrainApproachingCrossingRead,
     pub read_crossing_approach: extern "C" fn(Handle) -> TrainCrossingApproachRead,
     pub read_next_offset: extern "C" fn(Handle) -> TrainNextOffsetRead,
     pub read_after_swap: extern "C" fn(Handle) -> TrainAfterSwapRead,
@@ -589,7 +580,6 @@ pub struct Leaves {
     pub is_railway: extern "C" fn(Handle, u32) -> u64,
     pub is_station: extern "C" fn(Handle, u32) -> u64,
     pub is_station_any: extern "C" fn(Handle, u32) -> u64,
-    pub is_station_rail: extern "C" fn(Handle, u32) -> u64,
     pub is_tunnelbridge: extern "C" fn(Handle, u32) -> u64,
     pub large_explosion: extern "C" fn(Handle),
     pub last_speed: extern "C" fn(Handle),
@@ -629,7 +619,6 @@ pub struct Leaves {
     pub rail_type: extern "C" fn(Handle, u32) -> u64,
     pub rail_types: extern "C" fn(Handle) -> u64,
     pub reserve_paths: extern "C" fn(Handle) -> u64,
-    pub reserve_track: extern "C" fn(Handle, u32, u8, u8) -> u64,
     pub reserve_under: extern "C" fn(Handle),
     pub reset_unbunch: extern "C" fn(Handle),
     pub reverse_at_signals: extern "C" fn(Handle) -> u64,
@@ -844,9 +833,6 @@ impl Game<'_> {
     }
     fn read_can_leave(&self, id: Handle) -> TrainCanLeaveRead {
         (self.leaves.read_can_leave)(id)
-    }
-    fn read_approaching_crossing(&self, id: Handle) -> TrainApproachingCrossingRead {
-        (self.leaves.read_approaching_crossing)(id)
     }
     fn read_crossing_approach(&self, id: Handle) -> TrainCrossingApproachRead {
         (self.leaves.read_crossing_approach)(id)
@@ -1193,9 +1179,6 @@ impl Game<'_> {
     fn svc_is_station_any(&self, id: Handle, a: u64) -> u64 {
         (self.leaves.is_station_any)(id, a as u32)
     }
-    fn svc_is_station_rail(&self, id: Handle, a: u64) -> u64 {
-        (self.leaves.is_station_rail)(id, a as u32)
-    }
     fn svc_is_tunnelbridge(&self, id: Handle, a: u64) -> u64 {
         (self.leaves.is_tunnelbridge)(id, a as u32)
     }
@@ -1326,9 +1309,6 @@ impl Game<'_> {
     }
     fn svc_reserve_paths(&self, id: Handle) -> u64 {
         (self.leaves.reserve_paths)(id)
-    }
-    fn svc_reserve_track(&self, id: Handle, a: u64, b: u64, c: u64) -> u64 {
-        (self.leaves.reserve_track)(id, a as u32, b as u8, c as u8)
     }
     fn svc_reserve_under(&self, id: Handle) -> u64 {
         (self.leaves.reserve_under)(id);
@@ -1831,8 +1811,9 @@ impl Game<'_> {
     }
     fn update_acceleration(&self, id: Handle) {
         let v = self.read_update_acceleration(id);
-        let accel = (v.power / v.weight).wrapping_mul(4).clamp(1, 255);
-        (self.leaves.write_acceleration)(id, (u64::from(accel)) as u8);
+        // Clamp(int, int, int): the uint product converts to int first.
+        let accel = ((v.power / v.weight).wrapping_mul(4) as i32).clamp(1, 255);
+        (self.leaves.write_acceleration)(id, accel as u8);
     }
     fn update_speed(&self, id: Handle) -> i32 {
         let v = self.read_update_speed(id);
@@ -1964,11 +1945,9 @@ impl Game<'_> {
         if !self.can_leave(id) {
             return INVALID;
         }
-        let v = self.read_approaching_crossing(id);
+        let base = self.read_tile(id);
         let dir = self.exitdir(id);
-        let tile = v
-            .tile
-            .wrapping_add(self.svc_tile_offset_diag(id, u64::from(dir)) as u32);
+        let tile = base.wrapping_add(self.svc_tile_offset_diag(id, u64::from(dir)) as u32);
         if self.svc_is_crossing(Handle::NONE, u64::from(tile)) == 0
             || self.svc_diag_axis(id, u64::from(dir))
                 == self.svc_crossing_road_axis(Handle::NONE, u64::from(tile))
@@ -2326,37 +2305,37 @@ impl Game<'_> {
             id.set_flag(8, false);
             return;
         }
-        let v = self.read_approaching_crossing(id);
+        let tile = self.read_tile(id);
         let mut dir = self.exitdir(id);
-        if self.svc_is_depot(Handle::NONE, u64::from(v.tile)) != 0
-            || self.svc_is_tunnelbridge(Handle::NONE, u64::from(v.tile)) != 0
+        if self.svc_is_depot(Handle::NONE, u64::from(tile)) != 0
+            || self.svc_is_tunnelbridge(Handle::NONE, u64::from(tile)) != 0
         {
             dir = u8::MAX;
         }
-        if self.svc_signals_update(id, u64::from(v.tile), u64::from(dir)) == self.svc_sigseg_pbs(id)
+        if self.svc_signals_update(id, u64::from(tile), u64::from(dir)) == self.svc_sigseg_pbs(id)
             || self.svc_reserve_paths(id) != 0
         {
             let td = self.trackdir(id);
-            let mut okay = !(self.svc_is_railway(Handle::NONE, u64::from(v.tile)) != 0
-                && self.svc_has_signal_td(id, u64::from(v.tile), u64::from(td)) != 0
+            let mut okay = !(self.svc_is_railway(Handle::NONE, u64::from(tile)) != 0
+                && self.svc_has_signal_td(id, u64::from(tile), u64::from(td)) != 0
                 && self.svc_signal_pbs(
                     id,
                     self.svc_signal_type(
                         id,
-                        u64::from(v.tile),
+                        u64::from(tile),
                         u64::from(id.track().trailing_zeros()),
                     ),
                 ) == 0);
-            if self.svc_is_depot(Handle::NONE, u64::from(v.tile)) != 0
+            if self.svc_is_depot(Handle::NONE, u64::from(tile)) != 0
                 && self.svc_trackdir_exit(id, u64::from(td))
-                    == self.svc_depot_dir(Handle::NONE, u64::from(v.tile))
+                    == self.svc_depot_dir(Handle::NONE, u64::from(tile))
             {
                 okay = false;
             }
-            if self.svc_is_station(Handle::NONE, u64::from(v.tile)) != 0 {
+            if self.svc_is_station(Handle::NONE, u64::from(tile)) != 0 {
                 self.svc_set_platform_res(
                     id,
-                    u64::from(v.tile),
+                    u64::from(tile),
                     self.svc_trackdir_exit(id, u64::from(td)),
                     1,
                 );
@@ -2663,16 +2642,16 @@ impl Game<'_> {
                     }
                     self.svc_try_reserve(id, u64::from(new), u64::from(chosen.trailing_zeros()), 0);
                 } else {
-                    let before = self.read_approaching_crossing(prev);
-                    if before.tile == new {
+                    let before = self.read_tile(prev);
+                    if before == new {
                         chosen = if prev.track() == WORMHOLE {
                             bits
                         } else {
                             prev.track()
                         };
                     } else {
-                        let exit = self.svc_diag_between(id, u64::from(new), u64::from(before.tile))
-                            as usize;
+                        let exit =
+                            self.svc_diag_between(id, u64::from(new), u64::from(before)) as usize;
                         let connecting =
                             [[1, 8, 0, 16], [4, 2, 16, 0], [0, 32, 1, 4], [32, 0, 8, 2]];
                         chosen = connecting[usize::from(entered)][exit];
@@ -2835,13 +2814,9 @@ impl Game<'_> {
 }
 
 impl Game<'_> {
+    /// `TryReserveRailTrack(tile, track)` with its default station triggers.
     fn reserve_track(&self, id: Handle, tile: u32, track: u64) -> u64 {
-        if self.svc_is_station_rail(Handle::NONE, u64::from(tile)) != 0 {
-            // The original station reservation invokes randomisation and animation.
-            self.svc_reserve_track(id, u64::from(tile), track, 1)
-        } else {
-            self.svc_try_reserve(id, u64::from(tile), track, 1)
-        }
+        self.svc_try_reserve(id, u64::from(tile), track, 1)
     }
     fn crash(&self, id: Handle, flooded: bool) -> u32 {
         let mut victims = 0_u32;
@@ -2852,12 +2827,12 @@ impl Game<'_> {
             }
             let mut u = id;
             while u != Handle::NONE {
-                let v = self.read_approaching_crossing(u);
-                self.svc_clear_reservation(u, u64::from(v.tile), u64::from(self.trackdir(u)));
-                if self.svc_is_tunnelbridge(Handle::NONE, u64::from(v.tile)) != 0 {
+                let tile = self.read_tile(u);
+                self.svc_clear_reservation(u, u64::from(tile), u64::from(self.trackdir(u)));
+                if self.svc_is_tunnelbridge(Handle::NONE, u64::from(tile)) != 0 {
                     self.svc_set_tunnel_res(
                         u,
-                        self.svc_other_end(Handle::NONE, u64::from(v.tile)),
+                        self.svc_other_end(Handle::NONE, u64::from(tile)),
                         0,
                     );
                 }
@@ -3212,14 +3187,14 @@ impl Game<'_> {
             self.reverse(id);
             return true;
         } else if id.flag(9) {
-            let v = self.read_approaching_crossing(id);
+            let tile = self.read_tile(id);
             let mut dir = self.exitdir(id);
-            if self.svc_is_depot(Handle::NONE, u64::from(v.tile)) != 0
-                || self.svc_is_tunnelbridge(Handle::NONE, u64::from(v.tile)) != 0
+            if self.svc_is_depot(Handle::NONE, u64::from(tile)) != 0
+                || self.svc_is_tunnelbridge(Handle::NONE, u64::from(tile)) != 0
             {
                 dir = u8::MAX;
             }
-            if self.svc_signals_update(id, u64::from(v.tile), u64::from(dir))
+            if self.svc_signals_update(id, u64::from(tile), u64::from(dir))
                 == self.svc_sigseg_pbs(id)
                 || self.svc_reserve_paths(id) != 0
             {
@@ -3453,9 +3428,9 @@ impl Game<'_> {
             }
             if execute {
                 if self.read_order(id) == 3 {
-                    let last = self.read_approaching_crossing(self.read_last(id));
-                    if self.svc_is_station_any(Handle::NONE, u64::from(last.tile)) == 0
-                        || self.svc_station(Handle::NONE, u64::from(last.tile))
+                    let last = self.read_tile(self.read_last(id));
+                    if self.svc_is_station_any(Handle::NONE, u64::from(last)) == 0
+                        || self.svc_station(Handle::NONE, u64::from(last))
                             != self.svc_station(Handle::NONE, u64::from(self.read_tile(id)))
                     {
                         self.svc_leave_station(id);

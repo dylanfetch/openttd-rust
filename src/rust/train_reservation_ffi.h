@@ -46,7 +46,6 @@ struct OpenTTDTrainReservationChooseRead {
 	uint32_t dest;
 	uint16_t destination;
 	uint8_t order;
-	uint8_t nearest;
 };
 struct OpenTTDTrainReservationChoose4Read {
 	uint8_t order;

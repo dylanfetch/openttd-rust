@@ -75,9 +75,6 @@ struct OpenTTDTrainCanLeaveRead {
 	uint32_t tile;
 	uint8_t direction;
 };
-struct OpenTTDTrainApproachingCrossingRead {
-	uint32_t tile;
-};
 struct OpenTTDTrainCrossingApproachRead {
 	uint8_t status;
 	uint8_t front;
@@ -153,12 +150,9 @@ struct OpenTTDTrainStayDepotRead {
 	uint32_t power;
 };
 struct OpenTTDTrainLocoRead {
-	uint32_t tile;
 	uint16_t speed;
-	uint16_t order_destination;
 	uint8_t status;
 	uint8_t order;
-	uint8_t nonstop;
 };
 struct OpenTTDTrainLoco26Read {
 	uint32_t tile;
@@ -225,7 +219,6 @@ struct OpenTTDTrainServices {
 	OpenTTDTrainUpdateSpeedRead (*read_update_speed)(OpenTTDTrainHandle) noexcept;
 	OpenTTDTrainTrackdirRead (*read_trackdir)(OpenTTDTrainHandle) noexcept;
 	OpenTTDTrainCanLeaveRead (*read_can_leave)(OpenTTDTrainHandle) noexcept;
-	OpenTTDTrainApproachingCrossingRead (*read_approaching_crossing)(OpenTTDTrainHandle) noexcept;
 	OpenTTDTrainCrossingApproachRead (*read_crossing_approach)(OpenTTDTrainHandle) noexcept;
 	OpenTTDTrainNextOffsetRead (*read_next_offset)(OpenTTDTrainHandle) noexcept;
 	OpenTTDTrainAfterSwapRead (*read_after_swap)(OpenTTDTrainHandle) noexcept;
@@ -358,7 +351,6 @@ struct OpenTTDTrainServices {
 	uint64_t (*is_railway)(OpenTTDTrainHandle, uint32_t) noexcept;
 	uint64_t (*is_station)(OpenTTDTrainHandle, uint32_t) noexcept;
 	uint64_t (*is_station_any)(OpenTTDTrainHandle, uint32_t) noexcept;
-	uint64_t (*is_station_rail)(OpenTTDTrainHandle, uint32_t) noexcept;
 	uint64_t (*is_tunnelbridge)(OpenTTDTrainHandle, uint32_t) noexcept;
 	void (*large_explosion)(OpenTTDTrainHandle) noexcept;
 	void (*last_speed)(OpenTTDTrainHandle) noexcept;
@@ -398,7 +390,6 @@ struct OpenTTDTrainServices {
 	uint64_t (*rail_type)(OpenTTDTrainHandle, uint32_t) noexcept;
 	uint64_t (*rail_types)(OpenTTDTrainHandle) noexcept;
 	uint64_t (*reserve_paths)(OpenTTDTrainHandle) noexcept;
-	uint64_t (*reserve_track)(OpenTTDTrainHandle, uint32_t, uint8_t, uint8_t) noexcept;
 	void (*reserve_under)(OpenTTDTrainHandle) noexcept;
 	void (*reset_unbunch)(OpenTTDTrainHandle) noexcept;
 	uint64_t (*reverse_at_signals)(OpenTTDTrainHandle) noexcept;

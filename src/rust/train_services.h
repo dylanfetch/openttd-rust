@@ -466,10 +466,6 @@ static uint64_t TrainIsStationAny(OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	return IsTileType(TileIndex(a), MP_STATION);
 }
-static uint64_t TrainIsStationRail(OpenTTDTrainHandle, uint32_t a) noexcept
-{
-	return IsTileType(TileIndex(a), MP_STATION) && HasStationRail(TileIndex(a));
-}
 static uint64_t TrainIsTunnelbridge(OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	return IsTileType(TileIndex(a), MP_TUNNELBRIDGE);
@@ -651,10 +647,6 @@ static uint64_t TrainRailTypes(OpenTTDTrainHandle id) noexcept
 static uint64_t TrainReservePaths(OpenTTDTrainHandle) noexcept
 {
 	return _settings_game.pf.reserve_paths;
-}
-static uint64_t TrainReserveTrack(OpenTTDTrainHandle, uint32_t a, uint8_t b, uint8_t c) noexcept
-{
-	return TryReserveRailTrack(TileIndex(a), static_cast<Track>(b), c != 0);
 }
 static void TrainReserveUnder(OpenTTDTrainHandle id) noexcept
 {
@@ -1174,11 +1166,6 @@ static OpenTTDTrainCanLeaveRead TrainReadCanLeave(OpenTTDTrainHandle id) noexcep
 	const Train *v=static_cast<Train *>(id.shell);
 	return {v->tile.base(), v->direction};
 }
-static OpenTTDTrainApproachingCrossingRead TrainReadApproachingCrossing(OpenTTDTrainHandle id) noexcept
-{
-	const Train *v=static_cast<Train *>(id.shell);
-	return {v->tile.base()};
-}
 static OpenTTDTrainCrossingApproachRead TrainReadCrossingApproach(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
@@ -1247,7 +1234,7 @@ static OpenTTDTrainStayDepotRead TrainReadStayDepot(OpenTTDTrainHandle id) noexc
 static OpenTTDTrainLocoRead TrainReadLoco(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return {v->tile.base(), v->cur_speed, v->current_order.GetDestination().base(), v->vehstatus.base(), v->current_order.GetType(), v->current_order.GetNonStopType().base()};
+	return {v->cur_speed, v->vehstatus.base(), v->current_order.GetType()};
 }
 static OpenTTDTrainLoco26Read TrainReadLoco26(OpenTTDTrainHandle id) noexcept
 {

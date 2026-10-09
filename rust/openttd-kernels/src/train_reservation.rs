@@ -47,7 +47,6 @@ pub struct TrainReservationChooseRead {
     pub dest: u32,
     pub destination: u16,
     pub order: u8,
-    pub nearest: u8,
 }
 #[repr(C)]
 #[derive(Clone, Copy, Default)]

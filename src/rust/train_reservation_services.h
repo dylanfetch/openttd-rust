@@ -456,7 +456,7 @@ static OpenTTDTrainReservationNewRead TrainReservationReadNew(OpenTTDTrainHandle
 static OpenTTDTrainReservationChooseRead TrainReservationReadChoose(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return {v->tile.base(), v->dest_tile.base(), v->current_order.GetDestination().base(), v->current_order.GetType(), static_cast<uint8_t>(v->current_order.GetDepotActionType().Test(OrderDepotActionFlag::NearestDepot))};
+	return {v->tile.base(), v->dest_tile.base(), v->current_order.GetDestination().base(), v->current_order.GetType()};
 }
 static OpenTTDTrainReservationChoose4Read TrainReservationReadChoose4(OpenTTDTrainHandle id) noexcept
 {
