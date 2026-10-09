@@ -249,6 +249,18 @@ static int ConsumerMain()
 				observation = std::to_string(value.has_value()) + ":" + std::to_string(Bits(value.value_or(42)));
 				break;
 			}
+			case 12: {
+				auto [length, value] = consumer.PeekUtf8();
+				observation = std::to_string(length) + ":" + std::to_string(value);
+				break;
+			}
+			case 13: observation = std::to_string(consumer.ReadUtf8(42)); break;
+			case 14: consumer.SkipUtf8(); break;
+			case 15: {
+				auto value = consumer.TryReadUtf8();
+				observation = std::to_string(value.has_value()) + ":" + std::to_string(value.value_or(42));
+				break;
+			}
 			default: std::abort();
 		}
 		std::cout << operation << ' ' << (observation.empty() ? "-" : observation) << ' ' << pointer_at_cursor << ' ' << consumer.GetBytesRead() << ' ' << messages.size();

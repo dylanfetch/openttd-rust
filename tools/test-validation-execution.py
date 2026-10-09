@@ -23,6 +23,15 @@ import migration
 TOOLS = Path(__file__).resolve().parent
 
 
+def running(pid):
+    """Return whether pid exists and is not a zombie; a reaped pid has exited."""
+    try:
+        state = Path(f"/proc/{pid}/stat").read_text()
+    except (FileNotFoundError, ProcessLookupError):
+        return False
+    return state.split(") ", 1)[1][0] != "Z"
+
+
 class ExecutionTests(unittest.TestCase):
     def test_package_module_import_needs_no_pythonpath(self):
         subprocess.run(
@@ -134,11 +143,7 @@ class ExecutionTests(unittest.TestCase):
                         )
                     process.wait(timeout=5)
                     for descendant in descendants:
-                        state = Path(f"/proc/{descendant}/stat")
-                        while (
-                            state.exists()
-                            and state.read_text().split(") ", 1)[1][0] != "Z"
-                        ):
+                        while running(descendant):
                             if time.monotonic() >= deadline:
                                 self.fail(
                                     f"descendant {descendant} survived driver death"

@@ -20,9 +20,9 @@ AI_FOLDER = "road-scenario-ai"
 SPEED_BUDGETS = {
     "play-opus-55-167-002-manual": 1.422193877551,
     "play-grok-159-001-manual": 1.405807365439,
-    "play-padhattan-ridge-1996-manual": 1.662674650699,
-    "play-padhattan-ridge-2000-manual": 1.982905982906,
-    "generate-tgp-256-1": 1.440443213296,
+    "play-padhattan-ridge-1996-manual": 1.612704918033,
+    "play-padhattan-ridge-2000-manual": 1.950450450450,
+    "generate-tgp-256-1": 1.437142857143,
 }
 
 

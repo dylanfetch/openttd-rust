@@ -11,6 +11,7 @@ from .core import (
     ROOT,
     SNAPSHOT_TICKS,
     Reader,
+    branch_witnesses,
     copy_runtime,
     decode_element,
     field_spans,
@@ -30,6 +31,11 @@ def uses_ai(scenario):
 
 def game_args(scenario):
     return ["-d", "yapf=3"] if scenario.get("water") else []
+
+
+def game_environment(scenario):
+    witnessed = scenario.get("water") and scenario.get("witnesses")
+    return {"OPENTTD_SHIP_PROFILE": "1"} if witnessed else {}
 
 
 def install(scenario, run_dir):
@@ -263,51 +269,47 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
 
 def check(scenario, run, mode, role, result):
     if "water" in scenario:
-        profile = run["snapshots"][-1].parents[2] / "ship-control-profile.json"
-        if profile.is_file():
-            branches = json.loads(profile.read_text())
-            required = ["economy_day", "path_cache", "reverse", "rotate", "buoy"]
-            required += (
-                ["loading", "auto_service", "rotation_reload"]
-                if scenario["water"] == "ferry"
-                else ["lock_up", "lock_down", "aqueduct"]
-            )
-            if scenario.get("water_operation") == "depot":
-                required += ["depot_search", "depot_leave", "depot_enter"]
-            if scenario.get("water_operation") == "class":
-                required += ["water_change"]
-            if scenario.get("water_operation") == "lifecycle":
-                required += ["build", "depot_leave"]
-                if branches["build"] < 2:
-                    raise RuntimeError(
-                        "ship controller did not initialize both build/reuse owners"
-                    )
-            if any(not branches[key] for key in required):
+        required = ["economy_day", "path_cache", "reverse", "rotate", "buoy"]
+        required += (
+            ["loading", "auto_service", "rotation_reload"]
+            if scenario["water"] == "ferry"
+            else ["lock_up", "lock_down", "aqueduct"]
+        )
+        if scenario.get("water_operation") == "depot":
+            required += ["depot_search", "depot_leave", "depot_enter"]
+        if scenario.get("water_operation") == "class":
+            required += ["water_change"]
+        if scenario.get("water_operation") == "lifecycle":
+            required += ["build", "depot_leave"]
+        branches = branch_witnesses(
+            scenario, run, role, "ship-control-profile.json", required
+        )
+        if branches is not None:
+            if scenario.get("water_operation") == "lifecycle" and branches["build"] < 2:
                 raise RuntimeError(
-                    f"ship controller branch witnesses missing: {required}; {branches}"
+                    "ship controller did not initialize both build/reuse owners"
                 )
             result[f"{mode}_{role}_ship_control_profile"] = branches
         result[f"{mode}_{role}_water"] = check_water(scenario, run, mode == "snapshots")
         profile = run["snapshots"][-1].parents[2] / "water-profile.json"
         if profile.is_file():
             result[f"{mode}_{role}_water_profile"] = json.loads(profile.read_text())
-        profile = run["snapshots"][-1].parents[2] / "ship-yapf-profile.json"
-        if profile.is_file():
-            branches = json.loads(profile.read_text())
-            required = [
-                "region_nodes",
-                "track_nodes",
-                "cache_truncations",
-                "final_region_clears",
-                "reverse_chosen",
-            ]
-            required += (
-                ["intermediate", "alternate_docking"]
-                if scenario["water"] == "ferry"
-                else ["retries", "lost", "random_draws", "blocked_calls"]
-            )
-            if any(not branches[key] for key in required):
-                raise RuntimeError("ship YAPF branch witnesses are incomplete")
+        required = [
+            "region_nodes",
+            "track_nodes",
+            "cache_truncations",
+            "final_region_clears",
+            "reverse_chosen",
+        ]
+        required += (
+            ["intermediate", "alternate_docking"]
+            if scenario["water"] == "ferry"
+            else ["retries", "lost", "random_draws", "blocked_calls"]
+        )
+        branches = branch_witnesses(
+            scenario, run, role, "ship-yapf-profile.json", required
+        )
+        if branches is not None:
             result[f"{mode}_{role}_ship_yapf_profile"] = branches
 
 

@@ -200,6 +200,10 @@ or complete log/stdout difference fails. Both modes compare their exit saves.
   id, build revision/NewGRF version, and `round_trip_time`, which the original
   saves uninitialized (#83); ports touching it need their own check.
 - Port divergences go in `KNOWN_FAILURES` by first divergence and issue.
+- Cited branch witnesses (#198): a module's `game_environment` enables its
+  counters when `scenario["witnesses"]` is set (distinct candidate, not
+  `--benchmark`), and its `check` calls `core.branch_witnesses`, which fails on
+  a missing profile or a zero required branch. Rail and water scenarios do so.
 - Games launch on Linux as an unprivileged user with child-only
   `RLIMIT_NPROC=0`. The original `StartNewThread` failure paths compute link
   graphs and write saves synchronously; graph scheduling, join dates and loaded
@@ -567,6 +571,8 @@ substring/character-set search and membership; and separator result/consumption
 decisions. C++ keeps typed optional/default conversions, string_view construction,
 diagnostic formatting, cursor commit and trivial accessors, and preserves empty
 view pointers through the original substring at the current offset.
+In-bounds Peek/Read/Skip are header-visible C++ fast paths; npos and oversized
+requests retain Rust's bounds decisions and logging before cursor commit.
 
 `src/rust/consumer_ffi.h` returns scalar `repr(C)` metadata by value. Rust calls no
 C++ logger while borrowing. C++ logs a shortfall before applying the returned
@@ -585,7 +591,7 @@ rebuilds the consumer; no Rust borrow survives that boundary.
 Evidence: the eleven unchanged consumer cases plus four public cases (empty-prefix
 offsets, partial-width TryRead cursor preservation, multi-byte separators with
 offsets/overlap/unknown policy, overlapping byte sets). The `--consumer` mode of
-`python3 tools/compare-integers.py` compares 60 byte/offset/shortfall cases and six
+`python3 tools/compare-integers.py` compares 103 byte/offset/shortfall cases and ten
 fatal-timing checks against pinned C++; the report records `consumer_bytes`.
 
 ### Spiral tile traversal
@@ -708,8 +714,9 @@ cover the C++ side only.
 
 ### UTF-8 codec and byte positions
 
-`EncodeUtf8`, `DecodeUtf8`, `IsUtf8Part`, forward/backward iterator stepping and
-`GetIterAtByte` normalization run in Rust. The C++ view keeps its borrowed
+The full UTF-8 codec, `IsUtf8Part`, forward/backward iterator stepping and
+`GetIterAtByte` normalization run in Rust. Inline DecodeUtf8/consumer PeekUtf8
+handle leading ASCII (including NUL) without an FFI call. The C++ view keeps its borrowed
 string_view and iterator facade, pair adapters, comparison assertions, postfix
 copying and invalid-data `?` dereference. Native generators use the same codec
 through issue #5's shared target.
@@ -728,7 +735,7 @@ codepoint/byte conversions are explicitly masked or bounded.
 Evidence: the three unchanged UTF-8 view tests and consumer/builder tests, plus
 `python3 tools/utf8-comparison.py` (assertion and NDEBUG builds; encoding
 boundaries, malformed runs, embedded NUL, empty views, consumer-versus-view
-movement, and the `offset >= size` end branch including SIZE_MAX). Game logging
+movement, all single bytes, and the `offset >= size` end branch including SIZE_MAX). Game logging
 and Unicode rendering are outside it.
 
 ### Rounded square root and runtime integer saturation
@@ -1365,9 +1372,10 @@ all chunks for ferry manual/cargodist, canal/lock loss and recovery, aqueducts,
 depot reversals and reference-produced live-path reload. Native checks compare
 2,000 heap operations to unchanged CBinaryHeapT and check path copy/lifetime and
 reversal and fixed/map-derived limit control against unchanged CYapfBaseT.
-`OPENTTD_SHIP_PROFILE=1` records alternate docking, retries and cache/reversal
-witnesses in scenario reports; node limits use injected graphs, not reachable-map
-claims. Arbitrary maps/NewGRFs and complete legacy saves are not exhaustive.
+Each candidate run requires alternate docking, retries and cache/reversal
+witnesses (`ship-yapf-profile.json`); node limits use injected graphs, not
+reachable-map claims. Arbitrary maps/NewGRFs and complete legacy saves are not
+exhaustive.
 
 ### Town growth control and private state
 
@@ -1568,10 +1576,11 @@ Unexpected environmental exceptions terminate inside their wrappers; Rust panics
 
 `python3 tools/migration.py verify --jobs 2` includes the four Cargo checks and
 native ABI checks for scalar widths, native C++ transient coordinate narrowing,
-direct callback order and nested owner mutation. `OPENTTD_SHIP_PROFILE=1 python3
-tools/migration.py simulate water --jobs 2` (also `--self`/`--soak`) reuses the water
-corpus for locks, aqueducts, rotation/reload, service, buoy/loading, depot restart,
-and moving build/sell/ID-reuse owners. The class case changes one existing clear
+direct callback order and nested owner mutation. `python3 tools/migration.py
+simulate water --jobs 2` (also `--soak`; `--self` counts nothing) requires the
+candidate's `ship-control-profile.json` branches in the water corpus for locks,
+aqueducts, rotation/reload, service, buoy/loading, depot restart, and moving
+build/sell/ID-reuse owners. The class case changes one existing clear
 canal input byte to `MakeRiver` class/owner encoding for both games and requires an
 actual cache-update branch. Legacy save versions, viewport pixels and arbitrary
 custom NewGRF combinations remain coverage limits; final independent review and CI gate integration.
@@ -1587,13 +1596,19 @@ wait/crash counters, railtype masks and scalar TrainCache fields. Shared Vehicle
 GroundVehicle fields, pools/links, sprite override references, rendering,
 construction/arrangement and generic orders/loading stay in C++. External writes,
 modern VEHS staging, legacy loading and afterload use canonical scalar adapters.
-Original selected bodies compile only in portable builds. Copied noexcept world
-services preserve immediate reads/writes; named callback tasks release borrows
-before tile/depot entry, orders/loading, station callbacks and destruction.
-`OPENTTD_TRAIN_PROFILE=1` writes controller branch counts in `train-profile.json`;
-this includes extension rollback separately from #122's search rollback.
+Original selected bodies compile only in portable builds. Typed synchronous
+entries borrow immutable noexcept service tables. Resolved shell/state handles and
+narrow reads remove repeated pool lookups and ordinary Last walks; native visitors
+filter trains and preserve order without nearby Vecs. Owner accesses end before
+direct tile/depot, orders/loading, station and deletion callbacks. Nested native
+stack snapshots restore temporary orders once; ordered signal rollback scratch
+remains local. No ordinary-play service unwinds here.
 Validation uses the existing Padhattan manual/cargodist, realistic acceleration,
-90-degree reservation, live reload and real command-built controller scenarios.
+90-degree reservation, live reload and real command-built controller scenarios;
+each candidate run requires its `rails.TRAIN_BRANCHES` counts in
+`train-profile.json` (extension rollback is distinct from #122's search rollback).
+Unreached branches (wormhole swap, unequal/articulated moves, red two-way,
+force-signal, free-wagon deletion, depot re-entry, opposing PBS restore) are #156.
 A narrow unchanged-source comparison covers variable-length curve/reversal inputs
 unavailable in the stock fixture. The PR records commands and branch/NewGRF limits; passing these inputs does not prove
 exhaustive train equivalence.
@@ -1635,21 +1650,27 @@ placement-constructed trivial C++ facades retain save, legacy load and external-
 addresses. Original bodies compile only in portable builds. Shared Vehicle/pools,
 orders/loading, airport geometry/FTA records and rendering remain C++.
 
-Rust copies world/FTA observations and calls bounded noexcept services directly,
-releasing scalar access before each call. ProcessOrders/UpdateOrderDest,
-VehicleEnterDepot/refit, Vehicle::Crash, depot commands and deletion return to
-the C++ stack for actual reentry; AI/Game event insertion only queues. Owners
-survive their original destruction policies and modern/legacy descriptor access.
-Flight helpers still accept disaster vehicles. Panics/environmental failures abort;
-wrapping counters and shared RNG retain original order.
+The #190 boundary uses named synchronous entries and typed noexcept services;
+entries resolve each live vehicle and canonical State once, with field-sized raw
+access and narrow map, vehicle, airport and FTA observations. An immutable service
+table is borrowed, with no continuation, selector dispatch or per-entry allocation.
+ProcessOrders/UpdateOrderDest, depot/refit, qualified Vehicle::Crash, depot commands
+and deletion call directly after all owner accesses end. Command failures return
+native results; event insertion queues without running a script VM. PreDestructor
+releases airport blocks while state is live; the deleting caller returns immediately.
+Disaster flight helpers use their actual Vehicle and independent flags address.
+Canonical save/legacy aliases and portable bodies remain unchanged. Panics and
+environmental failures abort; wrapping counters and shared RNG retain source order.
 
 `python3 tools/migration.py simulate aircraft-route aircraft-controller disasters`
 compares every saved chunk and debug log: planes/helicopters, terminal groups,
 dedicated pads, occupied-block waits, service, closure diversion, zeppelin landing
-abort, airborne airport removal, out-of-fuel crash/destruction and live reload. `--self` and
+abort, airborne airport removal, orderless service-to-hangar diversion,
+out-of-fuel crash/destruction and live reload. `--self` and
 `--soak` check reproducibility/longer runs. A scenario-local native probe compares
 800 finite-range branches against unchanged reference helpers because supplied
-engines have unlimited range. ABI checks cover owner defaults/layout/lifetime.
+engines have unlimited range. ABI checks cover owner defaults/layout/lifetime, typed table/record offsets,
+nested same-owner mutation, live block-release/deletion and disaster flight flags.
 Full legacy files, arbitrary NewGRFs/airport rotations and viewport/sound output
 remain evidence limits. A reference-built ownerless oilrig route checks public
 helicopter landing through the ordinary FTA path.

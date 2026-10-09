@@ -44,8 +44,14 @@
 #ifdef WITH_RUST
 #include "rust/train_ffi.h"
 #include "rust/train_reservation_ffi.h"
-static OpenTTDTrainReservationStep TrainReservationRun(uint32_t kind, const Train *train, uint64_t a = 0, uint64_t b = 0, uint64_t c = 0);
-static uint64_t TrainRun(uint32_t kind, const Train *v, uint64_t a = 0, uint64_t b = 0, uint64_t c = 0);
+static const OpenTTDTrainServices &GetTrainServices();
+static const OpenTTDTrainReservationLeaves &GetTrainReservationServices();
+static inline OpenTTDTrainHandle TrainHandle(const Train *v) noexcept
+{
+	return {const_cast<Train *>(v), v == nullptr ? nullptr : v->GetRustState()};
+}
+struct TrainReservationContext { std::optional<Order> saved_order; };
+
 #endif
 
 #include "safeguards.h"
@@ -118,7 +124,7 @@ void CheckTrainsLengths()
 void Train::ConsistChanged(ConsistChangeFlags allowed_changes)
 {
 #ifdef WITH_RUST
-	TrainRun(0, this, allowed_changes.base());
+	openttd_rust_train_consist_changed(TrainHandle(this), static_cast<uint8_t>(allowed_changes.base()), &GetTrainServices(), &GetRustSharedServices());
 #else
 	uint16_t max_speed = UINT16_MAX;
 
@@ -322,7 +328,7 @@ int GetTrainStopLocation(StationID station_id, TileIndex tile, const Train *v, i
 uint16_t Train::GetCurveSpeedLimit() const
 {
 #ifdef WITH_RUST
-	return static_cast<uint16_t>(TrainRun(1, this));
+	return static_cast<uint16_t>(openttd_rust_train_curve_limit(TrainHandle(this), &GetTrainServices(), &GetRustSharedServices()));
 #else
 	assert(this->First() == this);
 
@@ -401,7 +407,7 @@ uint16_t Train::GetCurveSpeedLimit() const
 int Train::GetCurrentMaxSpeed() const
 {
 #ifdef WITH_RUST
-	return static_cast<int>(TrainRun(2, this));
+	return static_cast<int>(openttd_rust_train_current_max_speed(TrainHandle(this), &GetTrainServices(), &GetRustSharedServices()));
 #else
 	int max_speed = _settings_game.vehicle.train_acceleration_model == AM_ORIGINAL ?
 			this->gcache.cached_max_track_speed :
@@ -453,7 +459,7 @@ int Train::GetCurrentMaxSpeed() const
 void Train::UpdateAcceleration()
 {
 #ifdef WITH_RUST
-	TrainRun(3, this);
+	openttd_rust_train_update_acceleration(TrainHandle(this), &GetTrainServices(), &GetRustSharedServices());
 #else
 	assert(this->IsFrontEngine() || this->IsFreeWagon());
 
@@ -1587,7 +1593,7 @@ void Train::UpdateDeltaXY()
 static void MarkTrainAsStuck(Train *v)
 {
 #ifdef WITH_RUST
-	TrainRun(11, v);
+	openttd_rust_train_mark_stuck(TrainHandle(v), &GetTrainServices(), &GetRustSharedServices());
 #else
 	if (!v->flags.Test(VehicleRailFlag::Stuck)) {
 		/* It is the first time the problem occurred, set the "train stuck" flag. */
@@ -1684,7 +1690,7 @@ static void UpdateStatusAfterSwap(Train *v)
 void ReverseTrainSwapVeh(Train *v, int l, int r)
 {
 #ifdef WITH_RUST
-	TrainRun(13, v, l, r);
+	openttd_rust_train_reverse_swap(TrainHandle(v), static_cast<int32_t>(l), static_cast<int32_t>(r), &GetTrainServices(), &GetRustSharedServices());
 #else
 	Train *a, *b;
 
@@ -1743,7 +1749,7 @@ static bool IsTrain(const Vehicle *v)
 bool TrainOnCrossing(TileIndex tile)
 {
 #ifdef WITH_RUST
-	return TrainRun(14, nullptr, tile.base()) != 0;
+	return openttd_rust_train_train_on_tile(static_cast<uint32_t>(tile.base()), &GetTrainServices(), &GetRustSharedServices()) != 0;
 #else
 	assert(IsLevelCrossingTile(tile));
 
@@ -1844,7 +1850,7 @@ static void UpdateLevelCrossingTile(TileIndex tile, bool sound, bool force_barre
 void UpdateLevelCrossing(TileIndex tile, bool sound, bool force_bar)
 {
 #ifdef WITH_RUST
-	TrainRun(15, nullptr, tile.base(), sound, force_bar);
+	openttd_rust_train_update_crossing(static_cast<uint32_t>(tile.base()), static_cast<uint8_t>(sound), static_cast<uint8_t>(force_bar), &GetTrainServices(), &GetRustSharedServices());
 #else
 	if (!IsLevelCrossingTile(tile)) return;
 
@@ -1880,7 +1886,7 @@ void UpdateLevelCrossing(TileIndex tile, bool sound, bool force_bar)
 void MarkDirtyAdjacentLevelCrossingTiles(TileIndex tile, Axis road_axis)
 {
 #ifdef WITH_RUST
-	TrainRun(16, nullptr, tile.base(), road_axis);
+	openttd_rust_train_adjacent_crossing_dirty(static_cast<uint32_t>(tile.base()), static_cast<uint8_t>(road_axis), &GetTrainServices(), &GetRustSharedServices());
 #else
 	const DiagDirection dir1 = AxisToDiagDir(road_axis);
 	const DiagDirection dir2 = ReverseDiagDir(dir1);
@@ -1901,7 +1907,7 @@ void MarkDirtyAdjacentLevelCrossingTiles(TileIndex tile, Axis road_axis)
 void UpdateAdjacentLevelCrossingTilesOnLevelCrossingRemoval(TileIndex tile, Axis road_axis)
 {
 #ifdef WITH_RUST
-	TrainRun(17, nullptr, tile.base(), road_axis);
+	openttd_rust_train_crossing_removed(static_cast<uint32_t>(tile.base()), static_cast<uint8_t>(road_axis), &GetTrainServices(), &GetRustSharedServices());
 #else
 	const DiagDirection dir1 = AxisToDiagDir(road_axis);
 	const DiagDirection dir2 = ReverseDiagDir(dir1);
@@ -2058,7 +2064,7 @@ static bool IsWholeTrainInsideDepot(const Train *v)
 void ReverseTrainDirection(Train *v)
 {
 #ifdef WITH_RUST
-	TrainRun(18, v);
+	openttd_rust_train_reverse(TrainHandle(v), &GetTrainServices(), &GetRustSharedServices());
 #else
 	if (IsRailDepotTile(v->tile)) {
 		if (IsWholeTrainInsideDepot(v)) return;
@@ -2157,7 +2163,7 @@ CommandCost CmdReverseTrainDirection(DoCommandFlags flags, VehicleID veh_id, boo
 	if (v == nullptr) return CMD_ERROR;
 	CommandCost ret = CheckOwnership(v->owner);
 	if (ret.Failed()) return ret;
-	switch (TrainRun(24, v, flags.Test(DoCommandFlag::Execute), reverse_single_veh)) {
+	switch (openttd_rust_train_reverse_command(TrainHandle(v), static_cast<uint8_t>(flags.Test(DoCommandFlag::Execute)), static_cast<uint8_t>(reverse_single_veh), &GetTrainServices(), &GetRustSharedServices())) {
 		case 0: return CommandCost();
 		case 1: return CommandCost(STR_ERROR_CAN_T_REVERSE_DIRECTION_RAIL_VEHICLE_MULTIPLE_UNITS);
 		case 2: return CommandCost(STR_ERROR_TRAINS_CAN_ONLY_BE_ALTERED_INSIDE_A_DEPOT);
@@ -2268,7 +2274,7 @@ CommandCost CmdForceTrainProceed(DoCommandFlags flags, VehicleID veh_id)
 	if (!t->IsPrimaryVehicle()) return CMD_ERROR;
 	CommandCost ret = CheckOwnership(t->owner);
 	if (ret.Failed()) return ret;
-	TrainRun(25, t, flags.Test(DoCommandFlag::Execute));
+	openttd_rust_train_force_command(TrainHandle(t), static_cast<uint8_t>(flags.Test(DoCommandFlag::Execute)), &GetTrainServices(), &GetRustSharedServices());
 	return CommandCost();
 #else
 	Train *t = Train::GetIfValid(veh_id);
@@ -2337,7 +2343,7 @@ void Train::PlayLeaveStationSound(bool force) const
 static void CheckNextTrainTile(Train *v)
 {
 #ifdef WITH_RUST
-	TrainReservationRun(0, v);
+	([&]() { TrainReservationContext context; return openttd_rust_train_reservation_check_next(TrainHandle(v), &GetTrainReservationServices(), &context); }());
 #else
 	/* Don't do any look-ahead if path_backoff_interval is 255. */
 	if (_settings_game.pf.path_backoff_interval == 255) return;
@@ -2487,7 +2493,7 @@ static bool CheckTrainStayInDepot(Train *v)
 static void ClearPathReservation(const Train *v, TileIndex tile, Trackdir track_dir)
 {
 #ifdef WITH_RUST
-	TrainReservationRun(1, v, tile.base(), track_dir);
+	([&]() { TrainReservationContext context; return openttd_rust_train_reservation_clear(TrainHandle(v), static_cast<uint32_t>(tile.base()), static_cast<uint8_t>(track_dir), &GetTrainReservationServices(), &context); }());
 #else
 	DiagDirection dir = TrackdirToExitdir(track_dir);
 
@@ -2532,7 +2538,7 @@ static void ClearPathReservation(const Train *v, TileIndex tile, Trackdir track_
 void FreeTrainTrackReservation(const Train *v)
 {
 #ifdef WITH_RUST
-	TrainReservationRun(2, v);
+	([&]() { TrainReservationContext context; return openttd_rust_train_reservation_free(TrainHandle(v), &GetTrainReservationServices(), &context); }());
 #else
 	assert(v->IsFrontEngine());
 
@@ -2854,9 +2860,9 @@ public:
 static Track ChooseTrainTrack(Train *v, TileIndex tile, DiagDirection enterdir, TrackBits tracks, bool force_res, bool *got_reservation, bool mark_stuck)
 {
 #ifdef WITH_RUST
-	OpenTTDTrainReservationStep result = TrainReservationRun(3, v, tile.base(), static_cast<uint64_t>(enterdir) | (static_cast<uint64_t>(tracks) << 8), static_cast<uint64_t>(force_res) | (static_cast<uint64_t>(mark_stuck) << 1));
-	if (got_reservation != nullptr) *got_reservation = result.got != 0;
-	return static_cast<Track>(result.value);
+	OpenTTDTrainReservationChoice result = ([&]() { TrainReservationContext context; return openttd_rust_train_reservation_choose(TrainHandle(v), static_cast<uint32_t>(tile.base()), static_cast<uint8_t>(enterdir), static_cast<uint8_t>(tracks), static_cast<uint8_t>(force_res), static_cast<uint8_t>(mark_stuck), &GetTrainReservationServices(), &context); }());
+	if (got_reservation != nullptr) *got_reservation = result.reserved != 0;
+	return static_cast<Track>(result.track);
 #else
 	Track best_track = INVALID_TRACK;
 	bool do_track_reservation = _settings_game.pf.reserve_paths || force_res;
@@ -3032,7 +3038,7 @@ static Track ChooseTrainTrack(Train *v, TileIndex tile, DiagDirection enterdir, 
 bool TryPathReserve(Train *v, bool mark_as_stuck, bool first_tile_okay)
 {
 #ifdef WITH_RUST
-	return TrainReservationRun(4, v, mark_as_stuck, first_tile_okay).value != 0;
+	return ([&]() { TrainReservationContext context; return openttd_rust_train_reservation_try_path(TrainHandle(v), static_cast<uint8_t>(mark_as_stuck), static_cast<uint8_t>(first_tile_okay), &GetTrainReservationServices(), &context); }()) != 0;
 #else
 	assert(v->IsFrontEngine());
 
@@ -3103,7 +3109,7 @@ bool TryPathReserve(Train *v, bool mark_as_stuck, bool first_tile_okay)
 static bool CheckReverseTrain(const Train *v)
 {
 #ifdef WITH_RUST
-	return TrainReservationRun(5, v).value != 0;
+	return ([&]() { TrainReservationContext context; return openttd_rust_train_reservation_check_reverse(TrainHandle(v), &GetTrainReservationServices(), &context); }()) != 0;
 #else
 	if (_settings_game.difficulty.line_reverse_mode != 0 ||
 			v->GetTrack() == TRACK_BIT_DEPOT || v->GetTrack() == TRACK_BIT_WORMHOLE ||
@@ -3125,7 +3131,7 @@ static bool CheckReverseTrain(const Train *v)
 TileIndex Train::GetOrderStationLocation(StationID station)
 {
 #ifdef WITH_RUST
-	return TileIndex(static_cast<uint32_t>(TrainReservationRun(6, this, station.base()).value));
+	return TileIndex(static_cast<uint32_t>(([&]() { TrainReservationContext context; return openttd_rust_train_reservation_station_location(TrainHandle(this), static_cast<uint16_t>(station.base()), &GetTrainReservationServices(), &context); }())));
 #else
 	if (station == this->last_station_visited) this->last_station_visited = StationID::Invalid();
 
@@ -3144,7 +3150,7 @@ TileIndex Train::GetOrderStationLocation(StationID station)
 void Train::MarkDirty()
 {
 #ifdef WITH_RUST
-	TrainRun(5, this);
+	openttd_rust_train_mark_dirty(TrainHandle(this), &GetTrainServices(), &GetRustSharedServices());
 #else
 	Train *v = this;
 	do {
@@ -3168,7 +3174,7 @@ void Train::MarkDirty()
 int Train::UpdateSpeed()
 {
 #ifdef WITH_RUST
-	return static_cast<int>(TrainRun(4, this));
+	return static_cast<int>(openttd_rust_train_update_speed(TrainHandle(this), &GetTrainServices(), &GetRustSharedServices()));
 #else
 	switch (_settings_game.vehicle.train_acceleration_model) {
 		default: NOT_REACHED();
@@ -3285,7 +3291,7 @@ static bool TrainMovedChangeSignals(TileIndex tile, DiagDirection dir)
 void Train::ReserveTrackUnderConsist() const
 {
 #ifdef WITH_RUST
-	TrainReservationRun(7, this);
+	([&]() { TrainReservationContext context; return openttd_rust_train_reservation_reserve_under(TrainHandle(this), &GetTrainReservationServices(), &context); }());
 #else
 	for (const Train *u = this; u != nullptr; u = u->Next()) {
 		switch (u->GetTrack()) {
@@ -3311,7 +3317,7 @@ void Train::ReserveTrackUnderConsist() const
 uint Train::Crash(bool flooded)
 {
 #ifdef WITH_RUST
-	return static_cast<uint>(TrainRun(20, this, flooded));
+	return static_cast<uint>(openttd_rust_train_crash(TrainHandle(this), static_cast<uint8_t>(flooded), &GetTrainServices(), &GetRustSharedServices()));
 #else
 	uint victims = 0;
 	if (this->IsFrontEngine()) {
@@ -3468,7 +3474,7 @@ static bool CheckTrainCollision(Train *v)
 bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 {
 #ifdef WITH_RUST
-	return TrainRun(19, v, nomove == nullptr ? UINT32_MAX : nomove->index.base(), reverse) != 0;
+	return openttd_rust_train_controller(TrainHandle(v), OpenTTDTrainHandle{nomove, nullptr}, static_cast<uint8_t>(reverse), &GetTrainServices(), &GetRustSharedServices()) != 0;
 #else
 	Train *first = v->First();
 	Train *prev;
@@ -4293,7 +4299,7 @@ static bool TrainLocoHandler(Train *v, bool mode)
 Money Train::GetRunningCost() const
 {
 #ifdef WITH_RUST
-	return Money(static_cast<int64_t>(TrainRun(9, this)));
+	return Money(static_cast<int64_t>(openttd_rust_train_running_cost(TrainHandle(this), &GetTrainServices(), &GetRustSharedServices())));
 #else
 	Money cost = 0;
 	const Train *v = this;
@@ -4324,9 +4330,9 @@ bool Train::Tick()
 #ifdef WITH_RUST
 	if (this->IsFrontEngine()) {
 		PerformanceAccumulator framerate(PFE_GL_TRAINS);
-		return TrainRun(6, this) != 0;
+		return openttd_rust_train_tick(TrainHandle(this), &GetTrainServices(), &GetRustSharedServices()) != 0;
 	}
-	return TrainRun(6, this) != 0;
+	return openttd_rust_train_tick(TrainHandle(this), &GetTrainServices(), &GetRustSharedServices()) != 0;
 #else
 	this->tick_counter++;
 
@@ -4359,7 +4365,7 @@ bool Train::Tick()
 static void CheckIfTrainNeedsService(Train *v)
 {
 #ifdef WITH_RUST
-	TrainRun(22, v);
+	openttd_rust_train_needs_service(TrainHandle(v), &GetTrainServices(), &GetRustSharedServices());
 #else
 	if (Company::Get(v->owner)->settings.vehicle.servint_trains == 0 || !v->NeedsAutomaticServicing()) return;
 	if (v->IsChainInDepot()) {
@@ -4401,7 +4407,7 @@ static void CheckIfTrainNeedsService(Train *v)
 void Train::OnNewCalendarDay()
 {
 #ifdef WITH_RUST
-	TrainRun(7, this);
+	openttd_rust_train_calendar_day(TrainHandle(this), &GetTrainServices(), &GetRustSharedServices());
 #else
 	AgeVehicle(this);
 #endif
@@ -4411,7 +4417,7 @@ void Train::OnNewCalendarDay()
 void Train::OnNewEconomyDay()
 {
 #ifdef WITH_RUST
-	TrainRun(8, this);
+	openttd_rust_train_economy_day(TrainHandle(this), &GetTrainServices(), &GetRustSharedServices());
 #else
 	EconomyAgeVehicle(this);
 
@@ -4453,7 +4459,7 @@ void Train::OnNewEconomyDay()
 Trackdir Train::GetVehicleTrackdir() const
 {
 #ifdef WITH_RUST
-	return static_cast<Trackdir>(TrainRun(10, this));
+	return static_cast<Trackdir>(openttd_rust_train_trackdir(TrainHandle(this), &GetTrainServices(), &GetRustSharedServices()));
 #else
 	if (this->vehstatus.Test(VehState::Crashed)) return INVALID_TRACKDIR;
 
@@ -4494,5 +4500,396 @@ uint16_t Train::GetMaxWeight() const
 
 #ifdef WITH_RUST
 #include "rust/train_reservation_services.h"
-#include "rust/train_reservation_adapter.h"
+
+#endif
+
+#ifdef WITH_RUST
+
+static const OpenTTDTrainServices &GetTrainServices()
+{
+	static const OpenTTDTrainServices services{
+		.read_first = TrainReadFirst,
+		.read_next = TrainReadNext,
+		.read_previous = TrainReadPrevious,
+		.read_next_unit = TrainReadNextUnit,
+		.read_last = TrainReadLast,
+		.read_tile = TrainReadTile,
+		.read_dest = TrainReadDest,
+		.read_order_time = TrainReadOrderTime,
+		.read_length = TrainReadLength,
+		.read_total_length = TrainReadTotalLength,
+		.read_max_track_speed = TrainReadMaxTrackSpeed,
+		.read_speed = TrainReadSpeed,
+		.read_gv_flags = TrainReadGvFlags,
+		.read_refit_cap = TrainReadRefitCap,
+		.read_last_station = TrainReadLastStation,
+		.read_direction = TrainReadDirection,
+		.read_status = TrainReadStatus,
+		.read_tick = TrainReadTick,
+		.read_running = TrainReadRunning,
+		.read_day = TrainReadDay,
+		.read_progress = TrainReadProgress,
+		.read_order = TrainReadOrder,
+		.read_front = TrainReadFront,
+		.read_articulated = TrainReadArticulated,
+		.read_multiheaded = TrainReadMultiheaded,
+		.read_owner = TrainReadOwner,
+		.read_vis_effect = TrainReadVisEffect,
+		.read_consist_changed = TrainReadConsistChanged,
+		.read_consist_changed_1 = TrainReadConsistChanged1,
+		.read_consist_changed_2 = TrainReadConsistChanged2,
+		.read_curve_limit = TrainReadCurveLimit,
+		.read_stop_location = TrainReadStopLocation,
+		.read_current_max_speed = TrainReadCurrentMaxSpeed,
+		.read_current_max_speed_6 = TrainReadCurrentMaxSpeed6,
+		.read_update_acceleration = TrainReadUpdateAcceleration,
+		.read_update_speed = TrainReadUpdateSpeed,
+		.read_trackdir = TrainReadTrackdir,
+		.read_can_leave = TrainReadCanLeave,
+		.read_crossing_approach = TrainReadCrossingApproach,
+		.read_next_offset = TrainReadNextOffset,
+		.read_after_swap = TrainReadAfterSwap,
+		.read_reverse_swap = TrainReadReverseSwap,
+		.read_approaching_end = TrainReadApproachingEnd,
+		.read_line_ends = TrainReadLineEnds,
+		.read_speed_z = TrainReadSpeedZ,
+		.read_move_vehicle = TrainReadMoveVehicle,
+		.read_move_vehicle_20 = TrainReadMoveVehicle20,
+		.read_collision_one = TrainReadCollisionOne,
+		.read_collision_one_22 = TrainReadCollisionOne22,
+		.read_delete_last = TrainReadDeleteLast,
+		.read_stay_depot = TrainReadStayDepot,
+		.read_loco = TrainReadLoco,
+		.read_loco_26 = TrainReadLoco26,
+		.read_tick_state = TrainReadTickState,
+		.read_needs_service = TrainReadNeedsService,
+		.read_next_force = TrainReadNextForce,
+		.read_reverse_command = TrainReadReverseCommand,
+		.write_tile = TrainWriteTile,
+		.write_dest = TrainWriteDest,
+		.write_x = TrainWriteX,
+		.write_y = TrainWriteY,
+		.write_z = TrainWriteZ,
+		.write_direction = TrainWriteDirection,
+		.write_speed = TrainWriteSpeed,
+		.write_tick = TrainWriteTick,
+		.write_running = TrainWriteRunning,
+		.write_day = TrainWriteDay,
+		.write_order_time = TrainWriteOrderTime,
+		.write_progress = TrainWriteProgress,
+		.write_subspeed = TrainWriteSubspeed,
+		.write_gv_flags = TrainWriteGvFlags,
+		.write_acceleration = TrainWriteAcceleration,
+		.write_length = TrainWriteLength,
+		.write_total_length = TrainWriteTotalLength,
+		.write_first_engine = TrainWriteFirstEngine,
+		.write_max_speed = TrainWriteMaxSpeed,
+		.write_cargo_cap = TrainWriteCargoCap,
+		.write_refit_cap = TrainWriteRefitCap,
+		.write_cargo_age = TrainWriteCargoAge,
+		.write_last_station = TrainWriteLastStation,
+		.write_colourmap = TrainWriteColourmap,
+		.write_status = TrainWriteStatus,
+		.acceleration = TrainAcceleration,
+		.acc_model = TrainAccModel,
+		.acc_type = TrainAccType,
+		.advance_distance = TrainAdvanceDistance,
+		.age = TrainAge,
+		.all_powered = TrainAllPowered,
+		.ambient_sound = TrainAmbientSound,
+		.arrival_news = TrainArrivalNews,
+		.arrival_triggers = TrainArrivalTriggers,
+		.axis_diag = TrainAxisDiag,
+		.backoff = TrainBackoff,
+		.base_viewport = TrainBaseViewport,
+		.begin_loading = TrainBeginLoading,
+		.bridge_speed = TrainBridgeSpeed,
+		.cache_override = TrainCacheOverride,
+		.callback_length = TrainCallbackLength,
+		.capacity = TrainCapacity,
+		.capacity_error = TrainCapacityError,
+		.cargo_age_default = TrainCargoAgeDefault,
+		.cargo_changed = TrainCargoChanged,
+		.chain_depot = TrainChainDepot,
+		.check_breakdown = TrainCheckBreakdown,
+		.check_next = TrainCheckNext,
+		.check_orders = TrainCheckOrders,
+		.check_reverse = TrainCheckReverse,
+		.choose_track = TrainChooseTrack,
+		.clear_reservation = TrainClearReservation,
+		.compatible_rail_owner = TrainCompatibleRailOwner,
+		.consist_windows = TrainConsistWindows,
+		.cost_class = TrainCostClass,
+		.cost_default = TrainCostDefault,
+		.cost_divisor = TrainCostDivisor,
+		.count_chain = TrainCountChain,
+		.crash_event = TrainCrashEvent,
+		.crash_ground = TrainCrashGround,
+		.crash_news = TrainCrashNews,
+		.crash_rating = TrainCrashRating,
+		.crash_sound = TrainCrashSound,
+		.crossing_barred = TrainCrossingBarred,
+		.crossing_rail_axis = TrainCrossingRailAxis,
+		.crossing_reserved = TrainCrossingReserved,
+		.crossing_road_axis = TrainCrossingRoadAxis,
+		.crossing_sound = TrainCrossingSound,
+		.curve_advantage = TrainCurveAdvantage,
+		.curve_mod = TrainCurveMod,
+		.day_ticks = TrainDayTicks,
+		.decrease_value = TrainDecreaseValue,
+		.delete_vehicle = TrainDeleteVehicle,
+		.depot_dir = TrainDepotDir,
+		.depot_dirty = TrainDepotDirty,
+		.depot_index = TrainDepotIndex,
+		.depot_track = TrainDepotTrack,
+		.depot_window = TrainDepotWindow,
+		.diag_axis = TrainDiagAxis,
+		.diag_between = TrainDiagBetween,
+		.diag_reaches_tracks = TrainDiagReachesTracks,
+		.diag_trackdir = TrainDiagTrackdir,
+		.dirty_tile = TrainDirtyTile,
+		.dir_diag = TrainDirDiag,
+		.disaster_sound = TrainDisasterSound,
+		.disconnect = TrainDisconnect,
+		.economy_age = TrainEconomyAge,
+		.engine_power = TrainEnginePower,
+		.enter_depot = TrainEnterDepot,
+		.enter_tile = TrainEnterTile,
+		.find_depot = TrainFindDepot,
+		.first_track = TrainFirstTrack,
+		.free_reservation = TrainFreeReservation,
+		.grf_version = TrainGrfVersion,
+		.handle_breakdown = TrainHandleBreakdown,
+		.has_depot_res = TrainHasDepotRes,
+		.has_reserved = TrainHasReserved,
+		.has_signal = TrainHasSignal,
+		.has_signals = TrainHasSignals,
+		.has_signal_td = TrainHasSignalTd,
+		.hide_fill = TrainHideFill,
+		.inclination = TrainInclination,
+		.invalidate_grf = TrainInvalidateGrf,
+		.invalid_price = TrainInvalidPrice,
+		.is_bridge = TrainIsBridge,
+		.is_crossing = TrainIsCrossing,
+		.is_depot = TrainIsDepot,
+		.is_plain_rail = TrainIsPlainRail,
+		.is_railway = TrainIsRailway,
+		.is_station = TrainIsStation,
+		.is_station_any = TrainIsStationAny,
+		.is_tunnelbridge = TrainIsTunnelbridge,
+		.large_explosion = TrainLargeExplosion,
+		.last_speed = TrainLastSpeed,
+		.leave_sound = TrainLeaveSound,
+		.leave_station = TrainLeaveStation,
+		.leave_unbunch = TrainLeaveUnbunch,
+		.length_callback = TrainLengthCallback,
+		.length_changed = TrainLengthChanged,
+		.length_default = TrainLengthDefault,
+		.length_error = TrainLengthError,
+		.loading = TrainLoading,
+		.local_company = TrainLocalCompany,
+		.lost_warn = TrainLostWarn,
+		.map_size = TrainMapSize,
+		.max_depot_penalty = TrainMaxDepotPenalty,
+		.needs_service = TrainNeedsService,
+		.no_90 = TrainNo90,
+		.oneway_blocking = TrainOnewayBlocking,
+		.order_depot_service = TrainOrderDepotService,
+		.order_dummy = TrainOrderDummy,
+		.order_free = TrainOrderFree,
+		.order_max_speed = TrainOrderMaxSpeed,
+		.order_stop = TrainOrderStop,
+		.other_end = TrainOtherEnd,
+		.pay_running = TrainPayRunning,
+		.pbs_signal_type = TrainPbsSignalType,
+		.platform_ahead = TrainPlatformAhead,
+		.platform_length = TrainPlatformLength,
+		.position = TrainPosition,
+		.pow_wag_power = TrainPowWagPower,
+		.price = TrainPrice,
+		.process_orders = TrainProcessOrders,
+		.profile = TrainProfile,
+		.property = TrainProperty,
+		.railveh_wagon = TrainRailvehWagon,
+		.rail_tilt = TrainRailTilt,
+		.rail_type = TrainRailType,
+		.rail_types = TrainRailTypes,
+		.reserve_paths = TrainReservePaths,
+		.reserve_under = TrainReserveUnder,
+		.reset_unbunch = TrainResetUnbunch,
+		.reverse_at_signals = TrainReverseAtSignals,
+		.reverse_single_blocked = TrainReverseSingleBlocked,
+		.reverse_windows = TrainReverseWindows,
+		.running_windows = TrainRunningWindows,
+		.service = TrainService,
+		.servint = TrainServint,
+		.set_depot_res = TrainSetDepotRes,
+		.set_next = TrainSetNext,
+		.set_platform_res = TrainSetPlatformRes,
+		.set_signal_state = TrainSetSignalState,
+		.set_tunnel_res = TrainSetTunnelRes,
+		.show_effect = TrainShowEffect,
+		.show_reservation = TrainShowReservation,
+		.signals_both = TrainSignalsBoth,
+		.signals_update = TrainSignalsUpdate,
+		.signals_update_owner = TrainSignalsUpdateOwner,
+		.signal_has_pbs = TrainSignalHasPbs,
+		.signal_pbs = TrainSignalPbs,
+		.signal_type = TrainSignalType,
+		.sigseg_full = TrainSigsegFull,
+		.sigseg_pbs = TrainSigsegPbs,
+		.small_explosion = TrainSmallExplosion,
+		.speed_default = TrainSpeedDefault,
+		.start_stop_dirty = TrainStartStopDirty,
+		.station = TrainStation,
+		.station_axis = TrainStationAxis,
+		.station_compatible = TrainStationCompatible,
+		.station_dest = TrainStationDest,
+		.stopped_in_depot = TrainStoppedInDepot,
+		.stop_location = TrainStopLocation,
+		.stuck_news = TrainStuckNews,
+		.suppress_implicit = TrainSuppressImplicit,
+		.ticks_leave_depot = TrainTicksLeaveDepot,
+		.tile_add_diag = TrainTileAddDiag,
+		.tile_offset_axis = TrainTileOffsetAxis,
+		.tile_offset_diag = TrainTileOffsetDiag,
+		.tile_owner = TrainTileOwner,
+		.tile_rail_type = TrainTileRailType,
+		.tile_virt = TrainTileVirt,
+		.trackdir_exit = TrainTrackdirExit,
+		.trackdir_reaches = TrainTrackdirReaches,
+		.track_bits = TrainTrackBits,
+		.track_crosses = TrainTrackCrosses,
+		.track_direction = TrainTrackDirection,
+		.track_status = TrainTrackStatus,
+		.train_list = TrainTrainList,
+		.train_visit = TrainTrainVisit,
+		.truncate_cargo = TrainTruncateCargo,
+		.try_path = TrainTryPath,
+		.try_reserve = TrainTryReserve,
+		.tunnel_dir = TrainTunnelDir,
+		.unreserve = TrainUnreserve,
+		.update_delta = TrainUpdateDelta,
+		.update_speed = TrainUpdateSpeed,
+		.user_default = TrainUserDefault,
+		.veh_exit_dir = TrainVehExitDir,
+		.viewport = TrainViewport,
+		.view_window = TrainViewWindow,
+		.visit_type = TrainVisitType,
+		.vis_effect = TrainVisEffect,
+		.wagon_override = TrainWagonOverride,
+		.wagon_speed_limits = TrainWagonSpeedLimits,
+		.wait_oneway = TrainWaitOneway,
+		.wait_pbs = TrainWaitPbs,
+		.wait_twoway = TrainWaitTwoway,
+		.wait_unbunch = TrainWaitUnbunch,
+		.write_crossing_bar = TrainWriteCrossingBar,
+		.write_crossing_res = TrainWriteCrossingRes,
+		.write_visit_type = TrainWriteVisitType,
+		.visit_tile = TrainVisitTile,
+		.visit_near = TrainVisitNear
+	};
+	return services;
+}
+static const OpenTTDTrainReservationLeaves &GetTrainReservationServices()
+{
+	static const OpenTTDTrainReservationLeaves services{
+		.read_tile = TrainReservationReadTile,
+		.read_next = TrainReservationReadNext,
+		.read_last_station = TrainReservationReadLastStation,
+		.read_direction = TrainReservationReadDirection,
+		.read_order = TrainReservationReadOrder,
+		.read_num_orders = TrainReservationReadNumOrders,
+		.read_order_index = TrainReservationReadOrderIndex,
+		.read_free = TrainReservationReadFree,
+		.read_free_1 = TrainReservationReadFree1,
+		.read_new = TrainReservationReadNew,
+		.read_choose = TrainReservationReadChoose,
+		.read_choose_4 = TrainReservationReadChoose4,
+		.read_check_next = TrainReservationReadCheckNext,
+		.all_compat = TrainReservationAllCompat,
+		.backoff = TrainReservationBackoff,
+		.bits_track = TrainReservationBitsTrack,
+		.blocking = TrainReservationBlocking,
+		.check_reverse = TrainReservationCheckReverse,
+		.compat_station = TrainReservationCompatStation,
+		.conditional = TrainReservationConditional,
+		.copy_order = TrainReservationCopyOrder,
+		.cross_dirs = TrainReservationCrossDirs,
+		.cross_tracks = TrainReservationCrossTracks,
+		.depot_dir = TrainReservationDepotDir,
+		.depot_reserved = TrainReservationDepotReserved,
+		.diag_reach_dirs = TrainReservationDiagReachDirs,
+		.diag_track = TrainReservationDiagTrack,
+		.enter_td = TrainReservationEnterTd,
+		.exit_dir = TrainReservationExitDir,
+		.free = TrainReservationFree,
+		.green = TrainReservationGreen,
+		.has_pbs = TrainReservationHasPbs,
+		.has_reserved = TrainReservationHasReserved,
+		.has_signal = TrainReservationHasSignal,
+		.increment_order = TrainReservationIncrementOrder,
+		.is_bridge = TrainReservationIsBridge,
+		.is_depot = TrainReservationIsDepot,
+		.is_pbs = TrainReservationIsPbs,
+		.is_plain = TrainReservationIsPlain,
+		.is_railway = TrainReservationIsRailway,
+		.is_station = TrainReservationIsStation,
+		.is_tunnel = TrainReservationIsTunnel,
+		.is_waypoint = TrainReservationIsWaypoint,
+		.line_reverse = TrainReservationLineReverse,
+		.mark_bridge = TrainReservationMarkBridge,
+		.mark_tile = TrainReservationMarkTile,
+		.needs_service = TrainReservationNeedsService,
+		.oneway = TrainReservationOneway,
+		.order_service = TrainReservationOrderService,
+		.order_stop = TrainReservationOrderStop,
+		.order_type = TrainReservationOrderType,
+		.other_end = TrainReservationOtherEnd,
+		.overlap = TrainReservationOverlap,
+		.path_result = TrainReservationPathResult,
+		.profile = TrainReservationProfile,
+		.rail90 = TrainReservationRail90,
+		.reach_dirs = TrainReservationReachDirs,
+		.reach_tracks = TrainReservationReachTracks,
+		.reserved = TrainReservationReserved,
+		.reserve_paths = TrainReservationReservePaths,
+		.restore_order = TrainReservationRestoreOrder,
+		.safe = TrainReservationSafe,
+		.save_order = TrainReservationSaveOrder,
+		.service = TrainReservationService,
+		.set_depot = TrainReservationSetDepot,
+		.set_depot_dest = TrainReservationSetDepotDest,
+		.set_platform = TrainReservationSetPlatform,
+		.set_signal = TrainReservationSetSignal,
+		.set_tunnel = TrainReservationSetTunnel,
+		.show_res = TrainReservationShowRes,
+		.signal_buffer = TrainReservationSignalBuffer,
+		.start_stop = TrainReservationStartStop,
+		.station = TrainReservationStation,
+		.station_train = TrainReservationStationTrain,
+		.station_xy = TrainReservationStationXy,
+		.stuck = TrainReservationStuck,
+		.tile_add = TrainReservationTileAdd,
+		.tile_offset = TrainReservationTileOffset,
+		.trackdir = TrainReservationTrackdir,
+		.track_status = TrainReservationTrackStatus,
+		.try_track = TrainReservationTryTrack,
+		.tunnel_dir = TrainReservationTunnelDir,
+		.tunnel_free = TrainReservationTunnelFree,
+		.unreserve = TrainReservationUnreserve,
+		.update_buffer = TrainReservationUpdateBuffer,
+		.write_dest = TrainReservationWriteDest,
+		.write_last = TrainReservationWriteLast,
+		.write_suppress = TrainReservationWriteSuppress,
+		.follow = TrainReservationFollow,
+		.origin = TrainReservationOrigin,
+		.pathfind = TrainReservationPathfind,
+		.safe_track = TrainReservationSafeTrack,
+		.process_orders = TrainReservationProcessOrders,
+		.update_order_dest = TrainReservationUpdateOrderDest
+	};
+	return services;
+}
+
 #endif

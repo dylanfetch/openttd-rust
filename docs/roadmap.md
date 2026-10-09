@@ -4,54 +4,56 @@ Root owns selection here; `AGENTS.md` and `docs/rust-migration.md` define proces
 If an issue conflicts, follow this roadmap and report it to root. Keep this
 forward-looking, about 200 lines; completed work is one row, with evidence in PRs.
 
-## Where the fork stands (2026-10-08, `2a76d5f287`)
+## Where the fork stands (2026-10-09, `d8aed8754f`)
 
-- Twenty-one ownership ports retire about 29.9k original C++ lines, about 7.8%
-  of roughly 384k non-vendored `src/` lines (24.6k excluding town-name and road
-  data). #184 totals: Rust 10166 / tooling 1918 / glue 4985 / retired 6073,
-  including direct-road/timing/save maintenance; 386 retired lines are old road
-  boundary code. Glue plus tooling exceeds retirement; next owners stay whole.
-- Exact three-pair ratios in #184: Opus 1.435x, Grok 1.419x, Padhattan-1996
-  1.704x, Padhattan-2000 2.018x, generation 1.452x. All pass current caps +3%;
-  no cap rises. The full semantic suite passes 259 cases / 1,922 snapshots.
-- Last mixed-save profile before #184's hot-path fixes, as extra candidate time:
-  aircraft +27%, train +25%, window drawing and string formatting +18%, road +11%, trees +8%.
-- #184 passed exact-head full validation; post-merge checks are running.
-  A full run costs about 104 job-minutes; ordinary PR pushes stay cheap.
-- One unintegrated component branch remains: #147 WIP. The next wave is fleet,
-  train #189, aircraft #190, UTF-8 #191 and coverage #188, within the cap of six.
+- Twenty-one ownership ports retire about 30.2k original C++ lines, about 7.9%
+  of roughly 384k non-vendored `src/` lines. Untouched simulation remains large:
+  `rail_cmd`, `road_cmd`, `water_cmd`, `tunnelbridge_cmd`, `clear_cmd`, most of
+  `vehicle.cpp` and `vehicle_cmd.cpp`, and the tile loops they drive.
+- Aircraft #194 integrated; with #193 it measures (paired, loaded host) Opus
+  1.44x, Grok 1.43x, Padhattan-1996 1.60x, Padhattan-2000 1.67-1.74x (was
+  1.95x), TGP 1.44x. Caps drop on the next idle-host run.
+- The #168 conversions still add glue: aircraft adds 1300 C++ glue lines for
+  247 retired, train #195 2812 for 853. Most is per-port copies of the same vehicle
+  and map accessors; #199 must shrink it.
+- Witnesses: train, ship and aircraft branch witnesses now run and fail by
+  default (#196, #204). Unreached branches are listed in #156.
+- Four unintegrated branches: train #195, fleet #197, trees #202, industry #203.
 
-## Fifth steering review (2026-10-08)
+## Sixth steering review (2026-10-09)
 
-A Claude Code review (`claude-opus-5-5`) audited the first `gpt-6.1-sol` xhigh
-root session. It ran four independent port audits (aircraft, company, cargo,
-orders) and a perf bisection and profile of #184. No reachable divergence was
-found. Root integrated #145, #149, #174 and #181 cleanly and correctly held #184
-at the ratchet. The user keeps Sol xhigh as root and Astra high for planning.
+A Claude Code review (`claude-opus-5-5`) audited root's 10-08 session: four
+independent audits (train #195, fleet #197, ship #152 with the orders/cargo
+hot-path fix, aircraft #194 with UTF-8 #193) and a perf/callgrind profile. Root
+applied the fifth review: exact timing, hot-path fixes, re-measured caps and a
+clean #184 integration. Train, aircraft, ship and UTF-8 show no reachable
+divergence. Fleet has one, and coverage claims rest on opt-in profiles.
 
 Corrections, in order:
-1. **Root is `gpt-6.1-sol` xhigh** (AGENTS.md, `/start-development`). Attribute
-   root artifacts with the effort actually used: several xhigh root comments
-   said "medium". Change `.codex/config.toml` root to `gpt-6.1-sol` in a small
-   PR; it may share #186's full run.
-2. **Fix the timer before trusting the ratchet (#186).** `subprocess.run(timeout=)`
-   rounds each game up to 50 ms. That is about 7.5% on a 0.65 s case, against a
-   3% tolerance. Root had noted this limit and still blocked on it. Re-measure
-   all caps once, exactly, then judge #184 against them.
-3. **#184 fixes its hot paths before integrating**, per its PR comment. Orders
-   must look up each record once per entry, not through about 17 indirect calls
-   per vehicle per tick. Cargo needs typed single-field getters, no `CargoNext`
-   vector, and no `Packets()` copy. Then a fresh review, the Opus/Grok caps, and
-   full CI.
-4. **No boundary exceptions at integration** (new AGENTS.md rule). Company's
-   accepted Task/Future exception also covered a 66-service switch, positional
-   `[i64; 32]` reads and reentry-only action services. All of these are now
-   listed in #168.
-5. **#168 order is confirmed**: train or aircraft first, then company, trees and
-   station/town. #168 also lists the per-character `DecodeUtf8`/string-consumer
-   crossings (+9% on Padhattan) as a separate small PR.
-6. **Coverage gaps**: new aircraft-breakdown, cargo forced-transfer/GetVia,
-   conditional-order and loan-arm gaps go to #156.
+1. **Done:** red Quick validation fixed by #200/#201 (`bb302706c1`). Check the
+   last push's runs before reporting the branch green.
+2. **Done:** cited train and ship witnesses run and fail by default (#204). The
+   shared witness facility replacing the per-port writers (#198 remainder) is
+   part of #199's first PR.
+3. **Done in #197 (not yet integrated):** fleet's `NEW_GROUP` sentinel, the
+   per-Vehicle `Box<u16>`, positional tables and dead wrappers are fixed, and
+   `fleet-drain`/`fleet-drain-cash` witness the tick-end drain.
+4. **Aircraft #194 and UTF-8 #193 are integrated.** Integrate train #195 as it
+   stands once its final-head evidence passes. #193 is a support-code fast path
+   (PR ruling), not a precedent.
+5. **Then #199: one shared typed vehicle and map service layer** with a
+   crossing budget per vehicle tick. New AGENTS.md rule: resolve once per entry,
+   read only the used fields once, one shared definition per accessor, real
+   return types and designated initializers. If Padhattan-2000 stays above 1.6x
+   after it, plan a pinned-offset field view versus Rust-owned vehicle storage
+   before more vehicle conversions.
+6. **Reorder #168 by measured cost:** trees (with `ObserveTile`'s unconditional
+   `GetTileZ` and per-call `Box`) and the industry tick's whole-record read come
+   before company #192; station tick and loading come before cold cargo/orders.
+   A fixed fast hasher for the lookup-only YAPF maps is a small independent PR.
+7. **The next planner looks at untouched simulation:** the tile loops (clear,
+   water flooding, rail, road, tunnel/bridge) and the vehicle base tick, age and
+   breakdown in `vehicle.cpp`, after #148 and #150.
 
 ## Earlier steering, still in force
 
@@ -62,9 +64,10 @@ gaps (#156); WIP cap of six branches (#157). Third (10-07): convert per-call
 task/future/`Rc` boundaries, opcode dispatch and whole-record reads to direct
 typed calls (#168); the speed budget is a ratchet; reviews use `gpt-6.1-sol` high
 with a fresh reviewer each round who fixes its own findings; close finished agents.
-Fourth (10-07): on-demand CI stays (#171, gaps closed by #173/#174). Keep
-`CI_ON_DEMAND=true`, require exact-head full validation, never merge with
-`--admin`, and treat more process tooling as no fallback.
+Fourth (10-07): on-demand CI stays (#171). Keep `CI_ON_DEMAND=true`, require
+exact-head full validation, never merge with `--admin`, and treat more process
+tooling as no fallback. Fifth (10-08): root is `gpt-6.1-sol` xhigh with Astra
+high planners; exact timing (#186, done); no boundary exceptions at integration.
 
 ## Completed ownership ports
 
@@ -110,6 +113,11 @@ attributed review reports retain evidence; batch totals are above.
 | Issues | Maintenance PRs | Integration | Commit | Metrics |
 | --- | --- | --- | --- | --- |
 | #169, #156, #179 | #175, #177, #180 | #181 | `f604e30d50` | 4 / 193 / 0 / 0 |
+| #200 | #201 | direct | `bb302706c1` | 0 / 10 / 0 / 0 |
+| #188 | #196 | direct | `05f94f56d5` | 0 / 182 / 0 / 0 |
+| #191 | #193 | direct | `b127ffaa88` | 0 / 44 / 73 / 14 |
+| #198 (enforcement) | #204 | direct | `c0c67a3dd4` | 0 / 147 / 0 / 0 |
+| #190 (#168 aircraft) | #194 | direct | `d8aed8754f` | 1279 / 352 / 1300 / 247 |
 
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -120,28 +128,19 @@ The harness is `python3 tools/migration.py simulate` (`docs/rust-migration.md`,
 always the first priority. Port differences go in `KNOWN_FAILURES` with an issue,
 never in masks.
 
-1. **Speed ratchet (#155); exact timing #186/#187 is integrated.** The budget
-   covers both road play saves, both Padhattan saves and generate-tgp-256-1, run
-   with `simulate <name> --benchmark 3 --jobs 2` on an idle host. A PR may exceed
-   a cap by at most 3%, unless root accepts a stated reason that is not a
-   boundary-rule exception. Improvements lower the caps. Targets: <=1.5x on play
-   saves and <=1.15x on generation when #168 closes.
-2. **#156 coverage, standing capacity.** Random and crash branches first. The
-   2000 and 2006 Padhattan saves are imported (#181, #185 via #184). The presence
-   of PBS signals, locks or subsidies in a save does not show that every route or
-   multiplier was exercised. Next slice: #188 aircraft breakdown witnesses.
-   Cargo-routing, conditional-order and company source plans are in #156;
-   their branches remain open until executed witnesses and sensitivity pass.
-
-Exact caps (three-pair medians; [samples and provenance](https://github.com/dylanfetch/openttd-rust/pull/187#issuecomment-6072318657)):
-
-| Scenario | Cap |
-| --- | ---: |
-| Opus manual | 1.422193877551 |
-| Grok manual | 1.405807365439 |
-| Padhattan 1996 manual | 1.662674650699 |
-| Padhattan 2000 manual | 1.982905982906 |
-| TGP 256 | 1.440443213296 |
+1. **#198 witness enforcement** is done (#204); keep it passing.
+2. **Speed ratchet (#155).** `SPEED_BUDGETS` in `tools/simulation/roads.py` is
+   the authority for the five caps, run with `simulate <name> --benchmark 3
+   --jobs 2` on an idle host. A PR may exceed a cap by at most 3%, unless root
+   accepts a stated reason that is not a boundary-rule exception. Improvements
+   lower the caps. Targets: <=1.5x on play saves and <=1.15x on generation when
+   #168/#199 close. Aircraft lowered Padhattan-2000; lower its cap on the next
+   idle-host run (a tools change in the next PR). The null driver redraws whenever 1 ms has elapsed, so a
+   slower candidate also draws more frames; read drawing cost with that in mind.
+3. **#156 coverage, standing capacity.** Random and crash branches first. The
+   presence of PBS signals, locks or subsidies in a save does not show that every
+   route or multiplier was exercised. #188/#196 aircraft breakdown is the current
+   slice; the sixth review added fleet, train, reservation and ship gaps.
 
 ## Phase 2: current work, in order
 
@@ -149,33 +148,36 @@ Integration of reviewed work comes before new starts. Never hold more than six
 unintegrated component branches (#157). Independent items (#156 slices) may run
 in parallel with this list.
 
-1. **Finish #147 fleet replacement** in the direct form; refresh its state-only
-   WIP from integrated main. Preserve full native CommandCost and its quirks.
-2. **#168 conversions, one PR per component:** train/reservation #189 first
-   (O(n^2) consist walk, per-step `nearby` Vec), aircraft #190, then company #192
-   with widened scope, then trees, town and disaster, then cold cargo/orders.
-   UTF-8/string-consumer #191 is a separate selected small PR at any point.
-   #192 keeps StopAI direct; only proven startup/post VM exceptions use stack
-   continuation records. No per-call heap task, generic dispatch or hot record copy.
-3. **New components** (#148 town lifecycle, then #150 industry construction)
-   start only once the road play saves are at or below 2.0x (they are) and #168's
-   train slice is integrated. When fewer than two unstarted selections remain, a
-   fresh Astra high planner replenishes whole simulation owners, planned in the
-   direct form.
+1. **Integrate the drafts:** train #195, then fleet #197 (merge the base after
+   train and renumber fleet's ABI layout IDs 343-346 past train's 340-385).
+   Preserve fleet's full native CommandCost and its quirks.
+2. **#199 shared vehicle and map layer**, one PR per vehicle type, starting once
+   train and aircraft are integrated. Report crossings per vehicle tick.
+3. **#168 remaining conversions, one PR per component:** trees, industry tick
+   read, company #192 (StopAI direct; only proven startup/post VM exceptions use
+   stack continuation records), station tick and loading, town, disaster, then
+   cold cargo/orders. The YAPF hasher is a small PR at any point.
+4. **New components** (#148 town lifecycle, then #150 industry construction)
+   start once train #195 is integrated. When fewer than two unstarted selections
+   remain, a fresh Astra high planner replenishes whole simulation owners in the
+   #199 form, starting with the tile loops and the vehicle base tick.
 
-The #108 decision keeps C++ map arrays and direct bundled `noexcept` services.
-Revisit it only if a post-#168 profile shows map/pool crossings dominating.
+The #108 decision keeps C++ map arrays and direct bundled `noexcept` services;
+map crossings are 5-11% of reference time. #199 decides vehicle state access.
 
 ## Resume checkpoint
 
+Sixth steering items 1-4 are applied; items 5-7 are in progress through #199,
+#202 and #203.
+
 | Issue / PR | Branch (worktree suffix), head | State and next step |
 | --- | --- | --- |
-| #147 | `fleet-replacement-ownership-147` (`fleet-replacement`), `68d660adc9` | State-only WIP; fresh completion owner next, refresh from integrated main. |
-| #189 / #168 | none | Train/reservation direct conversion selected first; scoped issue and source plan ready. |
-| #190 / #168 | none | Aircraft direct conversion selected after train in work order; scoped plan ready. |
-| #191 / #168 | none | Selected ASCII/string-consumer support fix; scoped plan ready. |
-| #192 / #168 | none | Company direct conversion after train/aircraft; exception disposition in issue. |
-| #188 / #156 | none | Aircraft breakdown slice selected; other source plans stay queued in #156. |
+| #189 / #195 | `train-direct-189` (`train-direct-189`), `0818e68172` | Final head reviewed (no findings); enforced rail suite 19/19. Base merges resolved an `abi.rs` conflict: fresh review of that resolution, verify, default suite, timing, full CI. |
+| #147 / #197 | `fleet-replacement-ownership-147` (`fleet-replacement`), `20fa6e581a` | Reviewed, including drain witness. After train: base merge with ABI renumbering, timing, full CI, ready. |
+| #202 | `trees-direct-202` (`trees-direct-202`) | Implementation in progress (no PR yet). |
+| #203 | `industry-typed-203` (`industry-typed-203`) | Implementation in progress (no PR yet). |
+| #199 | none | First-PR plan in progress (road, shared module, witness facility); starts after train integrates. |
+| #192 / #168 | none | Company direct conversion after trees and industry. |
 
 Preserve the pinned reference, paused curve worktrees and evidence branches
 `evidence-disaster-vehicles` (`a775543162`) and `evidence-water-regions`

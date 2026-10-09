@@ -198,6 +198,9 @@ def main():
         objects[group] = []
         group_flags = flags + (["-DWITH_RUST"] if group == "rust" else [])
         for number, source in enumerate(vm_sources + [allocator]):
+            # Relative includes resolve beside the source; use this group's copy.
+            if source.is_relative_to(REFERENCE):
+                source = source_root / source.relative_to(REFERENCE)
             obj = OUT / f"vm-{group}-{number}.o"
             compile(
                 [

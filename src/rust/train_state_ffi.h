@@ -21,13 +21,31 @@ extern "C" {
 /* One zero-created allocation per ordinary/indexed-load shell. Destroy exactly
  * once after PreDestructor, including pool cleanup. Game-thread scalar access;
  * no returned references, no owner borrow across callbacks, panic/OOM abort.
- * Selectors 0..10: flags:u16, crash:u16, wait:u16, compatible-railtypes:u64,
- * railtypes:u64, track:u8, force-proceed:u8, tilt:bool, user-data:u8,
- * curve-modifier:i16, max-curve-speed:u16. Writes narrow to original widths.
- * Signed curve values travel as their low 16-bit representation. */
+ * Typed scalar entries retain original widths, including signed curve modifiers. */
 OpenTTDTrainState *OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_new();
 void OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_destroy(OpenTTDTrainState *);
-uint64_t OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_get(const OpenTTDTrainState *, uint8_t);
-void OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_set(OpenTTDTrainState *, uint8_t, uint64_t);
+uint16_t OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_get_flags(const OpenTTDTrainState *);
+void OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_set_flags(OpenTTDTrainState *, uint16_t);
+uint16_t OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_get_crash_anim_pos(const OpenTTDTrainState *);
+void OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_set_crash_anim_pos(OpenTTDTrainState *, uint16_t);
+uint16_t OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_get_wait_counter(const OpenTTDTrainState *);
+void OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_set_wait_counter(OpenTTDTrainState *, uint16_t);
+uint64_t OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_get_compatible_railtypes(const OpenTTDTrainState *);
+void OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_set_compatible_railtypes(OpenTTDTrainState *, uint64_t);
+uint64_t OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_get_railtypes(const OpenTTDTrainState *);
+void OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_set_railtypes(OpenTTDTrainState *, uint64_t);
+uint8_t OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_get_track(const OpenTTDTrainState *);
+void OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_set_track(OpenTTDTrainState *, uint8_t);
+uint8_t OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_get_force_proceed(const OpenTTDTrainState *);
+void OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_set_force_proceed(OpenTTDTrainState *, uint8_t);
+uint8_t OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_get_cached_tilt(const OpenTTDTrainState *);
+void OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_set_cached_tilt(OpenTTDTrainState *, uint8_t);
+uint8_t OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_get_user_def_data(const OpenTTDTrainState *);
+void OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_set_user_def_data(OpenTTDTrainState *, uint8_t);
+int16_t OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_get_cached_curve_speed_mod(const OpenTTDTrainState *);
+void OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_set_cached_curve_speed_mod(OpenTTDTrainState *, int16_t);
+uint16_t OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_get_cached_max_curve_speed(const OpenTTDTrainState *);
+void OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_set_cached_max_curve_speed(OpenTTDTrainState *, uint16_t);
+
 }
 #endif /* RUST_TRAIN_STATE_FFI_H */
