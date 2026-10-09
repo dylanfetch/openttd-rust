@@ -16,12 +16,11 @@ forward-looking, about 200 lines; completed work is one row, with evidence in PR
   no cap rises. The full semantic suite passes 259 cases / 1,922 snapshots.
 - Last mixed-save profile before #184's hot-path fixes, as extra candidate time:
   aircraft +27%, train +25%, window drawing and string formatting +18%, road +11%, trees +8%.
-- #184 passed exact-head full validation and post-merge platform checks; native
-  comparisons are running.
+- #184 passed exact-head full validation and all post-merge checks.
   A full run costs about 104 job-minutes; ordinary PR pushes stay cheap.
-- Four unintegrated branches: fleet #147, train #189, aircraft #190 and UTF-8
-  #191. The host accepted three fresh workers before its thread limit; root
-  implements the bounded UTF-8 fix. Coverage #188 waits for a fresh slot.
+- Five unintegrated branches: fleet #147, train #189, aircraft #190, UTF-8
+  #191 and breakdown coverage #188. Development stopped at the user's request;
+  the clean draft checkpoints and remaining gates are below.
 
 ## Fifth steering review (2026-10-08)
 
@@ -145,14 +144,17 @@ Exact caps (three-pair medians; [samples and provenance](https://github.com/dyla
 | Padhattan 2000 manual | 1.982905982906 |
 | TGP 256 | 1.440443213296 |
 
+These integrated caps remain in force. Draft #193 lowers both Padhattan caps
+and TGP after its idle three-pair run; those changes await review and integration.
+
 ## Phase 2: current work, in order
 
 Integration of reviewed work comes before new starts. Never hold more than six
 unintegrated component branches (#157). Independent items (#156 slices) may run
 in parallel with this list.
 
-1. **Finish #147 fleet replacement** in the direct form; refresh its state-only
-   WIP from integrated main. Preserve full native CommandCost and its quirks.
+1. **Finish #147 fleet replacement** in the direct form. Complete its remaining
+   evidence and review; preserve full native CommandCost and its quirks.
 2. **#168 conversions, one PR per component:** train/reservation #189 first
    (O(n^2) consist walk, per-step `nearby` Vec), aircraft #190, then company #192
    with widened scope, then trees, town and disaster, then cold cargo/orders.
@@ -170,14 +172,17 @@ Revisit it only if a post-#168 profile shows map/pool crossings dominating.
 
 ## Resume checkpoint
 
+Resume saved drafts before starting company #192 or another component. Fresh
+Sol high review of #193 can start first; #188 still needs sensitivity probes.
+
 | Issue / PR | Branch (worktree suffix), head | State and next step |
 | --- | --- | --- |
-| #147 | `fleet-replacement-ownership-147` (`fleet-replacement`), `9d81c9a0e0` | Fresh Sol high owner completing controller; integrated main refreshed. |
-| #189 / #168 | `train-direct-189` (`train-direct-189`), `c28136c093` | Fresh Sol high owner converting train and reservation services. |
-| #190 / #168 | `aircraft-direct-190` (`aircraft-direct-190`), `c28136c093` | Fresh Sol high owner converting aircraft services and existing native adapters. |
-| #191 / #193 | `utf8-hot-191` (`utf8-hot-191`), `9ae81d9b25` | Root implementation; validation running, fresh Sol high review next. |
+| #147 / #197 | `fleet-replacement-ownership-147` (`fleet-replacement`), `32785b4631` | Direct controller WIP saved; final audit, ABI/reentry/CommandCost fixtures, broader checks, fresh review and full CI remain. |
+| #189 / #195 | `train-direct-189` (`train-direct-189`), `8aa1657008` | Final-head Cargo/native checks pass; final-head simulation, timing, fresh review and full CI remain. |
+| #190 / #194 | `aircraft-direct-190` (`aircraft-direct-190`), `29ff227562` | Final-head Cargo/native and 3 cases/7 snapshots pass; broader simulation, timing, fresh review and full CI remain. |
+| #191 / #193 | `utf8-hot-191` (`utf8-hot-191`), `cf91511991` | Cargo/native and default 259 cases/1,922 snapshots pass; comparisons/timing recorded in PR, fresh review and full CI remain. |
 | #192 / #168 | none | Company direct conversion after train/aircraft; exception disposition in issue. |
-| #188 / #156 | none | Aircraft breakdown slice queued for a fresh slot; other plans stay in #156. |
+| #188 / #196 | `aircraft-breakdown-188` (`aircraft-breakdown-188`), `3fa6047b09` | Five reference-self and paired witnesses pass; sensitivity, soak, fresh review and full CI remain. |
 
 Preserve the pinned reference, paused curve worktrees and evidence branches
 `evidence-disaster-vehicles` (`a775543162`) and `evidence-water-regions`
