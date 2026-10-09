@@ -1702,5 +1702,6 @@ Checks: `python3 tools/migration.py verify --jobs 2`, `python3 tools/migration.p
 simulate fleet- --jobs 2` (also `--self`, `--soak`). Scenarios cover hierarchy,
 rules/protection, list-based NEW_GROUP and veh_id 0xFFFFFFFF, renewals for four
 transports, free-unit and different-engine wagon-removal replacement, cash and
-length rollback, and reload. Native tests cover layouts, slots, CommandCost and
+length rollback, reload, and the tick-end drain in play (renewal with restart;
+money-limit failure with reserve and news). Native tests cover layouts, slots, CommandCost and
 drain reentry. NewGRF refit/attach callbacks and articulated parts remain #156.
