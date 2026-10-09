@@ -182,8 +182,7 @@ static void Co_recession_news(bool begin) noexcept
 static OpenTTDCompanyPriceBase Co_price_base(uint32_t price) noexcept { return {_price_base_specs[price].start_price.base(), static_cast<uint8_t>(_price_base_specs[price].category)}; }
 static uint32_t Co_cargo_next(uint32_t from, int64_t *initial_payment) noexcept
 {
-	for (const CargoSpec *cs : CargoSpec::Iterate()) {
-		if (cs->Index() < from) continue;
+	for (const CargoSpec *cs : CargoSpec::Iterate(from)) {
 		*initial_payment = cs->initial_payment;
 		return cs->Index();
 	}
