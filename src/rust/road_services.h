@@ -5,201 +5,887 @@
  * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
  */
 
-/** @file road_services.h Shared-world road leaves and named reentry dispatch. */
-static void OPENTTD_ROAD_CALL RoadObserve(uint32_t id, OpenTTDRoadView *out) noexcept
+/** @file road_services.h Typed synchronous road world services. */
+static uint32_t OPENTTD_ROAD_CALL RoadAccModel() noexcept
+{
+	return _settings_game.vehicle.roadveh_acceleration_model;
+}
+static uint32_t OPENTTD_ROAD_CALL RoadRoadSide() noexcept
+{
+	return _settings_game.vehicle.road_side;
+}
+static uint32_t OPENTTD_ROAD_CALL RoadTileType(uint32_t tile) noexcept
+{
+	return GetTileType(TileIndex(tile));
+}
+static uint32_t OPENTTD_ROAD_CALL RoadHasRoad(uint32_t id, uint32_t tile) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	return HasTileAnyRoadType(TileIndex(tile), v->compatible_roadtypes);
+}
+static uint32_t OPENTTD_ROAD_CALL RoadTrackStatus(uint32_t id, uint32_t tile) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	return GetTileTrackStatus(TileIndex(tile), TRANSPORT_ROAD, GetRoadTramType(v->roadtype));
+}
+static uint32_t OPENTTD_ROAD_CALL RoadTileOwner(uint32_t tile) noexcept
+{
+	return GetTileOwner(TileIndex(tile)).base();
+}
+static uint32_t OPENTTD_ROAD_CALL RoadDepotDir(uint32_t tile) noexcept
+{
+	return GetRoadDepotDirection(TileIndex(tile));
+}
+static uint32_t OPENTTD_ROAD_CALL RoadBayDir(uint32_t tile) noexcept
+{
+	return GetBayRoadStopDir(TileIndex(tile));
+}
+static uint32_t OPENTTD_ROAD_CALL RoadIsDepot(uint32_t tile) noexcept
+{
+	return IsRoadDepotTile(TileIndex(tile));
+}
+static uint32_t OPENTTD_ROAD_CALL RoadNormalRoad(uint32_t tile) noexcept
+{
+	return IsNormalRoadTile(TileIndex(tile));
+}
+static uint32_t OPENTTD_ROAD_CALL RoadRoadWorks(uint32_t tile) noexcept
+{
+	return HasRoadWorks(TileIndex(tile));
+}
+static uint32_t OPENTTD_ROAD_CALL RoadDisallowed(uint32_t tile) noexcept
+{
+	return GetDisallowedRoadDirections(TileIndex(tile));
+}
+static uint32_t OPENTTD_ROAD_CALL RoadBayStop(uint32_t tile) noexcept
+{
+	return IsBayRoadStopTile(TileIndex(tile));
+}
+static uint32_t OPENTTD_ROAD_CALL RoadIsDtStop(uint32_t tile) noexcept
+{
+	return IsDriveThroughStopTile(TileIndex(tile));
+}
+static uint32_t OPENTTD_ROAD_CALL RoadStopType(uint32_t tile) noexcept
+{
+	return to_underlying(GetRoadStopType(TileIndex(tile)));
+}
+static uint32_t OPENTTD_ROAD_CALL RoadFreeBay(uint32_t tile) noexcept
+{
+	return RoadStop::GetByTile(TileIndex(tile), GetRoadStopType(TileIndex(tile)))->HasFreeBay();
+}
+static uint32_t OPENTTD_ROAD_CALL RoadAnyRoadBits(uint32_t id, uint32_t tile, bool straight_only) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	return GetAnyRoadBits(TileIndex(tile), GetRoadTramType(v->roadtype), straight_only != 0);
+}
+static uint32_t OPENTTD_ROAD_CALL RoadRoadBits(uint32_t id, uint32_t tile) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	return GetRoadBits(TileIndex(tile), GetRoadTramType(v->roadtype));
+}
+static uint32_t OPENTTD_ROAD_CALL RoadOffset(uint8_t direction) noexcept
+{
+	return static_cast<uint32_t>(TileOffsByDiagDir(static_cast<DiagDirection>(direction)));
+}
+static uint32_t OPENTTD_ROAD_CALL RoadTileX(uint32_t tile) noexcept
+{
+	return TileX(TileIndex(tile));
+}
+static uint32_t OPENTTD_ROAD_CALL RoadTileY(uint32_t tile) noexcept
+{
+	return TileY(TileIndex(tile));
+}
+static uint32_t OPENTTD_ROAD_CALL RoadStation(uint32_t tile) noexcept
+{
+	return GetStationIndex(TileIndex(tile)).base();
+}
+static uint32_t OPENTTD_ROAD_CALL RoadContinuation(uint32_t tile, uint32_t other_tile) noexcept
+{
+	return RoadStop::IsDriveThroughRoadStopContinuation(TileIndex(tile), TileIndex(other_tile));
+}
+static uint32_t OPENTTD_ROAD_CALL RoadBridgeSpeed(uint32_t tile) noexcept
+{
+	return GetBridgeSpec(GetBridgeType(TileIndex(tile)))->speed;
+}
+static uint32_t OPENTTD_ROAD_CALL RoadMaxPenalty() noexcept
+{
+	return _settings_game.pf.yapf.maximum_go_to_depot_penalty;
+}
+static uint32_t OPENTTD_ROAD_CALL RoadServint(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	return Company::Get(v->owner)->settings.vehicle.servint_roadveh;
+}
+static uint32_t OPENTTD_ROAD_CALL RoadNeedsService(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	return v->NeedsAutomaticServicing();
+}
+static uint32_t OPENTTD_ROAD_CALL RoadWaitUnbunch(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	return v->IsWaitingForUnbunching();
+}
+static uint32_t OPENTTD_ROAD_CALL RoadOrderStop(uint32_t id, uint32_t tile) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	return v->current_order.ShouldStopAtStation(v, GetStationIndex(TileIndex(tile)));
+}
+static uint32_t OPENTTD_ROAD_CALL RoadRoadType(uint32_t id, uint32_t tile) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	return GetRoadType(TileIndex(tile), GetRoadTramType(v->roadtype));
+}
+static uint32_t OPENTTD_ROAD_CALL RoadQueue() noexcept
+{
+	return _settings_game.pf.roadveh_queue;
+}
+static uint32_t OPENTTD_ROAD_CALL RoadTunnelDir(uint32_t tile) noexcept
+{
+	return GetTunnelBridgeDirection(TileIndex(tile));
+}
+static int32_t OPENTTD_ROAD_CALL RoadAcceleration(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	return v->GetAcceleration();
+}
+static int32_t OPENTTD_ROAD_CALL RoadUpdateSpeed(uint32_t id, uint32_t acceleration, int32_t min_speed, int32_t max_speed) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	return v->RustDoUpdateSpeed(static_cast<uint32_t>(acceleration), static_cast<int32_t>(min_speed), static_cast<int32_t>(max_speed));
+}
+static uint32_t OPENTTD_ROAD_CALL RoadAdvance(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	return v->GetAdvanceDistance();
+}
+static void OPENTTD_ROAD_CALL RoadPosition(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->UpdatePosition();
+}
+static void OPENTTD_ROAD_CALL RoadBaseViewport(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->Vehicle::UpdateViewport(true);
+}
+static void OPENTTD_ROAD_CALL RoadLastSpeed(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->SetLastSpeed();
+}
+static void OPENTTD_ROAD_CALL RoadRoadstopLeave(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	RoadStop::GetByTile(v->tile, GetRoadStopType(v->tile))->Leave(v);
+}
+static void OPENTTD_ROAD_CALL RoadEntranceSet(uint32_t id, bool busy) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	RoadStop::GetByTile(v->tile, GetRoadStopType(v->tile))->SetEntranceBusy(busy != 0);
+}
+static uint32_t OPENTTD_ROAD_CALL RoadEntranceBusy(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	return RoadStop::GetByTile(v->tile, GetRoadStopType(v->tile))->IsEntranceBusy();
+}
+static void OPENTTD_ROAD_CALL RoadOrderFree(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->current_order.Free();
+}
+static void OPENTTD_ROAD_CALL RoadSetNext(uint32_t id, uint32_t next) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->SetNext(next == UINT32_MAX ? nullptr : Vehicle::Get(VehicleID(next)));
+}
+static void OPENTTD_ROAD_CALL RoadStartStopDirty(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	SetWindowWidgetDirty(WC_VEHICLE_VIEW, v->index, WID_VV_START_STOP);
+}
+static void OPENTTD_ROAD_CALL RoadDepotDirty(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	InvalidateWindowData(WC_VEHICLE_DEPOT, v->tile);
+}
+static void OPENTTD_ROAD_CALL RoadDetailsDirty(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	SetWindowDirty(WC_VEHICLE_DETAILS, v->index); SetWindowClassesDirty(WC_ROADVEH_LIST);
+}
+static void OPENTTD_ROAD_CALL RoadService(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	VehicleServiceInDepot(v);
+}
+static void OPENTTD_ROAD_CALL RoadLeaveUnbunch(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->LeaveUnbunchingDepot();
+}
+static void OPENTTD_ROAD_CALL RoadResetUnbunch(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->ResetDepotUnbunching();
+}
+static void OPENTTD_ROAD_CALL RoadPathResult(uint32_t id, bool found) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->HandlePathfindingResult(found != 0);
+}
+static void OPENTTD_ROAD_CALL RoadOrderDummy(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->current_order.MakeDummy();
+}
+static void OPENTTD_ROAD_CALL RoadOrderDepot(uint32_t id, uint16_t depot) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->current_order.MakeGoToDepot(DepotID(depot), OrderDepotTypeFlag::Service);
+}
+static uint32_t OPENTTD_ROAD_CALL RoadDepotIndex(uint32_t tile) noexcept
+{
+	return GetDepotIndex(TileIndex(tile)).base();
+}
+static void OPENTTD_ROAD_CALL RoadDecreaseValue(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	DecreaseVehicleValue(v);
+}
+static void OPENTTD_ROAD_CALL RoadAge(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	AgeVehicle(v);
+}
+static void OPENTTD_ROAD_CALL RoadEconomyAge(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	EconomyAgeVehicle(v);
+}
+static void OPENTTD_ROAD_CALL RoadCheckBreakdown(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	CheckVehicleBreakdown(v);
+}
+static void OPENTTD_ROAD_CALL RoadCheckOrders(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	CheckOrders(v);
+}
+static void OPENTTD_ROAD_CALL RoadPayRunning(uint32_t id, int64_t amount) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	CommandCost cost(EXPENSES_ROADVEH_RUN, Money(amount)); v->profit_this_year -= cost.GetCost(); v->running_ticks = 0; SubtractMoneyFromCompanyFract(v->owner, cost);
+}
+static uint32_t OPENTTD_ROAD_CALL RoadCostClass(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	return static_cast<uint32_t>(v->GetEngine()->VehInfo<RoadVehicleInfo>().running_cost_class);
+}
+static uint32_t OPENTTD_ROAD_CALL RoadCostFactor(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	return v->GetEngine()->VehInfo<RoadVehicleInfo>().running_cost;
+}
+static int64_t OPENTTD_ROAD_CALL RoadGetPrice(uint32_t id, uint64_t factor) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	return static_cast<int64_t>(GetPrice(v->GetEngine()->VehInfo<RoadVehicleInfo>().running_cost_class, factor, v->GetEngine()->GetGRF()));
+}
+static uint32_t OPENTTD_ROAD_CALL RoadGrfVersion(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	return v->GetEngine()->GetGRF() == nullptr ? 0 : v->GetEngine()->GetGRF()->grf_version;
+}
+static uint32_t OPENTTD_ROAD_CALL RoadLengthDefault(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	return v->GetEngine()->VehInfo<RoadVehicleInfo>().shorten_factor;
+}
+static uint32_t OPENTTD_ROAD_CALL RoadAgeDefault(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	return EngInfo(v->engine_type)->cargo_age_period;
+}
+static uint32_t OPENTTD_ROAD_CALL RoadSpeedDefault(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	return RoadVehInfo(v->engine_type)->max_speed;
+}
+static void OPENTTD_ROAD_CALL RoadLengthError(uint32_t id, uint32_t result) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	ErrorUnknownCallbackResult(v->GetEngine()->GetGRFID(), CBID_VEHICLE_LENGTH, result);
+}
+static void OPENTTD_ROAD_CALL RoadDisconnect() noexcept
+{
+	FatalError("Disconnecting road vehicle.");
+}
+static void OPENTTD_ROAD_CALL RoadExplosion(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	CreateEffectVehicleRel(v, 4, 4, 8, EV_EXPLOSION_LARGE);
+}
+static uint32_t OPENTTD_ROAD_CALL RoadSoundDefault(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	return RoadVehInfo(v->engine_type)->sfx;
+}
+static void OPENTTD_ROAD_CALL RoadSound(uint32_t id, uint16_t sound) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	SndPlayVehicleFx(static_cast<SoundID>(sound), v);
+}
+static uint32_t OPENTTD_ROAD_CALL RoadSoundOld1() noexcept
+{
+	return SND_19_DEPARTURE_OLD_RV_1;
+}
+static uint32_t OPENTTD_ROAD_CALL RoadSoundOld2() noexcept
+{
+	return SND_1A_DEPARTURE_OLD_RV_2;
+}
+static uint32_t OPENTTD_ROAD_CALL RoadEngineInvalid() noexcept
+{
+	return EngineID::Invalid().base();
+}
+static uint32_t OPENTTD_ROAD_CALL RoadInvalidPrice() noexcept
+{
+	return static_cast<uint32_t>(INVALID_PRICE);
+}
+static uint32_t OPENTTD_ROAD_CALL RoadCostDivisor() noexcept
+{
+	return CalendarTime::DAYS_IN_YEAR * Ticks::DAY_TICKS;
+}
+static uint32_t OPENTTD_ROAD_CALL RoadIsCrossing(uint32_t tile) noexcept
+{
+	return IsLevelCrossingTile(TileIndex(tile));
+}
+static OpenTTDRoadPosition OPENTTD_ROAD_CALL RoadNewPosition(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	auto gp = GetNewVehiclePos(v); return {gp.x, gp.y};
+}
+static uint32_t OPENTTD_ROAD_CALL RoadVirtTile(int32_t x, int32_t y) noexcept
+{
+	return TileVirtXY(static_cast<int32_t>(x), static_cast<int32_t>(y)).base();
+}
+static uint32_t OPENTTD_ROAD_CALL RoadIsRoadStop(uint32_t tile) noexcept
+{
+	return IsStationRoadStop(TileIndex(tile));
+}
+static void OPENTTD_ROAD_CALL RoadSetDest(uint32_t id, uint32_t tile) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->dest_tile = TileIndex(static_cast<uint32_t>(tile));
+}
+static void OPENTTD_ROAD_CALL RoadCacheInvalidate(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->InvalidateNewGRFCacheOfChain();
+}
+static void OPENTTD_ROAD_CALL RoadArrival(uint32_t id, uint16_t station, uint32_t headline, bool local) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	static const StringID headlines[] = {STR_NEWS_FIRST_BUS_ARRIVAL, STR_NEWS_FIRST_PASSENGER_TRAM_ARRIVAL, STR_NEWS_FIRST_TRUCK_ARRIVAL, STR_NEWS_FIRST_CARGO_TRAM_ARRIVAL};
+			AddVehicleNewsItem(GetEncodedString(headlines[headline], StationID(station)), local != 0 ? NewsType::ArrivalCompany : NewsType::ArrivalOther, v->index, StationID(station));
+			AI::NewEvent(v->owner, new ScriptEventStationFirstVehicle(StationID(station), v->index));
+			Game::NewEvent(new ScriptEventStationFirstVehicle(StationID(station), v->index));
+}
+static void OPENTTD_ROAD_CALL RoadCrashNews(uint32_t id, uint32_t victims) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	RoadCrashNews(v, static_cast<uint32_t>(victims));
+}
+static uint32_t OPENTTD_ROAD_CALL RoadStationVisits(uint16_t station) noexcept
+{
+	return Station::Get(StationID(station))->had_vehicle_of_type;
+}
+static void OPENTTD_ROAD_CALL RoadStationVisitSet(uint16_t station, uint32_t vehicle_type) noexcept
+{
+	Station::Get(StationID(station))->had_vehicle_of_type |= static_cast<StationHadVehicleOfType>(vehicle_type);
+}
+static uint32_t OPENTTD_ROAD_CALL RoadLocalCompany() noexcept
+{
+	return _local_company.base();
+}
+static uint32_t OPENTTD_ROAD_CALL RoadEnterTile(uint32_t id, uint32_t tile, int32_t x, int32_t y) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	return VehicleEnterTile(v, TileIndex(tile), static_cast<int32_t>(x), static_cast<int32_t>(y)).base();
+}
+static void OPENTTD_ROAD_CALL RoadEnterDepot(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	VehicleEnterDepot(v);
+}
+static void OPENTTD_ROAD_CALL RoadProcessOrders(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	ProcessOrders(v);
+}
+static void OPENTTD_ROAD_CALL RoadLoading(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->HandleLoading();
+}
+static void OPENTTD_ROAD_CALL RoadBeginLoading(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->BeginLoading();
+}
+static uint32_t OPENTTD_ROAD_CALL RoadTramProbe(uint32_t id, uint32_t tile, uint8_t bits) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	Backup<CompanyID> current(_current_company, v->owner); CommandCost result = Command<CMD_BUILD_ROAD>::Do(DoCommandFlag::NoWater, TileIndex(tile), static_cast<RoadBits>(bits), v->roadtype, DRD_NONE, TownID::Invalid()); current.Restore(); return result.Succeeded();
+}
+static uint32_t OPENTTD_ROAD_CALL RoadProperty(uint32_t id, uint8_t property, uint32_t fallback) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	return GetVehicleProperty(v, static_cast<PropertyID>(property), fallback);
+}
+static uint32_t OPENTTD_ROAD_CALL RoadLengthCallback(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	return GetVehicleCallback(CBID_VEHICLE_LENGTH, 0, 0, v->engine_type, v);
+}
+static uint32_t OPENTTD_ROAD_CALL RoadPlaySound(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	return PlayVehicleSound(v, VSE_START);
+}
+static void OPENTTD_ROAD_CALL RoadVisual(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->ShowVisualEffect();
+}
+static void OPENTTD_ROAD_CALL RoadUpdateVisual(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->UpdateVisualEffect();
+}
+static void OPENTTD_ROAD_CALL RoadCargoChanged(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->CargoChanged();
+}
+static void OPENTTD_ROAD_CALL RoadLengthChanged(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	VehicleLengthChanged(v);
+}
+static uint32_t OPENTTD_ROAD_CALL RoadBreakdown(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	return v->HandleBreakdown();
+}
+static void OPENTTD_ROAD_CALL RoadDelete(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	delete v;
+}
+static uint32_t OPENTTD_ROAD_CALL RoadGroundCrash(uint32_t id, bool flooded) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	return v->GroundVehicleBase::Crash(flooded != 0);
+}
+static void OPENTTD_ROAD_CALL RoadStopRandom(uint32_t id, uint16_t station) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	TriggerRoadStopRandomisation(Station::Get(StationID(station)), v->tile, StationRandomTrigger::VehicleArrives);
+}
+static void OPENTTD_ROAD_CALL RoadStopAnimation(uint32_t id, uint16_t station) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	TriggerRoadStopAnimation(Station::Get(StationID(station)), v->tile, StationAnimationTrigger::VehicleArrives);
+}
+static OpenTTDRoadTrackChoice OPENTTD_ROAD_CALL RoadYapf(uint32_t id, uint32_t tile, uint8_t entry_direction, uint16_t tracks) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	bool found = true; Trackdir dir = YapfRoadVehicleChooseTrack(v, TileIndex(tile), static_cast<DiagDirection>(entry_direction), static_cast<TrackdirBits>(tracks), found); return {static_cast<uint8_t>(dir), found};
+}
+static OpenTTDRoadDepotResult OPENTTD_ROAD_CALL RoadFindDepot(uint32_t id, int32_t max_distance) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	FindDepotData result = YapfRoadVehicleFindNearestDepot(v, static_cast<int32_t>(max_distance)); return {result.tile.base(), result.best_length};
+}
+static int32_t OPENTTD_ROAD_CALL RoadInclination(uint32_t id, bool new_tile, bool delta) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	return v->UpdateInclination(new_tile, delta);
+}
+static void OPENTTD_ROAD_CALL RoadViewport(uint32_t id, bool force_update, bool update_delta) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->UpdateViewport(force_update != 0, update_delta != 0);
+}
+static void OPENTTD_ROAD_CALL RoadSetTile(uint32_t id, uint32_t tile) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->tile = TileIndex(static_cast<uint32_t>(tile));
+}
+static void OPENTTD_ROAD_CALL RoadSetX(uint32_t id, int32_t x) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->x_pos = static_cast<int32_t>(x);
+}
+static void OPENTTD_ROAD_CALL RoadSetY(uint32_t id, int32_t y) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->y_pos = static_cast<int32_t>(y);
+}
+static void OPENTTD_ROAD_CALL RoadSetDirection(uint32_t id, uint8_t direction) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->direction = static_cast<Direction>(direction);
+}
+static void OPENTTD_ROAD_CALL RoadSetSpeed(uint32_t id, uint16_t speed) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->cur_speed = static_cast<uint16_t>(speed);
+}
+static void OPENTTD_ROAD_CALL RoadSetTick(uint32_t id, uint8_t tick) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->tick_counter = static_cast<uint8_t>(tick);
+}
+static void OPENTTD_ROAD_CALL RoadSetRunning(uint32_t id, uint8_t running) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->running_ticks = static_cast<uint8_t>(running);
+}
+static void OPENTTD_ROAD_CALL RoadSetDay(uint32_t id, uint8_t day) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->day_counter = static_cast<uint8_t>(day);
+}
+static void OPENTTD_ROAD_CALL RoadSetOrderTime(uint32_t id, int32_t order_time) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->current_order_time = static_cast<int32_t>(order_time);
+}
+static void OPENTTD_ROAD_CALL RoadSetProgress(uint32_t id, uint8_t progress) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->progress = static_cast<uint8_t>(progress);
+}
+static void OPENTTD_ROAD_CALL RoadSetLastStation(uint32_t id, uint16_t station) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->last_station_visited = StationID(static_cast<uint16_t>(station));
+}
+static void OPENTTD_ROAD_CALL RoadSetHidden(uint32_t id, bool hidden) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->vehstatus.Set(VehState::Hidden, hidden != 0);
+}
+static void OPENTTD_ROAD_CALL RoadSetFirstEngine(uint32_t id, uint16_t engine) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->gcache.first_engine = EngineID(static_cast<uint16_t>(engine));
+}
+static void OPENTTD_ROAD_CALL RoadSetLength(uint32_t id, uint8_t length) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->gcache.cached_veh_length = static_cast<uint8_t>(length);
+}
+static void OPENTTD_ROAD_CALL RoadSetTotalLength(uint32_t id, uint16_t length) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->gcache.cached_total_length = static_cast<uint16_t>(length);
+}
+static void OPENTTD_ROAD_CALL RoadSetCargoAge(uint32_t id, uint16_t period) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->vcache.cached_cargo_age_period = static_cast<uint16_t>(period);
+}
+static void OPENTTD_ROAD_CALL RoadSetMaxSpeed(uint32_t id, uint16_t speed) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	v->vcache.cached_max_speed = static_cast<uint16_t>(speed);
+}
+static void OPENTTD_ROAD_CALL RoadSetSuppressImplicit(uint32_t id) noexcept
+{
+	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	SetBit(v->gv_flags, GVF_SUPPRESS_IMPLICIT_ORDERS);
+}
+static uint32_t OPENTTD_ROAD_CALL RoadReadDay(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return v->day_counter;
+}
+static uint32_t OPENTTD_ROAD_CALL RoadReadDest(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return v->dest_tile.base();
+}
+static uint32_t OPENTTD_ROAD_CALL RoadReadDirection(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return v->direction;
+}
+static uint32_t OPENTTD_ROAD_CALL RoadReadEngine(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return v->engine_type.base();
+}
+static uint32_t OPENTTD_ROAD_CALL RoadReadFirst(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return v->First()->index.base();
+}
+static uint32_t OPENTTD_ROAD_CALL RoadReadFront(uint32_t id) noexcept
 {
 	const Vehicle *v = Vehicle::Get(VehicleID(id));
 	const RoadVehicle *rv = v->type == VEH_ROAD ? RoadVehicle::From(v) : nullptr;
-	out->type = v->type;
-	out->first = v->First()->index.base();
-	out->next = v->Next() == nullptr ? UINT32_MAX : v->Next()->index.base();
-	out->previous = v->Previous() == nullptr ? UINT32_MAX : v->Previous()->index.base();
-	out->tile = v->tile.base();
-	out->dest = v->dest_tile.base();
-	out->x = v->x_pos;
-	out->y = v->y_pos;
-	out->z = v->z_pos;
-	out->direction = v->direction;
-	out->speed = v->cur_speed;
-	out->tick = v->tick_counter;
-	out->running = v->running_ticks;
-	out->day = v->day_counter;
-	out->order_time = v->current_order_time;
-	out->progress = v->progress;
-	out->status = v->vehstatus.base();
-	out->owner = v->owner.base();
-	out->engine = v->engine_type.base();
-	out->last_station = v->last_station_visited.base();
-	out->order_destination = v->current_order.GetDestination().base();
-	out->order_type = v->current_order.GetType();
-	out->order_max_speed = v->current_order.GetMaxSpeed();
-	out->breakdown = v->breakdown_ctr;
-	out->max_track_speed = rv == nullptr ? 0 : rv->gcache.cached_max_track_speed;
-	out->length = rv == nullptr ? 0 : rv->gcache.cached_veh_length;
-	out->total_length = rv == nullptr ? 0 : rv->gcache.cached_total_length;
-	out->roadtype = rv == nullptr ? 0 : rv->roadtype;
-	out->front = rv != nullptr && rv->IsFrontEngine();
-	out->articulated = rv != nullptr && rv->HasArticulatedPart();
-	out->tram = rv != nullptr && RoadTypeIsTram(rv->roadtype);
-	out->bus = rv != nullptr && rv->IsFrontEngine() && rv->IsBus();
-	out->order_nonstop = v->current_order.GetNonStopType().base();
+	return rv != nullptr && rv->IsFrontEngine();
 }
-static void OPENTTD_ROAD_CALL RoadWrite(uint32_t id, uint32_t field, uint64_t value) noexcept
+static uint32_t OPENTTD_ROAD_CALL RoadReadLastStation(uint32_t id) noexcept
 {
-	RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
-	switch (field) {
-		case ROAD_WRITE_TILE: v->tile = TileIndex(static_cast<uint32_t>(value)); break;
-		case ROAD_WRITE_X: v->x_pos = static_cast<int32_t>(value); break;
-		case ROAD_WRITE_Y: v->y_pos = static_cast<int32_t>(value); break;
-		case ROAD_WRITE_DIRECTION: v->direction = static_cast<Direction>(value); break;
-		case ROAD_WRITE_SPEED: v->cur_speed = static_cast<uint16_t>(value); break;
-		case ROAD_WRITE_TICK: v->tick_counter = static_cast<uint8_t>(value); break;
-		case ROAD_WRITE_RUNNING: v->running_ticks = static_cast<uint8_t>(value); break;
-		case ROAD_WRITE_DAY: v->day_counter = static_cast<uint8_t>(value); break;
-		case ROAD_WRITE_ORDER_TIME: v->current_order_time = static_cast<int32_t>(value); break;
-		case ROAD_WRITE_PROGRESS: v->progress = static_cast<uint8_t>(value); break;
-		case ROAD_WRITE_LAST_STATION: v->last_station_visited = StationID(static_cast<uint16_t>(value)); break;
-		case ROAD_WRITE_HIDDEN: v->vehstatus.Set(VehState::Hidden, value != 0); break;
-		case ROAD_WRITE_FIRST_ENGINE: v->gcache.first_engine = EngineID(static_cast<uint16_t>(value)); break;
-		case ROAD_WRITE_LENGTH: v->gcache.cached_veh_length = static_cast<uint8_t>(value); break;
-		case ROAD_WRITE_TOTAL_LENGTH: v->gcache.cached_total_length = static_cast<uint16_t>(value); break;
-		case ROAD_WRITE_CARGO_AGE: v->vcache.cached_cargo_age_period = static_cast<uint16_t>(value); break;
-		case ROAD_WRITE_MAX_SPEED: v->vcache.cached_max_speed = static_cast<uint16_t>(value); break;
-		case ROAD_WRITE_SUPPRESS_IMPLICIT: SetBit(v->gv_flags, GVF_SUPPRESS_IMPLICIT_ORDERS); break;
-		default: NOT_REACHED();
-	}
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return v->last_station_visited.base();
 }
-
-static uint64_t OPENTTD_ROAD_CALL RoadLeaf(uint32_t op, uint32_t id, uint64_t a, uint64_t b, uint64_t c) noexcept
+static uint32_t OPENTTD_ROAD_CALL RoadReadLength(uint32_t id) noexcept
 {
-	RoadVehicle *v = id == UINT32_MAX ? nullptr : RoadVehicle::Get(VehicleID(id));
-	switch (op) {
-		case ROAD_OP_ACC_MODEL: { return _settings_game.vehicle.roadveh_acceleration_model; }
-		case ROAD_OP_ROAD_SIDE: { return _settings_game.vehicle.road_side; }
-		case ROAD_OP_TILE_TYPE: { return GetTileType(TileIndex(a)); }
-		case ROAD_OP_HAS_ROAD: { return HasTileAnyRoadType(TileIndex(a), v->compatible_roadtypes); }
-		case ROAD_OP_TRACK_STATUS: { return GetTileTrackStatus(TileIndex(a), TRANSPORT_ROAD, GetRoadTramType(v->roadtype)); }
-		case ROAD_OP_TILE_OWNER: { return GetTileOwner(TileIndex(a)).base(); }
-		case ROAD_OP_DEPOT_DIR: { return GetRoadDepotDirection(TileIndex(a)); }
-		case ROAD_OP_BAY_DIR: { return GetBayRoadStopDir(TileIndex(a)); }
-		case ROAD_OP_IS_DEPOT: { return IsRoadDepotTile(TileIndex(a)); }
-		case ROAD_OP_NORMAL_ROAD: { return IsNormalRoadTile(TileIndex(a)); }
-		case ROAD_OP_ROAD_WORKS: { return HasRoadWorks(TileIndex(a)); }
-		case ROAD_OP_DISALLOWED: { return GetDisallowedRoadDirections(TileIndex(a)); }
-		case ROAD_OP_BAY_STOP: { return IsBayRoadStopTile(TileIndex(a)); }
-		case ROAD_OP_IS_DT_STOP: { return IsDriveThroughStopTile(TileIndex(a)); }
-		case ROAD_OP_STOP_TYPE: { return to_underlying(GetRoadStopType(TileIndex(a))); }
-		case ROAD_OP_FREE_BAY: { return RoadStop::GetByTile(TileIndex(a), GetRoadStopType(TileIndex(a)))->HasFreeBay(); }
-		case ROAD_OP_ANY_ROAD_BITS: { return GetAnyRoadBits(TileIndex(a), GetRoadTramType(v->roadtype), b != 0); }
-		case ROAD_OP_ROAD_BITS: { return GetRoadBits(TileIndex(a), GetRoadTramType(v->roadtype)); }
-		case ROAD_OP_OFFSET: { return static_cast<uint32_t>(TileOffsByDiagDir(static_cast<DiagDirection>(a))); }
-		case ROAD_OP_TILE_X: { return TileX(TileIndex(a)); }
-		case ROAD_OP_TILE_Y: { return TileY(TileIndex(a)); }
-		case ROAD_OP_STATION: { return GetStationIndex(TileIndex(a)).base(); }
-		case ROAD_OP_CONTINUATION: { return RoadStop::IsDriveThroughRoadStopContinuation(TileIndex(a), TileIndex(b)); }
-		case ROAD_OP_BRIDGE_SPEED: { return GetBridgeSpec(GetBridgeType(TileIndex(a)))->speed; }
-		case ROAD_OP_MAX_PENALTY: { return _settings_game.pf.yapf.maximum_go_to_depot_penalty; }
-		case ROAD_OP_SERVINT: { return Company::Get(v->owner)->settings.vehicle.servint_roadveh; }
-		case ROAD_OP_NEEDS_SERVICE: { return v->NeedsAutomaticServicing(); }
-		case ROAD_OP_WAIT_UNBUNCH: { return v->IsWaitingForUnbunching(); }
-		case ROAD_OP_ORDER_STOP: { return v->current_order.ShouldStopAtStation(v, GetStationIndex(TileIndex(a))); }
-		case ROAD_OP_ROAD_TYPE: { return GetRoadType(TileIndex(a), GetRoadTramType(v->roadtype)); }
-		case ROAD_OP_QUEUE: { return _settings_game.pf.roadveh_queue; }
-		case ROAD_OP_TUNNEL_DIR: { return GetTunnelBridgeDirection(TileIndex(a)); }
-		case ROAD_OP_ACCELERATION: { return static_cast<uint64_t>(v->GetAcceleration()); }
-		case ROAD_OP_UPDATE_SPEED: { return v->RustDoUpdateSpeed(static_cast<uint32_t>(a), static_cast<int32_t>(b), static_cast<int32_t>(c)); }
-		case ROAD_OP_ADVANCE: { return v->GetAdvanceDistance(); }
-		case ROAD_OP_POSITION: { v->UpdatePosition(); break; }
-		case ROAD_OP_BASE_VIEWPORT: { v->Vehicle::UpdateViewport(true); break; }
-		case ROAD_OP_LAST_SPEED: { v->SetLastSpeed(); break; }
-		case ROAD_OP_ROADSTOP_LEAVE: { RoadStop::GetByTile(v->tile, GetRoadStopType(v->tile))->Leave(v); break; }
-		case ROAD_OP_ENTRANCE_SET: { RoadStop::GetByTile(v->tile, GetRoadStopType(v->tile))->SetEntranceBusy(a != 0); break; }
-		case ROAD_OP_ENTRANCE_BUSY: { return RoadStop::GetByTile(v->tile, GetRoadStopType(v->tile))->IsEntranceBusy(); }
-		case ROAD_OP_ORDER_FREE: { v->current_order.Free(); break; }
-		case ROAD_OP_SET_NEXT: { v->SetNext(a == UINT32_MAX ? nullptr : Vehicle::Get(VehicleID(a))); break; }
-		case ROAD_OP_START_STOP_DIRTY: { SetWindowWidgetDirty(WC_VEHICLE_VIEW, v->index, WID_VV_START_STOP); break; }
-		case ROAD_OP_DEPOT_DIRTY: { InvalidateWindowData(WC_VEHICLE_DEPOT, v->tile); break; }
-		case ROAD_OP_DETAILS_DIRTY: { SetWindowDirty(WC_VEHICLE_DETAILS, v->index); SetWindowClassesDirty(WC_ROADVEH_LIST); break; }
-		case ROAD_OP_SERVICE: { VehicleServiceInDepot(v); break; }
-		case ROAD_OP_LEAVE_UNBUNCH: { v->LeaveUnbunchingDepot(); break; }
-		case ROAD_OP_RESET_UNBUNCH: { v->ResetDepotUnbunching(); break; }
-		case ROAD_OP_PATH_RESULT: { v->HandlePathfindingResult(a != 0); break; }
-		case ROAD_OP_ORDER_DUMMY: { v->current_order.MakeDummy(); break; }
-		case ROAD_OP_ORDER_DEPOT: { v->current_order.MakeGoToDepot(DepotID(a), OrderDepotTypeFlag::Service); break; }
-		case ROAD_OP_DEPOT_INDEX: { return GetDepotIndex(TileIndex(a)).base(); }
-		case ROAD_OP_DECREASE_VALUE: { DecreaseVehicleValue(v); break; }
-		case ROAD_OP_AGE: { AgeVehicle(v); break; }
-		case ROAD_OP_ECONOMY_AGE: { EconomyAgeVehicle(v); break; }
-		case ROAD_OP_CHECK_BREAKDOWN: { CheckVehicleBreakdown(v); break; }
-		case ROAD_OP_CHECK_ORDERS: { CheckOrders(v); break; }
-		case ROAD_OP_PAY_RUNNING: { CommandCost cost(EXPENSES_ROADVEH_RUN, Money(static_cast<int64_t>(a))); v->profit_this_year -= cost.GetCost(); v->running_ticks = 0; SubtractMoneyFromCompanyFract(v->owner, cost); break; }
-		case ROAD_OP_COST_CLASS: { return static_cast<uint32_t>(v->GetEngine()->VehInfo<RoadVehicleInfo>().running_cost_class); }
-		case ROAD_OP_COST_FACTOR: { return v->GetEngine()->VehInfo<RoadVehicleInfo>().running_cost; }
-		case ROAD_OP_GET_PRICE: { return static_cast<uint64_t>(GetPrice(v->GetEngine()->VehInfo<RoadVehicleInfo>().running_cost_class, a, v->GetEngine()->GetGRF())); }
-		case ROAD_OP_GRF_VERSION: { return v->GetEngine()->GetGRF() == nullptr ? 0 : v->GetEngine()->GetGRF()->grf_version; }
-		case ROAD_OP_LENGTH_DEFAULT: { return v->GetEngine()->VehInfo<RoadVehicleInfo>().shorten_factor; }
-		case ROAD_OP_AGE_DEFAULT: { return EngInfo(v->engine_type)->cargo_age_period; }
-		case ROAD_OP_SPEED_DEFAULT: { return RoadVehInfo(v->engine_type)->max_speed; }
-		case ROAD_OP_LENGTH_ERROR: { ErrorUnknownCallbackResult(v->GetEngine()->GetGRFID(), CBID_VEHICLE_LENGTH, a); break; }
-		case ROAD_OP_DISCONNECT: { FatalError("Disconnecting road vehicle."); }
-		case ROAD_OP_EXPLOSION: { CreateEffectVehicleRel(v, 4, 4, 8, EV_EXPLOSION_LARGE); break; }
-		case ROAD_OP_SOUND_DEFAULT: { return RoadVehInfo(v->engine_type)->sfx; }
-		case ROAD_OP_SOUND: { SndPlayVehicleFx(static_cast<SoundID>(a), v); break; }
-		case ROAD_OP_SOUND_OLD1: { return SND_19_DEPARTURE_OLD_RV_1; }
-		case ROAD_OP_SOUND_OLD2: { return SND_1A_DEPARTURE_OLD_RV_2; }
-		case ROAD_OP_ENGINE_INVALID: { return EngineID::Invalid().base(); }
-		case ROAD_OP_INVALID_PRICE: { return static_cast<uint32_t>(INVALID_PRICE); }
-		case ROAD_OP_COST_DIVISOR: { return CalendarTime::DAYS_IN_YEAR * Ticks::DAY_TICKS; }
-		case ROAD_OP_IS_CROSSING: return IsLevelCrossingTile(TileIndex(a));
-		case ROAD_OP_NEW_POSITION: { auto gp = GetNewVehiclePos(v); return static_cast<uint32_t>(gp.x) | (static_cast<uint64_t>(static_cast<uint32_t>(gp.y)) << 32); }
-		case ROAD_OP_VIRT_TILE: return TileVirtXY(static_cast<int32_t>(a), static_cast<int32_t>(b)).base();
-		case ROAD_OP_IS_ROAD_STOP: return IsStationRoadStop(TileIndex(a));
-		case ROAD_OP_SET_DEST: v->dest_tile = TileIndex(static_cast<uint32_t>(a)); break;
-		case ROAD_OP_CACHE_INVALIDATE: { v->InvalidateNewGRFCacheOfChain(); break; }
-		case ROAD_OP_ARRIVAL: {
-			static const StringID headlines[] = {STR_NEWS_FIRST_BUS_ARRIVAL, STR_NEWS_FIRST_PASSENGER_TRAM_ARRIVAL, STR_NEWS_FIRST_TRUCK_ARRIVAL, STR_NEWS_FIRST_CARGO_TRAM_ARRIVAL};
-			AddVehicleNewsItem(GetEncodedString(headlines[b], StationID(a)), c != 0 ? NewsType::ArrivalCompany : NewsType::ArrivalOther, v->index, StationID(a));
-			AI::NewEvent(v->owner, new ScriptEventStationFirstVehicle(StationID(a), v->index));
-			Game::NewEvent(new ScriptEventStationFirstVehicle(StationID(a), v->index));
-			break;
-		}
-		case ROAD_OP_CRASH_NEWS: { RoadCrashNews(v, static_cast<uint32_t>(a)); break; }
-		case ROAD_OP_STATION_VISITS: return Station::Get(StationID(a))->had_vehicle_of_type;
-		case ROAD_OP_STATION_VISIT_SET: Station::Get(StationID(a))->had_vehicle_of_type |= static_cast<StationHadVehicleOfType>(b); break;
-		case ROAD_OP_LOCAL_COMPANY: return _local_company.base();
-		default: NOT_REACHED();
-	}
-	return 0;
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	const RoadVehicle *rv = v->type == VEH_ROAD ? RoadVehicle::From(v) : nullptr;
+	return rv == nullptr ? 0 : rv->gcache.cached_veh_length;
+}
+static uint32_t OPENTTD_ROAD_CALL RoadReadNext(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return v->Next() == nullptr ? UINT32_MAX : v->Next()->index.base();
+}
+static uint32_t OPENTTD_ROAD_CALL RoadReadOrderType(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return v->current_order.GetType();
+}
+static uint32_t OPENTTD_ROAD_CALL RoadReadPrevious(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return v->Previous() == nullptr ? UINT32_MAX : v->Previous()->index.base();
+}
+static uint32_t OPENTTD_ROAD_CALL RoadReadProgress(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return v->progress;
+}
+static uint32_t OPENTTD_ROAD_CALL RoadReadRunning(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return v->running_ticks;
+}
+static uint32_t OPENTTD_ROAD_CALL RoadReadSpeed(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return v->cur_speed;
+}
+static uint32_t OPENTTD_ROAD_CALL RoadReadStatus(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return v->vehstatus.base();
+}
+static uint32_t OPENTTD_ROAD_CALL RoadReadTick(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return v->tick_counter;
+}
+static uint32_t OPENTTD_ROAD_CALL RoadReadTile(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return v->tile.base();
+}
+static uint32_t OPENTTD_ROAD_CALL RoadReadTotalLength(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	const RoadVehicle *rv = v->type == VEH_ROAD ? RoadVehicle::From(v) : nullptr;
+	return rv == nullptr ? 0 : rv->gcache.cached_total_length;
+}
+static uint32_t OPENTTD_ROAD_CALL RoadReadTram(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	const RoadVehicle *rv = v->type == VEH_ROAD ? RoadVehicle::From(v) : nullptr;
+	return rv != nullptr && RoadTypeIsTram(rv->roadtype);
+}
+static OpenTTDRoadSpeedLimits OPENTTD_ROAD_CALL RoadSpeedLimits(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	const RoadVehicle *rv = v->type == VEH_ROAD ? RoadVehicle::From(v) : nullptr;
+	return {static_cast<uint32_t>(rv == nullptr ? 0 : rv->gcache.cached_max_track_speed), static_cast<uint32_t>(v->current_order.GetMaxSpeed())};
+}
+static OpenTTDRoadConsistSpeed OPENTTD_ROAD_CALL RoadConsistSpeed(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return {static_cast<uint32_t>(v->direction), static_cast<uint32_t>(v->Next() == nullptr ? UINT32_MAX : v->Next()->index.base()), static_cast<uint32_t>(v->vehstatus.base()), static_cast<uint32_t>(v->tile.base())};
+}
+static OpenTTDRoadCloseOrigin OPENTTD_ROAD_CALL RoadCloseOrigin(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return {static_cast<uint32_t>(v->First()->index.base()), static_cast<uint32_t>(v->z_pos)};
+}
+static OpenTTDRoadCloseCandidate OPENTTD_ROAD_CALL RoadCloseCandidate(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return {static_cast<uint32_t>(v->direction), static_cast<uint32_t>(v->First()->index.base()), static_cast<uint32_t>(v->x_pos), static_cast<uint32_t>(v->y_pos), static_cast<uint32_t>(v->z_pos)};
 }
 
-static uint64_t RoadAction(const OpenTTDRoadAction &action)
+static OpenTTDRoadOvertakeOrigin OPENTTD_ROAD_CALL RoadOvertakeOrigin(uint32_t id) noexcept
 {
-	RoadVehicle *v = RoadVehicle::Get(VehicleID(action.id));
-	uint64_t a = action.a, b = action.b, c = action.c;
-	switch (action.op) {
-		case ROAD_OP_ENTER_TILE: { return VehicleEnterTile(v, TileIndex(a), static_cast<int32_t>(b), static_cast<int32_t>(c)).base(); }
-		case ROAD_OP_ENTER_DEPOT: { VehicleEnterDepot(v); break; }
-		case ROAD_OP_PROCESS_ORDERS: { ProcessOrders(v); break; }
-		case ROAD_OP_LOADING: { v->HandleLoading(); break; }
-		case ROAD_OP_BEGIN_LOADING: { v->BeginLoading(); break; }
-		case ROAD_OP_TRAM_PROBE: { Backup<CompanyID> current(_current_company, v->owner); CommandCost result = Command<CMD_BUILD_ROAD>::Do(DoCommandFlag::NoWater, TileIndex(a), static_cast<RoadBits>(b), v->roadtype, DRD_NONE, TownID::Invalid()); current.Restore(); return result.Succeeded(); }
-		case ROAD_OP_PROPERTY: { return GetVehicleProperty(v, static_cast<PropertyID>(a), b); }
-		case ROAD_OP_LENGTH_CALLBACK: { return GetVehicleCallback(CBID_VEHICLE_LENGTH, 0, 0, v->engine_type, v); }
-		case ROAD_OP_PLAY_SOUND: { return PlayVehicleSound(v, VSE_START); }
-		case ROAD_OP_VISUAL: { v->ShowVisualEffect(); break; }
-		case ROAD_OP_UPDATE_VISUAL: { v->UpdateVisualEffect(); break; }
-		case ROAD_OP_CARGO_CHANGED: { v->CargoChanged(); break; }
-		case ROAD_OP_LENGTH_CHANGED: { VehicleLengthChanged(v); break; }
-		case ROAD_OP_BREAKDOWN: { return v->HandleBreakdown(); }
-		case ROAD_OP_DELETE: { delete v; break; }
-		case ROAD_OP_GROUND_CRASH: { return v->GroundVehicleBase::Crash(a != 0); }
-		case ROAD_OP_STOP_RANDOM: { TriggerRoadStopRandomisation(Station::Get(StationID(a)), v->tile, StationRandomTrigger::VehicleArrives); break; }
-		case ROAD_OP_STOP_ANIMATION: { TriggerRoadStopAnimation(Station::Get(StationID(a)), v->tile, StationAnimationTrigger::VehicleArrives); break; }
-		case ROAD_OP_YAPF: { bool found = true; Trackdir dir = YapfRoadVehicleChooseTrack(v, TileIndex(a), static_cast<DiagDirection>(b), static_cast<TrackdirBits>(c), found); return dir | (static_cast<uint64_t>(found) << 8); }
-		case ROAD_OP_FIND_DEPOT: { FindDepotData result = YapfRoadVehicleFindNearestDepot(v, static_cast<int32_t>(a)); return result.tile.base() | (static_cast<uint64_t>(result.best_length) << 32); }
-		case ROAD_OP_INCLINATION: { return static_cast<uint64_t>(v->UpdateInclination(a != 0, b != 0)); }
-		case ROAD_OP_VIEWPORT: { v->UpdateViewport(a != 0, b != 0); break; }
-		default: NOT_REACHED();
-	}
-	return 0;
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	const RoadVehicle *rv = v->type == VEH_ROAD ? RoadVehicle::From(v) : nullptr;
+	return {static_cast<uint32_t>(rv != nullptr && rv->HasArticulatedPart()), static_cast<uint32_t>(v->direction), static_cast<uint32_t>(v->tile.base()), static_cast<uint32_t>(rv != nullptr && RoadTypeIsTram(rv->roadtype))};
+}
+static OpenTTDRoadOvertakeSpeed OPENTTD_ROAD_CALL RoadOvertakeSpeed(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return {static_cast<uint32_t>(v->direction), static_cast<uint32_t>(v->cur_speed), static_cast<uint32_t>(v->vehstatus.base()), static_cast<uint32_t>(v->tile.base())};
+}
+static OpenTTDRoadSlidingPosition OPENTTD_ROAD_CALL RoadSlidingPosition(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return {static_cast<uint32_t>(v->direction), static_cast<uint32_t>(v->x_pos), static_cast<uint32_t>(v->y_pos)};
+}
+static OpenTTDRoadHeightSpeed OPENTTD_ROAD_CALL RoadHeightSpeed(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	const RoadVehicle *rv = v->type == VEH_ROAD ? RoadVehicle::From(v) : nullptr;
+	return {static_cast<uint32_t>(rv == nullptr ? 0 : rv->gcache.cached_max_track_speed), static_cast<uint32_t>(v->cur_speed), static_cast<uint32_t>(v->z_pos)};
+}
+static OpenTTDRoadCollisionPart OPENTTD_ROAD_CALL RoadCollisionPart(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return {static_cast<uint32_t>(v->Next() == nullptr ? UINT32_MAX : v->Next()->index.base()), static_cast<uint32_t>(v->tile.base()), static_cast<uint32_t>(v->z_pos)};
+}
+static OpenTTDRoadCollisionOrigin OPENTTD_ROAD_CALL RoadCollisionOrigin(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return {static_cast<uint32_t>(v->x_pos), static_cast<uint32_t>(v->y_pos)};
+}
+
+static OpenTTDRoadCrashDirection OPENTTD_ROAD_CALL RoadCrashDirection(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return {static_cast<uint32_t>(v->direction)};
+}
+static OpenTTDRoadPathVehicle OPENTTD_ROAD_CALL RoadPathVehicle(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	const RoadVehicle *rv = v->type == VEH_ROAD ? RoadVehicle::From(v) : nullptr;
+	return {static_cast<uint32_t>(rv != nullptr && rv->HasArticulatedPart()), static_cast<uint32_t>(v->owner.base()), static_cast<uint32_t>(v->tile.base()), static_cast<uint32_t>(rv != nullptr && RoadTypeIsTram(rv->roadtype))};
+}
+static OpenTTDRoadDepotPart OPENTTD_ROAD_CALL RoadDepotPart(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return {static_cast<uint32_t>(v->Next() == nullptr ? UINT32_MAX : v->Next()->index.base()), static_cast<uint32_t>(v->tile.base())};
+}
+static OpenTTDRoadDepotOrders OPENTTD_ROAD_CALL RoadDepotOrders(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return {static_cast<uint32_t>(v->dest_tile.base()), static_cast<uint32_t>(v->current_order.GetType())};
+}
+static OpenTTDRoadVehicleTile OPENTTD_ROAD_CALL RoadVehicleTile(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return {static_cast<uint32_t>(v->tile.base())};
+}
+static OpenTTDRoadArrivalVehicle OPENTTD_ROAD_CALL RoadArrivalVehicle(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	const RoadVehicle *rv = v->type == VEH_ROAD ? RoadVehicle::From(v) : nullptr;
+	return {static_cast<uint32_t>(v->owner.base()), static_cast<uint32_t>(rv != nullptr && RoadTypeIsTram(rv->roadtype))};
+}
+static OpenTTDRoadTunnelVehicle OPENTTD_ROAD_CALL RoadTunnelVehicle(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	const RoadVehicle *rv = v->type == VEH_ROAD ? RoadVehicle::From(v) : nullptr;
+	return {static_cast<uint32_t>(v->direction), static_cast<uint32_t>(rv != nullptr && rv->IsFrontEngine())};
+}
+static OpenTTDRoadMoveVehicle OPENTTD_ROAD_CALL RoadMoveVehicle(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	const RoadVehicle *rv = v->type == VEH_ROAD ? RoadVehicle::From(v) : nullptr;
+	return {static_cast<uint32_t>(rv != nullptr && rv->IsFrontEngine()), static_cast<uint32_t>(v->tile.base()), static_cast<uint32_t>(rv != nullptr && RoadTypeIsTram(rv->roadtype))};
+}
+static OpenTTDRoadMoveTransition OPENTTD_ROAD_CALL RoadMoveTransition(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	const RoadVehicle *rv = v->type == VEH_ROAD ? RoadVehicle::From(v) : nullptr;
+	return {static_cast<uint32_t>(rv == nullptr ? 0 : rv->gcache.cached_veh_length), static_cast<uint32_t>(v->Next() == nullptr ? UINT32_MAX : v->Next()->index.base()), static_cast<uint32_t>(v->tile.base())};
+}
+static OpenTTDRoadMovePosition OPENTTD_ROAD_CALL RoadMovePosition(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return {static_cast<uint32_t>(v->current_order.GetType()), static_cast<uint32_t>(v->owner.base()), static_cast<uint32_t>(v->cur_speed), static_cast<uint32_t>(v->tile.base())};
+}
+static OpenTTDRoadBlockVehicle OPENTTD_ROAD_CALL RoadBlockVehicle(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	const RoadVehicle *rv = v->type == VEH_ROAD ? RoadVehicle::From(v) : nullptr;
+	return {static_cast<uint32_t>(v->direction), static_cast<uint32_t>(rv != nullptr && rv->IsFrontEngine()), static_cast<uint32_t>(v->owner.base()), static_cast<uint32_t>(v->tile.base())};
+}
+static OpenTTDRoadStopOrder OPENTTD_ROAD_CALL RoadStopOrder(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return {static_cast<uint32_t>(v->current_order.GetDestination().base()), static_cast<uint32_t>(v->current_order.GetType()), static_cast<uint32_t>(v->tile.base())};
+}
+static OpenTTDRoadMoveStop OPENTTD_ROAD_CALL RoadMoveStop(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return {static_cast<uint32_t>(v->current_order.GetType()), static_cast<uint32_t>(v->tile.base())};
+}
+static OpenTTDRoadOrderClock OPENTTD_ROAD_CALL RoadOrderClock(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return {static_cast<uint32_t>(v->current_order_time)};
+}
+static OpenTTDRoadControllerPart OPENTTD_ROAD_CALL RoadControllerPart(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return {static_cast<uint32_t>(v->Next() == nullptr ? UINT32_MAX : v->Next()->index.base()), static_cast<uint32_t>(v->vehstatus.base())};
+}
+static OpenTTDRoadServiceOrigin OPENTTD_ROAD_CALL RoadServiceOrigin(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return {static_cast<uint32_t>(v->First()->index.base()), static_cast<uint32_t>(v->cur_speed), static_cast<uint32_t>(v->tile.base())};
+}
+static OpenTTDRoadServiceOrder OPENTTD_ROAD_CALL RoadServiceOrder(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return {static_cast<uint32_t>(v->current_order.GetNonStopType().base()), static_cast<uint32_t>(v->current_order.GetType())};
+}
+static OpenTTDRoadTrackDirection OPENTTD_ROAD_CALL RoadTrackDirection(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return {static_cast<uint32_t>(v->direction), static_cast<uint32_t>(v->vehstatus.base()), static_cast<uint32_t>(v->tile.base())};
+}
+static OpenTTDRoadSlopeOrigin OPENTTD_ROAD_CALL RoadSlopeOrigin(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return {static_cast<uint32_t>(v->direction), static_cast<uint32_t>(v->First()->index.base())};
+}
+static OpenTTDRoadSlopePart OPENTTD_ROAD_CALL RoadSlopePart(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return {static_cast<uint32_t>(v->direction), static_cast<uint32_t>(v->Next() == nullptr ? UINT32_MAX : v->Next()->index.base())};
+}
+static OpenTTDRoadTurnVehicle OPENTTD_ROAD_CALL RoadTurnVehicle(uint32_t id) noexcept
+{
+	const Vehicle *v = Vehicle::Get(VehicleID(id));
+	return {static_cast<uint32_t>(v->breakdown_ctr), static_cast<uint32_t>(v->direction), static_cast<uint32_t>(v->current_order.GetType()), static_cast<uint32_t>(v->vehstatus.base()), static_cast<uint32_t>(v->tile.base())};
+}
+
+static uint32_t OPENTTD_ROAD_CALL RoadReadType(uint32_t id) noexcept
+{
+	return Vehicle::Get(VehicleID(id))->type;
+}
+
+static uint32_t OPENTTD_ROAD_CALL RoadReadZ(uint32_t id) noexcept
+{
+	return Vehicle::Get(VehicleID(id))->z_pos;
+}
+
+static uint32_t OPENTTD_ROAD_CALL RoadReadBus(uint32_t id) noexcept
+{
+	const RoadVehicle *v = RoadVehicle::Get(VehicleID(id));
+	return v->IsFrontEngine() && v->IsBus();
 }

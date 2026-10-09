@@ -14,6 +14,7 @@
 
 #include "safeguards.h"
 
+#ifndef WITH_RUST
 /**
  * Decides if a packet needs to be split.
  * @param cp Packet to be either split or moved in one piece.
@@ -238,3 +239,5 @@ template uint CargoRemoval<VehicleCargoList>::Preprocess(CargoPacket *cp);
 template uint CargoRemoval<StationCargoList>::Preprocess(CargoPacket *cp);
 template bool CargoRemoval<VehicleCargoList>::Postprocess(CargoPacket *cp, uint remove);
 template bool CargoRemoval<StationCargoList>::Postprocess(CargoPacket *cp, uint remove);
+
+#endif /* WITH_RUST */

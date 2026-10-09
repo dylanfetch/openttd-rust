@@ -21,6 +21,9 @@
 CargoPacketPool _cargopacket_pool("CargoPacket");
 INSTANTIATE_POOL_METHODS(CargoPacket)
 
+#ifdef WITH_RUST
+#include "rust/cargo_storage.hpp"
+#else
 /**
  * Create a new packet for savegame loading.
  */
@@ -862,3 +865,5 @@ uint StationCargoList::Reroute(uint max_move, StationCargoList *dest, StationID 
 template class CargoList<VehicleCargoList, CargoPacketList>;
 template class CargoList<StationCargoList, StationCargoPacketMap>;
 template uint VehicleCargoList::Reassign<VehicleCargoList::MTA_DELIVER, VehicleCargoList::MTA_KEEP>(uint);
+
+#endif /* WITH_RUST */

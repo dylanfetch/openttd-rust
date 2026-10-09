@@ -18,205 +18,250 @@
 #else
 #define OPENTTD_ROAD_CALL
 #endif
-/** Immediate shared services and named arbitrary-code/owner-reentry actions. */
-enum RoadOperation : uint32_t {
-	ROAD_OP_ACC_MODEL = 1,
-	ROAD_OP_ROAD_SIDE = 2,
-	ROAD_OP_TILE_TYPE = 3,
-	ROAD_OP_HAS_ROAD = 4,
-	ROAD_OP_TRACK_STATUS = 5,
-	ROAD_OP_TILE_OWNER = 6,
-	ROAD_OP_DEPOT_DIR = 7,
-	ROAD_OP_BAY_DIR = 8,
-	ROAD_OP_IS_DEPOT = 9,
-	ROAD_OP_NORMAL_ROAD = 10,
-	ROAD_OP_ROAD_WORKS = 11,
-	ROAD_OP_DISALLOWED = 12,
-	ROAD_OP_BAY_STOP = 13,
-	ROAD_OP_IS_DT_STOP = 14,
-	ROAD_OP_STOP_TYPE = 15,
-	ROAD_OP_FREE_BAY = 16,
-	ROAD_OP_ANY_ROAD_BITS = 17,
-	ROAD_OP_ROAD_BITS = 18,
-	ROAD_OP_OFFSET = 20,
-	ROAD_OP_TILE_X = 21,
-	ROAD_OP_TILE_Y = 22,
-	ROAD_OP_STATION = 23,
-	ROAD_OP_CONTINUATION = 24,
-	ROAD_OP_BRIDGE_SPEED = 25,
-	ROAD_OP_MAX_PENALTY = 26,
-	ROAD_OP_SERVINT = 27,
-	ROAD_OP_NEEDS_SERVICE = 28,
-	ROAD_OP_WAIT_UNBUNCH = 30,
-	ROAD_OP_ORDER_STOP = 31,
-	ROAD_OP_ROAD_TYPE = 32,
-	ROAD_OP_QUEUE = 33,
-	ROAD_OP_TUNNEL_DIR = 34,
-	ROAD_OP_ACCELERATION = 35,
-	ROAD_OP_UPDATE_SPEED = 36,
-	ROAD_OP_ADVANCE = 37,
-	ROAD_OP_POSITION = 39,
-	ROAD_OP_BASE_VIEWPORT = 41,
-	ROAD_OP_LAST_SPEED = 42,
-	ROAD_OP_ROADSTOP_LEAVE = 43,
-	ROAD_OP_ENTRANCE_SET = 44,
-	ROAD_OP_ENTRANCE_BUSY = 45,
-	ROAD_OP_ORDER_FREE = 46,
-	ROAD_OP_SET_NEXT = 47,
-	ROAD_OP_START_STOP_DIRTY = 48,
-	ROAD_OP_DEPOT_DIRTY = 49,
-	ROAD_OP_DETAILS_DIRTY = 50,
-	ROAD_OP_SERVICE = 51,
-	ROAD_OP_LEAVE_UNBUNCH = 52,
-	ROAD_OP_RESET_UNBUNCH = 53,
-	ROAD_OP_PATH_RESULT = 54,
-	ROAD_OP_ORDER_DUMMY = 55,
-	ROAD_OP_ORDER_DEPOT = 56,
-	ROAD_OP_DEPOT_INDEX = 57,
-	ROAD_OP_DECREASE_VALUE = 58,
-	ROAD_OP_AGE = 59,
-	ROAD_OP_ECONOMY_AGE = 60,
-	ROAD_OP_CHECK_BREAKDOWN = 61,
-	ROAD_OP_CHECK_ORDERS = 62,
-	ROAD_OP_PAY_RUNNING = 63,
-	ROAD_OP_COST_CLASS = 64,
-	ROAD_OP_COST_FACTOR = 65,
-	ROAD_OP_GET_PRICE = 66,
-	ROAD_OP_GRF_VERSION = 67,
-	ROAD_OP_LENGTH_DEFAULT = 68,
-	ROAD_OP_AGE_DEFAULT = 69,
-	ROAD_OP_SPEED_DEFAULT = 70,
-	ROAD_OP_LENGTH_ERROR = 71,
-	ROAD_OP_DISCONNECT = 72,
-	ROAD_OP_EXPLOSION = 73,
-	ROAD_OP_SOUND_DEFAULT = 74,
-	ROAD_OP_SOUND = 75,
-	ROAD_OP_SOUND_OLD1 = 76,
-	ROAD_OP_SOUND_OLD2 = 77,
-	ROAD_OP_ENGINE_INVALID = 79,
-	ROAD_OP_INVALID_PRICE = 80,
-	ROAD_OP_COST_DIVISOR = 81,
-	ROAD_OP_IS_CROSSING = 82,
-	ROAD_OP_NEW_POSITION = 83,
-	ROAD_OP_VIRT_TILE = 84,
-	ROAD_OP_IS_ROAD_STOP = 85,
-	ROAD_OP_SET_DEST = 86,
-	ROAD_OP_STATION_VISITS = 87,
-	ROAD_OP_STATION_VISIT_SET = 88,
-	ROAD_OP_LOCAL_COMPANY = 89,
-	ROAD_OP_ENTER_TILE = 128,
-	ROAD_OP_ENTER_DEPOT = 129,
-	ROAD_OP_PROCESS_ORDERS = 130,
-	ROAD_OP_LOADING = 131,
-	ROAD_OP_BEGIN_LOADING = 132,
-	ROAD_OP_TRAM_PROBE = 133,
-	ROAD_OP_PROPERTY = 134,
-	ROAD_OP_LENGTH_CALLBACK = 135,
-	ROAD_OP_PLAY_SOUND = 136,
-	ROAD_OP_VISUAL = 137,
-	ROAD_OP_UPDATE_VISUAL = 138,
-	ROAD_OP_CARGO_CHANGED = 139,
-	ROAD_OP_CACHE_INVALIDATE = 140,
-	ROAD_OP_LENGTH_CHANGED = 141,
-	ROAD_OP_BREAKDOWN = 142,
-	ROAD_OP_DELETE = 143,
-	ROAD_OP_GROUND_CRASH = 144,
-	ROAD_OP_ARRIVAL = 145,
-	ROAD_OP_STOP_RANDOM = 146,
-	ROAD_OP_STOP_ANIMATION = 147,
-	ROAD_OP_CRASH_NEWS = 148,
-	ROAD_OP_YAPF = 149,
-	ROAD_OP_FIND_DEPOT = 150,
-	ROAD_OP_INCLINATION = 151,
-	ROAD_OP_VIEWPORT = 152,
-};
-enum RoadSharedField : uint32_t {
-	ROAD_WRITE_TILE = 0,
-	ROAD_WRITE_X = 1,
-	ROAD_WRITE_Y = 2,
-	ROAD_WRITE_DIRECTION = 3,
-	ROAD_WRITE_SPEED = 4,
-	ROAD_WRITE_TICK = 5,
-	ROAD_WRITE_RUNNING = 6,
-	ROAD_WRITE_DAY = 7,
-	ROAD_WRITE_ORDER_TIME = 8,
-	ROAD_WRITE_PROGRESS = 9,
-	ROAD_WRITE_LAST_STATION = 10,
-	ROAD_WRITE_HIDDEN = 11,
-	ROAD_WRITE_FIRST_ENGINE = 12,
-	ROAD_WRITE_LENGTH = 13,
-	ROAD_WRITE_TOTAL_LENGTH = 14,
-	ROAD_WRITE_CARGO_AGE = 15,
-	ROAD_WRITE_MAX_SPEED = 16,
-	ROAD_WRITE_SUPPRESS_IMPLICIT = 17,
-};
+/** Synchronous immutable callback table; no reference into shared world storage.
+ * Each read copies only fields consumed together at the source observation point.
+ * All callbacks are noexcept, including nested road entries and shell destruction.
+ * No owner/path borrow spans a callback; panic and environmental failures abort. */
 struct OpenTTDRoadState;
-struct OpenTTDRoadPathElement {
-	uint8_t trackdir;
-	uint32_t tile;
-};
-struct OpenTTDRoadView {
-	uint32_t type;
-	uint32_t first;
-	uint32_t next;
-	uint32_t previous;
-	uint32_t tile;
-	uint32_t dest;
-	uint32_t x;
-	uint32_t y;
-	uint32_t z;
-	uint32_t direction;
-	uint32_t speed;
-	uint32_t tick;
-	uint32_t running;
-	uint32_t day;
-	uint32_t order_time;
-	uint32_t progress;
-	uint32_t status;
-	uint32_t owner;
-	uint32_t engine;
-	uint32_t last_station;
-	uint32_t order_destination;
-	uint32_t order_type;
-	uint32_t order_max_speed;
-	uint32_t breakdown;
-	uint32_t max_track_speed;
-	uint32_t length;
-	uint32_t total_length;
-	uint32_t roadtype;
-	uint32_t front;
-	uint32_t articulated;
-	uint32_t tram;
-	uint32_t bus;
-	uint32_t order_nonstop;
-};
-struct OpenTTDRoadAction { uint32_t op, id; uint64_t a, b, c; };
+struct OpenTTDRoadPathElement { uint8_t trackdir; uint32_t tile; };
+struct OpenTTDRoadSpeedLimits { uint32_t max_track_speed; uint32_t order_max_speed; };
+struct OpenTTDRoadConsistSpeed { uint32_t direction; uint32_t next; uint32_t status; uint32_t tile; };
+struct OpenTTDRoadCloseOrigin { uint32_t first; uint32_t z; };
+struct OpenTTDRoadCloseCandidate { uint32_t direction; uint32_t first; uint32_t x; uint32_t y; uint32_t z; };
+struct OpenTTDRoadOvertakeOrigin { uint32_t articulated; uint32_t direction; uint32_t tile; uint32_t tram; };
+struct OpenTTDRoadOvertakeSpeed { uint32_t direction; uint32_t speed; uint32_t status; uint32_t tile; };
+struct OpenTTDRoadSlidingPosition { uint32_t direction; uint32_t x; uint32_t y; };
+struct OpenTTDRoadHeightSpeed { uint32_t max_track_speed; uint32_t speed; uint32_t z; };
+struct OpenTTDRoadCollisionPart { uint32_t next; uint32_t tile; uint32_t z; };
+struct OpenTTDRoadCollisionOrigin { uint32_t x; uint32_t y; };
+struct OpenTTDRoadCrashDirection { uint32_t direction; };
+struct OpenTTDRoadPathVehicle { uint32_t articulated; uint32_t owner; uint32_t tile; uint32_t tram; };
+struct OpenTTDRoadDepotPart { uint32_t next; uint32_t tile; };
+struct OpenTTDRoadDepotOrders { uint32_t dest; uint32_t order_type; };
+struct OpenTTDRoadVehicleTile { uint32_t tile; };
+struct OpenTTDRoadArrivalVehicle { uint32_t owner; uint32_t tram; };
+struct OpenTTDRoadTunnelVehicle { uint32_t direction; uint32_t front; };
+struct OpenTTDRoadMoveVehicle { uint32_t front; uint32_t tile; uint32_t tram; };
+struct OpenTTDRoadMoveTransition { uint32_t length; uint32_t next; uint32_t tile; };
+struct OpenTTDRoadMovePosition { uint32_t order_type; uint32_t owner; uint32_t speed; uint32_t tile; };
+struct OpenTTDRoadBlockVehicle { uint32_t direction; uint32_t front; uint32_t owner; uint32_t tile; };
+struct OpenTTDRoadStopOrder { uint32_t order_destination; uint32_t order_type; uint32_t tile; };
+struct OpenTTDRoadMoveStop { uint32_t order_type; uint32_t tile; };
+struct OpenTTDRoadOrderClock { uint32_t order_time; };
+struct OpenTTDRoadControllerPart { uint32_t next; uint32_t status; };
+struct OpenTTDRoadServiceOrigin { uint32_t first; uint32_t speed; uint32_t tile; };
+struct OpenTTDRoadServiceOrder { uint32_t order_nonstop; uint32_t order_type; };
+struct OpenTTDRoadTrackDirection { uint32_t direction; uint32_t status; uint32_t tile; };
+struct OpenTTDRoadSlopeOrigin { uint32_t direction; uint32_t first; };
+struct OpenTTDRoadSlopePart { uint32_t direction; uint32_t next; };
+struct OpenTTDRoadTurnVehicle { uint32_t breakdown; uint32_t direction; uint32_t order_type; uint32_t status; uint32_t tile; };
+struct OpenTTDRoadPosition { int32_t x; int32_t y; };
+struct OpenTTDRoadTrackChoice { uint8_t trackdir; bool found; };
+struct OpenTTDRoadDepotResult { uint32_t tile; uint32_t length; };
+using OpenTTDRoadVisitor = bool (OPENTTD_ROAD_CALL *)(void *, uint32_t);
 struct OpenTTDRoadLeaves {
-	void (OPENTTD_ROAD_CALL *observe)(uint32_t, OpenTTDRoadView *) noexcept;
-	void (OPENTTD_ROAD_CALL *write)(uint32_t, uint32_t, uint64_t) noexcept;
-	uint64_t (OPENTTD_ROAD_CALL *leaf)(uint32_t, uint32_t, uint64_t, uint64_t, uint64_t) noexcept;
-	OpenTTDRoadState *(OPENTTD_ROAD_CALL *owner)(uint32_t) noexcept;
-	size_t (OPENTTD_ROAD_CALL *nearby)(uint32_t, uint32_t, int32_t, int32_t, uint32_t *, size_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *read_z)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *read_type)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_acc_model)() noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_road_side)() noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_tile_type)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_has_road)(uint32_t, uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_track_status)(uint32_t, uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_tile_owner)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_depot_dir)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_bay_dir)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_is_depot)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_normal_road)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_road_works)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_disallowed)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_bay_stop)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_is_dt_stop)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_stop_type)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_free_bay)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_any_road_bits)(uint32_t, uint32_t, bool) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_road_bits)(uint32_t, uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_offset)(uint8_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_tile_x)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_tile_y)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_station)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_continuation)(uint32_t, uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_bridge_speed)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_max_penalty)() noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_servint)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_needs_service)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_wait_unbunch)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_order_stop)(uint32_t, uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_road_type)(uint32_t, uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_queue)() noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_tunnel_dir)(uint32_t) noexcept;
+	int32_t (OPENTTD_ROAD_CALL *op_acceleration)(uint32_t) noexcept;
+	int32_t (OPENTTD_ROAD_CALL *op_update_speed)(uint32_t, uint32_t, int32_t, int32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_advance)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_position)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_base_viewport)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_last_speed)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_roadstop_leave)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_entrance_set)(uint32_t, bool) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_entrance_busy)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_order_free)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_set_next)(uint32_t, uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_start_stop_dirty)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_depot_dirty)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_details_dirty)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_service)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_leave_unbunch)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_reset_unbunch)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_path_result)(uint32_t, bool) noexcept;
+	void (OPENTTD_ROAD_CALL *op_order_dummy)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_order_depot)(uint32_t, uint16_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_depot_index)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_decrease_value)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_age)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_economy_age)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_check_breakdown)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_check_orders)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_pay_running)(uint32_t, int64_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_cost_class)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_cost_factor)(uint32_t) noexcept;
+	int64_t (OPENTTD_ROAD_CALL *op_get_price)(uint32_t, uint64_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_grf_version)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_length_default)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_age_default)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_speed_default)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_length_error)(uint32_t, uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_disconnect)() noexcept;
+	void (OPENTTD_ROAD_CALL *op_explosion)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_sound_default)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_sound)(uint32_t, uint16_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_sound_old1)() noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_sound_old2)() noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_engine_invalid)() noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_invalid_price)() noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_cost_divisor)() noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_is_crossing)(uint32_t) noexcept;
+	OpenTTDRoadPosition (OPENTTD_ROAD_CALL *op_new_position)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_virt_tile)(int32_t, int32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_is_road_stop)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_set_dest)(uint32_t, uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_cache_invalidate)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_arrival)(uint32_t, uint16_t, uint32_t, bool) noexcept;
+	void (OPENTTD_ROAD_CALL *op_crash_news)(uint32_t, uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_station_visits)(uint16_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_station_visit_set)(uint16_t, uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_local_company)() noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_enter_tile)(uint32_t, uint32_t, int32_t, int32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_enter_depot)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_process_orders)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_loading)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_begin_loading)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_tram_probe)(uint32_t, uint32_t, uint8_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_property)(uint32_t, uint8_t, uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_length_callback)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_play_sound)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_visual)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_update_visual)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_cargo_changed)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_length_changed)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_breakdown)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_delete)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *op_ground_crash)(uint32_t, bool) noexcept;
+	void (OPENTTD_ROAD_CALL *op_stop_random)(uint32_t, uint16_t) noexcept;
+	void (OPENTTD_ROAD_CALL *op_stop_animation)(uint32_t, uint16_t) noexcept;
+	OpenTTDRoadTrackChoice (OPENTTD_ROAD_CALL *op_yapf)(uint32_t, uint32_t, uint8_t, uint16_t) noexcept;
+	OpenTTDRoadDepotResult (OPENTTD_ROAD_CALL *op_find_depot)(uint32_t, int32_t) noexcept;
+	int32_t (OPENTTD_ROAD_CALL *op_inclination)(uint32_t, bool, bool) noexcept;
+	void (OPENTTD_ROAD_CALL *op_viewport)(uint32_t, bool, bool) noexcept;
+	void (OPENTTD_ROAD_CALL *set_tile)(uint32_t, uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *set_x)(uint32_t, int32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *set_y)(uint32_t, int32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *set_direction)(uint32_t, uint8_t) noexcept;
+	void (OPENTTD_ROAD_CALL *set_speed)(uint32_t, uint16_t) noexcept;
+	void (OPENTTD_ROAD_CALL *set_tick)(uint32_t, uint8_t) noexcept;
+	void (OPENTTD_ROAD_CALL *set_running)(uint32_t, uint8_t) noexcept;
+	void (OPENTTD_ROAD_CALL *set_day)(uint32_t, uint8_t) noexcept;
+	void (OPENTTD_ROAD_CALL *set_order_time)(uint32_t, int32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *set_progress)(uint32_t, uint8_t) noexcept;
+	void (OPENTTD_ROAD_CALL *set_last_station)(uint32_t, uint16_t) noexcept;
+	void (OPENTTD_ROAD_CALL *set_hidden)(uint32_t, bool) noexcept;
+	void (OPENTTD_ROAD_CALL *set_first_engine)(uint32_t, uint16_t) noexcept;
+	void (OPENTTD_ROAD_CALL *set_length)(uint32_t, uint8_t) noexcept;
+	void (OPENTTD_ROAD_CALL *set_total_length)(uint32_t, uint16_t) noexcept;
+	void (OPENTTD_ROAD_CALL *set_cargo_age)(uint32_t, uint16_t) noexcept;
+	void (OPENTTD_ROAD_CALL *set_max_speed)(uint32_t, uint16_t) noexcept;
+	void (OPENTTD_ROAD_CALL *set_suppress_implicit)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *read_day)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *read_dest)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *read_direction)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *read_engine)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *read_first)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *read_front)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *read_last_station)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *read_length)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *read_next)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *read_order_type)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *read_previous)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *read_progress)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *read_running)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *read_speed)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *read_status)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *read_tick)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *read_tile)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *read_total_length)(uint32_t) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *read_tram)(uint32_t) noexcept;
+	OpenTTDRoadSpeedLimits (OPENTTD_ROAD_CALL *speed_limits)(uint32_t) noexcept;
+	OpenTTDRoadConsistSpeed (OPENTTD_ROAD_CALL *consist_speed)(uint32_t) noexcept;
+	OpenTTDRoadCloseOrigin (OPENTTD_ROAD_CALL *close_origin)(uint32_t) noexcept;
+	OpenTTDRoadCloseCandidate (OPENTTD_ROAD_CALL *close_candidate)(uint32_t) noexcept;
+	OpenTTDRoadOvertakeOrigin (OPENTTD_ROAD_CALL *overtake_origin)(uint32_t) noexcept;
+	OpenTTDRoadOvertakeSpeed (OPENTTD_ROAD_CALL *overtake_speed)(uint32_t) noexcept;
+	OpenTTDRoadSlidingPosition (OPENTTD_ROAD_CALL *sliding_position)(uint32_t) noexcept;
+	OpenTTDRoadHeightSpeed (OPENTTD_ROAD_CALL *height_speed)(uint32_t) noexcept;
+	OpenTTDRoadCollisionPart (OPENTTD_ROAD_CALL *collision_part)(uint32_t) noexcept;
+	OpenTTDRoadCollisionOrigin (OPENTTD_ROAD_CALL *collision_origin)(uint32_t) noexcept;
+	OpenTTDRoadCrashDirection (OPENTTD_ROAD_CALL *crash_direction)(uint32_t) noexcept;
+	OpenTTDRoadPathVehicle (OPENTTD_ROAD_CALL *path_vehicle)(uint32_t) noexcept;
+	OpenTTDRoadDepotPart (OPENTTD_ROAD_CALL *depot_part)(uint32_t) noexcept;
+	OpenTTDRoadDepotOrders (OPENTTD_ROAD_CALL *depot_orders)(uint32_t) noexcept;
+	OpenTTDRoadVehicleTile (OPENTTD_ROAD_CALL *vehicle_tile)(uint32_t) noexcept;
+	OpenTTDRoadArrivalVehicle (OPENTTD_ROAD_CALL *arrival_vehicle)(uint32_t) noexcept;
+	OpenTTDRoadTunnelVehicle (OPENTTD_ROAD_CALL *tunnel_vehicle)(uint32_t) noexcept;
+	OpenTTDRoadMoveVehicle (OPENTTD_ROAD_CALL *move_vehicle)(uint32_t) noexcept;
+	OpenTTDRoadMoveTransition (OPENTTD_ROAD_CALL *move_transition)(uint32_t) noexcept;
+	OpenTTDRoadMovePosition (OPENTTD_ROAD_CALL *move_position)(uint32_t) noexcept;
+	OpenTTDRoadBlockVehicle (OPENTTD_ROAD_CALL *block_vehicle)(uint32_t) noexcept;
+	OpenTTDRoadStopOrder (OPENTTD_ROAD_CALL *stop_order)(uint32_t) noexcept;
+	OpenTTDRoadMoveStop (OPENTTD_ROAD_CALL *move_stop)(uint32_t) noexcept;
+	OpenTTDRoadOrderClock (OPENTTD_ROAD_CALL *order_clock)(uint32_t) noexcept;
+	OpenTTDRoadControllerPart (OPENTTD_ROAD_CALL *controller_part)(uint32_t) noexcept;
+	OpenTTDRoadServiceOrigin (OPENTTD_ROAD_CALL *service_origin)(uint32_t) noexcept;
+	OpenTTDRoadServiceOrder (OPENTTD_ROAD_CALL *service_order)(uint32_t) noexcept;
+	OpenTTDRoadTrackDirection (OPENTTD_ROAD_CALL *track_direction)(uint32_t) noexcept;
+	OpenTTDRoadSlopeOrigin (OPENTTD_ROAD_CALL *slope_origin)(uint32_t) noexcept;
+	OpenTTDRoadSlopePart (OPENTTD_ROAD_CALL *slope_part)(uint32_t) noexcept;
+	OpenTTDRoadTurnVehicle (OPENTTD_ROAD_CALL *turn_vehicle)(uint32_t) noexcept;
+	OpenTTDRoadState * (OPENTTD_ROAD_CALL *owner)(uint32_t) noexcept;
+	void (OPENTTD_ROAD_CALL *visit_close)(uint32_t, int32_t, int32_t, OpenTTDRoadVisitor, void *) noexcept;
+	void (OPENTTD_ROAD_CALL *visit_tunnel)(uint32_t, int32_t, int32_t, OpenTTDRoadVisitor, void *) noexcept;
+	void (OPENTTD_ROAD_CALL *visit_tile)(uint32_t, int32_t, int32_t, OpenTTDRoadVisitor, void *) noexcept;
+	void (OPENTTD_ROAD_CALL *visit_train)(uint32_t, int32_t, int32_t, OpenTTDRoadVisitor, void *) noexcept;
+	uint32_t (OPENTTD_ROAD_CALL *read_bus)(uint32_t) noexcept;
+
 };
 extern "C" {
-/* Entry kinds:0 tick,1 individual(previous ID or UINT32_MAX),2 leave depot(first),
- * 3 crash(flooded),4 cache(same length),5 calendar day,6 economy day,7 running cost,
- * 8 max speed,9 speed update,10 destination,11 turn(execute),12 trackdir,13 slope.
- * Tables are copied before use. View/IDs are values, never borrowed world storage.
- * observe/write/leaf/owner/nearby are synchronous noexcept nonreentrant services;
- * nearby copies only pool IDs in original traversal order. No Rust owner borrow
- * spans a service. create owns only invocation control, separate from shell state.
- * advance returns op0/result when complete; other ops dispatch after Rust returns:
- * tile/depot entry; ProcessOrders/HandleLoading/BeginLoading; CMD_BUILD_ROAD probe;
- * NewGRF property/length/sound/visual/stop callbacks; cache length warnings;
- * HandleBreakdown; destruction; generic GroundVehicle crash; YAPF calls that
- * invoke RoadVehicle trackdir; and inclination/viewport calls that resolve
- * NewGRF sprites or reenter road slope policy. No RNG continuation exists.
- * Errors unwind solely through C++ RAII; task_destroy does not access the world. */
-void *OPENTTD_ROAD_CALL openttd_rust_road_create(uint32_t, uint32_t, uint64_t, uint64_t, uint64_t, const OpenTTDRoadLeaves *, const OpenTTDSharedServices *);
-OpenTTDRoadAction OPENTTD_ROAD_CALL openttd_rust_road_advance(void *, uint64_t);
-void OPENTTD_ROAD_CALL openttd_rust_road_task_destroy(void *);
-
+bool OPENTTD_ROAD_CALL openttd_rust_road_tick(uint32_t, OpenTTDRoadState *, const OpenTTDRoadLeaves *, const OpenTTDSharedServices *);
+bool OPENTTD_ROAD_CALL openttd_rust_road_individual(uint32_t, OpenTTDRoadState *, uint32_t, const OpenTTDRoadLeaves *, const OpenTTDSharedServices *);
+bool OPENTTD_ROAD_CALL openttd_rust_road_leave_depot(uint32_t, OpenTTDRoadState *, bool, const OpenTTDRoadLeaves *, const OpenTTDSharedServices *);
+uint32_t OPENTTD_ROAD_CALL openttd_rust_road_crash(uint32_t, OpenTTDRoadState *, bool, const OpenTTDRoadLeaves *, const OpenTTDSharedServices *);
+void OPENTTD_ROAD_CALL openttd_rust_road_update_cache(uint32_t, OpenTTDRoadState *, bool, const OpenTTDRoadLeaves *, const OpenTTDSharedServices *);
+void OPENTTD_ROAD_CALL openttd_rust_road_calendar_day(uint32_t, OpenTTDRoadState *, const OpenTTDRoadLeaves *, const OpenTTDSharedServices *);
+void OPENTTD_ROAD_CALL openttd_rust_road_economy_day(uint32_t, OpenTTDRoadState *, const OpenTTDRoadLeaves *, const OpenTTDSharedServices *);
+int64_t OPENTTD_ROAD_CALL openttd_rust_road_running_cost(uint32_t, OpenTTDRoadState *, const OpenTTDRoadLeaves *, const OpenTTDSharedServices *);
+int32_t OPENTTD_ROAD_CALL openttd_rust_road_max_speed(uint32_t, OpenTTDRoadState *, const OpenTTDRoadLeaves *, const OpenTTDSharedServices *);
+int32_t OPENTTD_ROAD_CALL openttd_rust_road_update_speed(uint32_t, OpenTTDRoadState *, const OpenTTDRoadLeaves *, const OpenTTDSharedServices *);
+void OPENTTD_ROAD_CALL openttd_rust_road_set_dest(uint32_t, OpenTTDRoadState *, uint32_t, const OpenTTDRoadLeaves *, const OpenTTDSharedServices *);
+bool OPENTTD_ROAD_CALL openttd_rust_road_turn(uint32_t, OpenTTDRoadState *, bool, const OpenTTDRoadLeaves *, const OpenTTDSharedServices *);
+uint8_t OPENTTD_ROAD_CALL openttd_rust_road_trackdir(uint32_t, OpenTTDRoadState *, const OpenTTDRoadLeaves *, const OpenTTDSharedServices *);
+bool OPENTTD_ROAD_CALL openttd_rust_road_slope_pixel(uint32_t, OpenTTDRoadState *, const OpenTTDRoadLeaves *, const OpenTTDSharedServices *);
 /* Each ordinary or indexed-load shell owns one zero-created state. Destruction
  * follows PreDestructor and occurs exactly once, also during pool cleanup.
  * Scalars 0..6: state:u8, frame:u8, blocked:u16, overtaking:u8,

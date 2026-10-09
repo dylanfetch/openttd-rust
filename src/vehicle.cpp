@@ -1549,7 +1549,7 @@ void VehicleEnterDepot(Vehicle *v)
 		case VEH_SHIP: {
 			SetWindowClassesDirty(WC_SHIPS_LIST);
 			Ship *ship = Ship::From(v);
-			ship->state = TRACK_BIT_DEPOT;
+			ship->SetState(TRACK_BIT_DEPOT);
 			ship->UpdateCache();
 			ship->UpdateViewport(true, true);
 			SetWindowDirty(WC_VEHICLE_DEPOT, v->tile);
@@ -1642,6 +1642,9 @@ void VehicleEnterDepot(Vehicle *v)
 			AI::NewEvent(v->owner, new ScriptEventVehicleWaitingInDepot(v->index));
 		}
 
+#ifdef WITH_RUST
+		openttd_rust_measure_unbunching(v, &GetRustOrdersLeaves());
+#else
 		/* If we've entered our unbunching depot, record the round trip duration. */
 		if (v->current_order.GetDepotActionType().Test(OrderDepotActionFlag::Unbunch) && v->depot_unbunching_last_departure > 0) {
 			TimerGameTick::Ticks measured_round_trip = TimerGameTick::counter - v->depot_unbunching_last_departure;
@@ -1653,6 +1656,7 @@ void VehicleEnterDepot(Vehicle *v)
 				v->round_trip_time = Clamp(measured_round_trip, (v->round_trip_time / 2), ClampTo<TimerGameTick::Ticks>(v->round_trip_time * 2));
 			}
 		}
+#endif
 
 		v->current_order.MakeDummy();
 	}
@@ -2148,6 +2152,9 @@ PaletteID GetVehiclePalette(const Vehicle *v)
  */
 void Vehicle::DeleteUnreachedImplicitOrders()
 {
+#ifdef WITH_RUST
+	openttd_rust_delete_implicit(this, &GetRustOrdersLeaves());
+#else
 	if (this->IsGroundVehicle()) {
 		uint16_t &gv_flags = this->GetGroundVehicleFlags();
 		if (HasBit(gv_flags, GVF_SUPPRESS_IMPLICIT_ORDERS)) {
@@ -2178,6 +2185,7 @@ void Vehicle::DeleteUnreachedImplicitOrders()
 			cur = this->orders->GetNext(cur);
 		}
 	}
+#endif
 }
 
 /**
@@ -2189,6 +2197,9 @@ void Vehicle::BeginLoading()
 	assert(IsTileType(this->tile, MP_STATION) || this->type == VEH_SHIP);
 
 	TimerGameTick::Ticks travel_time = TimerGameTick::counter - this->last_loading_tick;
+#ifdef WITH_RUST
+	openttd_rust_begin_loading(this, &GetRustOrdersLeaves());
+#else
 	if (this->current_order.IsType(OT_GOTO_STATION) &&
 			this->current_order.GetDestination() == this->last_station_visited) {
 		this->DeleteUnreachedImplicitOrders();
@@ -2287,6 +2298,7 @@ void Vehicle::BeginLoading()
 		}
 		this->current_order.MakeLoading(false);
 	}
+#endif
 
 	if (this->last_loading_station != StationID::Invalid() &&
 			this->last_loading_station != this->last_station_visited &&
@@ -2445,9 +2457,13 @@ void Vehicle::HandleLoading(bool mode)
  */
 bool Vehicle::HasFullLoadOrder() const
 {
+#ifdef WITH_RUST
+	return openttd_rust_has_full_load(const_cast<Vehicle *>(this), &GetRustOrdersLeaves()) != 0;
+#else
 	return std::ranges::any_of(this->Orders(), [](const Order &o) {
 		return o.IsType(OT_GOTO_STATION) && o.IsFullLoadOrder();
 	});
+#endif
 }
 
 /**
@@ -2456,7 +2472,11 @@ bool Vehicle::HasFullLoadOrder() const
  */
 bool Vehicle::HasConditionalOrder() const
 {
+#ifdef WITH_RUST
+	return openttd_rust_has_conditional(const_cast<Vehicle *>(this), &GetRustOrdersLeaves()) != 0;
+#else
 	return std::ranges::any_of(this->Orders(), [](const Order &o) { return o.IsType(OT_CONDITIONAL); });
+#endif
 }
 
 /**
@@ -2465,15 +2485,20 @@ bool Vehicle::HasConditionalOrder() const
  */
 bool Vehicle::HasUnbunchingOrder() const
 {
+#ifdef WITH_RUST
+	return openttd_rust_has_unbunching(const_cast<Vehicle *>(this), &GetRustOrdersLeaves()) != 0;
+#else
 	return std::ranges::any_of(this->Orders(), [](const Order &o) {
 		return o.IsType(OT_GOTO_DEPOT) && o.GetDepotActionType().Test(OrderDepotActionFlag::Unbunch);
 	});
+#endif
 }
 
 /**
  * Check if the previous order is a depot unbunching order.
  * @return true Iff the previous order is a depot order with the unbunch flag.
  */
+#ifndef WITH_RUST
 static bool PreviousOrderIsUnbunching(const Vehicle *v)
 {
 	/* If we are headed for the first order, we must wrap around back to the last order. */
@@ -2483,12 +2508,16 @@ static bool PreviousOrderIsUnbunching(const Vehicle *v)
 	if (previous_order == nullptr || !previous_order->IsType(OT_GOTO_DEPOT)) return false;
 	return previous_order->GetDepotActionType().Test(OrderDepotActionFlag::Unbunch);
 }
+#endif
 
 /**
  * Leave an unbunching depot and calculate the next departure time for shared order vehicles.
  */
 void Vehicle::LeaveUnbunchingDepot()
 {
+#ifdef WITH_RUST
+	openttd_rust_leave_unbunching(this, &GetRustOrdersLeaves());
+#else
 	/* Don't do anything if this is not our unbunching order. */
 	if (!PreviousOrderIsUnbunching(this)) return;
 
@@ -2528,6 +2557,7 @@ void Vehicle::LeaveUnbunchingDepot()
 		u->depot_unbunching_next_departure = next_departure;
 		SetWindowDirty(WC_VEHICLE_VIEW, u->index);
 	}
+#endif
 }
 
 /**
@@ -2536,6 +2566,9 @@ void Vehicle::LeaveUnbunchingDepot()
  */
 bool Vehicle::IsWaitingForUnbunching() const
 {
+#ifdef WITH_RUST
+	assert(this->IsInDepot()); return openttd_rust_wait_unbunching(const_cast<Vehicle *>(this), &GetRustOrdersLeaves()) != 0;
+#else
 	assert(this->IsInDepot());
 
 	/* Don't bother if there are no vehicles sharing orders. */
@@ -2548,6 +2581,7 @@ bool Vehicle::IsWaitingForUnbunching() const
 	if (!PreviousOrderIsUnbunching(this)) return false;
 
 	return (this->depot_unbunching_next_departure > TimerGameTick::counter);
+#endif
 };
 
 /**
@@ -2959,6 +2993,9 @@ void Vehicle::SetNext(Vehicle *next)
  */
 void Vehicle::AddToShared(Vehicle *shared_chain)
 {
+#ifdef WITH_RUST
+	openttd_rust_add_shared(this, shared_chain, &GetRustOrdersLeaves());
+#else
 	assert(this->previous_shared == nullptr && this->next_shared == nullptr);
 
 	if (shared_chain->orders == nullptr) {
@@ -2975,6 +3012,7 @@ void Vehicle::AddToShared(Vehicle *shared_chain)
 	if (this->next_shared != nullptr) this->next_shared->previous_shared = this;
 
 	shared_chain->orders->AddVehicle(this);
+#endif
 }
 
 /**
@@ -2982,6 +3020,9 @@ void Vehicle::AddToShared(Vehicle *shared_chain)
  */
 void Vehicle::RemoveFromShared()
 {
+#ifdef WITH_RUST
+	openttd_rust_remove_shared(this, &GetRustOrdersLeaves());
+#else
 	/* Remember if we were first and the old window number before RemoveVehicle()
 	 * as this changes first if needed. */
 	bool were_first = (this->FirstShared() == this);
@@ -3009,6 +3050,7 @@ void Vehicle::RemoveFromShared()
 
 	this->next_shared     = nullptr;
 	this->previous_shared = nullptr;
+#endif
 }
 
 static const IntervalTimer<TimerGameEconomy> _economy_vehicles_yearly({TimerGameEconomy::YEAR, TimerGameEconomy::Priority::VEHICLE}, [](auto)

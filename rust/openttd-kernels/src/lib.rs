@@ -12,6 +12,7 @@ mod aircraft;
 mod alternating;
 mod auth;
 mod byte_strings;
+mod cargo_flow;
 mod cargo_payment;
 mod company;
 mod consumer;
@@ -28,6 +29,7 @@ mod road_data;
 mod road_yapf;
 mod script_list;
 pub mod services;
+mod ship_control;
 mod station_cargo;
 mod station_service;
 mod string_validation;
@@ -770,7 +772,7 @@ mod abi;
 /// Scalar metadata only: no allocation, pointers, ownership or callbacks.
 #[allow(unsafe_code)] // Exported scalar C symbol, like the existing kernel entry points.
 #[unsafe(no_mangle)]
-pub extern "C" fn openttd_rust_abi_layout(type_id: u8, item: u8) -> usize {
+pub extern "C" fn openttd_rust_abi_layout(type_id: u16, item: u8) -> usize {
     abi::layout(type_id, item)
 }
 
@@ -1310,7 +1312,9 @@ mod industry;
 #[allow(unsafe_code)]
 mod ship_yapf;
 
+mod orders;
 mod train;
 mod train_state;
 
+mod cargo_storage;
 mod train_reservation;

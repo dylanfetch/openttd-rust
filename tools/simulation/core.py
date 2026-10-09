@@ -25,6 +25,7 @@ import statistics
 import struct
 import subprocess
 import sys
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -72,12 +73,14 @@ def scenario_modules():
     """Families in scenario-list order; import after shared core initialization."""
     from . import (
         aircraft,
+        cargo_storage,
         companies,
         disasters,
         economy,
         effects,
         generated,
         industries,
+        orders,
         play_saves,
         rails,
         roads,
@@ -102,6 +105,8 @@ def scenario_modules():
         companies,
         stations,
         industries,
+        cargo_storage,
+        orders,
     )
 
 
@@ -403,6 +408,32 @@ def game_slot(isolate):
         yield
 
 
+def benchmark_run(command, *, timeout, **kwargs):
+    """Wait without polling; the watchdog kills and the caller reaps on timeout."""
+    with subprocess.Popen(command, **kwargs) as child:
+        expired = threading.Event()
+
+        def kill():
+            expired.set()
+            child.kill()
+
+        watchdog = threading.Timer(timeout, kill)
+        try:
+            watchdog.start()
+            code = child.wait()
+        except BaseException:
+            child.kill()
+            child.wait()
+            raise
+        finally:
+            watchdog.cancel()
+            if watchdog.ident is not None:
+                watchdog.join()
+        if expired.is_set():
+            raise subprocess.TimeoutExpired(command, timeout)
+        return subprocess.CompletedProcess(command, code)
+
+
 def run_game(
     scenario,
     binary,
@@ -459,6 +490,9 @@ def run_game(
         XDG_CONFIG_HOME=str(run_dir / "xdg-config"),
         XDG_CACHE_HOME=str(run_dir / "xdg-cache"),
     )
+    for module in scenario_modules():
+        if game_environment := getattr(module, "game_environment", None):
+            env.update(game_environment(scenario))
     with (
         game_slot(isolate),
         open(run_dir / "stdout.log", "wb") as out,
@@ -466,7 +500,7 @@ def run_game(
     ):
         started = time.monotonic()
         try:
-            code = subprocess.run(
+            code = (benchmark_run if isolate else subprocess.run)(
                 [
                     sys.executable,
                     str(ROOT / "tools/simulation/game_launcher.py"),
@@ -606,8 +640,8 @@ def run_scenario(
         for mode, desync in modes:
             runs = {
                 role: run_game(
-                    scenario,
-                    binaries[role],
+                    dict(scenario, **scenario.get("role_inputs", {}).get(role, {})),
+                    scenario.get("executables", binaries)[role],
                     builds[role],
                     out / name / mode / role,
                     timeout,
@@ -756,6 +790,13 @@ def run_scenario(
     if ratios:
         result["plain_speed"]["median_candidate_reference_ratio"] = statistics.median(
             ratios
+        )
+    if benchmark_repetitions:
+        from .roads import speed_budget
+
+        result["plain_speed"]["budget"] = speed_budget(
+            scenario["name"],
+            result["plain_speed"]["median_candidate_reference_ratio"],
         )
     result["passed"] = not result["differences"] and not result["problems"]
     if result["passed"] and not benchmark_repetitions:
@@ -1007,6 +1048,12 @@ def main():
             )
             ratio = result["plain_speed"]["median_candidate_reference_ratio"]
             speed = f", plain {ratio:.3f}x" if ratio is not None else ""
+            budget = result["plain_speed"].get("budget")
+            if budget is not None:
+                speed += (
+                    f", best {budget['best_known_ratio']:.3f}x "
+                    f"({budget['change_percent']:+.1f}%)"
+                )
             print(
                 f"{status} {result['scenario']}: {result['snapshots']} snapshots, "
                 f"{result['stats']['chunks']} chunks, {result['stats']['elements']} elements{known}{speed}",

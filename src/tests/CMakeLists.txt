@@ -3,6 +3,7 @@ add_test_files(
     alternating_iterator_state.cpp
     bitmath_func.cpp
     company_economy.cpp
+    cargo_storage.cpp
     cargo_payment.cpp
     cargo_payment_stubs.hpp
     effectvehicle.cpp
@@ -17,6 +18,7 @@ add_test_files(
     mock_fontcache.h
     mock_spritecache.cpp
     mock_spritecache.h
+    orders.cpp
     rail_yapf.cpp
     train_reservation.cpp
     train.cpp
