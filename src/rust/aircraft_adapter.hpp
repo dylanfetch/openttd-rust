@@ -14,6 +14,13 @@ static_assert(EV_BREAKDOWN_SMOKE_AIRCRAFT == 10 && EV_EXPLOSION_LARGE == 5 && EV
 static_assert(HVOT_AIRCRAFT == 16);
 static_assert(OWNER_NONE.base() == 16);
 
+/* Preserve the aircraft ABI while using the canonical vehicle field definitions. */
+template <typename Result, auto Read>
+static Result OPENTTD_AIRCRAFT_CALL AircraftVehicleRead(OpenTTDAircraftVehicle vehicle) noexcept
+{
+	return Read(static_cast<const Vehicle *>(vehicle.handle));
+}
+
 /* Resolve each live shell/private owner once. Disaster helpers retain null State.
  * The record contains opaque pointers only; Rust never views C++ object layout. */
 static OpenTTDAircraftVehicle AircraftVehicle(Vehicle *v) noexcept
@@ -63,34 +70,16 @@ static void OPENTTD_AIRCRAFT_CALL Aircraft_set_z(OpenTTDAircraftVehicle vehicle,
 	v->z_pos = value;
 }
 
-static uint32_t OPENTTD_AIRCRAFT_CALL Aircraft_tile(OpenTTDAircraftVehicle vehicle) noexcept
-{
-	const Vehicle *v = static_cast<const Vehicle *>(vehicle.handle);
-	return RustVehicleTile(v);
-}
-
 static void OPENTTD_AIRCRAFT_CALL Aircraft_set_tile(OpenTTDAircraftVehicle vehicle, uint32_t value) noexcept
 {
 	Vehicle *v = static_cast<Vehicle *>(vehicle.handle);
 	v->tile = TileIndex{value};
 }
 
-static uint8_t OPENTTD_AIRCRAFT_CALL Aircraft_direction(OpenTTDAircraftVehicle vehicle) noexcept
-{
-	const Vehicle *v = static_cast<const Vehicle *>(vehicle.handle);
-	return RustVehicleDirection(v);
-}
-
 static void OPENTTD_AIRCRAFT_CALL Aircraft_set_direction(OpenTTDAircraftVehicle vehicle, uint8_t value) noexcept
 {
 	Vehicle *v = static_cast<Vehicle *>(vehicle.handle);
 	v->direction = static_cast<Direction>(value);
-}
-
-static uint8_t OPENTTD_AIRCRAFT_CALL Aircraft_tick_counter(OpenTTDAircraftVehicle vehicle) noexcept
-{
-	const Vehicle *v = static_cast<const Vehicle *>(vehicle.handle);
-	return RustVehicleTick(v);
 }
 
 static void OPENTTD_AIRCRAFT_CALL Aircraft_set_tick_counter(OpenTTDAircraftVehicle vehicle, uint8_t value) noexcept
@@ -103,12 +92,6 @@ static uint8_t OPENTTD_AIRCRAFT_CALL Aircraft_owner(OpenTTDAircraftVehicle vehic
 {
 	const Vehicle *v = static_cast<const Vehicle *>(vehicle.handle);
 	return v->owner.base();
-}
-
-static uint8_t OPENTTD_AIRCRAFT_CALL Aircraft_vehicle_status(OpenTTDAircraftVehicle vehicle) noexcept
-{
-	const Vehicle *v = static_cast<const Vehicle *>(vehicle.handle);
-	return RustVehicleStatus(v);
 }
 
 static void OPENTTD_AIRCRAFT_CALL Aircraft_set_vehicle_status(OpenTTDAircraftVehicle vehicle, uint8_t value) noexcept
@@ -139,12 +122,6 @@ static void OPENTTD_AIRCRAFT_CALL Aircraft_set_subspeed(OpenTTDAircraftVehicle v
 {
 	Vehicle *v = static_cast<Vehicle *>(vehicle.handle);
 	v->subspeed = value;
-}
-
-static uint8_t OPENTTD_AIRCRAFT_CALL Aircraft_progress(OpenTTDAircraftVehicle vehicle) noexcept
-{
-	const Vehicle *v = static_cast<const Vehicle *>(vehicle.handle);
-	return RustVehicleProgress(v);
 }
 
 static void OPENTTD_AIRCRAFT_CALL Aircraft_set_progress(OpenTTDAircraftVehicle vehicle, uint8_t value) noexcept
@@ -941,20 +918,20 @@ static const OpenTTDAircraftLeaves _aircraft_leaves{
 	.set_y = Aircraft_set_y,
 	.z = Aircraft_z,
 	.set_z = Aircraft_set_z,
-	.tile = Aircraft_tile,
+	.tile = AircraftVehicleRead<uint32_t, RustVehicleTile>,
 	.set_tile = Aircraft_set_tile,
-	.direction = Aircraft_direction,
+	.direction = AircraftVehicleRead<uint8_t, RustVehicleDirection>,
 	.set_direction = Aircraft_set_direction,
-	.tick_counter = Aircraft_tick_counter,
+	.tick_counter = AircraftVehicleRead<uint8_t, RustVehicleTick>,
 	.set_tick_counter = Aircraft_set_tick_counter,
 	.owner = Aircraft_owner,
-	.vehicle_status = Aircraft_vehicle_status,
+	.vehicle_status = AircraftVehicleRead<uint8_t, RustVehicleStatus>,
 	.set_vehicle_status = Aircraft_set_vehicle_status,
 	.current_speed = Aircraft_current_speed,
 	.set_current_speed = Aircraft_set_current_speed,
 	.subspeed = Aircraft_subspeed,
 	.set_subspeed = Aircraft_set_subspeed,
-	.progress = Aircraft_progress,
+	.progress = AircraftVehicleRead<uint8_t, RustVehicleProgress>,
 	.set_progress = Aircraft_set_progress,
 	.acceleration = Aircraft_acceleration,
 	.maximum_speed = Aircraft_maximum_speed,

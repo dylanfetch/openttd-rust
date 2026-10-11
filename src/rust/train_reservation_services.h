@@ -9,6 +9,12 @@
 
 /** @file train_reservation_services.h Direct map/PBS/follower services. */
 
+template <typename Result, auto Member>
+static Result TrainReservationSharedMap(void *, OpenTTDTrainHandle, uint32_t tile) noexcept
+{
+	return (GetRustSharedServices().*Member)(tile);
+}
+
 static uint64_t TrainReservationAllCompat(void *, OpenTTDTrainHandle id) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
@@ -161,11 +167,6 @@ static void TrainReservationMarkBridge(void *, OpenTTDTrainHandle, uint32_t a) n
 	TileIndex t(static_cast<uint32_t>(a));
 	MarkBridgeDirty(t);
 }
-static void TrainReservationMarkTile(void *, OpenTTDTrainHandle, uint32_t a) noexcept
-{
-	TileIndex t(static_cast<uint32_t>(a));
-	GetRustSharedServices().mark_dirty(t.base());
-}
 static uint64_t TrainReservationNeedsService(void *, OpenTTDTrainHandle id) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
@@ -291,11 +292,6 @@ static void TrainReservationStartStop(void *, OpenTTDTrainHandle id) noexcept
 	Train *v = static_cast<Train *>(id.shell);
 	SetWindowWidgetDirty(WC_VEHICLE_VIEW, v->index, WID_VV_START_STOP);
 }
-static uint64_t TrainReservationStation(void *, OpenTTDTrainHandle, uint32_t a) noexcept
-{
-	TileIndex t(static_cast<uint32_t>(a));
-	return GetRustSharedServices().station_index(t.base());
-}
 static uint64_t TrainReservationStationTrain(void *, OpenTTDTrainHandle, uint16_t a) noexcept
 {
 	return Station::Get(StationID(static_cast<uint16_t>(a)))->facilities.Test(StationFacility::Train);
@@ -332,11 +328,6 @@ static uint64_t TrainReservationTryTrack(void *, OpenTTDTrainHandle, uint32_t a,
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	return TryReserveRailTrack(t, static_cast<Track>(b));
-}
-static uint64_t TrainReservationTunnelDir(void *, OpenTTDTrainHandle, uint32_t a) noexcept
-{
-	TileIndex t(static_cast<uint32_t>(a));
-	return GetRustSharedServices().tunnel_bridge_direction(t.base());
 }
 static uint64_t TrainReservationTunnelFree(void *, OpenTTDTrainHandle id, uint32_t a, uint32_t b) noexcept
 {
@@ -401,31 +392,6 @@ static uint8_t TrainReservationProcessOrders(OpenTTDTrainHandle id) noexcept
 static uint8_t TrainReservationUpdateOrderDest(OpenTTDTrainHandle id, uint8_t index) noexcept
 {Train *v=static_cast<Train *>(id.shell);return UpdateOrderDest(v,v->GetOrder(static_cast<VehicleOrderID>(index)),0,true);}
 
-static uint32_t TrainReservationReadTile(OpenTTDTrainHandle id) noexcept
-{
-	const Train *v=static_cast<Train *>(id.shell);
-	return RustVehicleTile(v);
-}
-static OpenTTDTrainHandle TrainReservationReadNext(OpenTTDTrainHandle id) noexcept
-{
-	const Train *v=static_cast<Train *>(id.shell);
-	return TrainHandle(static_cast<Train *>(RustVehicleNext(v)));
-}
-static uint16_t TrainReservationReadLastStation(OpenTTDTrainHandle id) noexcept
-{
-	const Train *v=static_cast<Train *>(id.shell);
-	return v->last_station_visited.base();
-}
-static uint8_t TrainReservationReadDirection(OpenTTDTrainHandle id) noexcept
-{
-	const Train *v=static_cast<Train *>(id.shell);
-	return RustVehicleDirection(v);
-}
-static uint8_t TrainReservationReadOrder(OpenTTDTrainHandle id) noexcept
-{
-	const Train *v=static_cast<Train *>(id.shell);
-	return v->current_order.GetType();
-}
 static uint8_t TrainReservationReadNumOrders(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);

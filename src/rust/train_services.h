@@ -11,6 +11,19 @@
 #include "vehicle_services.h"
 #include "settings_services.h"
 
+/* Compile-time adapters retain the legacy callback widths while sharing the actual reads. */
+template <typename Result, auto Read>
+static Result TrainVehicleRead(OpenTTDTrainHandle id) noexcept
+{
+	return Read(static_cast<const Train *>(id.shell));
+}
+
+template <typename Result, auto Member>
+static Result TrainSharedMap(OpenTTDTrainHandle, uint32_t tile) noexcept
+{
+	return (GetRustSharedServices().*Member)(tile);
+}
+
 static void TrainWriteTile(OpenTTDTrainHandle id, uint32_t value) noexcept
 {Train *v=static_cast<Train *>(id.shell); v->tile = TileIndex(static_cast<uint32_t>(value));}
 static void TrainWriteDest(OpenTTDTrainHandle id, uint32_t value) noexcept
@@ -120,10 +133,6 @@ static void TrainBeginLoading(OpenTTDTrainHandle id) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
 	v->BeginLoading();
-}
-static uint64_t TrainBridgeSpeed(OpenTTDTrainHandle, uint32_t a) noexcept
-{
-	return GetRustSharedServices().bridge_speed(a);
 }
 static void TrainCacheOverride(OpenTTDTrainHandle id) noexcept
 {
@@ -297,10 +306,6 @@ static void TrainDepotDirty(OpenTTDTrainHandle id) noexcept
 	Train *v = static_cast<Train *>(id.shell);
 	InvalidateWindowData(WC_VEHICLE_DEPOT, v->tile);
 }
-static uint64_t TrainDepotIndex(OpenTTDTrainHandle, uint32_t a) noexcept
-{
-	return GetRustSharedServices().depot_index(a);
-}
 static uint64_t TrainDepotTrack(OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	return GetRailDepotTrack(TileIndex(a));
@@ -324,10 +329,6 @@ static uint64_t TrainDiagReachesTracks(OpenTTDTrainHandle, uint8_t a) noexcept
 static uint64_t TrainDiagTrackdir(OpenTTDTrainHandle, uint8_t a) noexcept
 {
 	return DiagDirToDiagTrackdir(static_cast<DiagDirection>(a));
-}
-static void TrainDirtyTile(OpenTTDTrainHandle, uint32_t a) noexcept
-{
-	GetRustSharedServices().mark_dirty(a);
 }
 static uint64_t TrainDirDiag(OpenTTDTrainHandle, uint8_t a) noexcept
 {
@@ -427,10 +428,6 @@ static uint64_t TrainInvalidPrice(OpenTTDTrainHandle) noexcept
 static uint64_t TrainIsBridge(OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	return IsBridgeTile(TileIndex(a));
-}
-static uint64_t TrainIsCrossing(OpenTTDTrainHandle, uint32_t a) noexcept
-{
-	return GetRustSharedServices().is_level_crossing(a);
 }
 static uint64_t TrainIsDepot(OpenTTDTrainHandle, uint32_t a) noexcept
 {
@@ -747,10 +744,6 @@ static void TrainStartStopDirty(OpenTTDTrainHandle id) noexcept
 	Train *v = static_cast<Train *>(id.shell);
 	SetWindowWidgetDirty(WC_VEHICLE_VIEW, v->index, WID_VV_START_STOP);
 }
-static uint64_t TrainStation(OpenTTDTrainHandle, uint32_t a) noexcept
-{
-	return GetRustSharedServices().station_index(a);
-}
 static uint64_t TrainStationAxis(OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	return GetRailStationAxis(TileIndex(a));
@@ -800,10 +793,6 @@ static uint64_t TrainTileOffsetAxis(OpenTTDTrainHandle, uint8_t a) noexcept
 static uint64_t TrainTileOffsetDiag(OpenTTDTrainHandle, uint8_t a) noexcept
 {
 	return static_cast<uint32_t>(TileOffsByDiagDir(static_cast<DiagDirection>(a)));
-}
-static uint64_t TrainTileOwner(OpenTTDTrainHandle, uint32_t a) noexcept
-{
-	return GetRustSharedServices().tile_owner(a);
 }
 static uint64_t TrainTileRailType(OpenTTDTrainHandle, uint32_t a) noexcept
 {
@@ -858,10 +847,6 @@ static uint64_t TrainTryPath(OpenTTDTrainHandle id, uint8_t a, uint8_t b) noexce
 static uint64_t TrainTryReserve(OpenTTDTrainHandle, uint32_t a, uint8_t b, uint8_t c) noexcept
 {
 	return TryReserveRailTrack(TileIndex(a), static_cast<Track>(b), c != 0);
-}
-static uint64_t TrainTunnelDir(OpenTTDTrainHandle, uint32_t a) noexcept
-{
-	return GetRustSharedServices().tunnel_bridge_direction(a);
 }
 static void TrainUnreserve(OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
@@ -983,11 +968,6 @@ static OpenTTDTrainHandle TrainReadLast(OpenTTDTrainHandle id) noexcept
 	const Train *v=static_cast<Train *>(id.shell);
 	return TrainHandle(v->Last());
 }
-static uint32_t TrainReadTile(OpenTTDTrainHandle id) noexcept
-{
-	const Train *v=static_cast<Train *>(id.shell);
-	return RustVehicleTile(v);
-}
 static uint32_t TrainReadDest(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
@@ -997,11 +977,6 @@ static int32_t TrainReadOrderTime(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
 	return v->current_order_time;
-}
-static uint16_t TrainReadLength(OpenTTDTrainHandle id) noexcept
-{
-	const Train *v=static_cast<Train *>(id.shell);
-	return RustGroundCachedLength(v);
 }
 static uint16_t TrainReadTotalLength(OpenTTDTrainHandle id) noexcept
 {
@@ -1033,21 +1008,6 @@ static uint16_t TrainReadLastStation(OpenTTDTrainHandle id) noexcept
 	const Train *v=static_cast<Train *>(id.shell);
 	return v->last_station_visited.base();
 }
-static uint8_t TrainReadDirection(OpenTTDTrainHandle id) noexcept
-{
-	const Train *v=static_cast<Train *>(id.shell);
-	return RustVehicleDirection(v);
-}
-static uint8_t TrainReadStatus(OpenTTDTrainHandle id) noexcept
-{
-	const Train *v=static_cast<Train *>(id.shell);
-	return RustVehicleStatus(v);
-}
-static uint8_t TrainReadTick(OpenTTDTrainHandle id) noexcept
-{
-	const Train *v=static_cast<Train *>(id.shell);
-	return RustVehicleTick(v);
-}
 static uint8_t TrainReadRunning(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
@@ -1057,11 +1017,6 @@ static uint8_t TrainReadDay(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
 	return v->day_counter;
-}
-static uint8_t TrainReadProgress(OpenTTDTrainHandle id) noexcept
-{
-	const Train *v=static_cast<Train *>(id.shell);
-	return RustVehicleProgress(v);
 }
 static uint8_t TrainReadOrder(OpenTTDTrainHandle id) noexcept
 {
