@@ -164,21 +164,22 @@ not a pinned-offset field view.
 
 ## Resume checkpoint
 
-Root resumed 2026-10-11; #211/#208 are integrated. Five agents own five unintegrated
-branches; passing heads and evidence are on linked issues/PRs. Integration order:
+Root resumed 2026-10-11; #211/#208 are integrated. Five unintegrated branches
+remain; passing heads and evidence are on linked issues/PRs. Integration order:
 #215, #209; #209 precedes final #217, both precede #216, whose shared boundaries precede final #218.
 
 | Issue / PR | Branch (worktree suffix), head | State and next step |
 | --- | --- | --- |
 | #192 / #209 | `company-direct-192`, `aaeafc9b69` | `/root/company_startup_coverage_156`: startup pair/self/soak and mutation pass; common Post witnesses/context helpers after #215, then fresh review/full CI. |
-| #199 / #215 | `shared-layer-road-199`, `d492122884` | `/root/shared_road_199_resume`: integrated tree table/native checks pass; Pad2000 exceeds 13 crossing budget. Faithful callback grouping, final checks/profile and fresh review next. |
-| #148 / #216 | `town-lifecycle-148`, `9802708fa2` | `/root/town_lifecycle_148`: storage/monthly/authority/population/radius/supplied/name metadata pass; tree-table merge, house/yearly/lifecycle and integrated services remain. |
+| #199 / #215 | `shared-layer-road-199`, `c50a4a56fc` | Fresh fixing review: native/Cargo checks pass; pair/self/soak running. Final profile, idle-host timing, full CI and disposition remain. |
+| #148 / #216 | `town-lifecycle-148`, `2c18e4a92c` | `/root/town_lifecycle_148`: narrow map/settings pass; house/yearly/create WIP comparisons pass, portable build pending. Full lifecycle and integrated services remain. |
 | #214 / #217 | `station-loading-direct-214`, `d456668553` | `/root/station_loading_direct_214`: typed station/domain handles, map/timer reuse and 16-case pair pass; consume integrated #215/#209, then final checks/review. |
-| #150 / #218 | `industry-construction-150`, `b6df981594` | `/root/industry_construction_150`: initialization/text span pass; builtin tile policy validating, transactions and integrated #216 services remain. |
+| #150 / #218 | `industry-construction-150`, `8675d08d7a` | `/root/industry_construction_150`: builtin tile policy passes; whole-command WIP native/new scenarios pass, remaining comparisons running. Integrated services remain. |
 
 Planning complete: #212/#213 selected after #150. ABI blocks: train through 385,
 tree additions 386-389, fleet 390-399, company 400-429, town 430-459, road 460-499,
-station/loading 500-559, industry construction 560-619 and shared CommandCost 620-629.
+station/loading 500-559, industry construction 560-619, shared CommandCost 620-629,
+and additional town lifecycle 630-669. Allocate only consumed layouts.
 
 Preserve the pinned reference, paused curve worktrees and evidence branches
 `evidence-disaster-vehicles` (`a775543162`) and `evidence-water-regions`
