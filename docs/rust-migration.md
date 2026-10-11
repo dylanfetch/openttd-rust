@@ -1534,9 +1534,9 @@ separate index-zero serialized fixtures; the original source stays unchanged.
 ### Station cargo service
 
 Issue #125 moves the ordered loading queue, station service counters, acceptance
-mask and per-cargo rating/pickup/speed/age/waiting/fraction metadata into one
-canonical opaque Rust owner per BaseStation. C++ scalar references and the queue
-facade address that allocation; ordinary/indexed construction, retirement, reuse,
+mask and cargo rating/pickup/speed/age/waiting/fraction metadata into one opaque
+Rust owner per BaseStation. Native scalar references and the queue facade share
+it; ordinary/indexed construction, retirement, reuse,
 STNN/STNS and legacy fixups share it without persistent native mirrors. Rust owns
 PrepareUnload, complete station/vehicle loading, refit/reservation/completion,
 acceptance, ratings/truncation, admission/distribution and periodic/stale-link
