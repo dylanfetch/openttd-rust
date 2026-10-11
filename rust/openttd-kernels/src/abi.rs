@@ -157,8 +157,10 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         54 => layout!(crate::ship_yapf::Follow, item; tile, skipped, dirs, followed),
         55 => layout!(crate::ship_yapf::Tile, item; ships, docking, sea, lock_middle, destination),
         56 => layout!(crate::ship_yapf::Result, item; direction, found, origin, stats),
-        60 => layout!(crate::town::Action, item; kind, town, tile, a, b, c, d, cost),
-        61 => layout!(crate::town::Leaves, item; observe, leaf, state, stations),
+        430 => layout!(crate::town::CommandResult, item; cost, success),
+        431 => {
+            layout!(crate::town::Leaves, item; settings, town, tile, house, road_info, state, stations, dirty_town, tropic_zone, tile_height, foundation_slope, terraform_price, clean_road_bits, set_road_town, exchange_company, increase_building_count, make_house, add_animation, dirty_tile, change_house_count, change_population, nearby_stations, update_radius, house_count, building_count, update_max_pass, next_town, road_mask, build_road, clear_land, terraform_land, build_bridge, build_tunnel, clear_house_land, allow_construction, construction_animation)
+        }
         90 => {
             layout!(crate::rail_yapf::Settings, item; max_nodes, firstred, firstred_exit, lastred, lastred_exit, station, slope, curve45, curve90, depot_reverse, crossing, lookahead, p0, p1, p2, pbs_cross, pbs_station, pbs_back, doubleslip, longer, longer_tile, shorter, shorter_tile, firstred_eol)
         }

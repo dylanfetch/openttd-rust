@@ -134,19 +134,22 @@ static void ObserveTile(void *, uint32_t, uint32_t *) noexcept {}
 static void WriteTile(void *, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) noexcept {}
 static float Trig(uint32_t, float value) noexcept { return value; }
 static uint32_t Industry(int32_t, int32_t, uint32_t *) noexcept { return 0; }
+static void Read_settings(uint32_t *v) noexcept { Observe(0, 0, v); }
+static void Read_town(uint32_t id, uint32_t *v) noexcept { Observe(1, id, v); }
+static void Read_tile(uint32_t id, uint32_t *v) noexcept { Observe(2, id, v); }
+static void Read_house(uint32_t id, uint32_t *v) noexcept { Observe(3, id, v); }
+static void Read_road_info(uint32_t id, uint32_t *v) noexcept { Observe(4, id, v); }
+static uint64_t RoadTypes() noexcept { return Leaf(21, 0, 0, 0, 0); }
+static bool BuildRoad(uint32_t town, uint32_t tile, uint32_t bits, uint32_t type, uint32_t mode) noexcept { assert(mode == 0); return RoadCommand(tile, bits, type, town).Succeeded(); }
+static bool BuildTunnel(uint32_t tile, uint32_t type, uint32_t execute) noexcept { return TunnelCommand(tile, type, execute != 0).Succeeded(); }
 static bool Candidate()
 {
-	const OpenTTDTownLeaves leaves{Observe, Leaf, State, Stations};
+	const OpenTTDTownLeaves leaves{
+		.settings = Read_settings, .town = Read_town, .tile = Read_tile, .house = Read_house, .road_info = Read_road_info,
+		.state = State, .stations = Stations, .road_mask = RoadTypes, .build_road = BuildRoad, .build_tunnel = BuildTunnel,
+	};
 	const OpenTTDSharedServices services{nullptr, Random, ObserveTile, WriteTile, Trig, Industry};
-	auto task = std::unique_ptr<OpenTTDTownTask, decltype(&openttd_rust_town_task_destroy)>(openttd_rust_town_begin(&leaves, &services, 11, world->town.index, world->start, world->direction, 0, 0, 0), openttd_rust_town_task_destroy);
-	OpenTTDTownAction action{};
-	uint64_t result = 0;
-	while (!openttd_rust_town_step(task.get(), result, 37, &action)) {
-		assert(action.c == 0 && action.d == 0);
-		if (action.kind == 1) result = RoadCommand(action.tile, action.a, action.b, action.town).Succeeded();
-		else { assert(action.kind == 5); result = TunnelCommand(action.tile, action.a, action.b != 0).Succeeded(); }
-	}
-	return action.a != 0;
+	return openttd_rust_town_tunnel(&leaves, &services, world->town.index, world->start, world->direction);
 }
 static uint32_t Along(const World &w, int distance) { return w.start + distance * TileOffsByDiagDir(w.direction); }
 static World Fixture(uint32_t dir, uint32_t length, bool mountain)

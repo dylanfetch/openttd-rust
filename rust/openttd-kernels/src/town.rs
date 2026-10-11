@@ -6,7 +6,7 @@
  */
 
 //! Complete town growth policy; canonical map, pools and shared caches remain C++.
-//! Commands and `NewGRF` callbacks execute after the future yields to its C++ facade.
+//! Commands and `NewGRF` callbacks run directly after all owner access ends.
 //! No private-state reference survives a shared service or a yielded action.
 #![allow(
     unsafe_code,
@@ -23,14 +23,7 @@
     clippy::decimal_bitwise_operands
 )]
 use crate::services::{Services, chance16_i};
-use std::{
-    cell::Cell,
-    ffi::c_void,
-    future::Future,
-    pin::Pin,
-    rc::Rc,
-    task::{Context, Poll, Waker},
-};
+use std::{cell::Cell, ffi::c_void};
 
 #[derive(Default)]
 pub struct State {
@@ -76,71 +69,77 @@ pub unsafe extern "C" fn openttd_rust_town_set(state: *mut State, field: u8, val
     }
 }
 #[repr(C)]
-#[derive(Default, Clone, Copy)]
-pub struct Action {
-    pub kind: u32,
-    pub town: u32,
-    pub tile: u32,
-    pub a: u32,
-    pub b: u32,
-    pub c: u32,
-    pub d: u32,
-    pub cost: i64,
+#[derive(Clone, Copy)]
+pub struct Leaves {
+    pub settings: extern "C" fn(*mut u32),
+    pub town: extern "C" fn(u32, *mut u32),
+    pub tile: extern "C" fn(u32, *mut u32),
+    pub house: extern "C" fn(u32, *mut u32),
+    pub road_info: extern "C" fn(u32, *mut u32),
+    pub state: extern "C" fn(u32) -> *mut State,
+    pub stations: extern "C" fn(u32, u32, *mut c_void, extern "C" fn(*mut c_void, u32, u32, u32)),
+    pub dirty_town: extern "C" fn(u32),
+    pub tropic_zone: extern "C" fn(u32) -> u32,
+    pub tile_height: extern "C" fn(u32) -> u32,
+    pub foundation_slope: extern "C" fn(u32) -> u32,
+    pub terraform_price: extern "C" fn() -> i64,
+    pub clean_road_bits: extern "C" fn(u32, u32) -> u32,
+    pub set_road_town: extern "C" fn(u32, u32),
+    pub exchange_company: extern "C" fn(u32) -> u32,
+    pub increase_building_count: extern "C" fn(u32, u32),
+    pub make_house: extern "C" fn(u32, u32, u32, u32),
+    pub add_animation: extern "C" fn(u32),
+    pub dirty_tile: extern "C" fn(u32),
+    pub change_house_count: extern "C" fn(u32, u32),
+    pub change_population: extern "C" fn(u32, u32),
+    pub nearby_stations: extern "C" fn(u32, u32, u32),
+    pub update_radius: extern "C" fn(u32),
+    pub house_count: extern "C" fn() -> u32,
+    pub building_count: extern "C" fn(u32, u32, u32) -> u16,
+    pub update_max_pass: extern "C" fn(u32),
+    pub next_town: extern "C" fn(u32) -> u32,
+    pub road_mask: extern "C" fn() -> u64,
+    pub build_road: extern "C" fn(u32, u32, u32, u32, u32) -> bool,
+    pub clear_land: extern "C" fn(u32, u32) -> bool,
+    pub terraform_land: extern "C" fn(u32, u32, u32, u32) -> CommandResult,
+    pub build_bridge: extern "C" fn(u32, u32, u32, u32, u32) -> bool,
+    pub build_tunnel: extern "C" fn(u32, u32, u32) -> bool,
+    pub clear_house_land: extern "C" fn(u32),
+    pub allow_construction: extern "C" fn(u32, u32, u32, u32) -> bool,
+    pub construction_animation: extern "C" fn(u32),
 }
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct Leaves {
-    pub observe: extern "C" fn(u32, u32, *mut u32),
-    pub leaf: extern "C" fn(u32, u32, u32, u32, u32) -> u64,
-    pub state: extern "C" fn(u32) -> *mut State,
-    pub stations: extern "C" fn(u32, u32, *mut c_void, extern "C" fn(*mut c_void, u32, u32, u32)),
-}
-#[derive(Default)]
-struct Exchange {
-    action: Cell<Action>,
-    result: Cell<(u64, i64)>,
-}
-struct Request {
-    exchange: Rc<Exchange>,
-    action: Action,
-    yielded: bool,
-}
-impl Future for Request {
-    type Output = (u64, i64);
-    fn poll(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
-        if self.yielded {
-            Poll::Ready(self.exchange.result.get())
-        } else {
-            self.exchange.action.set(self.action);
-            self.yielded = true;
-            Poll::Pending
-        }
-    }
+pub struct CommandResult {
+    pub cost: i64,
+    pub success: bool,
 }
 #[derive(Clone)]
 struct Engine {
     leaves: Leaves,
     services: Services,
-    exchange: Rc<Exchange>,
-    settings: Rc<Cell<[u32; 32]>>,
+    settings: Cell<[u32; 32]>,
 }
 impl Engine {
-    fn observe(&self, kind: u32, id: u32) -> [u32; 32] {
+    fn tile(&self, id: u32) -> [u32; 32] {
         let mut record = [0; 32];
-        (self.leaves.observe)(kind, id, record.as_mut_ptr());
+        (self.leaves.tile)(id, record.as_mut_ptr());
         record
     }
-    fn tile(&self, tile: u32) -> [u32; 32] {
-        self.observe(2, tile)
+    fn town(&self, id: u32) -> [u32; 32] {
+        let mut record = [0; 32];
+        (self.leaves.town)(id, record.as_mut_ptr());
+        record
     }
-    fn town(&self, town: u32) -> [u32; 32] {
-        self.observe(1, town)
+    fn house(&self, id: u32) -> [u32; 32] {
+        let mut record = [0; 32];
+        (self.leaves.house)(id, record.as_mut_ptr());
+        record
     }
-    fn house(&self, house: u32) -> [u32; 32] {
-        self.observe(3, house)
-    }
-    fn leaf(&self, op: u32, id: u32, a: u32, b: u32, c: u32) -> u64 {
-        (self.leaves.leaf)(op, id, a, b, c)
+    fn road_info(&self, id: u32) -> [u32; 32] {
+        let mut record = [0; 32];
+        (self.leaves.road_info)(id, record.as_mut_ptr());
+        record
     }
     fn get(&self, town: u32, field: u8) -> u16 {
         // SAFETY: The pool lookup yields the source's live town owner.
@@ -188,34 +187,12 @@ impl Engine {
         let y = (a / sx) as i32 - (b / sx) as i32;
         (x * x + y * y) as u32
     }
-    async fn action(&self, kind: u32, town: u32, tile: u32, args: [u32; 4]) -> (u64, i64) {
-        let result = Request {
-            exchange: self.exchange.clone(),
-            action: Action {
-                kind,
-                town,
-                tile,
-                a: args[0],
-                b: args[1],
-                c: args[2],
-                d: args[3],
-                cost: 0,
-            },
-            yielded: false,
-        }
-        .await;
-        self.settings.set(self.observe(0, 0));
-        result
-    }
-    async fn road(&self, town: u32, tile: u32, bits: u32, flags: u32) -> bool {
+    fn road(&self, town: u32, tile: u32, bits: u32, flags: u32) -> bool {
         let rt = self.road_type();
-        self.action(1, town, tile, [bits, rt, flags, 0]).await.0 != 0
+        (self.leaves.build_road)(town, tile, bits, rt, flags)
     }
-    async fn clear(&self, tile: u32, execute: bool) -> bool {
-        self.action(2, 0, tile, [u32::from(execute), 0, 0, 0])
-            .await
-            .0
-            != 0
+    fn clear(&self, tile: u32, execute: bool) -> bool {
+        (self.leaves.clear_land)(tile, u32::from(execute))
     }
     fn count_stations(&self, town: u32) -> u32 {
         struct StationCount {
@@ -280,12 +257,12 @@ impl Engine {
                 },
             );
         }
-        self.leaf(1, town, 0, 0, 0);
+        (self.leaves.dirty_town)(town);
     }
     fn update_growth(&self, town: u32) {
         self.update_rate(town);
         self.flags(town, 1, 0);
-        self.leaf(1, town, 0, 0, 0);
+        (self.leaves.dirty_town)(town);
         let funding = self.get(town, 2) != 0;
         if self.settings.get()[3] == 0 && !funding {
             return;
@@ -295,7 +272,7 @@ impl Engine {
             for i in 0..6 {
                 match t[11 + i] {
                     0xffff_fffe => {
-                        if self.leaf(3, t[0], 0, 0, 0) as u32 >= self.settings.get()[5]
+                        if (self.leaves.tile_height)(t[0]) >= self.settings.get()[5]
                             && t[17 + i] == 0
                             && t[3] > 90
                         {
@@ -303,7 +280,7 @@ impl Engine {
                         }
                     }
                     u32::MAX => {
-                        if self.leaf(2, t[0], 0, 0, 0) == 1 && t[17 + i] == 0 && t[3] > 60 {
+                        if (self.leaves.tropic_zone)(t[0]) == 1 && t[17 + i] == 0 && t[3] > 60 {
                             return;
                         }
                     }
@@ -319,14 +296,14 @@ impl Engine {
             if self.get(town, 1) != u16::MAX {
                 self.flags(town, 0, 1);
             }
-            self.leaf(1, town, 0, 0, 0);
+            (self.leaves.dirty_town)(town);
             return;
         }
         if !funding && self.count_stations(town) == 0 && !self.chance(1, 12) {
             return;
         }
         self.flags(town, 0, 1);
-        self.leaf(1, town, 0, 0, 0);
+        (self.leaves.dirty_town)(town);
     }
 }
 fn reverse(dir: u32) -> u32 {
@@ -339,75 +316,18 @@ fn incline(dir: u32) -> u32 {
     [12, 6, 3, 9][dir as usize]
 }
 
-pub struct Task {
-    exchange: Rc<Exchange>,
-    future: Pin<Box<dyn Future<Output = u32>>>,
-}
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_town_begin(
-    leaves: *const Leaves,
-    services: *const Services,
-    operation: u32,
-    town: u32,
-    tile: u32,
-    a: u32,
-    b: u32,
-    c: u32,
-    d: u32,
-) -> *mut Task {
-    // SAFETY: Both immutable tables remain live while copied; no pointers retained.
+fn engine(leaves: *const Leaves, services: *const Services) -> Engine {
+    // SAFETY: Immutable game-thread service tables remain live for each synchronous entry.
     let leaves = unsafe { *leaves };
     let services = unsafe { *services };
-    let exchange = Rc::new(Exchange::default());
     let mut settings = [0; 32];
-    (leaves.observe)(0, 0, settings.as_mut_ptr());
-    let engine = Engine {
+    (leaves.settings)(settings.as_mut_ptr());
+    Engine {
         leaves,
         services,
-        exchange: exchange.clone(),
-        settings: Rc::new(Cell::new(settings)),
-    };
-    let future = Box::pin(async move { engine.run(operation, town, tile, a, b, c, d).await });
-    Box::into_raw(Box::new(Task { exchange, future }))
-}
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_town_step(
-    task: *mut Task,
-    result: u64,
-    cost: i64,
-    action: *mut Action,
-) -> u32 {
-    // SAFETY: Facade exclusively owns this task between calls; all state access is raw.
-    let task = unsafe { &mut *task };
-    task.exchange.result.set((result, cost));
-    let mut context = Context::from_waker(Waker::noop());
-    match task.future.as_mut().poll(&mut context) {
-        Poll::Pending => {
-            unsafe {
-                *action = task.exchange.action.get();
-            }
-            0
-        }
-        Poll::Ready(value) => {
-            unsafe {
-                *action = Action {
-                    kind: 0,
-                    a: value,
-                    ..Action::default()
-                };
-            }
-            1
-        }
+        settings: Cell::new(settings),
     }
 }
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_town_task_destroy(task: *mut Task) {
-    // SAFETY: Facade RAII destroys once, including exceptional command return.
-    unsafe {
-        drop(Box::from_raw(task));
-    }
-}
-
 fn round_div(a: i32, b: u32) -> i32 {
     if a > 0 {
         (a + (b as i32) / 2) / (b as i32)
@@ -418,13 +338,13 @@ fn round_div(a: i32, b: u32) -> i32 {
 
 impl Engine {
     fn road_type(&self) -> u32 {
-        let mut mask = self.leaf(21, 0, 0, 0, 0);
+        let mut mask = (self.leaves.road_mask)();
         let mut best = 0;
         let mut best_speed = None;
         while mask != 0 {
             let rt = mask.trailing_zeros();
             mask &= mask - 1;
-            let rti = self.observe(4, rt);
+            let rti = self.road_info(rt);
             if rti[0] == 0 {
                 continue;
             }
@@ -465,21 +385,19 @@ impl Engine {
         }
         false
     }
-    async fn road_allowed(&self, town: u32, tile: u32, dir: u32) -> bool {
+    fn road_allowed(&self, town: u32, tile: u32, dir: u32) -> bool {
         let t = self.tile(tile);
         if t[5] == 0 || (t[6] != u32::MAX && t[6] == (dir & 1)) {
             return false;
         }
         if self.rb(tile) == 0
-            && !self
-                .road(town, tile, if dir & 1 != 0 { 5 } else { 10 }, 0)
-                .await
-            && !self.clear(tile, false).await
+            && !self.road(town, tile, if dir & 1 != 0 { 5 } else { 10 }, 0)
+            && !self.clear(tile, false)
         {
             return false;
         }
         let slope = if self.settings.get()[2] != 0 {
-            self.leaf(4, tile, 0, 0, 0) as u32
+            (self.leaves.foundation_slope)(tile)
         } else {
             self.tile(tile)[1]
         };
@@ -497,7 +415,7 @@ impl Engine {
                     } else {
                         slope ^ 15
                     };
-                    success = self.action(3, 0, tile, [edges, 0, 1, 0]).await.0 != 0;
+                    success = (self.leaves.terraform_land)(tile, edges, 0, 1).success;
                 }
                 if !success && self.chance(1, 3) {
                     return ret;
@@ -507,15 +425,16 @@ impl Engine {
         }
         ret
     }
-    async fn terraform(&self, tile: u32, edges: u32, up: bool) -> bool {
-        let (success, cost) = self.action(3, 0, tile, [edges, u32::from(up), 0, 0]).await;
-        if success == 0 || cost >= ((self.leaf(5, 0, 0, 0, 0) as i64) + 2) * 8 {
+    fn terraform(&self, tile: u32, edges: u32, up: bool) -> bool {
+        let CommandResult { success, cost } =
+            (self.leaves.terraform_land)(tile, edges, u32::from(up), 0);
+        if !success || cost >= ((self.leaves.terraform_price)() + 2) * 8 {
             return false;
         }
-        self.action(3, 0, tile, [edges, u32::from(up), 1, 0]).await;
+        (self.leaves.terraform_land)(tile, edges, u32::from(up), 1);
         true
     }
-    async fn level(&self, tile: u32) {
+    fn level(&self, tile: u32) {
         if self.tile(tile)[0] == 3 {
             return;
         }
@@ -523,8 +442,8 @@ impl Engine {
         if slope == 0 {
             return;
         }
-        if !self.terraform(tile, (!slope) & 15, true).await {
-            self.terraform(tile, slope & 15, false).await;
+        if !self.terraform(tile, (!slope) & 15, true) {
+            self.terraform(tile, slope & 15, false);
         }
     }
     fn grid(&self, town: u32, tile: u32, dir: u32) -> u32 {
@@ -552,7 +471,7 @@ impl Engine {
             bit(dir) | bit(reverse(dir))
         }
     }
-    async fn extra_house(&self, town: u32, tile: u32, modes: u32) -> bool {
+    fn extra_house(&self, town: u32, tile: u32, modes: u32) -> bool {
         if self.tile(tile)[5] == 0 {
             return false;
         }
@@ -562,12 +481,12 @@ impl Engine {
                 count += 1;
             }
             if count >= 3 {
-                return self.try_house(town, tile, modes).await;
+                return self.try_house(town, tile, modes);
             }
         }
         false
     }
-    async fn road_continue(&self, town: u32, tile: u32, dir: u32) -> bool {
+    fn road_continue(&self, town: u32, tile: u32, dir: u32) -> bool {
         let next = self.step(tile, dir);
         let t = self.tile(next);
         let rt = self.road_type();
@@ -591,12 +510,13 @@ impl Engine {
             }
             _ => {}
         }
-        self.action(1, town, next, [bit(reverse(dir)), rt, 0, 0])
-            .await
+        (
+            (self.leaves.build_road)(town, next, bit(reverse(dir)), rt, 0),
+            0_i64,
+        )
             .0
-            != 0
     }
-    async fn bridge(&self, town: u32, tile: u32, dir: u32) -> bool {
+    fn bridge(&self, town: u32, tile: u32, dir: u32) -> bool {
         let slope = self.tile(tile)[1];
         if slope != 0 && slope & incline(dir) != 0 {
             return false;
@@ -623,7 +543,7 @@ impl Engine {
                 break;
             }
         }
-        if length == 1 || !self.road_continue(town, end, dir).await {
+        if length == 1 || !self.road_continue(town, end, dir) {
             return false;
         }
         if slope != 0 {
@@ -647,20 +567,20 @@ impl Engine {
         for _ in 0..=22 {
             let bridge = self.services.random_range(self.settings.get()[9] - 1);
             let rt = self.road_type();
-            if self.action(4, 0, tile, [end, bridge, rt, 0]).await.0 != 0 {
-                self.action(4, 0, tile, [end, bridge, rt, 1]).await;
+            if (self.leaves.build_bridge)(tile, end, bridge, rt, 0) {
+                (self.leaves.build_bridge)(tile, end, bridge, rt, 1);
                 return true;
             }
         }
         false
     }
-    async fn tunnel(&self, town: u32, tile: u32, dir: u32) -> bool {
+    fn tunnel(&self, town: u32, tile: u32, dir: u32) -> bool {
         if self.tile(tile)[1] != incline(dir)
             || self.rb(self.step(tile, reverse(dir))) & bit(dir) == 0
         {
             return false;
         }
-        let max = if self.road_continue(town, tile, dir).await {
+        let max = if self.road_continue(town, tile, dir) {
             let mut test = tile;
             for _ in 0..4 {
                 let t = self.tile(test);
@@ -690,12 +610,12 @@ impl Engine {
                 break;
             }
         }
-        if length == 1 || !self.road_continue(town, end, dir).await {
+        if length == 1 || !self.road_continue(town, end, dir) {
             return false;
         }
         let rt = self.road_type();
-        if self.action(5, 0, tile, [rt, 0, 0, 0]).await.0 != 0 {
-            self.action(5, 0, tile, [rt, 1, 0, 0]).await;
+        if (self.leaves.build_tunnel)(tile, rt, 0) {
+            (self.leaves.build_tunnel)(tile, rt, 1);
             return true;
         }
         false
@@ -750,7 +670,7 @@ impl Engine {
 }
 
 impl Engine {
-    async fn in_tile(&self, town: u32, tile: &mut u32, cur: u32, mut dir: u32, modes: u32) -> u32 {
+    fn in_tile(&self, town: u32, tile: &mut u32, cur: u32, mut dir: u32, modes: u32) -> u32 {
         let at = *tile;
         let layout = self.town(town)[4];
         let mut bits;
@@ -759,7 +679,7 @@ impl Engine {
                 return 1;
             }
             if self.settings.get()[2] == 0 || self.chance(1, 6) {
-                self.level(at).await;
+                self.level(at);
             }
             if layout >= 2 {
                 bits = self.grid(town, at, dir);
@@ -767,7 +687,7 @@ impl Engine {
                     return 1;
                 }
             } else {
-                if !self.road_allowed(town, at, dir).await {
+                if !self.road_allowed(town, at, dir) {
                     return 1;
                 }
                 let source = reverse(dir);
@@ -779,7 +699,7 @@ impl Engine {
                         }
                     }
                 }
-                if !self.road_allowed(town, self.step(at, dir), dir).await {
+                if !self.road_allowed(town, self.step(at, dir), dir) {
                     if dir != reverse(source) {
                         return 1;
                     }
@@ -840,10 +760,7 @@ impl Engine {
             bits = 0;
             if dir != 4 && modes & 2 != 0 {
                 if layout == 3 || layout == 1 {
-                    if self
-                        .extra_house(town, self.step(house_tile, dir), modes)
-                        .await
-                    {
+                    if self.extra_house(town, self.step(house_tile, dir), modes) {
                         result = 0;
                     }
                 }
@@ -852,16 +769,16 @@ impl Engine {
                     allow = bits & target == 0;
                 } else {
                     bits = target;
-                    allow = !self.road_allowed(town, house_tile, dir).await || self.chance(6, 10);
+                    allow = !self.road_allowed(town, house_tile, dir) || self.chance(6, 10);
                 }
             }
             allow &= self.roads_allow_house(house_tile);
             if allow {
                 if self.tile(house_tile)[0] != 3 {
                     if self.chance(1, 6) {
-                        self.level(house_tile).await;
+                        self.level(house_tile);
                     }
-                    if self.try_house(town, house_tile, modes).await {
+                    if self.try_house(town, house_tile, modes) {
                         result = 0;
                     }
                 }
@@ -874,19 +791,17 @@ impl Engine {
         if self.tile(at)[18] != 0 {
             return 1;
         }
-        bits = self.leaf(6, at, bits, 0, 0) as u32;
+        bits = (self.leaves.clean_road_bits)(at, bits);
         if bits == 0 {
             return 1;
         }
-        if self.bridge(town, at, dir).await
-            || self.tunnel(town, at, dir).await
-            || self.road(town, at, bits, 1).await
+        if self.bridge(town, at, dir) || self.tunnel(town, at, dir) || self.road(town, at, bits, 1)
         {
             return 0;
         }
         1
     }
-    async fn at_road(&self, town: u32, mut tile: u32, modes: u32) -> bool {
+    fn at_road(&self, town: u32, mut tile: u32, modes: u32) -> bool {
         let t = self.town(town);
         let factor = match t[4] {
             1 => 2,
@@ -897,7 +812,7 @@ impl Engine {
         let mut dir = 4;
         loop {
             let mut cur = self.rb(tile);
-            match self.in_tile(town, &mut tile, cur, dir, modes).await {
+            match self.in_tile(town, &mut tile, cur, dir, modes) {
                 0 => return true,
                 1 => iterations = 0,
                 _ => {}
@@ -936,7 +851,7 @@ impl Engine {
                     return false;
                 }
                 if t[10] == self.settings.get()[12] && self.settings.get()[6] != 0 {
-                    self.leaf(7, tile, town, 0, 0);
+                    (self.leaves.set_road_town)(tile, town);
                 }
             }
             iterations -= 1;
@@ -946,7 +861,7 @@ impl Engine {
         }
         false
     }
-    async fn grow(&self, town: u32, modes: u32) -> bool {
+    fn grow(&self, town: u32, modes: u32) -> bool {
         const OFFSETS: [(i32, i32); 13] = [
             (-1, 0),
             (1, 1),
@@ -964,12 +879,12 @@ impl Engine {
         ];
         // Company replacement is a shared scalar leaf; the C++ invocation facade
         // additionally restores it on command exceptions while dropping the task.
-        let company = self.leaf(8, 0, self.settings.get()[11], 0, 0) as u32;
+        let company = (self.leaves.exchange_company)(self.settings.get()[11]);
         let mut tile = self.town(town)[0];
         for (x, y) in OFFSETS {
             if self.rb(tile) != 0 {
-                let result = self.at_road(town, tile, modes).await;
-                self.leaf(8, 0, company, 0, 0);
+                let result = self.at_road(town, tile, modes);
+                (self.leaves.exchange_company)(company);
                 return result;
             }
             tile = self.offset(tile, x, y);
@@ -978,7 +893,7 @@ impl Engine {
             tile = self.town(town)[0];
             for (x, y) in OFFSETS {
                 let t = self.tile(tile);
-                if t[0] != 3 && t[1] == 0 && self.clear(tile, false).await {
+                if t[0] != 3 && t[1] == 0 && self.clear(tile, false) {
                     let rt = self.road_type();
                     let r = self.services.random();
                     let a = r & 3;
@@ -986,15 +901,14 @@ impl Engine {
                     if a == b {
                         b ^= 2;
                     }
-                    self.action(1, town, tile, [(1 << a) + (1 << b), rt, 2, 0])
-                        .await;
-                    self.leaf(8, 0, company, 0, 0);
+                    (self.leaves.build_road)(town, tile, (1 << a) + (1 << b), rt, 2);
+                    (self.leaves.exchange_company)(company);
                     return true;
                 }
                 tile = self.offset(tile, x, y);
             }
         }
-        self.leaf(8, 0, company, 0, 0);
+        (self.leaves.exchange_company)(company);
         false
     }
     fn layout_house(&self, town: u32, tile: u32, modes: u32, square: bool) -> bool {
@@ -1023,7 +937,7 @@ impl Engine {
             _ => true,
         }
     }
-    async fn can_house(&self, tile: u32, noslope: bool) -> bool {
+    fn can_house(&self, tile: u32, noslope: bool) -> bool {
         let slope = self.tile(tile)[1];
         if (noslope && slope != 0) || slope & 16 != 0 {
             return false;
@@ -1031,24 +945,24 @@ impl Engine {
         if !self.roads_allow_house(tile) || self.tile(tile)[6] != u32::MAX {
             return false;
         }
-        self.clear(tile, false).await
+        self.clear(tile, false)
     }
-    async fn same_z(&self, tile: u32, z: u32, noslope: bool) -> bool {
-        self.can_house(tile, noslope).await && self.tile(tile)[2] == z
+    fn same_z(&self, tile: u32, z: u32, noslope: bool) -> bool {
+        self.can_house(tile, noslope) && self.tile(tile)[2] == z
     }
-    async fn free_square(&self, mut tile: u32, z: u32, noslope: bool) -> bool {
-        if !self.same_z(tile, z, noslope).await {
+    fn free_square(&self, mut tile: u32, z: u32, noslope: bool) -> bool {
+        if !self.same_z(tile, z, noslope) {
             return false;
         }
         for dir in 1..4 {
             tile = self.step(tile, dir);
-            if !self.same_z(tile, z, noslope).await {
+            if !self.same_z(tile, z, noslope) {
                 return false;
             }
         }
         true
     }
-    async fn check_house(
+    fn check_house(
         &self,
         town: u32,
         tile: &mut u32,
@@ -1060,8 +974,7 @@ impl Engine {
         if size & 16 != 0 {
             let mut test = *tile;
             for dir in 1..=4 {
-                if self.layout_house(town, test, modes, true)
-                    && self.free_square(test, z, noslope).await
+                if self.layout_house(town, test, modes, true) && self.free_square(test, z, noslope)
                 {
                     *tile = test;
                     return true;
@@ -1075,11 +988,11 @@ impl Engine {
         } else if size & 12 != 0 {
             let dir = if size & 4 != 0 { 2 } else { 1 };
             let mut test = self.step(*tile, dir);
-            if self.layout_house(town, test, modes, false) && self.same_z(test, z, noslope).await {
+            if self.layout_house(town, test, modes, false) && self.same_z(test, z, noslope) {
                 return true;
             }
             test = self.step(*tile, reverse(dir));
-            if self.layout_house(town, test, modes, false) && self.same_z(test, z, noslope).await {
+            if self.layout_house(town, test, modes, false) && self.same_z(test, z, noslope) {
                 *tile = test;
                 return true;
             }
@@ -1088,7 +1001,7 @@ impl Engine {
             true
         }
     }
-    async fn make_house_tile(
+    fn make_house_tile(
         &self,
         town: u32,
         tile: u32,
@@ -1098,21 +1011,20 @@ impl Engine {
         random: u32,
         protected: bool,
     ) {
-        self.action(6, town, tile, [0, 0, 0, 0]).await;
-        self.leaf(9, town, house, 0, 0);
-        self.leaf(
-            10,
+        (self.leaves.clear_house_land)(tile);
+        (self.leaves.increase_building_count)(town, house);
+        (self.leaves.make_house)(
             tile,
             town,
             house,
             counter | (stage << 8) | (random << 16) | (u32::from(protected) << 24),
         );
         if self.house(house)[2] & 32 != 0 {
-            self.leaf(11, tile, 0, 0, 0);
+            (self.leaves.add_animation)(tile);
         }
-        self.leaf(12, tile, 0, 0, 0);
+        (self.leaves.dirty_tile)(tile);
     }
-    async fn build_house(
+    fn build_house(
         &self,
         town: u32,
         tile: u32,
@@ -1121,7 +1033,7 @@ impl Engine {
         complete: bool,
         protected: bool,
     ) {
-        self.leaf(13, town, 1, 0, 0);
+        (self.leaves.change_house_count)(town, 1);
         let h = self.house(house);
         let mut counter = 0;
         let mut stage = 0;
@@ -1132,15 +1044,14 @@ impl Engine {
                 stage = construction & 3;
             }
             if stage == 3 {
-                self.leaf(14, town, h[9], 0, 0);
+                (self.leaves.change_population)(town, h[9]);
             } else {
                 counter = (construction >> 2) & 3;
             }
         }
         let size = self.house(house)[2];
         let mut part = house;
-        self.make_house_tile(town, tile, counter, stage, part, random, protected)
-            .await;
+        self.make_house_tile(town, tile, counter, stage, part, random, protected);
         if size & 24 != 0 {
             part += 1;
             self.make_house_tile(
@@ -1151,8 +1062,7 @@ impl Engine {
                 part,
                 random,
                 protected,
-            )
-            .await;
+            );
         }
         if size & 20 != 0 {
             part += 1;
@@ -1164,8 +1074,7 @@ impl Engine {
                 part,
                 random,
                 protected,
-            )
-            .await;
+            );
         }
         if size & 16 != 0 {
             part += 1;
@@ -1177,29 +1086,25 @@ impl Engine {
                 part,
                 random,
                 protected,
-            )
-            .await;
+            );
         }
-        self.leaf(15, town, tile, size, 0);
-        self.leaf(16, town, 0, 0, 0);
+        (self.leaves.nearby_stations)(town, tile, size);
+        (self.leaves.update_radius)(town);
         self.update_rate(town);
         let size = self.house(house)[2];
-        self.action(8, town, tile, [0, 0, 0, 0]).await;
+        (self.leaves.construction_animation)(tile);
         if size & 24 != 0 {
-            self.action(8, town, self.offset(tile, 0, 1), [0, 0, 0, 0])
-                .await;
+            (self.leaves.construction_animation)(self.offset(tile, 0, 1));
         }
         if size & 20 != 0 {
-            self.action(8, town, self.offset(tile, 1, 0), [0, 0, 0, 0])
-                .await;
+            (self.leaves.construction_animation)(self.offset(tile, 1, 0));
         }
         if size & 16 != 0 {
-            self.action(8, town, self.offset(tile, 1, 1), [0, 0, 0, 0])
-                .await;
+            (self.leaves.construction_animation)(self.offset(tile, 1, 1));
         }
     }
-    async fn try_house(&self, town: u32, base: u32, modes: u32) -> bool {
-        if !self.layout_house(town, base, modes, false) || !self.can_house(base, false).await {
+    fn try_house(&self, town: u32, base: u32, modes: u32) -> bool {
+        if !self.layout_house(town, base, modes, false) || !self.can_house(base, false) {
             return false;
         }
         let t = self.tile(base);
@@ -1232,12 +1137,12 @@ impl Engine {
         let zones = (1 << zone) | (1 << climate);
         let mut probs = Vec::new();
         let mut max = 0_u32;
-        for house in 0..self.leaf(17, 0, 0, 0, 0) as u32 {
+        for house in 0..(self.leaves.house_count)() {
             let h = self.house(house);
             if h[0] & zones != zones || h[1] == 0 || h[4] != u16::MAX.into() {
                 continue;
             }
-            if self.leaf(18, town, house, h[8], 0) == u64::from(u16::MAX) {
+            if (self.leaves.building_count)(town, house, h[8]) == u16::MAX {
                 continue;
             }
             max = max.wrapping_add(h[5]);
@@ -1281,15 +1186,16 @@ impl Engine {
             if noslope && slope != 0 {
                 continue;
             }
-            if !self
-                .check_house(town, &mut tile, maxz, noslope, h[2], modes)
-                .await
-            {
+            if !self.check_house(town, &mut tile, maxz, noslope, h[2], modes) {
                 continue;
             }
             let random = u32::from(self.services.random() as u8);
             if self.house(house)[10] != 0
-                && self.action(7, town, tile, [house, random, 0, 0]).await.0 == 0
+                && !(
+                    (self.leaves.allow_construction)(town, tile, house, random),
+                    0_i64,
+                )
+                    .0
             {
                 continue;
             }
@@ -1301,20 +1207,19 @@ impl Engine {
                 random,
                 false,
                 self.house(house)[3] & 2 != 0,
-            )
-            .await;
+            );
             return true;
         }
         false
     }
-    async fn tick(&self, town: u32) {
+    fn tick(&self, town: u32) {
         if self.get(town, 4) & 1 == 0 {
             return;
         }
         let modes = 1 | if self.settings.get()[15] != 0 { 2 } else { 0 };
         let mut counter = i32::from(self.get(town, 0)) - 1;
         if counter < 0 {
-            counter = i32::from(if self.grow(town, modes).await {
+            counter = i32::from(if self.grow(town, modes) {
                 self.get(town, 1)
             } else {
                 self.get(town, 1).min((self.settings.get()[4] - 1) as u16)
@@ -1322,106 +1227,184 @@ impl Engine {
         }
         self.set(town, 0, counter as u16);
     }
-    async fn expand(&self, town: u32, amount: u32, modes: u32) {
+    fn expand(&self, town: u32, amount: u32, modes: u32) {
         if amount == 0 {
             let amount = self
                 .services
                 .random_range((self.town(town)[2] / 10).min(u32::from(u16::MAX)))
                 + 3;
-            self.leaf(13, town, amount, 0, 0);
-            self.leaf(16, town, 0, 0, 0);
+            (self.leaves.change_house_count)(town, amount);
+            (self.leaves.update_radius)(town);
             for _ in 0..amount * 10 {
-                self.grow(town, modes).await;
+                self.grow(town, modes);
             }
-            self.leaf(13, town, amount.wrapping_neg(), 0, 0);
+            (self.leaves.change_house_count)(town, amount.wrapping_neg());
         } else {
             for _ in 0..amount {
                 for _ in 0..25 {
-                    if self.grow(town, modes).await {
+                    if self.grow(town, modes) {
                         break;
                     }
                 }
             }
         }
-        self.leaf(16, town, 0, 0, 0);
-        self.leaf(19, town, 0, 0, 0);
+        (self.leaves.update_radius)(town);
+        (self.leaves.update_max_pass)(town);
     }
-    async fn run(&self, op: u32, town: u32, tile: u32, a: u32, b: u32, c: u32, d: u32) -> u32 {
-        match op {
-            0 => u32::from(self.grow(town, a).await),
-            1 => u32::from(self.try_house(town, tile, a).await),
-            2 => {
-                self.build_house(town, tile, a, b, c != 0, d != 0).await;
-                0
+    fn tick_all(&self) {
+        if self.settings.get()[6] == 0 {
+            let mut id = (self.leaves.next_town)(0);
+            while id != u32::MAX {
+                self.tick(id);
+                id = (self.leaves.next_town)(id + 1);
             }
-            3 => {
-                if self.settings.get()[6] == 0 {
-                    let mut id = self.leaf(20, 0, 0, 0, 0) as u32;
-                    while id != u32::MAX {
-                        self.tick(id).await;
-                        id = self.leaf(20, 0, id + 1, 0, 0) as u32;
-                    }
-                }
-                0
-            }
-            4 => {
-                self.update_rate(town);
-                0
-            }
-            5 => {
-                self.update_growth(town);
-                0
-            }
-            6 => {
-                self.expand(town, a, b).await;
-                0
-            }
-            7 => {
-                for field in [3, 2] {
-                    let months = self.get(town, field);
-                    if months != 0 {
-                        self.set(town, field, months - 1);
-                    }
-                }
-                0
-            }
-            8 => {
-                if a == 0 {
-                    self.flags(town, 8, 0);
-                } else {
-                    let old = u32::from(self.get(town, 1));
-                    let counter = u32::from(self.get(town, 0));
-                    self.set(
-                        town,
-                        0,
-                        if counter >= old {
-                            a as u16
-                        } else {
-                            (counter * a / old) as u16
-                        },
-                    );
-                    self.set(town, 1, a as u16);
-                    self.flags(town, 0, 8);
-                }
-                self.update_growth(town);
-                0
-            }
-            9 => {
-                self.set(town, 2, 3);
-                self.update_growth(town);
-                let counter = i32::from(self.get(town, 0));
-                let rate = i32::from(self.get(town, 1));
-                let ticks = self.settings.get()[4] as i32;
-                self.set(
-                    town,
-                    0,
-                    (counter.min(2 * ticks - (rate - counter) % ticks)) as u16,
-                );
-                0
-            }
-            10 => self.road_type(),
-            11 => u32::from(self.tunnel(town, tile, a).await),
-            _ => 0,
         }
     }
+    fn monthly_counters(&self, town: u32) {
+        for field in [3, 2] {
+            let months = self.get(town, field);
+            if months != 0 {
+                self.set(town, field, months - 1);
+            }
+        }
+    }
+    fn custom_rate(&self, town: u32, a: u32) {
+        if a == 0 {
+            self.flags(town, 8, 0);
+        } else {
+            let old = u32::from(self.get(town, 1));
+            let counter = u32::from(self.get(town, 0));
+            self.set(
+                town,
+                0,
+                if counter >= old {
+                    a as u16
+                } else {
+                    (counter * a / old) as u16
+                },
+            );
+            self.set(town, 1, a as u16);
+            self.flags(town, 0, 8);
+        }
+        self.update_growth(town);
+    }
+    fn fund(&self, town: u32) {
+        self.set(town, 2, 3);
+        self.update_growth(town);
+        let counter = i32::from(self.get(town, 0));
+        let rate = i32::from(self.get(town, 1));
+        let ticks = self.settings.get()[4] as i32;
+        self.set(
+            town,
+            0,
+            (counter.min(2 * ticks - (rate - counter) % ticks)) as u16,
+        );
+    }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_grow(
+    leaves: *const Leaves,
+    services: *const Services,
+    town: u32,
+    modes: u32,
+) -> bool {
+    engine(leaves, services).grow(town, modes)
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_try_house(
+    leaves: *const Leaves,
+    services: *const Services,
+    town: u32,
+    tile: u32,
+    modes: u32,
+) -> bool {
+    engine(leaves, services).try_house(town, tile, modes)
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_build_house(
+    leaves: *const Leaves,
+    services: *const Services,
+    town: u32,
+    tile: u32,
+    house: u32,
+    random: u32,
+    complete: bool,
+    protected: bool,
+) {
+    engine(leaves, services).build_house(town, tile, house, random, complete, protected);
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_tick_all(
+    leaves: *const Leaves,
+    services: *const Services,
+) {
+    engine(leaves, services).tick_all();
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_update_rate(
+    leaves: *const Leaves,
+    services: *const Services,
+    town: u32,
+) {
+    engine(leaves, services).update_rate(town);
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_update_growth(
+    leaves: *const Leaves,
+    services: *const Services,
+    town: u32,
+) {
+    engine(leaves, services).update_growth(town);
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_expand(
+    leaves: *const Leaves,
+    services: *const Services,
+    town: u32,
+    amount: u32,
+    modes: u32,
+) {
+    engine(leaves, services).expand(town, amount, modes);
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_monthly_counters(
+    leaves: *const Leaves,
+    services: *const Services,
+    town: u32,
+) {
+    engine(leaves, services).monthly_counters(town);
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_custom_rate(
+    leaves: *const Leaves,
+    services: *const Services,
+    town: u32,
+    rate: u32,
+) {
+    engine(leaves, services).custom_rate(town, rate);
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_fund(
+    leaves: *const Leaves,
+    services: *const Services,
+    town: u32,
+) {
+    engine(leaves, services).fund(town);
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_road_type(
+    leaves: *const Leaves,
+    services: *const Services,
+) -> u32 {
+    engine(leaves, services).road_type()
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_tunnel(
+    leaves: *const Leaves,
+    services: *const Services,
+    town: u32,
+    tile: u32,
+    dir: u32,
+) -> bool {
+    engine(leaves, services).tunnel(town, tile, dir)
 }

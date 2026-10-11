@@ -5,49 +5,70 @@
  * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
  */
 
-/** @file town_ffi.h Town growth owner and command/NewGRF action boundaries. */
+/** @file town_ffi.h Canonical town state and synchronous typed services. */
 #ifndef RUST_TOWN_FFI_H
 #define RUST_TOWN_FFI_H
 #include "services_ffi.h"
 #include <cstdint>
-
 struct OpenTTDTownState;
-struct OpenTTDTownTask;
-struct OpenTTDTownAction {
-	uint32_t kind, town, tile, a, b, c, d;
-	int64_t cost;
-};
+struct OpenTTDTownCommandResult { int64_t cost; bool success; };
 struct OpenTTDTownLeaves {
-	void (*observe)(uint32_t, uint32_t, uint32_t *) noexcept;
-	uint64_t (*leaf)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) noexcept;
+	void (*settings)(uint32_t *) noexcept;
+	void (*town)(uint32_t, uint32_t *) noexcept;
+	void (*tile)(uint32_t, uint32_t *) noexcept;
+	void (*house)(uint32_t, uint32_t *) noexcept;
+	void (*road_info)(uint32_t, uint32_t *) noexcept;
 	OpenTTDTownState *(*state)(uint32_t) noexcept;
 	void (*stations)(uint32_t, uint32_t, void *, void (*)(void *, uint32_t, uint32_t, uint32_t)) noexcept;
+	void (*dirty_town)(uint32_t town) noexcept;
+	uint32_t (*tropic_zone)(uint32_t tile) noexcept;
+	uint32_t (*tile_height)(uint32_t tile) noexcept;
+	uint32_t (*foundation_slope)(uint32_t tile) noexcept;
+	int64_t (*terraform_price)() noexcept;
+	uint32_t (*clean_road_bits)(uint32_t tile, uint32_t bits) noexcept;
+	void (*set_road_town)(uint32_t tile, uint32_t town) noexcept;
+	uint32_t (*exchange_company)(uint32_t company) noexcept;
+	void (*increase_building_count)(uint32_t town, uint32_t house) noexcept;
+	void (*make_house)(uint32_t tile, uint32_t town, uint32_t house, uint32_t construction) noexcept;
+	void (*add_animation)(uint32_t tile) noexcept;
+	void (*dirty_tile)(uint32_t tile) noexcept;
+	void (*change_house_count)(uint32_t town, uint32_t amount) noexcept;
+	void (*change_population)(uint32_t town, uint32_t amount) noexcept;
+	void (*nearby_stations)(uint32_t town, uint32_t tile, uint32_t size) noexcept;
+	void (*update_radius)(uint32_t town) noexcept;
+	uint32_t (*house_count)() noexcept;
+	uint16_t (*building_count)(uint32_t town, uint32_t house, uint32_t house_class) noexcept;
+	void (*update_max_pass)(uint32_t town) noexcept;
+	uint32_t (*next_town)(uint32_t from) noexcept;
+	uint64_t (*road_mask)() noexcept;
+	bool (*build_road)(uint32_t town, uint32_t tile, uint32_t bits, uint32_t road_type, uint32_t mode) noexcept;
+	bool (*clear_land)(uint32_t tile, uint32_t execute) noexcept;
+	OpenTTDTownCommandResult (*terraform_land)(uint32_t tile, uint32_t slope, uint32_t up, uint32_t execute) noexcept;
+	bool (*build_bridge)(uint32_t tile, uint32_t end, uint32_t bridge, uint32_t road_type, uint32_t execute) noexcept;
+	bool (*build_tunnel)(uint32_t tile, uint32_t road_type, uint32_t execute) noexcept;
+	void (*clear_house_land)(uint32_t tile) noexcept;
+	bool (*allow_construction)(uint32_t town, uint32_t tile, uint32_t house, uint32_t random) noexcept;
+	void (*construction_animation)(uint32_t tile) noexcept;
 };
-/* A shell owns one state from construction (including indexed load) through
- * member destruction, even when Town::~Town returns during pool cleanup. Scalar
- * proxies contain only the owner pointer, never a second authoritative value.
- * Fields:0 grow_counter,1 growth_rate,2 funding months,3 road months,4 entire flags.
- * All table leaves are direct noexcept operations on canonical shared storage;
- * outputs are 32 copied words, type-valid fields only. Tile field24 is plain
- * IsWaterTile, distinct from the MP_WATER type which also includes coast.
- * They cannot reenter Rust,
- * throw, destroy the town, retain output pointers or execute commands/NewGRF.
- * Task operation:0 grow,1 try-house,2 build-house,3 tick all,4 rate,5 growth,
- * 6 expand,7 monthly counters,8 custom rate,9 funding,10 shared town road type;
- * 11 invokes the complete tunnel helper for the named bounded evidence gap (a=dir).
- * step yields only ordinary command/NewGRF boundaries; result/cost are copied
- * after C++ executes the action. No owner borrow survives a yield or shared leaf.
- * Tasks retain invocation-local candidate probabilities; reentrant invocations
- * have separate scratch. RAII drops tasks on exceptions, restores the caller's
- * company, and preserves all already-written state. Panics/environmental failure
- * abort. Save/load never runs growth: C++ staging commits even on partial loads. */
+/* Services are synchronous noexcept calls. No owner reference spans one. Commands
+ * and bounded NewGRF resolution may reenter; ordinary gameplay does not throw.
+ * Environmental failures and Rust panics abort. Save/load staging stays native. */
 extern "C" {
 OpenTTDTownState *openttd_rust_town_new();
 void openttd_rust_town_destroy(OpenTTDTownState *);
 uint16_t openttd_rust_town_get(const OpenTTDTownState *, uint8_t);
 void openttd_rust_town_set(OpenTTDTownState *, uint8_t, uint16_t);
-OpenTTDTownTask *openttd_rust_town_begin(const OpenTTDTownLeaves *, const OpenTTDSharedServices *, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
-uint32_t openttd_rust_town_step(OpenTTDTownTask *, uint64_t, int64_t, OpenTTDTownAction *);
-void openttd_rust_town_task_destroy(OpenTTDTownTask *);
+bool openttd_rust_town_grow(const OpenTTDTownLeaves *, const OpenTTDSharedServices *, uint32_t town, uint32_t modes);
+bool openttd_rust_town_try_house(const OpenTTDTownLeaves *, const OpenTTDSharedServices *, uint32_t town, uint32_t tile, uint32_t modes);
+void openttd_rust_town_build_house(const OpenTTDTownLeaves *, const OpenTTDSharedServices *, uint32_t town, uint32_t tile, uint32_t house, uint32_t random, bool complete, bool is_protected);
+void openttd_rust_town_tick_all(const OpenTTDTownLeaves *, const OpenTTDSharedServices *);
+void openttd_rust_town_update_rate(const OpenTTDTownLeaves *, const OpenTTDSharedServices *, uint32_t town);
+void openttd_rust_town_update_growth(const OpenTTDTownLeaves *, const OpenTTDSharedServices *, uint32_t town);
+void openttd_rust_town_expand(const OpenTTDTownLeaves *, const OpenTTDSharedServices *, uint32_t town, uint32_t amount, uint32_t modes);
+void openttd_rust_town_monthly_counters(const OpenTTDTownLeaves *, const OpenTTDSharedServices *, uint32_t town);
+void openttd_rust_town_custom_rate(const OpenTTDTownLeaves *, const OpenTTDSharedServices *, uint32_t town, uint32_t rate);
+void openttd_rust_town_fund(const OpenTTDTownLeaves *, const OpenTTDSharedServices *, uint32_t town);
+uint32_t openttd_rust_town_road_type(const OpenTTDTownLeaves *, const OpenTTDSharedServices *);
+bool openttd_rust_town_tunnel(const OpenTTDTownLeaves *, const OpenTTDSharedServices *, uint32_t town, uint32_t tile, uint32_t dir);
 }
 #endif /* RUST_TOWN_FFI_H */
