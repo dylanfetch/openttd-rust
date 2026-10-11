@@ -25,7 +25,12 @@ template <typename T> struct RustIndustryHistory {
 /** Views never own or destroy slot records. Mutations may invalidate all iterators. */
 template <typename T, bool Produced> class RustIndustryVector {
 	OpenTTDIndustry *owner;
-	OpenTTDIndustrySlots View() const { return openttd_rust_industry_slots(this->owner, Produced, 0, 0); }
+	/* Produced selects the entry at compile time; each call is one typed entry. */
+	OpenTTDIndustrySlots View() const
+	{
+		if constexpr (Produced) return openttd_rust_industry_produced_view(this->owner);
+		else return openttd_rust_industry_accepted_view(this->owner);
+	}
 public:
 	using value_type = T;
 	using iterator = T *;
@@ -47,13 +52,31 @@ public:
 	const T &front() const { return *this->begin(); }
 	T &back() { return this->data()[this->size() - 1]; }
 	const T &back() const { return this->data()[this->size() - 1]; }
-	void reserve(size_t n) { openttd_rust_industry_slots(this->owner, Produced, 1, n); }
-	void resize(size_t n) { openttd_rust_industry_slots(this->owner, Produced, 2, n); }
-	T &emplace_back() { auto v = openttd_rust_industry_slots(this->owner, Produced, 3, 0); return static_cast<T *>(v.data)[v.size - 1]; }
+	void reserve(size_t n)
+	{
+		if constexpr (Produced) openttd_rust_industry_produced_reserve(this->owner, n);
+		else openttd_rust_industry_accepted_reserve(this->owner, n);
+	}
+	void resize(size_t n)
+	{
+		if constexpr (Produced) openttd_rust_industry_produced_resize(this->owner, n);
+		else openttd_rust_industry_accepted_resize(this->owner, n);
+	}
+	T &emplace_back()
+	{
+		OpenTTDIndustrySlots v;
+		if constexpr (Produced) v = openttd_rust_industry_produced_emplace_back(this->owner);
+		else v = openttd_rust_industry_accepted_emplace_back(this->owner);
+		return static_cast<T *>(v.data)[v.size - 1];
+	}
 	void push_back(const T &value) { this->emplace_back() = value; }
 	void push_back(T &&value) { this->emplace_back() = std::move(value); }
 	void clear() { this->resize(0); }
-	void shrink_to_fit() { openttd_rust_industry_slots(this->owner, Produced, 4, 0); }
+	void shrink_to_fit()
+	{
+		if constexpr (Produced) openttd_rust_industry_produced_shrink_to_fit(this->owner);
+		else openttd_rust_industry_accepted_shrink_to_fit(this->owner);
+	}
 	iterator erase(iterator first, [[maybe_unused]] iterator last) { auto n = first - this->begin(); assert(last == this->end()); this->resize(n); return this->end(); }
 };
 #endif

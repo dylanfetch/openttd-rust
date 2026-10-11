@@ -21,6 +21,7 @@
     clippy::collapsible_else_if,
     clippy::similar_names
 )]
+use crate::node_hash::NodeMap;
 use crate::witness;
 use std::cell::UnsafeCell;
 use std::collections::HashMap;
@@ -251,7 +252,8 @@ impl Segment {
 type SegmentRef = Rc<UnsafeCell<Segment>>;
 struct Bank {
     seen: i32,
-    segments: HashMap<u32, SegmentRef>,
+    // Lookup-only cache (get/insert/clear); never iterated.
+    segments: NodeMap<u32, SegmentRef>,
 }
 struct Globals {
     counter: i32,
@@ -270,7 +272,7 @@ unsafe fn globals() -> *mut Globals {
                 counter: 0,
                 banks: std::array::from_fn(|_| Bank {
                     seen: 0,
-                    segments: HashMap::new(),
+                    segments: NodeMap::default(),
                 }),
             });
         }
@@ -329,8 +331,9 @@ struct Search {
     any_depot: bool,
     arena: Vec<Node>,
     scratch: Option<usize>,
-    open: HashMap<(u32, u8), usize>,
-    closed: HashMap<(u32, u8), usize>,
+    // Lookup-only (never iterated); order never selects a node.
+    open: NodeMap<(u32, u8), usize>,
+    closed: NodeMap<(u32, u8), usize>,
     heap: Vec<usize>,
     best_dest: Option<usize>,
     intermediate: Option<usize>,
@@ -393,8 +396,8 @@ impl Search {
             any_depot: false,
             arena: Vec::new(),
             scratch: None,
-            open: HashMap::new(),
-            closed: HashMap::new(),
+            open: NodeMap::default(),
+            closed: NodeMap::default(),
             heap: vec![usize::MAX],
             best_dest: None,
             intermediate: None,

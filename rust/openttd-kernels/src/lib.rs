@@ -22,6 +22,7 @@ mod integer;
 mod landscape;
 mod linkgraph;
 mod math;
+mod node_hash;
 mod packet;
 pub mod rail_yapf;
 mod road;
@@ -1320,3 +1321,5 @@ mod train_state;
 
 mod cargo_storage;
 mod train_reservation;
+
+mod fleet;

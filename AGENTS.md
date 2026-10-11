@@ -63,8 +63,9 @@ fork; the remaining upstream documentation explains behavior and architecture.
   and do not wait for it. Extend the harness's scenarios rather than writing a
   new per-component comparison tool. Add a narrow comparison against unchanged
   reference bodies only for a concrete gap the harness cannot reach, and say in
-  the PR which gap. A branch witness that a doc or PR cites runs in the default
-  suite and fails when missing; an opt-in profile is not evidence.
+  the PR which gap. Any check that a doc or PR cites, whether a branch witness or
+  a reference probe, runs in default CI and fails when missing. An opt-in
+  profile or a `__main__`-only probe is not evidence.
 - Keep the pinned reference worktree unchanged. Never change candidate behavior
   and expected results together merely to make checks pass. Existing test success
   establishes covered behavior, not complete game equivalence.
@@ -126,7 +127,15 @@ Every agent-authored GitHub issue, PR, comment, and review report must identify
 the agent, exact model, and reasoning effort, including artifacts authored by root.
 For example: `Agent: /root/implementation | Model: gpt-6.1-sol | Reasoning effort: high`.
 A user-directed session outside Codex (for example Claude Code) names its exact
-model and states its effort as reported by its host.
+model and states its effort as reported by its host. When such a session runs
+root, it keeps the same structure with its host's models: subagents at lower
+effort than root, and a fresh reviewer per round.
+
+Sessions can end without warning (usage limits, host restarts). Implementation
+agents commit and push their branch at every passing milestone, not only at the
+end, and each task records its state on its issue or PR when it starts or stops.
+A review that stops before recording findings and a disposition counts as no
+review.
 
 Spawn a fresh agent for each task and name it after that task. Do not reassign a
 finished agent to unrelated work: its name is its attribution, and its context

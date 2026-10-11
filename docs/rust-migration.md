@@ -1627,11 +1627,13 @@ monthly statistics/change/closure, daily changes and builder targets/retries.
 The original selected bodies remain in the portable C++ path.
 
 Pool/map/spec storage, construction and landscape-clear transactions, presentation
-and bounded NewGRF resolution remain direct `noexcept` world services. Construction,
-clearing, cargo distribution and destruction can reenter industry accessors;
-Rust retains no owner reference across them. Script events only enqueue; save/load
-errors remain native. CargoPayment delivery and its original-end flush remain #117.
-ABI IDs 130–138 cover canonical records and synchronous services.
+and bounded NewGRF resolution stay in C++ behind typed `noexcept` slots (#203).
+The tick passes one record (counter, map, scaled callback interval, ambient,
+editor); `next_tick` returns industry, owner, ID and callbacks; sound count,
+behaviour, location and `GetTileZ` are read only on original branches. Rust keeps
+no owner reference across reentrant construction, clearing, distribution or
+destruction; script events only enqueue and save/load errors stay native.
+CargoPayment delivery remains #117. ABI IDs 130–145 cover records and services.
 
 `python3 tools/migration.py simulate industry-` reuses real cargo saves, generated
 climates/economies and disaster reset/release, with explicit production-control,
@@ -1702,3 +1704,29 @@ After building, `python3 -m tools.simulation.cargo_storage` probes 1k-64k queues
 identity/order/cache preservation and bounded reads for first-hit append/keyed load;
 its synthetic timings are not whole-game speed ratios. Legacy conversions and
 complete refit/autoreplace transactions lack additional play witnesses (#156).
+
+### Fleet grouping and replacement lifecycle (#147)
+
+Rust owns group metadata/names/ordered children, group/company statistics and
+engine counts, renewal rules/links and company renewal heads, plus the pending
+tick-end map. It runs every group command, traversal/statistics/livery update,
+renewal-rule command, replacement eligibility/refit choice, speculative build,
+rearrangement, rollback, execution and the ascending-VehicleID drain. Original
+bodies compile only in portable builds. C++ keeps pool identity/allocation, group
+numbers, GUI folding, save adapters and `Vehicle::group_id`, which stays shell
+storage that Rust reads/writes through typed services at the original points;
+company-merge rewriting (economy.cpp), train/vehicle construction and save/load
+writes of `group_id` remain C++.
+
+Three named-slot noexcept tables (ABI 393-396, with owner prefixes 390-392)
+serve Rust; native stack CommandCost objects keep AddCost first-error and Money
+saturation, and original assertion sites run in assertion builds. No owner borrow
+spans a callback; nested commands reenter directly.
+
+Checks: `python3 tools/migration.py verify --jobs 2`, `python3 tools/migration.py
+simulate fleet- --jobs 2` (also `--self`, `--soak`). Scenarios cover hierarchy,
+rules/protection, list-based NEW_GROUP and veh_id 0xFFFFFFFF, renewals for four
+transports, free-unit and different-engine wagon-removal replacement, cash and
+length rollback, reload, and the tick-end drain in play (renewal with restart;
+money-limit failure with reserve and news). Native tests cover layouts, slots, CommandCost and
+drain reentry. NewGRF refit/attach callbacks and articulated parts remain #156.

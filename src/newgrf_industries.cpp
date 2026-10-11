@@ -610,7 +610,7 @@ void IndustryProductionCallback(Industry *ind, int reason)
 	/* Resolution is bounded and does not run scripts/commands. Rust owns random,
 	 * repeat limit, version policy and all slot mutations; this leaf only resolves
 	 * and copies register values while the native resolver context is live. */
-	openttd_rust_industry_production_callback(ind, &object, spec->behaviour.base(), reason,
+	openttd_rust_industry_production_callback(ind, ind->production_owner.get(), &object, spec->behaviour.base(), reason,
 		[](void *context, uint32_t random, uint32_t parameter, OpenTTDIndustryProductionResult *out) noexcept {
 			auto &object = *static_cast<IndustriesResolverObject *>(context);
 			object.callback_param1 = random;

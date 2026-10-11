@@ -530,7 +530,8 @@ static CommandCost ClearTile_Industry(TileIndex tile, DoCommandFlags flags)
 static bool TransportIndustryGoods(TileIndex tile)
 {
 #ifdef WITH_RUST
-	return openttd_rust_industry_transport(Industry::GetByTile(tile), &GetIndustryRustServices()) != 0;
+	Industry *i = Industry::GetByTile(tile);
+	return openttd_rust_industry_transport(i, i->production_owner.get(), GetIndustrySpec(i->type)->minimal_cargo, EconomyIsInRecession(), &GetIndustryRustServices());
 #else
 	Industry *i = Industry::GetByTile(tile);
 	const IndustrySpec *indspec = GetIndustrySpec(i->type);
@@ -1111,7 +1112,7 @@ static void PlantFarmField(TileIndex tile, IndustryID industry)
 void PlantRandomFarmField(const Industry *i)
 {
 #ifdef WITH_RUST
-	openttd_rust_industry_farm(const_cast<Industry *>(i), &GetIndustryRustServices());
+	openttd_rust_industry_farm(const_cast<Industry *>(i), i->index.base(), {Map::SizeX(), Map::SizeY(), to_underlying(_settings_game.game_creation.landscape)}, &GetIndustryRustServices());
 #else
 	int x = i->location.w / 2 + Random() % 31 - 16;
 	int y = i->location.h / 2 + Random() % 31 - 16;
@@ -1252,7 +1253,10 @@ static void ProduceIndustryGoods(Industry *i)
 void OnTick_Industry()
 {
 #ifdef WITH_RUST
-	openttd_rust_industry_tick(_industry_builder.owner.get(), &GetIndustryRustServices());
+	/* Values the original reads inline; none changes during the tick. */
+	const OpenTTDIndustryTickRecord record{TimerGameTick::counter, {Map::SizeX(), Map::SizeY(), to_underlying(_settings_game.game_creation.landscape)},
+		ScaleByInverseCargoScale(Ticks::INDUSTRY_PRODUCE_TICKS, false), _settings_client.sound.ambient, _game_mode == GM_EDITOR};
+	openttd_rust_industry_tick(_industry_builder.owner.get(), &record, &GetIndustryRustServices());
 #else
 	if (_industry_sound_ctr != 0) {
 		_industry_sound_ctr++;
@@ -2648,7 +2652,7 @@ void Industry::RecomputeProductionMultipliers()
 {
 #ifdef WITH_RUST
 	assert(GetIndustrySpec(this->type)->UsesOriginalEconomy());
-	openttd_rust_industry_recompute(this, &GetIndustryRustServices());
+	openttd_rust_industry_recompute(this, this->production_owner.get(), &GetIndustryRustServices());
 #else
 	const IndustrySpec *indspec = GetIndustrySpec(this->type);
 	assert(indspec->UsesOriginalEconomy());
@@ -3434,114 +3438,132 @@ static void RustIndustryNews(Industry *i, StringID str, bool close) noexcept
 	}
 }
 
+static Industry *RustIndustry(void *handle) noexcept { return static_cast<Industry *>(handle); }
+static const IndustrySpec *RustIndustrySpec(void *handle) noexcept { return GetIndustrySpec(RustIndustry(handle)->type); }
+
+/** One typed noexcept slot per original operation, in industry_ffi.h order. */
 static const OpenTTDIndustryServices _industry_services = {
-	[](void *handle, OpenTTDIndustryObservation *out) noexcept {
-		Industry *i = static_cast<Industry *>(handle);
+	.next_tick = [](uint32_t from) noexcept -> OpenTTDIndustryEntry {
+		auto range = Industry::Iterate(from);
+		if (range.empty()) return {};
+		Industry *i = *range.begin();
+		return {i, i->production_owner.get(), i->index.base(), GetIndustrySpec(i->type)->callback_mask.base()};
+	},
+	.sound_count = [](void *i) noexcept -> uint16_t { return static_cast<uint16_t>(RustIndustrySpec(i)->random_sounds.size()); },
+	.behaviour = [](void *i) noexcept -> uint32_t { return RustIndustrySpec(i)->behaviour.base(); },
+	.location = [](void *handle) noexcept -> OpenTTDIndustryLocation {
+		const Industry *i = RustIndustry(handle);
+		return {i->location.tile.base(), i->location.w, i->location.h};
+	},
+	.industry_sound = [](void *handle, uint32_t index) noexcept {
+		Industry *i = RustIndustry(handle);
+		SndPlayTileFx(static_cast<SoundFx>(GetIndustrySpec(i->type)->random_sounds[index]), i->location.tile);
+	},
+	.play_sound = [](uint16_t sound, uint32_t tile) noexcept { SndPlayTileFx(static_cast<SoundFx>(sound), TileIndex(tile)); },
+	.special_effect = [](void *handle, uint32_t random, uint32_t parameter) noexcept -> uint16_t {
+		Industry *i = RustIndustry(handle);
+		uint16_t result = GetIndustryCallback(CBID_INDUSTRY_SPECIAL_EFFECT, random, parameter, i, i->type, i->location.tile);
+		return result == CALLBACK_FAILED ? CALLBACK_FAILED : ConvertBooleanCallback(GetIndustrySpec(i->type)->grf_prop.grffile, CBID_INDUSTRY_SPECIAL_EFFECT, result);
+	},
+	.tick_trigger = [](void *handle) noexcept {
+		Industry *i = RustIndustry(handle);
+		TriggerIndustryRandomisation(i, IndustryRandomTrigger::IndustryTick);
+		TriggerIndustryAnimation(i, IndustryAnimationTrigger::IndustryTick);
+	},
+	.production_callback = [](void *i, uint8_t reason) noexcept { IndustryProductionCallback(RustIndustry(i), reason); },
+	.scale_cargo = [](uint32_t amount) noexcept -> uint32_t { return ScaleByCargoScale(amount, false); },
+	.random = []() noexcept -> uint32_t { return Random(); },
+	.random_range = [](uint32_t limit) noexcept -> uint32_t { return RandomRange(limit); },
+	.move_goods = [](void *handle, uint32_t slot, uint32_t amount) noexcept -> uint32_t {
+		Industry *i = RustIndustry(handle);
+		return MoveGoodsToStation(i->produced[slot].cargo, amount, {i->index, SourceType::Industry}, i->stations_near, i->exclusive_consumer);
+	},
+	.tile_add_wrap = [](uint32_t tile, int32_t x, int32_t y) noexcept -> uint32_t { return TileAddWrap(TileIndex(tile), x, y).base(); },
+	.farm_tile = [](uint32_t index) noexcept -> OpenTTDIndustryFarmTile {
+		TileIndex tile(index);
+		switch (GetTileType(tile)) {
+			case MP_CLEAR: return {MP_CLEAR, IsSnowTile(tile), static_cast<uint8_t>(GetClearGround(tile)), 0};
+			case MP_TREES: return {MP_TREES, 0, static_cast<uint8_t>(GetTreeGround(tile)), GetTreeGrowth(tile) >= TreeGrowthStage::Grown};
+			default: return {static_cast<uint8_t>(GetTileType(tile)), 0, 0, 0};
+		}
+	},
+	.tile_z = [](uint32_t tile) noexcept -> int32_t { return GetTileZ(TileIndex(tile)); },
+	.snow_line = []() noexcept -> uint8_t { return GetSnowLine(); },
+	.make_field = [](uint32_t index, uint8_t field_type, uint8_t counter, uint16_t industry) noexcept {
+		TileIndex tile(index);
+		MakeField(tile, field_type, IndustryID(industry));
+		SetClearCounter(tile, counter);
+		MarkTileDirtyByTile(tile);
+	},
+	.fence_wanted = [](uint32_t index, uint8_t side) noexcept -> bool {
+		TileIndex tile(index);
+		auto dir = static_cast<DiagDirection>(side);
+		if (!IsTileType(tile, MP_CLEAR) || !IsClearGround(tile, CLEAR_FIELDS)) return false;
+		TileIndex neighbour = tile + TileOffsByDiagDir(dir);
+		return !IsTileType(neighbour, MP_CLEAR) || !IsClearGround(neighbour, CLEAR_FIELDS) || GetFence(neighbour, ReverseDiagDir(dir)) == 0;
+	},
+	.set_fence = [](uint32_t tile, uint8_t side, uint8_t type) noexcept { SetFence(TileIndex(tile), static_cast<DiagDirection>(side), type); },
+	.tile_completed = [](void *i, uint32_t tile) noexcept -> bool { return !RustIndustry(i)->TileBelongsToIndustry(TileIndex(tile)) || IsIndustryCompleted(TileIndex(tile)); },
+	.harvest = [](uint32_t tile) noexcept {
+		if (_settings_client.sound.ambient) SndPlayTileFx(SND_38_LUMBER_MILL_1, TileIndex(tile));
+		AutoRestoreBackup<CompanyID> current(_current_company, OWNER_NONE);
+		Command<CMD_LANDSCAPE_CLEAR>::Do(DoCommandFlag::Execute, TileIndex(tile));
+	},
+	.observe = [](void *handle, OpenTTDIndustryObservation *out) noexcept {
+		Industry *i = RustIndustry(handle);
 		const IndustrySpec *spec = GetIndustrySpec(i->type);
 		*out = {i->production_owner.get(), i->location.tile.base(), spec->behaviour.base(), i->index.base(), i->location.w, i->location.h,
 			spec->callback_mask.base(), static_cast<uint16_t>(spec->random_sounds.size()), spec->life_type.base(), uint8_t(spec->UsesOriginalEconomy()), spec->minimal_cargo, i->type,
 			spec->production_up_text, spec->production_down_text, spec->closure_text};
 	},
-	[](uint32_t from) noexcept -> void * { auto range = Industry::Iterate(from); return range.empty() ? nullptr : *range.begin(); },
-	[](uint8_t field) noexcept -> uint32_t {
-		switch (field) {
-			case 0: return _settings_client.sound.ambient;
-			case 1: return _game_mode == GM_EDITOR;
-			case 3: return EconomyIsInRecession();
-			case 4: return TimerGameEconomy::month;
-			case 5: return TimerGameEconomy::year.base();
-			case 6: return TimerGameEconomy::days_since_last_month;
-			case 7: return to_underlying(_settings_game.game_creation.landscape);
-			case 8: return _settings_game.economy.type;
-			case 9: return GetCargoTypeByLabel(CT_PASSENGERS);
-			case 10: return _settings_game.difficulty.industry_density == ID_FUND_ONLY;
-			case 11: return TimerGameCalendar::year.base();
-			case 13: return Map::SizeX();
-			case 14: return Map::SizeY();
-			case 15: return GetSnowLine();
-			case 16: return _current_company == OWNER_DEITY;
-			default: NOT_REACHED();
-		}
+	.production_rate = [](void *i, uint32_t slot) noexcept -> uint8_t { return RustIndustrySpec(i)->production_rate[slot]; },
+	.change_callback = [](void *handle, bool monthly, uint32_t random) noexcept -> OpenTTDIndustryChange {
+		Industry *i = RustIndustry(handle);
+		std::array<int32_t, 1> reg{};
+		uint16_t result = GetIndustryCallback(monthly ? CBID_INDUSTRY_MONTHLYPROD_CHANGE : CBID_INDUSTRY_PRODUCTION_CHANGE, 0, random, i, i->type, i->location.tile, reg);
+		return {result, reg[0]};
 	},
-	[](uint8_t operation, void *handle, uint32_t a, uint32_t b, uint32_t c) noexcept -> uint64_t {
-		Industry *i = static_cast<Industry *>(handle);
-		switch (operation) {
-			case 0: return Random();
-			case 1: return RandomRange(a);
-			case 2: return ScaleByCargoScale(a, false);
-			case 3: return ScaleByInverseCargoScale(a, false);
-			case 4: {
-				SoundFx sound = a == 0 ? static_cast<SoundFx>(GetIndustrySpec(i->type)->random_sounds[b]) : a == 1 ? SND_37_LUMBER_MILL_2 : SND_36_LUMBER_MILL_3;
-				SndPlayTileFx(sound, TileIndex(c));
-				break;
-			}
-			case 5: {
-				uint16_t result = GetIndustryCallback(CBID_INDUSTRY_SPECIAL_EFFECT, a, b, i, i->type, i->location.tile);
-				return result == CALLBACK_FAILED ? CALLBACK_FAILED : ConvertBooleanCallback(GetIndustrySpec(i->type)->grf_prop.grffile, CBID_INDUSTRY_SPECIAL_EFFECT, result);
-			}
-			case 6: TriggerIndustryRandomisation(i, IndustryRandomTrigger::IndustryTick); TriggerIndustryAnimation(i, IndustryAnimationTrigger::IndustryTick); break;
-			case 7: IndustryProductionCallback(i, a); break;
-			case 8: return MoveGoodsToStation(i->produced[a].cargo, b, {i->index, SourceType::Industry}, i->stations_near, i->exclusive_consumer);
-			case 9: return GetIndustrySpec(i->type)->production_rate[a];
-			case 11: return Industry::GetIndustryTypeCount(a);
-			case 12: return GetCurrentTotalNumberOfIndustries();
-			case 13: return Map::ScaleBySize(a);
-			case 14: return reinterpret_cast<uintptr_t>(CreateNewIndustry(RandomTile(), a, static_cast<IndustryAvailabilityCallType>(b)));
-			case 15: AdvertiseIndustryOpening(i); break;
-			case 16: return reinterpret_cast<uintptr_t>(Industry::GetRandom());
-			case 17: delete i; break;
-			case 18: SetWindowDirty(WC_INDUSTRY_VIEW, i->index); break;
-			case 19: InvalidateWindowData(WC_INDUSTRY_DIRECTORY, 0, IDIWD_PRODUCTION_CHANGE); break;
-			case 20: if (a == 0) { auto old = _current_company; _current_company = OWNER_NONE; return old.base(); } _current_company = CompanyID(b); break;
-			case 21: {
-				std::array<int32_t, 1> reg{};
-				auto result = GetIndustryCallback(a != 0 ? CBID_INDUSTRY_MONTHLYPROD_CHANGE : CBID_INDUSTRY_PRODUCTION_CHANGE, 0, b, i, i->type, i->location.tile, reg);
-				return uint64_t(result) | (uint64_t(uint32_t(reg[0])) << 16);
-			}
-			case 22: return MapGRFStringID(GetIndustrySpec(i->type)->grf_prop.grfid, GRFStringID(a));
-			case 23: RustIndustryNews(i, a, b != 0); break;
-			case 24: ReportNewsProductionChangeIndustry(i, a, static_cast<int32_t>(b)); break;
-			case 25: {
-				if (i != nullptr) return TileAddWrap(TileIndex(a), static_cast<int32_t>(b), static_cast<int32_t>(c)).base();
-				TileIndex tile(a);
-				uint32_t info = GetTileType(tile) | (GetTileZ(tile) << 16);
-				if (IsTileType(tile, MP_CLEAR)) info |= uint32_t(IsSnowTile(tile)) << 4 | GetClearGround(tile) << 8;
-				if (IsTileType(tile, MP_TREES)) info |= uint32_t(GetTreeGrowth(tile) >= TreeGrowthStage::Grown) << 5 | GetTreeGround(tile) << 8;
-				return info;
-			}
-			case 26: MakeField(TileIndex(a), GB(b, 0, 8), IndustryID(c)); SetClearCounter(TileIndex(a), GB(b, 8, 8)); MarkTileDirtyByTile(TileIndex(a)); break;
-			case 27: {
-				TileIndex tile(a); auto side = static_cast<DiagDirection>(b);
-				if (c != 0) { SetFence(tile, side, c); break; }
-				if (!IsTileType(tile, MP_CLEAR) || !IsClearGround(tile, CLEAR_FIELDS)) return 0;
-				TileIndex neighbour = tile + TileOffsByDiagDir(side);
-				return !IsTileType(neighbour, MP_CLEAR) || !IsClearGround(neighbour, CLEAR_FIELDS) || GetFence(neighbour, ReverseDiagDir(side)) == 0;
-			}
-			case 28: return !i->TileBelongsToIndustry(TileIndex(a)) || IsIndustryCompleted(TileIndex(a));
-			case 29: {
-				if (_settings_client.sound.ambient) SndPlayTileFx(SND_38_LUMBER_MILL_1, TileIndex(a));
-				AutoRestoreBackup<CompanyID> current(_current_company, OWNER_NONE);
-				Command<CMD_LANDSCAPE_CLEAR>::Do(DoCommandFlag::Execute, TileIndex(a));
-				break;
-			}
-			case 30: {
-				const IndustrySpec *spec = GetIndustrySpec(i->type);
-				auto detail = a == 0 ? GetEncodedString(STR_NEWGRF_BUGGY_ENDLESS_PRODUCTION_CALLBACK, std::monostate{}, spec->name)
-					: GetEncodedString(STR_NEWGRF_BUGGY_INVALID_CARGO_PRODUCTION_CALLBACK, std::monostate{}, spec->name, i->location.tile);
-				ShowErrorMessage(GetEncodedString(STR_NEWGRF_BUGGY, spec->grf_prop.grffile->filename), std::move(detail), WL_WARNING);
-				break;
-			}
-			case 31: {
-				const IndustrySpec *spec = GetIndustrySpec(a);
-				return uint64_t(spec->enabled) | uint64_t(!spec->layouts.empty()) << 1 | uint64_t(spec->appear_ingame[to_underlying(_settings_game.game_creation.landscape)]) << 8 | uint64_t(spec->behaviour.base()) << 32;
-			}
-			case 32: return GetIndustryProbabilityCallback(a, IACT_RANDOMCREATION, b);
-			case 33: return TimerGameTick::counter;
-			case 34: return reinterpret_cast<uintptr_t>(Industry::GetIfValid(IndustryID(a)));
-			default: NOT_REACHED();
-		}
-		return 0;
+	.custom_text = [](void *i, uint16_t text) noexcept -> uint32_t { return MapGRFStringID(RustIndustrySpec(i)->grf_prop.grfid, GRFStringID(text)); },
+	.news = [](void *i, uint32_t text, bool close) noexcept { RustIndustryNews(RustIndustry(i), text, close); },
+	.rate_news = [](void *i, uint8_t cargo, int32_t percent) noexcept { ReportNewsProductionChangeIndustry(RustIndustry(i), cargo, percent); },
+	.callback_error = [](void *handle, bool invalid_cargo) noexcept {
+		Industry *i = RustIndustry(handle);
+		const IndustrySpec *spec = GetIndustrySpec(i->type);
+		auto detail = !invalid_cargo ? GetEncodedString(STR_NEWGRF_BUGGY_ENDLESS_PRODUCTION_CALLBACK, std::monostate{}, spec->name)
+			: GetEncodedString(STR_NEWGRF_BUGGY_INVALID_CARGO_PRODUCTION_CALLBACK, std::monostate{}, spec->name, i->location.tile);
+		ShowErrorMessage(GetEncodedString(STR_NEWGRF_BUGGY, spec->grf_prop.grffile->filename), std::move(detail), WL_WARNING);
 	},
+	.set_dirty = [](void *i) noexcept { SetWindowDirty(WC_INDUSTRY_VIEW, RustIndustry(i)->index); },
+	.destroy = [](void *i) noexcept { delete RustIndustry(i); },
+	.advertise = [](void *i) noexcept { AdvertiseIndustryOpening(RustIndustry(i)); },
+	.create = [](uint8_t type, uint8_t creation) noexcept -> void * { return CreateNewIndustry(RandomTile(), type, static_cast<IndustryAvailabilityCallType>(creation)); },
+	.random_industry = []() noexcept -> void * { return Industry::GetRandom(); },
+	.get = [](uint16_t id) noexcept -> void * { return Industry::GetIfValid(IndustryID(id)); },
+	.type_count = [](uint8_t type) noexcept -> uint16_t { return Industry::GetIndustryTypeCount(type); },
+	.total = []() noexcept -> uint32_t { return GetCurrentTotalNumberOfIndustries(); },
+	.type_info = [](uint8_t type) noexcept -> OpenTTDIndustryTypeInfo {
+		const IndustrySpec *spec = GetIndustrySpec(type);
+		return {spec->behaviour.base(), spec->enabled, !spec->layouts.empty(), spec->appear_ingame[to_underlying(_settings_game.game_creation.landscape)]};
+	},
+	.probability_callback = [](uint8_t type, uint32_t chance) noexcept -> uint32_t { return GetIndustryProbabilityCallback(type, IACT_RANDOMCREATION, chance); },
+	.scale_by_map_size = [](uint32_t n) noexcept -> uint32_t { return Map::ScaleBySize(n); },
+	.company_none = []() noexcept -> uint8_t {
+		CompanyID old = _current_company;
+		_current_company = OWNER_NONE;
+		return old.base();
+	},
+	.restore_company = [](uint8_t company) noexcept { _current_company = CompanyID(company); },
+	.directory_dirty = []() noexcept { InvalidateWindowData(WC_INDUSTRY_DIRECTORY, 0, IDIWD_PRODUCTION_CHANGE); },
+	.recession = []() noexcept -> bool { return EconomyIsInRecession(); },
+	.economy_month = []() noexcept -> uint8_t { return TimerGameEconomy::month; },
+	.economy_year = []() noexcept -> int32_t { return TimerGameEconomy::year.base(); },
+	.days_since_last_month = []() noexcept -> uint32_t { return TimerGameEconomy::days_since_last_month; },
+	.landscape = []() noexcept -> uint8_t { return to_underlying(_settings_game.game_creation.landscape); },
+	.economy_type = []() noexcept -> uint8_t { return _settings_game.economy.type; },
+	.passengers = []() noexcept -> uint8_t { return GetCargoTypeByLabel(CT_PASSENGERS); },
+	.fund_only = []() noexcept -> bool { return _settings_game.difficulty.industry_density == ID_FUND_ONLY; },
+	.calendar_year = []() noexcept -> int32_t { return TimerGameCalendar::year.base(); },
+	.deity = []() noexcept -> bool { return _current_company == OWNER_DEITY; },
 };
 const OpenTTDIndustryServices &GetIndustryRustServices() { return _industry_services; }
 #endif

@@ -85,8 +85,9 @@ int main()
 	std::remove_pointer_t<decltype(spec.grf_prop.grffile)> file{};
 	spec.grf_prop.grffile = &file;
 	OpenTTDIndustryServices services{};
-	services.observe = [](void *handle, OpenTTDIndustryObservation *out) { out->owner = static_cast<Industry *>(handle)->owner; };
-	services.world = [](uint8_t op, void *, uint32_t, uint32_t, uint32_t) -> uint64_t { if (op == 0) return Random(); if (op == 18) dirty++; if (op == 30) errors++; return 0; };
+	services.random = []() noexcept { return Random(); };
+	services.set_dirty = [](void *) noexcept { dirty++; };
+	services.callback_error = [](void *, bool) noexcept { errors++; };
 	uint cases = 0;
 	for (uint8_t version : {0, 1, 2, 255}) for (uint8_t level : {0, 4, 16, 128, 255}) for (uint32_t behaviour : {0u, 1u << 14, 1u << 15, 3u << 14}) {
 		for (uint32_t limit : {0u, 1u, 3u, 65536u}) for (uint8_t reason : {0, 1}) {
@@ -105,14 +106,16 @@ int main()
 				auto expected = parameters; auto expected_rng = rng; auto expected_errors = errors; auto expected_dirty = dirty;
 				Industry candidate{openttd_rust_industry_new(), {}, {}, level};
 				auto *fields = openttd_rust_industry_fields(candidate.owner); fields->prod_level = level;
-				auto a = openttd_rust_industry_slots(candidate.owner, 0, 2, 3);
-				auto p = openttd_rust_industry_slots(candidate.owner, 1, 2, 3);
+				openttd_rust_industry_accepted_resize(candidate.owner, 3);
+				openttd_rust_industry_produced_resize(candidate.owner, 3);
+				auto a = openttd_rust_industry_accepted_view(candidate.owner);
+				auto p = openttd_rust_industry_produced_view(candidate.owner);
 				for (size_t n = 0; n < 3; n++) {
 					auto *slot_a = static_cast<Accepted *>(a.data) + n; slot_a->cargo = n == 0 ? cargo : n == 1 ? 255 : 3; slot_a->waiting = n == 0 ? 65535 : n == 1 ? 15 : 1;
 					auto *slot_p = static_cast<Produced *>(p.data) + n; slot_p->cargo = n == 0 ? cargo : n == 1 ? 255 : 8; slot_p->waiting = n == 0 ? 65535 : n == 1 ? 15 : 1;
 				}
 				rng = 0x12345678; errors = dirty = 0; parameters.clear();
-				openttd_rust_industry_production_callback(&candidate, nullptr, behaviour, reason, Resolve, &services);
+				openttd_rust_industry_production_callback(&candidate, candidate.owner, nullptr, behaviour, reason, Resolve, &services);
 				if (parameters != expected || rng != expected_rng || errors != expected_errors || dirty != expected_dirty) return 1;
 				for (size_t n = 0; n < 3; n++) if (reference.accepted[n].waiting != static_cast<Accepted *>(a.data)[n].waiting || reference.produced[n].waiting != static_cast<Produced *>(p.data)[n].waiting) return 2;
 				openttd_rust_industry_destroy(candidate.owner);
