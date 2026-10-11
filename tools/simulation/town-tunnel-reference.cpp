@@ -130,14 +130,11 @@ static uint64_t Leaf(uint32_t op, uint32_t, uint32_t, uint32_t, uint32_t) noexce
 static OpenTTDTownState *State(uint32_t id) noexcept { assert(id == world->town.index); return world->owner; }
 static void Stations(uint32_t, uint32_t, void *, void (*)(void *, uint32_t, uint32_t, uint32_t)) noexcept {}
 static uint32_t Random(void *) noexcept { world->draws++; return 0; }
-static void ObserveTile(void *, uint32_t, uint32_t *) noexcept {}
-static void WriteTile(void *, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) noexcept {}
-static float Trig(uint32_t, float value) noexcept { return value; }
 static uint32_t Industry(int32_t, int32_t, uint32_t *) noexcept { return 0; }
 static bool Candidate()
 {
 	const OpenTTDTownLeaves leaves{Observe, Leaf, State, Stations};
-	const OpenTTDSharedServices services{nullptr, Random, ObserveTile, WriteTile, Trig, Industry};
+	const OpenTTDSharedServices services = OpenTTDFixtureSharedServices(nullptr, Random, Industry);
 	auto task = std::unique_ptr<OpenTTDTownTask, decltype(&openttd_rust_town_task_destroy)>(openttd_rust_town_begin(&leaves, &services, 11, world->town.index, world->start, world->direction, 0, 0, 0), openttd_rust_town_task_destroy);
 	OpenTTDTownAction action{};
 	uint64_t result = 0;
