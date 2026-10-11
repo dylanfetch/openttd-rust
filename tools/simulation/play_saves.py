@@ -181,7 +181,7 @@ PREPARE_ORDER = 3
 
 def counted_road_save(scenario):
     return any(
-        scenario["name"].startswith(f"play-{save}-")
+        scenario.get("name", "").startswith(f"play-{save}-")
         for save in (*PLAY_SAVES, "padhattan-ridge-2000")
     )
 
