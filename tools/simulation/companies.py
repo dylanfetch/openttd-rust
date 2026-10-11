@@ -4,11 +4,19 @@ import datetime
 import hashlib
 import lzma
 import shutil
+import struct
 import subprocess
 from pathlib import Path
 
-from .core import ROOT, SNAPSHOT_TICKS, decode_element, read_save, run_game
-from .disasters import patch
+from .core import (
+    ROOT,
+    SNAPSHOT_TICKS,
+    Reader,
+    decode_element,
+    read_save,
+    run_game,
+)
+from .disasters import gamma, patch
 
 AI_FOLDER = "company-scenario-ai"
 
@@ -109,6 +117,9 @@ def scenarios(soak):
             ("reuse", 120),
             ("finance", (24 if soak else 12) * SNAPSHOT_TICKS),
             ("reload", 120),
+            ("competitors", 120),
+            ("competitor-timer", 3 * SNAPSHOT_TICKS if soak else 120),
+            ("competitor-reload", 120),
         )
     ]
 
@@ -134,6 +145,42 @@ def rows(path, cid):
         index: decode_element(chunks[cid], body)
         for index, body in chunks[cid]["elements"]
     }
+
+
+def configure_competitors(path, receipt):
+    """Declare fixed local scripts for vacant slots; preserve running AI data."""
+    original, chunks = path.read_bytes(), read_save(path)
+    chunk = chunks["AIPL"]
+    if chunk["kind"] != 3 or chunk["header"] != [
+        {"type": 26, "key": "name"},
+        {"type": 26, "key": "settings"},
+        {"type": 6, "key": "version"},
+    ]:
+        raise RuntimeError("unexpected company AI configuration schema")
+    elements = dict(chunk["elements"])
+    name = b"MigrationCompanies"
+    config = gamma(len(name)) + name + b"\0" + struct.pack(">I", 1)
+    for index in (3, 4):
+        if elements[index] != b"\0\0\xff\xff\xff\xff":
+            raise RuntimeError("competitor input slot already has an AI configured")
+        elements[index] = config
+        receipt["assignments"].append(["AIPL", index, "configuration", name.decode()])
+    reader = Reader(original, chunk["span"][0] + 5)
+    reader.take(reader.gamma() - 1)
+    begin, end = reader.pos, chunk["span"][1]
+    body = (
+        b"".join(gamma(len(value) + 1) + value for value in elements.values()) + b"\0"
+    )
+    prepared = original[:begin] + body + original[end:]
+    path.write_bytes(prepared)
+    after = read_save(path)
+    for cid in set(chunks) - {"AIPL"}:
+        if (
+            original[slice(*chunks[cid]["span"])]
+            != prepared[slice(*after[cid]["span"])]
+        ):
+            raise RuntimeError(f"competitor configuration changed unrelated {cid}")
+    receipt["sha256"] = hashlib.sha256(prepared).hexdigest()
 
 
 def prepare(scenario, binaries, builds, out, timeout, env, result):
@@ -216,7 +263,9 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
         finances[1].update(bankrupt_asked=0, bankrupt_value=0)
     if operation == "recover":
         finances[1]["money"] = 500_000
-    if operation in ("finance", "reuse", "reload"):
+    if operation in ("finance", "reuse", "reload") or operation.startswith(
+        "competitor"
+    ):
         finances[1].update(money=500_000, months_of_bankruptcy=0, bankrupt_asked=0)
     if operation == "tie":
         finances[0]["old_economy[1]/performance_history"] = 900
@@ -277,8 +326,27 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
                 "unpause",
             ],
         )
+    if operation.startswith("competitor"):
+        # There are already two actor AIs. Cap four requires two successive
+        # OnTick Posts; interval one instead exercises the timer's single Post.
+        timer = operation == "competitor-timer"
+        changes["DATE"][0].update(
+            competitors_interval=1 if timer else 0,
+            competitors_interval_elapsed=0,
+            competitors_interval_fired=not timer,
+        )
+        scenario = dict(
+            scenario,
+            console=[
+                "setting difficulty.max_no_competitors 4",
+                f"setting difficulty.competitors_interval {int(timer)}",
+                "unpause",
+            ],
+        )
     prepared = folder / "company-input.sav"
     receipt = patch(fixture, prepared, changes)
+    if operation.startswith("competitor"):
+        configure_competitors(prepared, receipt)
     receipt.update(
         committed_source=str(source),
         committed_sha256=hashlib.sha256(packed).hexdigest(),
@@ -287,7 +355,7 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
         assets=[int(x) for x in assets[0].split()],
         console=scenario["console"],
     )
-    if operation == "reload":
+    if operation in ("reload", "competitor-reload"):
         live = run_game(
             dict(scenario, save=str(prepared), ticks=120),
             binaries["reference"],
@@ -299,10 +367,66 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
         )
         if live["exit"] or not live["snapshots"]:
             raise RuntimeError("company reference reload failed")
+        if operation == "competitor-reload":
+            check_competitors(scenario, live, prepared, live["snapshots"][-1])
         prepared = folder / "reload-input.sav"
         receipt["reload"] = patch(live["snapshots"][-1], prepared, {})
     result["company_input"] = receipt
     return dict(scenario, save=str(prepared))
+
+
+def check_competitors(scenario, run, source, final):
+    """Require runtime creation/events, fixed configurations and saved timer state."""
+    operation = scenario["companies"]
+    before, after = rows(source, "PLYR"), rows(final, "PLYR")
+    created = (
+        {3} if operation == "competitor-timer" and scenario["ticks"] == 120 else {3, 4}
+    )
+    reload = operation == "competitor-reload" and set(before) == {0, 1, 2, 3, 4}
+    if set(before) != ({0, 1, 2, 3, 4} if reload else {0, 1, 2}):
+        raise RuntimeError("competitor input has unexpected company IDs")
+    if set(after) != {0, 1, 2} | created:
+        raise RuntimeError("competitor Posts did not create the expected companies")
+    log = "\n".join(run["log"])
+    for index in created:
+        if f"COMPANY-START {index}" not in log:
+            raise RuntimeError(f"competitor {index} did not start the local AI")
+        # Loading a running AI does not broadcast CompanyNew. An existing actor
+        # receiving this event proves creation occurred after input loading.
+        if not reload and f"COMPANY-NEW 2 {index}" not in log:
+            raise RuntimeError(f"competitor {index} lacks its runtime creation event")
+        if not after[index]["is_ai"]:
+            raise RuntimeError(f"competitor {index} is not an AI company")
+    chunks = read_save(final)
+    for index, body in chunks["AIPL"]["elements"]:
+        if index not in created:
+            continue
+        # Running AIPL rows append VM data beyond the table header. Read both
+        # declared configuration prefixes without interpreting opaque VM state.
+        reader = Reader(body)
+        for _ in range(2):
+            name = reader.take(reader.gamma()).decode()
+            settings = reader.take(reader.gamma())
+            version = struct.unpack(">I", reader.take(4))[0]
+            if name != "MigrationCompanies" or settings or version != 1:
+                raise RuntimeError(
+                    f"competitor {index} did not retain its fixed configuration"
+                )
+    date = rows(final, "DATE")[0]
+    if date["competitors_interval_fired"] or not date["competitors_interval"]:
+        raise RuntimeError("competitor timer did not reset after startup")
+    settings = rows(final, "PATS")[0]
+    if settings["difficulty.max_no_competitors"] != 4 or settings[
+        "difficulty.competitors_interval"
+    ] != (operation == "competitor-timer"):
+        raise RuntimeError("competitor settings did not take effect")
+    return {
+        "created": [] if reload else sorted(created),
+        "reloaded": sorted(created) if reload else [],
+        "timer": {
+            key: value for key, value in date.items() if key.startswith("competitors_")
+        },
+    }
 
 
 def check(scenario, run, mode, role, result):
@@ -313,6 +437,10 @@ def check(scenario, run, mode, role, result):
     operation = scenario["companies"]
     source, final = Path(scenario["save"]), run["snapshots"][-1]
     before, after = rows(source, "PLYR"), rows(final, "PLYR")
+    if operation.startswith("competitor"):
+        result[f"{mode}_{role}_competitors"] = check_competitors(
+            scenario, run, source, final
+        )
     log = "\n".join(run["log"])
 
     def require(condition, message):
