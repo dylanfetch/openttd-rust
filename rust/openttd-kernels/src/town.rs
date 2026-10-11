@@ -23,10 +23,94 @@
     clippy::decimal_bitwise_operands
 )]
 use crate::services::{Services, chance16_i};
-use std::{cell::Cell, ffi::c_void};
+use std::{
+    cell::{Cell, UnsafeCell},
+    ffi::c_void,
+};
 
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct Received {
+    pub old_max: u16,
+    pub new_max: u16,
+    pub old_act: u16,
+    pub new_act: u16,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct SimulationFields {
+    pub valid_history: u64,
+    pub xy: u32,
+    pub num_houses: u32,
+    pub population: u32,
+    pub radius: [u32; 5],
+    pub goal: [u32; 6],
+    pub ratings: [i16; 15],
+    pub received: [Received; 6],
+    pub noise_reached: u16,
+    pub time_until_rebuild: u16,
+    pub statues: u16,
+    pub have_ratings: u16,
+    pub unwanted: [u8; 15],
+    pub exclusivity: u8,
+    pub exclusive_counter: u8,
+    pub larger_town: bool,
+    pub layout: u8,
+}
+impl Default for SimulationFields {
+    fn default() -> Self {
+        Self {
+            valid_history: 0,
+            xy: u32::MAX,
+            num_houses: 0,
+            population: 0,
+            radius: [0; 5],
+            goal: [0; 6],
+            ratings: [0; 15],
+            received: [Received::default(); 6],
+            noise_reached: 0,
+            time_until_rebuild: 0,
+            statues: 0,
+            have_ratings: 0,
+            unwanted: [0; 15],
+            exclusivity: u8::MAX,
+            exclusive_counter: 0,
+            larger_town: false,
+            layout: 0,
+        }
+    }
+}
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct SuppliedHistory {
+    pub production: u32,
+    pub transported: u32,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct Supplied {
+    pub cargo: u8,
+    pub history: [SuppliedHistory; 61],
+}
+impl Default for Supplied {
+    fn default() -> Self {
+        Self {
+            cargo: u8::MAX,
+            history: [SuppliedHistory::default(); 61],
+        }
+    }
+}
+#[repr(C)]
+pub struct Slots {
+    pub data: *mut c_void,
+    pub size: usize,
+}
 #[derive(Default)]
 pub struct State {
+    simulation: SimulationFields,
+    supplied: Vec<Supplied>,
+    id_counts: Vec<u16>,
+    class_counts: Vec<u16>,
     counter: u16,
     rate: u16,
     funding: u8,
@@ -67,6 +151,161 @@ pub unsafe extern "C" fn openttd_rust_town_set(state: *mut State, field: u8, val
         3 => state.road = value as u8,
         _ => state.flags = value as u8,
     }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_simulation(state: *mut State) -> *mut SimulationFields {
+    // SAFETY: Stable shell-owned allocation. C++ starts the matching trivial native
+    // object's lifetime here; aliases remain valid until owner destruction.
+    unsafe { &raw mut (*state).simulation }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_supplied_view(state: *mut State) -> Slots {
+    // SAFETY: Serialized shell-owned vector. Views end before reserve/insert.
+    let supplied = unsafe { &mut (*state).supplied };
+    Slots {
+        data: supplied.as_mut_ptr().cast(),
+        size: supplied.len(),
+    }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_supplied_reserve(state: *mut State, capacity: usize) {
+    // SAFETY: No native vector views survive mutation, matching std::vector.
+    let supplied = unsafe { &mut (*state).supplied };
+    if capacity > supplied.len() {
+        supplied.reserve(capacity - supplied.len());
+    }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_supplied_insert(
+    state: *mut State,
+    at: usize,
+    cargo: u8,
+) -> *mut Supplied {
+    // SAFETY: Native facade supplies the source's valid insertion position.
+    let supplied = unsafe { &mut (*state).supplied };
+    supplied.insert(
+        at,
+        Supplied {
+            cargo,
+            ..Supplied::default()
+        },
+    );
+    supplied.as_mut_ptr().wrapping_add(at)
+}
+#[derive(Default)]
+struct GlobalCounts {
+    ids: Vec<u32>,
+    classes: Vec<u32>,
+}
+thread_local! { static BUILDING_COUNTS: UnsafeCell<GlobalCounts> = UnsafeCell::default(); }
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_id_counts(state: *mut State) -> Slots {
+    // SAFETY: Canonical serialized vector. Native views end before resize.
+    let counts = unsafe { &mut (*state).id_counts };
+    Slots {
+        data: counts.as_mut_ptr().cast(),
+        size: counts.len(),
+    }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_id_counts_resize(state: *mut State, count: usize) {
+    // SAFETY: No native view survives a structural vector mutation.
+    unsafe {
+        (*state).id_counts.resize(count, 0);
+    }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_class_counts(state: *mut State) -> Slots {
+    // SAFETY: Canonical serialized vector. Native views end before resize.
+    let counts = unsafe { &mut (*state).class_counts };
+    Slots {
+        data: counts.as_mut_ptr().cast(),
+        size: counts.len(),
+    }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_class_counts_resize(state: *mut State, count: usize) {
+    // SAFETY: No native view survives a structural vector mutation.
+    unsafe {
+        (*state).class_counts.resize(count, 0);
+    }
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_town_global_id_counts() -> Slots {
+    BUILDING_COUNTS.with(|cell| {
+        // SAFETY: Game-thread serialized access; no service call or reentry.
+        let counts = unsafe { &mut (*cell.get()).ids };
+        Slots {
+            data: counts.as_mut_ptr().cast(),
+            size: counts.len(),
+        }
+    })
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_town_global_id_counts_resize(count: usize) {
+    // SAFETY: Game-thread serialized access; no native view survives resizing.
+    BUILDING_COUNTS.with(|cell| unsafe {
+        (*cell.get()).ids.resize(count, 0);
+    });
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_town_global_class_counts() -> Slots {
+    BUILDING_COUNTS.with(|cell| {
+        // SAFETY: Game-thread serialized access; no service call or reentry.
+        let counts = unsafe { &mut (*cell.get()).classes };
+        Slots {
+            data: counts.as_mut_ptr().cast(),
+            size: counts.len(),
+        }
+    })
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_town_global_class_counts_resize(count: usize) {
+    // SAFETY: Game-thread serialized access; no native view survives resizing.
+    BUILDING_COUNTS.with(|cell| unsafe {
+        (*cell.get()).classes.resize(count, 0);
+    });
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_increase_building(
+    state: *mut State,
+    house: u16,
+    class: u16,
+) {
+    // SAFETY: Original valid spec/count indices; no callback while borrowed.
+    let state = unsafe { &mut *state };
+    BUILDING_COUNTS.with(|cell| {
+        // SAFETY: All counters are serialized on the game thread.
+        let global = unsafe { &mut *cell.get() };
+        state.id_counts[usize::from(house)] = state.id_counts[usize::from(house)].wrapping_add(1);
+        global.ids[usize::from(house)] = global.ids[usize::from(house)].wrapping_add(1);
+        if class != 0 {
+            state.class_counts[usize::from(class)] =
+                state.class_counts[usize::from(class)].wrapping_add(1);
+            global.classes[usize::from(class)] = global.classes[usize::from(class)].wrapping_add(1);
+        }
+    });
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_decrease_building(
+    state: *mut State,
+    house: u16,
+    class: u16,
+) {
+    // SAFETY: Source valid indices and serialized original lifetime preconditions.
+    let state = unsafe { &mut *state };
+    BUILDING_COUNTS.with(|cell| {
+        // SAFETY: No callback spans the game-thread global count access.
+        let global = unsafe { &mut *cell.get() };
+        state.id_counts[usize::from(house)] = state.id_counts[usize::from(house)].saturating_sub(1);
+        global.ids[usize::from(house)] = global.ids[usize::from(house)].saturating_sub(1);
+        if class != 0 {
+            state.class_counts[usize::from(class)] =
+                state.class_counts[usize::from(class)].saturating_sub(1);
+            global.classes[usize::from(class)] =
+                global.classes[usize::from(class)].saturating_sub(1);
+        }
+    });
 }
 #[repr(C)]
 #[derive(Clone, Copy)]

@@ -157,6 +157,13 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         54 => layout!(crate::ship_yapf::Follow, item; tile, skipped, dirs, followed),
         55 => layout!(crate::ship_yapf::Tile, item; ships, docking, sea, lock_middle, destination),
         56 => layout!(crate::ship_yapf::Result, item; direction, found, origin, stats),
+        432 => {
+            layout!(crate::town::SimulationFields, item; valid_history, xy, num_houses, population, radius, goal, ratings, received, noise_reached, time_until_rebuild, statues, have_ratings, unwanted, exclusivity, exclusive_counter, larger_town, layout)
+        }
+        433 => layout!(crate::town::Received, item; old_max, new_max, old_act, new_act),
+        434 => layout!(crate::town::SuppliedHistory, item; production, transported),
+        435 => layout!(crate::town::Supplied, item; cargo, history),
+        436 => layout!(crate::town::Slots, item; data, size),
         430 => layout!(crate::town::CommandResult, item; cost, success),
         431 => {
             layout!(crate::town::Leaves, item; settings, town, tile, house, road_info, state, stations, dirty_town, tropic_zone, tile_height, foundation_slope, terraform_price, clean_road_bits, set_road_town, exchange_company, increase_building_count, make_house, add_animation, dirty_tile, change_house_count, change_population, nearby_stations, update_radius, house_count, building_count, update_max_pass, next_town, road_mask, build_road, clear_land, terraform_land, build_bridge, build_tunnel, clear_house_land, allow_construction, construction_animation)

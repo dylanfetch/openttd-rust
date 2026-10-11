@@ -186,7 +186,7 @@ public:
 	}
 };
 
-class SlTownSupplied : public VectorSaveLoadHandler<SlTownSupplied, Town, Town::SuppliedCargo> {
+class SlTownSupplied : public VectorSaveLoadHandler<SlTownSupplied, Town, Town::SuppliedCargo, UINT32_MAX, Town::SuppliedCargoes> {
 public:
 	inline static const SaveLoad description[] = {
 		SLE_VAR(Town::SuppliedCargo, cargo, SLE_UINT8),
@@ -194,7 +194,7 @@ public:
 	};
 	inline const static SaveLoadCompatTable compat_description = {};
 
-	std::vector<Town::SuppliedCargo> &GetVector(Town *t) const override { return t->supplied; }
+	Town::SuppliedCargoes &GetVector(Town *t) const override { return t->supplied; }
 };
 
 class SlTownReceived : public DefaultSaveLoadHandler<SlTownReceived, Town> {
@@ -207,19 +207,27 @@ public:
 	};
 	static inline const SaveLoadCompatTable compat_description = _town_received_sl_compat;
 
-	void Save(Town *t) const override
+	void Save([[maybe_unused]] Town *t) const override
 	{
-		SlSetStructListLength(std::size(t->received));
+		SlSetStructListLength(NUM_TAE);
+#ifdef WITH_RUST
+		for (auto &received : TownSimulationSaveScope::current.received) {
+#else
 		for (auto &received : t->received) {
+#endif
 			SlObject(&received, this->GetDescription());
 		}
 	}
 
-	void Load(Town *t) const override
+	void Load([[maybe_unused]] Town *t) const override
 	{
 		size_t length = IsSavegameVersionBefore(SLV_SAVELOAD_LIST_LENGTH) ? static_cast<size_t>(TAE_END) : SlGetStructListLength(TAE_END);
 		for (size_t i = 0; i < length; i++) {
+#ifdef WITH_RUST
+			SlObject(&TownSimulationSaveScope::current.received[i], this->GetLoadDescription());
+#else
 			SlObject(&t->received[i], this->GetLoadDescription());
+#endif
 		}
 	}
 };
@@ -255,8 +263,16 @@ static std::array<Town::SuppliedHistory, 2> _old_pass_supplied{};
 static std::array<Town::SuppliedHistory, 2> _old_mail_supplied{};
 
 static const SaveLoad _town_desc[] = {
+#ifdef WITH_RUST
+	SLEG_CONDVAR("xy", TownSimulationSaveScope::current.xy, SLE_FILE_U16 | SLE_VAR_U32, SL_MIN_VERSION, SLV_6),
+#else
 	SLE_CONDVAR(Town, xy,                    SLE_FILE_U16 | SLE_VAR_U32, SL_MIN_VERSION, SLV_6),
+#endif
+#ifdef WITH_RUST
+	SLEG_CONDVAR("xy", TownSimulationSaveScope::current.xy, SLE_UINT32, SLV_6, SL_MAX_VERSION),
+#else
 	SLE_CONDVAR(Town, xy,                    SLE_UINT32,                 SLV_6, SL_MAX_VERSION),
+#endif
 
 	SLE_CONDVAR(Town, townnamegrfid,         SLE_UINT32, SLV_66, SL_MAX_VERSION),
 	    SLE_VAR(Town, townnametype,          SLE_UINT16),
@@ -268,15 +284,47 @@ static const SaveLoad _town_desc[] = {
 #else
 	    SLE_VAR(Town, flags,                 SLE_UINT8),
 #endif
+#ifdef WITH_RUST
+	SLEG_CONDVAR("statues", TownSimulationSaveScope::current.statues, SLE_FILE_U8  | SLE_VAR_U16, SL_MIN_VERSION, SLV_104),
+#else
 	SLE_CONDVAR(Town, statues,               SLE_FILE_U8  | SLE_VAR_U16, SL_MIN_VERSION, SLV_104),
+#endif
+#ifdef WITH_RUST
+	SLEG_CONDVAR("statues", TownSimulationSaveScope::current.statues, SLE_UINT16, SLV_104, SL_MAX_VERSION),
+#else
 	SLE_CONDVAR(Town, statues,               SLE_UINT16,               SLV_104, SL_MAX_VERSION),
+#endif
 
+#ifdef WITH_RUST
+	SLEG_CONDVAR("have_ratings", TownSimulationSaveScope::current.have_ratings, SLE_FILE_U8  | SLE_VAR_U16, SL_MIN_VERSION, SLV_104),
+#else
 	SLE_CONDVAR(Town, have_ratings,          SLE_FILE_U8  | SLE_VAR_U16, SL_MIN_VERSION, SLV_104),
+#endif
+#ifdef WITH_RUST
+	SLEG_CONDVAR("have_ratings", TownSimulationSaveScope::current.have_ratings, SLE_UINT16, SLV_104, SL_MAX_VERSION),
+#else
 	SLE_CONDVAR(Town, have_ratings,          SLE_UINT16,               SLV_104, SL_MAX_VERSION),
+#endif
+#ifdef WITH_RUST
+	SLEG_CONDARR("ratings", TownSimulationSaveScope::current.ratings, SLE_INT16, 8, SL_MIN_VERSION, SLV_104),
+#else
 	SLE_CONDARR(Town, ratings,               SLE_INT16, 8,               SL_MIN_VERSION, SLV_104),
+#endif
+#ifdef WITH_RUST
+	SLEG_CONDARR("ratings", TownSimulationSaveScope::current.ratings, SLE_INT16, MAX_COMPANIES, SLV_104, SL_MAX_VERSION),
+#else
 	SLE_CONDARR(Town, ratings,               SLE_INT16, MAX_COMPANIES, SLV_104, SL_MAX_VERSION),
+#endif
+#ifdef WITH_RUST
+	SLEG_CONDARR("unwanted", TownSimulationSaveScope::current.unwanted, SLE_INT8, 8, SLV_4, SLV_104),
+#else
 	SLE_CONDARR(Town, unwanted,              SLE_INT8,  8,               SLV_4, SLV_104),
+#endif
+#ifdef WITH_RUST
+	SLEG_CONDARR("unwanted", TownSimulationSaveScope::current.unwanted, SLE_INT8, MAX_COMPANIES, SLV_104, SL_MAX_VERSION),
+#else
 	SLE_CONDARR(Town, unwanted,              SLE_INT8,  MAX_COMPANIES, SLV_104, SL_MAX_VERSION),
+#endif
 
 	/* Slots 0 and 2 are passengers and mail respectively for old saves. */
 	SLEG_CONDVAR("supplied[CT_PASSENGERS].old_max", _old_pass_supplied[LAST_MONTH].production, SLE_FILE_U16 | SLE_VAR_U32, SL_MIN_VERSION, SLV_9),
@@ -296,17 +344,45 @@ static const SaveLoad _town_desc[] = {
 	SLEG_CONDVAR(      "supplied[CT_MAIL].new_act", _old_mail_supplied[THIS_MONTH].transported, SLE_FILE_U16 | SLE_VAR_U32, SL_MIN_VERSION, SLV_9),
 	SLEG_CONDVAR(      "supplied[CT_MAIL].new_act", _old_mail_supplied[THIS_MONTH].transported, SLE_UINT32,                 SLV_9, SLV_165),
 
+#ifdef WITH_RUST
+	SLEG_CONDVAR("received[TE_FOOD].old_act", TownSimulationSaveScope::current.received[TAE_FOOD].old_act, SLE_UINT16, SL_MIN_VERSION, SLV_165),
+#else
 	SLE_CONDVARNAME(Town, received[TAE_FOOD].old_act,  "received[TE_FOOD].old_act",  SLE_UINT16,                 SL_MIN_VERSION, SLV_165),
+#endif
+#ifdef WITH_RUST
+	SLEG_CONDVAR("received[TE_WATER].old_act", TownSimulationSaveScope::current.received[TAE_WATER].old_act, SLE_UINT16, SL_MIN_VERSION, SLV_165),
+#else
 	SLE_CONDVARNAME(Town, received[TAE_WATER].old_act, "received[TE_WATER].old_act", SLE_UINT16,                 SL_MIN_VERSION, SLV_165),
+#endif
+#ifdef WITH_RUST
+	SLEG_CONDVAR("received[TE_FOOD].new_act", TownSimulationSaveScope::current.received[TAE_FOOD].new_act, SLE_UINT16, SL_MIN_VERSION, SLV_165),
+#else
 	SLE_CONDVARNAME(Town, received[TAE_FOOD].new_act,  "received[TE_FOOD].new_act",  SLE_UINT16,                 SL_MIN_VERSION, SLV_165),
+#endif
+#ifdef WITH_RUST
+	SLEG_CONDVAR("received[TE_WATER].new_act", TownSimulationSaveScope::current.received[TAE_WATER].new_act, SLE_UINT16, SL_MIN_VERSION, SLV_165),
+#else
 	SLE_CONDVARNAME(Town, received[TAE_WATER].new_act, "received[TE_WATER].new_act", SLE_UINT16,                 SL_MIN_VERSION, SLV_165),
+#endif
 
+#ifdef WITH_RUST
+	SLEG_CONDARR("goal", TownSimulationSaveScope::current.goal, SLE_UINT32, NUM_TAE, SLV_165, SL_MAX_VERSION),
+#else
 	SLE_CONDARR(Town, goal, SLE_UINT32, NUM_TAE, SLV_165, SL_MAX_VERSION),
+#endif
 
 	SLE_CONDSSTR(Town, text,                 SLE_STR | SLF_ALLOW_CONTROL, SLV_168, SL_MAX_VERSION),
 
+#ifdef WITH_RUST
+	SLEG_CONDVAR("time_until_rebuild", TownSimulationSaveScope::current.time_until_rebuild, SLE_FILE_U8 | SLE_VAR_U16, SL_MIN_VERSION, SLV_54),
+#else
 	SLE_CONDVAR(Town, time_until_rebuild,    SLE_FILE_U8 | SLE_VAR_U16,  SL_MIN_VERSION, SLV_54),
+#endif
+#ifdef WITH_RUST
+	SLEG_CONDVAR("time_until_rebuild", TownSimulationSaveScope::current.time_until_rebuild, SLE_UINT16, SLV_54, SL_MAX_VERSION),
+#else
 	SLE_CONDVAR(Town, time_until_rebuild,    SLE_UINT16,                SLV_54, SL_MAX_VERSION),
+#endif
 #ifdef WITH_RUST
 	SLEG_CONDVAR("grow_counter", TownGrowthSaveScope::current.counter,          SLE_FILE_U8 | SLE_VAR_U16,  SL_MIN_VERSION, SLV_54),
 #else
@@ -344,12 +420,32 @@ static const SaveLoad _town_desc[] = {
 	    SLE_VAR(Town, road_build_months,     SLE_UINT8),
 #endif
 
+#ifdef WITH_RUST
+	SLEG_CONDVAR("exclusivity", TownSimulationSaveScope::current.exclusivity, SLE_UINT8, SLV_2, SL_MAX_VERSION),
+#else
 	SLE_CONDVAR(Town, exclusivity,           SLE_UINT8,                  SLV_2, SL_MAX_VERSION),
+#endif
+#ifdef WITH_RUST
+	SLEG_CONDVAR("exclusive_counter", TownSimulationSaveScope::current.exclusive_counter, SLE_UINT8, SLV_2, SL_MAX_VERSION),
+#else
 	SLE_CONDVAR(Town, exclusive_counter,     SLE_UINT8,                  SLV_2, SL_MAX_VERSION),
+#endif
 
+#ifdef WITH_RUST
+	SLEG_CONDVAR("larger_town", TownSimulationSaveScope::current.larger_town, SLE_BOOL, SLV_56, SL_MAX_VERSION),
+#else
 	SLE_CONDVAR(Town, larger_town,           SLE_BOOL,                  SLV_56, SL_MAX_VERSION),
+#endif
+#ifdef WITH_RUST
+	SLEG_CONDVAR("layout", TownSimulationSaveScope::current.layout, SLE_UINT8, SLV_113, SL_MAX_VERSION),
+#else
 	SLE_CONDVAR(Town, layout,                SLE_UINT8,                SLV_113, SL_MAX_VERSION),
+#endif
+#ifdef WITH_RUST
+	SLEG_CONDVAR("valid_history", TownSimulationSaveScope::current.valid_history, SLE_UINT64, SLV_TOWN_SUPPLY_HISTORY, SL_MAX_VERSION),
+#else
 	SLE_CONDVAR(Town, valid_history, SLE_UINT64, SLV_TOWN_SUPPLY_HISTORY, SL_MAX_VERSION),
+#endif
 
 	SLE_CONDREFVECTOR(Town, psa_list,        REF_STORAGE,              SLV_161, SL_MAX_VERSION),
 
@@ -373,6 +469,7 @@ struct CITYChunkHandler : ChunkHandler {
 		for (Town *t : Town::Iterate()) {
 			SlSetArrayIndex(t->index);
 #ifdef WITH_RUST
+			TownSimulationSaveScope simulation_scope(t, false);
 			TownGrowthSaveScope growth_scope(t, false);
 #endif
 			SlObject(t, _town_desc);
@@ -389,6 +486,7 @@ struct CITYChunkHandler : ChunkHandler {
 			Town *t = new (TownID(index)) Town();
 			{
 #ifdef WITH_RUST
+				TownSimulationSaveScope simulation_scope(t, true);
 				TownGrowthSaveScope growth_scope(t, true);
 #endif
 				SlObject(t, slt);
@@ -420,6 +518,7 @@ struct CITYChunkHandler : ChunkHandler {
 
 		for (Town *t : Town::Iterate()) {
 #ifdef WITH_RUST
+			TownSimulationSaveScope simulation_scope(t, false);
 			TownGrowthSaveScope growth_scope(t, false);
 #endif
 			SlObject(t, _town_desc);

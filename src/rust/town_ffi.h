@@ -10,7 +10,22 @@
 #define RUST_TOWN_FFI_H
 #include "services_ffi.h"
 #include <cstdint>
+#include <cstddef>
 struct OpenTTDTownState;
+struct OpenTTDTownReceived { uint16_t old_max, new_max, old_act, new_act; };
+struct OpenTTDTownSimulationFields {
+	uint64_t valid_history;
+	uint32_t xy, num_houses, population, radius[5], goal[6];
+	int16_t ratings[15];
+	OpenTTDTownReceived received[6];
+	uint16_t noise_reached, time_until_rebuild, statues, have_ratings;
+	uint8_t unwanted[15], exclusivity, exclusive_counter;
+	bool larger_town;
+	uint8_t layout;
+};
+struct OpenTTDTownSuppliedHistory { uint32_t production, transported; };
+struct OpenTTDTownSupplied { uint8_t cargo; OpenTTDTownSuppliedHistory history[61]; };
+struct OpenTTDTownSlots { void *data; size_t size; };
 struct OpenTTDTownCommandResult { int64_t cost; bool success; };
 struct OpenTTDTownLeaves {
 	void (*settings)(uint32_t *) noexcept;
@@ -54,6 +69,20 @@ struct OpenTTDTownLeaves {
  * and bounded NewGRF resolution may reenter; ordinary gameplay does not throw.
  * Environmental failures and Rust panics abort. Save/load staging stays native. */
 extern "C" {
+OpenTTDTownSimulationFields *openttd_rust_town_simulation(OpenTTDTownState *);
+OpenTTDTownSlots openttd_rust_town_supplied_view(OpenTTDTownState *);
+void openttd_rust_town_supplied_reserve(OpenTTDTownState *, size_t);
+OpenTTDTownSupplied *openttd_rust_town_supplied_insert(OpenTTDTownState *, size_t, uint8_t);
+OpenTTDTownSlots openttd_rust_town_id_counts(OpenTTDTownState *);
+void openttd_rust_town_id_counts_resize(OpenTTDTownState *, size_t);
+OpenTTDTownSlots openttd_rust_town_global_id_counts();
+void openttd_rust_town_global_id_counts_resize(size_t);
+OpenTTDTownSlots openttd_rust_town_class_counts(OpenTTDTownState *);
+void openttd_rust_town_class_counts_resize(OpenTTDTownState *, size_t);
+OpenTTDTownSlots openttd_rust_town_global_class_counts();
+void openttd_rust_town_global_class_counts_resize(size_t);
+void openttd_rust_town_increase_building(OpenTTDTownState *, uint16_t, uint16_t);
+void openttd_rust_town_decrease_building(OpenTTDTownState *, uint16_t, uint16_t);
 OpenTTDTownState *openttd_rust_town_new();
 void openttd_rust_town_destroy(OpenTTDTownState *);
 uint16_t openttd_rust_town_get(const OpenTTDTownState *, uint8_t);

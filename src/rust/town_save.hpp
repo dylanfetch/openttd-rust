@@ -10,6 +10,23 @@
 #define RUST_TOWN_SAVE_HPP
 #include "../town.h"
 
+/** Native save staging is invocation-local, including nested and partial loads.
+ * The shell fields remain aliases of Rust's one allocation outside this scope. */
+struct TownSimulationSaveScope {
+	static inline TownSimulationFields current{};
+	TownSimulationFields previous;
+	Town *town;
+	bool loading;
+	TownSimulationSaveScope(Town *town, bool loading) : previous(current), town(town), loading(loading) { current = town->simulation; }
+	~TownSimulationSaveScope()
+	{
+		if (this->loading) this->town->simulation = current;
+		current = this->previous;
+	}
+	TownSimulationSaveScope(const TownSimulationSaveScope &) = delete;
+	TownSimulationSaveScope &operator=(const TownSimulationSaveScope &) = delete;
+};
+
 struct TownGrowthSaveScope {
 	struct Values { uint16_t counter, rate; uint8_t funding, road, flags; };
 	static inline Values current{};
