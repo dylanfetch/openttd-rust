@@ -16,6 +16,7 @@
 #include <cstdio>
 #include <initializer_list>
 #include <memory>
+#include <map>
 #include <numeric>
 #include <span>
 #include <limits>
@@ -34,17 +35,29 @@ struct Town {
 	uint32_t index = 17;
 	struct { uint32_t population = 0; } cache;
 	struct SuppliedHistory { uint32_t production = 0, transported = 0; };
+	std::array<int16_t, 15> ratings{};
+	struct { uint16_t bits = 0; void Set(uint8_t company) { this->bits |= 1 << company; } } have_ratings;
 };
 template <typename T> T SumHistory(std::span<const T>);
 template <typename T> T ClampTo(uint64_t value) { return static_cast<T>(std::min<uint64_t>(value, std::numeric_limits<T>::max())); }
 struct { struct { bool allow_town_level_crossings = true; } economy; } _settings_game;
-enum class DoCommandFlag { Auto = 1, NoWater = 2, Execute = 4 };
+enum class DoCommandFlag { Auto = 1, NoWater = 2, Execute = 4, NoModifyTownRating = 8 };
 struct Flags {
 	uint32_t bits = 0;
 	Flags() = default;
 	Flags(std::initializer_list<DoCommandFlag> flags) { for (auto flag : flags) this->Set(flag); }
+	bool Test(DoCommandFlag flag) const { return (this->bits & static_cast<uint32_t>(flag)) != 0; }
 	Flags &Set(DoCommandFlag flag) { this->bits |= static_cast<uint32_t>(flag); return *this; }
 };
+using DoCommandFlags = Flags;
+static bool _town_rating_test = false;
+static std::map<const Town *, int> _town_test_ratings;
+static uint8_t _current_company;
+static struct { struct { bool value = false; } magic_bulldozer; } _cheats;
+static uint32_t rating_valid_calls, rating_dirty_calls;
+struct Company { static bool IsValidID(uint8_t company) { rating_valid_calls++; return company == 0 || company == 4; } };
+constexpr uint32_t WC_TOWN_AUTHORITY = 1;
+static void SetWindowDirty(uint32_t, uint32_t) { rating_dirty_calls++; }
 enum { CMD_BUILD_ROAD, CMD_BUILD_TUNNEL };
 template <int> constexpr uint32_t GetCommandFlags() { return 0; }
 static Flags CommandFlagsToDCFlags(uint32_t) { return {}; }
@@ -231,9 +244,59 @@ static void CompareHistories()
 	}
 	std::printf("\nPASS %u unchanged-reference history cases\n", checked);
 }
+static bool RatingCompanyValid(uint8_t company) noexcept { return Company::IsValidID(company); }
+static void RatingDirty(uint32_t town) noexcept { SetWindowDirty(WC_TOWN_AUTHORITY, town); }
+static void CompareRatings()
+{
+	Town town;
+	auto owner = std::unique_ptr<OpenTTDTownState, decltype(&openttd_rust_town_destroy)>(openttd_rust_town_new(), openttd_rust_town_destroy);
+	auto leaves = TownProtocolServices(); leaves.dirty_authority = RatingDirty;
+	const OpenTTDSharedServices services{.context = nullptr, .random = Random, .observe_tile = ObserveTile, .write_tile = WriteTile, .trig = Trig, .industry = Industry, .company_valid = RatingCompanyValid, .next_company = UnusedNextCompany};
+	uint32_t checked = 0;
+	auto reset = [&](int16_t initial) {
+		town.ratings.fill(initial); town.have_ratings.bits = 0;
+		auto *state = openttd_rust_town_simulation(owner.get());
+		std::fill_n(state->ratings, 15, initial); state->have_ratings = 0;
+	};
+	auto mode = [&](bool enabled) { SetTownRatingTestMode(enabled); openttd_rust_town_rating_test(enabled); };
+	auto check = [&](int add, int maximum, uint8_t company, bool no_modify = false, bool bulldozer = false, bool null_town = false) {
+		_current_company = company; _cheats.magic_bulldozer.value = bulldozer;
+		rating_valid_calls = rating_dirty_calls = 0;
+		ChangeTownRating(null_town ? nullptr : &town, add, maximum, no_modify ? Flags{DoCommandFlag::NoModifyTownRating} : Flags{});
+		const auto expected_valid = rating_valid_calls, expected_dirty = rating_dirty_calls;
+		rating_valid_calls = rating_dirty_calls = 0;
+		openttd_rust_town_change_rating(&leaves, &services, null_town ? nullptr : owner.get(), town.index,
+			reinterpret_cast<uintptr_t>(&town), company, add, maximum, no_modify, bulldozer);
+		const auto *state = openttd_rust_town_simulation(owner.get());
+		bool equal = expected_valid == rating_valid_calls && expected_dirty == rating_dirty_calls && state->have_ratings == town.have_ratings.bits && std::equal(town.ratings.begin(), town.ratings.end(), state->ratings);
+		if (company == 0 || company == 4) equal &= GetRating(&town) == openttd_rust_town_rating(owner.get(), reinterpret_cast<uintptr_t>(&town), company);
+		if (!equal) {
+			std::fprintf(stderr, "rating mismatch case=%u add=%d max=%d company=%u mode=%u no-modify=%u cheat=%u null=%u\n", checked, add, maximum, company, _town_rating_test, no_modify, bulldozer, null_town);
+			std::exit(1);
+		}
+		checked++;
+	};
+	for (const int16_t initial : {-32768, -1000, 0, 1000, 32767}) {
+		for (const int add : {-40000, -1, 0, 1, 40000}) {
+			for (const int maximum : {-50000, -1000, 0, 1000, 50000}) {
+				reset(initial); check(add, maximum, 0); check(add, maximum, 4);
+				reset(initial); mode(true); check(add, maximum, 0);
+				mode(true); check(add, maximum, 4); mode(false); check(-add, maximum, 0); mode(false);
+				check(add, maximum, 0, true); check(add, maximum, 255); check(add, maximum, 4, false, true); check(add, maximum, 0, false, false, true);
+			}
+		}
+	}
+	/* Source keys only the native shell address, including across company and
+	 * owner reuse within nested test mode; starting a new outer mode clears it. */
+	reset(10); mode(true); check(100, 1000, 0); mode(true);
+	owner.reset(openttd_rust_town_new()); reset(-100); check(1, 1000, 4); mode(false); check(-1, -1000, 0); mode(false);
+	mode(true); check(1, 1000, 4); mode(false);
+	std::printf("\nPASS %u unchanged-reference rating cases\n", checked);
+}
 int main()
 {
 	CompareHistories();
+	CompareRatings();
 	for (uint32_t dir = 0; dir < 4; dir++) {
 		for (bool mountain : {false, true}) {
 			for (uint32_t length : {1, 2, 4, 5, 6, 7, 8, 9, 255, 256, 257}) {

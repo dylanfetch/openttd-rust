@@ -228,6 +228,9 @@ def tunnel_reference_gap(out, archive=None):
         "CanRoadContinueIntoNextTile": "static bool CanRoadContinueIntoNextTile(",
         "GrowTownWithTunnel": "static bool GrowTownWithTunnel(",
         "SumHistory": "template <>\nTown::SuppliedHistory SumHistory(",
+        "SetTownRatingTestMode": "void SetTownRatingTestMode(",
+        "GetRating": "static int GetRating(",
+        "ChangeTownRating": "void ChangeTownRating(",
     }
     for name, signature in signatures.items():
         start = source.index(signature)
@@ -279,10 +282,14 @@ def tunnel_reference_gap(out, archive=None):
     )
     if not history or int(history[1]) == 0:
         raise RuntimeError("town history reference gap omitted completion/count marker")
+    rating = re.search(rb"\nPASS (\d+) unchanged-reference rating cases\n", run.stdout)
+    if not rating or int(rating[1]) == 0:
+        raise RuntimeError("town rating reference gap omitted completion/count marker")
     migration.ensure_reference()
     report = {
         "passed": True,
         "history_cases": int(history[1]),
+        "rating_cases": int(rating[1]),
         "cases": int(match[1]),
         "successful_tunnel_cases": len(re.findall(rb" result=1 ", run.stdout)),
         "execute_effect_cases": len(re.findall(rb" effects=1 ", run.stdout)),
@@ -299,6 +306,7 @@ def tunnel_reference_gap(out, archive=None):
         "limits": [
             "Controlled world and command outcomes; the paired save corpus has no actual tunnel build.",
             "Original int history accumulation compares full uint32 edges; ordinary saves cannot reach these extreme histories.",
+            "Nested rating scratch, company changes, shell reuse and early-return service ordering are absent from ordinary console saves.",
             "Ordered road-mask/info services, command arguments, result, RNG and partial execute effects compare exactly.",
             "Pure C++ map getter calls and Rust bundled records have different granularity; their call counts/order are not compared.",
             "One active town-buildable road type; shared command internals and road-type selection are outside this gap check.",
