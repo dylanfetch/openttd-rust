@@ -143,6 +143,11 @@ static OpenTTDTreeLandscapeClear TreeLandscapeClear(OpenTTDTreeCommand *ctx, uin
 static const OpenTTDTreeServices _tree_services{
 	.plant_observation = TreePlantObservation,
 	.tree_observation = TreeObservation,
+	.tree_count = [](uint32_t tile) noexcept { return GetTreeCount(TileIndex{tile}); },
+	.clear_observation = [](uint32_t index) noexcept {
+		TileIndex tile{index};
+		return OpenTTDTreeClearObservation{.count = GetTreeCount(tile), .species = GetTreeType(tile)};
+	},
 	.snow_line = []() noexcept { return GetSnowLine(); },
 	.sin = [](float v) noexcept { return sinf(v); },
 	.cos = [](float v) noexcept { return cosf(v); },

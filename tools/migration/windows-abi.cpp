@@ -117,9 +117,10 @@ static void Layouts()
 	Layout(34, "OpenTTDLinkGraphNode", {sizeof(OpenTTDLinkGraphNode), alignof(OpenTTDLinkGraphNode), offsetof(OpenTTDLinkGraphNode, supply), offsetof(OpenTTDLinkGraphNode, demand), offsetof(OpenTTDLinkGraphNode, station), offsetof(OpenTTDLinkGraphNode, x), offsetof(OpenTTDLinkGraphNode, y), offsetof(OpenTTDLinkGraphNode, edge_begin), offsetof(OpenTTDLinkGraphNode, edge_count)});
 	Layout(35, "OpenTTDLinkGraphEdge", {sizeof(OpenTTDLinkGraphEdge), alignof(OpenTTDLinkGraphEdge), offsetof(OpenTTDLinkGraphEdge, capacity), offsetof(OpenTTDLinkGraphEdge, travel_time), offsetof(OpenTTDLinkGraphEdge, dest)});
 	Layout(36, "OpenTTDLinkGraphSettings", {sizeof(OpenTTDLinkGraphSettings), alignof(OpenTTDLinkGraphSettings), offsetof(OpenTTDLinkGraphSettings, accuracy), offsetof(OpenTTDLinkGraphSettings, demand_distance), offsetof(OpenTTDLinkGraphSettings, demand_size), offsetof(OpenTTDLinkGraphSettings, saturation), offsetof(OpenTTDLinkGraphSettings, distribution), offsetof(OpenTTDLinkGraphSettings, express), offsetof(OpenTTDLinkGraphSettings, map_max_x), offsetof(OpenTTDLinkGraphSettings, map_max_y), offsetof(OpenTTDLinkGraphSettings, runtime)});
-	Layout(38, "OpenTTDTreeServices", {sizeof(OpenTTDTreeServices), alignof(OpenTTDTreeServices), offsetof(OpenTTDTreeServices, plant_observation), offsetof(OpenTTDTreeServices, tree_observation), offsetof(OpenTTDTreeServices, snow_line), offsetof(OpenTTDTreeServices, sin), offsetof(OpenTTDTreeServices, cos), offsetof(OpenTTDTreeServices, make_tree), offsetof(OpenTTDTreeServices, set_ground_density), offsetof(OpenTTDTreeServices, add_count), offsetof(OpenTTDTreeServices, add_growth), offsetof(OpenTTDTreeServices, set_growth), offsetof(OpenTTDTreeServices, make_clear), offsetof(OpenTTDTreeServices, make_shore), offsetof(OpenTTDTreeServices, make_snow), offsetof(OpenTTDTreeServices, clear_neighbour_flooding), offsetof(OpenTTDTreeServices, tile_loop_water), offsetof(OpenTTDTreeServices, ambient), offsetof(OpenTTDTreeServices, play_sound), offsetof(OpenTTDTreeServices, progress), offsetof(OpenTTDTreeServices, progress_total), offsetof(OpenTTDTreeServices, clear_square), offsetof(OpenTTDTreeServices, town_rating), offsetof(OpenTTDTreeServices, command_begin), offsetof(OpenTTDTreeServices, command_tile), offsetof(OpenTTDTreeServices, command_next), offsetof(OpenTTDTreeServices, command_debit), offsetof(OpenTTDTreeServices, landscape_clear)});
+	Layout(38, "OpenTTDTreeServices", {sizeof(OpenTTDTreeServices), alignof(OpenTTDTreeServices), offsetof(OpenTTDTreeServices, plant_observation), offsetof(OpenTTDTreeServices, tree_observation), offsetof(OpenTTDTreeServices, tree_count), offsetof(OpenTTDTreeServices, clear_observation), offsetof(OpenTTDTreeServices, snow_line), offsetof(OpenTTDTreeServices, sin), offsetof(OpenTTDTreeServices, cos), offsetof(OpenTTDTreeServices, make_tree), offsetof(OpenTTDTreeServices, set_ground_density), offsetof(OpenTTDTreeServices, add_count), offsetof(OpenTTDTreeServices, add_growth), offsetof(OpenTTDTreeServices, set_growth), offsetof(OpenTTDTreeServices, make_clear), offsetof(OpenTTDTreeServices, make_shore), offsetof(OpenTTDTreeServices, make_snow), offsetof(OpenTTDTreeServices, clear_neighbour_flooding), offsetof(OpenTTDTreeServices, tile_loop_water), offsetof(OpenTTDTreeServices, ambient), offsetof(OpenTTDTreeServices, play_sound), offsetof(OpenTTDTreeServices, progress), offsetof(OpenTTDTreeServices, progress_total), offsetof(OpenTTDTreeServices, clear_square), offsetof(OpenTTDTreeServices, town_rating), offsetof(OpenTTDTreeServices, command_begin), offsetof(OpenTTDTreeServices, command_tile), offsetof(OpenTTDTreeServices, command_next), offsetof(OpenTTDTreeServices, command_debit), offsetof(OpenTTDTreeServices, landscape_clear)});
 	Layout(28, "OpenTTDTreePlantObservation", {sizeof(OpenTTDTreePlantObservation), alignof(OpenTTDTreePlantObservation), offsetof(OpenTTDTreePlantObservation, tile_type), offsetof(OpenTTDTreePlantObservation, bridge), offsetof(OpenTTDTreePlantObservation, ground), offsetof(OpenTTDTreePlantObservation, density), offsetof(OpenTTDTreePlantObservation, snow), offsetof(OpenTTDTreePlantObservation, coast), offsetof(OpenTTDTreePlantObservation, zone)});
 	Layout(31, "OpenTTDTreeObservation", {sizeof(OpenTTDTreeObservation), alignof(OpenTTDTreeObservation), offsetof(OpenTTDTreeObservation, ground), offsetof(OpenTTDTreeObservation, density), offsetof(OpenTTDTreeObservation, species), offsetof(OpenTTDTreeObservation, count), offsetof(OpenTTDTreeObservation, growth), offsetof(OpenTTDTreeObservation, zone)});
+	Layout(386, "OpenTTDTreeClearObservation", {sizeof(OpenTTDTreeClearObservation), alignof(OpenTTDTreeClearObservation), offsetof(OpenTTDTreeClearObservation, count), offsetof(OpenTTDTreeClearObservation, species)});
 	Layout(32, "OpenTTDTreeLoopSettings", {sizeof(OpenTTDTreeLoopSettings), alignof(OpenTTDTreeLoopSettings), offsetof(OpenTTDTreeLoopSettings, tick_counter), offsetof(OpenTTDTreeLoopSettings, size_x), offsetof(OpenTTDTreeLoopSettings, climate), offsetof(OpenTTDTreeLoopSettings, extra), offsetof(OpenTTDTreeLoopSettings, ambient)});
 	Layout(33, "OpenTTDTreeTickSettings", {sizeof(OpenTTDTreeTickSettings), alignof(OpenTTDTreeTickSettings), offsetof(OpenTTDTreeTickSettings, tick_counter), offsetof(OpenTTDTreeTickSettings, size), offsetof(OpenTTDTreeTickSettings, climate), offsetof(OpenTTDTreeTickSettings, extra)});
 	Layout(43, "OpenTTDTreeGenerateSettings", {sizeof(OpenTTDTreeGenerateSettings), alignof(OpenTTDTreeGenerateSettings), offsetof(OpenTTDTreeGenerateSettings, size), offsetof(OpenTTDTreeGenerateSettings, size_x), offsetof(OpenTTDTreeGenerateSettings, size_y), offsetof(OpenTTDTreeGenerateSettings, climate), offsetof(OpenTTDTreeGenerateSettings, placer), offsetof(OpenTTDTreeGenerateSettings, height_limit), offsetof(OpenTTDTreeGenerateSettings, editor), offsetof(OpenTTDTreeGenerateSettings, freeform_edges)});
@@ -804,6 +805,8 @@ static uint32_t TreeRandom(void *) noexcept { return UINT32_MAX; }
 static const OpenTTDTreeServices tree_probe_services{
 	.plant_observation = [](uint32_t) noexcept { return tree_probe.plant; },
 	.tree_observation = [](uint32_t) noexcept { return tree_probe.tree; },
+	.tree_count = [](uint32_t) noexcept { return uint32_t{tree_probe.tree.count}; },
+	.clear_observation = [](uint32_t) noexcept { return OpenTTDTreeClearObservation{.count = tree_probe.tree.count, .species = tree_probe.tree.species}; },
 	.snow_line = TreeUnused<uint8_t>,
 	.sin = [](float value) noexcept { return value; },
 	.cos = [](float value) noexcept { return value; },
@@ -830,9 +833,9 @@ static const OpenTTDTreeServices tree_probe_services{
 	.progress_total = TreeUnused<bool, uint32_t>,
 	.clear_square = [](uint32_t) noexcept { ++tree_probe.clears; },
 	.town_rating = TreeUnused<void, OpenTTDTreeCommand *, uint32_t, bool>,
-	.command_begin = TreeUnused<int32_t, OpenTTDTreeCommand *, uint32_t, uint32_t, bool>,
-	.command_tile = TreeUnused<uint32_t, OpenTTDTreeCommand *>,
-	.command_next = TreeUnused<uint32_t, OpenTTDTreeCommand *>,
+	.command_begin = [](OpenTTDTreeCommand *, uint32_t, uint32_t, bool) noexcept { return INT32_MAX; },
+	.command_tile = [](OpenTTDTreeCommand *) noexcept { return uint32_t{1}; },
+	.command_next = [](OpenTTDTreeCommand *) noexcept { return UINT32_MAX; },
 	.command_debit = TreeUnused<void, OpenTTDTreeCommand *>,
 	.landscape_clear = TreeUnused<OpenTTDTreeLandscapeClear, OpenTTDTreeCommand *, uint32_t>,
 };
@@ -850,6 +853,11 @@ static void Trees()
 	tree_probe.plant = {.tile_type = 0, .bridge = false, .ground = 0, .density = 2, .snow = false, .coast = false, .zone = 0};
 	openttd_rust_trees_plant(1, 12, 2, 6, &tree_probe_services, &shared);
 	CHECK(tree_probe.writes == 1 && openttd_rust_trees_can_plant(1, false, &tree_probe_services));
+	tree_probe.plant.tile_type = 4;
+	const auto command = openttd_rust_trees_cmd_plant(nullptr, 1, 1, 255, false,
+		{.build_price = 15, .size = 4096, .climate = 0, .editor = false, .execute = false, .company_valid = false}, &tree_probe_services, &shared);
+	CHECK(command.cost == 30 && command.status == 0);
+	tree_probe.plant.tile_type = 0;
 	openttd_rust_trees_tile_loop(1, {.tick_counter = 0, .size_x = 64, .climate = 0, .extra = 2, .ambient = false}, &tree_probe_services, &shared);
 	CHECK(tree_probe.waters == 1 && tree_probe.clears == 1 && tree_probe.nested_cost == 40 && tree_probe.writes == 1);
 	openttd_rust_trees_initialize();

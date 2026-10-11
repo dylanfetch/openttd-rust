@@ -27,6 +27,11 @@ struct OpenTTDTreePlantObservation {
 struct OpenTTDTreeObservation {
 	uint8_t ground, density, species, count, growth, zone;
 };
+/* Only the fields ClearTile_Trees uses, with GetTreeCount's uint return type. */
+struct OpenTTDTreeClearObservation {
+	uint32_t count;
+	uint8_t species;
+};
 /* Settings read once per entry. Prices are Money values. */
 struct OpenTTDTreeLoopSettings {
 	uint64_t tick_counter;
@@ -73,6 +78,8 @@ struct OpenTTDTreeCommand;
 struct OpenTTDTreeServices {
 	OpenTTDTreePlantObservation (*plant_observation)(uint32_t) noexcept;
 	OpenTTDTreeObservation (*tree_observation)(uint32_t) noexcept;
+	uint32_t (*tree_count)(uint32_t) noexcept;
+	OpenTTDTreeClearObservation (*clear_observation)(uint32_t) noexcept;
 	uint8_t (*snow_line)() noexcept;
 	float (*sin)(float) noexcept;
 	float (*cos)(float) noexcept;

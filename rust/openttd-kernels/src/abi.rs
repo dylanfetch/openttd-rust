@@ -84,7 +84,7 @@ pub fn layout(type_id: u16, item: u8) -> usize {
             layout!(crate::linkgraph::OutputShare, item; node, origin, via, cumulative, unrestricted, has_share)
         }
         38 => {
-            layout!(crate::trees::TreeServices, item; plant_observation, tree_observation, snow_line, sin, cos, make_tree, set_ground_density, add_count, add_growth, set_growth, make_clear, make_shore, make_snow, clear_neighbour_flooding, tile_loop_water, ambient, play_sound, progress, progress_total, clear_square, town_rating, command_begin, command_tile, command_next, command_debit, landscape_clear)
+            layout!(crate::trees::TreeServices, item; plant_observation, tree_observation, tree_count, clear_observation, snow_line, sin, cos, make_tree, set_ground_density, add_count, add_growth, set_growth, make_clear, make_shore, make_snow, clear_neighbour_flooding, tile_loop_water, ambient, play_sound, progress, progress_total, clear_square, town_rating, command_begin, command_tile, command_next, command_debit, landscape_clear)
         }
         28 => {
             layout!(crate::trees::PlantObservation, item; tile_type, bridge, ground, density, snow, coast, zone)
@@ -92,6 +92,7 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         31 => {
             layout!(crate::trees::TreeObservation, item; ground, density, species, count, growth, zone)
         }
+        386 => layout!(crate::trees::ClearObservation, item; count, species),
         32 => {
             layout!(crate::trees::LoopSettings, item; tick_counter, size_x, climate, extra, ambient)
         }

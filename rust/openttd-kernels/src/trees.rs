@@ -148,6 +148,14 @@ pub struct TreeObservation {
     pub zone: u8,
 }
 
+/// Only the tree count and species read by `ClearTile_Trees`.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct ClearObservation {
+    pub count: u32,
+    pub species: u8,
+}
+
 /// `TileLoop_Trees` settings, read once per entry.
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -228,6 +236,8 @@ pub struct Command {
 pub struct TreeServices {
     pub plant_observation: extern "C" fn(u32) -> PlantObservation,
     pub tree_observation: extern "C" fn(u32) -> TreeObservation,
+    pub tree_count: extern "C" fn(u32) -> u32,
+    pub clear_observation: extern "C" fn(u32) -> ClearObservation,
     pub snow_line: extern "C" fn() -> u8,
     pub sin: extern "C" fn(f32) -> f32,
     pub cos: extern "C" fn(f32) -> f32,
@@ -846,7 +856,7 @@ impl Trees<'_> {
             'tile: {
                 match p.tile_type {
                     MP_TREES => {
-                        if self.tree_observation(current).count == 4 {
+                        if (self.t.tree_count)(current) == 4 {
                             message = 1;
                             break 'tile;
                         }
@@ -1099,8 +1109,8 @@ pub unsafe extern "C" fn openttd_rust_trees_clear_tile(
     if company_valid {
         (t.town_rating)(ctx, tile, false);
     }
-    let tree = (t.tree_observation)(tile);
-    let mut num = u32::from(tree.count);
+    let tree = (t.clear_observation)(tile);
+    let mut num = tree.count;
     if is_rainforest_tree(tree.species) {
         num = num.wrapping_mul(4);
     }
@@ -1125,6 +1135,8 @@ mod tests {
         Snow,
         Plant,
         Tree,
+        Count,
+        ClearTree,
         Write(&'static str),
         Dirty,
         Zone(u8),
@@ -1200,6 +1212,17 @@ mod tests {
     extern "C" fn tree_observation(_: u32) -> TreeObservation {
         log(Event::Tree);
         WORLD.with_borrow(|w| w.tree)
+    }
+    extern "C" fn tree_count(_: u32) -> u32 {
+        log(Event::Count);
+        WORLD.with_borrow(|w| u32::from(w.tree.count))
+    }
+    extern "C" fn clear_observation(_: u32) -> ClearObservation {
+        log(Event::ClearTree);
+        WORLD.with_borrow(|w| ClearObservation {
+            count: u32::from(w.tree.count),
+            species: w.tree.species,
+        })
     }
     extern "C" fn snow_line() -> u8 {
         log(Event::Snow);
@@ -1320,6 +1343,8 @@ mod tests {
     const SERVICES: TreeServices = TreeServices {
         plant_observation,
         tree_observation,
+        tree_count,
+        clear_observation,
         snow_line,
         sin: trig,
         cos: trig,
@@ -1744,6 +1769,8 @@ mod tests {
             };
             let result = with(|t| t.plant_command(std::ptr::null_mut(), 2, 1, 255, false, &s));
             assert_eq!(result.cost, price);
+            assert_eq!(events().iter().filter(|e| **e == Event::Count).count(), 3);
+            assert!(!events().contains(&Event::Tree));
             WORLD.with_borrow_mut(|w| w.tree.count = 4);
             // SAFETY: The test table is a live constant.
             let cost = unsafe {
@@ -1756,7 +1783,7 @@ mod tests {
             &log[log.len() - 3..],
             [
                 Event::Rating(false),
-                Event::Tree,
+                Event::ClearTree,
                 Event::Write("clear_square")
             ]
         );
