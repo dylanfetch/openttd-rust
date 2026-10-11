@@ -115,7 +115,6 @@ struct OpenTTDTrainReservationLeaves {
 	uint64_t (*other_end)(void *, OpenTTDTrainHandle, uint32_t) noexcept;
 	uint64_t (*overlap)(void *, OpenTTDTrainHandle, uint8_t) noexcept;
 	void (*path_result)(void *, OpenTTDTrainHandle, uint8_t) noexcept;
-	void (*profile)(void *, OpenTTDTrainHandle, uint64_t) noexcept;
 	uint64_t (*rail90)(void *, OpenTTDTrainHandle, uint32_t, uint32_t) noexcept;
 	uint64_t (*reach_dirs)(void *, OpenTTDTrainHandle, uint8_t) noexcept;
 	uint64_t (*reach_tracks)(void *, OpenTTDTrainHandle, uint8_t) noexcept;

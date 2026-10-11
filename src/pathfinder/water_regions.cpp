@@ -24,34 +24,14 @@
 
 #ifdef WITH_RUST
 #include "../rust/water_regions_ffi.h"
-#include <cstdio>
-#include <cstdlib>
-
-struct WaterProfile {
-	bool enabled = std::getenv("OPENTTD_WATER_PROFILE") != nullptr;
-	uint64_t tracks = 0, follows = 0, aqueducts = 0, rebuilds = 0;
-	~WaterProfile()
-	{
-		if (!this->enabled) return;
-		const char *personal = std::getenv("HOME");
-		if (personal == nullptr) return;
-		if (FILE *file = std::fopen(fmt::format("{}/water-profile.json", personal).c_str(), "w")) {
-			fmt::print(file, "{{\"tracks\":{},\"follows\":{},\"aqueducts\":{},\"rebuilds\":{}}}\n", this->tracks, this->follows, this->aqueducts, this->rebuilds);
-			std::fclose(file);
-		}
-	}
-};
-static WaterProfile _water_profile;
 
 static uint16_t WaterTracks(uint32_t tile) noexcept
 {
-	if (_water_profile.enabled) ++_water_profile.tracks;
 	return TrackBitsToTrackdirBits(TrackStatusToTrackBits(GetTileTrackStatus(TileIndex{tile}, TRANSPORT_WATER, 0)));
 }
 
 static uint32_t WaterFollow(uint32_t tile, uint8_t dir, uint8_t *bridge) noexcept
 {
-	if (_water_profile.enabled) ++_water_profile.follows;
 	CFollowTrackWater ft;
 	if (!ft.Follow(TileIndex{tile}, static_cast<Trackdir>(dir))) return INVALID_TILE.base();
 	*bridge = ft.is_bridge;
@@ -60,14 +40,12 @@ static uint32_t WaterFollow(uint32_t tile, uint8_t dir, uint8_t *bridge) noexcep
 
 static uint32_t WaterAqueduct(uint32_t tile) noexcept
 {
-	if (_water_profile.enabled) ++_water_profile.aqueducts;
 	const TileIndex t{tile};
 	return IsBridgeTile(t) && GetTunnelBridgeTransportType(t) == TRANSPORT_WATER ? GetOtherBridgeEnd(t).base() : INVALID_TILE.base();
 }
 
 static void WaterDebug(uint8_t operation, int32_t x, int32_t y) noexcept
 {
-	if (_water_profile.enabled && operation == 0) ++_water_profile.rebuilds;
 	if (operation == 0) Debug(map, 3, "Updating water region ({},{})", x, y);
 	else Debug(map, 3, "Invalidated water region ({},{})", x, y);
 }

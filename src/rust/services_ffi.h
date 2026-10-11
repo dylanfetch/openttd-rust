@@ -32,6 +32,12 @@ struct OpenTTDSharedServices {
 	uint8_t (*tile_slope)(uint32_t) noexcept;
 	void (*mark_dirty)(uint32_t) noexcept;
 	void (*set_tropic_zone)(uint32_t, uint8_t) noexcept;
+	uint8_t (*tile_owner)(uint32_t) noexcept;
+	uint16_t (*station_index)(uint32_t) noexcept;
+	uint16_t (*depot_index)(uint32_t) noexcept;
+	bool (*is_level_crossing)(uint32_t) noexcept;
+	uint8_t (*tunnel_bridge_direction)(uint32_t) noexcept;
+	uint16_t (*bridge_speed)(uint32_t) noexcept;
 };
 const OpenTTDSharedServices &GetRustSharedServices() noexcept;
 
@@ -54,6 +60,12 @@ inline OpenTTDSharedServices OpenTTDFixtureSharedServices(void *context, uint32_
 		.tile_slope = OpenTTDFixtureMapService<uint8_t, uint32_t>,
 		.mark_dirty = OpenTTDFixtureMapService<void, uint32_t>,
 		.set_tropic_zone = OpenTTDFixtureMapService<void, uint32_t, uint8_t>,
+		.tile_owner = OpenTTDFixtureMapService<uint8_t, uint32_t>,
+		.station_index = OpenTTDFixtureMapService<uint16_t, uint32_t>,
+		.depot_index = OpenTTDFixtureMapService<uint16_t, uint32_t>,
+		.is_level_crossing = OpenTTDFixtureMapService<bool, uint32_t>,
+		.tunnel_bridge_direction = OpenTTDFixtureMapService<uint8_t, uint32_t>,
+		.bridge_speed = OpenTTDFixtureMapService<uint16_t, uint32_t>,
 	};
 }
 #endif /* RUST_SERVICES_FFI_H */

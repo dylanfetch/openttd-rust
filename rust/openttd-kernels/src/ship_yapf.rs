@@ -712,6 +712,36 @@ unsafe fn origin_slice<'a>(p: *const u32, len: usize) -> &'a [u32] {
         unsafe { std::slice::from_raw_parts(p, len) }
     }
 }
+/// Branch witnesses: the 13 search statistics, the call kind and reverse choice.
+fn witness(result: &Result, call: usize) {
+    if crate::witness::enabled() {
+        for (index, &count) in result.stats.iter().enumerate() {
+            crate::witness::add(
+                [
+                    crate::witness::SHIP_YAPF_REGION_NODES,
+                    crate::witness::SHIP_YAPF_TRACK_NODES,
+                    crate::witness::SHIP_YAPF_RETRIES,
+                    crate::witness::SHIP_YAPF_TRACK_LIMITS,
+                    crate::witness::SHIP_YAPF_INTERMEDIATE,
+                    crate::witness::SHIP_YAPF_CACHE_TRUNCATIONS,
+                    crate::witness::SHIP_YAPF_FINAL_REGION_CLEARS,
+                    crate::witness::SHIP_YAPF_LOST,
+                    crate::witness::SHIP_YAPF_RANDOM_DRAWS,
+                    crate::witness::SHIP_YAPF_REVERSE_ORIGINS,
+                    crate::witness::SHIP_YAPF_BLOCKED_FALLBACKS,
+                    crate::witness::SHIP_YAPF_REGION_LIMITS,
+                    crate::witness::SHIP_YAPF_ALTERNATE_DOCKING,
+                    crate::witness::SHIP_YAPF_CHOOSE_CALLS,
+                ][index],
+                u64::from(count),
+            );
+        }
+        crate::witness::hit(call);
+        if call == crate::witness::SHIP_YAPF_REVERSE_CALLS && result.found != 0 {
+            crate::witness::hit(crate::witness::SHIP_YAPF_REVERSE_CHOSEN);
+        }
+    }
+}
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_ship_choose(
     cache: *mut Path,
@@ -725,7 +755,7 @@ pub unsafe extern "C" fn openttd_rust_ship_choose(
     origins: *const u32,
     len: usize,
 ) -> Result {
-    unsafe {
+    let result = unsafe {
         choose(
             &mut *cache,
             &*input,
@@ -737,7 +767,9 @@ pub unsafe extern "C" fn openttd_rust_ship_choose(
             reverse,
             origin_slice(origins, len),
         )
-    }
+    };
+    witness(&result, crate::witness::SHIP_YAPF_CHOOSE_CALLS);
+    result
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_ship_reverse(
@@ -784,6 +816,14 @@ pub unsafe extern "C" fn openttd_rust_ship_reverse(
     } else {
         result.found = u8::from(result.found != 0 && result.origin == reverse);
     }
+    witness(
+        &result,
+        if blocked != 0 {
+            crate::witness::SHIP_YAPF_BLOCKED_CALLS
+        } else {
+            crate::witness::SHIP_YAPF_REVERSE_CALLS
+        },
+    );
     result
 }
 #[unsafe(no_mangle)]

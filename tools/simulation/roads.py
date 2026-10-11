@@ -14,15 +14,16 @@ COMMON = ROAD + "common[0]/"
 AI_FOLDER = "road-scenario-ai"
 
 # Best-known idle-host medians from three semantic-equal pairs (#155).
-# Coordinated idle-host run at 193591dd10 (2026-10-11), published in #208:
-# https://github.com/dylanfetch/openttd-rust/pull/208
+# Pad caps: coordinated idle run at 193591dd10 (2026-10-11), PR #208.
+# TGP/Opus/Grok caps: coordinated idle run at 842d8a4e0a, PR #215.
+# https://github.com/dylanfetch/openttd-rust/pull/215
 # Lower these only after coordinated measurements; never raise them for a port.
 SPEED_BUDGETS = {
-    "play-opus-55-167-002-manual": 1.3577135832821143,
-    "play-grok-159-001-manual": 1.355510752688172,
+    "play-opus-55-167-002-manual": 1.2792207792207793,
+    "play-grok-159-001-manual": 1.2427385892116183,
     "play-padhattan-ridge-1996-manual": 1.284351145038168,
     "play-padhattan-ridge-2000-manual": 1.3475177304964538,
-    "generate-tgp-256-1": 1.181058495821727,
+    "generate-tgp-256-1": 1.173913043478261,
 }
 
 
