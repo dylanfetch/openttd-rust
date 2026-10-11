@@ -13,7 +13,10 @@
 #include "../autoreplace_base.h"
 #include "../company_base.h"
 #include "../command_type.h"
+#include "../company_func.h"
+#include "../core/backup_type.hpp"
 #include "../rust/abi_ffi.h"
+#include "../rust/command_cost_services.h"
 #include "../table/strings.h"
 #include <map>
 #endif
@@ -139,7 +142,33 @@ TEST_CASE("Fleet - service tables match the Rust layout and fill every slot")
 
 static bool SameCost(const CommandCost &a, const CommandCost &b)
 {
-	return a.Succeeded() == b.Succeeded() && a.GetCost() == b.GetCost() && a.GetErrorMessage() == b.GetErrorMessage() && a.GetExpensesType() == b.GetExpensesType() && a.GetExtraErrorMessage() == b.GetExtraErrorMessage();
+	return a.Succeeded() == b.Succeeded() && a.GetCost() == b.GetCost() && a.GetErrorMessage() == b.GetErrorMessage() && a.GetExpensesType() == b.GetExpensesType() && a.GetExtraErrorMessage() == b.GetExtraErrorMessage() && a.GetErrorOwner() == b.GetErrorOwner();
+}
+
+TEST_CASE("Commands - shared native stack result layouts and encoded parameters")
+{
+	using T = OpenTTDCommandCostServices;
+	FleetLayout(620, {sizeof(T), alignof(T), offsetof(T, zero), offsetof(T, error), offsetof(T, expense_money), offsetof(T, error_param), offsetof(T, add), offsetof(T, move), offsetof(T, amount), offsetof(T, success), offsetof(T, error_message), offsetof(T, money)});
+	const auto &w = GetRustCommandCostServices();
+	FleetSlotsFilled(620, &w, 10);
+	AutoRestoreBackup<CompanyID> current(_current_company, CompanyID(0));
+	AutoRestoreBackup<CompanyID> local(_local_company, CompanyID(0));
+	CommandCost result;
+	w.error_param(RustCommandCost(&result), STR_ERROR_LOCAL_AUTHORITY_REFUSES_TO_ALLOW_THIS, UINT16_MAX);
+	CommandCost expected = CommandCostWithParam(STR_ERROR_LOCAL_AUTHORITY_REFUSES_TO_ALLOW_THIS, UINT16_MAX);
+	result.SetErrorOwner(CompanyID(4)); expected.SetErrorOwner(CompanyID(4));
+	CHECK(SameCost(result, expected));
+	CHECK_FALSE(expected.GetEncodedMessage().empty());
+	CHECK(result.GetEncodedMessage() == expected.GetEncodedMessage());
+	CommandCost moved;
+	w.move(RustCommandCost(&moved), RustCommandCost(&result));
+	CHECK(SameCost(moved, expected));
+	CHECK(moved.GetEncodedMessage() == expected.GetEncodedMessage());
+	w.error(RustCommandCost(&moved), INVALID_STRING_ID);
+	CHECK_FALSE(w.success(RustCommandCost(&moved)));
+	CHECK(w.error_message(RustCommandCost(&moved)) == INVALID_STRING_ID);
+	w.expense_money(RustCommandCost(&moved), EXPENSES_CONSTRUCTION, INT64_MIN);
+	CHECK(SameCost(moved, CommandCost(EXPENSES_CONSTRUCTION, Money(INT64_MIN))));
 }
 
 TEST_CASE("Fleet - CommandCost services keep native first-error and saturation")

@@ -474,6 +474,88 @@ pub struct HouseConstruction {
     pub extra_flags: u8,
     pub population: u8,
 }
+/// Narrow authority settings are read only at their source short-circuit points.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct AuthorityServices {
+    pub council_tolerance: extern "C" fn() -> u8,
+    pub bulldozer: extern "C" fn() -> bool,
+    pub authority_distance: extern "C" fn() -> u8,
+    pub town_index: extern "C" fn(*const crate::services::TownHandle) -> u16,
+    pub refusal: u32,
+}
+
+/// Native stack result and immutable tables remain live through this invocation.
+/// No Rust owner borrow crosses a service; errors retain full native parameters.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_authority_station(
+    authority: *const AuthorityServices,
+    services: *const Services,
+    costs: *const crate::services::CommandCostServices,
+    result: *mut crate::services::CommandCost,
+    tile: u32,
+    no_test: bool,
+) {
+    // SAFETY: Native immutable tables live for this synchronous invocation.
+    let (a, s, c) = unsafe { (*authority, *services, *costs) };
+    if (a.council_tolerance)() == 3 {
+        (c.zero)(result);
+        return;
+    }
+    let company = (s.current_company)();
+    if !(s.company_valid)(company) || no_test {
+        (c.zero)(result);
+        return;
+    }
+    let town = (s.closest_town)(tile, u32::from((a.authority_distance)()));
+    if town.is_null() {
+        (c.zero)(result);
+        return;
+    }
+    let owner = (s.town_owner)(town);
+    // SAFETY: Live single owner and valid company; immediate copy ends here.
+    let rating = unsafe { (*owner).simulation.ratings[usize::from(company)] };
+    if rating > -200 {
+        (c.zero)(result);
+    } else {
+        (c.error_param)(result, a.refusal, u64::from((a.town_index)(town)));
+    }
+}
+
+/// Original destructive-action rating check, including scratch-rating precedence.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_authority_remove(
+    authority: *const AuthorityServices,
+    services: *const Services,
+    costs: *const crate::services::CommandCostServices,
+    result: *mut crate::services::CommandCost,
+    town: *const crate::services::TownHandle,
+    no_test: bool,
+    kind: u8,
+) {
+    // SAFETY: Native immutable tables and stack-owned result outlive this call.
+    let (a, s, c) = unsafe { (*authority, *services, *costs) };
+    if town.is_null() {
+        (c.zero)(result);
+        return;
+    }
+    let company = (s.current_company)();
+    if !(s.company_valid)(company) || (a.bulldozer)() || no_test {
+        (c.zero)(result);
+        return;
+    }
+    let needed = [[16, 144], [64, 208], [112, 400], [-1000, -1000]]
+        [usize::from((a.council_tolerance)())][usize::from(kind)];
+    let owner = (s.town_owner)(town);
+    // SAFETY: Live owner, valid company; scratch/native rating access ends here.
+    let rating = unsafe { openttd_rust_town_rating(owner, town as usize, company) };
+    if rating < needed {
+        (c.error_param)(result, a.refusal, u64::from((a.town_index)(town)));
+    } else {
+        (c.zero)(result);
+    }
+}
+
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct Leaves {

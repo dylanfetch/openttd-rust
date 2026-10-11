@@ -247,6 +247,8 @@ add_files(
     rust/company_adapter.cpp
     rust/services.cpp
     rust/services_ffi.h
+    rust/command_cost_ffi.h
+    rust/command_cost_services.h
     rust/ffi.h
     landscape.h
     landscape_cmd.h

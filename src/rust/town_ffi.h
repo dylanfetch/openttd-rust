@@ -10,6 +10,7 @@
 #define RUST_TOWN_FFI_H
 #include "services_ffi.h"
 #include <cstdint>
+#include "command_cost_ffi.h"
 #include <cstddef>
 struct OpenTTDTownState;
 struct OpenTTDTownGrowthFields { uint16_t counter, rate; uint8_t funding, road, flags; };
@@ -33,6 +34,13 @@ struct OpenTTDTownRoadChoice { int32_t introduction_date; uint16_t max_speed; bo
 struct OpenTTDTownHouseAvailability { uint16_t zones; uint16_t override_id; uint16_t class_id; uint8_t probability; bool enabled; };
 struct OpenTTDTownHousePlacement { int32_t min_year; int32_t max_year; uint8_t flags; uint8_t extra_flags; };
 struct OpenTTDTownHouseConstruction { uint8_t extra_flags; uint8_t population; };
+struct OpenTTDTownAuthorityServices {
+	uint8_t (*council_tolerance)() noexcept;
+	bool (*bulldozer)() noexcept;
+	uint8_t (*authority_distance)() noexcept;
+	uint16_t (*town_index)(const OpenTTDTownHandle *) noexcept;
+	uint32_t refusal;
+};
 struct OpenTTDTownLeaves {
 	void (*settings)(uint32_t *) noexcept;
 	void (*tile)(uint32_t, uint32_t *) noexcept;
@@ -80,6 +88,8 @@ struct OpenTTDTownLeaves {
  * and bounded NewGRF resolution may reenter; ordinary gameplay does not throw.
  * Environmental failures and Rust panics abort. Save/load staging stays native. */
 extern "C" {
+void openttd_rust_town_authority_station(const OpenTTDTownAuthorityServices *, const OpenTTDSharedServices *, const OpenTTDCommandCostServices *, OpenTTDCommandCost *, uint32_t, bool);
+void openttd_rust_town_authority_remove(const OpenTTDTownAuthorityServices *, const OpenTTDSharedServices *, const OpenTTDCommandCostServices *, OpenTTDCommandCost *, const OpenTTDTownHandle *, bool, uint8_t);
 bool openttd_rust_town_generating_exchange(bool);
 void openttd_rust_town_update_radius(OpenTTDTownState *);
 void openttd_rust_town_change_population(const OpenTTDTownLeaves *, OpenTTDTownState *, uint32_t, int32_t);

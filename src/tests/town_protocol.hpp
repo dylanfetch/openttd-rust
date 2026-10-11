@@ -148,7 +148,7 @@ template <typename Check> void CheckTownProtocol(Check check)
 	TownProtocolWorld w{}; w.owner = owner.get(); town_protocol_world = &w;
 	auto *fields = openttd_rust_town_simulation(owner.get()); fields->xy = 2080; std::fill_n(fields->radius, 5, 100);
 	const auto leaves = TownProtocolServices();
-	const OpenTTDSharedServices services{.context = nullptr, .random = TownProtocolRandom, .observe_tile = TownProtocolTile, .write_tile = TownProtocolWrite, .trig = TownProtocolTrig, .industry = TownProtocolIndustry, .company_valid = UnusedCompanyValid, .next_company = UnusedNextCompany, .closest_town = UnusedClosestTown, .town_owner = UnusedTownOwner};
+	const OpenTTDSharedServices services{.context = nullptr, .random = TownProtocolRandom, .observe_tile = TownProtocolTile, .write_tile = TownProtocolWrite, .trig = TownProtocolTrig, .industry = TownProtocolIndustry, .company_valid = UnusedCompanyValid, .next_company = UnusedNextCompany, .current_company = UnusedCurrentCompany, .closest_town = UnusedClosestTown, .town_owner = UnusedTownOwner};
 	check(!openttd_rust_town_grow(&leaves, &services, 0, 1) && w.draws == 0 && w.company == 7);
 	check(openttd_rust_town_grow(&leaves, &services, 0, 2) && w.roads == 1 && w.draws == 1 && w.company == 7);
 	w.clears = 0; w.clear_ok = false;

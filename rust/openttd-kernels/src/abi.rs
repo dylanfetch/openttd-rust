@@ -26,6 +26,12 @@ macro_rules! layout {
 #[allow(clippy::too_many_lines)]
 pub fn layout(type_id: u16, item: u8) -> usize {
     match type_id {
+        443 => {
+            layout!(crate::town::AuthorityServices, item; council_tolerance, bulldozer, authority_distance, town_index, refusal)
+        }
+        620 => {
+            layout!(crate::services::CommandCostServices, item; zero, error, expense_money, error_param, add, move_cost, amount, success, error_message, money)
+        }
         210..=214 => crate::company::abi_layout(u8::try_from(type_id).unwrap(), item),
         320 => layout!(crate::ship_control::Position, item; x, y, old_tile, new_tile),
         321 => {
@@ -92,7 +98,7 @@ pub fn layout(type_id: u16, item: u8) -> usize {
             layout!(crate::effect::Leaves, item; observe, write, viewport, sound, animated)
         }
         42 => {
-            layout!(crate::services::Services, item; context, random, observe_tile, write_tile, trig, industry, company_valid, next_company, closest_town, town_owner)
+            layout!(crate::services::Services, item; context, random, observe_tile, write_tile, trig, industry, company_valid, next_company, current_company, closest_town, town_owner)
         }
         80 => layout!(crate::road::PathElement, item; trackdir, tile),
         81 => layout!(crate::road::SpeedLimits, item; max_track_speed, order_max_speed),

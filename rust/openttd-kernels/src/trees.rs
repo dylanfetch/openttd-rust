@@ -986,6 +986,7 @@ mod tests {
                 industry,
                 company_valid: crate::services::unused_company_valid,
                 next_company: crate::services::unused_next_company,
+                current_company: crate::services::unused_current_company,
                 closest_town: crate::services::unused_closest_town,
                 town_owner: crate::services::unused_town_owner,
             },

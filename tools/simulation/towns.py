@@ -232,6 +232,8 @@ def tunnel_reference_gap(out, archive=None):
         "GetRating": "static int GetRating(",
         "ChangeTownRating": "void ChangeTownRating(",
         "UpdateTownRadius": "void UpdateTownRadius(",
+        "CheckIfAuthorityAllowsNewStation": "CommandCost CheckIfAuthorityAllowsNewStation(",
+        "CheckforTownRating": "CommandCost CheckforTownRating(",
     }
     for name, signature in signatures.items():
         start = source.index(signature)
@@ -289,12 +291,20 @@ def tunnel_reference_gap(out, archive=None):
     radius = re.search(rb"\nPASS (\d+) unchanged-reference radius cases\n", run.stdout)
     if not radius or int(radius[1]) == 0:
         raise RuntimeError("town radius reference gap omitted completion/count marker")
+    authority = re.search(
+        rb"\nPASS (\d+) unchanged-reference authority cases\n", run.stdout
+    )
+    if not authority or int(authority[1]) == 0:
+        raise RuntimeError(
+            "town authority reference gap omitted completion/count marker"
+        )
     migration.ensure_reference()
     report = {
         "passed": True,
         "history_cases": int(history[1]),
         "rating_cases": int(rating[1]),
         "radius_cases": int(radius[1]),
+        "authority_cases": int(authority[1]),
         "cases": int(match[1]),
         "successful_tunnel_cases": len(re.findall(rb" result=1 ", run.stdout)),
         "execute_effect_cases": len(re.findall(rb" effects=1 ", run.stdout)),

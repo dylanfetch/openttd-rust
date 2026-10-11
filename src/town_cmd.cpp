@@ -41,6 +41,9 @@
 #include "subsidy_func.h"
 #include "core/pool_func.hpp"
 #include "town.h"
+#ifdef WITH_RUST
+#include "rust/command_cost_services.h"
+#endif
 #include "town_kdtree.h"
 #include "townname_func.h"
 #include "core/random_func.hpp"
@@ -4261,8 +4264,30 @@ static void UpdateTownGrowth(Town *t)
  * @param flags Command flags. DoCommandFlag::NoTestTownRating is tested.
  * @return Succeeded or failed command.
  */
+#ifdef WITH_RUST
+static uint8_t RustTownCouncilTolerance() noexcept { return _settings_game.difficulty.town_council_tolerance; }
+static bool RustTownBulldozer() noexcept { return _cheats.magic_bulldozer.value; }
+static uint8_t RustTownAuthorityDistance() noexcept { return _settings_game.economy.dist_local_authority; }
+static uint16_t RustTownAuthorityIndex(const OpenTTDTownHandle *town) noexcept { return reinterpret_cast<const Town *>(town)->index.base(); }
+static const OpenTTDTownAuthorityServices &RustTownAuthorityServices() noexcept
+{
+	static const OpenTTDTownAuthorityServices services{
+		.council_tolerance = RustTownCouncilTolerance, .bulldozer = RustTownBulldozer,
+		.authority_distance = RustTownAuthorityDistance, .town_index = RustTownAuthorityIndex,
+		.refusal = STR_ERROR_LOCAL_AUTHORITY_REFUSES_TO_ALLOW_THIS,
+	};
+	return services;
+}
+#endif
+
 CommandCost CheckIfAuthorityAllowsNewStation(TileIndex tile, DoCommandFlags flags)
 {
+#ifdef WITH_RUST
+	CommandCost result;
+	openttd_rust_town_authority_station(&RustTownAuthorityServices(), &GetRustSharedServices(), &GetRustCommandCostServices(), RustCommandCost(&result), tile.base(), flags.Test(DoCommandFlag::NoTestTownRating));
+	return result;
+#else
+
 	/* The required rating is hardcoded to RATING_VERYPOOR (see below), not the authority attitude setting, so we can bail out like this. */
 	if (_settings_game.difficulty.town_council_tolerance == TOWN_COUNCIL_PERMISSIVE) return CommandCost();
 
@@ -4274,6 +4299,7 @@ CommandCost CheckIfAuthorityAllowsNewStation(TileIndex tile, DoCommandFlags flag
 	if (t->ratings[_current_company] > RATING_VERYPOOR) return CommandCost();
 
 	return CommandCostWithParam(STR_ERROR_LOCAL_AUTHORITY_REFUSES_TO_ALLOW_THIS, t->index);
+#endif
 }
 
 /**
@@ -4432,6 +4458,12 @@ void ChangeTownRating(Town *t, int add, int max, DoCommandFlags flags)
  */
 CommandCost CheckforTownRating(DoCommandFlags flags, Town *t, TownRatingCheckType type)
 {
+#ifdef WITH_RUST
+	CommandCost result;
+	openttd_rust_town_authority_remove(&RustTownAuthorityServices(), &GetRustSharedServices(), &GetRustCommandCostServices(), RustCommandCost(&result), reinterpret_cast<const OpenTTDTownHandle *>(t), flags.Test(DoCommandFlag::NoTestTownRating), to_underlying(type));
+	return result;
+#else
+
 	/* if magic_bulldozer cheat is active, town doesn't restrict your destructive actions */
 	if (t == nullptr || !Company::IsValidID(_current_company) ||
 			_cheats.magic_bulldozer.value || flags.Test(DoCommandFlag::NoTestTownRating)) {
@@ -4458,6 +4490,7 @@ CommandCost CheckforTownRating(DoCommandFlags flags, Town *t, TownRatingCheckTyp
 	}
 
 	return CommandCost();
+#endif
 }
 
 template <>

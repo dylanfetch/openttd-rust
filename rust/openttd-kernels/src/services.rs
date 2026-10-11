@@ -10,6 +10,40 @@
 #![allow(unsafe_code, clippy::cast_possible_truncation)]
 use std::ffi::c_void;
 
+/// Native stack-owned command result, including encoded error parameters.
+/// Rust only borrows its address and invokes the native operations below.
+#[repr(C)]
+pub struct CommandCost {
+    _private: [u8; 0],
+}
+/// Copied immutable command-result operations. Every input/output denotes a live
+/// native object for this call; C++ owns construction, storage and destruction.
+/// Moves and additions use the original native implementation without snapshots.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct CommandCostServices {
+    /// Assign native successful zero cost.
+    pub zero: extern "C" fn(*mut CommandCost),
+    /// Assign the native `StringID` error constructor, including `INVALID_STRING_ID`.
+    pub error: extern "C" fn(*mut CommandCost, u32),
+    /// Assign native `ExpensesType` and saturating `Money` value.
+    pub expense_money: extern "C" fn(*mut CommandCost, u8, i64),
+    /// Use native `CommandCostWithParam(StringID, uint64_t)` encoding.
+    pub error_param: extern "C" fn(*mut CommandCost, u32, u64),
+    /// Add the moved native result, retaining first-error semantics.
+    pub add: extern "C" fn(*mut CommandCost, *mut CommandCost),
+    /// Move-assign every native field, including encoded parameters.
+    pub move_cost: extern "C" fn(*mut CommandCost, *mut CommandCost),
+    /// Add native Money with its original saturation.
+    pub amount: extern "C" fn(*mut CommandCost, i64),
+    /// Query native `Succeeded()`.
+    pub success: extern "C" fn(*const CommandCost) -> bool,
+    /// Query native `GetErrorMessage()`.
+    pub error_message: extern "C" fn(*const CommandCost) -> u32,
+    /// Query native `GetCost()`.
+    pub money: extern "C" fn(*const CommandCost) -> i64,
+}
+
 /// Opaque native town shell. Its address identifies the shell, not the Rust owner.
 #[repr(C)]
 pub struct TownHandle {
@@ -39,6 +73,8 @@ pub struct Services {
     pub company_valid: extern "C" fn(u8) -> bool,
     /// Next live company at or after this ID; 255 denotes end.
     pub next_company: extern "C" fn(u8) -> u8,
+    /// Current native command actor, read at the original short-circuit point.
+    pub current_company: extern "C" fn() -> u8,
     /// Original native nearest-town spatial lookup; the result may be null.
     pub closest_town: extern "C" fn(u32, u32) -> *const TownHandle,
     /// Resolve the single Rust owner of a live native town shell.
@@ -89,6 +125,11 @@ pub(crate) extern "C" fn unused_closest_town(_: u32, _: u32) -> *const TownHandl
 #[cfg(test)]
 pub(crate) extern "C" fn unused_town_owner(_: *const TownHandle) -> *mut crate::town::State {
     std::ptr::null_mut()
+}
+
+#[cfg(test)]
+pub(crate) extern "C" fn unused_current_company() -> u8 {
+    u8::MAX
 }
 
 #[cfg(test)]

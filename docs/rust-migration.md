@@ -1383,13 +1383,14 @@ Issue #120 owns town tick traversal, road walking/build choices,
 bridge/tunnel/terraform retries, house selection/layout/placement and expansion.
 The partial #148 extension owns metadata, population/house counts, radii, ratings,
 masks, goals, received/supplied histories, rebuild counters and building counts.
-Monthly traversal, history rotation, rating changes and nested rating-test scratch
-run in Rust. Remaining lifecycle, house simulation and commands are still pending.
+Population/radius policy, monthly histories, authority checks and rating scratch
+run in Rust. Remaining founding/deletion, house simulation and commands are pending.
 C++ shells expose native field aliases to the single Rust owner; scoped save
 staging preserves modern/legacy formats, nested loads and partial load commits.
 Growth entries call named synchronous `noexcept` services; fixed probability
 scratch preserves original candidate order without per-attempt heap allocation.
-Owner accesses end before commands and NewGRF callbacks that may reenter.
+Native stack CommandCost services preserve full errors/params/expense/move state;
+owner accesses end before commands and NewGRF callbacks that may reenter.
 Portable original bodies remain under the non-Rust branches. Panics and
 exceptional environmental failures abort; save/load errors stay native.
 `python3 tools/migration.py simulate town-growth --jobs 2` compares house/road,
@@ -1397,8 +1398,8 @@ bridge/terrain, growth state, funding expiry, cargo goals, layouts/climates and
 modern reload; `--self`/`--soak` extend the same component scenarios. Native tests
 cover expansion modes, first-road failures, reentry, multi-tile writes, canonical
 aliases, count reuse and partial save staging. Mandatory component reference
-probes compare unchanged tunnel control, full-width history accumulation and
-nested rating scratch/company/shell reuse with ordered early-return services.
+probes compare unchanged tunnels, full-width histories/radii and nested rating
+scratch/authority thresholds with ordered early-return services.
 Natural tunnel construction, real custom NewGRF callbacks and complete historical
 saves remain evidence limits; #148 is not yet a complete lifecycle ownership port.
 

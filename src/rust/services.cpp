@@ -8,6 +8,7 @@
 /** @file services.cpp Direct shared-world leaves for Rust game owners. */
 #include "../stdafx.h"
 #include "services_ffi.h"
+#include "command_cost_services.h"
 #ifdef WITH_RUST
 #include "../clear_map.h"
 #include "../tree_map.h"
@@ -17,8 +18,32 @@
 #include "../viewport_func.h"
 #include "../core/random_func.hpp"
 #include "../company_base.h"
+#include "../company_func.h"
+#include "../command_type.h"
 #include "../town.h"
 #include "../safeguards.h"
+
+static CommandCost *NativeCost(OpenTTDCommandCost *cost) noexcept { return reinterpret_cast<CommandCost *>(cost); }
+static const CommandCost *NativeCost(const OpenTTDCommandCost *cost) noexcept { return reinterpret_cast<const CommandCost *>(cost); }
+static void CostZero(OpenTTDCommandCost *out) noexcept { *NativeCost(out) = CommandCost(); }
+static void CostError(OpenTTDCommandCost *out, uint32_t message) noexcept { *NativeCost(out) = CommandCost(message); }
+static void CostExpenseMoney(OpenTTDCommandCost *out, uint8_t expense, int64_t amount) noexcept { *NativeCost(out) = CommandCost(static_cast<ExpensesType>(expense), Money(amount)); }
+static void CostErrorParam(OpenTTDCommandCost *out, uint32_t message, uint64_t parameter) noexcept { *NativeCost(out) = CommandCostWithParam(message, parameter); }
+static void CostAdd(OpenTTDCommandCost *out, OpenTTDCommandCost *item) noexcept { NativeCost(out)->AddCost(std::move(*NativeCost(item))); }
+static void CostMove(OpenTTDCommandCost *out, OpenTTDCommandCost *item) noexcept { *NativeCost(out) = std::move(*NativeCost(item)); }
+static void CostAmount(OpenTTDCommandCost *out, int64_t amount) noexcept { NativeCost(out)->AddCost(Money(amount)); }
+static bool CostSuccess(const OpenTTDCommandCost *cost) noexcept { return NativeCost(cost)->Succeeded(); }
+static uint32_t CostErrorMessage(const OpenTTDCommandCost *cost) noexcept { return NativeCost(cost)->GetErrorMessage(); }
+static int64_t CostMoney(const OpenTTDCommandCost *cost) noexcept { return NativeCost(cost)->GetCost(); }
+const OpenTTDCommandCostServices &GetRustCommandCostServices() noexcept
+{
+	static const OpenTTDCommandCostServices services{
+		.zero = CostZero, .error = CostError, .expense_money = CostExpenseMoney,
+		.error_param = CostErrorParam, .add = CostAdd, .move = CostMove,
+		.amount = CostAmount, .success = CostSuccess, .error_message = CostErrorMessage, .money = CostMoney,
+	};
+	return services;
+}
 
 static uint32_t SharedRandom(void *) noexcept { return Random(); }
 static void ObserveTile(void *, uint32_t index, uint32_t *v) noexcept
@@ -64,6 +89,7 @@ static uint32_t SharedIndustry(int32_t x, int32_t y, uint32_t *index) noexcept
 }
 
 static bool SharedCompanyValid(uint8_t company) noexcept { return Company::IsValidID(CompanyID(company)); }
+static uint8_t SharedCurrentCompany() noexcept { return _current_company.base(); }
 static uint8_t SharedNextCompany(uint8_t from) noexcept
 {
 	auto range = Company::Iterate(from);
@@ -85,7 +111,7 @@ const OpenTTDSharedServices &GetRustSharedServices() noexcept
 	static const OpenTTDSharedServices services{
 		.context = nullptr, .random = SharedRandom, .observe_tile = ObserveTile,
 		.write_tile = WriteTile, .trig = SharedTrig, .industry = SharedIndustry,
-		.company_valid = SharedCompanyValid, .next_company = SharedNextCompany,
+		.company_valid = SharedCompanyValid, .next_company = SharedNextCompany, .current_company = SharedCurrentCompany,
 		.closest_town = SharedClosestTown, .town_owner = SharedTownOwner,
 	};
 	return services;

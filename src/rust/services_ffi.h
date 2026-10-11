@@ -32,6 +32,7 @@ struct OpenTTDSharedServices {
 	uint32_t (*industry)(int32_t, int32_t, uint32_t *) noexcept;
 	bool (*company_valid)(uint8_t) noexcept;
 	uint8_t (*next_company)(uint8_t) noexcept;
+	uint8_t (*current_company)() noexcept;
 	const OpenTTDTownHandle *(*closest_town)(uint32_t, uint32_t) noexcept;
 	OpenTTDTownState *(*town_owner)(const OpenTTDTownHandle *) noexcept;
 };

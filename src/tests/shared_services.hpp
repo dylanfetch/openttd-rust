@@ -15,4 +15,5 @@ inline bool UnusedCompanyValid(uint8_t) noexcept { return false; }
 inline uint8_t UnusedNextCompany(uint8_t) noexcept { return UINT8_MAX; }
 inline const OpenTTDTownHandle *UnusedClosestTown(uint32_t, uint32_t) noexcept { return nullptr; }
 inline OpenTTDTownState *UnusedTownOwner(const OpenTTDTownHandle *) noexcept { return nullptr; }
+inline uint8_t UnusedCurrentCompany() noexcept { return UINT8_MAX; }
 #endif
