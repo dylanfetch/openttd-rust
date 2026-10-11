@@ -257,7 +257,7 @@ static OpenTTDRoadCachePart OPENTTD_VEHICLE_CALL RoadSvcCachePart(OpenTTDVehicle
 	const RoadVehicle *u = RoadOf(v);
 	const Engine *e = u->GetEngine();
 	return {.next = RustVehicle(u->Next()), .engine = u->engine_type.base(), .max_speed = RoadVehInfo(u->engine_type)->max_speed,
-		.grf_version = e->GetGRF() == nullptr ? uint8_t(0) : e->GetGRF()->grf_version, .shorten = e->VehInfo<RoadVehicleInfo>().shorten_factor,
+		.grf_version = RustEngineGRFVersion(e), .shorten = e->VehInfo<RoadVehicleInfo>().shorten_factor,
 		.length = u->gcache.cached_veh_length};
 }
 static void OPENTTD_VEHICLE_CALL RoadSvcUpdateCargoAge(OpenTTDVehicle *v) noexcept

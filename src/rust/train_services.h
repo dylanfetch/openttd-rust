@@ -6,6 +6,7 @@
  */
 
 /** @file train_services.h Direct shared-world operations; no train policy. */
+#include "vehicle_services.h"
 
 static void TrainWriteTile(OpenTTDTrainHandle id, uint32_t value) noexcept
 {Train *v=static_cast<Train *>(id.shell); v->tile = TileIndex(static_cast<uint32_t>(value));}
@@ -374,7 +375,7 @@ static void TrainFreeReservation(OpenTTDTrainHandle id) noexcept
 static uint64_t TrainGrfVersion(OpenTTDTrainHandle id) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
-	return v->GetEngine()->GetGRF() == nullptr ? 0 : v->GetEngine()->GetGRF()->grf_version;
+	return RustEngineGRFVersion(v->GetEngine());
 }
 static uint64_t TrainHandleBreakdown(OpenTTDTrainHandle id) noexcept
 {

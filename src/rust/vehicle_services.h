@@ -10,11 +10,20 @@
 #define RUST_VEHICLE_SERVICES_H
 #include "vehicle_ffi.h"
 #include "../ground_vehicle.hpp"
+#include "../engine_base.h"
+#include "../newgrf.h"
 
 /** The Rust handle of a live vehicle; null stays null. */
 inline OpenTTDVehicle *RustVehicle(const Vehicle *v) noexcept { return reinterpret_cast<OpenTTDVehicle *>(const_cast<Vehicle *>(v)); }
 /** The vehicle behind a Rust handle. */
 inline Vehicle *VehicleOf(OpenTTDVehicle *v) noexcept { return reinterpret_cast<Vehicle *>(v); }
+
+/** GRF version of a live engine; the original default-engine value is zero. */
+inline uint8_t RustEngineGRFVersion(const Engine *engine) noexcept
+{
+	const GRFFile *grf = engine->GetGRF();
+	return grf == nullptr ? uint8_t(0) : grf->grf_version;
+}
 
 template <class T>
 static OpenTTDGroundMoved OPENTTD_VEHICLE_CALL GroundSvcMoveIncline(OpenTTDVehicle *v, int32_t x, int32_t y, bool new_tile, bool update_delta) noexcept
