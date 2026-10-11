@@ -1699,15 +1699,17 @@ unsafe fn load_vehicle(front: *mut c_void, st: *mut c_void, w: &World, l: &Loadi
             if l.gradual(front) != 0 {
                 ticks = [40, 20, 10, 20][l.vehicle_type(front) as usize];
             }
-            let observed = (l.wait_observation)(front);
-            let wait = i32::from(observed.wait)
-                .wrapping_sub(observed.lateness)
-                .max(0);
             if !unloaded
                 && full_load == 0
                 && reservation_left == 0
                 && l.full_load_order(front) == 0
-                && (l.order_time)(front) >= wait
+                && {
+                    let observed = (l.wait_observation)(front);
+                    let wait = i32::from(observed.wait)
+                        .wrapping_sub(observed.lateness)
+                        .max(0);
+                    (l.order_time)(front) >= wait
+                }
             {
                 (l.set_stop)(front, true);
             }
