@@ -16,6 +16,7 @@
 #include "../landscape.h"
 #include "../viewport_func.h"
 #include "../core/random_func.hpp"
+#include "../company_base.h"
 #include "../safeguards.h"
 
 static uint32_t SharedRandom(void *) noexcept { return Random(); }
@@ -61,9 +62,21 @@ static uint32_t SharedIndustry(int32_t x, int32_t y, uint32_t *index) noexcept
 	return GetIndustryGfx(tile) == GFX_BUBBLE_CATCHER ? 2 : 1;
 }
 
+static bool SharedCompanyValid(uint8_t company) noexcept { return Company::IsValidID(CompanyID(company)); }
+static uint8_t SharedNextCompany(uint8_t from) noexcept
+{
+	auto range = Company::Iterate(from);
+	auto it = range.begin();
+	return it == range.end() ? CompanyID::Invalid().base() : (*it)->index.base();
+}
+
 const OpenTTDSharedServices &GetRustSharedServices() noexcept
 {
-	static const OpenTTDSharedServices services{nullptr, SharedRandom, ObserveTile, WriteTile, SharedTrig, SharedIndustry};
+	static const OpenTTDSharedServices services{
+		.context = nullptr, .random = SharedRandom, .observe_tile = ObserveTile,
+		.write_tile = WriteTile, .trig = SharedTrig, .industry = SharedIndustry,
+		.company_valid = SharedCompanyValid, .next_company = SharedNextCompany,
+	};
 	return services;
 }
 #endif /* WITH_RUST */

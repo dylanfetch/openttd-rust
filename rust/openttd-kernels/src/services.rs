@@ -29,6 +29,10 @@ pub struct Services {
     pub trig: extern "C" fn(u32, f32) -> f32,
     /// `TileVirtXY` query: 0 not industry, 1 industry, 2 bubble catcher; writes tile.
     pub industry: extern "C" fn(i32, i32, *mut u32) -> u32,
+    /// Whether this company pool ID is live.
+    pub company_valid: extern "C" fn(u8) -> bool,
+    /// Next live company at or after this ID; 255 denotes end.
+    pub next_company: extern "C" fn(u8) -> u8,
 }
 impl Services {
     /// Draw one shared random word.
@@ -57,6 +61,15 @@ impl Services {
 #[must_use]
 pub fn chance16_i(a: u32, b: u32, r: u32) -> bool {
     (((r & 65535).wrapping_mul(b).wrapping_add(b / 2)) >> 16) < a
+}
+
+#[cfg(test)]
+pub(crate) extern "C" fn unused_company_valid(_: u8) -> bool {
+    false
+}
+#[cfg(test)]
+pub(crate) extern "C" fn unused_next_company(_: u8) -> u8 {
+    u8::MAX
 }
 
 #[cfg(test)]

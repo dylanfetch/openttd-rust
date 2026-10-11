@@ -6,6 +6,7 @@
  */
 
 /** @file windows-abi.cpp Bounded first-32-bit layout and real C ABI call checks. */
+#include "../../src/tests/shared_services.hpp"
 #include "rust/abi_ffi.h"
 #include "rust/water_regions_ffi.h"
 #include "rust/cargo_payment_ffi.h"
@@ -118,7 +119,7 @@ static void Layouts()
 	Layout(35, "OpenTTDLinkGraphEdge", {sizeof(OpenTTDLinkGraphEdge), alignof(OpenTTDLinkGraphEdge), offsetof(OpenTTDLinkGraphEdge, capacity), offsetof(OpenTTDLinkGraphEdge, travel_time), offsetof(OpenTTDLinkGraphEdge, dest)});
 	Layout(36, "OpenTTDLinkGraphSettings", {sizeof(OpenTTDLinkGraphSettings), alignof(OpenTTDLinkGraphSettings), offsetof(OpenTTDLinkGraphSettings, accuracy), offsetof(OpenTTDLinkGraphSettings, demand_distance), offsetof(OpenTTDLinkGraphSettings, demand_size), offsetof(OpenTTDLinkGraphSettings, saturation), offsetof(OpenTTDLinkGraphSettings, distribution), offsetof(OpenTTDLinkGraphSettings, express), offsetof(OpenTTDLinkGraphSettings, map_max_x), offsetof(OpenTTDLinkGraphSettings, map_max_y), offsetof(OpenTTDLinkGraphSettings, runtime)});
 	Layout(38, "OpenTTDTreeAction", {sizeof(OpenTTDTreeAction), alignof(OpenTTDTreeAction), offsetof(OpenTTDTreeAction, kind), offsetof(OpenTTDTreeAction, tile), offsetof(OpenTTDTreeAction, a), offsetof(OpenTTDTreeAction, b), offsetof(OpenTTDTreeAction, cost)});
-	Layout(42, "OpenTTDSharedServices", {sizeof(OpenTTDSharedServices), alignof(OpenTTDSharedServices), offsetof(OpenTTDSharedServices, context), offsetof(OpenTTDSharedServices, random), offsetof(OpenTTDSharedServices, observe_tile), offsetof(OpenTTDSharedServices, write_tile), offsetof(OpenTTDSharedServices, trig), offsetof(OpenTTDSharedServices, industry)});
+	Layout(42, "OpenTTDSharedServices", {sizeof(OpenTTDSharedServices), alignof(OpenTTDSharedServices), offsetof(OpenTTDSharedServices, context), offsetof(OpenTTDSharedServices, random), offsetof(OpenTTDSharedServices, observe_tile), offsetof(OpenTTDSharedServices, write_tile), offsetof(OpenTTDSharedServices, trig), offsetof(OpenTTDSharedServices, industry), offsetof(OpenTTDSharedServices, company_valid), offsetof(OpenTTDSharedServices, next_company)});
 	Layout(37, "OpenTTDLinkGraphShare", {sizeof(OpenTTDLinkGraphShare), alignof(OpenTTDLinkGraphShare), offsetof(OpenTTDLinkGraphShare, node), offsetof(OpenTTDLinkGraphShare, origin), offsetof(OpenTTDLinkGraphShare, via), offsetof(OpenTTDLinkGraphShare, cumulative), offsetof(OpenTTDLinkGraphShare, unrestricted), offsetof(OpenTTDLinkGraphShare, has_share)});
 	Layout(39, "OpenTTDEffectView", {sizeof(OpenTTDEffectView), alignof(OpenTTDEffectView), offsetof(OpenTTDEffectView, x), offsetof(OpenTTDEffectView, y), offsetof(OpenTTDEffectView, z), offsetof(OpenTTDEffectView, sprite), offsetof(OpenTTDEffectView, progress), offsetof(OpenTTDEffectView, spritenum), offsetof(OpenTTDEffectView, subtype), offsetof(OpenTTDEffectView, ambient)});
 	Layout(41, "OpenTTDEffectLeaves", {sizeof(OpenTTDEffectLeaves), alignof(OpenTTDEffectLeaves), offsetof(OpenTTDEffectLeaves, observe), offsetof(OpenTTDEffectLeaves, write), offsetof(OpenTTDEffectLeaves, viewport), offsetof(OpenTTDEffectLeaves, sound), offsetof(OpenTTDEffectLeaves, animated)});
@@ -231,10 +232,11 @@ static void Layouts()
 	Layout(433, "OpenTTDTownReceived", {sizeof(OpenTTDTownReceived), alignof(OpenTTDTownReceived), offsetof(OpenTTDTownReceived, old_max), offsetof(OpenTTDTownReceived, new_max), offsetof(OpenTTDTownReceived, old_act), offsetof(OpenTTDTownReceived, new_act)});
 	Layout(434, "OpenTTDTownSuppliedHistory", {sizeof(OpenTTDTownSuppliedHistory), alignof(OpenTTDTownSuppliedHistory), offsetof(OpenTTDTownSuppliedHistory, production), offsetof(OpenTTDTownSuppliedHistory, transported)});
 	Layout(435, "OpenTTDTownSupplied", {sizeof(OpenTTDTownSupplied), alignof(OpenTTDTownSupplied), offsetof(OpenTTDTownSupplied, cargo), offsetof(OpenTTDTownSupplied, history)});
+	Layout(438, "OpenTTDTownStationActivity", {sizeof(OpenTTDTownStationActivity), alignof(OpenTTDTownStationActivity), offsetof(OpenTTDTownStationActivity, time_since_load), offsetof(OpenTTDTownStationActivity, time_since_unload)});
 	Layout(437, "OpenTTDTownGrowthFields", {sizeof(OpenTTDTownGrowthFields), alignof(OpenTTDTownGrowthFields), offsetof(OpenTTDTownGrowthFields, counter), offsetof(OpenTTDTownGrowthFields, rate), offsetof(OpenTTDTownGrowthFields, funding), offsetof(OpenTTDTownGrowthFields, road), offsetof(OpenTTDTownGrowthFields, flags)});
 	Layout(436, "OpenTTDTownSlots", {sizeof(OpenTTDTownSlots), alignof(OpenTTDTownSlots), offsetof(OpenTTDTownSlots, data), offsetof(OpenTTDTownSlots, size)});
 	Layout(430, "OpenTTDTownCommandResult", {sizeof(OpenTTDTownCommandResult), alignof(OpenTTDTownCommandResult), offsetof(OpenTTDTownCommandResult, cost), offsetof(OpenTTDTownCommandResult, success)});
-	Layout(431, "OpenTTDTownLeaves", {sizeof(OpenTTDTownLeaves), alignof(OpenTTDTownLeaves), offsetof(OpenTTDTownLeaves, settings), offsetof(OpenTTDTownLeaves, tile), offsetof(OpenTTDTownLeaves, house), offsetof(OpenTTDTownLeaves, road_info), offsetof(OpenTTDTownLeaves, state), offsetof(OpenTTDTownLeaves, stations), offsetof(OpenTTDTownLeaves, dirty_town), offsetof(OpenTTDTownLeaves, tropic_zone), offsetof(OpenTTDTownLeaves, tile_height), offsetof(OpenTTDTownLeaves, foundation_slope), offsetof(OpenTTDTownLeaves, terraform_price), offsetof(OpenTTDTownLeaves, clean_road_bits), offsetof(OpenTTDTownLeaves, set_road_town), offsetof(OpenTTDTownLeaves, exchange_company), offsetof(OpenTTDTownLeaves, increase_building_count), offsetof(OpenTTDTownLeaves, make_house), offsetof(OpenTTDTownLeaves, add_animation), offsetof(OpenTTDTownLeaves, dirty_tile), offsetof(OpenTTDTownLeaves, change_house_count), offsetof(OpenTTDTownLeaves, change_population), offsetof(OpenTTDTownLeaves, nearby_stations), offsetof(OpenTTDTownLeaves, update_radius), offsetof(OpenTTDTownLeaves, house_count), offsetof(OpenTTDTownLeaves, building_count), offsetof(OpenTTDTownLeaves, update_max_pass), offsetof(OpenTTDTownLeaves, next_town), offsetof(OpenTTDTownLeaves, road_mask), offsetof(OpenTTDTownLeaves, build_road), offsetof(OpenTTDTownLeaves, clear_land), offsetof(OpenTTDTownLeaves, terraform_land), offsetof(OpenTTDTownLeaves, build_bridge), offsetof(OpenTTDTownLeaves, build_tunnel), offsetof(OpenTTDTownLeaves, clear_house_land), offsetof(OpenTTDTownLeaves, allow_construction), offsetof(OpenTTDTownLeaves, construction_animation)});
+	Layout(431, "OpenTTDTownLeaves", {sizeof(OpenTTDTownLeaves), alignof(OpenTTDTownLeaves), offsetof(OpenTTDTownLeaves, settings), offsetof(OpenTTDTownLeaves, tile), offsetof(OpenTTDTownLeaves, house), offsetof(OpenTTDTownLeaves, road_info), offsetof(OpenTTDTownLeaves, state), offsetof(OpenTTDTownLeaves, stations), offsetof(OpenTTDTownLeaves, station_activity), offsetof(OpenTTDTownLeaves, station_owner), offsetof(OpenTTDTownLeaves, dirty_authority), offsetof(OpenTTDTownLeaves, dirty_town), offsetof(OpenTTDTownLeaves, tropic_zone), offsetof(OpenTTDTownLeaves, tile_height), offsetof(OpenTTDTownLeaves, foundation_slope), offsetof(OpenTTDTownLeaves, terraform_price), offsetof(OpenTTDTownLeaves, clean_road_bits), offsetof(OpenTTDTownLeaves, set_road_town), offsetof(OpenTTDTownLeaves, exchange_company), offsetof(OpenTTDTownLeaves, increase_building_count), offsetof(OpenTTDTownLeaves, make_house), offsetof(OpenTTDTownLeaves, add_animation), offsetof(OpenTTDTownLeaves, dirty_tile), offsetof(OpenTTDTownLeaves, change_house_count), offsetof(OpenTTDTownLeaves, change_population), offsetof(OpenTTDTownLeaves, nearby_stations), offsetof(OpenTTDTownLeaves, update_radius), offsetof(OpenTTDTownLeaves, house_count), offsetof(OpenTTDTownLeaves, building_count), offsetof(OpenTTDTownLeaves, update_max_pass), offsetof(OpenTTDTownLeaves, next_town), offsetof(OpenTTDTownLeaves, road_mask), offsetof(OpenTTDTownLeaves, build_road), offsetof(OpenTTDTownLeaves, clear_land), offsetof(OpenTTDTownLeaves, terraform_land), offsetof(OpenTTDTownLeaves, build_bridge), offsetof(OpenTTDTownLeaves, build_tunnel), offsetof(OpenTTDTownLeaves, clear_house_land), offsetof(OpenTTDTownLeaves, allow_construction), offsetof(OpenTTDTownLeaves, construction_animation)});
 	Layout(90, "OpenTTDRailSettings", {sizeof(OpenTTDRailSettings), alignof(OpenTTDRailSettings), offsetof(OpenTTDRailSettings, max_nodes), offsetof(OpenTTDRailSettings, firstred), offsetof(OpenTTDRailSettings, firstred_exit), offsetof(OpenTTDRailSettings, lastred), offsetof(OpenTTDRailSettings, lastred_exit), offsetof(OpenTTDRailSettings, station), offsetof(OpenTTDRailSettings, slope), offsetof(OpenTTDRailSettings, curve45), offsetof(OpenTTDRailSettings, curve90), offsetof(OpenTTDRailSettings, depot_reverse), offsetof(OpenTTDRailSettings, crossing), offsetof(OpenTTDRailSettings, lookahead), offsetof(OpenTTDRailSettings, p0), offsetof(OpenTTDRailSettings, p1), offsetof(OpenTTDRailSettings, p2), offsetof(OpenTTDRailSettings, pbs_cross), offsetof(OpenTTDRailSettings, pbs_station), offsetof(OpenTTDRailSettings, pbs_back), offsetof(OpenTTDRailSettings, doubleslip), offsetof(OpenTTDRailSettings, longer), offsetof(OpenTTDRailSettings, longer_tile), offsetof(OpenTTDRailSettings, shorter), offsetof(OpenTTDRailSettings, shorter_tile), offsetof(OpenTTDRailSettings, firstred_eol)});
 	Layout(91, "OpenTTDRailTile", {sizeof(OpenTTDRailTile), alignof(OpenTTDRailTile), offsetof(OpenTTDRailTile, flags), offsetof(OpenTTDRailTile, other_end), offsetof(OpenTTDRailTile, station), offsetof(OpenTTDRailTile, railtype), offsetof(OpenTTDRailTile, tracks), offsetof(OpenTTDRailTile, reserved), offsetof(OpenTTDRailTile, station_track), offsetof(OpenTTDRailTile, tunnel_dir), offsetof(OpenTTDRailTile, uphill), offsetof(OpenTTDRailTile, flat_ramp), offsetof(OpenTTDRailTile, signal_along), offsetof(OpenTTDRailTile, signal_against), offsetof(OpenTTDRailTile, signal_green), offsetof(OpenTTDRailTile, signal_type), offsetof(OpenTTDRailTile, oneway)});
 	Layout(92, "OpenTTDRailFollow", {sizeof(OpenTTDRailFollow), alignof(OpenTTDRailFollow), offsetof(OpenTTDRailFollow, tile), offsetof(OpenTTDRailFollow, skipped), offsetof(OpenTTDRailFollow, min_speed), offsetof(OpenTTDRailFollow, max_speed), offsetof(OpenTTDRailFollow, dirs), offsetof(OpenTTDRailFollow, followed), offsetof(OpenTTDRailFollow, error), offsetof(OpenTTDRailFollow, station)});
@@ -809,7 +811,7 @@ static void Trees()
 {
 	using Owner = std::unique_ptr<void, decltype(&openttd_rust_trees_destroy)>;
 	TreeProbe probe;
-	const OpenTTDSharedServices services{&probe, TreeRandom, TreeObserve, TreeWrite, TreeTrig, EffectTestIndustry};
+	const OpenTTDSharedServices services{.context = &probe, .random = TreeRandom, .observe_tile = TreeObserve, .write_tile = TreeWrite, .trig = TreeTrig, .industry = EffectTestIndustry, .company_valid = UnusedCompanyValid, .next_company = UnusedNextCompany};
 	auto make = [&](uint32_t kind, uint32_t a = 0, uint32_t b = 0, uint32_t c = 0) {
 		return Owner(openttd_rust_trees_create(kind, 1, a, b, c, &probe, TreeSettings, &services, TreeLeaf), openttd_rust_trees_destroy);
 	};
@@ -1058,7 +1060,7 @@ static void RoadBoundary()
 	road_abi_probe = &probe;
 	EffectTestWorld world;
 	effect_test_world = &world;
-	const OpenTTDSharedServices services{&world, EffectTestRandom, EffectTestTile, EffectTestMapWrite, EffectTestTrig, EffectTestIndustry};
+	const OpenTTDSharedServices services{.context = &world, .random = EffectTestRandom, .observe_tile = EffectTestTile, .write_tile = EffectTestMapWrite, .trig = EffectTestTrig, .industry = EffectTestIndustry, .company_valid = UnusedCompanyValid, .next_company = UnusedNextCompany};
 	auto leaves = RoadTestLeaves();
 	probe.leaves = &leaves;
 	probe.services = &services;
@@ -1168,7 +1170,7 @@ static void RoadServiceBoundary()
 	road_service_probe = &probe;
 	EffectTestWorld world;
 	effect_test_world = &world;
-	const OpenTTDSharedServices services{&world, EffectTestRandom, EffectTestTile, EffectTestMapWrite, EffectTestTrig, EffectTestIndustry};
+	const OpenTTDSharedServices services{.context = &world, .random = EffectTestRandom, .observe_tile = EffectTestTile, .write_tile = EffectTestMapWrite, .trig = EffectTestTrig, .industry = EffectTestIndustry, .company_valid = UnusedCompanyValid, .next_company = UnusedNextCompany};
 	auto leaves = RoadTestLeaves();
 	leaves.owner = [](uint32_t id) noexcept { return id == 17 ? road_service_probe->head : road_service_probe->tail; };
 	leaves.read_front = [](uint32_t) noexcept -> uint32_t { return 1; };
@@ -1238,7 +1240,7 @@ static void Disasters()
 	using Owner = std::unique_ptr<OpenTTDDisasterRun, decltype(&openttd_rust_disaster_destroy)>;
 	using StateOwner = std::unique_ptr<OpenTTDDisasterState, decltype(&openttd_rust_disaster_state_destroy)>;
 	DisasterProbe probe;
-	const OpenTTDSharedServices services{&probe, DisasterProbeRandom, DisasterProbeTile, DisasterProbeTileWrite, DisasterProbeTrig, DisasterProbeIndustry};
+	const OpenTTDSharedServices services{.context = &probe, .random = DisasterProbeRandom, .observe_tile = DisasterProbeTile, .write_tile = DisasterProbeTileWrite, .trig = DisasterProbeTrig, .industry = DisasterProbeIndustry, .company_valid = UnusedCompanyValid, .next_company = UnusedNextCompany};
 	auto make = [&](uint32_t operation, uint32_t id = 0) { return Owner(openttd_rust_disaster_create(operation, id, 0, 0, 0, 0, &probe, DisasterProbeRead, DisasterProbeWrite, &services, DisasterProbeService), openttd_rust_disaster_destroy); };
 	StateOwner state(openttd_rust_disaster_state_create(1048575), openttd_rust_disaster_state_destroy);
 	auto *address = state.get(); state->state = 65535; state->flags = 0xAB; state->image_override = UINT32_MAX;
@@ -1371,6 +1373,7 @@ static void ShipBoundary()
 		nullptr, ShipProbeUnused<uint32_t, void *>, ShipProbeUnused<void, void *, uint32_t, uint32_t *>,
 		ShipProbeUnused<void, void *, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t>,
 		ShipProbeUnused<float, uint32_t, float>, ShipProbeUnused<uint32_t, int32_t, int32_t, uint32_t *>,
+		UnusedCompanyValid, UnusedNextCompany,
 	};
 	leaves.state_owner = [](uint32_t) noexcept { return ship_probe.owner; };
 	leaves.x = [](uint32_t) noexcept { return static_cast<uint32_t>(ship_probe.x); };

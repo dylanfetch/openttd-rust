@@ -6,6 +6,7 @@
  */
 
 /** @file train-edge-comparison.cpp Bounded NewGRF-only copied-world curve/reversal gap. */
+#include "../../src/tests/shared_services.hpp"
 #include "stdafx.h"
 #include "core/math_func.hpp"
 #include "direction_func.h"
@@ -101,13 +102,13 @@ static OpenTTDTrainServices Leaves()
 static uint16_t RustCurve()
 {
 	const auto leaves = Leaves();
-	const OpenTTDSharedServices shared{nullptr, UnexpectedRandom, UnexpectedObserve, UnexpectedWrite, UnexpectedTrig, UnexpectedIndustry};
+	const OpenTTDSharedServices shared{.context = nullptr, .random = UnexpectedRandom, .observe_tile = UnexpectedObserve, .write_tile = UnexpectedWrite, .trig = UnexpectedTrig, .industry = UnexpectedIndustry, .company_valid = UnusedCompanyValid, .next_company = UnusedNextCompany};
 	return openttd_rust_train_curve_limit(Handle(trains), &leaves, &shared);
 }
 static void RustReverse(int left, int right)
 {
 	const auto leaves = Leaves();
-	const OpenTTDSharedServices shared{nullptr, UnexpectedRandom, UnexpectedObserve, UnexpectedWrite, UnexpectedTrig, UnexpectedIndustry};
+	const OpenTTDSharedServices shared{.context = nullptr, .random = UnexpectedRandom, .observe_tile = UnexpectedObserve, .write_tile = UnexpectedWrite, .trig = UnexpectedTrig, .industry = UnexpectedIndustry, .company_valid = UnusedCompanyValid, .next_company = UnusedNextCompany};
 	openttd_rust_train_reverse_swap(Handle(trains), left, right, &leaves, &shared);
 }
 static uint32_t random_state = 130;

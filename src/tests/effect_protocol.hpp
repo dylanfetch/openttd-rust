@@ -8,6 +8,7 @@
 /** @file effect_protocol.hpp Native direct-service checks for transient effects absent from saves. */
 #ifndef EFFECT_PROTOCOL_HPP
 #define EFFECT_PROTOCOL_HPP
+#include "shared_services.hpp"
 #include "../rust/effect_ffi.h"
 #include <array>
 #include <memory>
@@ -66,7 +67,7 @@ template <typename Check> void CheckEffectProtocol(Check check)
 	EffectTestWorld w;
 	effect_test_world = &w;
 	const OpenTTDEffectLeaves leaves{EffectTestObserve, EffectTestWrite, EffectTestViewport, EffectTestSound, EffectTestAnimated};
-	const OpenTTDSharedServices services{&w, EffectTestRandom, EffectTestTile, EffectTestMapWrite, EffectTestTrig, EffectTestIndustry};
+	const OpenTTDSharedServices services{.context = &w, .random = EffectTestRandom, .observe_tile = EffectTestTile, .write_tile = EffectTestMapWrite, .trig = EffectTestTrig, .industry = EffectTestIndustry, .company_valid = UnusedCompanyValid, .next_company = UnusedNextCompany};
 	auto owner = std::unique_ptr<OpenTTDEffectState, decltype(&openttd_rust_effect_destroy)>(openttd_rust_effect_new(), openttd_rust_effect_destroy);
 	check(openttd_rust_effect_get(owner.get(), 0) == 0 && openttd_rust_effect_get(owner.get(), 1) == 0);
 	openttd_rust_effect_set(owner.get(), 0, 65535);

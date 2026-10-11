@@ -347,7 +347,11 @@ pub struct Leaves {
     pub house: extern "C" fn(u32, *mut u32),
     pub road_info: extern "C" fn(u32, *mut u32),
     pub state: extern "C" fn(u32) -> *mut State,
-    pub stations: extern "C" fn(u32, u32, *mut c_void, extern "C" fn(*mut c_void, u32, u32, u32)),
+    pub stations:
+        extern "C" fn(u32, u32, *mut c_void, extern "C" fn(*mut c_void, *const c_void, u32)),
+    pub station_activity: extern "C" fn(*const c_void) -> StationActivity,
+    pub station_owner: extern "C" fn(*const c_void) -> u8,
+    pub dirty_authority: extern "C" fn(u32),
     pub dirty_town: extern "C" fn(u32),
     pub tropic_zone: extern "C" fn(u32) -> u32,
     pub tile_height: extern "C" fn(u32) -> u32,
@@ -377,6 +381,12 @@ pub struct Leaves {
     pub clear_house_land: extern "C" fn(u32),
     pub allow_construction: extern "C" fn(u32, u32, u32, u32) -> bool,
     pub construction_animation: extern "C" fn(u32),
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct StationActivity {
+    pub time_since_load: u8,
+    pub time_since_unload: u8,
 }
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -476,16 +486,6 @@ impl Engine {
             (*self.owner).growth.funding = value as u8;
         }
     }
-    fn road_months(&self) -> u16 {
-        // SAFETY: Entry resolves its live owner once; immediate access ends here.
-        unsafe { u16::from((*self.owner).growth.road) }
-    }
-    fn set_road(&self, value: u16) {
-        // SAFETY: No owner reference spans a callback or possible reentry.
-        unsafe {
-            (*self.owner).growth.road = value as u8;
-        }
-    }
     fn flags(&self) -> u16 {
         // SAFETY: Entry resolves its live owner once; immediate access ends here.
         unsafe { u16::from((*self.owner).growth.flags) }
@@ -543,13 +543,14 @@ impl Engine {
             radius: u32,
             count: u32,
         }
-        extern "C" fn visit(ctx: *mut c_void, xy: u32, load: u32, unload: u32) {
+        extern "C" fn visit(ctx: *mut c_void, station: *const c_void, xy: u32) {
             // SAFETY: Synchronous non-reentrant visitor; context lives on this stack.
             let count = unsafe { &mut *ctx.cast::<StationCount>() };
-            if count.engine.distance(xy, count.center) <= count.radius
-                && (load <= 20 || unload <= 20)
-            {
-                count.count = count.count.wrapping_add(1);
+            if count.engine.distance(xy, count.center) <= count.radius {
+                let activity = (count.engine.leaves.station_activity)(station);
+                if activity.time_since_load <= 20 || activity.time_since_unload <= 20 {
+                    count.count = count.count.wrapping_add(1);
+                }
             }
         }
         let center = self.position();
@@ -1579,14 +1580,6 @@ impl Engine {
             }
         }
     }
-    fn monthly_counters(&self, _town: u32) {
-        if self.road_months() != 0 {
-            self.set_road(self.road_months() - 1);
-        }
-        if self.funding() != 0 {
-            self.set_funding(self.funding() - 1);
-        }
-    }
     fn custom_rate(&self, town: u32, a: u32) {
         if a == 0 {
             self.modify_flags(8, 0);
@@ -1684,14 +1677,6 @@ pub unsafe extern "C" fn openttd_rust_town_expand(
         .expand(town, amount, modes);
 }
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_town_monthly_counters(
-    leaves: *const Leaves,
-    services: *const Services,
-    town: u32,
-) {
-    engine(leaves, services).bind(town).monthly_counters(town);
-}
-#[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_town_custom_rate(
     leaves: *const Leaves,
     services: *const Services,
@@ -1724,4 +1709,271 @@ pub unsafe extern "C" fn openttd_rust_town_tunnel(
     dir: u32,
 ) -> bool {
     engine(leaves, services).bind(town).tunnel(town, tile, dir)
+}
+
+// Original std::accumulate's literal 0 deduces an int accumulator. Each lambda
+// result narrows to int, then the final int sign-extends to the uint64 destination.
+fn sum_history(history: &[SuppliedHistory]) -> SuppliedHistory {
+    let production = history.iter().fold(0_i32, |sum, h| {
+        (sum as u64).wrapping_add(u64::from(h.production)) as i32
+    }) as u64;
+    let transported = history.iter().fold(0_i32, |sum, h| {
+        (sum as u64).wrapping_add(u64::from(h.transported)) as i32
+    }) as u64;
+    SuppliedHistory {
+        production: (production / history.len() as u64).min(u64::from(u32::MAX)) as u32,
+        transported: (transported / history.len() as u64).min(u64::from(u32::MAX)) as u32,
+    }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_sum_history(
+    history: *const SuppliedHistory,
+    len: usize,
+) -> SuppliedHistory {
+    // SAFETY: Native supplied-history layout is checked; original nonempty range.
+    sum_history(unsafe { std::slice::from_raw_parts(history, len) })
+}
+fn history_ranges() -> [crate::history::Descriptor; 3] {
+    let descriptor = |first, last, division, total_division| crate::history::Descriptor {
+        child: 0,
+        periods: 24,
+        records: last - first,
+        first,
+        last,
+        division,
+        total_division,
+        child_periods: 0,
+        child_division: 0,
+    };
+    [
+        descriptor(1, 25, 1, 1),
+        descriptor(25, 42, 3, 3),
+        descriptor(42, 61, 4, 12),
+    ]
+}
+impl Engine {
+    fn monthly_statistics(&self, month: u8) {
+        // SAFETY: No callback or service spans this borrow of canonical histories.
+        let state = unsafe { &mut *self.owner };
+        if state.growth.road != 0 {
+            state.growth.road -= 1;
+        }
+        if state.growth.funding != 0 {
+            state.growth.funding -= 1;
+        }
+        if state.simulation.exclusive_counter != 0 {
+            state.simulation.exclusive_counter -= 1;
+            if state.simulation.exclusive_counter == 0 {
+                state.simulation.exclusivity = u8::MAX;
+            }
+        }
+        // Company traversal is external, so this borrow ends before it.
+        let mut company = (self.services.next_company)(0);
+        while company != u8::MAX {
+            // SAFETY: Live canonical owner; no reference spans the next pool callback.
+            unsafe {
+                let unwanted = &mut (*self.owner).simulation.unwanted[usize::from(company)];
+                if *unwanted != 0 {
+                    *unwanted -= 1;
+                }
+            }
+            company = (self.services.next_company)(company + 1);
+        }
+        // SAFETY: Reacquire only after traversal; no callback spans history writes.
+        let state = unsafe { &mut *self.owner };
+        for range in history_ranges() {
+            state.simulation.valid_history =
+                crate::history::update(state.simulation.valid_history, range, u32::from(month));
+        }
+        for supplied in &mut state.supplied {
+            for range in history_ranges() {
+                if !month.is_multiple_of(range.total_division) {
+                    continue;
+                }
+                let first = usize::from(range.first);
+                let last = usize::from(range.last);
+                supplied.history.copy_within(first..last - 1, first + 1);
+                if range.total_division == 1 {
+                    supplied.history[first] = supplied.history[first - 1];
+                    supplied.history[0] = SuppliedHistory::default();
+                } else if state.simulation.valid_history & (1 << (range.first - range.division))
+                    != 0
+                {
+                    supplied.history[first] =
+                        sum_history(&supplied.history[first - usize::from(range.division)..first]);
+                }
+            }
+        }
+        for received in &mut state.simulation.received {
+            received.old_max = received.new_max;
+            received.new_max = 0;
+            received.old_act = received.new_act;
+            received.new_act = 0;
+        }
+    }
+    fn update_rating(&self, town: u32) {
+        struct RatingContext {
+            engine: Engine,
+            center: u32,
+            radius: u32,
+        }
+        extern "C" fn visit(context: *mut c_void, station: *const c_void, xy: u32) {
+            // SAFETY: Synchronous stack visitor; no reference survives reentry.
+            let context = unsafe { &*context.cast::<RatingContext>() };
+            let engine = context.engine.clone();
+            let center = context.center;
+            let radius = context.radius;
+            if engine.distance(xy, center) > radius {
+                return;
+            }
+            let activity = (engine.leaves.station_activity)(station);
+            let active = activity.time_since_load <= 20 || activity.time_since_unload <= 20;
+            let owner = (engine.leaves.station_owner)(station);
+            if !(engine.services.company_valid)(owner) {
+                return;
+            }
+            // SAFETY: Valid company index and immediate write after all services.
+            unsafe {
+                let rating = &mut (*engine.owner).simulation.ratings[usize::from(owner)];
+                *rating = if active {
+                    (i32::from(*rating) + 12).min(i32::from(i16::MAX)) as i16
+                } else {
+                    (i32::from(*rating) - 15).max(i32::from(i16::MIN)) as i16
+                };
+            }
+        }
+        let mut company = (self.services.next_company)(0);
+        while company != u8::MAX {
+            // SAFETY: Immediate field update; borrow ends before pool traversal.
+            unsafe {
+                let rating = &mut (*self.owner).simulation.ratings[usize::from(company)];
+                if *rating < 200 {
+                    *rating = (i32::from(*rating) + 5).min(200) as i16;
+                }
+            }
+            company = (self.services.next_company)(company + 1);
+        }
+        let center = self.position();
+        let radius = self.radius()[0];
+        let mut context = RatingContext {
+            engine: self.clone(),
+            center,
+            radius,
+        };
+        (self.leaves.stations)(center, radius / 2, (&raw mut context).cast(), visit);
+        // SAFETY: All station visitors returned; no callback spans clamping.
+        unsafe {
+            for rating in &mut (*self.owner).simulation.ratings {
+                *rating = (*rating).clamp(-1000, 1000);
+            }
+        }
+        (self.leaves.dirty_authority)(town);
+    }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_monthly_all(
+    leaves: *const Leaves,
+    services: *const Services,
+    month: u8,
+) {
+    let engine = engine(leaves, services);
+    let mut town = (engine.leaves.next_town)(0);
+    while town != u32::MAX {
+        let owner = engine.clone().bind(town);
+        owner.monthly_statistics(month);
+        owner.update_growth(town);
+        owner.update_rating(town);
+        (owner.leaves.dirty_town)(town);
+        town = (engine.leaves.next_town)(town + 1);
+    }
+}
+#[derive(Default)]
+struct RatingTest {
+    depth: i32,
+    ratings: std::collections::BTreeMap<usize, i32>,
+}
+thread_local! { static RATING_TEST: UnsafeCell<RatingTest> = UnsafeCell::default(); }
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_town_rating_test(mode: bool) {
+    RATING_TEST.with(|cell| {
+        // SAFETY: Game-thread serialized scratch; no callback.
+        let test = unsafe { &mut *cell.get() };
+        if mode {
+            if test.depth == 0 {
+                test.ratings.clear();
+            }
+            test.depth = test.depth.wrapping_add(1);
+        } else {
+            debug_assert!(test.depth > 0);
+            test.depth = test.depth.wrapping_sub(1);
+        }
+    });
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_rating(
+    state: *const State,
+    shell: usize,
+    company: u8,
+) -> i32 {
+    RATING_TEST.with(|cell| {
+        // SAFETY: Serialized immediate accesses; native shell address preserves source map keys and reuse.
+        let test = unsafe { &*cell.get() };
+        if test.depth != 0 {
+            if let Some(rating) = test.ratings.get(&shell) {
+                return *rating;
+            }
+        }
+        // SAFETY: Original source invokes this only with live owner and valid company.
+        unsafe { i32::from((*state).simulation.ratings[usize::from(company)]) }
+    })
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_change_rating(
+    leaves: *const Leaves,
+    services: *const Services,
+    state: *mut State,
+    town: u32,
+    shell: usize,
+    company: u8,
+    add: i32,
+    maximum: i32,
+    no_modify: bool,
+    bulldozer: bool,
+) {
+    if state.is_null() || no_modify {
+        return;
+    }
+    // SAFETY: Immutable call tables, live for invocation; no owner borrow.
+    let valid = (unsafe { (*services).company_valid })(company);
+    if !valid || (bulldozer && add < 0) {
+        return;
+    }
+    // SAFETY: Valid company, immediate read through original scratch precedence.
+    let mut rating = unsafe { openttd_rust_town_rating(state, shell, company) };
+    if add < 0 {
+        if rating > maximum {
+            rating = rating.wrapping_add(add).max(maximum);
+        }
+    } else if rating < maximum {
+        rating = rating.wrapping_add(add).min(maximum);
+    }
+    let testing = RATING_TEST.with(|cell| {
+        // SAFETY: No callback during scratch map insertion.
+        let test = unsafe { &mut *cell.get() };
+        if test.depth == 0 {
+            false
+        } else {
+            test.ratings.insert(shell, rating);
+            true
+        }
+    });
+    if !testing {
+        // SAFETY: Field writes finish before native window invalidation.
+        unsafe {
+            (*state).simulation.have_ratings |= 1 << company;
+            (*state).simulation.ratings[usize::from(company)] = rating as i16;
+        }
+        // SAFETY: Live immutable typed service table.
+        (unsafe { (*leaves).dirty_authority })(town);
+    }
 }

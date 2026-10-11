@@ -8,6 +8,7 @@
 /** @file town_protocol.hpp Narrow expansion-mode and callback-reentry gaps absent from console saves. */
 #ifndef TOWN_PROTOCOL_HPP
 #define TOWN_PROTOCOL_HPP
+#include "shared_services.hpp"
 #include "../rust/town_ffi.h"
 #include <algorithm>
 #include <array>
@@ -47,7 +48,9 @@ static inline uint64_t TownProtocolLeaf(uint32_t op, uint32_t id, uint32_t a, ui
 	return 0;
 }
 static inline OpenTTDTownState *TownProtocolState(uint32_t) noexcept { return town_protocol_world->owner; }
-static inline void TownProtocolStations(uint32_t, uint32_t, void *, void (*)(void *, uint32_t, uint32_t, uint32_t)) noexcept {}
+static inline void TownProtocolStations(uint32_t, uint32_t, void *, void (*)(void *, const void *, uint32_t)) noexcept {}
+static inline OpenTTDTownStationActivity TownProtocolStationActivity(const void *) noexcept { return {}; }
+static inline uint8_t TownProtocolStationOwner(const void *) noexcept { return UINT8_MAX; }
 static inline uint32_t TownProtocolRandom(void *) noexcept { town_protocol_world->draws++; return 0xABCDEF01; }
 static inline void TownProtocolTile(void *, uint32_t, uint32_t *) noexcept {}
 static inline void TownProtocolWrite(void *, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) noexcept {}
@@ -102,6 +105,9 @@ static inline OpenTTDTownLeaves TownProtocolServices()
 		.road_info = TownProtocol_road_info,
 		.state = TownProtocolState,
 		.stations = TownProtocolStations,
+		.station_activity = TownProtocolStationActivity,
+		.station_owner = TownProtocolStationOwner,
+		.dirty_authority = TownProtocol_dirty_town,
 		.dirty_town = TownProtocol_dirty_town,
 		.tropic_zone = TownProtocol_tropic_zone,
 		.tile_height = TownProtocol_tile_height,
@@ -141,7 +147,7 @@ template <typename Check> void CheckTownProtocol(Check check)
 	TownProtocolWorld w{}; w.owner = owner.get(); town_protocol_world = &w;
 	auto *fields = openttd_rust_town_simulation(owner.get()); fields->xy = 2080; std::fill_n(fields->radius, 5, 100);
 	const auto leaves = TownProtocolServices();
-	const OpenTTDSharedServices services{nullptr, TownProtocolRandom, TownProtocolTile, TownProtocolWrite, TownProtocolTrig, TownProtocolIndustry};
+	const OpenTTDSharedServices services{.context = nullptr, .random = TownProtocolRandom, .observe_tile = TownProtocolTile, .write_tile = TownProtocolWrite, .trig = TownProtocolTrig, .industry = TownProtocolIndustry, .company_valid = UnusedCompanyValid, .next_company = UnusedNextCompany};
 	check(!openttd_rust_town_grow(&leaves, &services, 0, 1) && w.draws == 0 && w.company == 7);
 	check(openttd_rust_town_grow(&leaves, &services, 0, 2) && w.roads == 1 && w.draws == 1 && w.company == 7);
 	w.clears = 0; w.clear_ok = false;

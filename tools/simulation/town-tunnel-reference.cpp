@@ -6,6 +6,8 @@
  */
 
 /** @file town-tunnel-reference.cpp Controlled services for unchanged town tunnel bodies, absent from the save corpus. */
+#include "../../src/tests/shared_services.hpp"
+#include "../../src/tests/town_protocol.hpp"
 #include "../../src/rust/town_ffi.h"
 #include <algorithm>
 #include <array>
@@ -14,6 +16,9 @@
 #include <cstdio>
 #include <initializer_list>
 #include <memory>
+#include <numeric>
+#include <span>
+#include <limits>
 #include <unordered_map>
 #include <vector>
 
@@ -25,7 +30,13 @@ using RoadType = uint32_t;
 using Slope = uint32_t;
 constexpr uint32_t DIAGDIR_END = 4, MP_ROAD = 2, MP_RAILWAY = 1, MP_STATION = 5, MP_TUNNELBRIDGE = 9;
 constexpr uint32_t TRANSPORT_ROAD = 1, DRD_NONE = 0;
-struct Town { uint32_t index = 17; struct { uint32_t population = 0; } cache; };
+struct Town {
+	uint32_t index = 17;
+	struct { uint32_t population = 0; } cache;
+	struct SuppliedHistory { uint32_t production = 0, transported = 0; };
+};
+template <typename T> T SumHistory(std::span<const T>);
+template <typename T> T ClampTo(uint64_t value) { return static_cast<T>(std::min<uint64_t>(value, std::numeric_limits<T>::max())); }
 struct { struct { bool allow_town_level_crossings = true; } economy; } _settings_game;
 enum class DoCommandFlag { Auto = 1, NoWater = 2, Execute = 4 };
 struct Flags {
@@ -128,7 +139,7 @@ static void Observe(uint32_t kind, uint32_t id, uint32_t *v) noexcept
 }
 static uint64_t Leaf(uint32_t op, uint32_t, uint32_t, uint32_t, uint32_t) noexcept { assert(op == 21); RoadMask(); return 1; }
 static OpenTTDTownState *State(uint32_t id) noexcept { assert(id == world->town.index); return world->owner; }
-static void Stations(uint32_t, uint32_t, void *, void (*)(void *, uint32_t, uint32_t, uint32_t)) noexcept {}
+static void Stations(uint32_t, uint32_t, void *, void (*)(void *, const void *, uint32_t)) noexcept {}
 static uint32_t Random(void *) noexcept { world->draws++; return 0; }
 static void ObserveTile(void *, uint32_t, uint32_t *) noexcept {}
 static void WriteTile(void *, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) noexcept {}
@@ -144,11 +155,10 @@ static bool BuildTunnel(uint32_t tile, uint32_t type, uint32_t execute) noexcept
 static bool Candidate()
 {
 	openttd_rust_town_simulation(world->owner)->population = world->town.cache.population;
-	const OpenTTDTownLeaves leaves{
-		.settings = Read_settings, .tile = Read_tile, .house = Read_house, .road_info = Read_road_info,
-		.state = State, .stations = Stations, .road_mask = RoadTypes, .build_road = BuildRoad, .build_tunnel = BuildTunnel,
-	};
-	const OpenTTDSharedServices services{nullptr, Random, ObserveTile, WriteTile, Trig, Industry};
+	auto leaves = TownProtocolServices();
+	leaves.settings = Read_settings; leaves.tile = Read_tile; leaves.house = Read_house; leaves.road_info = Read_road_info;
+	leaves.state = State; leaves.stations = Stations; leaves.road_mask = RoadTypes; leaves.build_road = BuildRoad; leaves.build_tunnel = BuildTunnel;
+	const OpenTTDSharedServices services{.context = nullptr, .random = Random, .observe_tile = ObserveTile, .write_tile = WriteTile, .trig = Trig, .industry = Industry, .company_valid = UnusedCompanyValid, .next_company = UnusedNextCompany};
 	return openttd_rust_town_tunnel(&leaves, &services, world->town.index, world->start, world->direction);
 }
 static uint32_t Along(const World &w, int distance) { return w.start + distance * TileOffsByDiagDir(w.direction); }
@@ -193,8 +203,37 @@ static void Compare(World input, const char *label)
 	for (const auto &entry : reference.trace) { std::printf(" |"); for (auto value : entry) std::printf(" %u", value); }
 	std::puts("");
 }
+static void CompareHistories()
+{
+	uint32_t checked = 0;
+	for (const size_t count : {1U, 3U, 4U, 61U}) {
+		for (const uint32_t production : {0U, 1U, 0x7FFFFFFFU, 0x80000000U, UINT32_MAX}) {
+			for (const uint32_t transported : {0U, 1U, 0x7FFFFFFFU, 0x80000000U, UINT32_MAX}) {
+				for (const uint32_t stride : {0U, 17U, 0x40000000U, 0x80000000U}) {
+					std::array<Town::SuppliedHistory, 61> reference{};
+					std::array<OpenTTDTownSuppliedHistory, 61> candidate{};
+					for (size_t i = 0; i < count; ++i) {
+						const auto p = production + static_cast<uint32_t>(i) * stride;
+						const auto t = transported + static_cast<uint32_t>(i) * stride;
+						reference[i] = {p, t}; candidate[i] = {p, t};
+					}
+					const auto expected = SumHistory<Town::SuppliedHistory>(std::span{reference.data(), count});
+					const auto actual = openttd_rust_town_sum_history(candidate.data(), count);
+					if (actual.production != expected.production || actual.transported != expected.transported) {
+						std::fprintf(stderr, "history mismatch count=%zu production=%u transported=%u stride=%u expected=%u/%u actual=%u/%u\n",
+							count, production, transported, stride, expected.production, expected.transported, actual.production, actual.transported);
+						std::exit(1);
+					}
+					checked++;
+				}
+			}
+		}
+	}
+	std::printf("\nPASS %u unchanged-reference history cases\n", checked);
+}
 int main()
 {
+	CompareHistories();
 	for (uint32_t dir = 0; dir < 4; dir++) {
 		for (bool mountain : {false, true}) {
 			for (uint32_t length : {1, 2, 4, 5, 6, 7, 8, 9, 255, 256, 257}) {

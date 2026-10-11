@@ -1129,10 +1129,18 @@ static bool RustTown_allow_construction(uint32_t town, uint32_t tile, uint32_t h
 }
 static void RustTown_construction_animation(uint32_t tile) noexcept { TriggerHouseAnimation_ConstructionStageChanged(TileIndex{tile}, true); }
 static OpenTTDTownState *RustTownState(uint32_t id) noexcept { return Town::Get(TownID(id))->growth_owner.get(); }
-static void RustTownStations(uint32_t tile, uint32_t radius, void *context, void (*visit)(void *, uint32_t, uint32_t, uint32_t)) noexcept
+static void RustTownStations(uint32_t tile, uint32_t radius, void *context, void (*visit)(void *, const void *, uint32_t)) noexcept
 {
-	ForAllStationsRadius(TileIndex{tile}, radius, [context, visit](const Station *st) { visit(context, st->xy.base(), st->time_since_load, st->time_since_unload); });
+	ForAllStationsRadius(TileIndex{tile}, radius, [context, visit](const Station *st) { visit(context, st, st->xy.base()); });
 }
+/* Temporary activity/owner adapters; #214 supplies their shared canonical helpers. */
+static OpenTTDTownStationActivity RustTownStationActivity(const void *station) noexcept
+{
+	const auto *st = static_cast<const Station *>(station);
+	return {st->time_since_load, st->time_since_unload};
+}
+static uint8_t RustTownStationOwner(const void *station) noexcept { return static_cast<const Station *>(station)->owner.base(); }
+static void RustTownDirtyAuthority(uint32_t town) noexcept { SetWindowDirty(WC_TOWN_AUTHORITY, TownID(town)); }
 
 static const OpenTTDTownLeaves &GetRustTownServices()
 {
@@ -1143,6 +1151,9 @@ static const OpenTTDTownLeaves &GetRustTownServices()
 		.road_info = RustTownRoadInfo,
 		.state = RustTownState,
 		.stations = RustTownStations,
+		.station_activity = RustTownStationActivity,
+		.station_owner = RustTownStationOwner,
+		.dirty_authority = RustTownDirtyAuthority,
 		.dirty_town = RustTown_dirty_town,
 		.tropic_zone = RustTown_tropic_zone,
 		.tile_height = RustTown_tile_height,
@@ -4047,6 +4058,7 @@ CommandCost CmdDoTownAction(DoCommandFlags flags, TownID town_id, TownAction act
 	return cost;
 }
 
+#ifndef WITH_RUST
 template <typename Func>
 static void ForAllStationsNearTown(Town *t, Func func)
 {
@@ -4096,6 +4108,8 @@ static void UpdateTownRating(Town *t)
 
 	SetWindowDirty(WC_TOWN_AUTHORITY, t->index);
 }
+
+#endif
 
 
 /**
@@ -4300,6 +4314,16 @@ Town *ClosestTownFromTile(TileIndex tile, uint threshold)
 	}
 }
 
+#ifdef WITH_RUST
+void SetTownRatingTestMode(bool mode) { openttd_rust_town_rating_test(mode); }
+static int GetRating(const Town *t) { return openttd_rust_town_rating(t->growth_owner.get(), reinterpret_cast<uintptr_t>(t), _current_company.base()); }
+void ChangeTownRating(Town *t, int add, int max, DoCommandFlags flags)
+{
+	openttd_rust_town_change_rating(&GetRustTownServices(), &GetRustSharedServices(), t == nullptr ? nullptr : t->growth_owner.get(),
+		t == nullptr ? TownID::Invalid().base() : t->index.base(), reinterpret_cast<uintptr_t>(t), _current_company.base(), add, max,
+		flags.Test(DoCommandFlag::NoModifyTownRating), _cheats.magic_bulldozer.value);
+}
+#else
 static bool _town_rating_test = false; ///< If \c true, town rating is in test-mode.
 static std::map<const Town *, int> _town_test_ratings; ///< Map of towns to modified ratings, while in town rating test-mode.
 
@@ -4376,6 +4400,8 @@ void ChangeTownRating(Town *t, int add, int max, DoCommandFlags flags)
 	}
 }
 
+#endif
+
 /**
  * Does the town authority allow the (destructive) action of the current company?
  * @param flags Checking flags of the command.
@@ -4416,22 +4442,27 @@ CommandCost CheckforTownRating(DoCommandFlags flags, Town *t, TownRatingCheckTyp
 template <>
 Town::SuppliedHistory SumHistory(std::span<const Town::SuppliedHistory> history)
 {
+#ifdef WITH_RUST
+	const auto sum = openttd_rust_town_sum_history(reinterpret_cast<const OpenTTDTownSuppliedHistory *>(history.data()), history.size());
+	return {.production = sum.production, .transported = sum.transported};
+#else
+
 	uint64_t production = std::accumulate(std::begin(history), std::end(history), 0, [](uint64_t r, const auto &s) { return r + s.production; });
 	uint64_t transported = std::accumulate(std::begin(history), std::end(history), 0, [](uint64_t r, const auto &s) { return r + s.transported; });
 	auto count = std::size(history);
 	return {.production = ClampTo<uint32_t>(production / count), .transported = ClampTo<uint32_t>(transported / count)};
+#endif
 }
 
 static const IntervalTimer<TimerGameEconomy> _economy_towns_monthly({TimerGameEconomy::MONTH, TimerGameEconomy::Priority::TOWN}, [](auto)
 {
+#ifdef WITH_RUST
+	openttd_rust_town_monthly_all(&GetRustTownServices(), &GetRustSharedServices(), TimerGameEconomy::month);
+#else
 	for (Town *t : Town::Iterate()) {
 		/* Check for active town actions and decrement their counters. */
-#ifdef WITH_RUST
-		openttd_rust_town_monthly_counters(&GetRustTownServices(), &GetRustSharedServices(), t->index.base());
-#else
 		if (t->road_build_months != 0) t->road_build_months--;
 		if (t->fund_buildings_months != 0) t->fund_buildings_months--;
-#endif
 
 		if (t->exclusive_counter != 0) {
 			if (--t->exclusive_counter == 0) t->exclusivity = CompanyID::Invalid();
@@ -4453,6 +4484,7 @@ static const IntervalTimer<TimerGameEconomy> _economy_towns_monthly({TimerGameEc
 
 		SetWindowDirty(WC_TOWN_VIEW, t->index);
 	}
+#endif
 });
 
 static const IntervalTimer<TimerGameEconomy> _economy_towns_yearly({TimerGameEconomy::YEAR, TimerGameEconomy::Priority::TOWN}, [](auto)

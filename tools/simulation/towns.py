@@ -224,8 +224,13 @@ def tunnel_reference_gap(out, archive=None):
     migration.ensure_reference()
     source = (migration.REFERENCE / "src/town_cmd.cpp").read_text()
     bodies = {}
-    for name in ("CanRoadContinueIntoNextTile", "GrowTownWithTunnel"):
-        start = source.index(f"static bool {name}(")
+    signatures = {
+        "CanRoadContinueIntoNextTile": "static bool CanRoadContinueIntoNextTile(",
+        "GrowTownWithTunnel": "static bool GrowTownWithTunnel(",
+        "SumHistory": "template <>\nTown::SuppliedHistory SumHistory(",
+    }
+    for name, signature in signatures.items():
+        start = source.index(signature)
         end = source.index("{", start) + 1
         depth = 1
         # These pinned bodies have balanced braces, including their comments.
@@ -269,9 +274,15 @@ def tunnel_reference_gap(out, archive=None):
     match = re.search(rb"\nPASS (\d+) unchanged-reference tunnel cases\n$", run.stdout)
     if not match or int(match[1]) == 0:
         raise RuntimeError("town tunnel reference gap omitted completion/count marker")
+    history = re.search(
+        rb"\nPASS (\d+) unchanged-reference history cases\n", run.stdout
+    )
+    if not history or int(history[1]) == 0:
+        raise RuntimeError("town history reference gap omitted completion/count marker")
     migration.ensure_reference()
     report = {
         "passed": True,
+        "history_cases": int(history[1]),
         "cases": int(match[1]),
         "successful_tunnel_cases": len(re.findall(rb" result=1 ", run.stdout)),
         "execute_effect_cases": len(re.findall(rb" effects=1 ", run.stdout)),
@@ -287,11 +298,12 @@ def tunnel_reference_gap(out, archive=None):
         "commands": [command, [str(binary)]],
         "limits": [
             "Controlled world and command outcomes; the paired save corpus has no actual tunnel build.",
+            "Original int history accumulation compares full uint32 edges; ordinary saves cannot reach these extreme histories.",
             "Ordered road-mask/info services, command arguments, result, RNG and partial execute effects compare exactly.",
             "Pure C++ map getter calls and Rust bundled records have different granularity; their call counts/order are not compared.",
             "One active town-buildable road type; shared command internals and road-type selection are outside this gap check.",
         ],
-        "agent": "/root/town_tunnel_reference_gap",
+        "agent": "/root/town_lifecycle_148",
         "model": "gpt-6.1-sol",
         "reasoning_effort": "high",
     }

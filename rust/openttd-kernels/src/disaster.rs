@@ -1282,6 +1282,8 @@ mod tests {
                     write_tile: tile_write,
                     trig,
                     industry,
+                    company_valid: crate::services::unused_company_valid,
+                    next_company: crate::services::unused_next_company,
                 },
                 service,
             )

@@ -28,6 +28,8 @@ struct OpenTTDSharedServices {
 	void (*write_tile)(void *, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) noexcept;
 	float (*trig)(uint32_t, float) noexcept;
 	uint32_t (*industry)(int32_t, int32_t, uint32_t *) noexcept;
+	bool (*company_valid)(uint8_t) noexcept;
+	uint8_t (*next_company)(uint8_t) noexcept;
 };
 const OpenTTDSharedServices &GetRustSharedServices() noexcept;
 #endif /* RUST_SERVICES_FFI_H */

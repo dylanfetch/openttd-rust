@@ -984,6 +984,8 @@ mod tests {
                 write_tile: write,
                 trig,
                 industry,
+                company_valid: crate::services::unused_company_valid,
+                next_company: crate::services::unused_next_company,
             },
             leaf,
             pending: Pending::Start(kind, 2, a, b, c),
