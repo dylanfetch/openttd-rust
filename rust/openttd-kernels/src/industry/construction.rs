@@ -464,9 +464,11 @@ pub unsafe extern "C" fn openttd_rust_industry_initialize(
     let kind = unsafe { (*owner).metadata.kind };
     let behaviour = unsafe { (g.spec_behaviour)((g.spec)(kind)) };
     if behaviour & (1 << 6) != 0 {
+        let map = unsafe { (c.map)() };
         for _ in 0..50 {
-            let map = unsafe { (c.map)() };
-            super::farm(industry, r.id, map, s);
+            // Only the shared service table is borrowed across map/RNG calls.
+            // Initialization observes landscape at the original plant branches.
+            super::farm_with_landscape(industry, r.id, map, s, &|| unsafe { (s.landscape)() });
         }
     }
     unsafe {

@@ -300,7 +300,7 @@ pub fn layout(type_id: u16, item: u8) -> usize {
             layout!(crate::industry::Accepted, item; cargo, waiting, accumulated_waiting, last_accepted, history)
         }
         136 => {
-            layout!(crate::industry::Observation, item; owner, tile, behaviour, id, width, height, callbacks, sound_count, life, original, minimal_cargo, kind, up_text, down_text, closure_text)
+            layout!(crate::industry::Observation, item; owner, behaviour, callbacks, life, original, kind, up_text, down_text, closure_text)
         }
         137 => {
             layout!(crate::industry::Services, item; next_tick, sound_count, behaviour, location, industry_sound, play_sound, special_effect, tick_trigger, production_callback, scale_cargo, random, random_range, move_goods, tile_add_wrap, farm_tile, tile_z, snow_line, make_field, fence_wanted, set_fence, tile_completed, harvest, observe, production_rate, change_callback, custom_text, news, rate_news, callback_error, set_dirty, destroy, advertise, create, random_industry, get, type_count, total, type_info, probability_callback, scale_by_map_size, company_none, restore_company, directory_dirty, recession, economy_month, economy_year, days_since_last_month, landscape, economy_type, passengers, fund_only, calendar_year, deity)

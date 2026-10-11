@@ -327,16 +327,10 @@ pub unsafe extern "C" fn openttd_rust_industry_builder_fields(
 #[derive(Default, Clone, Copy)]
 pub struct Observation {
     pub owner: *mut Industry,
-    pub tile: u32,
     pub behaviour: u32,
-    pub id: u16,
-    pub width: u16,
-    pub height: u16,
     pub callbacks: u16,
-    pub sound_count: u16,
     pub life: u8,
     pub original: u8,
-    pub minimal_cargo: u8,
     pub kind: u8,
     pub up_text: u32,
     pub down_text: u32,
@@ -1323,14 +1317,14 @@ fn fence(mut tile: u32, mut size: u32, kind: u8, side: u8, map: Map, s: &Service
         }
     }
 }
-fn plant(tile: u32, industry: u16, map: Map, s: &Services) {
-    if map.landscape == LANDSCAPE_ARCTIC
+fn plant(tile: u32, industry: u16, map: Map, s: &Services, landscape: &impl Fn() -> u8) {
+    if landscape() == LANDSCAPE_ARCTIC
         && unsafe { (s.tile_z)(tile) + 2 >= i32::from((s.snow_line)()) }
     {
         return;
     }
     let mut r = (rand(s) & 0x303) + 0x404;
-    if map.landscape == LANDSCAPE_ARCTIC {
+    if landscape() == LANDSCAPE_ARCTIC {
         r += 0x404;
     }
     let (width, height) = (map.size_x, map.size_y);
@@ -1366,7 +1360,7 @@ fn plant(tile: u32, industry: u16, map: Map, s: &Services) {
         }
     }
     let mut kind = 3;
-    if map.landscape != LANDSCAPE_ARCTIC && map.landscape != LANDSCAPE_TROPIC {
+    if landscape() != LANDSCAPE_ARCTIC && landscape() != LANDSCAPE_TROPIC {
         kind = [1, 1, 1, 1, 1, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6][(rand(s) & 15) as usize];
     }
     fence(tile_xy(x, y, map), sy, kind, 0, map, s);
@@ -1374,7 +1368,13 @@ fn plant(tile: u32, industry: u16, map: Map, s: &Services) {
     fence(tile_xy(x + sx - 1, y, map), sy, kind, 2, map, s);
     fence(tile_xy(x, y + sy - 1, map), sx, kind, 1, map, s);
 }
-fn farm(i: *mut c_void, id: u16, map: Map, s: &Services) {
+fn farm_with_landscape(
+    i: *mut c_void,
+    id: u16,
+    map: Map,
+    s: &Services,
+    landscape: &impl Fn() -> u8,
+) {
     let l = unsafe { (s.location)(i) };
     let x = (u32::from(l.width) / 2)
         .wrapping_add(rand(s) % 31)
@@ -1384,8 +1384,12 @@ fn farm(i: *mut c_void, id: u16, map: Map, s: &Services) {
         .wrapping_sub(16) as i32;
     let tile = unsafe { (s.tile_add_wrap)(l.tile, x, y) };
     if tile != INVALID_TILE {
-        plant(tile, id, map, s);
+        plant(tile, id, map, s, landscape);
     }
+}
+fn farm(i: *mut c_void, id: u16, map: Map, s: &Services) {
+    // Preserve the earlier production tick's captured landscape until #168.
+    farm_with_landscape(i, id, map, s, &|| map.landscape);
 }
 /// # Safety
 /// Live industry, synchronous map/RNG services. No owner references cross calls.

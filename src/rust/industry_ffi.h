@@ -73,9 +73,9 @@ OpenTTDIndustryBuilderFields *openttd_rust_industry_builder_fields(OpenTTDIndust
 
 typedef struct OpenTTDIndustryObservation {
 	OpenTTDIndustry *owner;
-	uint32_t tile, behaviour;
-	uint16_t id, width, height, callbacks, sound_count;
-	uint8_t life, original, minimal_cargo, type;
+	uint32_t behaviour;
+	uint16_t callbacks;
+	uint8_t life, original, type;
 	uint32_t up_text, down_text, closure_text;
 } OpenTTDIndustryObservation;
 /** Map facts constant for one entry; landscape is the original enum value. */
