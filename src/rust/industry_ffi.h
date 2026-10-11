@@ -33,6 +33,20 @@ typedef struct OpenTTDIndustryBuilderFields {
 	uint8_t sound_ctr;
 } OpenTTDIndustryBuilderFields;
 typedef struct OpenTTDIndustrySlots { void *data; size_t size; } OpenTTDIndustrySlots;
+typedef struct OpenTTDIndustryMetadata {
+	uint32_t tile;
+	uint16_t width, height;
+	int32_t construction_date;
+	uint16_t random;
+	uint8_t type, owner, random_colour, founder, construction_type, selected_layout, exclusive_supplier, exclusive_consumer;
+} OpenTTDIndustryMetadata;
+OpenTTDIndustryMetadata *openttd_rust_industry_metadata(OpenTTDIndustry *owner);
+size_t openttd_rust_industry_text(OpenTTDIndustry *owner, uint8_t *output, size_t capacity);
+void openttd_rust_industry_set_text(OpenTTDIndustry *owner, const uint8_t *text, size_t length);
+OpenTTDIndustrySlots openttd_rust_industry_registry_view(OpenTTDIndustryBuilder *owner, uint8_t type);
+void openttd_rust_industry_registry_insert(OpenTTDIndustryBuilder *owner, uint8_t type, uint16_t id);
+void openttd_rust_industry_registry_erase(OpenTTDIndustryBuilder *owner, uint8_t type, uint16_t id);
+void openttd_rust_industry_registry_clear(OpenTTDIndustryBuilder *owner, uint8_t type);
 OpenTTDIndustry *openttd_rust_industry_new(void);
 void openttd_rust_industry_destroy(OpenTTDIndustry *owner);
 OpenTTDIndustryFields *openttd_rust_industry_fields(OpenTTDIndustry *owner);
@@ -159,6 +173,48 @@ typedef struct OpenTTDIndustryServices {
 	int32_t (*calendar_year)(void) OPENTTD_INDUSTRY_NOEXCEPT;
 	bool (*deity)(void) OPENTTD_INDUSTRY_NOEXCEPT;
 } OpenTTDIndustryServices;
+
+/** Minimal destruction map facts, queried at the original observation point. */
+typedef struct OpenTTDIndustryCleanupTile { uint16_t industry; uint8_t type; bool oilrig; } OpenTTDIndustryCleanupTile;
+/** NewGRF resolver output. Sprite groups/resolvers remain native shared services. */
+typedef struct OpenTTDIndustryReseed { uint32_t self, parent; uint8_t used; } OpenTTDIndustryReseed;
+typedef struct OpenTTDIndustryRandomisationSpec { uint16_t gfx; bool enabled; } OpenTTDIndustryRandomisationSpec;
+typedef struct OpenTTDIndustryAnimationSpec { const void *spec; uint8_t triggers; } OpenTTDIndustryAnimationSpec;
+typedef struct OpenTTDIndustryLifecycleServices {
+	bool (*neutral_station)(void *) OPENTTD_INDUSTRY_NOEXCEPT;
+	OpenTTDIndustryCleanupTile (*cleanup_tile)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*delete_tile_inspect)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*make_water)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*delete_oilrig)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*clear_docking)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	bool (*industry_field)(uint32_t, uint16_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*disassociate_field)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*release_disasters)(uint16_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*delete_storage)(void *) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*delete_news)(uint16_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*close_view)(uint16_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*close_production)(uint16_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*delete_inspect)(uint16_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*delete_subsidies)(uint16_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*invalidate_cargo)(uint16_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void *(*next_near_station)(void *, void *) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*remove_delivery)(void *, void *) OPENTTD_INDUSTRY_NOEXCEPT;
+	bool (*belongs)(uint32_t, uint16_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	OpenTTDIndustryRandomisationSpec (*randomisation_spec)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint8_t (*random_triggers)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*set_random_triggers)(uint32_t, uint8_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	OpenTTDIndustryReseed (*resolve_reseed)(uint32_t, uint16_t, void *, uint8_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint8_t (*random_bits)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*set_random_bits)(uint32_t, uint8_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*mark_dirty)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	OpenTTDIndustryAnimationSpec (*animation_spec)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*change_frame)(const void *, uint32_t, uint32_t, uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+} OpenTTDIndustryLifecycleServices;
+void openttd_rust_industry_cleanup(void *, OpenTTDIndustry *, OpenTTDIndustryBuilder *, uint16_t, bool, OpenTTDIndustryMap, const OpenTTDIndustryServices *, const OpenTTDIndustryLifecycleServices *);
+void openttd_rust_industry_randomise_tile(uint32_t, uint8_t, void *, OpenTTDIndustry *, const OpenTTDIndustryServices *, const OpenTTDIndustryLifecycleServices *);
+void openttd_rust_industry_randomise(void *, OpenTTDIndustry *, uint16_t, uint8_t, uint32_t, const OpenTTDIndustryServices *, const OpenTTDIndustryLifecycleServices *);
+bool openttd_rust_industry_animate_tile(uint32_t, uint8_t, uint32_t, const OpenTTDIndustryServices *, const OpenTTDIndustryLifecycleServices *);
+bool openttd_rust_industry_animate(OpenTTDIndustry *, uint16_t, uint8_t, uint32_t, const OpenTTDIndustryServices *, const OpenTTDIndustryLifecycleServices *);
 void openttd_rust_industry_tick(OpenTTDIndustryBuilder *builder, const OpenTTDIndustryTickRecord *record, const OpenTTDIndustryServices *services);
 bool openttd_rust_industry_transport(void *industry, OpenTTDIndustry *owner, uint8_t minimal_cargo, bool recession, const OpenTTDIndustryServices *services);
 void openttd_rust_industry_farm(void *industry, uint16_t id, OpenTTDIndustryMap map, const OpenTTDIndustryServices *services);

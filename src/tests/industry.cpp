@@ -11,13 +11,30 @@
 #ifdef WITH_RUST
 #include "../industry.h"
 #include "../rust/abi_ffi.h"
+static_assert(std::is_trivially_destructible_v<TileArea>);
+static_assert(sizeof(TileArea) == sizeof(OpenTTDIndustryLocation));
+static_assert(alignof(TileArea) == alignof(OpenTTDIndustryMetadata));
+static_assert(offsetof(TileArea, tile) == offsetof(OpenTTDIndustryMetadata, tile));
+static_assert(offsetof(TileArea, w) == offsetof(OpenTTDIndustryMetadata, width));
+static_assert(offsetof(TileArea, h) == offsetof(OpenTTDIndustryMetadata, height));
+static_assert(sizeof(IndustryID) == sizeof(uint16_t) && alignof(IndustryID) == alignof(uint16_t));
+static_assert(sizeof(Owner) == sizeof(uint8_t) && alignof(Owner) == alignof(uint8_t));
+static_assert(sizeof(Colours) == sizeof(uint8_t));
+static_assert(sizeof(TimerGameCalendar::Date) == sizeof(int32_t));
+
 TEST_CASE("Industry - canonical native layouts")
 {
-	auto layout = [](uint8_t type, std::initializer_list<size_t> fields) {
+	auto layout = [](uint16_t type, std::initializer_list<size_t> fields) {
 		uint8_t item = 0;
 		for (size_t expected : fields) CHECK(openttd_rust_abi_layout(type, item++) == expected);
 		CHECK(openttd_rust_abi_layout(type, item) == SIZE_MAX);
 	};
+	layout(560, {sizeof(OpenTTDIndustryMetadata), alignof(OpenTTDIndustryMetadata), offsetof(OpenTTDIndustryMetadata, tile), offsetof(OpenTTDIndustryMetadata, width), offsetof(OpenTTDIndustryMetadata, height), offsetof(OpenTTDIndustryMetadata, construction_date), offsetof(OpenTTDIndustryMetadata, random), offsetof(OpenTTDIndustryMetadata, type), offsetof(OpenTTDIndustryMetadata, owner), offsetof(OpenTTDIndustryMetadata, random_colour), offsetof(OpenTTDIndustryMetadata, founder), offsetof(OpenTTDIndustryMetadata, construction_type), offsetof(OpenTTDIndustryMetadata, selected_layout), offsetof(OpenTTDIndustryMetadata, exclusive_supplier), offsetof(OpenTTDIndustryMetadata, exclusive_consumer)});
+	layout(561, {sizeof(OpenTTDIndustryCleanupTile), alignof(OpenTTDIndustryCleanupTile), offsetof(OpenTTDIndustryCleanupTile, industry), offsetof(OpenTTDIndustryCleanupTile, type), offsetof(OpenTTDIndustryCleanupTile, oilrig)});
+	layout(562, {sizeof(OpenTTDIndustryReseed), alignof(OpenTTDIndustryReseed), offsetof(OpenTTDIndustryReseed, self), offsetof(OpenTTDIndustryReseed, parent), offsetof(OpenTTDIndustryReseed, used)});
+	layout(563, {sizeof(OpenTTDIndustryRandomisationSpec), alignof(OpenTTDIndustryRandomisationSpec), offsetof(OpenTTDIndustryRandomisationSpec, gfx), offsetof(OpenTTDIndustryRandomisationSpec, enabled)});
+	layout(564, {sizeof(OpenTTDIndustryAnimationSpec), alignof(OpenTTDIndustryAnimationSpec), offsetof(OpenTTDIndustryAnimationSpec, spec), offsetof(OpenTTDIndustryAnimationSpec, triggers)});
+	layout(565, {sizeof(OpenTTDIndustryLifecycleServices), alignof(OpenTTDIndustryLifecycleServices), offsetof(OpenTTDIndustryLifecycleServices, neutral_station), offsetof(OpenTTDIndustryLifecycleServices, cleanup_tile), offsetof(OpenTTDIndustryLifecycleServices, delete_tile_inspect), offsetof(OpenTTDIndustryLifecycleServices, make_water), offsetof(OpenTTDIndustryLifecycleServices, delete_oilrig), offsetof(OpenTTDIndustryLifecycleServices, clear_docking), offsetof(OpenTTDIndustryLifecycleServices, industry_field), offsetof(OpenTTDIndustryLifecycleServices, disassociate_field), offsetof(OpenTTDIndustryLifecycleServices, release_disasters), offsetof(OpenTTDIndustryLifecycleServices, delete_storage), offsetof(OpenTTDIndustryLifecycleServices, delete_news), offsetof(OpenTTDIndustryLifecycleServices, close_view), offsetof(OpenTTDIndustryLifecycleServices, close_production), offsetof(OpenTTDIndustryLifecycleServices, delete_inspect), offsetof(OpenTTDIndustryLifecycleServices, delete_subsidies), offsetof(OpenTTDIndustryLifecycleServices, invalidate_cargo), offsetof(OpenTTDIndustryLifecycleServices, next_near_station), offsetof(OpenTTDIndustryLifecycleServices, remove_delivery), offsetof(OpenTTDIndustryLifecycleServices, belongs), offsetof(OpenTTDIndustryLifecycleServices, randomisation_spec), offsetof(OpenTTDIndustryLifecycleServices, random_triggers), offsetof(OpenTTDIndustryLifecycleServices, set_random_triggers), offsetof(OpenTTDIndustryLifecycleServices, resolve_reseed), offsetof(OpenTTDIndustryLifecycleServices, random_bits), offsetof(OpenTTDIndustryLifecycleServices, set_random_bits), offsetof(OpenTTDIndustryLifecycleServices, mark_dirty), offsetof(OpenTTDIndustryLifecycleServices, animation_spec), offsetof(OpenTTDIndustryLifecycleServices, change_frame)});
 	layout(130, {sizeof(OpenTTDIndustryFields), alignof(OpenTTDIndustryFields), offsetof(OpenTTDIndustryFields, valid_history), offsetof(OpenTTDIndustryFields, last_prod_year), offsetof(OpenTTDIndustryFields, counter), offsetof(OpenTTDIndustryFields, prod_level), offsetof(OpenTTDIndustryFields, was_cargo_delivered), offsetof(OpenTTDIndustryFields, ctlflags)});
 	layout(131, {sizeof(OpenTTDIndustryBuildFields), alignof(OpenTTDIndustryBuildFields), offsetof(OpenTTDIndustryBuildFields, probability), offsetof(OpenTTDIndustryBuildFields, min_number), offsetof(OpenTTDIndustryBuildFields, target_count), offsetof(OpenTTDIndustryBuildFields, max_wait), offsetof(OpenTTDIndustryBuildFields, wait_count)});
 	layout(132, {sizeof(OpenTTDIndustryBuilderFields), alignof(OpenTTDIndustryBuilderFields), offsetof(OpenTTDIndustryBuilderFields, builddata), offsetof(OpenTTDIndustryBuilderFields, wanted_inds), offsetof(OpenTTDIndustryBuilderFields, daily_counter), offsetof(OpenTTDIndustryBuilderFields, daily_increment), offsetof(OpenTTDIndustryBuilderFields, sound_tile), offsetof(OpenTTDIndustryBuilderFields, sound_ctr)});
@@ -67,5 +84,41 @@ TEST_CASE("Industry - canonical allocation and history lifetime")
 	accepted.clear();
 	CHECK(accepted.empty());
 	CHECK(accepted.emplace_back().history == nullptr);
+}
+TEST_CASE("Industry - construction owner and ascending type registry")
+{
+	RustIndustryOwner owner{openttd_rust_industry_new(), openttd_rust_industry_destroy};
+	auto *metadata = openttd_rust_industry_metadata(owner.get());
+	CHECK(metadata->tile == INVALID_TILE.base());
+	CHECK(metadata->width == 0);
+	CHECK(metadata->owner == INVALID_OWNER);
+	CHECK(metadata->founder == INVALID_OWNER);
+	CHECK(metadata->exclusive_supplier == INVALID_OWNER);
+	CHECK(metadata->exclusive_consumer == INVALID_OWNER);
+	std::construct_at(reinterpret_cast<TileArea *>(&metadata->tile), TileIndex(456), 7, 9);
+	CHECK(metadata->tile == 456);
+	CHECK(metadata->width == 7);
+	CHECK(metadata->height == 9);
+	const uint8_t text[] = {0, 0xFF, 0x1E, 'a'};
+	openttd_rust_industry_set_text(owner.get(), text, sizeof(text));
+	uint8_t output[sizeof(text)]{};
+	CHECK(openttd_rust_industry_text(owner.get(), output, sizeof(output)) == sizeof(text));
+	CHECK(std::equal(std::begin(text), std::end(text), std::begin(output)));
+	openttd_rust_industry_set_text(owner.get(), nullptr, 0);
+	CHECK(openttd_rust_industry_text(owner.get(), nullptr, 0) == 0);
+	RustIndustryBuilderOwner builder{openttd_rust_industry_builder_new(), openttd_rust_industry_builder_destroy};
+	for (uint16_t id : {9, 1, 9, 5}) openttd_rust_industry_registry_insert(builder.get(), 3, id);
+	const uint16_t expected[] = {1, 5, 9};
+	auto view = openttd_rust_industry_registry_view(builder.get(), 3);
+	CHECK(view.size == 3);
+	CHECK(std::equal(std::begin(expected), std::end(expected), static_cast<uint16_t *>(view.data)));
+	openttd_rust_industry_registry_erase(builder.get(), 3, 5);
+	openttd_rust_industry_registry_erase(builder.get(), 3, 99);
+	CHECK(openttd_rust_industry_registry_view(builder.get(), 3).size == 2);
+	CHECK(openttd_rust_industry_registry_view(builder.get(), 4).size == 0);
+	openttd_rust_industry_registry_insert(builder.get(), 3, 5);
+	CHECK(openttd_rust_industry_registry_view(builder.get(), 3).size == 3);
+	openttd_rust_industry_registry_clear(builder.get(), 3);
+	CHECK(openttd_rust_industry_registry_view(builder.get(), 3).size == 0);
 }
 #endif

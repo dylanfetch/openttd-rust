@@ -979,9 +979,9 @@ public:
 			}
 		}
 
-		if (!i->text.empty()) {
+		if (!i->GetText().empty()) {
 			ir.top += WidgetDimensions::scaled.vsep_wide;
-			ir.top = DrawStringMultiLine(ir, i->text.GetDecodedString(), TC_BLACK);
+			ir.top = DrawStringMultiLine(ir, i->GetText().GetDecodedString(), TC_BLACK);
 		}
 
 		/* Return required bottom position, the last pixel row plus some padding. */

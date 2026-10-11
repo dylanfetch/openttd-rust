@@ -276,6 +276,7 @@ void AnimateNewIndustryTile(TileIndex tile)
 	IndustryAnimationBase::AnimateTile(itspec, Industry::GetByTile(tile), tile, itspec->special_flags.Test(IndustryTileSpecialFlag::NextFrameRandomBits));
 }
 
+#ifndef WITH_RUST
 static bool DoTriggerIndustryTileAnimation(TileIndex tile, IndustryAnimationTrigger iat, uint32_t random, uint32_t var18_extra = 0)
 {
 	const IndustryTileSpec *itspec = GetIndustryTileSpec(GetIndustryGfx(tile));
@@ -284,21 +285,34 @@ static bool DoTriggerIndustryTileAnimation(TileIndex tile, IndustryAnimationTrig
 	IndustryAnimationBase::ChangeAnimationFrame(CBID_INDTILE_ANIMATION_TRIGGER, itspec, Industry::GetByTile(tile), tile, random, to_underlying(iat) | var18_extra);
 	return true;
 }
+#endif
 
 bool TriggerIndustryTileAnimation_ConstructionStageChanged(TileIndex tile, bool first_call)
 {
+#ifdef WITH_RUST
+	return openttd_rust_industry_animate_tile(tile.base(), to_underlying(IndustryAnimationTrigger::ConstructionStageChanged), first_call ? 0x100 : 0, &GetIndustryRustServices(), &GetIndustryLifecycleRustServices());
+#else
 	auto iat = IndustryAnimationTrigger::ConstructionStageChanged;
 	return DoTriggerIndustryTileAnimation(tile, iat, Random(), first_call ? 0x100 : 0);
+#endif
 }
 
 bool TriggerIndustryTileAnimation(TileIndex tile, IndustryAnimationTrigger iat)
 {
+#ifdef WITH_RUST
+	assert(iat != IndustryAnimationTrigger::ConstructionStageChanged);
+	return openttd_rust_industry_animate_tile(tile.base(), to_underlying(iat), 0, &GetIndustryRustServices(), &GetIndustryLifecycleRustServices());
+#else
 	assert(iat != IndustryAnimationTrigger::ConstructionStageChanged);
 	return DoTriggerIndustryTileAnimation(tile, iat, Random());
+#endif
 }
 
 bool TriggerIndustryAnimation(const Industry *ind, IndustryAnimationTrigger iat)
 {
+#ifdef WITH_RUST
+	return openttd_rust_industry_animate(ind->production_owner.get(), ind->index.base(), to_underlying(iat), Map::SizeX(), &GetIndustryRustServices(), &GetIndustryLifecycleRustServices());
+#else
 	bool ret = true;
 	uint32_t random = Random();
 	for (TileIndex tile : ind->location) {
@@ -312,6 +326,7 @@ bool TriggerIndustryAnimation(const Industry *ind, IndustryAnimationTrigger iat)
 	}
 
 	return ret;
+#endif
 }
 
 /**
@@ -321,6 +336,7 @@ bool TriggerIndustryAnimation(const Industry *ind, IndustryAnimationTrigger iat)
  * @param ind Industry of the tile.
  * @param[in,out] reseed_industry Collects bits to reseed for the industry.
  */
+#ifndef WITH_RUST
 static void DoTriggerIndustryTileRandomisation(TileIndex tile, IndustryRandomTrigger trigger, Industry *ind, uint32_t &reseed_industry)
 {
 	assert(IsValidTile(tile) && IsTileType(tile, MP_INDUSTRY));
@@ -352,12 +368,14 @@ static void DoTriggerIndustryTileRandomisation(TileIndex tile, IndustryRandomTri
 
 	reseed_industry |= object.reseed[VSG_SCOPE_PARENT];
 }
+#endif
 
 /**
  * Reseeds the random bits of an industry.
  * @param ind Industry.
  * @param reseed Bits to reseed.
  */
+#ifndef WITH_RUST
 static void DoReseedIndustry(Industry *ind, uint32_t reseed)
 {
 	if (reseed == 0 || ind == nullptr) return;
@@ -366,6 +384,7 @@ static void DoReseedIndustry(Industry *ind, uint32_t reseed)
 	ind->random &= reseed;
 	ind->random |= random_bits & reseed;
 }
+#endif
 
 /**
  * Trigger a random trigger for a single industry tile.
@@ -374,10 +393,15 @@ static void DoReseedIndustry(Industry *ind, uint32_t reseed)
  */
 void TriggerIndustryTileRandomisation(TileIndex tile, IndustryRandomTrigger trigger)
 {
+#ifdef WITH_RUST
+	Industry *ind = Industry::GetByTile(tile);
+	openttd_rust_industry_randomise_tile(tile.base(), to_underlying(trigger), ind, ind->production_owner.get(), &GetIndustryRustServices(), &GetIndustryLifecycleRustServices());
+#else
 	uint32_t reseed_industry = 0;
 	Industry *ind = Industry::GetByTile(tile);
 	DoTriggerIndustryTileRandomisation(tile, trigger, ind, reseed_industry);
 	DoReseedIndustry(ind, reseed_industry);
+#endif
 }
 
 /**
@@ -387,6 +411,9 @@ void TriggerIndustryTileRandomisation(TileIndex tile, IndustryRandomTrigger trig
  */
 void TriggerIndustryRandomisation(Industry *ind, IndustryRandomTrigger trigger)
 {
+#ifdef WITH_RUST
+	openttd_rust_industry_randomise(ind, ind->production_owner.get(), ind->index.base(), to_underlying(trigger), Map::SizeX(), &GetIndustryRustServices(), &GetIndustryLifecycleRustServices());
+#else
 	uint32_t reseed_industry = 0;
 	for (TileIndex tile : ind->location) {
 		if (ind->TileBelongsToIndustry(tile)) {
@@ -394,5 +421,32 @@ void TriggerIndustryRandomisation(Industry *ind, IndustryRandomTrigger trigger)
 		}
 	}
 	DoReseedIndustry(ind, reseed_industry);
+#endif
 }
 
+
+#ifdef WITH_RUST
+OpenTTDIndustryRandomisationSpec IndustryRandomisationSpec(uint32_t index) noexcept
+{
+	TileIndex tile(index);
+	assert(IsValidTile(tile) && IsTileType(tile, MP_INDUSTRY));
+	IndustryGfx gfx = GetIndustryGfx(tile);
+	return {gfx, GetIndustryTileSpec(gfx)->grf_prop.HasSpriteGroups()};
+}
+OpenTTDIndustryReseed IndustryResolveReseed(uint32_t tile, uint16_t gfx, void *industry, uint8_t waiting) noexcept
+{
+	IndustryTileResolverObject object(gfx, TileIndex(tile), static_cast<Industry *>(industry), CBID_RANDOM_TRIGGER);
+	object.SetWaitingRandomTriggers(IndustryRandomTriggers(waiting));
+	object.ResolveRerandomisation();
+	return {object.reseed[VSG_SCOPE_SELF], object.reseed[VSG_SCOPE_PARENT], object.GetUsedRandomTriggers().base()};
+}
+OpenTTDIndustryAnimationSpec IndustryAnimationSpec(uint32_t tile) noexcept
+{
+	const IndustryTileSpec *spec = GetIndustryTileSpec(GetIndustryGfx(TileIndex(tile)));
+	return {spec, spec->animation.triggers.base()};
+}
+void IndustryChangeAnimationFrame(const void *spec, uint32_t tile, uint32_t random, uint32_t parameter) noexcept
+{
+	IndustryAnimationBase::ChangeAnimationFrame(CBID_INDTILE_ANIMATION_TRIGGER, static_cast<const IndustryTileSpec *>(spec), Industry::GetByTile(TileIndex(tile)), TileIndex(tile), random, parameter);
+}
+#endif

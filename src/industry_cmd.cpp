@@ -71,11 +71,22 @@ static uint8_t _industry_sound_ctr;
 static TileIndex _industry_sound_tile;
 #endif
 
+#ifdef WITH_RUST
+std::array<RustIndustryRegistry, NUM_INDUSTRYTYPES> Industry::industries = [] {
+	std::array<RustIndustryRegistry, NUM_INDUSTRYTYPES> result{};
+	for (uint8_t type = 0; type < NUM_INDUSTRYTYPES; type++) result[type].type = type;
+	return result;
+}();
+#else
 std::array<FlatSet<IndustryID>, NUM_INDUSTRYTYPES> Industry::industries;
+#endif
 
 IndustrySpec _industry_specs[NUM_INDUSTRYTYPES];
 IndustryTileSpec _industry_tile_specs[NUM_INDUSTRYTILES];
 IndustryBuildData _industry_builder; ///< In-game manager of industries.
+#ifdef WITH_RUST
+OpenTTDIndustryBuilder *RustIndustryRegistry::Owner() const { return _industry_builder.owner.get(); }
+#endif
 
 static int WhoCanServiceIndustry(Industry *ind);
 
@@ -150,6 +161,9 @@ const IndustryTileSpec *GetIndustryTileSpec(IndustryGfx gfx)
 
 Industry::~Industry()
 {
+#ifdef WITH_RUST
+	openttd_rust_industry_cleanup(this, this->production_owner.get(), _industry_builder.owner.get(), this->index.base(), CleaningPool(), {Map::SizeX(), Map::SizeY(), 0}, &GetIndustryRustServices(), &GetIndustryLifecycleRustServices());
+#else
 	if (CleaningPool()) return;
 
 	/* Industry can also be destroyed when not fully initialized.
@@ -212,6 +226,7 @@ Industry::~Industry()
 	for (Station *st : this->stations_near) {
 		st->RemoveIndustryToDeliver(this);
 	}
+#endif
 }
 
 /**
@@ -1462,7 +1477,7 @@ static CommandCost FindTownForIndustry(TileIndex tile, IndustryType type, Town *
 
 	if (_settings_game.economy.multiple_industry_per_town) return CommandCost();
 
-	for (const IndustryID &industry : Industry::industries[type]) {
+	for (const IndustryID industry : Industry::industries[type]) {
 		if (Industry::Get(industry)->town == *t) {
 			*t = nullptr;
 			return CommandCost(STR_ERROR_ONLY_ONE_ALLOWED_PER_TOWN);
@@ -1724,7 +1739,7 @@ static CommandCost CheckIfFarEnoughFromConflictingIndustry(TileIndex tile, Indus
 	for (IndustryType conflicting_type : indspec->conflicting) {
 		if (conflicting_type == IT_INVALID) continue;
 
-		for (const IndustryID &industry : Industry::industries[conflicting_type]) {
+		for (const IndustryID industry : Industry::industries[conflicting_type]) {
 			/* Within 14 tiles from another industry is considered close */
 			if (DistanceMax(tile, Industry::Get(industry)->location.tile) > 14) continue;
 
@@ -2304,8 +2319,7 @@ CommandCost CmdIndustrySetText(DoCommandFlags flags, IndustryID ind_id, const En
 	if (ind == nullptr) return CMD_ERROR;
 
 	if (flags.Test(DoCommandFlag::Execute)) {
-		ind->text.clear();
-		if (!text.empty()) ind->text = text;
+		ind->SetText(text);
 		InvalidateWindowData(WC_INDUSTRY_VIEW, ind->index);
 	}
 
@@ -3243,7 +3257,11 @@ static const IntervalTimer<TimerGameEconomy> _economy_industries_monthly({TimerG
 
 void InitializeIndustries()
 {
+#ifdef WITH_RUST
+	for (auto &registry : Industry::industries) registry.clear();
+#else
 	Industry::industries.fill({});
+#endif
 	_industry_sound_tile = TileIndex{};
 
 	_industry_builder.Reset();
@@ -3566,4 +3584,48 @@ static const OpenTTDIndustryServices _industry_services = {
 	.deity = []() noexcept -> bool { return _current_company == OWNER_DEITY; },
 };
 const OpenTTDIndustryServices &GetIndustryRustServices() { return _industry_services; }
+#endif
+
+#ifdef WITH_RUST
+/** Native shells, packed map, resolver and shared station/cargo services only.
+ * Destruction may reenter; Rust holds no owner or registry borrow across a slot. */
+static const OpenTTDIndustryLifecycleServices _industry_lifecycle_services = {
+	.neutral_station = [](void *shell) noexcept -> bool { return static_cast<Industry *>(shell)->neutral_station != nullptr; },
+	.cleanup_tile = [](uint32_t index) noexcept -> OpenTTDIndustryCleanupTile {
+		TileIndex tile(index);
+		TileType type = GetTileType(tile);
+		return {type == MP_INDUSTRY ? GetIndustryIndex(tile).base() : uint16_t{0xFFFF}, static_cast<uint8_t>(type), type == MP_STATION && IsOilRig(tile)};
+	},
+	.delete_tile_inspect = [](uint32_t tile) noexcept { DeleteNewGRFInspectWindow(GSF_INDUSTRYTILES, tile); },
+	.make_water = [](uint32_t tile) noexcept { MakeWaterKeepingClass(TileIndex(tile), OWNER_NONE); },
+	.delete_oilrig = [](uint32_t tile) noexcept { DeleteOilRig(TileIndex(tile)); },
+	.clear_docking = [](uint32_t tile) noexcept { ClearDockingTilesCheckingNeighbours(TileIndex(tile)); },
+	.industry_field = [](uint32_t index, uint16_t industry) noexcept -> bool { TileIndex tile(index); return IsTileType(tile, MP_CLEAR) && IsClearGround(tile, CLEAR_FIELDS) && GetIndustryIndexOfField(tile) == IndustryID(industry); },
+	.disassociate_field = [](uint32_t tile) noexcept { SetIndustryIndexOfField(TileIndex(tile), IndustryID::Invalid()); },
+	.release_disasters = [](uint16_t industry) noexcept { ReleaseDisastersTargetingIndustry(IndustryID(industry)); },
+	.delete_storage = [](void *shell) noexcept { delete static_cast<Industry *>(shell)->psa; },
+	.delete_news = [](uint16_t industry) noexcept { DeleteIndustryNews(IndustryID(industry)); },
+	.close_view = [](uint16_t industry) noexcept { CloseWindowById(WC_INDUSTRY_VIEW, industry); },
+	.close_production = [](uint16_t industry) noexcept { CloseWindowById(WC_INDUSTRY_PRODUCTION, industry); },
+	.delete_inspect = [](uint16_t industry) noexcept { DeleteNewGRFInspectWindow(GSF_INDUSTRIES, industry); },
+	.delete_subsidies = [](uint16_t industry) noexcept { DeleteSubsidyWith({IndustryID(industry), SourceType::Industry}); },
+	.invalidate_cargo = [](uint16_t industry) noexcept { CargoPacket::InvalidateAllFrom({IndustryID(industry), SourceType::Industry}); },
+	.next_near_station = [](void *shell, void *previous) noexcept -> void * {
+		const StationList &stations = static_cast<Industry *>(shell)->stations_near;
+		auto next = previous == nullptr ? stations.begin() : stations.upper_bound(static_cast<Station *>(previous));
+		return next == stations.end() ? nullptr : *next;
+	},
+	.remove_delivery = [](void *station, void *industry) noexcept { static_cast<Station *>(station)->RemoveIndustryToDeliver(static_cast<Industry *>(industry)); },
+	.belongs = [](uint32_t tile, uint16_t industry) noexcept -> bool { return IsTileType(TileIndex(tile), MP_INDUSTRY) && GetIndustryIndex(TileIndex(tile)) == IndustryID(industry); },
+	.randomisation_spec = IndustryRandomisationSpec,
+	.random_triggers = [](uint32_t tile) noexcept -> uint8_t { return GetIndustryRandomTriggers(TileIndex(tile)).base(); },
+	.set_random_triggers = [](uint32_t tile, uint8_t bits) noexcept { SetIndustryRandomTriggers(TileIndex(tile), IndustryRandomTriggers(bits)); },
+	.resolve_reseed = IndustryResolveReseed,
+	.random_bits = [](uint32_t tile) noexcept -> uint8_t { return GetIndustryRandomBits(TileIndex(tile)); },
+	.set_random_bits = [](uint32_t tile, uint8_t bits) noexcept { SetIndustryRandomBits(TileIndex(tile), bits); },
+	.mark_dirty = [](uint32_t tile) noexcept { MarkTileDirtyByTile(TileIndex(tile)); },
+	.animation_spec = IndustryAnimationSpec,
+	.change_frame = IndustryChangeAnimationFrame,
+};
+const OpenTTDIndustryLifecycleServices &GetIndustryLifecycleRustServices() { return _industry_lifecycle_services; }
 #endif

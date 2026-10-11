@@ -1644,6 +1644,18 @@ tools.simulation.industries` checks absent NewGRF versions/repeat/arithmetic aga
 the unchanged pinned callback body. The corpus does not exhaust legacy saves,
 NewGRF resolver programs or every industry layout; native tests check ABI/lifetimes.
 
+### Industry construction and tile lifecycle (#150, in progress)
+
+The first checkpoint extends the production owner with native-layout location,
+construction metadata, colour, founder, layout, exclusivity, random bits and
+encoded-text bytes. Its builder owns ascending per-type ID registries. Native
+field aliases and scoped modern/old-load adapters retain saved field names,
+reference fixups and partial initialization. Rust owns destruction cleanup and
+industry-wide/tile animation and rerandomisation traversal; the pinned-body
+industry comparison checks unavailable NewGRF tile/parent triggers and RNG.
+Construction/funding/prospecting, generation traversal and remaining tile policy
+are still native and remain required before this component is complete.
+
 ### Aircraft controllers and airport movement
 
 Issue #136 moves both tick passes, movement/speed/flight levels, shadow/rotor,

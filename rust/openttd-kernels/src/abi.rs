@@ -228,6 +228,16 @@ pub fn layout(type_id: u16, item: u8) -> usize {
             layout!(crate::station_service::Loading, item; read, write, next, next_stations, next_stations_destroy, cargo, load_callback, payment, effect, refit)
         }
 
+        560 => {
+            layout!(crate::industry::Metadata, item; tile, width, height, construction_date, random, kind, owner, random_colour, founder, construction_type, selected_layout, exclusive_supplier, exclusive_consumer)
+        }
+        561 => layout!(crate::industry::CleanupTile, item; industry, kind, oilrig),
+        562 => layout!(crate::industry::Reseed, item; own, parent, used),
+        563 => layout!(crate::industry::RandomisationSpec, item; gfx, enabled),
+        564 => layout!(crate::industry::AnimationSpec, item; spec, triggers),
+        565 => {
+            layout!(crate::industry::LifecycleServices, item; neutral_station, cleanup_tile, delete_tile_inspect, make_water, delete_oilrig, clear_docking, industry_field, disassociate_field, release_disasters, delete_storage, delete_news, close_view, close_production, delete_inspect, delete_subsidies, invalidate_cargo, next_near_station, remove_delivery, belongs, randomisation_spec, random_triggers, set_random_triggers, resolve_reseed, random_bits, set_random_bits, mark_dirty, animation_spec, change_frame)
+        }
         130 => {
             layout!(crate::industry::Fields, item; valid_history, last_prod_year, counter, prod_level, was_cargo_delivered, ctlflags)
         }

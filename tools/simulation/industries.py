@@ -57,7 +57,7 @@ def scenarios(soak):
                 },
             }
         )
-    for mode in ("original", "frozen", "control", "closure", "builder"):
+    for mode in ("original", "frozen", "control", "closure", "farm-cleanup", "builder"):
         result.append(
             {
                 "name": "industry-" + mode,
@@ -99,7 +99,14 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
         target = out / scenario["name"] / "input" / "lumber.sav"
         result["industry_input"] = disasters.patch(source, target, {})
         return dict(scenario, kind="save", save=str(target))
-    if mode not in ("original", "frozen", "control", "closure", "builder"):
+    if mode not in (
+        "original",
+        "frozen",
+        "control",
+        "closure",
+        "farm-cleanup",
+        "builder",
+    ):
         return scenario
     folder = out / scenario["name"] / "input"
     setup = dict(scenario, ticks=2 * SNAPSHOT_TICKS)
@@ -127,7 +134,14 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
         console.append("setting economy.type " + ("0" if mode == "original" else "2"))
     if mode == "control":
         changes["INDY"] = {index: {"ctlflags": 15} for index in industries}
-    if mode == "closure":
+    if mode in ("closure", "farm-cleanup"):
+        if mode == "farm-cleanup":
+            chosen = next(
+                index for index, row in industries.items() if row["type"] == 9
+            )
+            result["industry_field_input"] = len(industry_fields(before, chosen))
+            if not result["industry_field_input"]:
+                raise RuntimeError("reference farm has no associated fields to remove")
         changes["INDY"] = {chosen: {"prod_level": 0}}
         console.append("setting difficulty.industry_density 0")
     if mode == "builder":
@@ -235,10 +249,18 @@ def check(scenario, run, mode, role, result):
     if kind == "cargo" and scenario["economy"] != "stockpile":
         if facts["transported_history"] == 0 or facts["accepted_history"] == 0:
             result["problems"].append(f"{mode}/{role}: no transported/accepted history")
-    if kind == "closure":
+    if kind in ("closure", "farm-cleanup"):
         chosen = result["industry_chosen"]
         if chosen in rows[-1]:
             result["problems"].append(f"{mode}/{role}: selected industry did not close")
+        if kind == "farm-cleanup":
+            facts["remaining_associated_fields"] = len(
+                industry_fields(saved[-1], chosen)
+            )
+            if facts["remaining_associated_fields"]:
+                result["problems"].append(
+                    f"{mode}/{role}: farm fields remained associated"
+                )
     if kind == "control":
         before = economy.rows(read_save(Path(scenario["save"])), "INDY")
         for index, row in rows[-1].items():
@@ -251,6 +273,19 @@ def check(scenario, run, mode, role, result):
         facts["new_industries"] = len(set(rows[-1]) - set(before))
         if facts["new_industries"] == 0 or facts["builder_backoff"] <= 1:
             result["problems"].append(f"{mode}/{role}: no builder success/backoff")
+
+
+def industry_fields(chunks, industry):
+    """Canonical packed field association, exposed by the existing save decoder."""
+    import struct
+
+    return {
+        tile
+        for tile, value in enumerate(chunks["MAPT"]["raw"])
+        if value >> 4 == 0
+        and (chunks["MAP5"]["raw"][tile] >> 2) & 7 == 3
+        and struct.unpack_from(">H", chunks["MAP2"]["raw"], tile * 2)[0] == industry
+    }
 
 
 def production_gap():
@@ -299,5 +334,73 @@ def production_gap():
     subprocess.run([str(binary)], cwd=ROOT, check=True)
 
 
+def lifecycle_gap():
+    """Absent custom industry GRFs: unchanged tile/parent RNG and animation."""
+    import importlib.util
+    import subprocess
+
+    from .core import ROOT
+
+    spec = importlib.util.spec_from_file_location(
+        "migration", ROOT / "tools/migration.py"
+    )
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    out = ROOT / ".local/industry-lifecycle-gap"
+    out.mkdir(parents=True, exist_ok=True)
+    source = subprocess.check_output(
+        ["git", "show", migration.BASELINE["commit"] + ":src/newgrf_industrytiles.cpp"],
+        cwd=ROOT,
+        text=True,
+    )
+    signatures = (
+        "static bool DoTriggerIndustryTileAnimation(",
+        "bool TriggerIndustryTileAnimation_ConstructionStageChanged(",
+        "bool TriggerIndustryTileAnimation(",
+        "bool TriggerIndustryAnimation(",
+        "static void DoTriggerIndustryTileRandomisation(",
+        "static void DoReseedIndustry(",
+        "void TriggerIndustryTileRandomisation(",
+        "void TriggerIndustryRandomisation(",
+    )
+    bodies = []
+    for signature in signatures:
+        start = source.index(signature)
+        end = source.index("{", start) + 1
+        depth = 1
+        while depth:
+            if source[end] == "{":
+                depth += 1
+            elif source[end] == "}":
+                depth -= 1
+            end += 1
+        bodies.append(source[start:end])
+    (out / "industry-lifecycle-reference.inc").write_text("\n\n".join(bodies))
+    binary = out / "probe"
+    subprocess.run(
+        [
+            "c++",
+            "-std=c++20",
+            "-O2",
+            "-fno-strict-overflow",
+            "-DPOINTER_IS_64BIT",
+            "-I" + str(ROOT / "src"),
+            "-I" + str(out),
+            str(ROOT / "tools/migration/industry-lifecycle-gap.cpp"),
+            str(migration.rust_archive(ROOT / "build-rust")),
+            "-ldl",
+            "-lpthread",
+            "-lm",
+            "-o",
+            str(binary),
+        ],
+        cwd=ROOT,
+        env=migration.environment(),
+        check=True,
+    )
+    subprocess.run([str(binary)], cwd=ROOT, check=True)
+
+
 if __name__ == "__main__":
     production_gap()
+    lifecycle_gap()

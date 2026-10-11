@@ -26,6 +26,8 @@
 )]
 use std::ffi::c_void;
 use std::ptr;
+mod lifecycle;
+pub use lifecycle::*;
 const RECORDS: usize = 61;
 const TYPES: usize = 240;
 #[repr(C)]
@@ -90,9 +92,47 @@ pub struct Fields {
     pub was_cargo_delivered: u8,
     pub ctlflags: u8,
 }
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct Metadata {
+    pub tile: u32,
+    pub width: u16,
+    pub height: u16,
+    pub construction_date: i32,
+    pub random: u16,
+    pub kind: u8,
+    pub owner: u8,
+    pub random_colour: u8,
+    pub founder: u8,
+    pub construction_type: u8,
+    pub selected_layout: u8,
+    pub exclusive_supplier: u8,
+    pub exclusive_consumer: u8,
+}
+impl Default for Metadata {
+    fn default() -> Self {
+        Self {
+            tile: u32::MAX,
+            width: 0,
+            height: 0,
+            construction_date: 0,
+            random: 0,
+            kind: 0,
+            owner: 255,
+            random_colour: 0,
+            founder: 255,
+            construction_type: 0,
+            selected_layout: 0,
+            exclusive_supplier: 255,
+            exclusive_consumer: 255,
+        }
+    }
+}
 #[derive(Default)]
 pub struct Industry {
     fields: Fields,
+    metadata: Metadata,
+    text: Vec<u8>,
     produced: Vec<Produced>,
     accepted: Vec<Accepted>,
 }
@@ -116,6 +156,7 @@ pub struct BuilderFields {
 }
 pub struct Builder {
     fields: BuilderFields,
+    registry: [Vec<u16>; TYPES],
 }
 #[repr(C)]
 pub struct Slots {
@@ -244,6 +285,7 @@ pub unsafe extern "C" fn openttd_rust_industry_history(accepted: *mut Accepted) 
 #[unsafe(no_mangle)]
 pub extern "C" fn openttd_rust_industry_builder_new() -> *mut Builder {
     Box::into_raw(Box::new(Builder {
+        registry: std::array::from_fn(|_| Vec::new()),
         fields: BuilderFields {
             builddata: [BuildFields::default(); TYPES],
             wanted_inds: 0,
@@ -1588,4 +1630,81 @@ pub unsafe extern "C" fn openttd_rust_industry_daily_start(
             (*fields).daily_counter = 0;
         }
     }
+}
+
+/// # Safety
+/// Live owner with serial field-sized accesses. The facade placement-constructs
+/// its native `TileArea` prefix once with pinned scalar layout; no reference spans a callback.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_industry_metadata(owner: *mut Industry) -> *mut Metadata {
+    unsafe { ptr::addr_of_mut!((*owner).metadata) }
+}
+/// # Safety
+/// Live owner; output is null or writable for capacity bytes and disjoint from it.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_industry_text(
+    owner: *mut Industry,
+    output: *mut u8,
+    capacity: usize,
+) -> usize {
+    let text = unsafe { &(*owner).text };
+    if !output.is_null() {
+        unsafe { ptr::copy_nonoverlapping(text.as_ptr(), output, text.len().min(capacity)) };
+    }
+    text.len()
+}
+/// # Safety
+/// Live owner; text points to length initialized bytes, disjoint from this owner.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_industry_set_text(
+    owner: *mut Industry,
+    text: *const u8,
+    length: usize,
+) {
+    let target = unsafe { &mut (*owner).text };
+    target.clear();
+    if length != 0 {
+        target.extend_from_slice(unsafe { std::slice::from_raw_parts(text, length) });
+    }
+}
+/// # Safety
+/// Live builder and valid original type. View ends before registry mutation.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_industry_registry_view(
+    owner: *mut Builder,
+    kind: u8,
+) -> Slots {
+    unsafe { view(&mut (*owner).registry[usize::from(kind)]) }
+}
+/// # Safety
+/// Live builder and valid original type. No registry view survives this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_industry_registry_insert(
+    owner: *mut Builder,
+    kind: u8,
+    id: u16,
+) {
+    let registry = unsafe { &mut (*owner).registry[usize::from(kind)] };
+    if let Err(index) = registry.binary_search(&id) {
+        registry.insert(index, id);
+    }
+}
+/// # Safety
+/// Live builder and valid original type. No registry view survives this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_industry_registry_erase(
+    owner: *mut Builder,
+    kind: u8,
+    id: u16,
+) {
+    let registry = unsafe { &mut (*owner).registry[usize::from(kind)] };
+    if let Ok(index) = registry.binary_search(&id) {
+        registry.remove(index);
+    }
+}
+/// # Safety
+/// Live builder and valid original type. No registry view survives this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_industry_registry_clear(owner: *mut Builder, kind: u8) {
+    unsafe { (*owner).registry[usize::from(kind)].clear() };
 }
