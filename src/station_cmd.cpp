@@ -649,7 +649,7 @@ static const OpenTTDStationServices _rust_station_services = {
 	},
 	.tick_counter = []() noexcept -> uint64_t {
 		CountStationBoundary<uint64_t>(StationBoundary::Station);
-		return TimerGameTick::counter;
+		return openttd_orders_tick_counter();
 	},
 	.editor = []() noexcept -> bool {
 		CountStationBoundary<bool>(StationBoundary::Station);
