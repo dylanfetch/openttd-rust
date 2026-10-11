@@ -3,7 +3,7 @@
 import shutil
 from pathlib import Path
 
-from . import disasters, economy
+from . import companies, disasters, economy
 from .core import SNAPSHOT_TICKS, TICKS_PER_DAY, read_save, run_game
 
 AI_FOLDER = "industry-scenario-ai"
@@ -127,11 +127,43 @@ def scenarios(soak):
                 ],
             }
         )
+    result.extend(
+        dict(
+            scenario,
+            name="industry-company-" + scenario["companies"],
+            industry="transfer",
+        )
+        for scenario in companies.scenarios(soak)
+        if scenario["companies"] in ("acquire", "delete", "reuse")
+    )
     return result
 
 
 def prepare(scenario, binaries, builds, out, timeout, env, result):
     mode = scenario.get("industry")
+    if mode == "transfer":
+        # Company preparation runs first and builds real AI assets with the
+        # unchanged reference. Both roles receive these same reachable settings.
+        source = Path(scenario["save"])
+        industries = economy.rows(read_save(source), "INDY")
+        chosen = next(i for i, row in industries.items() if row["prod_level"] >= 4)
+        target = source.parent / "industry-transfer.sav"
+        result["industry_input"] = disasters.patch(
+            source,
+            target,
+            {
+                "INDY": {
+                    chosen: {
+                        "founder": 1,
+                        "exclusive_supplier": 1,
+                        "exclusive_consumer": 1,
+                        "ctlflags": industries[chosen]["ctlflags"] | 4,
+                    }
+                }
+            },
+        )
+        result["industry_chosen"] = chosen
+        return dict(scenario, save=str(target))
     if mode in ("clear", "terraform"):
         folder = out / scenario["name"] / "input"
         setup = dict(
@@ -250,6 +282,8 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
 
 def check(scenario, run, mode, role, result):
     kind = scenario.get("industry")
+    if kind == "transfer" and not run["snapshots"]:
+        raise RuntimeError("industry ownership transfer witness has no output save")
     if kind is None or not run["snapshots"]:
         return
     saved = [read_save(path) for path in run["snapshots"]]
@@ -297,6 +331,18 @@ def check(scenario, run, mode, role, result):
         ),
     }
     facts["year_history"] = bool(facts["valid_history"] & (1 << 42))
+    if kind == "transfer":
+        chosen = result["industry_chosen"]
+        expected = (2, 2, 2) if scenario["companies"] == "acquire" else (16, 255, 255)
+        final = rows[-1].get(chosen, {})
+        facts["ownership"] = tuple(
+            final.get(field)
+            for field in ("founder", "exclusive_supplier", "exclusive_consumer")
+        )
+        if facts["ownership"] != expected:
+            result["problems"].append(
+                f"{mode}/{role}: industry ownership transfer missing: {facts['ownership']} != {expected}"
+            )
     if kind in ("temperate", "arctic"):
 
         def fields(chunks):
@@ -359,7 +405,16 @@ def check(scenario, run, mode, role, result):
                 f"{mode}/{role}: generation density branch missing"
             )
     if (
-        kind not in ("cargo", "generation", "fund", "prospect", "clear", "terraform")
+        kind
+        not in (
+            "cargo",
+            "generation",
+            "fund",
+            "prospect",
+            "clear",
+            "terraform",
+            "transfer",
+        )
         and facts["produced_history"] == 0
     ):
         result["problems"].append(f"{mode}/{role}: no industry production history")
