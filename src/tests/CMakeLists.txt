@@ -6,6 +6,7 @@ add_test_files(
     cargo_storage.cpp
     cargo_payment.cpp
     cargo_payment_stubs.hpp
+    fleet.cpp
     effectvehicle.cpp
     effect_protocol.hpp
     enum_over_optimisation.cpp

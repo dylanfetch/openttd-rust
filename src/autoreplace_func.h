@@ -24,7 +24,7 @@ CommandCost RemoveEngineReplacement(EngineRenewList *erl, EngineID engine, Group
  */
 inline void RemoveAllEngineReplacementForCompany(Company *c)
 {
-	RemoveAllEngineReplacement(&c->engine_renew_list);
+	RemoveAllEngineReplacement(&c->RenewalList());
 }
 
 /**
@@ -38,7 +38,7 @@ inline void RemoveAllEngineReplacementForCompany(Company *c)
  */
 inline EngineID EngineReplacementForCompany(const Company *c, EngineID engine, GroupID group, bool *replace_when_old = nullptr)
 {
-	return EngineReplacement(c->engine_renew_list, engine, group, replace_when_old);
+	return EngineReplacement(c->RenewalList(), engine, group, replace_when_old);
 }
 
 /**
@@ -63,7 +63,7 @@ inline bool EngineHasReplacementForCompany(const Company *c, EngineID engine, Gr
 inline bool EngineHasReplacementWhenOldForCompany(const Company *c, EngineID engine, GroupID group)
 {
 	bool replace_when_old;
-	EngineReplacement(c->engine_renew_list, engine, group, &replace_when_old);
+	EngineReplacement(c->RenewalList(), engine, group, &replace_when_old);
 	return replace_when_old;
 }
 
@@ -79,7 +79,7 @@ inline bool EngineHasReplacementWhenOldForCompany(const Company *c, EngineID eng
  */
 inline CommandCost AddEngineReplacementForCompany(Company *c, EngineID old_engine, EngineID new_engine, GroupID group, bool replace_when_old, DoCommandFlags flags)
 {
-	return AddEngineReplacement(&c->engine_renew_list, old_engine, new_engine, group, replace_when_old, flags);
+	return AddEngineReplacement(&c->RenewalList(), old_engine, new_engine, group, replace_when_old, flags);
 }
 
 /**
@@ -92,7 +92,7 @@ inline CommandCost AddEngineReplacementForCompany(Company *c, EngineID old_engin
  */
 inline CommandCost RemoveEngineReplacementForCompany(Company *c, EngineID engine, GroupID group, DoCommandFlags flags)
 {
-	return RemoveEngineReplacement(&c->engine_renew_list, engine, group, flags);
+	return RemoveEngineReplacement(&c->RenewalList(), engine, group, flags);
 }
 
 bool CheckAutoreplaceValidity(EngineID from, EngineID to, CompanyID company);

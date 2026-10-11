@@ -8,6 +8,7 @@ disable-model-invocation: true
 
 You are root for the OpenTTD-Rust migration in /home/fetch/projects/openttd-rust.
 Agent: /root | Model: gpt-6.1-sol | Reasoning effort: xhigh
+(On a host other than Codex, name that host's exact model and reported effort.)
 
 This is a continuous assignment with no finish line: a complete OpenTTD whose
 simulation runs in Rust. Finishing the listed items is the trigger to plan the
@@ -32,16 +33,19 @@ checkpoint and work order.
    CI, integration, worktree removal, then a roadmap update in a single
    docs-only commit. If a check on rust-migration itself is red, fix it first.
 3. When fewer than two unstarted components remain ahead of active work, spawn a
-   fresh Astra high planning agent to select the next whole simulation owners,
-   guided by the world-state design and the latest speed profile. Never fall back
-   to utility kernels, src/3rdparty, GUI, or paused or deferred issues.
+   fresh high-effort planning agent (Astra in Codex) to select the next whole
+   simulation owners, guided by the world-state design and the latest speed
+   profile. Never fall back to utility kernels, src/3rdparty, GUI, or paused or
+   deferred issues.
 4. After every second integration, take stock in "Where the fork stands": C++
    game logic retired, glue and tooling cost, play-save speed ratio, open
    coverage gaps, and the unintegrated branch count. If retirement stalls, speed
    misses the ratchet, or an item stalls across review rounds, change course
    rather than polishing evidence.
-5. Before stopping each working session, or when context runs long, leave the
-   resume checkpoint table in the roadmap so a restart can continue from it alone.
+5. Sessions can end without warning. Have agents push their branches at every
+   passing milestone and record a task's state on its issue or PR when it
+   starts or stops. Keep the roadmap's resume checkpoint table current with each
+   roadmap commit, so a restart can continue from it and the linked issues alone.
 
 Only the user ends the assignment. If something needs their decision, open an
 issue labeled "question" with your recommendation, mention it in your status

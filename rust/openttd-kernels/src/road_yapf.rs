@@ -16,8 +16,8 @@
     clippy::too_many_arguments,
     clippy::similar_names
 )]
+use crate::node_hash::NodeMap;
 use crate::road::{PathElement, State};
-use std::collections::HashMap;
 use std::ffi::c_void;
 
 #[repr(C)]
@@ -149,8 +149,9 @@ struct Search {
     dest_station: Option<u16>,
     station_type: u8,
     arena: Vec<Node>,
-    open: HashMap<(u32, u8), usize>,
-    closed: HashMap<(u32, u8), usize>,
+    // Lookup-only (never iterated); order never selects a node.
+    open: NodeMap<(u32, u8), usize>,
+    closed: NodeMap<(u32, u8), usize>,
     heap: Vec<usize>,
     intermediate: Option<usize>,
     best_dest: Option<usize>,
@@ -176,8 +177,8 @@ impl Search {
             dest_station: None,
             station_type: 0,
             arena: Vec::new(),
-            open: HashMap::new(),
-            closed: HashMap::new(),
+            open: NodeMap::default(),
+            closed: NodeMap::default(),
             heap: vec![usize::MAX],
             intermediate: None,
             best_dest: None,

@@ -1703,8 +1703,9 @@ static void FormatString(StringBuilder &builder, std::string_view str_arg, Strin
 					const Group *g = Group::GetIfValid(args.GetNextParameter<GroupID>());
 					if (g == nullptr) break;
 
-					if (!g->name.empty()) {
-						auto tmp_params = MakeParameters(g->name);
+					const std::string name = g->GetName();
+					if (!name.empty()) {
+						auto tmp_params = MakeParameters(name);
 						GetStringWithArgs(builder, STR_JUST_RAW_STRING, tmp_params);
 					} else {
 						auto tmp_params = MakeParameters(g->number);
