@@ -91,7 +91,6 @@ static OpenTTDTrainServices Leaves()
 	leaves.viewport = [](OpenTTDTrainHandle h, uint8_t a, uint8_t b) noexcept { Part(h).UpdateViewport(a != 0, b != 0); };
 	leaves.tile_virt = [](OpenTTDTrainHandle, int32_t x, int32_t y) noexcept { return uint64_t(TileVirtXY(x, y)); };
 	leaves.is_tunnelbridge = [](OpenTTDTrainHandle, uint32_t) noexcept { return uint64_t(0); };
-	leaves.profile = [](OpenTTDTrainHandle, uint64_t) noexcept {};
 	leaves.enter_tile = [](OpenTTDTrainHandle h, uint32_t tile, int32_t x, int32_t y) noexcept { VehicleEnterTile(&Part(h), tile, x, y); return uint64_t(0); };
 	return leaves;
 }
