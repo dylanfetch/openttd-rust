@@ -1036,11 +1036,13 @@ struct RoadAbiProbe {
 	uint32_t dest = 0, nested = 0, destroyed = 0, departures = 0, progress = 255;
 	uint8_t tick = 0, running = 0;
 	uint32_t cache_properties = 0, cargo_ages = 0, length_changes = 0, viewports = 0, turns = 0, next_reads = 0;
+	uint32_t progress_writes = 0;
 	bool fallback_cache = false, engine_replaced = false;
+	bool hidden_viewport_tail = false;
 	int32_t order_time = 0;
 };
 static RoadAbiProbe *road_abi_probe;
-static int road_abi_second, road_abi_engine, road_abi_new_engine;
+static int road_abi_second, road_abi_hidden, road_abi_engine, road_abi_new_engine;
 static int road_abi_vehicle; ///< Its address is the opaque vehicle handle.
 static OpenTTDVehicle *RoadAbiHandle() { return reinterpret_cast<OpenTTDVehicle *>(&road_abi_vehicle); }
 static OpenTTDRoadMaxSpeedRead RoadAbiMaxSpeed()
@@ -1166,6 +1168,31 @@ static void RoadBoundary()
 	};
 	CHECK(openttd_rust_road_running_cost(v, probe.state, &t.leaves) == 123);
 
+	/* A non-station order must not read its destination at the bay stopping frame. */
+	openttd_rust_road_set(probe.state, 0, 32);
+	openttd_rust_road_set(probe.state, 1, 20);
+	openttd_rust_road_set(probe.state, 6, 1); // Skip nearby-vehicle traversal.
+	t.leaves.step = [](OpenTTDVehicle *) noexcept -> OpenTTDRoadStep {
+		uint16_t rd = openttd_rust_road_drive_entry(0, 32, 21);
+		CHECK((rd & 0xC0) == 0 && (rd & 15) < 15);
+		return {.tile = 100, .x = (rd & 15) + 1, .y = (rd >> 8) & 15, .z = 0, .cur_speed = 0, .direction = 1, .length = 8, .front = true, .tram = false};
+	};
+	t.leaves.link = [](OpenTTDVehicle *) noexcept -> OpenTTDRoadLink { return {.next = nullptr, .next_state = nullptr}; };
+	t.shared.station_index = [](uint32_t tile) noexcept -> uint16_t { CHECK(tile == 100); return 55; };
+	t.leaves.is_drive_through = [](uint32_t tile) noexcept { CHECK(tile == 100); return false; };
+	t.leaves.stop_entrance = [](OpenTTDVehicle *, bool busy) noexcept { CHECK(!busy); };
+	t.vehicle.write_last_station = [](OpenTTDVehicle *, uint16_t station) noexcept { CHECK(station == 55); };
+	t.vehicle.order_type = [](OpenTTDVehicle *) noexcept -> uint8_t { return 0; };
+	t.leaves.is_bay_stop = [](uint32_t tile) noexcept { CHECK(tile == 100); return false; };
+	t.vehicle.play_start_sound = [](OpenTTDVehicle *) noexcept { return true; };
+	t.vehicle.start_stop_dirty = [](OpenTTDVehicle *) noexcept {};
+	t.leaves.enter_tile = [](OpenTTDVehicle *, uint32_t, int32_t, int32_t) noexcept -> OpenTTDRoadEntered { return {.tile = 100, .cur_speed = 0, .flags = 4, .direction = 1, .order_type = 0}; };
+	t.vehicle.write_speed = [](OpenTTDVehicle *, uint16_t speed) noexcept { CHECK(speed == 0); };
+	CHECK(!openttd_rust_road_individual(v, probe.state, nullptr, nullptr, &probe.entry, &t.leaves));
+	CHECK(openttd_rust_road_get(probe.state, 0) == 36);
+	openttd_rust_road_set(probe.state, 0, 0);
+	openttd_rust_road_set(probe.state, 6, 0);
+
 	/* A front tick reenters the setter from ProcessOrders and the speed getter from ShowVisualEffect. */
 	t.vehicle.handle_breakdown = [](OpenTTDVehicle *) noexcept -> OpenTTDVehicleBreakdown { return {.broken = false, .status = 0}; };
 	t.leaves.process_orders_then_loading = [](OpenTTDVehicle *u) noexcept -> uint8_t {
@@ -1205,6 +1232,47 @@ static void RoadBoundary()
 	t.vehicle.progress = [](OpenTTDVehicle *) noexcept -> uint8_t { CHECK(road_abi_probe->viewports == 1 && road_abi_probe->next_reads == 2); return static_cast<uint8_t>(road_abi_probe->progress); };
 	CHECK(openttd_rust_road_tick(v, probe.state, &front, &t.leaves));
 	CHECK(probe.viewports == 1 && probe.next_reads == 2 && probe.progress == 7);
+
+	/* Viewport reentry can add a later visible part. Its progress mutation is
+	 * observed only after that viewport and any hidden final part's Next read. */
+	t.ground.set_last_speed = [](OpenTTDVehicle *) noexcept -> OpenTTDGroundLastSpeed { road_abi_probe->progress = 0; return {.status = 0}; };
+	t.ground.update_viewport_then_next = [](OpenTTDVehicle *part, OpenTTDVehicle *front) noexcept -> OpenTTDGroundViewportNext {
+		auto &p = *road_abi_probe;
+		CHECK(front == RoadAbiHandle());
+		CHECK((p.viewports == 0 && part == front) || (p.viewports == 1 && part == reinterpret_cast<OpenTTDVehicle *>(&road_abi_second)));
+		++p.viewports;
+		p.progress = part == front ? 7 : 0;
+		openttd_rust_road_set_dest(front, p.state, 200 + p.viewports, p.dest, p.leaves);
+		++p.next_reads;
+		OpenTTDVehicle *next = part == front ? reinterpret_cast<OpenTTDVehicle *>(&road_abi_second) : p.hidden_viewport_tail ? reinterpret_cast<OpenTTDVehicle *>(&road_abi_hidden) : nullptr;
+		return {.next = next, .final_progress = next == nullptr ? uint8_t(p.progress) : uint8_t(99)};
+	};
+	t.vehicle.status = [](OpenTTDVehicle *part) noexcept -> uint8_t {
+		bool hidden = part == reinterpret_cast<OpenTTDVehicle *>(&road_abi_hidden);
+		CHECK(hidden ? road_abi_probe->hidden_viewport_tail && road_abi_probe->viewports == 2 : part == reinterpret_cast<OpenTTDVehicle *>(&road_abi_second) && road_abi_probe->viewports == 1);
+		return hidden ? 1 : 0;
+	};
+	t.vehicle.next = [](OpenTTDVehicle *part) noexcept -> OpenTTDVehicle * {
+		CHECK(part == reinterpret_cast<OpenTTDVehicle *>(&road_abi_hidden) && road_abi_probe->hidden_viewport_tail && road_abi_probe->viewports == 2);
+		++road_abi_probe->next_reads;
+		return nullptr;
+	};
+	t.vehicle.progress = [](OpenTTDVehicle *front) noexcept -> uint8_t {
+		CHECK(front == RoadAbiHandle() && road_abi_probe->hidden_viewport_tail && road_abi_probe->viewports == 2 && road_abi_probe->next_reads == 3);
+		return road_abi_probe->progress;
+	};
+	t.vehicle.write_progress = [](OpenTTDVehicle *front, uint8_t progress) noexcept {
+		auto &p = *road_abi_probe;
+		CHECK(front == RoadAbiHandle() && p.viewports == 2 && p.next_reads == (p.hidden_viewport_tail ? 3U : 2U) && progress == 0);
+		++p.progress_writes;
+		p.progress = progress;
+	};
+	for (bool hidden : {false, true}) {
+		probe.hidden_viewport_tail = hidden;
+		probe.viewports = probe.next_reads = probe.progress_writes = 0;
+		CHECK(openttd_rust_road_tick(v, probe.state, &front, &t.leaves));
+		CHECK(probe.viewports == 2 && probe.next_reads == (hidden ? 3U : 2U) && probe.progress_writes == 1 && probe.progress == 0 && probe.dest == 202);
+	}
 
 	/* Crash animation reads the next link after the turn/viewport callback. */
 	openttd_rust_road_set(probe.state, 5, 0);
