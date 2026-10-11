@@ -1819,11 +1819,12 @@ impl Game<'_> {
 }
 
 macro_rules! entry {
-    ($leaves:expr, $entry:expr) => {
+    ($leaves:expr, $entry:expr) => {{
+        crate::witness::hit(crate::witness::ROAD_ENTRIES);
         // SAFETY: Immutable tables outlive this synchronous call and nested entries;
         // owner places are accessed only through raw pointers between services.
         unsafe { Game::new($leaves, $entry) }
-    };
+    }};
 }
 
 /// # Safety
@@ -1902,6 +1903,7 @@ pub unsafe extern "C" fn openttd_rust_road_calendar_day(
     front: bool,
     leaves: *const Leaves,
 ) {
+    crate::witness::hit(crate::witness::ROAD_ENTRIES);
     if front {
         // SAFETY: Static tables.
         unsafe { service!((*(*leaves).vehicle).age)(v) };

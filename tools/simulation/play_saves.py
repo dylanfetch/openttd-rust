@@ -197,13 +197,26 @@ def game_environment(scenario):
 def check(scenario, run, mode, role, result):
     if not counted_road_save(scenario):
         return
-    counts = branch_witnesses(scenario, run, role, "road", ("ticks", "services"))
+    counts = branch_witnesses(
+        scenario, run, role, "road", ("ticks", "services", "entries")
+    )
     if counts is None:
         return
     crossings = counts["services"] + counts["visitors"]
     density = crossings / counts["ticks"]
-    result[f"{mode}_{role}_road_crossings"] = dict(counts, per_tick=density)
+    result[f"{mode}_{role}_road_crossings"] = dict(
+        counts,
+        services_and_visitors_per_tick=density,
+        controller_entries_per_tick=counts["entries"] / counts["ticks"],
+        observed_controller_crossings_per_tick=(crossings + counts["entries"])
+        / counts["ticks"],
+    )
     # The fixed Padhattan-2000 network measured ~44 outgoing calls/tick before
-    # #199. The shared road slice budgets 13 including callback visitor entries.
-    if scenario["name"] == "play-padhattan-ridge-2000-manual" and density > 13:
+    # #199. Plain mode budgets 13 including callbacks; snapshot desync checks
+    # additionally rebuild/check caches and contribute eight calls per tick.
+    if (
+        mode == "plain"
+        and scenario["name"] == "play-padhattan-ridge-2000-manual"
+        and density > 13
+    ):
         raise RuntimeError(f"road boundary exceeds 13 crossings/tick: {density:.3f}")

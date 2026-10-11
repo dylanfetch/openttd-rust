@@ -1432,7 +1432,8 @@ service, blocking/overtaking, path, RNG, crossing/flooding, crash expiry and rel
 `--self` controls reference determinism. Native checks cover typed ABI, nested
 getter/cache/destination/path mutation, destruction, movement data and save staging.
 Default play scenarios count actual road service calls and visitor entries;
-Padhattan-2000 requires at most 13 crossings/tick. Benchmarks disable counters.
+Plain Padhattan-2000 budgets 13 service/visitor calls per tick; controller ingress
+is reported separately. Snapshot cache checks add calls. Benchmarks disable counters.
 Legacy saves, NewGRFs, articulated/tram turns, sounds and viewport pixels remain
 unexercised domains tracked by #156.
 

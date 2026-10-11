@@ -218,8 +218,11 @@ pub const ROAD_SERVICES: usize = 92;
 /// Native traversal calls back into the road Rust visitor.
 pub const ROAD_VISITORS: usize = 93;
 
+/// Selected road controller entries, including reentrant helpers.
+pub const ROAD_ENTRIES: usize = 94;
+
 /// Counter names, grouped by the prefix the harness selects.
-pub const NAMES: [&str; 94] = [
+pub const NAMES: [&str; 95] = [
     "train.tick_first",
     "train.tick_second",
     "train.reversal",
@@ -314,6 +317,7 @@ pub const NAMES: [&str; 94] = [
     "road.ticks",
     "road.services",
     "road.visitors",
+    "road.entries",
 ];
 
 static ENABLED: AtomicBool = AtomicBool::new(false);
