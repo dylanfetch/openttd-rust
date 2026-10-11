@@ -1437,9 +1437,10 @@ Issue #137 moves cash/fraction accounting, loans, histories, rating/value,
 construction budgets, maintenance/interest/year rotation, bankruptcy/recovery,
 ranked offers, creation/deletion, acquisition and the complete ownership-transfer
 traversal into Rust. Rust also owns periodic scheduling, prices/multipliers,
-inflation/recession, score parts and the company tick cursor. Original selected
-bodies compile only in portable builds; identity, settings, network transport,
-UI, AI objects and shared map/pools/group/infrastructure services remain C++.
+inflation/recession, score parts and the company tick cursor. Selected bodies
+compile only portably except StartupCompanies/InitializeCompanies: their native
+timer/reset control remains, and InitializeCompanies writes Rust's tick cursor.
+Identity, settings, networking, UI, AI and shared world services remain C++.
 One Rust allocation per CompanyProperties holds finance/history fields with C++
 field lifetimes and stable addresses; economy/prices/scores have process lifetimes.
 #192 makes every entry a named synchronous call taking borrowed designated tables
