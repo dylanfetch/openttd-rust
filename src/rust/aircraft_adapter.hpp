@@ -6,6 +6,7 @@
  */
 /** @file aircraft_adapter.hpp Canonical pool observations and direct shared leaves. */
 #include "aircraft_ffi.h"
+#include "vehicle_services.h"
 static_assert(AIR_FAST == 2 && AIR_CTOL == 1 && ROTOR_Z_OFFSET == 5);
 static_assert(HRS_ROTOR_STOPPED == 0 && HRS_ROTOR_MOVING_3 == 3);
 static_assert(VehicleID::Invalid().base() == 1048575 && StationID::Invalid().base() == 65535);
@@ -280,7 +281,7 @@ static void OPENTTD_AIRCRAFT_CALL Aircraft_set_cargo_age(OpenTTDAircraftVehicle 
 
 static OpenTTDAircraftVehicle OPENTTD_AIRCRAFT_CALL Aircraft_next(OpenTTDAircraftVehicle vehicle) noexcept
 {
-	return AircraftVehicle(static_cast<Vehicle *>(vehicle.handle)->Next());
+	return AircraftVehicle(RustVehicleNext(static_cast<Vehicle *>(vehicle.handle)));
 }
 
 static uint32_t OPENTTD_AIRCRAFT_CALL Aircraft_map_size_x() noexcept

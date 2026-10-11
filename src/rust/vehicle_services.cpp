@@ -85,9 +85,9 @@ static uint16_t OPENTTD_VEHICLE_CALL VehicleSvcLengthCallback(OpenTTDVehicle *v)
 	Vehicle *u = VehicleOf(v);
 	return GetVehicleCallback(CBID_VEHICLE_LENGTH, 0, 0, u->engine_type, u);
 }
-static void OPENTTD_VEHICLE_CALL VehicleSvcUnknownLengthResult(OpenTTDVehicle *v, uint16_t result) noexcept
+static void OPENTTD_VEHICLE_CALL VehicleSvcUnknownLengthResult(const OpenTTDEngine *e, uint16_t result) noexcept
 {
-	ErrorUnknownCallbackResult(VehicleOf(v)->GetEngine()->GetGRFID(), CBID_VEHICLE_LENGTH, result);
+	ErrorUnknownCallbackResult(EngineOf(e)->GetGRFID(), CBID_VEHICLE_LENGTH, result);
 }
 static void OPENTTD_VEHICLE_CALL VehicleSvcLengthChanged(OpenTTDVehicle *v) noexcept { VehicleLengthChanged(VehicleOf(v)); }
 static bool OPENTTD_VEHICLE_CALL VehicleSvcPlayStartSound(OpenTTDVehicle *v) noexcept { return PlayVehicleSound(VehicleOf(v), VSE_START); }
@@ -137,6 +137,14 @@ static void OPENTTD_VEHICLE_CALL VehicleSvcDetachLast(OpenTTDVehicle *previous, 
 }
 static void OPENTTD_VEHICLE_CALL VehicleSvcWriteMaxSpeed(OpenTTDVehicle *v, uint16_t speed) noexcept { VehicleOf(v)->vcache.cached_max_speed = speed; }
 
+static OpenTTDVehicle *OPENTTD_VEHICLE_CALL VehicleSvcNext(OpenTTDVehicle *v) noexcept { return RustVehicle(RustVehicleNext(VehicleOf(v))); }
+static uint16_t OPENTTD_VEHICLE_CALL VehicleSvcEngineID(OpenTTDVehicle *v) noexcept { return RustVehicleEngineID(VehicleOf(v)); }
+static OpenTTDEngineForLength OPENTTD_VEHICLE_CALL VehicleSvcEngineForLength(OpenTTDVehicle *v) noexcept
+{
+	const Engine *e = VehicleOf(v)->GetEngine();
+	return {.engine = RustEngine(e), .grf_version = RustEngineGRFVersion(e)};
+}
+
 const OpenTTDVehicleServices &GetRustVehicleServices() noexcept
 {
 	static const OpenTTDVehicleServices services{
@@ -177,6 +185,9 @@ const OpenTTDVehicleServices &GetRustVehicleServices() noexcept
 		.write_max_speed = VehicleSvcWriteMaxSpeed,
 		.previous_tile = VehicleSvcPreviousTile,
 		.detach_last = VehicleSvcDetachLast,
+		.next = VehicleSvcNext,
+		.engine_id = VehicleSvcEngineID,
+		.engine_for_length = VehicleSvcEngineForLength,
 	};
 	return services;
 }

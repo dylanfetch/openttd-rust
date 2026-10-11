@@ -407,7 +407,7 @@ static uint32_t TrainReservationReadTile(OpenTTDTrainHandle id) noexcept
 static OpenTTDTrainHandle TrainReservationReadNext(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return TrainHandle(v->Next());
+	return TrainHandle(static_cast<Train *>(RustVehicleNext(v)));
 }
 static uint16_t TrainReservationReadLastStation(OpenTTDTrainHandle id) noexcept
 {
@@ -442,7 +442,7 @@ static OpenTTDTrainReservationFreeRead TrainReservationReadFree(OpenTTDTrainHand
 static OpenTTDTrainReservationFree1Read TrainReservationReadFree1(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return {v->tile.base(), TrainHandle(v->Next())};
+	return {v->tile.base(), TrainHandle(static_cast<Train *>(RustVehicleNext(v)))};
 }
 static OpenTTDTrainReservationNewRead TrainReservationReadNew(OpenTTDTrainHandle id) noexcept
 {

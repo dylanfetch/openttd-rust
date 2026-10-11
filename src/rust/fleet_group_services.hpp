@@ -5,6 +5,8 @@
  * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
  */
 
+#include "vehicle_services.h"
+
 struct FleetVehicleListContext { VehicleList list; const VehicleListIdentifier &vli; };
 /* Fleet shared-world services. No selected group algorithm remains here.
  * All wrappers are noexcept; ordinary commands retain native stack frames.
@@ -18,7 +20,7 @@ static uint32_t FleetGroup_vehicle_id(void *shell) noexcept { auto *v = static_c
 static uint8_t FleetGroup_vehicle_type(void *shell) noexcept { auto *v = static_cast<Vehicle *>(shell); return v->type; }
 static uint8_t FleetGroup_vehicle_owner(void *shell) noexcept { auto *v = static_cast<Vehicle *>(shell); return v->owner.base(); }
 static uint16_t FleetGroup_vehicle_group(void *shell) noexcept { auto *v = static_cast<Vehicle *>(shell); return v->group_id.base(); }
-static uint16_t FleetGroup_vehicle_engine(void *shell) noexcept { auto *v = static_cast<Vehicle *>(shell); return v->engine_type.base(); }
+static uint16_t FleetGroup_vehicle_engine(void *shell) noexcept { auto *v = static_cast<Vehicle *>(shell); return RustVehicleEngineID(v); }
 static int64_t FleetGroup_profit(void *shell) noexcept { auto *v = static_cast<Vehicle *>(shell); return v->GetDisplayProfitLastYear(); }
 static bool FleetGroup_old_enough(void *shell) noexcept { auto *v = static_cast<Vehicle *>(shell); return v->economy_age > VEHICLE_PROFIT_MIN_AGE; }
 static bool FleetGroup_primary(void *shell) noexcept { auto *v = static_cast<Vehicle *>(shell); return v->IsPrimaryVehicle(); }

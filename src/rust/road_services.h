@@ -15,7 +15,7 @@ static OpenTTDRoadState *RoadStateOf(const RoadVehicle *u) noexcept { return u =
 
 static OpenTTDRoadMaxSpeedRead RoadMaxSpeedRead(const RoadVehicle *u) noexcept
 {
-	const RoadVehicle *next = u->Next();
+	const RoadVehicle *next = static_cast<const RoadVehicle *>(RustVehicleNext(u));
 	return {.next = RustVehicle(next), .next_state = RoadStateOf(next), .tile = u->tile.base(), .max_track_speed = u->gcache.cached_max_track_speed,
 		.order_max_speed = u->current_order.GetMaxSpeed(), .direction = u->direction, .status = u->vehstatus.base()};
 }
@@ -24,32 +24,32 @@ static OpenTTDRoadSpeedRead OPENTTD_VEHICLE_CALL RoadSvcVisualThenSpeed(OpenTTDV
 	RoadVehicle *u = RoadOf(v);
 	u->ShowVisualEffect();
 	return {.max = RoadMaxSpeedRead(u), .x = u->x_pos, .y = u->y_pos, .z = u->z_pos, .acceleration = realistic ? u->GetAcceleration() : 0,
-		.length = u->gcache.cached_veh_length, .tram = RoadTypeIsTram(u->roadtype)};
+		.length = RustGroundCachedLength(u), .tram = RoadTypeIsTram(u->roadtype)};
 }
 static OpenTTDRoadMaxSpeedRead OPENTTD_VEHICLE_CALL RoadSvcMaxSpeedRead(OpenTTDVehicle *v) noexcept { return RoadMaxSpeedRead(RoadOf(v)); }
 static OpenTTDRoadSpeedPart OPENTTD_VEHICLE_CALL RoadSvcSpeedPart(OpenTTDVehicle *v) noexcept
 {
 	const RoadVehicle *u = RoadOf(v);
-	const RoadVehicle *next = u->Next();
+	const RoadVehicle *next = static_cast<const RoadVehicle *>(RustVehicleNext(u));
 	return {.next = RustVehicle(next), .next_state = RoadStateOf(next), .tile = u->tile.base(), .direction = u->direction, .status = u->vehstatus.base()};
 }
 static OpenTTDRoadStep OPENTTD_VEHICLE_CALL RoadSvcStep(OpenTTDVehicle *v) noexcept
 {
 	const RoadVehicle *u = RoadOf(v);
-	const RoadVehicle *next = u->Next();
+	const RoadVehicle *next = static_cast<const RoadVehicle *>(RustVehicleNext(u));
 	return {.next = RustVehicle(next), .next_state = RoadStateOf(next), .tile = u->tile.base(), .x = u->x_pos, .y = u->y_pos, .z = u->z_pos,
-		.cur_speed = u->cur_speed, .direction = u->direction, .length = u->gcache.cached_veh_length, .front = u->IsFrontEngine(), .tram = RoadTypeIsTram(u->roadtype)};
+		.cur_speed = u->cur_speed, .direction = u->direction, .length = RustGroundCachedLength(u), .front = u->IsFrontEngine(), .tram = RoadTypeIsTram(u->roadtype)};
 }
 static OpenTTDRoadCrashPart OPENTTD_VEHICLE_CALL RoadSvcCrashPart(OpenTTDVehicle *v) noexcept
 {
 	const RoadVehicle *u = RoadOf(v);
-	const RoadVehicle *next = u->Next();
+	const RoadVehicle *next = static_cast<const RoadVehicle *>(RustVehicleNext(u));
 	return {.next = RustVehicle(next), .next_state = RoadStateOf(next), .tile = u->tile.base(), .z = u->z_pos, .crossing = IsLevelCrossingTile(u->tile)};
 }
 static OpenTTDRoadPartRead OPENTTD_VEHICLE_CALL RoadSvcPart(OpenTTDVehicle *v) noexcept
 {
 	const RoadVehicle *u = RoadOf(v);
-	const RoadVehicle *next = u->Next();
+	const RoadVehicle *next = static_cast<const RoadVehicle *>(RustVehicleNext(u));
 	return {.next = RustVehicle(next), .next_state = RoadStateOf(next), .tile = u->tile.base(), .z = u->z_pos, .tram = RoadTypeIsTram(u->roadtype)};
 }
 static OpenTTDRoadEntered OPENTTD_VEHICLE_CALL RoadSvcEnterTile(OpenTTDVehicle *v, uint32_t tile, int32_t x, int32_t y) noexcept
@@ -252,13 +252,13 @@ static void OPENTTD_VEHICLE_CALL RoadSvcCrashNews(OpenTTDVehicle *v, uint32_t vi
 	ModifyStationRatingAround(u->tile, u->owner, -160, 22);
 	if (_settings_client.sound.disaster) SndPlayVehicleFx(SND_12_EXPLOSION, u);
 }
-static OpenTTDRoadCachePart OPENTTD_VEHICLE_CALL RoadSvcCachePart(OpenTTDVehicle *v) noexcept
+static uint8_t OPENTTD_VEHICLE_CALL RoadSvcShortenFactor(const OpenTTDEngine *e) noexcept
 {
-	const RoadVehicle *u = RoadOf(v);
-	const Engine *e = u->GetEngine();
-	return {.next = RustVehicle(u->Next()), .engine = u->engine_type.base(), .max_speed = RoadVehInfo(u->engine_type)->max_speed,
-		.grf_version = RustEngineGRFVersion(e), .shorten = e->VehInfo<RoadVehicleInfo>().shorten_factor,
-		.length = u->gcache.cached_veh_length};
+	return EngineOf(e)->VehInfo<RoadVehicleInfo>().shorten_factor;
+}
+static uint16_t OPENTTD_VEHICLE_CALL RoadSvcDefaultMaxSpeed(OpenTTDVehicle *v) noexcept
+{
+	return RoadVehInfo(EngineID(RustVehicleEngineID(VehicleOf(v))))->max_speed;
 }
 static void OPENTTD_VEHICLE_CALL RoadSvcUpdateCargoAge(OpenTTDVehicle *v) noexcept
 {
@@ -365,7 +365,8 @@ static const OpenTTDRoadLeaves &GetRoadLeaves()
 		.depot_order = RoadSvcDepotOrder,
 		.depot_exit = RoadSvcDepotExit,
 		.crash_news = RoadSvcCrashNews,
-		.cache_part = RoadSvcCachePart,
+		.shorten_factor = RoadSvcShortenFactor,
+		.default_max_speed = RoadSvcDefaultMaxSpeed,
 		.update_cargo_age = RoadSvcUpdateCargoAge,
 		.cost_read = RoadSvcCostRead,
 		.price = RoadSvcPrice,

@@ -156,14 +156,6 @@ struct OpenTTDRoadSoundRead {
 	uint16_t sound;
 	uint8_t tick;
 };
-struct OpenTTDRoadCachePart {
-	OpenTTDVehicle *next;
-	uint16_t engine;
-	uint16_t max_speed;
-	uint8_t grf_version;
-	uint8_t shorten;
-	uint8_t length;
-};
 struct OpenTTDRoadCostRead {
 	uint8_t cost_class;
 	uint8_t cost_factor;
@@ -238,7 +230,8 @@ struct OpenTTDRoadLeaves {
 	OpenTTDRoadDepotOrder (OPENTTD_VEHICLE_CALL *depot_order)(OpenTTDVehicle *) noexcept;
 	void (OPENTTD_VEHICLE_CALL *depot_exit)(OpenTTDVehicle *, int32_t, int32_t) noexcept;
 	void (OPENTTD_VEHICLE_CALL *crash_news)(OpenTTDVehicle *, uint32_t) noexcept;
-	OpenTTDRoadCachePart (OPENTTD_VEHICLE_CALL *cache_part)(OpenTTDVehicle *) noexcept;
+	uint8_t (OPENTTD_VEHICLE_CALL *shorten_factor)(const OpenTTDEngine *) noexcept;
+	uint16_t (OPENTTD_VEHICLE_CALL *default_max_speed)(OpenTTDVehicle *) noexcept;
 	void (OPENTTD_VEHICLE_CALL *update_cargo_age)(OpenTTDVehicle *) noexcept;
 	OpenTTDRoadCostRead (OPENTTD_VEHICLE_CALL *cost_read)(OpenTTDVehicle *) noexcept;
 	int64_t (OPENTTD_VEHICLE_CALL *price)(OpenTTDVehicle *, uint32_t) noexcept;

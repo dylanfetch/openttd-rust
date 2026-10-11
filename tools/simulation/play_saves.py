@@ -211,9 +211,9 @@ def check(scenario, run, mode, role, result):
         observed_controller_crossings_per_tick=(crossings + counts["entries"])
         / counts["ticks"],
     )
-    # The fixed Padhattan-2000 network measured ~44 outgoing calls/tick before
-    # #199. Plain mode budgets 13 including callbacks; snapshot desync checks
-    # additionally rebuild/check caches and contribute eight calls per tick.
+    # Plain mode budgets 13 outgoing services plus visitor callbacks per tick.
+    # Snapshot desync checks additionally rebuild/check caches; their calls and
+    # selected controller ingress are reported separately.
     if (
         mode == "plain"
         and scenario["name"] == "play-padhattan-ridge-2000-manual"

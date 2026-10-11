@@ -963,7 +963,7 @@ static OpenTTDTrainHandle TrainReadFirst(OpenTTDTrainHandle id) noexcept
 static OpenTTDTrainHandle TrainReadNext(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return TrainHandle(v->Next());
+	return TrainHandle(static_cast<Train *>(RustVehicleNext(v)));
 }
 static OpenTTDTrainHandle TrainReadPrevious(OpenTTDTrainHandle id) noexcept
 {
@@ -998,7 +998,7 @@ static int32_t TrainReadOrderTime(OpenTTDTrainHandle id) noexcept
 static uint16_t TrainReadLength(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return v->gcache.cached_veh_length;
+	return RustGroundCachedLength(v);
 }
 static uint16_t TrainReadTotalLength(OpenTTDTrainHandle id) noexcept
 {
@@ -1093,12 +1093,12 @@ static uint8_t TrainReadVisEffect(OpenTTDTrainHandle id) noexcept
 static OpenTTDTrainConsistChangedRead TrainReadConsistChanged(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return {v->engine_type.base(), v->IsFrontEngine()};
+	return {RustVehicleEngineID(v), v->IsFrontEngine()};
 }
 static OpenTTDTrainConsistChanged1Read TrainReadConsistChanged1(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return {v->engine_type.base(), v->IsEngine()};
+	return {RustVehicleEngineID(v), v->IsEngine()};
 }
 static OpenTTDTrainConsistChanged2Read TrainReadConsistChanged2(OpenTTDTrainHandle id) noexcept
 {
@@ -1108,12 +1108,12 @@ static OpenTTDTrainConsistChanged2Read TrainReadConsistChanged2(OpenTTDTrainHand
 static OpenTTDTrainCurveLimitRead TrainReadCurveLimit(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return {TrainHandle(v->Next()), v->direction};
+	return {TrainHandle(static_cast<Train *>(RustVehicleNext(v))), v->direction};
 }
 static OpenTTDTrainStopLocationRead TrainReadStopLocation(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return {v->gcache.cached_veh_length, v->gcache.cached_total_length, v->current_order.GetDestination().base(), v->current_order.GetType()};
+	return {RustGroundCachedLength(v), v->gcache.cached_total_length, v->current_order.GetDestination().base(), v->current_order.GetType()};
 }
 static OpenTTDTrainCurrentMaxSpeedRead TrainReadCurrentMaxSpeed(OpenTTDTrainHandle id) noexcept
 {
@@ -1123,7 +1123,7 @@ static OpenTTDTrainCurrentMaxSpeedRead TrainReadCurrentMaxSpeed(OpenTTDTrainHand
 static OpenTTDTrainCurrentMaxSpeed6Read TrainReadCurrentMaxSpeed6(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return {TrainHandle(v->Next()), v->tile.base(), v->vehstatus.base()};
+	return {TrainHandle(static_cast<Train *>(RustVehicleNext(v))), v->tile.base(), v->vehstatus.base()};
 }
 static OpenTTDTrainUpdateAccelerationRead TrainReadUpdateAcceleration(OpenTTDTrainHandle id) noexcept
 {
@@ -1153,7 +1153,7 @@ static OpenTTDTrainCrossingApproachRead TrainReadCrossingApproach(OpenTTDTrainHa
 static OpenTTDTrainNextOffsetRead TrainReadNextOffset(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return {TrainHandle(v->Next()), v->gcache.cached_veh_length};
+	return {TrainHandle(static_cast<Train *>(RustVehicleNext(v))), RustGroundCachedLength(v)};
 }
 static OpenTTDTrainAfterSwapRead TrainReadAfterSwap(OpenTTDTrainHandle id) noexcept
 {
@@ -1168,7 +1168,7 @@ static OpenTTDTrainReverseSwapRead TrainReadReverseSwap(OpenTTDTrainHandle id) n
 static OpenTTDTrainApproachingEndRead TrainReadApproachingEnd(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return {v->x_pos, v->y_pos, v->gcache.cached_veh_length, v->cur_speed, v->direction};
+	return {v->x_pos, v->y_pos, RustGroundCachedLength(v), v->cur_speed, v->direction};
 }
 static OpenTTDTrainLineEndsRead TrainReadLineEnds(OpenTTDTrainHandle id) noexcept
 {
@@ -1193,12 +1193,12 @@ static OpenTTDTrainMoveVehicle20Read TrainReadMoveVehicle20(OpenTTDTrainHandle i
 static OpenTTDTrainCollisionOneRead TrainReadCollisionOne(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return {TrainHandle(v->First()), v->x_pos, v->y_pos, v->z_pos, v->gcache.cached_veh_length, v->owner.base()};
+	return {TrainHandle(v->First()), v->x_pos, v->y_pos, v->z_pos, RustGroundCachedLength(v), v->owner.base()};
 }
 static OpenTTDTrainCollisionOne22Read TrainReadCollisionOne22(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return {v->x_pos, v->y_pos, v->z_pos, v->gcache.cached_veh_length, v->owner.base()};
+	return {v->x_pos, v->y_pos, v->z_pos, RustGroundCachedLength(v), v->owner.base()};
 }
 static OpenTTDTrainDeleteLastRead TrainReadDeleteLast(OpenTTDTrainHandle id) noexcept
 {

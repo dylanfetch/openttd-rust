@@ -26,6 +26,23 @@ pub struct OpenTTDVehicle {
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct VehicleRef(pub NonNull<OpenTTDVehicle>);
 
+/// Opaque immutable C++ engine context captured before a callback.
+#[repr(C)]
+pub struct OpenTTDEngine {
+    _private: [u8; 0],
+}
+#[repr(transparent)]
+#[derive(Clone, Copy)]
+pub struct EngineRef(pub NonNull<OpenTTDEngine>);
+
+/// Only the engine context and GRF version consumed before the length callback.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct EngineForLength {
+    pub engine: EngineRef,
+    pub grf_version: u8,
+}
+
 /// `MP_*` tile types.
 pub const MP_ROAD: u8 = 2;
 pub const MP_STATION: u8 = 5;
@@ -112,7 +129,7 @@ pub struct VehicleServices {
     /// `GetVehicleCallback(CBID_VEHICLE_LENGTH, 0, 0, v->engine_type, v)`.
     pub length_callback: extern "C" fn(VehicleRef) -> u16,
     /// `ErrorUnknownCallbackResult(grfid, CBID_VEHICLE_LENGTH, result)`.
-    pub unknown_length_result: extern "C" fn(VehicleRef, u16),
+    pub unknown_length_result: extern "C" fn(EngineRef, u16),
     pub length_changed: extern "C" fn(VehicleRef),
     /// `PlayVehicleSound(v, VSE_START)`.
     pub play_start_sound: extern "C" fn(VehicleRef) -> bool,
@@ -141,6 +158,9 @@ pub struct VehicleServices {
     pub write_max_speed: extern "C" fn(VehicleRef, u16),
     pub previous_tile: extern "C" fn(VehicleRef) -> PreviousTile,
     pub detach_last: extern "C" fn(VehicleRef, VehicleRef, VehicleRef),
+    pub next: extern "C" fn(VehicleRef) -> Option<VehicleRef>,
+    pub engine_id: extern "C" fn(VehicleRef) -> u16,
+    pub engine_for_length: extern "C" fn(VehicleRef) -> EngineForLength,
 }
 
 /// Position step result: `UpdateInclination`'s old height, then the new height,
@@ -200,6 +220,7 @@ pub struct GroundServices {
     pub write_first_engine: extern "C" fn(VehicleRef, u16),
     /// Store `u` length and `v` total length, then `u->UpdateVisualEffect()`.
     pub write_length: extern "C" fn(VehicleRef, u8, VehicleRef, u16),
+    pub cached_length: extern "C" fn(VehicleRef) -> u8,
 }
 
 /// `GetAdvanceDistance()`.

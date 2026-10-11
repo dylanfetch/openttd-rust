@@ -21,6 +21,12 @@
  * vehicle once and reads only the fields it returns. Rust holds no reference into
  * a vehicle or the map across a service call; an escaping exception terminates. */
 struct OpenTTDVehicle;
+/** Captured immutable engine context, valid across synchronous vehicle callbacks. */
+struct OpenTTDEngine;
+struct OpenTTDEngineForLength {
+	const OpenTTDEngine *engine;
+	uint8_t grf_version;
+};
 struct OpenTTDVehicleNewPosition {
 	int32_t x;
 	int32_t y;
@@ -49,7 +55,7 @@ struct OpenTTDVehicleServices {
 	void (OPENTTD_VEHICLE_CALL *base_viewport)(OpenTTDVehicle *) noexcept;
 	int32_t (OPENTTD_VEHICLE_CALL *property)(OpenTTDVehicle *, uint8_t, int32_t) noexcept;
 	uint16_t (OPENTTD_VEHICLE_CALL *length_callback)(OpenTTDVehicle *) noexcept;
-	void (OPENTTD_VEHICLE_CALL *unknown_length_result)(OpenTTDVehicle *, uint16_t) noexcept;
+	void (OPENTTD_VEHICLE_CALL *unknown_length_result)(const OpenTTDEngine *, uint16_t) noexcept;
 	void (OPENTTD_VEHICLE_CALL *length_changed)(OpenTTDVehicle *) noexcept;
 	bool (OPENTTD_VEHICLE_CALL *play_start_sound)(OpenTTDVehicle *) noexcept;
 	void (OPENTTD_VEHICLE_CALL *play_sound)(OpenTTDVehicle *, uint16_t) noexcept;
@@ -72,6 +78,9 @@ struct OpenTTDVehicleServices {
 	void (OPENTTD_VEHICLE_CALL *write_max_speed)(OpenTTDVehicle *, uint16_t) noexcept;
 	OpenTTDVehiclePreviousTile (OPENTTD_VEHICLE_CALL *previous_tile)(OpenTTDVehicle *) noexcept;
 	void (OPENTTD_VEHICLE_CALL *detach_last)(OpenTTDVehicle *, OpenTTDVehicle *, OpenTTDVehicle *) noexcept;
+	OpenTTDVehicle *(OPENTTD_VEHICLE_CALL *next)(OpenTTDVehicle *) noexcept;
+	uint16_t (OPENTTD_VEHICLE_CALL *engine_id)(OpenTTDVehicle *) noexcept;
+	OpenTTDEngineForLength (OPENTTD_VEHICLE_CALL *engine_for_length)(OpenTTDVehicle *) noexcept;
 };
 struct OpenTTDGroundMoved {
 	int32_t old_z;
@@ -104,6 +113,7 @@ struct OpenTTDGroundServices {
 	void (OPENTTD_VEHICLE_CALL *go_to_depot_service)(OpenTTDVehicle *, uint16_t) noexcept;
 	void (OPENTTD_VEHICLE_CALL *write_first_engine)(OpenTTDVehicle *, uint16_t) noexcept;
 	void (OPENTTD_VEHICLE_CALL *write_length)(OpenTTDVehicle *, uint8_t, OpenTTDVehicle *, uint16_t) noexcept;
+	uint8_t (OPENTTD_VEHICLE_CALL *cached_length)(OpenTTDVehicle *) noexcept;
 };
 const OpenTTDVehicleServices &GetRustVehicleServices() noexcept;
 #endif /* RUST_VEHICLE_FFI_H */

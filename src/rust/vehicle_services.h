@@ -18,6 +18,14 @@ inline OpenTTDVehicle *RustVehicle(const Vehicle *v) noexcept { return reinterpr
 /** The vehicle behind a Rust handle. */
 inline Vehicle *VehicleOf(OpenTTDVehicle *v) noexcept { return reinterpret_cast<Vehicle *>(v); }
 
+/** Shared native field definitions, also used by bundled observations. */
+inline Vehicle *RustVehicleNext(const Vehicle *v) noexcept { return v->Next(); }
+inline uint16_t RustVehicleEngineID(const Vehicle *v) noexcept { return v->engine_type.base(); }
+inline const OpenTTDEngine *RustEngine(const Engine *e) noexcept { return reinterpret_cast<const OpenTTDEngine *>(e); }
+inline const Engine *EngineOf(const OpenTTDEngine *e) noexcept { return reinterpret_cast<const Engine *>(e); }
+template <class T>
+inline uint8_t RustGroundCachedLength(const T *v) noexcept { return v->gcache.cached_veh_length; }
+
 /** GRF version of a live engine; the original default-engine value is zero. */
 inline uint8_t RustEngineGRFVersion(const Engine *engine) noexcept
 {
@@ -108,6 +116,12 @@ static void OPENTTD_VEHICLE_CALL GroundSvcCacheBegin(OpenTTDVehicle *v) noexcept
 	u->gcache.cached_total_length = 0;
 }
 
+template <class T>
+static uint8_t OPENTTD_VEHICLE_CALL GroundSvcCachedLength(OpenTTDVehicle *v) noexcept
+{
+	return RustGroundCachedLength(T::From(VehicleOf(v)));
+}
+
 /** One GroundVehicle service table per vehicle type. */
 template <class T>
 const OpenTTDGroundServices &GetRustGroundServices() noexcept
@@ -125,6 +139,7 @@ const OpenTTDGroundServices &GetRustGroundServices() noexcept
 		.go_to_depot_service = GroundSvcGoToDepotService<T>,
 		.write_first_engine = GroundSvcWriteFirstEngine<T>,
 		.write_length = GroundSvcWriteLength<T>,
+		.cached_length = GroundSvcCachedLength<T>,
 	};
 	return services;
 }

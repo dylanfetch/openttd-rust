@@ -360,17 +360,6 @@ pub struct SoundRead {
 
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct CachePart {
-    pub next: Option<VehicleRef>,
-    pub engine: u16,
-    pub max_speed: u16,
-    pub grf_version: u8,
-    pub shorten: u8,
-    pub length: u8,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy)]
 pub struct CostRead {
     pub cost_class: u8,
     pub cost_factor: u8,
@@ -458,7 +447,8 @@ pub struct Leaves {
     pub depot_order: extern "C" fn(VehicleRef) -> DepotOrder,
     pub depot_exit: extern "C" fn(VehicleRef, i32, i32),
     pub crash_news: extern "C" fn(VehicleRef, u32),
-    pub cache_part: extern "C" fn(VehicleRef) -> CachePart,
+    pub shorten_factor: extern "C" fn(crate::vehicle::EngineRef) -> u8,
+    pub default_max_speed: extern "C" fn(VehicleRef) -> u16,
     pub update_cargo_age: extern "C" fn(VehicleRef),
     pub cost_read: extern "C" fn(VehicleRef) -> CostRead,
     pub price: extern "C" fn(VehicleRef, u32) -> i64,
@@ -958,46 +948,42 @@ impl Game<'_> {
     /// `RoadVehUpdateCache`.
     fn update_cache(&self, v: Part, same_length: bool) {
         service!(self.gs.cache_begin)(v.v);
-        let first = service!(self.l.cache_part)(v.v);
         let mut total: u16 = 0;
         let mut u = v.v;
-        let mut r = first;
         loop {
-            service!(self.gs.write_first_engine)(
-                u,
-                if u == v.v {
-                    INVALID_ENGINE
-                } else {
-                    first.engine
-                },
-            );
+            let first_engine = if u == v.v {
+                INVALID_ENGINE
+            } else {
+                service!(self.vs.engine_id)(v.v)
+            };
+            service!(self.gs.write_first_engine)(u, first_engine);
+            let engine = service!(self.vs.engine_for_length)(u);
             let mut length = VEHICLE_LENGTH;
-            let mut factor = if r.grf_version >= 8 {
+            let mut factor = if engine.grf_version >= 8 {
                 let value = service!(self.vs.property)(u, 0x23, i32::from(CALLBACK_FAILED)) as u16;
                 if value != CALLBACK_FAILED && value >= u16::from(VEHICLE_LENGTH) {
-                    service!(self.vs.unknown_length_result)(u, value);
+                    service!(self.vs.unknown_length_result)(engine.engine, value);
                 }
                 value
             } else {
                 service!(self.vs.length_callback)(u)
             };
             if factor == CALLBACK_FAILED {
-                factor = u16::from(r.shorten);
+                factor = u16::from(service!(self.l.shorten_factor)(engine.engine));
             }
             if factor != 0 {
                 length -= factor.min(u16::from(VEHICLE_LENGTH - 1)) as u8;
             }
-            if same_length && length != r.length {
+            if same_length && length != service!(self.gs.cached_length)(u) {
                 service!(self.vs.length_changed)(u);
             }
             total = total.wrapping_add(u16::from(length));
             service!(self.gs.write_length)(u, length, v.v, total);
             service!(self.l.update_cargo_age)(u);
-            let Some(next) = r.next else {
+            let Some(next) = service!(self.vs.next)(u) else {
                 break;
             };
             u = next;
-            r = service!(self.l.cache_part)(u);
         }
         let speed = service!(self.vs.property)(v.v, 0x15, 0) as u32;
         service!(self.vs.write_max_speed)(
@@ -1005,7 +991,7 @@ impl Game<'_> {
             if speed != 0 {
                 speed.wrapping_mul(4)
             } else {
-                u32::from(first.max_speed)
+                u32::from(service!(self.l.default_max_speed)(v.v))
             } as u16,
         );
     }
