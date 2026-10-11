@@ -1493,11 +1493,23 @@ static const OpenTTDStationLoading _rust_station_loading = {
 	.load_engine = [](void *handle) noexcept -> OpenTTDLoadEngine {
 		CountStationBoundary<OpenTTDLoadEngine>(StationBoundary::Loading, true);
 		const Engine *engine = static_cast<Vehicle *>(handle)->GetEngine();
-		return {
-			engine->info.load_amount, engine->GetGRF() == nullptr ? uint8_t{
-				0
-			} : engine->GetGRF()->grf_version, engine->info.callback_mask.Test(VehicleCallbackMask::LoadAmount), engine->info.misc_flags.Test(EngineMiscFlag::NoDefaultCargoMultiplier)
-		};
+		return {reinterpret_cast<const OpenTTDStationEngine *>(engine), engine->info.load_amount};
+	},
+	.engine_grf = [](const OpenTTDStationEngine *handle) noexcept -> const OpenTTDStationGRF * {
+		CountStationBoundary<const OpenTTDStationGRF *>(StationBoundary::Loading);
+		return reinterpret_cast<const OpenTTDStationGRF *>(reinterpret_cast<const Engine *>(handle)->GetGRF());
+	},
+	.grf_version = [](const OpenTTDStationGRF *handle) noexcept -> uint8_t {
+		CountStationBoundary<uint8_t>(StationBoundary::Loading);
+		return reinterpret_cast<const GRFFile *>(handle)->grf_version;
+	},
+	.engine_load_callback = [](const OpenTTDStationEngine *handle) noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Loading);
+		return reinterpret_cast<const Engine *>(handle)->info.callback_mask.Test(VehicleCallbackMask::LoadAmount);
+	},
+	.engine_no_multiplier = [](const OpenTTDStationEngine *handle) noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Loading);
+		return reinterpret_cast<const Engine *>(handle)->info.misc_flags.Test(EngineMiscFlag::NoDefaultCargoMultiplier);
 	},
 	.delivery_remaining = [](void *handle) noexcept -> OpenTTDDeliveryRemaining {
 		CountStationBoundary<OpenTTDDeliveryRemaining>(StationBoundary::Loading, true);

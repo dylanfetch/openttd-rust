@@ -77,11 +77,11 @@ struct OpenTTDDeliveryRemaining {
 	uint32_t deliver;
 	uint16_t capacity;
 };
+struct OpenTTDStationEngine;
+struct OpenTTDStationGRF;
 struct OpenTTDLoadEngine {
+	const OpenTTDStationEngine *engine;
 	uint8_t amount;
-	uint8_t version;
-	bool callback;
-	bool no_multiplier;
 };
 struct OpenTTDLoadingWait {
 	int32_t lateness;
@@ -173,6 +173,10 @@ struct OpenTTDStationLinks {
 struct OpenTTDStationLoading {
 	OpenTTDLoadingWait (*wait_observation)(void *) noexcept;
 	OpenTTDLoadEngine (*load_engine)(void *) noexcept;
+	const OpenTTDStationGRF *(*engine_grf)(const OpenTTDStationEngine *) noexcept;
+	uint8_t (*grf_version)(const OpenTTDStationGRF *) noexcept;
+	bool (*engine_load_callback)(const OpenTTDStationEngine *) noexcept;
+	bool (*engine_no_multiplier)(const OpenTTDStationEngine *) noexcept;
 	OpenTTDDeliveryRemaining (*delivery_remaining)(void *) noexcept;
 	OpenTTDCargoStored (*cargo_stored)(void *) noexcept;
 	OpenTTDCargoReservation (*cargo_reservation)(void *) noexcept;

@@ -780,7 +780,7 @@ static const OpenTTDStationServices _rust_station_services = {
 		SetWindowDirty(WC_STATION_VIEW, static_cast<BaseStation *>(handle)->index);
 		Station::From(static_cast<BaseStation *>(handle))->MarkTilesDirty(true);
 	},
-	.rating_callback = [](void *handle, uint8_t cargo, uint32_t var10, uint32_t var18) noexcept -> uint16_t {
+	.rating_callback = [](void *, uint8_t cargo, uint32_t var10, uint32_t var18) noexcept -> uint16_t {
 		CountStationBoundary<uint16_t>(StationBoundary::Station);
 		return GetCargoCallback(CBID_CARGO_STATION_RATING_CALC, var10, var18, CargoSpec::Get(cargo));
 	},

@@ -286,12 +286,12 @@ pub struct DeliveryRemaining {
     pub(crate) deliver: u32,
     pub(crate) capacity: u16,
 }
+pub(crate) enum Engine {}
+pub(crate) enum Grf {}
 #[repr(C)]
 pub struct LoadEngine {
+    pub(crate) engine: *const Engine,
     pub(crate) amount: u8,
-    pub(crate) version: u8,
-    pub(crate) callback: bool,
-    pub(crate) no_multiplier: bool,
 }
 #[repr(C)]
 pub struct LoadingWait {
@@ -1067,6 +1067,10 @@ pub unsafe extern "C" fn openttd_rust_station_tick(world: *const World, links: *
 pub struct Loading {
     pub(crate) wait_observation: extern "C" fn(*mut c_void) -> LoadingWait,
     pub(crate) load_engine: extern "C" fn(*mut c_void) -> LoadEngine,
+    pub(crate) engine_grf: extern "C" fn(*const Engine) -> *const Grf,
+    pub(crate) grf_version: extern "C" fn(*const Grf) -> u8,
+    pub(crate) engine_load_callback: extern "C" fn(*const Engine) -> bool,
+    pub(crate) engine_no_multiplier: extern "C" fn(*const Engine) -> bool,
     pub(crate) delivery_remaining: extern "C" fn(*mut c_void) -> DeliveryRemaining,
     pub(crate) cargo_stored: extern "C" fn(*mut c_void) -> CargoStored,
     pub(crate) cargo_reservation: extern "C" fn(*mut c_void) -> CargoReservation,
@@ -1336,22 +1340,23 @@ fn reserve_consist(
     }
 }
 fn load_amount(v: *mut c_void, l: &Loading) -> u32 {
-    let engine = (l.load_engine)(v);
-    let mut amount = u32::from(engine.amount);
+    let observed = (l.load_engine)(v);
+    let engine = observed.engine;
+    let mut amount = u32::from(observed.amount);
     let mail = l.vehicle_type(v) == 3 && l.is_normal_aircraft(v) == 0;
     if mail {
         amount = amount.wrapping_add(3) / 4;
     }
     if l.gradual(v) != 0 {
-        let version = engine.version;
+        let grf = (l.engine_grf)(engine);
         let mut cb = 0xffff;
-        if version >= 8 {
+        if !grf.is_null() && (l.grf_version)(grf) >= 8 {
             cb = (l.load_property)(v);
-        } else if engine.callback {
+        } else if (l.engine_load_callback)(engine) {
             cb = (l.load_callback)(v);
         }
         if cb != 0xffff {
-            if version < 8 {
+            if (l.grf_version)((l.engine_grf)(engine)) < 8 {
                 cb &= 255;
             }
             if cb >= 256 {
@@ -1361,7 +1366,7 @@ fn load_amount(v: *mut c_void, l: &Loading) -> u32 {
             }
         }
     }
-    if engine.no_multiplier && !mail {
+    if (l.engine_no_multiplier)(engine) && !mail {
         amount = amount.wrapping_mul(l.cargo_multiplier(v)).wrapping_add(255) / 256;
     }
     amount.max(1)
