@@ -146,7 +146,7 @@ Independent items (#156, #210) may run in parallel.
    `shared-layer-road-199` (fixes listed on #199), then aircraft (about 150
    crossings per tick), train, ship. Each PR deletes that port's accessor copies
    and reports crossings per vehicle tick.
-3. **#148 town lifecycle (#216)** owns state and control in the direct typed
+3. **#148 town lifecycle (#216)** owns state, custom-name/text bytes and control in the direct typed
    form. Reuse integrated #217 station activity and #209 company context before review.
 4. **#168 station tick and loading (#214 / #217)**: consolidate typed handles and
    reuse integrated #215 vehicle/engine and #209 company-context services. Then disaster and the cold
@@ -171,14 +171,14 @@ remain; passing heads and evidence are on linked issues/PRs. Integration order:
 | Issue / PR | Branch (worktree suffix), head | State and next step |
 | --- | --- | --- |
 | #192 / #209 | `company-direct-192`, `aaeafc9b69` | `/root/company_startup_coverage_156`: startup pair/self/soak and mutation pass; common Post witnesses/context helpers after #215, then fresh review/full CI. |
-| #199 / #215 | `shared-layer-road-199`, `c50a4a56fc` | Fresh fixing review: native/Cargo checks pass; pair/self/soak running. Final profile, idle-host timing, full CI and disposition remain. |
-| #148 / #216 | `town-lifecycle-148`, `2c18e4a92c` | `/root/town_lifecycle_148`: narrow map/settings pass; house/yearly/create WIP comparisons pass, portable build pending. Full lifecycle and integrated services remain. |
+| #199 / #215 | `shared-layer-road-199`, `842d8a4e0a` | Two fixing reviews and local checks pass. Profiles preserve state and meet crossing caps; instruction target misses, recorded as a limit. Idle timing/full CI pending. |
+| #148 / #216 | `town-lifecycle-148`, `bcff8c58e9` | `/root/town_lifecycle_148`: house/yearly/create comparisons and portable build pass; placement/names WIP. Full lifecycle and integrated services remain. |
 | #214 / #217 | `station-loading-direct-214`, `d456668553` | `/root/station_loading_direct_214`: typed station/domain handles, map/timer reuse and 16-case pair pass; consume integrated #215/#209, then final checks/review. |
-| #150 / #218 | `industry-construction-150`, `8675d08d7a` | `/root/industry_construction_150`: builtin tile policy passes; whole-command WIP native/new scenarios pass, remaining comparisons running. Integrated services remain. |
+| #150 / #218 | `industry-construction-150`, `8cb227cb75` | `/root/industry_construction_150`: whole construction/command batch passes 13 pairs; narrow observation/map consolidation WIP. Integrated services and final checks remain. |
 
 Planning complete: #212/#213 selected after #150. ABI blocks: train through 385,
 tree additions 386-389, fleet 390-399, company 400-429, town 430-459, road 460-499,
-station/loading 500-559, industry construction 560-619, shared CommandCost 620-629,
+station/loading 500-559, industry 560-619 (572 shared ByteSpan lands with town), CommandCost 620-629,
 and additional town lifecycle 630-669. Allocate only consumed layouts.
 
 Preserve the pinned reference, paused curve worktrees and evidence branches
