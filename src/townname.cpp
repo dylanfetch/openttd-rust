@@ -19,6 +19,7 @@
 
 #ifdef WITH_RUST
 #include "rust/townname_ffi.h"
+#include "rust/town_names_ffi.h"
 #else
 #include "table/townname.h"
 #endif
@@ -97,6 +98,33 @@ std::string GetTownName(const Town *t)
 }
 
 
+#ifdef WITH_RUST
+OpenTTDTownNameParams GetRustTownNameParams() noexcept
+{
+	TownNameParams params(_settings_game.game_creation.town_name);
+	return {.grfid = params.grfid, .kind = params.type};
+}
+const OpenTTDTownNameServices &GetRustTownNameServices() noexcept
+{
+	static const OpenTTDTownNameServices services{
+		.params = GetRustTownNameParams,
+		.next_random = [](OpenTTDTownRandomizer *randomizer) noexcept { return randomizer->Next(); },
+		.next_town = [](uint32_t from) noexcept {
+			const auto *town = OpenTTDNextTown(from);
+			return OpenTTDTownNameCursor{.town = town, .index = town == nullptr ? uint16_t{0} : reinterpret_cast<const Town *>(town)->index.base()};
+		},
+		.grf_valid = [](uint32_t grfid) noexcept { return GetGRFTownName(grfid) != nullptr; },
+		.render = [](OpenTTDTownNameParams params, uint32_t parts, void *context, bool (*consume)(void *, OpenTTDByteSpan)) noexcept {
+			static_assert(sizeof(TownNameParams) == sizeof(OpenTTDTownNameParams));
+			auto native_params = std::bit_cast<TownNameParams>(params);
+			std::string name = GetTownName(&native_params, parts);
+			return consume(context, {reinterpret_cast<const uint8_t *>(name.data()), name.size()});
+		},
+	};
+	return services;
+}
+#endif
+
 /**
  * Verifies the town name is valid and unique.
  * @param r random bits
@@ -106,6 +134,9 @@ std::string GetTownName(const Town *t)
  */
 bool VerifyTownName(uint32_t r, const TownNameParams *par, TownNames *town_names)
 {
+#ifdef WITH_RUST
+	return openttd_rust_town_verify_name(&GetRustTownNameServices(), &GetRustSharedServices(), r, {.grfid = par->grfid, .kind = par->type}, town_names == nullptr ? nullptr : town_names->get());
+#else
 	std::string name = GetTownName(par, r);
 
 	/* Check size and width */
@@ -127,6 +158,7 @@ bool VerifyTownName(uint32_t r, const TownNameParams *par, TownNames *town_names
 	}
 
 	return true;
+#endif
 }
 
 
@@ -139,6 +171,9 @@ bool VerifyTownName(uint32_t r, const TownNameParams *par, TownNames *town_names
  */
 bool GenerateTownName(Randomizer &randomizer, uint32_t *townnameparts, TownNames *town_names)
 {
+#ifdef WITH_RUST
+	return openttd_rust_town_generate_name(&GetRustTownNameServices(), &GetRustSharedServices(), &randomizer, townnameparts, town_names == nullptr ? nullptr : town_names->get());
+#else
 	TownNameParams par(_settings_game.game_creation.town_name);
 
 	/* Do not set i too low, since when we run out of names, we loop
@@ -155,6 +190,7 @@ bool GenerateTownName(Randomizer &randomizer, uint32_t *townnameparts, TownNames
 	}
 
 	return false;
+#endif
 }
 
 

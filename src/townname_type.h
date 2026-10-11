@@ -17,7 +17,22 @@
 #include "town_type.h"
 #include "string_type.h"
 
+#ifdef WITH_RUST
+#include "rust/town_names_ffi.h"
+class TownNames {
+	OpenTTDTownNamesScratch scratch;
+public:
+	TownNames() { openttd_rust_town_names_init(&this->scratch); }
+	~TownNames() { openttd_rust_town_names_destroy(&this->scratch); }
+	TownNames(const TownNames &) = delete;
+	TownNames &operator=(const TownNames &) = delete;
+	OpenTTDTownNamesScratch *get() { return &this->scratch; }
+	void insert(std::string_view name) { openttd_rust_town_names_insert(this->get(), {reinterpret_cast<const uint8_t *>(name.data()), name.size()}); }
+	void clear() { openttd_rust_town_names_clear(this->get()); }
+};
+#else
 typedef std::set<std::string> TownNames;
+#endif
 
 /**
  * Struct holding parameters used to generate town name.

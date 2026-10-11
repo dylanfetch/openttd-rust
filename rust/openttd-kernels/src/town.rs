@@ -24,6 +24,7 @@
 )]
 pub(crate) mod house;
 pub(crate) mod lifecycle;
+pub(crate) mod names;
 pub(crate) mod placement;
 use crate::services::{ByteSpan, Services, chance16_i};
 use std::{

@@ -12,6 +12,7 @@
 #include <cstddef>
 struct OpenTTDTownLeaves;
 struct OpenTTDTownNameParams { uint32_t grfid; uint16_t kind; };
+OpenTTDTownNameParams GetRustTownNameParams() noexcept;
 struct OpenTTDTownCountSizes { size_t houses; size_t classes; };
 /* Persistent count storage belongs to Rust. Native spec/class registries supply
  * only sizes; no view or owner borrow survives structural count initialization. */

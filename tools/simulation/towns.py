@@ -257,6 +257,29 @@ def tunnel_reference_gap(out, archive=None):
             end += 1
         return text[start:end]
 
+    name_source = (migration.REFERENCE / "src/townname.cpp").read_text()
+    utf_header = (migration.REFERENCE / "src/core/utf8.hpp").read_text()
+    name_bodies = {
+        "IsUtf8Part": unchanged_body(utf_header, "inline bool IsUtf8Part("),
+        "Utf8View": unchanged_body(utf_header, "class Utf8View {") + ";",
+        "Utf8StringLength": unchanged_body(
+            (migration.REFERENCE / "src/string.cpp").read_text(),
+            "size_t Utf8StringLength(",
+        ),
+        "TownNameParams": unchanged_body(
+            name_source, "TownNameParams::TownNameParams(const Town *t)"
+        ),
+        "GetTownName": unchanged_body(
+            name_source, "std::string GetTownName(const Town *t)"
+        ),
+        "VerifyTownName": unchanged_body(name_source, "bool VerifyTownName("),
+        "GenerateTownName": unchanged_body(name_source, "bool GenerateTownName("),
+        "IsUniqueTownName": unchanged_body(source, "static bool IsUniqueTownName("),
+    }
+    (out / "town-names-original.hpp").write_text(
+        "\n\n".join(name_bodies.values()) + "\n"
+    )
+    bodies.update(name_bodies)
     map_source = (migration.REFERENCE / "src/town_map.h").read_text()
     map_bodies = {}
     for name in (
@@ -379,6 +402,7 @@ def tunnel_reference_gap(out, archive=None):
             and name not in placement_bodies
             and name not in spiral_bodies
             and name not in scale_bodies
+            and name not in name_bodies
         )
         + "\n"
     )
@@ -468,6 +492,11 @@ def tunnel_reference_gap(out, archive=None):
     )
     if not town_bytes or int(town_bytes[1]) == 0:
         raise RuntimeError("town byte ownership gap omitted completion/count marker")
+    names = re.search(
+        rb"\nPASS (\d+) unchanged-reference name-policy cases\n", run.stdout
+    )
+    if not names or int(names[1]) == 0:
+        raise RuntimeError("town name policy gap omitted completion/count marker")
     migration.ensure_reference()
     report = {
         "passed": True,
@@ -479,6 +508,7 @@ def tunnel_reference_gap(out, archive=None):
         "house_cases": int(house[1]),
         "placement_cases": int(placement[1]),
         "town_byte_cases": int(town_bytes[1]),
+        "name_policy_cases": int(names[1]),
         "cases": int(match[1]),
         "successful_tunnel_cases": len(re.findall(rb" result=1 ", run.stdout)),
         "execute_effect_cases": len(re.findall(rb" effects=1 ", run.stdout)),
@@ -500,6 +530,7 @@ def tunnel_reference_gap(out, archive=None):
             "Ordered road-mask/info services, command arguments, result, RNG and partial execute effects compare exactly.",
             "Pure C++ map getter calls and typed Rust predicates have different granularity; their call counts/order are not compared.",
             "Packed-byte construction/age boundaries, multi-tile order and animation reentry supplement the ordinary house-growth snapshots.",
+            "Name collisions, malformed UTF-8 length, missing GRF fallback, retry exhaustion and untouched failure output are not forced by generated worlds.",
             "Raw NUL/non-UTF8 ownership and stable cached-name reference invalidation are not reachable through validated name commands.",
             "Exact site goals/near-town thresholds, clipped coastal order/ties and default-count widths are not forced by generated-save scenarios.",
             "One active town-buildable road type; shared command internals and road-type selection are outside this gap check.",

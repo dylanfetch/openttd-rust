@@ -26,6 +26,11 @@ macro_rules! layout {
 #[allow(clippy::too_many_lines)]
 pub fn layout(type_id: u16, item: u8) -> usize {
     match type_id {
+        454 => {
+            layout!(crate::town::names::World, item; params, next_random, next_town, grf_valid, render)
+        }
+        453 => layout!(crate::town::names::Cursor, item; town, index),
+        452 => layout!(crate::town::names::Scratch, item; words),
         572 => layout!(crate::services::ByteSpan, item; data, size),
         451 => layout!(crate::townname::StackOutput, item; words),
         450 => {

@@ -10,6 +10,8 @@
 #include "../../src/rust/town_ffi.h"
 #include "../../src/rust/town_house_ffi.h"
 #include "../../src/rust/town_placement_ffi.h"
+#include "../../src/rust/town_names_ffi.h"
+#include <set>
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -712,8 +714,109 @@ static void Compare()
 }
 } // namespace town_bytes_probe
 
+namespace town_names_probe {
+using TownNames = std::set<std::string>;
+constexpr size_t MAX_LENGTH_TOWN_NAME_CHARS = 32;
+constexpr uint16_t SPECSTR_TOWNNAME_START = 0x20c0;
+struct Town {
+	uint16_t index;
+	uint32_t townnamegrfid, townnameparts;
+	uint16_t townnametype;
+	std::string name;
+	OpenTTDTownState *owner;
+	static const std::vector<const Town *> &Iterate();
+};
+struct Fixture {
+	std::vector<std::unique_ptr<Town>> towns;
+	std::vector<const Town *> pool;
+	std::array<std::string, 4> names;
+	std::vector<std::array<uint32_t, 4>> trace;
+	OpenTTDTownNameParams selected{0, SPECSTR_TOWNNAME_START};
+	std::vector<uint32_t> random;
+	uint32_t draws = 0;
+	~Fixture() { for (auto &t : this->towns) openttd_rust_town_destroy(t->owner); }
+	void Add(uint16_t id, std::string custom, uint32_t parts, uint32_t grfid = 0) {
+		auto t = std::make_unique<Town>(Town{id, grfid, parts, SPECSTR_TOWNNAME_START, std::move(custom), openttd_rust_town_new()});
+		auto fields = openttd_rust_town_simulation(t->owner); fields->townnamegrfid = grfid; fields->townnametype = t->townnametype; fields->townnameparts = parts;
+		openttd_rust_town_set_name(t->owner, {reinterpret_cast<const uint8_t *>(t->name.data()), t->name.size()});
+		this->pool.push_back(t.get()); this->towns.push_back(std::move(t));
+	}
+};
+static Fixture *fixture;
+const std::vector<const Town *> &Town::Iterate() { return fixture->pool; }
+static const void *GetGRFTownName(uint32_t id) { fixture->trace.push_back({1, id, 0, 0}); return id == 7 ? fixture : nullptr; }
+struct TownNameParams {
+	uint32_t grfid;
+	uint16_t type;
+	explicit TownNameParams(uint8_t) { fixture->trace.push_back({2, 0, 0, 0}); this->grfid = fixture->selected.grfid; this->type = fixture->selected.kind; }
+	TownNameParams(const Town *t);
+};
+struct { struct { uint8_t town_name = 0; } game_creation; } _settings_game;
+struct Randomizer { uint32_t Next() { fixture->trace.push_back({3, fixture->draws, 0, 0}); return fixture->random[fixture->draws++ % fixture->random.size()]; } };
+static std::string GetTownName(const TownNameParams *params, uint32_t parts) {
+	fixture->trace.push_back({4, params->grfid, params->type, parts});
+	return fixture->names[(parts + (params->grfid == 7 ? 1 : 0)) & 3];
+}
+template <typename T> constexpr unsigned GB(T value, unsigned start, unsigned length) { return (static_cast<std::make_unsigned_t<T>>(value) >> start) & ((1U << length) - 1); }
+std::pair<size_t, char32_t> DecodeUtf8(std::string_view);
+#include "town-names-original.hpp"
+static const OpenTTDTownNameServices &Services()
+{
+	static const OpenTTDTownNameServices services{
+		.params = []() noexcept { TownNameParams p(_settings_game.game_creation.town_name); return OpenTTDTownNameParams{p.grfid, p.type}; },
+		.next_random = [](OpenTTDTownRandomizer *r) noexcept { return reinterpret_cast<Randomizer *>(r)->Next(); },
+		.next_town = [](uint32_t from) noexcept { for (auto t : fixture->pool) if (t->index >= from) return OpenTTDTownNameCursor{reinterpret_cast<const OpenTTDTownHandle *>(t), t->index}; return OpenTTDTownNameCursor{}; },
+		.grf_valid = [](uint32_t id) noexcept { return GetGRFTownName(id) != nullptr; },
+		.render = [](OpenTTDTownNameParams p, uint32_t parts, void *context, bool (*consume)(void *, OpenTTDByteSpan)) noexcept {
+			TownNameParams params(uint8_t{0}); fixture->trace.pop_back(); params.grfid = p.grfid; params.type = p.kind;
+			auto name = GetTownName(&params, parts); return consume(context, {reinterpret_cast<const uint8_t *>(name.data()), name.size()});
+		},
+	};
+	return services;
+}
+static void Compare()
+{
+	uint32_t checked = 0;
+	const std::array<std::string, 10> corpus{"", "A", std::string(31, 'X'), std::string(32, 'X'), std::string(33, 'X'), std::string("A\0B", 3), std::string("\xff\x80\0Z", 4), std::string(96, '\x80'), std::string(31, '\xe2'), std::string("\xe2\x82\xac")};
+	for (const auto &bytes : corpus) for (uint32_t mode = 0; mode < 6; mode++) {
+		Fixture f; fixture = &f; f.names = {bytes, "Other", "Other", "Last"}; f.random = {0, 1, 2, 3};
+		if (mode == 1) f.Add(1, bytes, 0);
+		if (mode == 2) f.Add(2, "", 2);
+		if (mode == 3) { f.Add(1, "", 0, 99); f.Add(65534, "Other", 1); }
+		if (mode == 4) { f.Add(2, "", 3, 7); f.Add(7, "Other", 1); }
+		auto shared = OpenTTDFixtureSharedServices(nullptr, Random, Industry);
+		shared.town_owner = [](const OpenTTDTownHandle *t) noexcept { return reinterpret_cast<const Town *>(t)->owner; };
+		OpenTTDTownNamesScratch scratch; openttd_rust_town_names_init(&scratch);
+		TownNames original;
+		if (mode == 5) { original.insert(bytes); openttd_rust_town_names_insert(&scratch, {reinterpret_cast<const uint8_t *>(bytes.data()), bytes.size()}); }
+		for (bool set : {false, true}) for (uint32_t parts = 0; parts < 4; parts++) {
+			TownNameParams p(uint8_t{0}); f.trace.clear(); bool expected = VerifyTownName(parts, &p, set ? &original : nullptr); auto trace = f.trace; f.trace.clear();
+			bool actual = openttd_rust_town_verify_name(&Services(), &shared, parts, {p.grfid, p.type}, set ? &scratch : nullptr);
+			if (actual != expected || f.trace != trace) std::abort(); checked++;
+		}
+		for (const auto &name : corpus) {
+			bool expected = IsUniqueTownName(name);
+			if (expected != openttd_rust_town_unique_name(&Services(), &shared, {reinterpret_cast<const uint8_t *>(name.data()), name.size()})) std::abort(); checked++;
+		}
+		for (bool set : {false, true}) for (bool failure : {false, true}) {
+			if (failure) { f.names.fill(std::string(32, 'X')); }
+			Randomizer randomizer; uint32_t expected_parts = 0xfeedbeef, actual_parts = expected_parts; f.trace.clear(); f.draws = 0;
+			bool expected = GenerateTownName(randomizer, &expected_parts, set ? &original : nullptr); auto trace = f.trace; auto draws = f.draws; f.trace.clear(); f.draws = 0;
+			bool actual = openttd_rust_town_generate_name(&Services(), &shared, reinterpret_cast<OpenTTDTownRandomizer *>(&randomizer), &actual_parts, set ? &scratch : nullptr);
+			if (actual != expected || actual_parts != expected_parts || f.trace != trace || f.draws != draws) std::abort(); checked++;
+		}
+		openttd_rust_town_names_clear(&scratch); original.clear();
+		TownNameParams p(uint8_t{0}); f.names.fill("After clear");
+		if (VerifyTownName(0, &p, &original) != openttd_rust_town_verify_name(&Services(), &shared, 0, {p.grfid, p.type}, &scratch)) std::abort(); checked++;
+		openttd_rust_town_names_destroy(&scratch);
+	}
+	std::printf("\nPASS %u unchanged-reference name-policy cases\n", checked);
+}
+} // namespace town_names_probe
+
 int main()
 {
+	town_names_probe::Compare();
 	town_bytes_probe::Compare();
 	placement_probe::Compare();
 	house_probe::Compare();

@@ -6,6 +6,7 @@
  */
 
 /** @file windows-abi.cpp Bounded first-32-bit layout and real C ABI call checks. */
+#include "rust/town_names_ffi.h"
 #include "rust/abi_ffi.h"
 #include "rust/byte_span_ffi.h"
 #include "rust/command_cost_ffi.h"
@@ -87,6 +88,9 @@ static void Layout(uint16_t type, const char *name, std::initializer_list<size_t
 static void Layouts()
 {
 	Layout(572, "OpenTTDByteSpan", {sizeof(OpenTTDByteSpan), alignof(OpenTTDByteSpan), offsetof(OpenTTDByteSpan, data), offsetof(OpenTTDByteSpan, size)});
+	Layout(454, "OpenTTDTownNameServices", {sizeof(OpenTTDTownNameServices), alignof(OpenTTDTownNameServices), offsetof(OpenTTDTownNameServices, params), offsetof(OpenTTDTownNameServices, next_random), offsetof(OpenTTDTownNameServices, next_town), offsetof(OpenTTDTownNameServices, grf_valid), offsetof(OpenTTDTownNameServices, render)});
+	Layout(453, "OpenTTDTownNameCursor", {sizeof(OpenTTDTownNameCursor), alignof(OpenTTDTownNameCursor), offsetof(OpenTTDTownNameCursor, town), offsetof(OpenTTDTownNameCursor, index)});
+	Layout(452, "OpenTTDTownNamesScratch", {sizeof(OpenTTDTownNamesScratch), alignof(OpenTTDTownNamesScratch), offsetof(OpenTTDTownNamesScratch, words)});
 	Layout(451, "OpenTTDTownNameStackOutput", {sizeof(OpenTTDTownNameStackOutput), alignof(OpenTTDTownNameStackOutput), offsetof(OpenTTDTownNameStackOutput, words)});
 	Layout(450, "OpenTTDTownPlacementServices", {sizeof(OpenTTDTownPlacementServices), alignof(OpenTTDTownPlacementServices), offsetof(OpenTTDTownPlacementServices, spatial_empty), offsetof(OpenTTDTownPlacementServices, nearest_town), offsetof(OpenTTDTownPlacementServices, clear_ground), offsetof(OpenTTDTownPlacementServices, tree_ground), offsetof(OpenTTDTownPlacementServices, water_distance), offsetof(OpenTTDTownPlacementServices, number_towns), offsetof(OpenTTDTownPlacementServices, custom_towns), offsetof(OpenTTDTownPlacementServices, edge_error), offsetof(OpenTTDTownPlacementServices, town_error), offsetof(OpenTTDTownPlacementServices, site_error)});
 	Layout(444, "OpenTTDTownSuppliedEntry", {sizeof(OpenTTDTownSuppliedEntry), alignof(OpenTTDTownSuppliedEntry), offsetof(OpenTTDTownSuppliedEntry, entry), offsetof(OpenTTDTownSuppliedEntry, created)});

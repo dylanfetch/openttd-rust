@@ -1063,7 +1063,8 @@ static void RustTown_update_max_pass(uint32_t town) noexcept
 }
 static uint32_t RustTown_next_town(uint32_t from) noexcept
 {
-	{ auto range = Town::Iterate(from); auto it = range.begin(); return it == range.end() ? UINT32_MAX : (*it)->index.base(); }
+	const auto *t = reinterpret_cast<const Town *>(OpenTTDNextTown(from));
+	return t == nullptr ? UINT32_MAX : t->index.base();
 }
 static uint64_t RustTown_road_mask() noexcept
 {
@@ -1173,7 +1174,7 @@ static const OpenTTDTownCreateServices &GetRustTownCreateServices() noexcept
 		.count_sizes = GetRustTownCountSizes,
 		.insert_spatial = [](const OpenTTDTownHandle *town) noexcept { _town_kdtree.Insert(reinterpret_cast<const Town *>(town)->index); },
 		.acceptance_cargo = [](uint8_t effect) noexcept { return FindFirstCargoWithTownAcceptanceEffect(static_cast<TownAcceptanceEffect>(effect)) != nullptr; },
-		.name_params = []() noexcept { TownNameParams params(_settings_game.game_creation.town_name); return OpenTTDTownNameParams{.grfid = params.grfid, .kind = params.type}; },
+		.name_params = GetRustTownNameParams,
 		.initial_city_size = []() noexcept { return _settings_game.economy.initial_city_size; },
 		.show_zone = [](const OpenTTDTownHandle *town, bool show) noexcept { const_cast<Town *>(reinterpret_cast<const Town *>(town))->show_zone = show; },
 		.virt_coord = [](const OpenTTDTownHandle *town) noexcept { const_cast<Town *>(reinterpret_cast<const Town *>(town))->UpdateVirtCoord(); },
@@ -2545,11 +2546,15 @@ static CommandCost TownCanBePlacedHere(TileIndex tile, bool check_surrounding)
  */
 static bool IsUniqueTownName(const std::string &name)
 {
+#ifdef WITH_RUST
+	return openttd_rust_town_unique_name(&GetRustTownNameServices(), &GetRustSharedServices(), {reinterpret_cast<const uint8_t *>(name.data()), name.size()});
+#else
 	for (const Town *t : Town::Iterate()) {
 		if (!t->name.empty() && t->name == name) return false;
 	}
 
 	return true;
+#endif
 }
 
 /**
