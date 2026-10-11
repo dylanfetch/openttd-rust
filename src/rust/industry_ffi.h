@@ -15,6 +15,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+typedef struct Industry OpenTTDIndustryShell;
+typedef struct EffectVehicle OpenTTDEffectVehicle;
 typedef struct OpenTTDIndustry OpenTTDIndustry;
 typedef struct OpenTTDIndustryBuilder OpenTTDIndustryBuilder;
 typedef struct OpenTTDIndustryFields {
@@ -308,6 +310,45 @@ typedef struct OpenTTDIndustryProductionResult {
 } OpenTTDIndustryProductionResult;
 typedef void (*OpenTTDIndustryResolve)(void *context, uint32_t random, uint32_t parameter, OpenTTDIndustryProductionResult *out);
 void openttd_rust_industry_production_callback(void *industry, OpenTTDIndustry *owner, void *context, uint32_t behaviour, uint8_t reason, OpenTTDIndustryResolve resolve, const OpenTTDIndustryServices *services);
+/** Minimal live tile lookup; no persistent shell observation. */
+typedef struct OpenTTDIndustryTileOwner {
+	OpenTTDIndustryShell *shell;
+	OpenTTDIndustry *owner;
+} OpenTTDIndustryTileOwner;
+/** Consumed direct leaves; generic animation/map leaves share native definitions. */
+typedef struct OpenTTDIndustryTileServices {
+	uint16_t (*gfx)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*set_gfx)(uint32_t, uint16_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint8_t (*frame)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*set_frame)(uint32_t, uint8_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint8_t (*animation_loop)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*set_animation_loop)(uint32_t, uint8_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*delete_animated)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint64_t (*tick_counter)(void) OPENTTD_INDUSTRY_NOEXCEPT;
+	bool (*ambient)(void) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*animate_new)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint8_t (*construction_counter)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint8_t (*construction_stage)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	bool (*completed)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*set_completed)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*reset_construction)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	OpenTTDIndustryTileOwner (*industry)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint16_t (*industry_index)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint8_t (*toffee_offset)(uint8_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	bool (*on_water)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*water_loop)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	bool (*is_industry)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	bool (*transport)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint16_t (*anim_production)(uint16_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint16_t (*anim_next)(uint16_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*build_oilrig)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	int32_t (*pixel_max_z)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	OpenTTDEffectVehicle * (*create_effect)(int32_t, int32_t, int32_t, uint8_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	OpenTTDEffectVehicle * (*create_effect_above)(int32_t, int32_t, int32_t, uint8_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*set_effect_substate)(OpenTTDEffectVehicle *, uint8_t) OPENTTD_INDUSTRY_NOEXCEPT;
+} OpenTTDIndustryTileServices;
+void openttd_rust_industry_tile_animate(uint32_t tile, const OpenTTDIndustryServices *, const OpenTTDIndustryConstructionServices *, const OpenTTDIndustryLifecycleServices *, const OpenTTDIndustryTileServices *);
+void openttd_rust_industry_tile_loop(uint32_t tile, const OpenTTDIndustryServices *, const OpenTTDIndustryConstructionServices *, const OpenTTDIndustryLifecycleServices *, const OpenTTDIndustryTileServices *, const OpenTTDIndustryGenerationServices *);
 #ifdef __cplusplus
 }
 #endif

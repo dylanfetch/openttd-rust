@@ -399,6 +399,50 @@ def lifecycle_gap():
             end += 1
         bodies.append(source[start:end])
     (out / "industry-lifecycle-reference.inc").write_text("\n\n".join(bodies))
+    tile_source = subprocess.check_output(
+        ["git", "show", migration.BASELINE["commit"] + ":src/industry_cmd.cpp"],
+        cwd=ROOT,
+        text=True,
+    )
+    animation = []
+    for name in (
+        "AnimateSugarSieve",
+        "AnimateToffeeQuarry",
+        "AnimateBubbleCatcher",
+        "AnimatePowerPlantSparks",
+        "AnimateToyFactory",
+        "AnimatePlasticFountain",
+        "AnimateOilWell",
+        "AnimateMineTower",
+        "AnimateTile_Industry",
+    ):
+        start = tile_source.index("static void " + name + "(")
+        end = tile_source.index("{", start) + 1
+        depth = 1
+        while depth:
+            if tile_source[end] == "{":
+                depth += 1
+            elif tile_source[end] == "}":
+                depth -= 1
+            end += 1
+        animation.append(tile_source[start:end])
+    drawing = subprocess.check_output(
+        ["git", "show", migration.BASELINE["commit"] + ":src/table/industry_land.h"],
+        cwd=ROOT,
+        text=True,
+    )
+    start = drawing.index("static const uint8_t _industry_anim_offs_toffee[]")
+    end = drawing.index("};", start) + 2
+    animation.insert(0, drawing[start:end])
+    (out / "industry-animation-reference.inc").write_text("\n\n".join(animation))
+    graphics = subprocess.check_output(
+        ["git", "show", migration.BASELINE["commit"] + ":src/industry_map.h"],
+        cwd=ROOT,
+        text=True,
+    )
+    start = graphics.index("enum IndustryGraphics :")
+    end = graphics.index("};", start) + 2
+    (out / "industry-graphics-reference.inc").write_text(graphics[start:end])
     binary = out / "probe"
     subprocess.run(
         [

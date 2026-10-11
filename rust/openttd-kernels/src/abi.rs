@@ -228,6 +228,10 @@ pub fn layout(type_id: u16, item: u8) -> usize {
             layout!(crate::station_service::Loading, item; read, write, next, next_stations, next_stations_destroy, cargo, load_callback, payment, effect, refit)
         }
 
+        573 => layout!(crate::industry::TileIndustry, item; shell, owner),
+        574 => {
+            layout!(crate::industry::TileServices, item; gfx, set_gfx, frame, set_frame, animation_loop, set_animation_loop, delete_animated, tick_counter, ambient, animate_new, construction_counter, construction_stage, completed, set_completed, reset_construction, industry, industry_index, toffee_offset, on_water, water_loop, is_industry, transport, anim_production, anim_next, build_oilrig, pixel_max_z, create_effect, create_effect_above, set_effect_substate)
+        }
         572 => layout!(crate::services::ByteSpan, item; data, size),
         568 => {
             layout!(crate::industry::CargoLists, item; produced, accepted)

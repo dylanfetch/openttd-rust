@@ -1659,8 +1659,11 @@ stack exception frame after source-order restoration; default native tests cover
 this handoff. Fund-only/custom-zero and four climates compare semantic generation.
 Initialization owns cargo slots, ordered callback validation, native-wrap location
 expansion, tile planting, construction triggers, fields and nearby-station policy.
-Construction validation/funding/prospecting and remaining tile policy are still
-native and remain required before this component is complete.
+Builtin animation, construction-stage completion and tile-loop control are Rust
+owned, including the type recheck after water-driven destruction. Default industry
+comparisons probe rare tick/frame/sound transitions against unchanged bodies.
+Construction validation/funding/prospecting and tile acceptance/clear/terraform
+remain required before this component is complete.
 
 ### Aircraft controllers and airport movement
 

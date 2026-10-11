@@ -57,6 +57,12 @@
 
 #ifdef WITH_RUST
 #include "rust/industry_generation_adapter.hpp"
+#include "rust/sound_services.h"
+#include "rust/tile_animation_services.h"
+#include "rust/orders_ffi.h"
+static const OpenTTDIndustryConstructionServices &GetIndustryConstructionServices();
+static const OpenTTDIndustryGenerationServices &GetIndustryGenerationServices();
+static const OpenTTDIndustryTileServices &GetIndustryTileServices();
 #endif
 
 #include "safeguards.h"
@@ -577,6 +583,7 @@ static bool TransportIndustryGoods(TileIndex tile)
 #endif
 }
 
+#ifndef WITH_RUST
 static void AnimateSugarSieve(TileIndex tile)
 {
 	uint8_t m = GetAnimationFrame(tile) + 1;
@@ -717,8 +724,13 @@ static void AnimateMineTower(TileIndex tile)
 	}
 }
 
+#endif
+
 static void AnimateTile_Industry(TileIndex tile)
 {
+#ifdef WITH_RUST
+	openttd_rust_industry_tile_animate(tile.base(), &GetIndustryRustServices(), &GetIndustryConstructionServices(), &GetIndustryLifecycleRustServices(), &GetIndustryTileServices());
+#else
 	IndustryGfx gfx = GetIndustryGfx(tile);
 
 	if (GetIndustryTileSpec(gfx)->animation.status != AnimationStatus::NoAnimation) {
@@ -766,8 +778,10 @@ static void AnimateTile_Industry(TileIndex tile)
 		AnimateMineTower(tile);
 		break;
 	}
+#endif
 }
 
+#ifndef WITH_RUST
 static void CreateChimneySmoke(TileIndex tile)
 {
 	uint x = TileX(tile) * TILE_SIZE;
@@ -859,8 +873,13 @@ static void TileLoopIndustry_BubbleGenerator(TileIndex tile)
 	if (v != nullptr) v->SetAnimationSubstate(dir);
 }
 
+#endif
+
 static void TileLoop_Industry(TileIndex tile)
 {
+#ifdef WITH_RUST
+	openttd_rust_industry_tile_loop(tile.base(), &GetIndustryRustServices(), &GetIndustryConstructionServices(), &GetIndustryLifecycleRustServices(), &GetIndustryTileServices(), &GetIndustryGenerationServices());
+#else
 	if (IsTileOnWater(tile)) TileLoop_Water(tile);
 
 	/* Normally this doesn't happen, but if an industry NewGRF is removed
@@ -976,6 +995,7 @@ static void TileLoop_Industry(TileIndex tile)
 		if (Chance16(1, 3)) AddAnimatedTile(tile);
 		break;
 	}
+#endif
 }
 
 static bool ClickTile_Industry(TileIndex tile)
@@ -3744,7 +3764,7 @@ static const OpenTTDIndustryConstructionServices &GetIndustryConstructionService
 		.set_construction_stage = [](uint32_t tile, uint8_t stage) noexcept { SetIndustryConstructionStage(TileIndex(tile), stage); },
 		.translated_gfx = [](uint16_t gfx) noexcept -> uint16_t { return GetTranslatedIndustryTileID(gfx); },
 		.animation_enabled = [](uint16_t gfx) noexcept -> bool { return GetIndustryTileSpec(gfx)->animation.status != AnimationStatus::NoAnimation; },
-		.add_animated = [](uint32_t tile, bool mark_dirty) noexcept { AddAnimatedTile(TileIndex(tile), mark_dirty); },
+		.add_animated = OpenTTDAddAnimatedTile,
 		.map = []() noexcept -> OpenTTDIndustryMap { return {Map::SizeX(), Map::SizeY(), to_underlying(_settings_game.game_creation.landscape)}; },
 		.build_window_dirty = []() noexcept { SetWindowDirty(WC_BUILD_INDUSTRY, 0); },
 		.neutral_station = [](void *shell) noexcept -> OpenTTDIndustryStationHandle * { return reinterpret_cast<OpenTTDIndustryStationHandle *>(RustIndustry(shell)->neutral_station); },
@@ -3756,6 +3776,42 @@ static const OpenTTDIndustryConstructionServices &GetIndustryConstructionService
 			ForAllStationsAroundTiles(RustIndustry(shell)->location, [context, visit](Station *station, TileIndex tile) { return visit(context, reinterpret_cast<OpenTTDIndustryStationHandle *>(station), tile.base()); });
 		},
 		.add_delivery = [](OpenTTDIndustryStationHandle *station, void *shell, uint32_t tile) noexcept { reinterpret_cast<Station *>(station)->AddIndustryToDeliver(RustIndustry(shell), TileIndex(tile)); },
+	};
+	return services;
+}
+
+static const OpenTTDIndustryTileServices &GetIndustryTileServices()
+{
+	static const OpenTTDIndustryTileServices services = {
+		.gfx = [](uint32_t tile) noexcept -> uint16_t { return GetIndustryGfx(TileIndex(tile)); },
+		.set_gfx = [](uint32_t tile, uint16_t gfx) noexcept { SetIndustryGfx(TileIndex(tile), gfx); },
+		.frame = OpenTTDAnimationFrame,
+		.set_frame = OpenTTDSetAnimationFrame,
+		.animation_loop = [](uint32_t tile) noexcept -> uint8_t { return GetIndustryAnimationLoop(TileIndex(tile)); },
+		.set_animation_loop = [](uint32_t tile, uint8_t value) noexcept { SetIndustryAnimationLoop(TileIndex(tile), value); },
+		.delete_animated = OpenTTDDeleteAnimatedTile,
+		.tick_counter = openttd_orders_tick_counter,
+		.ambient = OpenTTDAmbientSound,
+		.animate_new = [](uint32_t tile) noexcept { AnimateNewIndustryTile(TileIndex(tile)); },
+		.construction_counter = [](uint32_t tile) noexcept -> uint8_t { return GetIndustryConstructionCounter(TileIndex(tile)); },
+		.construction_stage = [](uint32_t tile) noexcept -> uint8_t { return GetIndustryConstructionStage(TileIndex(tile)); },
+		.completed = [](uint32_t tile) noexcept -> bool { return IsIndustryCompleted(TileIndex(tile)); },
+		.set_completed = [](uint32_t tile) noexcept { SetIndustryCompleted(TileIndex(tile)); },
+		.reset_construction = [](uint32_t tile) noexcept { ResetIndustryConstructionStage(TileIndex(tile)); },
+		.industry = [](uint32_t tile) noexcept -> OpenTTDIndustryTileOwner { Industry *i = Industry::GetByTile(TileIndex(tile)); return {i, i->production_owner.get()}; },
+		.industry_index = [](uint32_t tile) noexcept -> uint16_t { return GetIndustryIndex(TileIndex(tile)).base(); },
+		.toffee_offset = [](uint8_t frame) noexcept -> uint8_t { return _industry_anim_offs_toffee[frame]; },
+		.on_water = [](uint32_t tile) noexcept -> bool { return IsTileOnWater(TileIndex(tile)); },
+		.water_loop = [](uint32_t tile) noexcept { TileLoop_Water(TileIndex(tile)); },
+		.is_industry = [](uint32_t tile) noexcept -> bool { return IsTileType(TileIndex(tile), MP_INDUSTRY); },
+		.transport = [](uint32_t tile) noexcept -> bool { return TransportIndustryGoods(TileIndex(tile)); },
+		.anim_production = [](uint16_t gfx) noexcept -> uint16_t { return GetIndustryTileSpec(gfx)->anim_production; },
+		.anim_next = [](uint16_t gfx) noexcept -> uint16_t { return GetIndustryTileSpec(gfx)->anim_next; },
+		.build_oilrig = [](uint32_t tile) noexcept { BuildOilRig(TileIndex(tile)); },
+		.pixel_max_z = OpenTTDTileMaxPixelZ,
+		.create_effect = [](int32_t x, int32_t y, int32_t z, uint8_t type) noexcept -> OpenTTDEffectVehicle * { return CreateEffectVehicle(x, y, z, static_cast<EffectVehicleType>(type)); },
+		.create_effect_above = [](int32_t x, int32_t y, int32_t z, uint8_t type) noexcept -> OpenTTDEffectVehicle * { return CreateEffectVehicleAbove(x, y, z, static_cast<EffectVehicleType>(type)); },
+		.set_effect_substate = [](OpenTTDEffectVehicle *vehicle, uint8_t state) noexcept { vehicle->SetAnimationSubstate(state); },
 	};
 	return services;
 }

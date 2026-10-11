@@ -10,8 +10,14 @@
 #include "../3rdparty/catch2/catch.hpp"
 #ifdef WITH_RUST
 #include "../industry.h"
+#include "../effectvehicle_func.h"
+#include "../sound_type.h"
 #include "../rust/abi_ffi.h"
 #include "../rust/industry_generation_adapter.hpp"
+static_assert(EV_CHIMNEY_SMOKE == 0 && EV_BUBBLE == 9 && EV_COPPER_MINE_SMOKE == 11);
+static_assert(SND_0B_MINE == 9 && SND_0C_POWER_STATION == 10 && SND_29_SUGAR_MINE_2 == 41);
+static_assert(SND_2A_TOY_FACTORY_3 == 42 && SND_2B_TOY_FACTORY_2 == 43 && SND_2C_TOY_FACTORY_1 == 44);
+static_assert(SND_2D_SUGAR_MINE_1 == 45 && SND_2E_BUBBLE_GENERATOR == 46 && SND_30_TOFFEE_QUARRY == 48);
 static_assert(OWNER_NONE.base() == 16 && INVALID_OWNER.base() == 255);
 static_assert(ICT_NORMAL_GAMEPLAY == 1 && ICT_MAP_GENERATION == 2 && ICT_SCENARIO_EDITOR == 3);
 static_assert(INDUSTRY_NUM_INPUTS == 16 && INDUSTRY_NUM_OUTPUTS == 16);
@@ -33,6 +39,8 @@ TEST_CASE("Industry - canonical native layouts")
 		for (size_t expected : fields) CHECK(openttd_rust_abi_layout(type, item++) == expected);
 		CHECK(openttd_rust_abi_layout(type, item) == SIZE_MAX);
 	};
+	layout(573, {sizeof(OpenTTDIndustryTileOwner), alignof(OpenTTDIndustryTileOwner), offsetof(OpenTTDIndustryTileOwner, shell), offsetof(OpenTTDIndustryTileOwner, owner)});
+	layout(574, {sizeof(OpenTTDIndustryTileServices), alignof(OpenTTDIndustryTileServices), offsetof(OpenTTDIndustryTileServices, gfx), offsetof(OpenTTDIndustryTileServices, set_gfx), offsetof(OpenTTDIndustryTileServices, frame), offsetof(OpenTTDIndustryTileServices, set_frame), offsetof(OpenTTDIndustryTileServices, animation_loop), offsetof(OpenTTDIndustryTileServices, set_animation_loop), offsetof(OpenTTDIndustryTileServices, delete_animated), offsetof(OpenTTDIndustryTileServices, tick_counter), offsetof(OpenTTDIndustryTileServices, ambient), offsetof(OpenTTDIndustryTileServices, animate_new), offsetof(OpenTTDIndustryTileServices, construction_counter), offsetof(OpenTTDIndustryTileServices, construction_stage), offsetof(OpenTTDIndustryTileServices, completed), offsetof(OpenTTDIndustryTileServices, set_completed), offsetof(OpenTTDIndustryTileServices, reset_construction), offsetof(OpenTTDIndustryTileServices, industry), offsetof(OpenTTDIndustryTileServices, industry_index), offsetof(OpenTTDIndustryTileServices, toffee_offset), offsetof(OpenTTDIndustryTileServices, on_water), offsetof(OpenTTDIndustryTileServices, water_loop), offsetof(OpenTTDIndustryTileServices, is_industry), offsetof(OpenTTDIndustryTileServices, transport), offsetof(OpenTTDIndustryTileServices, anim_production), offsetof(OpenTTDIndustryTileServices, anim_next), offsetof(OpenTTDIndustryTileServices, build_oilrig), offsetof(OpenTTDIndustryTileServices, pixel_max_z), offsetof(OpenTTDIndustryTileServices, create_effect), offsetof(OpenTTDIndustryTileServices, create_effect_above), offsetof(OpenTTDIndustryTileServices, set_effect_substate)});
 	layout(572, {sizeof(OpenTTDByteSpan), alignof(OpenTTDByteSpan), offsetof(OpenTTDByteSpan, data), offsetof(OpenTTDByteSpan, size)});
 	layout(568, {sizeof(OpenTTDIndustryCargoLists), alignof(OpenTTDIndustryCargoLists), offsetof(OpenTTDIndustryCargoLists, produced), offsetof(OpenTTDIndustryCargoLists, accepted)});
 	layout(569, {sizeof(OpenTTDIndustryLayoutTile), alignof(OpenTTDIndustryLayoutTile), offsetof(OpenTTDIndustryLayoutTile, x), offsetof(OpenTTDIndustryLayoutTile, y), offsetof(OpenTTDIndustryLayoutTile, gfx)});

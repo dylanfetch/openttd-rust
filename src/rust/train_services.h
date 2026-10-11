@@ -6,6 +6,8 @@
  */
 
 /** @file train_services.h Direct shared-world operations; no train policy. */
+#include "sound_services.h"
+
 struct TrainProfile {
 	bool enabled = std::getenv("OPENTTD_TRAIN_PROFILE") != nullptr;
 	uint64_t counts[31]{};
@@ -105,7 +107,7 @@ static uint64_t TrainAllPowered(OpenTTDTrainHandle, uint64_t a) noexcept
 }
 static uint64_t TrainAmbientSound(OpenTTDTrainHandle) noexcept
 {
-	return _settings_client.sound.ambient;
+	return OpenTTDAmbientSound();
 }
 static void TrainArrivalNews(OpenTTDTrainHandle id, uint16_t a) noexcept
 {

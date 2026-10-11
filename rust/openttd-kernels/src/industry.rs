@@ -26,6 +26,8 @@
 )]
 use std::ffi::c_void;
 use std::ptr;
+mod tile;
+pub use tile::*;
 mod construction;
 pub use construction::*;
 mod generation;
