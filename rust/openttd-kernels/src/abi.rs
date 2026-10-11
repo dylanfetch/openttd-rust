@@ -119,14 +119,14 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         461 => layout!(crate::vehicle::NewPosition, item; x, y, tile),
         462 => layout!(crate::vehicle::Breakdown, item; broken, status),
         460 => {
-            layout!(crate::vehicle::VehicleServices, item; write_counters, handle_breakdown, waiting_for_unbunching, leave_unbunching_depot, reset_depot_unbunching, service_in_depot, needs_automatic_servicing, enter_depot, pathfinding_result, new_position, move_then_status, base_viewport, property, length_callback, unknown_length_result, length_changed, play_start_sound, play_sound, large_explosion, order_free, order_dummy, start_stop_dirty, destroy, age, economy_age, decrease_value, check_breakdown, check_orders, write_day, write_direction, write_speed, write_last_station, write_dest, write_progress, write_max_speed, previous_tile, detach_last, next, engine_id, engine_for_length, write_tick, direction, status, tile, progress)
+            layout!(crate::vehicle::VehicleServices, item; write_counters, handle_breakdown, waiting_for_unbunching, leave_unbunching_depot, reset_depot_unbunching, service_in_depot, needs_automatic_servicing, enter_depot, pathfinding_result, new_position, move_then_status, base_viewport, property, length_callback, unknown_length_result, length_changed, play_start_sound, play_sound, large_explosion, order_free, order_dummy, start_stop_dirty, destroy, age, economy_age, decrease_value, check_breakdown, check_orders, write_day, write_direction, write_speed, write_last_station, write_dest, write_progress, write_max_speed, previous_tile, detach_last, next, engine_id, engine_for_length, write_tick, direction, status, tile, progress, dest_tile, order_type, order_destination)
         }
         464 => layout!(crate::vehicle::Moved, item; old_z, z, cur_speed, max_track_speed),
         465 => layout!(crate::vehicle::Speed, item; distance, cur_speed),
         466 => layout!(crate::vehicle::LastSpeed, item; status),
         467 => layout!(crate::vehicle::Crash, item; victims, front),
         463 => {
-            layout!(crate::vehicle::GroundServices, item; cache_begin, move_incline, update_viewport_then_next, turn, do_update_speed, set_last_speed, acceleration, crash, first_cargo_changed, go_to_depot_service, write_first_engine, write_length, cached_length)
+            layout!(crate::vehicle::GroundServices, item; cache_begin, move_incline, update_viewport_then_next, turn, do_update_speed, set_last_speed, acceleration, crash, first_cargo_changed, go_to_depot_service, write_first_engine, write_length, cached_length, has_articulated)
         }
         80 => layout!(crate::road::PathElement, item; trackdir, tile),
         81 => {
@@ -151,9 +151,9 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         223 => layout!(crate::road::TileVehicle, item; vehicle, first),
         224 => layout!(crate::road::PartRead, item; next, next_state, tile, z, tram),
         225 => layout!(crate::road::PathRead, item; dest, owner, articulated, bus),
-        226 => layout!(crate::road::StopRead, item; order_destination, order_type, owner, bus),
+        226 => layout!(crate::road::StopRead, item; owner, bus),
         227 => {
-            layout!(crate::road::OvertakeRead, item; tile, cur_speed, direction, status, articulated)
+            layout!(crate::road::OvertakeRead, item; tile, cur_speed, direction, status)
         }
         228 => layout!(crate::road::RoadTypes, item; before, after),
         468 => layout!(crate::vehicle::PreviousTile, item; tile, exists),

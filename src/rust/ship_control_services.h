@@ -349,7 +349,7 @@ static void Ship_set_dest(uint32_t id, uint32_t value) noexcept { Ship *v = Ship
 
 static uint32_t Ship_tile(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(RustVehicleTile(v)); }
 
-static uint32_t Ship_dest(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(v->dest_tile.base()); }
+static uint32_t Ship_dest(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(RustVehicleDestTile(v)); }
 
 static uint32_t Ship_x(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(v->x_pos); }
 
@@ -373,13 +373,13 @@ static uint32_t Ship_progress(uint32_t id) noexcept { const Ship *v = Ship::Get(
 
 static uint32_t Ship_status(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(RustVehicleStatus(v)); }
 
-static uint32_t Ship_owner(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(v->owner.base()); }
+static uint32_t Ship_owner(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(RustVehicleOwner(v)); }
 
 static uint32_t Ship_last_station(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(v->last_station_visited.base()); }
 
-static uint32_t Ship_order_destination(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(v->current_order.GetDestination().base()); }
+static uint32_t Ship_order_destination(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(RustVehicleOrderDestination(v)); }
 
-static uint32_t Ship_order_type(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(v->current_order.GetType()); }
+static uint32_t Ship_order_type(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(RustVehicleOrderType(v)); }
 
 static uint32_t Ship_order_max_speed(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(v->current_order.GetMaxSpeed()); }
 

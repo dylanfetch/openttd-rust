@@ -72,7 +72,7 @@ static OpenTTDRoadEntered OPENTTD_VEHICLE_CALL RoadSvcEnterTile(OpenTTDVehicle *
 {
 	RoadVehicle *u = RoadOf(v);
 	uint8_t flags = VehicleEnterTile(u, TileIndex(tile), x, y).base();
-	return {.tile = RustVehicleTile(u), .cur_speed = u->cur_speed, .flags = flags, .direction = RustVehicleDirection(u), .order_type = u->current_order.GetType()};
+	return {.tile = RustVehicleTile(u), .cur_speed = u->cur_speed, .flags = flags, .direction = RustVehicleDirection(u), .order_type = RustVehicleOrderType(u)};
 }
 
 /** Pool-order traversals; C++ skips what the original predicate rejects by type or consist, Rust decides the rest. */
@@ -153,7 +153,7 @@ static OpenTTDRoadRoadTypes OPENTTD_VEHICLE_CALL RoadSvcMoveTile(OpenTTDVehicle 
 static OpenTTDRoadPathRead OPENTTD_VEHICLE_CALL RoadSvcPathRead(OpenTTDVehicle *v) noexcept
 {
 	const RoadVehicle *u = RoadOf(v);
-	return {.dest = u->dest_tile.base(), .owner = u->owner.base(), .articulated = u->HasArticulatedPart(), .bus = u->IsBus()};
+	return {.dest = RustVehicleDestTile(u), .owner = RustVehicleOwner(u), .articulated = RustGroundHasArticulated(u), .bus = u->IsBus()};
 }
 static OpenTTDRoadTrackChoice OPENTTD_VEHICLE_CALL RoadSvcChooseTrack(OpenTTDVehicle *v, uint32_t tile, uint8_t entry, uint16_t trackdirs) noexcept
 {
@@ -179,7 +179,7 @@ static void OPENTTD_VEHICLE_CALL RoadSvcDisconnect() noexcept { FatalError("Disc
 static OpenTTDRoadStopRead OPENTTD_VEHICLE_CALL RoadSvcStopRead(OpenTTDVehicle *v) noexcept
 {
 	const RoadVehicle *u = RoadOf(v);
-	return {.order_destination = u->current_order.GetDestination().base(), .order_type = u->current_order.GetType(), .owner = u->owner.base(), .bus = u->IsBus()};
+	return {.owner = RustVehicleOwner(u), .bus = u->IsBus()};
 }
 static bool OPENTTD_VEHICLE_CALL RoadSvcShouldStop(OpenTTDVehicle *v, uint32_t tile) noexcept
 {
@@ -228,7 +228,7 @@ static void OPENTTD_VEHICLE_CALL RoadSvcBeginLoadingAt(OpenTTDVehicle *v, uint16
 static OpenTTDRoadOvertakeRead OPENTTD_VEHICLE_CALL RoadSvcOvertakeRead(OpenTTDVehicle *v) noexcept
 {
 	const RoadVehicle *u = RoadOf(v);
-	return {.tile = RustVehicleTile(u), .cur_speed = u->cur_speed, .direction = RustVehicleDirection(u), .status = RustVehicleStatus(u), .articulated = u->HasArticulatedPart()};
+	return {.tile = RustVehicleTile(u), .cur_speed = u->cur_speed, .direction = RustVehicleDirection(u), .status = RustVehicleStatus(u)};
 }
 static OpenTTDRoadSoundRead OPENTTD_VEHICLE_CALL RoadSvcSoundRead(OpenTTDVehicle *v) noexcept
 {
@@ -238,7 +238,7 @@ static OpenTTDRoadSoundRead OPENTTD_VEHICLE_CALL RoadSvcSoundRead(OpenTTDVehicle
 static OpenTTDRoadDepotOrder OPENTTD_VEHICLE_CALL RoadSvcDepotOrder(OpenTTDVehicle *v) noexcept
 {
 	const RoadVehicle *u = RoadOf(v);
-	return {.dest = u->dest_tile.base(), .order_type = u->current_order.GetType(), .nonstop = u->current_order.GetNonStopType().base()};
+	return {.dest = RustVehicleDestTile(u), .order_type = RustVehicleOrderType(u), .nonstop = u->current_order.GetNonStopType().base()};
 }
 /** The depot exit tail of `RoadVehLeaveDepot` after the state and frame stores. */
 static void OPENTTD_VEHICLE_CALL RoadSvcDepotExit(OpenTTDVehicle *v, int32_t x, int32_t y) noexcept
@@ -314,7 +314,7 @@ static OpenTTDRoadServiceRead OPENTTD_VEHICLE_CALL RoadSvcServiceRead(OpenTTDVeh
 static OpenTTDRoadTurnRead OPENTTD_VEHICLE_CALL RoadSvcTurnRead(OpenTTDVehicle *v) noexcept
 {
 	const RoadVehicle *u = RoadOf(v);
-	return {.tile = RustVehicleTile(u), .breakdown_ctr = u->breakdown_ctr, .direction = RustVehicleDirection(u), .order_type = u->current_order.GetType(), .status = RustVehicleStatus(u)};
+	return {.tile = RustVehicleTile(u), .breakdown_ctr = u->breakdown_ctr, .direction = RustVehicleDirection(u), .order_type = RustVehicleOrderType(u), .status = RustVehicleStatus(u)};
 }
 static OpenTTDRoadTrackdirRead OPENTTD_VEHICLE_CALL RoadSvcTrackdirRead(OpenTTDVehicle *v) noexcept
 {
@@ -327,7 +327,7 @@ static uint8_t OPENTTD_VEHICLE_CALL RoadSvcProcessOrdersThenLoading(OpenTTDVehic
 	Vehicle *u = VehicleOf(v);
 	ProcessOrders(u);
 	u->HandleLoading();
-	return u->current_order.GetType();
+	return RustVehicleOrderType(u);
 }
 
 static const OpenTTDRoadLeaves &GetRoadLeaves()

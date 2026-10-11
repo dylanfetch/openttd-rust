@@ -86,6 +86,9 @@ struct OpenTTDVehicleServices {
 	uint8_t (OPENTTD_VEHICLE_CALL *status)(OpenTTDVehicle *) noexcept;
 	uint32_t (OPENTTD_VEHICLE_CALL *tile)(OpenTTDVehicle *) noexcept;
 	uint8_t (OPENTTD_VEHICLE_CALL *progress)(OpenTTDVehicle *) noexcept;
+	uint32_t (OPENTTD_VEHICLE_CALL *dest_tile)(OpenTTDVehicle *) noexcept;
+	uint8_t (OPENTTD_VEHICLE_CALL *order_type)(OpenTTDVehicle *) noexcept;
+	uint16_t (OPENTTD_VEHICLE_CALL *order_destination)(OpenTTDVehicle *) noexcept;
 };
 struct OpenTTDGroundMoved {
 	int32_t old_z;
@@ -122,6 +125,7 @@ struct OpenTTDGroundServices {
 	void (OPENTTD_VEHICLE_CALL *write_first_engine)(OpenTTDVehicle *, uint16_t) noexcept;
 	void (OPENTTD_VEHICLE_CALL *write_length)(OpenTTDVehicle *, uint8_t, OpenTTDVehicle *, uint16_t) noexcept;
 	uint8_t (OPENTTD_VEHICLE_CALL *cached_length)(OpenTTDVehicle *) noexcept;
+	bool (OPENTTD_VEHICLE_CALL *has_articulated)(OpenTTDVehicle *) noexcept;
 };
 const OpenTTDVehicleServices &GetRustVehicleServices() noexcept;
 #endif /* RUST_VEHICLE_FFI_H */

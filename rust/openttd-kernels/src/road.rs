@@ -312,8 +312,6 @@ pub struct PathRead {
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct StopRead {
-    pub order_destination: u16,
-    pub order_type: u8,
     pub owner: u8,
     pub bus: bool,
 }
@@ -326,7 +324,6 @@ pub struct OvertakeRead {
     pub cur_speed: u16,
     pub direction: u8,
     pub status: u8,
-    pub articulated: bool,
 }
 
 #[repr(C)]
@@ -786,8 +783,7 @@ impl Game<'_> {
         {
             return;
         }
-        if service!(self.vs.next)(v.v).is_some() && service!(self.l.overtake_read)(v.v).articulated
-        {
+        if service!(self.gs.has_articulated)(v.v) {
             return;
         }
         let u_speed = if self.original() || service!(self.gs.acceleration)(u.v) > 0 {
@@ -1436,7 +1432,7 @@ impl Game<'_> {
                 {
                     let r = service!(self.l.stop_read)(v.v);
                     if r.owner == service!(self.ss.tile_owner)(s.tile)
-                        && r.order_type != OT_LEAVESTATION
+                        && service!(self.vs.order_type)(v.v) != OT_LEAVESTATION
                         && service!(self.l.stop_type)(s.tile) == u8::from(!r.bus)
                     {
                         let station = service!(self.ss.station_index)(s.tile);
@@ -1482,10 +1478,10 @@ impl Game<'_> {
                 service!(self.l.stop_entrance)(v.v, false);
                 v.set(STATE, u16::from(state | 4));
                 service!(self.vs.write_last_station)(v.v, station);
-                if service!(self.l.is_drive_through)(s.tile) || {
-                    let r = service!(self.l.stop_read)(v.v);
-                    r.order_type == OT_GOTO_STATION && r.order_destination == station
-                } {
+                if service!(self.l.is_drive_through)(s.tile)
+                    || (service!(self.vs.order_type)(v.v) == OT_GOTO_STATION
+                        && service!(self.vs.order_destination)(v.v) == station)
+                {
                     self.arrive_load(v, s, station);
                     return false;
                 }
@@ -1494,7 +1490,7 @@ impl Game<'_> {
                     self.set_speed(v, s, 0);
                     return false;
                 }
-                if service!(self.l.stop_read)(v.v).order_type == OT_LEAVESTATION {
+                if service!(self.vs.order_type)(v.v) == OT_LEAVESTATION {
                     service!(self.vs.order_free)(v.v);
                 }
             }
@@ -1725,7 +1721,7 @@ impl Game<'_> {
             service!(self.l.find_depot)(v.v, penalty as i32)
         };
         if depot.length == u32::MAX || depot.length > penalty {
-            if service!(self.l.depot_order)(v.v).order_type == OT_GOTO_DEPOT {
+            if service!(self.vs.order_type)(v.v) == OT_GOTO_DEPOT {
                 service!(self.vs.order_dummy)(v.v);
             }
             return;
@@ -1739,7 +1735,7 @@ impl Game<'_> {
             return;
         }
         service!(self.gs.go_to_depot_service)(v.v, depot_id);
-        self.set_dest(v, depot.tile, service!(self.l.path_read)(v.v).dest);
+        self.set_dest(v, depot.tile, service!(self.vs.dest_tile)(v.v));
         service!(self.vs.start_stop_dirty)(v.v);
     }
     /// `RoadVehicle::OnNewEconomyDay`.

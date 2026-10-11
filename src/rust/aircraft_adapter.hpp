@@ -88,11 +88,6 @@ static void OPENTTD_AIRCRAFT_CALL Aircraft_set_tick_counter(OpenTTDAircraftVehic
 	RustWriteVehicleTick(v, value);
 }
 
-static uint8_t OPENTTD_AIRCRAFT_CALL Aircraft_owner(OpenTTDAircraftVehicle vehicle) noexcept
-{
-	const Vehicle *v = static_cast<const Vehicle *>(vehicle.handle);
-	return v->owner.base();
-}
 
 static void OPENTTD_AIRCRAFT_CALL Aircraft_set_vehicle_status(OpenTTDAircraftVehicle vehicle, uint8_t value) noexcept
 {
@@ -154,17 +149,6 @@ static void OPENTTD_AIRCRAFT_CALL Aircraft_set_breakdown_counter(OpenTTDAircraft
 	v->breakdown_ctr = value;
 }
 
-static uint8_t OPENTTD_AIRCRAFT_CALL Aircraft_order_type(OpenTTDAircraftVehicle vehicle) noexcept
-{
-	const Vehicle *v = static_cast<const Vehicle *>(vehicle.handle);
-	return v->current_order.GetType();
-}
-
-static uint16_t OPENTTD_AIRCRAFT_CALL Aircraft_order_destination(OpenTTDAircraftVehicle vehicle) noexcept
-{
-	const Vehicle *v = static_cast<const Vehicle *>(vehicle.handle);
-	return v->current_order.GetDestination().base();
-}
 
 static uint8_t OPENTTD_AIRCRAFT_CALL Aircraft_running_ticks(OpenTTDAircraftVehicle vehicle) noexcept
 {
@@ -924,7 +908,7 @@ static const OpenTTDAircraftLeaves _aircraft_leaves{
 	.set_direction = Aircraft_set_direction,
 	.tick_counter = AircraftVehicleRead<uint8_t, RustVehicleTick>,
 	.set_tick_counter = Aircraft_set_tick_counter,
-	.owner = Aircraft_owner,
+	.owner = AircraftVehicleRead<uint8_t, RustVehicleOwner>,
 	.vehicle_status = AircraftVehicleRead<uint8_t, RustVehicleStatus>,
 	.set_vehicle_status = Aircraft_set_vehicle_status,
 	.current_speed = Aircraft_current_speed,
@@ -937,8 +921,8 @@ static const OpenTTDAircraftLeaves _aircraft_leaves{
 	.maximum_speed = Aircraft_maximum_speed,
 	.set_maximum_speed = Aircraft_set_maximum_speed,
 	.set_breakdown_counter = Aircraft_set_breakdown_counter,
-	.order_type = Aircraft_order_type,
-	.order_destination = Aircraft_order_destination,
+	.order_type = AircraftVehicleRead<uint8_t, RustVehicleOrderType>,
+	.order_destination = AircraftVehicleRead<uint16_t, RustVehicleOrderDestination>,
 	.running_ticks = Aircraft_running_ticks,
 	.set_running_ticks = Aircraft_set_running_ticks,
 	.order_time = Aircraft_order_time,

@@ -18,7 +18,7 @@ static void * FleetGroup_next_vehicle(uint32_t from) noexcept { for (Vehicle *v 
 static void * FleetGroup_vehicle(uint32_t id) noexcept { return Vehicle::GetIfValid(VehicleID(id)); }
 static uint32_t FleetGroup_vehicle_id(void *shell) noexcept { auto *v = static_cast<Vehicle *>(shell); return v->index.base(); }
 static uint8_t FleetGroup_vehicle_type(void *shell) noexcept { auto *v = static_cast<Vehicle *>(shell); return v->type; }
-static uint8_t FleetGroup_vehicle_owner(void *shell) noexcept { auto *v = static_cast<Vehicle *>(shell); return v->owner.base(); }
+static uint8_t FleetGroup_vehicle_owner(void *shell) noexcept { auto *v = static_cast<Vehicle *>(shell); return RustVehicleOwner(v); }
 static uint16_t FleetGroup_vehicle_group(void *shell) noexcept { auto *v = static_cast<Vehicle *>(shell); return v->group_id.base(); }
 static uint16_t FleetGroup_vehicle_engine(void *shell) noexcept { auto *v = static_cast<Vehicle *>(shell); return RustVehicleEngineID(v); }
 static int64_t FleetGroup_profit(void *shell) noexcept { auto *v = static_cast<Vehicle *>(shell); return v->GetDisplayProfitLastYear(); }

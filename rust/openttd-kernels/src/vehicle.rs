@@ -166,6 +166,9 @@ pub struct VehicleServices {
     pub status: extern "C" fn(VehicleRef) -> u8,
     pub tile: extern "C" fn(VehicleRef) -> u32,
     pub progress: extern "C" fn(VehicleRef) -> u8,
+    pub dest_tile: extern "C" fn(VehicleRef) -> u32,
+    pub order_type: extern "C" fn(VehicleRef) -> u8,
+    pub order_destination: extern "C" fn(VehicleRef) -> u16,
 }
 
 /// Position step result: `UpdateInclination`'s old height, then the new height,
@@ -233,6 +236,7 @@ pub struct GroundServices {
     /// Store `u` length and `v` total length, then `u->UpdateVisualEffect()`.
     pub write_length: extern "C" fn(VehicleRef, u8, VehicleRef, u16),
     pub cached_length: extern "C" fn(VehicleRef) -> u8,
+    pub has_articulated: extern "C" fn(VehicleRef) -> bool,
 }
 
 /// `GetAdvanceDistance()`.

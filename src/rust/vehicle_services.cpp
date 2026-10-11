@@ -138,6 +138,9 @@ static void OPENTTD_VEHICLE_CALL VehicleSvcDetachLast(OpenTTDVehicle *previous, 
 static void OPENTTD_VEHICLE_CALL VehicleSvcWriteMaxSpeed(OpenTTDVehicle *v, uint16_t speed) noexcept { VehicleOf(v)->vcache.cached_max_speed = speed; }
 
 static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcProgress(OpenTTDVehicle *v) noexcept { return RustVehicleProgress(VehicleOf(v)); }
+static uint32_t OPENTTD_VEHICLE_CALL VehicleSvcDestTile(OpenTTDVehicle *v) noexcept { return RustVehicleDestTile(VehicleOf(v)); }
+static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcOrderType(OpenTTDVehicle *v) noexcept { return RustVehicleOrderType(VehicleOf(v)); }
+static uint16_t OPENTTD_VEHICLE_CALL VehicleSvcOrderDestination(OpenTTDVehicle *v) noexcept { return RustVehicleOrderDestination(VehicleOf(v)); }
 static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcDirection(OpenTTDVehicle *v) noexcept { return RustVehicleDirection(VehicleOf(v)); }
 static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcStatus(OpenTTDVehicle *v) noexcept { return RustVehicleStatus(VehicleOf(v)); }
 static uint32_t OPENTTD_VEHICLE_CALL VehicleSvcTile(OpenTTDVehicle *v) noexcept { return RustVehicleTile(VehicleOf(v)); }
@@ -199,6 +202,9 @@ const OpenTTDVehicleServices &GetRustVehicleServices() noexcept
 		.status = VehicleSvcStatus,
 		.tile = VehicleSvcTile,
 		.progress = VehicleSvcProgress,
+		.dest_tile = VehicleSvcDestTile,
+		.order_type = VehicleSvcOrderType,
+		.order_destination = VehicleSvcOrderDestination,
 	};
 	return services;
 }

@@ -122,8 +122,6 @@ struct OpenTTDRoadPathRead {
 	bool bus;
 };
 struct OpenTTDRoadStopRead {
-	uint16_t order_destination;
-	uint8_t order_type;
 	uint8_t owner;
 	bool bus;
 };
@@ -132,7 +130,6 @@ struct OpenTTDRoadOvertakeRead {
 	uint16_t cur_speed;
 	uint8_t direction;
 	uint8_t status;
-	bool articulated;
 };
 struct OpenTTDRoadRoadTypes {
 	uint8_t before;

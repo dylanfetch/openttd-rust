@@ -21,6 +21,10 @@ inline Vehicle *VehicleOf(OpenTTDVehicle *v) noexcept { return reinterpret_cast<
 /** Shared native field definitions, also used by bundled observations. */
 inline Vehicle *RustVehicleNext(const Vehicle *v) noexcept { return v->Next(); }
 inline uint32_t RustVehicleTile(const Vehicle *v) noexcept { return v->tile.base(); }
+inline uint32_t RustVehicleDestTile(const Vehicle *v) noexcept { return v->dest_tile.base(); }
+inline OrderType RustVehicleOrderType(const Vehicle *v) noexcept { return v->current_order.GetType(); }
+inline uint16_t RustVehicleOrderDestination(const Vehicle *v) noexcept { return v->current_order.GetDestination().base(); }
+inline uint8_t RustVehicleOwner(const Vehicle *v) noexcept { return v->owner.base(); }
 inline Direction RustVehicleDirection(const Vehicle *v) noexcept { return v->direction; }
 inline uint8_t RustVehicleProgress(const Vehicle *v) noexcept { return v->progress; }
 inline void RustWriteVehicleProgress(Vehicle *v, uint8_t progress) noexcept { v->progress = progress; }
@@ -32,6 +36,8 @@ inline const OpenTTDEngine *RustEngine(const Engine *e) noexcept { return reinte
 inline const Engine *EngineOf(const OpenTTDEngine *e) noexcept { return reinterpret_cast<const Engine *>(e); }
 template <class T>
 inline uint8_t RustGroundCachedLength(const T *v) noexcept { return v->gcache.cached_veh_length; }
+template <class T>
+inline bool RustGroundHasArticulated(const T *v) noexcept { return v->HasArticulatedPart(); }
 
 /** GRF version of a live engine; the original default-engine value is zero. */
 inline uint8_t RustEngineGRFVersion(const Engine *engine) noexcept
@@ -134,6 +140,12 @@ static uint8_t OPENTTD_VEHICLE_CALL GroundSvcCachedLength(OpenTTDVehicle *v) noe
 	return RustGroundCachedLength(T::From(VehicleOf(v)));
 }
 
+template <class T>
+static bool OPENTTD_VEHICLE_CALL GroundSvcHasArticulated(OpenTTDVehicle *v) noexcept
+{
+	return RustGroundHasArticulated(T::From(VehicleOf(v)));
+}
+
 /** One GroundVehicle service table per vehicle type. */
 template <class T>
 const OpenTTDGroundServices &GetRustGroundServices() noexcept
@@ -152,6 +164,7 @@ const OpenTTDGroundServices &GetRustGroundServices() noexcept
 		.write_first_engine = GroundSvcWriteFirstEngine<T>,
 		.write_length = GroundSvcWriteLength<T>,
 		.cached_length = GroundSvcCachedLength<T>,
+		.has_articulated = GroundSvcHasArticulated<T>,
 	};
 	return services;
 }

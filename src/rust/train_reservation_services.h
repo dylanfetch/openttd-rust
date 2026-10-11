@@ -415,20 +415,20 @@ static OpenTTDTrainReservationFree1Read TrainReservationReadFree1(OpenTTDTrainHa
 static OpenTTDTrainReservationNewRead TrainReservationReadNew(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return {v->dest_tile.base(), v->last_station_visited.base(), v->cur_real_order_index, static_cast<uint8_t>(HasBit(v->gv_flags, GVF_SUPPRESS_IMPLICIT_ORDERS))};
+	return {RustVehicleDestTile(v), v->last_station_visited.base(), v->cur_real_order_index, static_cast<uint8_t>(HasBit(v->gv_flags, GVF_SUPPRESS_IMPLICIT_ORDERS))};
 }
 static OpenTTDTrainReservationChooseRead TrainReservationReadChoose(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return {RustVehicleTile(v), v->dest_tile.base(), v->current_order.GetDestination().base(), v->current_order.GetType()};
+	return {RustVehicleTile(v), RustVehicleDestTile(v), RustVehicleOrderDestination(v), RustVehicleOrderType(v)};
 }
 static OpenTTDTrainReservationChoose4Read TrainReservationReadChoose4(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return {v->current_order.GetType(), static_cast<uint8_t>(v->current_order.GetDepotActionType().Test(OrderDepotActionFlag::NearestDepot))};
+	return {RustVehicleOrderType(v), static_cast<uint8_t>(v->current_order.GetDepotActionType().Test(OrderDepotActionFlag::NearestDepot))};
 }
 static OpenTTDTrainReservationCheckNextRead TrainReservationReadCheckNext(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return {RustVehicleTile(v), v->dest_tile.base(), v->current_order.GetDestination().base(), v->current_order.GetType(), v->GetNumOrders()};
+	return {RustVehicleTile(v), RustVehicleDestTile(v), RustVehicleOrderDestination(v), RustVehicleOrderType(v), v->GetNumOrders()};
 }
