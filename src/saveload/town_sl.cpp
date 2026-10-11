@@ -274,9 +274,15 @@ static const SaveLoad _town_desc[] = {
 	SLE_CONDVAR(Town, xy,                    SLE_UINT32,                 SLV_6, SL_MAX_VERSION),
 #endif
 
+#ifdef WITH_RUST
+	SLEG_CONDVAR("townnamegrfid", TownSimulationSaveScope::current.townnamegrfid, SLE_UINT32, SLV_66, SL_MAX_VERSION),
+	    SLEG_VAR("townnametype", TownSimulationSaveScope::current.townnametype, SLE_UINT16),
+	    SLEG_VAR("townnameparts", TownSimulationSaveScope::current.townnameparts, SLE_UINT32),
+#else
 	SLE_CONDVAR(Town, townnamegrfid,         SLE_UINT32, SLV_66, SL_MAX_VERSION),
 	    SLE_VAR(Town, townnametype,          SLE_UINT16),
 	    SLE_VAR(Town, townnameparts,         SLE_UINT32),
+#endif
 	SLE_CONDSSTR(Town, name,                 SLE_STR | SLF_ALLOW_CONTROL, SLV_84, SL_MAX_VERSION),
 
 #ifdef WITH_RUST

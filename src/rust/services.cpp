@@ -8,7 +8,7 @@
 /** @file services.cpp Direct shared-world leaves for Rust game owners. */
 #include "../stdafx.h"
 #include "services_ffi.h"
-#include "command_cost_services.h"
+#include "command_services.h"
 #ifdef WITH_RUST
 #include "../clear_map.h"
 #include "../tree_map.h"
@@ -20,6 +20,8 @@
 #include "../company_base.h"
 #include "../company_func.h"
 #include "../command_type.h"
+#include "../command_func.h"
+#include "../landscape_cmd.h"
 #include "../town.h"
 #include "../safeguards.h"
 
@@ -42,6 +44,20 @@ const OpenTTDCommandCostServices &GetRustCommandCostServices() noexcept
 		.error_param = CostErrorParam, .add = CostAdd, .move = CostMove,
 		.amount = CostAmount, .success = CostSuccess, .error_message = CostErrorMessage, .money = CostMoney,
 	};
+	return services;
+}
+
+/* Direct command execution and its tile callbacks do not run a script VM or
+ * save/load code. They may reenter Rust owners, but ordinary play cannot unwind
+ * these leaves; allocation/error-formatting failures terminate under noexcept.
+ * The native returned object is moved whole into its caller's stack sink. */
+static void LandscapeClear(OpenTTDCommandCost *out, uint32_t tile, uint16_t flags) noexcept
+{
+	*NativeCost(out) = Command<CMD_LANDSCAPE_CLEAR>::Do(DoCommandFlags(flags), TileIndex{tile});
+}
+const OpenTTDCommandServices &GetRustCommandServices() noexcept
+{
+	static const OpenTTDCommandServices services{.landscape_clear = LandscapeClear};
 	return services;
 }
 

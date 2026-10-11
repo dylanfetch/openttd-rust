@@ -56,6 +56,9 @@ pub struct SimulationFields {
     pub exclusive_counter: u8,
     pub larger_town: bool,
     pub layout: u8,
+    pub townnamegrfid: u32,
+    pub townnametype: u16,
+    pub townnameparts: u32,
 }
 impl Default for SimulationFields {
     fn default() -> Self {
@@ -77,6 +80,9 @@ impl Default for SimulationFields {
             exclusive_counter: 0,
             larger_town: false,
             layout: 0,
+            townnamegrfid: 0,
+            townnametype: 0,
+            townnameparts: 0,
         }
     }
 }
@@ -282,6 +288,63 @@ pub unsafe extern "C" fn openttd_rust_town_supplied_insert(
         },
     );
     supplied.as_mut_ptr().wrapping_add(at)
+}
+/// Copied insertion result: native starts a matching trivial lifetime only for
+/// a newly allocated row, preserving histories when the cargo already exists.
+#[repr(C)]
+pub struct SuppliedEntry {
+    pub entry: *mut Supplied,
+    pub created: bool,
+}
+unsafe fn supplied_entry(state: *mut State, cargo: u8) -> SuppliedEntry {
+    // SAFETY: Live sole owner, no native vector views survive its mutation.
+    let rows = unsafe { &mut (*state).supplied };
+    let at = rows.partition_point(|row| row.cargo < cargo);
+    let created = at == rows.len() || rows[at].cargo != cargo;
+    if created {
+        rows.insert(
+            at,
+            Supplied {
+                cargo,
+                ..Supplied::default()
+            },
+        );
+    }
+    SuppliedEntry {
+        entry: rows.as_mut_ptr().wrapping_add(at),
+        created,
+    }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_supplied_entry(
+    state: *mut State,
+    cargo: u8,
+) -> SuppliedEntry {
+    // SAFETY: Native facade has ended every vector view before this call.
+    unsafe { supplied_entry(state, cargo) }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_supplied_find(state: *const State, cargo: u8) -> usize {
+    // SAFETY: Immediate shared owner access, with no callbacks or mutation.
+    let rows = unsafe { &(*state).supplied };
+    let at = rows.partition_point(|row| row.cargo < cargo);
+    if at == rows.len() || rows[at].cargo != cargo {
+        rows.len()
+    } else {
+        at
+    }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_percent_transported(
+    history: *const SuppliedHistory,
+) -> u8 {
+    // SAFETY: Native supplies one matching live history; both scalar reads end here.
+    let (production, transported) = unsafe { ((*history).production, (*history).transported) };
+    if production == 0 {
+        return 0;
+    }
+    // Original uint32 multiplication wraps before division and uint8 clamping.
+    (transported.wrapping_mul(256) / production).min(u32::from(u8::MAX)) as u8
 }
 #[derive(Default)]
 struct GlobalCounts {

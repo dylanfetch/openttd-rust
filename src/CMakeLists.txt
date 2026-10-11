@@ -249,6 +249,8 @@ add_files(
     rust/services_ffi.h
     rust/command_cost_ffi.h
     rust/command_cost_services.h
+    rust/command_services_ffi.h
+    rust/command_services.h
     rust/ffi.h
     landscape.h
     landscape_cmd.h

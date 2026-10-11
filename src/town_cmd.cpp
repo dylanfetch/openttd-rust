@@ -42,7 +42,7 @@
 #include "core/pool_func.hpp"
 #include "town.h"
 #ifdef WITH_RUST
-#include "rust/command_cost_services.h"
+#include "rust/command_services.h"
 #endif
 #include "town_kdtree.h"
 #include "townname_func.h"
@@ -1104,7 +1104,9 @@ static bool RustTown_clear_land(uint32_t tile, uint32_t execute) noexcept
 {
 	DoCommandFlags flags{DoCommandFlag::Auto, DoCommandFlag::NoWater};
 	if (execute != 0) flags.Set(DoCommandFlag::Execute);
-	return Command<CMD_LANDSCAPE_CLEAR>::Do(flags, TileIndex{tile}).Succeeded();
+	CommandCost result;
+	GetRustCommandServices().landscape_clear(RustCommandCost(&result), tile, flags.base());
+	return result.Succeeded();
 }
 static OpenTTDTownCommandResult RustTown_terraform_land(uint32_t tile, uint32_t slope, uint32_t up, uint32_t execute) noexcept
 {
@@ -1127,7 +1129,8 @@ static bool RustTown_build_tunnel(uint32_t tile, uint32_t road_type, uint32_t ex
 }
 static void RustTown_clear_house_land(uint32_t tile) noexcept
 {
-	const auto result = Command<CMD_LANDSCAPE_CLEAR>::Do({DoCommandFlag::Auto, DoCommandFlag::NoWater, DoCommandFlag::Execute}, TileIndex{tile});
+	CommandCost result;
+	GetRustCommandServices().landscape_clear(RustCommandCost(&result), tile, DoCommandFlags{DoCommandFlag::Auto, DoCommandFlag::NoWater, DoCommandFlag::Execute}.base());
 	assert(result.Succeeded());
 }
 static bool RustTown_allow_construction(uint32_t town, uint32_t tile, uint32_t house, uint32_t random) noexcept
@@ -4363,7 +4366,6 @@ Town *ClosestTownFromTile(TileIndex tile, uint threshold)
 
 #ifdef WITH_RUST
 void SetTownRatingTestMode(bool mode) { openttd_rust_town_rating_test(mode); }
-static int GetRating(const Town *t) { return openttd_rust_town_rating(t->growth_owner.get(), reinterpret_cast<uintptr_t>(t), _current_company.base()); }
 void ChangeTownRating(Town *t, int add, int max, DoCommandFlags flags)
 {
 	openttd_rust_town_change_rating(&GetRustTownServices(), &GetRustSharedServices(), t == nullptr ? nullptr : t->growth_owner.get(),

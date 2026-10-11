@@ -26,9 +26,11 @@ macro_rules! layout {
 #[allow(clippy::too_many_lines)]
 pub fn layout(type_id: u16, item: u8) -> usize {
     match type_id {
+        444 => layout!(crate::town::SuppliedEntry, item; entry, created),
         443 => {
             layout!(crate::town::AuthorityServices, item; council_tolerance, bulldozer, authority_distance, town_index, refusal)
         }
+        621 => layout!(crate::services::CommandServices, item; landscape_clear),
         620 => {
             layout!(crate::services::CommandCostServices, item; zero, error, expense_money, error_param, add, move_cost, amount, success, error_message, money)
         }
@@ -164,7 +166,7 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         55 => layout!(crate::ship_yapf::Tile, item; ships, docking, sea, lock_middle, destination),
         56 => layout!(crate::ship_yapf::Result, item; direction, found, origin, stats),
         432 => {
-            layout!(crate::town::SimulationFields, item; valid_history, xy, num_houses, population, radius, goal, ratings, received, noise_reached, time_until_rebuild, statues, have_ratings, unwanted, exclusivity, exclusive_counter, larger_town, layout)
+            layout!(crate::town::SimulationFields, item; valid_history, xy, num_houses, population, radius, goal, ratings, received, noise_reached, time_until_rebuild, statues, have_ratings, unwanted, exclusivity, exclusive_counter, larger_town, layout, townnamegrfid, townnametype, townnameparts)
         }
         433 => layout!(crate::town::Received, item; old_max, new_max, old_act, new_act),
         434 => layout!(crate::town::SuppliedHistory, item; production, transported),

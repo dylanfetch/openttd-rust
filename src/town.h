@@ -68,6 +68,9 @@ struct TownSimulationFields {
 	uint8_t exclusive_counter = 0;
 	bool larger_town = false;
 	TownLayout layout{};
+	uint32_t townnamegrfid = 0;
+	uint16_t townnametype = 0;
+	uint32_t townnameparts = 0;
 };
 static_assert(sizeof(TownSimulationFields) == sizeof(OpenTTDTownSimulationFields));
 static_assert(alignof(TownSimulationFields) == alignof(OpenTTDTownSimulationFields));
@@ -76,6 +79,7 @@ CHECK_TOWN_FIELD(valid_history); CHECK_TOWN_FIELD(xy); CHECK_TOWN_FIELD(num_hous
 CHECK_TOWN_FIELD(radius); CHECK_TOWN_FIELD(goal); CHECK_TOWN_FIELD(ratings); CHECK_TOWN_FIELD(received);
 CHECK_TOWN_FIELD(noise_reached); CHECK_TOWN_FIELD(time_until_rebuild); CHECK_TOWN_FIELD(statues); CHECK_TOWN_FIELD(have_ratings);
 CHECK_TOWN_FIELD(unwanted); CHECK_TOWN_FIELD(exclusivity); CHECK_TOWN_FIELD(exclusive_counter); CHECK_TOWN_FIELD(larger_town); CHECK_TOWN_FIELD(layout);
+CHECK_TOWN_FIELD(townnamegrfid); CHECK_TOWN_FIELD(townnametype); CHECK_TOWN_FIELD(townnameparts);
 #undef CHECK_TOWN_FIELD
 #endif
 
@@ -141,9 +145,15 @@ struct Town : TownPool::PoolItem<&_town_pool> {
 #endif
 
 	/* Town name */
+#ifdef WITH_RUST
+	uint32_t &townnamegrfid = simulation.townnamegrfid;
+	uint16_t &townnametype = simulation.townnametype;
+	uint32_t &townnameparts = simulation.townnameparts;
+#else
 	uint32_t townnamegrfid = 0;
 	uint16_t townnametype = 0;
 	uint32_t townnameparts = 0;
+#endif
 	std::string name{}; ///< Custom town name. If empty, the town was not renamed and uses the generated name.
 	mutable std::string cached_name{}; ///< NOSAVE: Cache of the resolved name of the town, if not using a custom town name
 
@@ -198,8 +208,12 @@ struct Town : TownPool::PoolItem<&_town_pool> {
 
 		uint8_t PctTransported() const
 		{
+#ifdef WITH_RUST
+			return openttd_rust_town_percent_transported(reinterpret_cast<const OpenTTDTownSuppliedHistory *>(this));
+#else
 			if (this->production == 0) return 0;
 			return ClampTo<uint8_t>(this->transported * 256 / this->production);
+#endif
 		}
 	};
 
@@ -250,18 +264,31 @@ struct Town : TownPool::PoolItem<&_town_pool> {
 
 	inline SuppliedCargo &GetOrCreateCargoSupplied(CargoType cargo)
 	{
+#ifdef WITH_RUST
+		assert(IsValidCargoType(cargo));
+		auto result = openttd_rust_town_supplied_entry(this->growth_owner.get(), cargo);
+		auto *entry = reinterpret_cast<SuppliedCargo *>(result.entry);
+		if (result.created) new (entry) SuppliedCargo(cargo);
+		return *entry;
+#else
 		assert(IsValidCargoType(cargo));
 		auto it = std::ranges::lower_bound(this->supplied, cargo, std::less{}, &SuppliedCargo::cargo);
 		if (it == std::end(this->supplied) || it->cargo != cargo) it = this->supplied.emplace(it, cargo);
 		return *it;
+#endif
 	}
 
 	inline SuppliedCargoes::const_iterator GetCargoSupplied(CargoType cargo) const
 	{
+#ifdef WITH_RUST
+		if (!IsValidCargoType(cargo)) return std::end(this->supplied);
+		return this->supplied.data() + openttd_rust_town_supplied_find(this->growth_owner.get(), cargo);
+#else
 		if (!IsValidCargoType(cargo)) return std::end(this->supplied);
 		auto it = std::ranges::lower_bound(this->supplied, cargo, std::less{}, &SuppliedCargo::cargo);
 		if (it == std::end(this->supplied) || it->cargo != cargo) return std::end(supplied);
 		return it;
+#endif
 	}
 
 	inline uint8_t GetPercentTransported(CargoType cargo_type) const

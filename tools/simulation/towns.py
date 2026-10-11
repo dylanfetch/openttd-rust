@@ -244,7 +244,17 @@ def tunnel_reference_gap(out, archive=None):
             depth += (source[end] == "{") - (source[end] == "}")
             end += 1
         bodies[name] = source[start:end]
+    header = (migration.REFERENCE / "src/town.h").read_text()
+    start = header.index("uint8_t PctTransported() const")
+    end = header.index("{", start) + 1
+    depth = 1
+    while depth:
+        depth += (header[end] == "{") - (header[end] == "}")
+        end += 1
+    percent_body = header[start:end]
+    (out / "town-percent-original.hpp").write_text(percent_body + "\n")
     (out / "town-tunnel-original.hpp").write_text("\n\n".join(bodies.values()) + "\n")
+    bodies["PctTransported"] = percent_body
     build = ROOT / "build-rust"
     configuration = migration.rust_configuration(build)
     archive = archive or migration.rust_archive(build)
@@ -298,6 +308,13 @@ def tunnel_reference_gap(out, archive=None):
         raise RuntimeError(
             "town authority reference gap omitted completion/count marker"
         )
+    percent = re.search(
+        rb"\nPASS (\d+) unchanged-reference percent cases\n", run.stdout
+    )
+    if not percent or int(percent[1]) == 0:
+        raise RuntimeError(
+            "town transported-percent gap omitted completion/count marker"
+        )
     migration.ensure_reference()
     report = {
         "passed": True,
@@ -305,6 +322,7 @@ def tunnel_reference_gap(out, archive=None):
         "rating_cases": int(rating[1]),
         "radius_cases": int(radius[1]),
         "authority_cases": int(authority[1]),
+        "percent_cases": int(percent[1]),
         "cases": int(match[1]),
         "successful_tunnel_cases": len(re.findall(rb" result=1 ", run.stdout)),
         "execute_effect_cases": len(re.findall(rb" effects=1 ", run.stdout)),

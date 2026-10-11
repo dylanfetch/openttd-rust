@@ -33,6 +33,8 @@ TEST_CASE("Town lifecycle - canonical metadata, histories and partial staging")
 	a->received[TAE_FOOD].old_act = 65535;
 	a->goal[TAE_WATER] = TOWN_GROWTH_DESERT;
 	a->noise_reached = 77;
+	a->townnamegrfid = 0xFFFFFFFF; a->townnametype = 0xFFFF; a->townnameparts = 0x80000001;
+	CHECK(openttd_rust_town_simulation(a->growth_owner.get())->townnameparts == 0x80000001);
 	CHECK(openttd_rust_town_simulation(a->growth_owner.get())->population == 999);
 	CHECK(openttd_rust_town_simulation(a->growth_owner.get())->ratings[2] == -123);
 	{
@@ -41,9 +43,10 @@ TEST_CASE("Town lifecycle - canonical metadata, histories and partial staging")
 		{
 			TownSimulationSaveScope loading(b, true);
 			TownSimulationSaveScope::current.population = 3;
+			TownSimulationSaveScope::current.townnameparts = 7;
 			TownSimulationSaveScope::current.ratings[CompanyID(2)] = 456;
 		}
-		CHECK((b->cache.population == 3 && b->ratings[CompanyID(2)] == 456));
+		CHECK((b->cache.population == 3 && b->ratings[CompanyID(2)] == 456 && b->townnameparts == 7));
 		CHECK(TownSimulationSaveScope::current.population == 999);
 	}
 	try {
@@ -59,6 +62,10 @@ TEST_CASE("Town lifecycle - canonical metadata, histories and partial staging")
 	const auto *slots = static_cast<const OpenTTDTownSupplied *>(view.data);
 	CHECK((slots[0].cargo == 2 && slots[0].history[LAST_MONTH].transported == 77));
 	CHECK((slots[1].cargo == 5 && slots[1].history[THIS_MONTH].production == 123));
+	CHECK(a->GetOrCreateCargoSupplied(5).history[THIS_MONTH].production == 123);
+	CHECK(a->GetCargoSupplied(2)->history[LAST_MONTH].transported == 77);
+	CHECK(a->GetCargoSupplied(3) == a->supplied.end());
+	CHECK(a->GetCargoSupplied(INVALID_CARGO) == a->supplied.end());
 	const auto snapshot = a->CopyTownCache();
 	a->cache.population = 1000;
 	CHECK((snapshot.population == 999 && snapshot != a->cache));

@@ -34,15 +34,18 @@ constexpr uint32_t TRANSPORT_ROAD = 1, DRD_NONE = 0;
 constexpr size_t NUM_HOUSE_ZONES = 5;
 enum class HouseZone : uint8_t { TownEdge, TownOutskirt, TownOuterSuburb, TownInnerSuburb, TownCentre };
 static uint8_t to_underlying(HouseZone zone) { return static_cast<uint8_t>(zone); }
+template <typename T> T ClampTo(uint64_t value) { return static_cast<T>(std::min<uint64_t>(value, std::numeric_limits<T>::max())); }
 struct Town {
 	uint32_t index = 17;
 	struct { uint32_t population = 0, num_houses = 0; std::array<uint32_t, 5> squared_town_zone_radius{}; } cache;
-	struct SuppliedHistory { uint32_t production = 0, transported = 0; };
+	struct SuppliedHistory {
+		uint32_t production = 0, transported = 0;
+#include "town-percent-original.hpp"
+	};
 	std::array<int16_t, 15> ratings{};
 	struct { uint16_t bits = 0; void Set(uint8_t company) { this->bits |= 1 << company; } } have_ratings;
 };
 template <typename T> T SumHistory(std::span<const T>);
-template <typename T> T ClampTo(uint64_t value) { return static_cast<T>(std::min<uint64_t>(value, std::numeric_limits<T>::max())); }
 struct { struct { bool allow_town_level_crossings = true; uint8_t dist_local_authority = 20; } economy; struct { uint8_t town_council_tolerance = 0; } difficulty; } _settings_game;
 enum class DoCommandFlag { Auto = 1, NoWater = 2, Execute = 4, NoModifyTownRating = 8, NoTestTownRating = 16 };
 struct Flags {
@@ -395,12 +398,28 @@ static void CompareAuthority()
 	}
 	std::printf("\nPASS %u unchanged-reference authority cases\n", checked);
 }
+static void ComparePercentTransported()
+{
+	uint32_t checked = 0;
+	for (uint32_t production : {0U, 1U, 255U, 256U, 0x1000000U, UINT32_MAX}) {
+		for (uint32_t transported : {0U, 1U, 255U, 256U, 0x1000000U, UINT32_MAX}) {
+			Town::SuppliedHistory original{production, transported};
+			OpenTTDTownSuppliedHistory candidate{production, transported};
+			if (original.PctTransported() != openttd_rust_town_percent_transported(&candidate)) {
+				std::fprintf(stderr, "transported percent mismatch production=%u transported=%u\n", production, transported); std::exit(1);
+			}
+			checked++;
+		}
+	}
+	std::printf("\nPASS %u unchanged-reference percent cases\n", checked);
+}
 int main()
 {
 	CompareHistories();
 	CompareRatings();
 	CompareRadii();
 	CompareAuthority();
+	ComparePercentTransported();
 	for (uint32_t dir = 0; dir < 4; dir++) {
 		for (bool mountain : {false, true}) {
 			for (uint32_t length : {1, 2, 4, 5, 6, 7, 8, 9, 255, 256, 257}) {

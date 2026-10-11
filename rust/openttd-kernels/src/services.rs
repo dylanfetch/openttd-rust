@@ -44,6 +44,15 @@ pub struct CommandCostServices {
     pub money: extern "C" fn(*const CommandCost) -> i64,
 }
 
+/// Ordinary direct commands. Native result storage retains complete errors and
+/// parameters; owner accesses must end before a command can reenter Rust.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct CommandServices {
+    /// Original `CMD_LANDSCAPE_CLEAR`, with actual `DoCommandFlags` width.
+    pub landscape_clear: extern "C" fn(*mut CommandCost, u32, u16),
+}
+
 /// Opaque native town shell. Its address identifies the shell, not the Rust owner.
 #[repr(C)]
 pub struct TownHandle {
