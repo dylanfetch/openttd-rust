@@ -13,6 +13,12 @@
 struct OpenTTDCargoPacket;
 struct OpenTTDCargoList;
 struct OpenTTDCargoFlow;
+enum class SourceType : uint8_t;
+/* Typed, call-local cargo Source value; the ID and source kind are never packed. */
+struct OpenTTDCargoSource {
+	uint16_t id;
+	SourceType type;
+};
 struct OpenTTDCargoPacketFields {
 	int64_t feeder_share = 0;
 	uint32_t source_xy = UINT32_MAX;

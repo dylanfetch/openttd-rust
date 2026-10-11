@@ -87,7 +87,7 @@ static void Layouts()
 	Layout(508, "OpenTTDLoadingWait", {sizeof(OpenTTDLoadingWait), alignof(OpenTTDLoadingWait), offsetof(OpenTTDLoadingWait, lateness), offsetof(OpenTTDLoadingWait, wait)});
 	Layout(509, "OpenTTDOrderDestination", {sizeof(OpenTTDOrderDestination), alignof(OpenTTDOrderDestination), offsetof(OpenTTDOrderDestination, destination), offsetof(OpenTTDOrderDestination, is_station)});
 	Layout(510, "OpenTTDTruncatedSource", {sizeof(OpenTTDTruncatedSource), alignof(OpenTTDTruncatedSource), offsetof(OpenTTDTruncatedSource, amount), offsetof(OpenTTDTruncatedSource, source), offsetof(OpenTTDTruncatedSource, present)});
-	Layout(511, "Source", {sizeof(Source), alignof(Source), offsetof(Source, id), offsetof(Source, type)});
+	Layout(511, "OpenTTDCargoSource", {sizeof(OpenTTDCargoSource), alignof(OpenTTDCargoSource), offsetof(OpenTTDCargoSource, id), offsetof(OpenTTDCargoSource, type)});
 	Layout(507, "OpenTTDLoadEngine", {sizeof(OpenTTDLoadEngine), alignof(OpenTTDLoadEngine), offsetof(OpenTTDLoadEngine, engine), offsetof(OpenTTDLoadEngine, amount)});
 	Layout(506, "OpenTTDDeliveryRemaining", {sizeof(OpenTTDDeliveryRemaining), alignof(OpenTTDDeliveryRemaining), offsetof(OpenTTDDeliveryRemaining, remaining), offsetof(OpenTTDDeliveryRemaining, deliver), offsetof(OpenTTDDeliveryRemaining, capacity)});
 	Layout(505, "OpenTTDCargoStored", {sizeof(OpenTTDCargoStored), alignof(OpenTTDCargoStored), offsetof(OpenTTDCargoStored, stored), offsetof(OpenTTDCargoStored, capacity)});

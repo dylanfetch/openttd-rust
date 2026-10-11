@@ -737,12 +737,12 @@ static const OpenTTDStationServices _rust_station_services = {
 		CountStationBoundary<void>(StationBoundary::Station);
 		TriggerHouseAnimation_WatchedCargoAccepted(TileIndex(tile), cargoes);
 	},
-	.append_packet = [](void *handle, uint8_t cargo, uint32_t amount, Source source) noexcept -> void {
+	.append_packet = [](void *handle, uint8_t cargo, uint32_t amount, OpenTTDCargoSource source) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Station);
 		Station *st = Station::From(static_cast<BaseStation *>(handle));
 		GoodsEntry &ge = st->goods[cargo];
 		StationID next = ge.GetVia(st->index);
-		ge.GetOrCreateData().cargo.Append(new CargoPacket(st->index, amount, source), next);
+		ge.GetOrCreateData().cargo.Append(new CargoPacket(st->index, amount, Source(source.id, source.type)), next);
 	},
 	.update_supply = [](void *handle, uint8_t cargo, uint32_t amount) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Station);
@@ -5021,7 +5021,7 @@ uint MoveGoodsToStation(CargoType cargo, uint amount, Source source, const Stati
 {
 #ifdef WITH_RUST
 	std::pair cursor(all_stations.begin(), all_stations.end());
-	return openttd_rust_station_distribute(cargo, amount, source, &cursor, exclusivity.base(), &_rust_station_services);
+	return openttd_rust_station_distribute(cargo, amount, {source.id, source.type}, &cursor, exclusivity.base(), &_rust_station_services);
 #else
 	/* Return if nothing to do. Also the rounding below fails for 0. */
 	if (all_stations.empty()) return 0;

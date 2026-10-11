@@ -11,7 +11,7 @@
 #include <cstdint>
 #include <cstddef>
 #include "services_ffi.h"
-#include "../source_type.h"
+#include "cargo_storage_ffi.h"
 struct OpenTTDStationService;
 struct OpenTTDStationCargo {
 	uint32_t max_waiting_cargo;
@@ -132,7 +132,7 @@ struct OpenTTDStationServices {
 	void (*delete_station)(void *) noexcept;
 	void (*acceptance_animation)(void *) noexcept;
 	void (*watched_animation)(uint32_t, uint64_t) noexcept;
-	void (*append_packet)(void *, uint8_t, uint32_t, Source) noexcept;
+	void (*append_packet)(void *, uint8_t, uint32_t, OpenTTDCargoSource) noexcept;
 	void (*update_supply)(void *, uint8_t, uint32_t) noexcept;
 	void (*station_list_invalidation)(void *) noexcept;
 	void (*new_cargo_animation)(void *, uint8_t) noexcept;
@@ -307,7 +307,7 @@ void openttd_rust_station_stale(void *, const OpenTTDStationServices *, const Op
 void openttd_rust_station_reroute(void *, uint8_t, uint16_t, uint16_t, const OpenTTDStationServices *, const OpenTTDStationLinks *);
 void openttd_rust_station_monthly(const OpenTTDStationServices *);
 void openttd_rust_station_modify_rating(OpenTTDStationService *, int32_t);
-uint32_t openttd_rust_station_distribute(uint8_t, uint32_t, Source, void *, uint8_t, const OpenTTDStationServices *);
+uint32_t openttd_rust_station_distribute(uint8_t, uint32_t, OpenTTDCargoSource, void *, uint8_t, const OpenTTDStationServices *);
 
 }
 #endif
