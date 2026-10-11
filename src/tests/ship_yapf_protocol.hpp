@@ -8,7 +8,6 @@
 /** @file ship_yapf_protocol.hpp Heap comparison and owner/lifetime ABI evidence. */
 #ifndef SHIP_YAPF_PROTOCOL_HPP
 #define SHIP_YAPF_PROTOCOL_HPP
-#include "shared_services.hpp"
 #include "../rust/ship_yapf_ffi.h"
 #include <array>
 #include <vector>
@@ -45,9 +44,6 @@ inline uint8_t VisitNext(void *cursor, OpenTTDWaterPatch from, OpenTTDWaterPatch
 }
 inline void VisitDestroy(void *cursor) noexcept { delete static_cast<Cursor *>(cursor); }
 inline void Report(uint32_t, uint8_t, uint8_t, uint32_t, uint32_t, uint32_t, int32_t, int32_t) noexcept {}
-inline void Observe(void *, uint32_t, uint32_t *) noexcept {}
-inline void Write(void *, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) noexcept {}
-inline float Trig(uint32_t, float) noexcept { return 0; }
 inline uint32_t Industry(int32_t, int32_t, uint32_t *) noexcept { return 0; }
 
 /* Save snapshots cannot distinguish every equal-priority heap shape. Compare
@@ -87,7 +83,7 @@ template <typename Check> void Run(Check check)
 	openttd_rust_ship_path_clear(path.get());
 	OpenTTDShipYapfInput input{32, 32, 10 + 32 * 20, 10 + 32 * 24, 100, 20, 100, 0, 1 << 9, 1, 0, 0, 0, 0};
 	const OpenTTDShipYapfLeaves leaves{Destination, Follow, Tile, Patch, VisitNew, VisitNext, VisitDestroy, Report};
-	const OpenTTDSharedServices services{.context = nullptr, .random = Random, .observe_tile = Observe, .write_tile = Write, .trig = Trig, .industry = Industry, .company_valid = UnusedCompanyValid, .next_company = UnusedNextCompany, .current_company = UnusedCurrentCompany, .closest_town = UnusedClosestTown, .town_owner = UnusedTownOwner};
+	const OpenTTDSharedServices services = OpenTTDFixtureSharedServices(nullptr, Random, Industry);
 	destination = input.dest_tile;
 	auto result = openttd_rust_ship_choose(path.get(), &input, &leaves, &services, nullptr, input.tile, 1 << 1, 0, &destination, 1);
 	check(result.found == 1 && result.direction == 1 && result.origin == 1 && openttd_rust_ship_path_size(path.get()) == 0 && draws == 0);

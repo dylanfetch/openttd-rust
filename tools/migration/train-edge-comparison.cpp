@@ -6,7 +6,6 @@
  */
 
 /** @file train-edge-comparison.cpp Bounded NewGRF-only copied-world curve/reversal gap. */
-#include "../../src/tests/shared_services.hpp"
 #include "stdafx.h"
 #include "core/math_func.hpp"
 #include "direction_func.h"
@@ -66,9 +65,6 @@ static bool IsBridgeTile(TileIndex) { return false; }
 static OpenTTDTrainHandle Handle(Train *v) noexcept { return {v, v == nullptr ? nullptr : v->state}; }
 static Train &Part(OpenTTDTrainHandle part) noexcept { return *static_cast<Train *>(part.shell); }
 static uint32_t UnexpectedRandom(void *) noexcept { std::abort(); }
-static void UnexpectedObserve(void *, uint32_t, uint32_t *) noexcept { std::abort(); }
-static void UnexpectedWrite(void *, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) noexcept { std::abort(); }
-static float UnexpectedTrig(uint32_t, float) noexcept { std::abort(); }
 static uint32_t UnexpectedIndustry(int32_t, int32_t, uint32_t *) noexcept { std::abort(); }
 static OpenTTDTrainServices Leaves()
 {
@@ -102,13 +98,13 @@ static OpenTTDTrainServices Leaves()
 static uint16_t RustCurve()
 {
 	const auto leaves = Leaves();
-	const OpenTTDSharedServices shared{.context = nullptr, .random = UnexpectedRandom, .observe_tile = UnexpectedObserve, .write_tile = UnexpectedWrite, .trig = UnexpectedTrig, .industry = UnexpectedIndustry, .company_valid = UnusedCompanyValid, .next_company = UnusedNextCompany};
+	const OpenTTDSharedServices shared = OpenTTDFixtureSharedServices(nullptr, UnexpectedRandom, UnexpectedIndustry);
 	return openttd_rust_train_curve_limit(Handle(trains), &leaves, &shared);
 }
 static void RustReverse(int left, int right)
 {
 	const auto leaves = Leaves();
-	const OpenTTDSharedServices shared{.context = nullptr, .random = UnexpectedRandom, .observe_tile = UnexpectedObserve, .write_tile = UnexpectedWrite, .trig = UnexpectedTrig, .industry = UnexpectedIndustry, .company_valid = UnusedCompanyValid, .next_company = UnusedNextCompany};
+	const OpenTTDSharedServices shared = OpenTTDFixtureSharedServices(nullptr, UnexpectedRandom, UnexpectedIndustry);
 	openttd_rust_train_reverse_swap(Handle(trains), left, right, &leaves, &shared);
 }
 static uint32_t random_state = 130;

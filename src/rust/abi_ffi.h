@@ -37,9 +37,13 @@ extern "C" {
  * 264 order backup, 265 typed order services, 266 closest-depot result.
  * 320 ship position, 321 typed ship services, 322 reverse result, 323 depot,
  * 324 ship track-choice result, 325 ship depot result.
- * 340 fleet group fields, 341 statistics fields, 342 renewal fields,
- * 343 fleet group services, 344 transaction services, 345 native costs,
- * 346 pending services.
+ * 386 tree clear observation; 387-389 reserved for tree additions.
+ * 390 fleet group fields, 391 statistics fields, 392 renewal fields,
+ * 393 fleet group services, 394 transaction services, 395 native costs,
+ * 396 pending services; 397-399 reserved for fleet additions.
+ * Existing train allocation spans 248-385; other existing low IDs remain.
+ * Reserved component blocks: company 400-429, town 430-459,
+ * shared vehicle/road services 460-499. Allocate within the component's block.
  * Item 0 size, 1 alignment, then every field offset in declaration order.
  * Unknown type/item returns SIZE_MAX. No memory borrow, ownership or callback.
  * Native extern-C convention (cdecl on i686 MSVC); Rust panic never unwinds.

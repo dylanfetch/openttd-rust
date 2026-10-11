@@ -6,7 +6,6 @@
  */
 
 /** @file town-tunnel-reference.cpp Controlled services for unchanged town tunnel bodies, absent from the save corpus. */
-#include "../../src/tests/shared_services.hpp"
 #include "../../src/tests/town_protocol.hpp"
 #include "../../src/rust/town_ffi.h"
 #include <algorithm>
@@ -176,9 +175,6 @@ static uint64_t Leaf(uint32_t op, uint32_t, uint32_t, uint32_t, uint32_t) noexce
 static OpenTTDTownState *State(uint32_t id) noexcept { assert(id == world->town.index); return world->owner; }
 static void Stations(uint32_t, uint32_t, void *, void (*)(void *, const void *, uint32_t)) noexcept {}
 static uint32_t Random(void *) noexcept { world->draws++; return 0; }
-static void ObserveTile(void *, uint32_t, uint32_t *) noexcept {}
-static void WriteTile(void *, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) noexcept {}
-static float Trig(uint32_t, float value) noexcept { return value; }
 static uint32_t Industry(int32_t, int32_t, uint32_t *) noexcept { return 0; }
 static void Read_settings(uint32_t *v) noexcept { Observe(0, 0, v); }
 static void Read_tile(uint32_t id, uint32_t *v) noexcept { Observe(2, id, v); }
@@ -192,7 +188,7 @@ static bool Candidate()
 	auto leaves = TownProtocolServices();
 	leaves.settings = Read_settings; leaves.tile = Read_tile; leaves.road_info = Read_road_info;
 	leaves.state = State; leaves.stations = Stations; leaves.road_mask = RoadTypes; leaves.build_road = BuildRoad; leaves.build_tunnel = BuildTunnel;
-	const OpenTTDSharedServices services{.context = nullptr, .random = Random, .observe_tile = ObserveTile, .write_tile = WriteTile, .trig = Trig, .industry = Industry, .company_valid = UnusedCompanyValid, .next_company = UnusedNextCompany, .current_company = UnusedCurrentCompany, .closest_town = UnusedClosestTown, .town_owner = UnusedTownOwner};
+	const OpenTTDSharedServices services = OpenTTDFixtureSharedServices(nullptr, Random, Industry);
 	return openttd_rust_town_tunnel(&leaves, &services, world->town.index, world->start, world->direction);
 }
 static uint32_t Along(const World &w, int distance) { return w.start + distance * TileOffsByDiagDir(w.direction); }
@@ -272,7 +268,8 @@ static void CompareRatings()
 	Town town;
 	auto owner = std::unique_ptr<OpenTTDTownState, decltype(&openttd_rust_town_destroy)>(openttd_rust_town_new(), openttd_rust_town_destroy);
 	auto leaves = TownProtocolServices(); leaves.dirty_authority = RatingDirty;
-	const OpenTTDSharedServices services{.context = nullptr, .random = Random, .observe_tile = ObserveTile, .write_tile = WriteTile, .trig = Trig, .industry = Industry, .company_valid = RatingCompanyValid, .next_company = UnusedNextCompany, .current_company = UnusedCurrentCompany, .closest_town = UnusedClosestTown, .town_owner = UnusedTownOwner};
+	OpenTTDSharedServices services = OpenTTDFixtureSharedServices(nullptr, Random, Industry);
+	services.company_valid = RatingCompanyValid;
 	uint32_t checked = 0;
 	auto reset = [&](int16_t initial) {
 		town.ratings.fill(initial); town.have_ratings.bits = 0;
@@ -336,7 +333,7 @@ static void CompareAuthority()
 	Town town;
 	auto owner = std::unique_ptr<OpenTTDTownState, decltype(&openttd_rust_town_destroy)>(openttd_rust_town_new(), openttd_rust_town_destroy);
 	authority_owner = owner.get();
-	OpenTTDSharedServices shared{.context = nullptr, .random = Random, .observe_tile = ObserveTile, .write_tile = WriteTile, .trig = Trig, .industry = Industry, .company_valid = UnusedCompanyValid, .next_company = UnusedNextCompany, .current_company = UnusedCurrentCompany, .closest_town = UnusedClosestTown, .town_owner = UnusedTownOwner};
+	OpenTTDSharedServices shared = OpenTTDFixtureSharedServices(nullptr, Random, Industry);
 	shared.current_company = +[]() noexcept { return _current_company; };
 	shared.company_valid = +[](uint8_t id) noexcept { return Company::IsValidID(id); };
 	shared.closest_town = +[](uint32_t tile, uint32_t threshold) noexcept { return reinterpret_cast<const OpenTTDTownHandle *>(ClosestTownFromTile(tile, threshold)); };

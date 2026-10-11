@@ -1,12 +1,10 @@
 """trees scenario evidence."""
 
 import hashlib
-import json
 import re
 import shutil
 import struct
 from collections import Counter
-from pathlib import Path
 
 from .core import (
     SNAPSHOT_TICKS,
@@ -340,9 +338,6 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
 
 def check(scenario, run, mode, role, result):
     if "trees" in scenario:
-        profile = run["snapshots"][-1].parents[2] / "tree-profile.json"
-        if profile.is_file():
-            result[f"{mode}_{role}_tree_profile"] = json.loads(profile.read_text())
         result[f"{mode}_{role}_trees"] = [
             tree_coverage(path) for path in run["snapshots"]
         ]
@@ -417,62 +412,3 @@ AI_FOLDER = "tree-scenario-ai"
 
 def uses_ai(scenario):
     return scenario.get("trees") == "commands"
-
-
-def profile_report(path):
-    """Counts are calls, not both directions; bytes are copied callback outputs.
-
-    A tile-loop batch visits map_size/256 tiles. Report tree work per batch and
-    per 256-batch sweep equivalent; changing tree population prevents treating
-    the latter as one particular sweep. Counts include generation warm-up.
-    Elapsed times cover the whole process, including startup and save I/O.
-    """
-    rows = []
-    for case in json.loads(Path(path).read_text())["results"]:
-        for mode in ("snapshots", "plain"):
-            profile = case.get(f"{mode}_candidate_tree_profile")
-            if profile is None:
-                continue
-            for kind, label in ((0, "generation"), (5, "tree_tile_loop")):
-                row = profile["kinds"][kind]
-                callbacks = sum(
-                    row[key]
-                    for key in (
-                        "random",
-                        "observe",
-                        "write",
-                        "trig",
-                        "settings",
-                        "leaf",
-                    )
-                )
-                crossings = callbacks + 2 * row["calls"] + row["advance"]
-                batches = profile["tile_loop_batches"] if kind == 5 else row["calls"]
-                rows.append(
-                    {
-                        "scenario": case["scenario"],
-                        "mode": mode,
-                        "kind": label,
-                        **row,
-                        "map_crossings": row["observe"] + row["write"],
-                        "ffi_crossings": crossings,
-                        "copied_record_bytes": 40 * row["observe"]
-                        + 96 * row["settings"],
-                        "batches": batches,
-                        "ffi_per_batch": crossings / batches if batches else None,
-                        "map_per_batch": (row["observe"] + row["write"]) / batches
-                        if batches
-                        else None,
-                        "reference_seconds": case[f"{mode}_reference_seconds"],
-                        "candidate_seconds": case[f"{mode}_candidate_seconds"],
-                    }
-                )
-    if not rows:
-        raise RuntimeError("report has no OPENTTD_TREE_PROFILE measurements")
-    return rows
-
-
-if __name__ == "__main__":
-    import sys
-
-    print(json.dumps(profile_report(sys.argv[1]), indent=2))

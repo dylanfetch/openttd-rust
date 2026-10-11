@@ -8,7 +8,6 @@
 /** @file town_protocol.hpp Narrow expansion-mode and callback-reentry gaps absent from console saves. */
 #ifndef TOWN_PROTOCOL_HPP
 #define TOWN_PROTOCOL_HPP
-#include "shared_services.hpp"
 #include "../rust/town_ffi.h"
 #include <algorithm>
 #include <array>
@@ -47,9 +46,6 @@ static inline void TownProtocolStations(uint32_t, uint32_t, void *, void (*)(voi
 static inline OpenTTDTownStationActivity TownProtocolStationActivity(const void *) noexcept { return {}; }
 static inline uint8_t TownProtocolStationOwner(const void *) noexcept { return UINT8_MAX; }
 static inline uint32_t TownProtocolRandom(void *) noexcept { town_protocol_world->draws++; return 0xABCDEF01; }
-static inline void TownProtocolTile(void *, uint32_t, uint32_t *) noexcept {}
-static inline void TownProtocolWrite(void *, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) noexcept {}
-static inline float TownProtocolTrig(uint32_t, float x) noexcept { return x; }
 static inline uint32_t TownProtocolIndustry(int32_t, int32_t, uint32_t *) noexcept { return 0; }
 
 static inline void TownProtocol_settings(uint32_t *v) noexcept { TownProtocolObserve(0, 0, v); }
@@ -148,7 +144,7 @@ template <typename Check> void CheckTownProtocol(Check check)
 	TownProtocolWorld w{}; w.owner = owner.get(); town_protocol_world = &w;
 	auto *fields = openttd_rust_town_simulation(owner.get()); fields->xy = 2080; std::fill_n(fields->radius, 5, 100);
 	const auto leaves = TownProtocolServices();
-	const OpenTTDSharedServices services{.context = nullptr, .random = TownProtocolRandom, .observe_tile = TownProtocolTile, .write_tile = TownProtocolWrite, .trig = TownProtocolTrig, .industry = TownProtocolIndustry, .company_valid = UnusedCompanyValid, .next_company = UnusedNextCompany, .current_company = UnusedCurrentCompany, .closest_town = UnusedClosestTown, .town_owner = UnusedTownOwner};
+	const OpenTTDSharedServices services = OpenTTDFixtureSharedServices(nullptr, TownProtocolRandom, TownProtocolIndustry);
 	check(!openttd_rust_town_grow(&leaves, &services, 0, 1) && w.draws == 0 && w.company == 7);
 	check(openttd_rust_town_grow(&leaves, &services, 0, 2) && w.roads == 1 && w.draws == 1 && w.company == 7);
 	w.clears = 0; w.clear_ok = false;
