@@ -122,6 +122,7 @@ Earlier maintenance: #109/#112, #107/#113/#115, #86/#110/#132, #108/#116,
 | #189 (#168 train) | #195 | direct | `3a2e8f6a10` | 4263 / 91 / 2812 / 853 |
 | #203 (#168 industry) | #205 | direct | `9025f623e0` | 450 / 8 / 278 / 16 |
 | #206 (YAPF hasher) | #207 | direct | `65ff465080` | 95 / 0 / 0 / 0 |
+| #210 (default probes) | #211 | direct | `cbebf6e5fe` | 0 / 25 / 0 / 0 |
 
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -130,16 +131,14 @@ Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas
 The default semantic harness runs in CI; regressions come first. Port differences
 go in `KNOWN_FAILURES` with an issue, never in masks (`docs/rust-migration.md`).
 
-1. **#210 / #211 cited probes:** company, industry, cargo storage and income
-   probes run in default CI or lose their citation.
-2. **Speed ratchet (#155).** `SPEED_BUDGETS` in `tools/simulation/roads.py` is
+1. **Speed ratchet (#155).** `SPEED_BUDGETS` in `tools/simulation/roads.py` is
    the authority for the five caps, run with `simulate <name> --benchmark 3
    --jobs 2` on an idle host. A PR may exceed a cap by at most 3%, unless root
    accepts a stated reason that is not a boundary-rule exception. Improvements
    lower the caps in the same PR (seventh review, item 4). Targets: play saves
    1.5x or less (met), generation 1.15x or less. The null driver redraws
    whenever 1 ms has elapsed, so a slower candidate also draws more frames.
-3. **#156 coverage, standing capacity.** Random and crash branches first. The
+2. **#156 coverage, standing capacity.** Random and crash branches first. The
    seventh review added fleet, industry, trees and company gaps. A company
    scenario with `max_no_competitors >= 1` reaches the AI-start Post loop.
 
@@ -148,18 +147,18 @@ go in `KNOWN_FAILURES` with an issue, never in masks (`docs/rust-migration.md`).
 Integrate reviewed work first; at most six unintegrated branches (#157).
 Independent items (#156, #210) may run in parallel.
 
-1. **Integrate:** trees #208 (fresh reviewer, caps lowered), then company #209
-   (after #210 and its doc fix).
+1. **Integrate:** reviewed trees #208 with lowered caps, then shared road #215,
+   then company #209. Default probes #211 and the company reset doc fix are done.
 2. **#199 shared vehicle and map layer**, one PR per vehicle type: road PR1 from
    `shared-layer-road-199` (fixes listed on #199), then aircraft (about 150
    crossings per tick), train, ship. Each PR deletes that port's accessor copies
    and reports crossings per vehicle tick.
-3. **#148 town lifecycle starts now**, in the direct typed form; it retires the
-   town operation dispatch.
-4. **#168 station tick and loading**: field-number reads (`RustStationRead`,
+3. **#148 town lifecycle (#216)** owns state and control in the direct typed
+   form. Its shared station activity reads reuse integrated #217 before final review.
+4. **#168 station tick and loading (#214 / #217)**: field-number reads (`RustStationRead`,
    `RustLoadingRead`) become typed narrow reads. Then disaster and the cold
    cargo/orders conversions, which never block new ownership work.
-5. **New ownership:** #150 industry construction, then #212 landscape tile
+5. **New ownership:** #150 industry construction is active, then #212 landscape tile
    scheduling and clear/water/rail/road/tunnel-bridge loops, then #213 base
    vehicle tick and maintenance. #212/#213 start after integrated #208 and
    #199 road; retain canonical map/shared Vehicle fields behind the typed layer.
@@ -172,20 +171,22 @@ not a pinned-offset field view.
 
 ## Resume checkpoint
 
-Root resumed 2026-10-11. Five agents are active; no integration since steering.
-Owners record passing heads and evidence on the linked issues/PRs. Integration
-order is #208, #199 road, #209; #210 is independent and gates #209.
+Root resumed 2026-10-11; #211 is integrated. Four implementation agents are active
+with six unintegrated branches. Owners record passing heads and evidence on linked
+issues/PRs. Integration order remains #208, #215, #209; #217 precedes #216.
 
 | Issue / PR | Branch (worktree suffix), head | State and next step |
 | --- | --- | --- |
-| #202 / #208 | `trees-direct-202` | `/root/review_trees_208_round1`: fresh review, base update, narrow reads, idle-host caps and full CI. |
-| #192 / #209 | `company-direct-192`, `d0c8e99cc0` | Root verified recorded fix and corrected reset docs; waits for #211 and preceding integrations. Coverage is on #156. |
-| #199 PR1 | `shared-layer-road-199` | `/root/shared_road_199_resume`: ABI/table fixes, base update, default suite, crossings, draft PR. |
-| #210 / #211 | `fix/cited-probes-210`, `3ee4031a7d` (`.local/worktrees/cited-probes-210`) | Four probes/negative checks pass. `/root/review_cited_probes_211_round1` reviews while broad checks finish; then full CI. |
-| #148 | `town-lifecycle-148` | `/root/town_lifecycle_148`: complete lifecycle owner and direct typed growth boundary, from integrated base. |
+| #202 / #208 | `trees-direct-202`, `e7c29cc708` | Review fixes verified, five idle-host caps lowered; root updates base and requests full CI. |
+| #192 / #209 | `company-direct-192`, `9b6ce4cdf1` | Reviewed fix/reset docs verified; root updates and validates after preceding integrations. Coverage is on #156. |
+| #199 / #215 | `shared-layer-road-199`, `006e743c99` | `/root/shared_road_199_resume`: focused/self/soak pass, preliminary default running; after #208, canonical helpers, final checks, profile and fresh review. |
+| #148 / #216 | `town-lifecycle-148`, `f2b56a82a6` | `/root/town_lifecycle_148`: canonical storage/direct growth pass; monthly control, remaining lifecycle and integrated #217 reuse next. |
+| #214 / #217 | `station-loading-direct-214`, `2bd95c5c6c` | `/root/station_loading_direct_214`: typed tables/scoped frames/shared activity pass; narrow engine reads, integrated #199 reuse and final simulation next. |
+| #150 | `industry-construction-150`, `cbebf6e5fe` | `/root/industry_construction_150`: complete construction/tile owner started; first metadata/registry/destruction milestone and draft PR next. |
 
 Planning complete: #212/#213 selected after #150. ABI blocks: train through 385,
-tree additions 386-389, fleet 390-399, company 400-429, town 430-459, road 460-499.
+tree additions 386-389, fleet 390-399, company 400-429, town 430-459, road 460-499,
+station/loading 500-559 and industry construction 560-619.
 
 Preserve the pinned reference, paused curve worktrees and evidence branches
 `evidence-disaster-vehicles` (`a775543162`) and `evidence-water-regions`
