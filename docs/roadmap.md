@@ -109,10 +109,9 @@ Harness and process: #72 harness (#85), #84 play saves (#87), #97 provenance
 freeze (#100), #88 Ruff (#92), #75 partial-pixel fidelity (#91), #90 world-state
 design (`docs/design/world-state.md`).
 
-Earlier maintenance (issue, PR, tooling lines): #109/#112 (2414, moved), #107
-(#113, #115), #86 (#110 141, #132 347), #108 (#116), #154 (#160 277), #158
-(#159), #155 (#163 212), #156 (#161, #162, #164, #167: 581), #170 (#171 3267),
-#173 (#174 -2), and in #184: #178, #185, #187 (+78). PR reviews keep the evidence.
+Earlier maintenance: #109/#112, #107/#113/#115, #86/#110/#132, #108/#116,
+#154/#160, #158/#159, #155/#163, #156/#161/#162/#164/#167, #170/#171,
+#173/#174, and #178/#185/#187 in #184; evidence remains in those PRs.
 | Issues | Maintenance PRs | Integration | Commit | Metrics |
 | --- | --- | --- | --- | --- |
 | #169, #156, #179 | #175, #177, #180 | #181 | `f604e30d50` | 4 / 193 / 0 / 0 |
@@ -175,13 +174,21 @@ not a pinned-offset field view.
 
 ## Resume checkpoint
 
-No agents or background runs are active. Apply the seventh steering review first.
+Root resumed 2026-10-11. Five agents are active; no integration since steering.
+Owners record passing heads and evidence on the linked issues/PRs. Integration
+order is #208, #199 road, #209; #210 is independent and gates #209.
 
 | Issue / PR | Branch (worktree suffix), head | State and next step |
 | --- | --- | --- |
-| #202 / #208 | `trees-direct-202`, `fb06f22ddd` | Interrupted review is no review; audit on PR. Fresh reviewer, base merge, lower caps, full CI. |
-| #192 / #209 | `company-direct-192`, `06a219d447` | Reviewed, fix verified. Blocked on #210 (company probe) and the `InitializeCompanies` doc line; #156 entry posted by steering. |
-| #199 PR1 | `shared-layer-road-199`, `04711fa568` | WIP saved. Fixes listed on #199 (ABI IDs, one table), rebase, full suite, crossings, draft PR. |
+| #202 / #208 | `trees-direct-202` | `/root/review_trees_208_round1`: fresh review, base update, narrow reads, idle-host caps and full CI. |
+| #192 / #209 | `company-direct-192`, `06a219d447` | Root verifies recorded fix and corrects reset docs; waits for #210 and preceding integrations. Coverage is on #156. |
+| #199 PR1 | `shared-layer-road-199` | `/root/shared_road_199_resume`: ABI/table fixes, base update, default suite, crossings, draft PR. |
+| #210 | `fix/cited-probes-210` (`.local/worktrees/cited-probes-210`) | `/root/cited_probes_210`: default comparison runner calls cited probes; negative checks, draft PR, then review. |
+| #148 | `town-lifecycle-148` | `/root/town_lifecycle_148`: complete lifecycle owner and direct typed growth boundary, from integrated base. |
+
+`/root/plan_next_simulation_owners` selects the next tile-loop and vehicle-base
+owners for root's decision. ABI blocks: existing train through 385, tree additions
+386-389, fleet 390-399, company 400-429, town 430-459, shared road 460-499.
 
 Preserve the pinned reference, paused curve worktrees and evidence branches
 `evidence-disaster-vehicles` (`a775543162`) and `evidence-water-regions`
