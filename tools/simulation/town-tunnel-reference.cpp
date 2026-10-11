@@ -147,7 +147,6 @@ static void Observe(uint32_t kind, uint32_t id, uint32_t *v) noexcept
 			v[13] = tile.stop < 3 ? tile.stop : 0; v[14] = tile.facing; v[15] = tile.transport; v[16] = tile.facing;
 			break;
 		}
-		case 4: RoadInfo(id); v[0] = 1; v[2] = 50; break;
 	}
 }
 static uint64_t Leaf(uint32_t op, uint32_t, uint32_t, uint32_t, uint32_t) noexcept { assert(op == 21); RoadMask(); return 1; }
@@ -160,8 +159,7 @@ static float Trig(uint32_t, float value) noexcept { return value; }
 static uint32_t Industry(int32_t, int32_t, uint32_t *) noexcept { return 0; }
 static void Read_settings(uint32_t *v) noexcept { Observe(0, 0, v); }
 static void Read_tile(uint32_t id, uint32_t *v) noexcept { Observe(2, id, v); }
-static void Read_house(uint32_t id, uint32_t *v) noexcept { Observe(3, id, v); }
-static void Read_road_info(uint32_t id, uint32_t *v) noexcept { Observe(4, id, v); }
+static OpenTTDTownRoadChoice Read_road_info(uint8_t id) noexcept { RoadInfo(id); return {.introduction_date = 0, .max_speed = 50, .town_build = true}; }
 static uint64_t RoadTypes() noexcept { return Leaf(21, 0, 0, 0, 0); }
 static bool BuildRoad(uint32_t town, uint32_t tile, uint32_t bits, uint32_t type, uint32_t mode) noexcept { assert(mode == 0); return RoadCommand(tile, bits, type, town).Succeeded(); }
 static bool BuildTunnel(uint32_t tile, uint32_t type, uint32_t execute) noexcept { return TunnelCommand(tile, type, execute != 0).Succeeded(); }
@@ -169,7 +167,7 @@ static bool Candidate()
 {
 	openttd_rust_town_simulation(world->owner)->population = world->town.cache.population;
 	auto leaves = TownProtocolServices();
-	leaves.settings = Read_settings; leaves.tile = Read_tile; leaves.house = Read_house; leaves.road_info = Read_road_info;
+	leaves.settings = Read_settings; leaves.tile = Read_tile; leaves.road_info = Read_road_info;
 	leaves.state = State; leaves.stations = Stations; leaves.road_mask = RoadTypes; leaves.build_road = BuildRoad; leaves.build_tunnel = BuildTunnel;
 	const OpenTTDSharedServices services{.context = nullptr, .random = Random, .observe_tile = ObserveTile, .write_tile = WriteTile, .trig = Trig, .industry = Industry, .company_valid = UnusedCompanyValid, .next_company = UnusedNextCompany};
 	return openttd_rust_town_tunnel(&leaves, &services, world->town.index, world->start, world->direction);

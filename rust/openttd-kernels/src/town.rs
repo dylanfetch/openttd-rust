@@ -341,11 +341,46 @@ fn take_house_candidate(mut random: u32) -> (u32, u32) {
 }
 #[repr(C)]
 #[derive(Clone, Copy)]
+pub struct RoadChoice {
+    pub introduction_date: i32,
+    pub max_speed: u16,
+    pub town_build: bool,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct HouseAvailability {
+    pub zones: u16,
+    pub override_id: u16,
+    pub class_id: u16,
+    pub probability: u8,
+    pub enabled: bool,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct HousePlacement {
+    pub min_year: i32,
+    pub max_year: i32,
+    pub flags: u8,
+    pub extra_flags: u8,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct HouseConstruction {
+    pub extra_flags: u8,
+    pub population: u8,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
 pub struct Leaves {
     pub settings: extern "C" fn(*mut u32),
     pub tile: extern "C" fn(u32, *mut u32),
-    pub house: extern "C" fn(u32, *mut u32),
-    pub road_info: extern "C" fn(u32, *mut u32),
+    pub house_availability: extern "C" fn(u16) -> HouseAvailability,
+    pub house_placement: extern "C" fn(u16) -> HousePlacement,
+    pub house_construction: extern "C" fn(u16) -> HouseConstruction,
+    pub house_flags: extern "C" fn(u16) -> u8,
+    pub house_extra_flags: extern "C" fn(u16) -> u8,
+    pub house_allows_callback: extern "C" fn(u16) -> bool,
+    pub road_info: extern "C" fn(u8) -> RoadChoice,
     pub state: extern "C" fn(u32) -> *mut State,
     pub stations:
         extern "C" fn(u32, u32, *mut c_void, extern "C" fn(*mut c_void, *const c_void, u32)),
@@ -438,16 +473,6 @@ impl Engine {
     fn old_received(&self, at: usize) -> u32 {
         // SAFETY: Source bounds and immediate owner access before any callback.
         unsafe { u32::from((*self.owner).simulation.received[at].old_act) }
-    }
-    fn house(&self, id: u32) -> [u32; 32] {
-        let mut record = [0; 32];
-        (self.leaves.house)(id, record.as_mut_ptr());
-        record
-    }
-    fn road_info(&self, id: u32) -> [u32; 32] {
-        let mut record = [0; 32];
-        (self.leaves.road_info)(id, record.as_mut_ptr());
-        record
     }
     fn bind(mut self, town: u32) -> Self {
         self.owner = (self.leaves.state)(town);
@@ -686,18 +711,22 @@ impl Engine {
         while mask != 0 {
             let rt = mask.trailing_zeros();
             mask &= mask - 1;
-            let rti = self.road_info(rt);
-            if rti[0] == 0 {
+            let rti = (self.leaves.road_info)(rt as u8);
+            if !rti.town_build {
                 continue;
             }
-            let date = rti[1] as i32;
+            let date = rti.introduction_date;
             if date >= 0
                 && date < self.settings.get()[17] as i32
                 && date > self.settings.get()[16] as i32
             {
                 continue;
             }
-            let speed = if rti[2] == 0 { 50 } else { rti[2] };
+            let speed = if rti.max_speed == 0 {
+                50
+            } else {
+                rti.max_speed
+            };
             if best_speed.is_some_and(|previous| speed < previous) {
                 continue;
             }
@@ -1355,7 +1384,7 @@ impl Engine {
             house,
             counter | (stage << 8) | (random << 16) | (u32::from(protected) << 24),
         );
-        if self.house(house)[2] & 32 != 0 {
+        if u32::from((self.leaves.house_flags)(house as u16)) & 32 != 0 {
             (self.leaves.add_animation)(tile);
         }
         (self.leaves.dirty_tile)(tile);
@@ -1370,22 +1399,22 @@ impl Engine {
         protected: bool,
     ) {
         (self.leaves.change_house_count)(town, 1);
-        let h = self.house(house);
+        let h = (self.leaves.house_construction)(house as u16);
         let mut counter = 0;
         let mut stage = 0;
         if self.settings.get()[7] != 0 || self.settings.get()[6] != 0 || complete {
             let construction = self.services.random();
             stage = 3;
-            if self.settings.get()[7] != 0 && h[3] & 1 == 0 && self.chance(1, 7) {
+            if self.settings.get()[7] != 0 && h.extra_flags & 1 == 0 && self.chance(1, 7) {
                 stage = construction & 3;
             }
             if stage == 3 {
-                (self.leaves.change_population)(town, h[9]);
+                (self.leaves.change_population)(town, u32::from(h.population));
             } else {
                 counter = (construction >> 2) & 3;
             }
         }
-        let size = self.house(house)[2];
+        let size = u32::from((self.leaves.house_flags)(house as u16));
         let mut part = house;
         self.make_house_tile(town, tile, counter, stage, part, random, protected);
         if size & 24 != 0 {
@@ -1427,7 +1456,7 @@ impl Engine {
         (self.leaves.nearby_stations)(town, tile, size);
         (self.leaves.update_radius)(town);
         self.update_rate(town);
-        let size = self.house(house)[2];
+        let size = u32::from((self.leaves.house_flags)(house as u16));
         (self.leaves.construction_animation)(tile);
         if size & 24 != 0 {
             (self.leaves.construction_animation)(self.offset(tile, 0, 1));
@@ -1474,31 +1503,32 @@ impl Engine {
         clear_house_candidates();
         let mut max = 0_u32;
         for house in 0..(self.leaves.house_count)() {
-            let h = self.house(house);
-            if h[0] & zones != zones || h[1] == 0 || h[4] != u16::MAX.into() {
+            let h = (self.leaves.house_availability)(house as u16);
+            if u32::from(h.zones) & zones != zones || !h.enabled || h.override_id != u16::MAX {
                 continue;
             }
-            if (self.leaves.building_count)(town, house, h[8]) == u16::MAX {
+            if (self.leaves.building_count)(town, house, u32::from(h.class_id)) == u16::MAX {
                 continue;
             }
-            max = max.wrapping_add(h[5]);
-            add_house_candidate(house, h[5]);
+            max = max.wrapping_add(u32::from(h.probability));
+            add_house_candidate(house, u32::from(h.probability));
         }
         while max > 0 {
             let mut tile = base;
             let (house, weight) = take_house_candidate(self.services.random_range(max));
             max -= weight;
-            let h = self.house(house);
-            if self.settings.get()[7] == 0 && self.settings.get()[6] == 0 && h[3] & 1 != 0 {
+            let h = (self.leaves.house_placement)(house as u16);
+            if self.settings.get()[7] == 0 && self.settings.get()[6] == 0 && h.extra_flags & 1 != 0
+            {
                 continue;
             }
             let year = self.settings.get()[14] as i32;
-            if year < (h[6] as i32) || year > (h[7] as i32) {
+            if year < h.min_year || year > h.max_year {
                 continue;
             }
-            let oneof = if h[2] & 64 != 0 {
+            let oneof = if u32::from(h.flags) & 64 != 0 {
                 2
-            } else if h[2] & 128 != 0 {
+            } else if u32::from(h.flags) & 128 != 0 {
                 4
             } else {
                 0
@@ -1506,15 +1536,15 @@ impl Engine {
             if self.flags() & oneof != 0 {
                 continue;
             }
-            let noslope = h[2] & 2 != 0;
+            let noslope = u32::from(h.flags) & 2 != 0;
             if noslope && slope != 0 {
                 continue;
             }
-            if !self.check_house(town, &mut tile, maxz, noslope, h[2], modes) {
+            if !self.check_house(town, &mut tile, maxz, noslope, u32::from(h.flags), modes) {
                 continue;
             }
             let random = u32::from(self.services.random() as u8);
-            if self.house(house)[10] != 0
+            if (self.leaves.house_allows_callback)(house as u16)
                 && !(self.leaves.allow_construction)(town, tile, house, random)
             {
                 continue;
@@ -1526,7 +1556,7 @@ impl Engine {
                 house,
                 random,
                 false,
-                self.house(house)[3] & 2 != 0,
+                (self.leaves.house_extra_flags)(house as u16) & 2 != 0,
             );
             return true;
         }

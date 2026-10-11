@@ -23,7 +23,7 @@ struct TownProtocolWorld {
 	std::vector<std::array<uint32_t, 4>> writes;
 };
 static inline TownProtocolWorld *town_protocol_world;
-static inline void TownProtocolObserve(uint32_t kind, uint32_t id, uint32_t *v) noexcept
+static inline void TownProtocolObserve(uint32_t kind, uint32_t, uint32_t *v) noexcept
 {
 	std::fill_n(v, 32, 0);
 	auto &w = *town_protocol_world;
@@ -31,7 +31,6 @@ static inline void TownProtocolObserve(uint32_t kind, uint32_t id, uint32_t *v) 
 		case 0: v[0] = v[1] = 64; v[3] = 2; v[4] = 70; v[9] = 13; v[11] = 15; v[12] = 16; v[14] = 1950; break;
 		case 1: v[0] = 2080; v[2] = w.houses; v[3] = w.population; std::fill_n(v + 6, 5, 100); break;
 		case 2: v[4] = v[5] = 1; v[6] = v[12] = UINT32_MAX; v[8] = 63; break;
-		case 3: v[0] = 0xFFFF; v[1] = 1; v[2] = id == 0 ? 1 : 16; v[4] = 65535; v[5] = 1; v[6] = 0; v[7] = 5000; v[9] = 10; v[10] = w.house_callback; break;
 	}
 }
 static inline uint64_t TownProtocolLeaf(uint32_t op, uint32_t id, uint32_t a, uint32_t b, uint32_t c) noexcept
@@ -59,8 +58,13 @@ static inline uint32_t TownProtocolIndustry(int32_t, int32_t, uint32_t *) noexce
 
 static inline void TownProtocol_settings(uint32_t *v) noexcept { TownProtocolObserve(0, 0, v); }
 static inline void TownProtocol_tile(uint32_t id, uint32_t *v) noexcept { TownProtocolObserve(2, id, v); }
-static inline void TownProtocol_house(uint32_t id, uint32_t *v) noexcept { TownProtocolObserve(3, id, v); }
-static inline void TownProtocol_road_info(uint32_t id, uint32_t *v) noexcept { TownProtocolObserve(4, id, v); }
+static inline OpenTTDTownHouseAvailability TownProtocol_house_availability(uint16_t) noexcept { return {.zones = 0xFFFF, .override_id = UINT16_MAX, .class_id = 0, .probability = 1, .enabled = true}; }
+static inline uint8_t TownProtocol_house_flags(uint16_t id) noexcept { return id == 0 ? 1 : 16; }
+static inline OpenTTDTownHousePlacement TownProtocol_house_placement(uint16_t id) noexcept { return {.min_year = 0, .max_year = 5000, .flags = TownProtocol_house_flags(id), .extra_flags = 0}; }
+static inline OpenTTDTownHouseConstruction TownProtocol_house_construction(uint16_t) noexcept { return {.extra_flags = 0, .population = 10}; }
+static inline uint8_t TownProtocol_house_extra_flags(uint16_t) noexcept { return 0; }
+static inline bool TownProtocol_house_allows_callback(uint16_t) noexcept { return town_protocol_world->house_callback; }
+static inline OpenTTDTownRoadChoice TownProtocol_road_info(uint8_t) noexcept { return {}; }
 static inline void TownProtocol_dirty_town(uint32_t town) noexcept { TownProtocolLeaf(1, town, 0, 0, 0); }
 static inline uint32_t TownProtocol_tropic_zone(uint32_t tile) noexcept { return TownProtocolLeaf(2, tile, 0, 0, 0); }
 static inline uint32_t TownProtocol_tile_height(uint32_t tile) noexcept { return TownProtocolLeaf(3, tile, 0, 0, 0); }
@@ -101,7 +105,12 @@ static inline OpenTTDTownLeaves TownProtocolServices()
 	return {
 		.settings = TownProtocol_settings,
 		.tile = TownProtocol_tile,
-		.house = TownProtocol_house,
+		.house_availability = TownProtocol_house_availability,
+		.house_placement = TownProtocol_house_placement,
+		.house_construction = TownProtocol_house_construction,
+		.house_flags = TownProtocol_house_flags,
+		.house_extra_flags = TownProtocol_house_extra_flags,
+		.house_allows_callback = TownProtocol_house_allows_callback,
 		.road_info = TownProtocol_road_info,
 		.state = TownProtocolState,
 		.stations = TownProtocolStations,

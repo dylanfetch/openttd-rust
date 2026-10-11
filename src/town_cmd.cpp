@@ -968,29 +968,28 @@ static void RustTownTile(uint32_t id, uint32_t *v) noexcept
 			return;
 		}
 }
-static void RustTownHouse(uint32_t id, uint32_t *v) noexcept
+static OpenTTDTownHouseAvailability RustTownHouseAvailability(uint16_t id) noexcept
 {
-	std::fill_n(v, 32, 0);
-	{
-			const auto *hs = HouseSpec::Get(id);
-			v[0] = hs->building_availability.base(); v[1] = hs->enabled;
-			v[2] = hs->building_flags.base(); v[3] = hs->extra_flags.base();
-			v[4] = hs->grf_prop.override_id; v[5] = hs->probability;
-			v[6] = hs->min_year.base(); v[7] = hs->max_year.base();
-			v[8] = hs->class_id; v[9] = hs->population;
-			v[10] = hs->callback_mask.Test(HouseCallbackMask::AllowConstruction);
-			return;
-		}
+	const auto *hs = HouseSpec::Get(id);
+	return {.zones = hs->building_availability.base(), .override_id = hs->grf_prop.override_id, .class_id = hs->class_id, .probability = hs->probability, .enabled = hs->enabled};
 }
-static void RustTownRoadInfo(uint32_t id, uint32_t *v) noexcept
+static OpenTTDTownHousePlacement RustTownHousePlacement(uint16_t id) noexcept
 {
-	std::fill_n(v, 32, 0);
-	{
-			const auto *rti = GetRoadTypeInfo(static_cast<RoadType>(id));
-			v[0] = rti->flags.Test(RoadTypeFlag::TownBuild);
-			v[1] = rti->introduction_date.base(); v[2] = rti->max_speed;
-			return;
-		}
+	const auto *hs = HouseSpec::Get(id);
+	return {.min_year = hs->min_year.base(), .max_year = hs->max_year.base(), .flags = hs->building_flags.base(), .extra_flags = hs->extra_flags.base()};
+}
+static OpenTTDTownHouseConstruction RustTownHouseConstruction(uint16_t id) noexcept
+{
+	const auto *hs = HouseSpec::Get(id);
+	return {.extra_flags = hs->extra_flags.base(), .population = hs->population};
+}
+static uint8_t RustTownHouseFlags(uint16_t id) noexcept { return HouseSpec::Get(id)->building_flags.base(); }
+static uint8_t RustTownHouseExtraFlags(uint16_t id) noexcept { return HouseSpec::Get(id)->extra_flags.base(); }
+static bool RustTownHouseAllowsCallback(uint16_t id) noexcept { return HouseSpec::Get(id)->callback_mask.Test(HouseCallbackMask::AllowConstruction); }
+static OpenTTDTownRoadChoice RustTownRoadInfo(uint8_t id) noexcept
+{
+	const auto *rti = GetRoadTypeInfo(static_cast<RoadType>(id));
+	return {.introduction_date = rti->introduction_date.base(), .max_speed = rti->max_speed, .town_build = rti->flags.Test(RoadTypeFlag::TownBuild)};
 }
 static void RustTown_dirty_town(uint32_t town) noexcept
 {
@@ -1147,7 +1146,12 @@ static const OpenTTDTownLeaves &GetRustTownServices()
 	static const OpenTTDTownLeaves services{
 		.settings = RustTownSettings,
 		.tile = RustTownTile,
-		.house = RustTownHouse,
+		.house_availability = RustTownHouseAvailability,
+		.house_placement = RustTownHousePlacement,
+		.house_construction = RustTownHouseConstruction,
+		.house_flags = RustTownHouseFlags,
+		.house_extra_flags = RustTownHouseExtraFlags,
+		.house_allows_callback = RustTownHouseAllowsCallback,
 		.road_info = RustTownRoadInfo,
 		.state = RustTownState,
 		.stations = RustTownStations,
