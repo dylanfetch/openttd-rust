@@ -20,6 +20,11 @@ inline Vehicle *VehicleOf(OpenTTDVehicle *v) noexcept { return reinterpret_cast<
 
 /** Shared native field definitions, also used by bundled observations. */
 inline Vehicle *RustVehicleNext(const Vehicle *v) noexcept { return v->Next(); }
+inline uint32_t RustVehicleTile(const Vehicle *v) noexcept { return v->tile.base(); }
+inline Direction RustVehicleDirection(const Vehicle *v) noexcept { return v->direction; }
+inline uint8_t RustVehicleTick(const Vehicle *v) noexcept { return v->tick_counter; }
+inline uint8_t RustVehicleStatus(const Vehicle *v) noexcept { return v->vehstatus.base(); }
+inline void RustWriteVehicleTick(Vehicle *v, uint8_t tick) noexcept { v->tick_counter = tick; }
 inline uint16_t RustVehicleEngineID(const Vehicle *v) noexcept { return v->engine_type.base(); }
 inline const OpenTTDEngine *RustEngine(const Engine *e) noexcept { return reinterpret_cast<const OpenTTDEngine *>(e); }
 inline const Engine *EngineOf(const OpenTTDEngine *e) noexcept { return reinterpret_cast<const Engine *>(e); }
@@ -67,7 +72,7 @@ static OpenTTDGroundLastSpeed OPENTTD_VEHICLE_CALL GroundSvcSetLastSpeed(OpenTTD
 {
 	T *u = T::From(VehicleOf(v));
 	u->SetLastSpeed();
-	return {.status = u->vehstatus.base(), .progress = u->progress};
+	return {.status = RustVehicleStatus(u), .progress = u->progress};
 }
 template <class T>
 static int32_t OPENTTD_VEHICLE_CALL GroundSvcAcceleration(OpenTTDVehicle *v) noexcept

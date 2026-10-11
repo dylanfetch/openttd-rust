@@ -161,6 +161,10 @@ pub struct VehicleServices {
     pub next: extern "C" fn(VehicleRef) -> Option<VehicleRef>,
     pub engine_id: extern "C" fn(VehicleRef) -> u16,
     pub engine_for_length: extern "C" fn(VehicleRef) -> EngineForLength,
+    pub write_tick: extern "C" fn(VehicleRef, u8),
+    pub direction: extern "C" fn(VehicleRef) -> u8,
+    pub status: extern "C" fn(VehicleRef) -> u8,
+    pub tile: extern "C" fn(VehicleRef) -> u32,
 }
 
 /// Position step result: `UpdateInclination`'s old height, then the new height,

@@ -6,6 +6,8 @@
  */
 
 /** @file ship_control_services.h Typed synchronous shared-world services. */
+#include "settings_services.h"
+#include "vehicle_services.h"
 static_assert(MP_INDUSTRY == 8 && MP_TUNNELBRIDGE == 9 && TILE_HEIGHT == 8 && TILE_SIZE == 16);
 static_assert(TRACK_BIT_DEPOT == 128 && TRACK_BIT_WORMHOLE == 64 && HVOT_SHIP == 32);
 static_assert(to_underlying(WaterClass::Sea) == 0 && DIRDIFF_REVERSE == 4);
@@ -27,7 +29,7 @@ static uint32_t Ship_servint(uint32_t id) noexcept { Ship *v = Ship::Get(Vehicle
 
 static bool Ship_needs_service(uint32_t id) noexcept { Ship *v = Ship::Get(VehicleID(id)); return v->NeedsAutomaticServicing(); }
 
-static uint32_t Ship_max_distance() noexcept { return _settings_game.pf.yapf.maximum_go_to_depot_penalty / YAPF_TILE_LENGTH; }
+static uint32_t Ship_max_distance() noexcept { return RustMaximumDepotPenalty() / YAPF_TILE_LENGTH; }
 
 static bool Ship_tile_valid(uint32_t tile) noexcept { return IsValidTile(TileIndex(tile)); }
 
@@ -323,7 +325,7 @@ static void Ship_set_direction(uint32_t id, uint8_t value) noexcept { Ship *v = 
 
 static void Ship_set_speed(uint32_t id, uint16_t value) noexcept { Ship *v = Ship::Get(VehicleID(id)); v->cur_speed = static_cast<uint16_t>(value); }
 
-static void Ship_set_tick(uint32_t id, uint8_t value) noexcept { Ship *v = Ship::Get(VehicleID(id)); v->tick_counter = static_cast<uint8_t>(value); }
+static void Ship_set_tick(uint32_t id, uint8_t value) noexcept { Ship *v = Ship::Get(VehicleID(id)); RustWriteVehicleTick(v, static_cast<uint8_t>(value)); }
 
 static void Ship_set_running(uint32_t id, uint8_t value) noexcept { Ship *v = Ship::Get(VehicleID(id)); v->running_ticks = static_cast<uint8_t>(value); }
 
@@ -343,7 +345,7 @@ static void Ship_set_cargo_age(uint32_t id, uint16_t value) noexcept { Ship *v =
 
 static void Ship_set_dest(uint32_t id, uint32_t value) noexcept { Ship *v = Ship::Get(VehicleID(id)); v->dest_tile = TileIndex(static_cast<uint32_t>(value)); }
 
-static uint32_t Ship_tile(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(v->tile.base()); }
+static uint32_t Ship_tile(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(RustVehicleTile(v)); }
 
 static uint32_t Ship_dest(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(v->dest_tile.base()); }
 
@@ -353,11 +355,11 @@ static uint32_t Ship_y(uint32_t id) noexcept { const Ship *v = Ship::Get(Vehicle
 
 static uint32_t Ship_z(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(v->z_pos); }
 
-static uint32_t Ship_direction(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(v->direction); }
+static uint32_t Ship_direction(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(RustVehicleDirection(v)); }
 
 static uint32_t Ship_speed(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(v->cur_speed); }
 
-static uint32_t Ship_tick(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(v->tick_counter); }
+static uint32_t Ship_tick(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(RustVehicleTick(v)); }
 
 static uint32_t Ship_running(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(v->running_ticks); }
 
@@ -367,7 +369,7 @@ static uint32_t Ship_order_time(uint32_t id) noexcept { const Ship *v = Ship::Ge
 
 static uint32_t Ship_progress(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(v->progress); }
 
-static uint32_t Ship_status(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(v->vehstatus.base()); }
+static uint32_t Ship_status(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(RustVehicleStatus(v)); }
 
 static uint32_t Ship_owner(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(v->owner.base()); }
 

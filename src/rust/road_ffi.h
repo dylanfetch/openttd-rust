@@ -19,23 +19,20 @@
 struct OpenTTDRoadState;
 struct OpenTTDRoadPathElement { uint8_t trackdir; uint32_t tile; };
 struct OpenTTDRoadEntry {
-	uint32_t max_penalty;
 	uint8_t acceleration_model;
 	uint8_t road_side;
 	bool queue;
 	uint8_t map_log_x;
 };
 struct OpenTTDRoadTickRead {
-	OpenTTDVehicle *next;
-	OpenTTDRoadState *next_state;
-	uint32_t tile;
-	int32_t z;
-	int32_t order_time;
 	uint8_t tick;
+	bool front;
+};
+struct OpenTTDRoadFrontTickRead {
+	OpenTTDRoadEntry movement;
+	int32_t order_time;
 	uint8_t running;
 	uint8_t status;
-	bool front;
-	bool crossing;
 };
 struct OpenTTDRoadMaxSpeedRead {
 	OpenTTDVehicle *next;
@@ -62,9 +59,15 @@ struct OpenTTDRoadSpeedPart {
 	uint8_t direction;
 	uint8_t status;
 };
-struct OpenTTDRoadStep {
+struct OpenTTDRoadLink {
 	OpenTTDVehicle *next;
 	OpenTTDRoadState *next_state;
+};
+struct OpenTTDRoadLinkTile {
+	OpenTTDRoadLink link;
+	uint32_t tile;
+};
+struct OpenTTDRoadStep {
 	uint32_t tile;
 	int32_t x;
 	int32_t y;
@@ -157,6 +160,7 @@ struct OpenTTDRoadSoundRead {
 	uint8_t tick;
 };
 struct OpenTTDRoadCostRead {
+	const OpenTTDEngine *engine;
 	uint8_t cost_class;
 	uint8_t cost_factor;
 };
@@ -184,6 +188,8 @@ struct OpenTTDRoadLeaves {
 	const OpenTTDVehicleServices *vehicle;
 	const OpenTTDGroundServices *ground;
 	const OpenTTDSharedServices *shared;
+	OpenTTDRoadFrontTickRead (OPENTTD_VEHICLE_CALL *tick_front)(OpenTTDVehicle *) noexcept;
+	uint32_t (OPENTTD_VEHICLE_CALL *max_depot_penalty)() noexcept;
 	uint8_t (OPENTTD_VEHICLE_CALL *process_orders_then_loading)(OpenTTDVehicle *) noexcept;
 	OpenTTDRoadSpeedRead (OPENTTD_VEHICLE_CALL *visual_then_speed)(OpenTTDVehicle *, bool) noexcept;
 	OpenTTDRoadMaxSpeedRead (OPENTTD_VEHICLE_CALL *max_speed_read)(OpenTTDVehicle *) noexcept;
@@ -191,6 +197,8 @@ struct OpenTTDRoadLeaves {
 	OpenTTDRoadStep (OPENTTD_VEHICLE_CALL *step)(OpenTTDVehicle *) noexcept;
 	OpenTTDRoadCrashPart (OPENTTD_VEHICLE_CALL *crash_part)(OpenTTDVehicle *) noexcept;
 	OpenTTDRoadPartRead (OPENTTD_VEHICLE_CALL *part)(OpenTTDVehicle *) noexcept;
+	OpenTTDRoadLink (OPENTTD_VEHICLE_CALL *link)(OpenTTDVehicle *) noexcept;
+	OpenTTDRoadLinkTile (OPENTTD_VEHICLE_CALL *link_tile)(OpenTTDVehicle *) noexcept;
 	OpenTTDRoadEntered (OPENTTD_VEHICLE_CALL *enter_tile)(OpenTTDVehicle *, uint32_t, int32_t, int32_t) noexcept;
 	void (OPENTTD_VEHICLE_CALL *visit_close)(OpenTTDVehicle *, int32_t, int32_t, bool, OpenTTDRoadCloseVisitor, void *) noexcept;
 	void (OPENTTD_VEHICLE_CALL *visit_trains)(OpenTTDVehicle *, OpenTTDRoadTrainVisitor, void *) noexcept;
@@ -234,22 +242,22 @@ struct OpenTTDRoadLeaves {
 	uint16_t (OPENTTD_VEHICLE_CALL *default_max_speed)(OpenTTDVehicle *) noexcept;
 	void (OPENTTD_VEHICLE_CALL *update_cargo_age)(OpenTTDVehicle *) noexcept;
 	OpenTTDRoadCostRead (OPENTTD_VEHICLE_CALL *cost_read)(OpenTTDVehicle *) noexcept;
-	int64_t (OPENTTD_VEHICLE_CALL *price)(OpenTTDVehicle *, uint32_t) noexcept;
+	int64_t (OPENTTD_VEHICLE_CALL *price)(const OpenTTDEngine *, uint32_t) noexcept;
 	void (OPENTTD_VEHICLE_CALL *pay_running)(OpenTTDVehicle *, int64_t) noexcept;
 	OpenTTDRoadServiceRead (OPENTTD_VEHICLE_CALL *service_read)(OpenTTDVehicle *) noexcept;
 	OpenTTDRoadTurnRead (OPENTTD_VEHICLE_CALL *turn_read)(OpenTTDVehicle *) noexcept;
 	OpenTTDRoadTrackdirRead (OPENTTD_VEHICLE_CALL *trackdir_read)(OpenTTDVehicle *) noexcept;
 };
 extern "C" {
-bool OPENTTD_VEHICLE_CALL openttd_rust_road_tick(OpenTTDVehicle *, OpenTTDRoadState *, const OpenTTDRoadEntry *, const OpenTTDRoadTickRead *, const OpenTTDRoadLeaves *);
+bool OPENTTD_VEHICLE_CALL openttd_rust_road_tick(OpenTTDVehicle *, OpenTTDRoadState *, const OpenTTDRoadTickRead *, const OpenTTDRoadLeaves *);
 bool OPENTTD_VEHICLE_CALL openttd_rust_road_individual(OpenTTDVehicle *, OpenTTDRoadState *, OpenTTDVehicle *, OpenTTDRoadState *, const OpenTTDRoadEntry *, const OpenTTDRoadLeaves *);
 bool OPENTTD_VEHICLE_CALL openttd_rust_road_leave_depot(OpenTTDVehicle *, OpenTTDRoadState *, bool, const OpenTTDRoadEntry *, const OpenTTDRoadLeaves *);
 uint32_t OPENTTD_VEHICLE_CALL openttd_rust_road_crash(OpenTTDVehicle *, OpenTTDRoadState *, bool, const OpenTTDRoadLeaves *);
 void OPENTTD_VEHICLE_CALL openttd_rust_road_update_cache(OpenTTDVehicle *, OpenTTDRoadState *, bool, const OpenTTDRoadLeaves *);
 void OPENTTD_VEHICLE_CALL openttd_rust_road_calendar_day(OpenTTDVehicle *, bool, const OpenTTDRoadLeaves *);
-void OPENTTD_VEHICLE_CALL openttd_rust_road_economy_day(OpenTTDVehicle *, OpenTTDRoadState *, bool, const OpenTTDRoadEntry *, const OpenTTDRoadLeaves *);
+void OPENTTD_VEHICLE_CALL openttd_rust_road_economy_day(OpenTTDVehicle *, OpenTTDRoadState *, bool, const OpenTTDRoadLeaves *);
 int64_t OPENTTD_VEHICLE_CALL openttd_rust_road_running_cost(OpenTTDVehicle *, OpenTTDRoadState *, const OpenTTDRoadLeaves *);
-int32_t OPENTTD_VEHICLE_CALL openttd_rust_road_max_speed(OpenTTDVehicle *, OpenTTDRoadState *, const OpenTTDRoadEntry *, const OpenTTDRoadMaxSpeedRead *, const OpenTTDRoadLeaves *);
+int32_t OPENTTD_VEHICLE_CALL openttd_rust_road_max_speed(OpenTTDVehicle *, OpenTTDRoadState *, uint8_t, const OpenTTDRoadMaxSpeedRead *, const OpenTTDRoadLeaves *);
 void OPENTTD_VEHICLE_CALL openttd_rust_road_set_dest(OpenTTDVehicle *, OpenTTDRoadState *, uint32_t, uint32_t, const OpenTTDRoadLeaves *);
 bool OPENTTD_VEHICLE_CALL openttd_rust_road_turn(OpenTTDVehicle *, OpenTTDRoadState *, bool, const OpenTTDRoadLeaves *);
 uint8_t OPENTTD_VEHICLE_CALL openttd_rust_road_trackdir(OpenTTDVehicle *, OpenTTDRoadState *, const OpenTTDRoadLeaves *);

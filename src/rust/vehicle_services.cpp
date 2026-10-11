@@ -45,7 +45,7 @@ static_assert(HVOT_BUS == 4 && HVOT_TRUCK == 8);
 static void OPENTTD_VEHICLE_CALL VehicleSvcWriteCounters(OpenTTDVehicle *v, uint8_t tick, uint8_t running, int32_t order_time) noexcept
 {
 	Vehicle *u = VehicleOf(v);
-	u->tick_counter = tick;
+	RustWriteVehicleTick(u, tick);
 	u->running_ticks = running;
 	u->current_order_time = order_time;
 }
@@ -53,7 +53,7 @@ static OpenTTDVehicleBreakdown OPENTTD_VEHICLE_CALL VehicleSvcHandleBreakdown(Op
 {
 	Vehicle *u = VehicleOf(v);
 	bool broken = u->HandleBreakdown();
-	return {.broken = broken, .status = u->vehstatus.base()};
+	return {.broken = broken, .status = RustVehicleStatus(u)};
 }
 static bool OPENTTD_VEHICLE_CALL VehicleSvcWaitingForUnbunching(OpenTTDVehicle *v) noexcept { return VehicleOf(v)->IsWaitingForUnbunching(); }
 static void OPENTTD_VEHICLE_CALL VehicleSvcLeaveUnbunchingDepot(OpenTTDVehicle *v) noexcept { VehicleOf(v)->LeaveUnbunchingDepot(); }
@@ -73,7 +73,7 @@ static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcMoveThenStatus(OpenTTDVehicle *v, 
 	u->x_pos = x;
 	u->y_pos = y;
 	u->UpdatePosition();
-	return u->vehstatus.base();
+	return RustVehicleStatus(u);
 }
 static void OPENTTD_VEHICLE_CALL VehicleSvcBaseViewport(OpenTTDVehicle *v) noexcept { VehicleOf(v)->Vehicle::UpdateViewport(true); }
 static int32_t OPENTTD_VEHICLE_CALL VehicleSvcProperty(OpenTTDVehicle *v, uint8_t property, int32_t fallback) noexcept
@@ -127,7 +127,7 @@ static void OPENTTD_VEHICLE_CALL VehicleSvcWriteProgress(OpenTTDVehicle *v, uint
 static OpenTTDVehiclePreviousTile OPENTTD_VEHICLE_CALL VehicleSvcPreviousTile(OpenTTDVehicle *v) noexcept
 {
 	const Vehicle *previous = VehicleOf(v)->Previous();
-	return {.tile = previous == nullptr ? 0 : previous->tile.base(), .exists = previous != nullptr};
+	return {.tile = previous == nullptr ? 0 : RustVehicleTile(previous), .exists = previous != nullptr};
 }
 /** `DeleteLastRoadVeh` before the road stop check: unlink the last part and copy the station. */
 static void OPENTTD_VEHICLE_CALL VehicleSvcDetachLast(OpenTTDVehicle *previous, OpenTTDVehicle *last, OpenTTDVehicle *first) noexcept
@@ -137,6 +137,9 @@ static void OPENTTD_VEHICLE_CALL VehicleSvcDetachLast(OpenTTDVehicle *previous, 
 }
 static void OPENTTD_VEHICLE_CALL VehicleSvcWriteMaxSpeed(OpenTTDVehicle *v, uint16_t speed) noexcept { VehicleOf(v)->vcache.cached_max_speed = speed; }
 
+static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcDirection(OpenTTDVehicle *v) noexcept { return RustVehicleDirection(VehicleOf(v)); }
+static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcStatus(OpenTTDVehicle *v) noexcept { return RustVehicleStatus(VehicleOf(v)); }
+static uint32_t OPENTTD_VEHICLE_CALL VehicleSvcTile(OpenTTDVehicle *v) noexcept { return RustVehicleTile(VehicleOf(v)); }
 static OpenTTDVehicle *OPENTTD_VEHICLE_CALL VehicleSvcNext(OpenTTDVehicle *v) noexcept { return RustVehicle(RustVehicleNext(VehicleOf(v))); }
 static uint16_t OPENTTD_VEHICLE_CALL VehicleSvcEngineID(OpenTTDVehicle *v) noexcept { return RustVehicleEngineID(VehicleOf(v)); }
 static OpenTTDEngineForLength OPENTTD_VEHICLE_CALL VehicleSvcEngineForLength(OpenTTDVehicle *v) noexcept
@@ -144,6 +147,8 @@ static OpenTTDEngineForLength OPENTTD_VEHICLE_CALL VehicleSvcEngineForLength(Ope
 	const Engine *e = VehicleOf(v)->GetEngine();
 	return {.engine = RustEngine(e), .grf_version = RustEngineGRFVersion(e)};
 }
+
+static void OPENTTD_VEHICLE_CALL VehicleSvcWriteTick(OpenTTDVehicle *v, uint8_t tick) noexcept { RustWriteVehicleTick(VehicleOf(v), tick); }
 
 const OpenTTDVehicleServices &GetRustVehicleServices() noexcept
 {
@@ -188,6 +193,10 @@ const OpenTTDVehicleServices &GetRustVehicleServices() noexcept
 		.next = VehicleSvcNext,
 		.engine_id = VehicleSvcEngineID,
 		.engine_for_length = VehicleSvcEngineForLength,
+		.write_tick = VehicleSvcWriteTick,
+		.direction = VehicleSvcDirection,
+		.status = VehicleSvcStatus,
+		.tile = VehicleSvcTile,
 	};
 	return services;
 }

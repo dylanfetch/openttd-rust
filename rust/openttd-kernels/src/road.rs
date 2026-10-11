@@ -149,29 +149,30 @@ pub unsafe extern "C" fn openttd_rust_road_path_pop(state: *mut State) {
     }
 }
 
-/// Settings and map size, read by the C++ facade once per entry.
+/// Movement settings and map size, read once only by movement entries.
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct Entry {
-    pub max_penalty: u32,
     pub acceleration_model: u8,
     pub road_side: u8,
     pub queue: bool,
     pub map_log_x: u8,
 }
 
-/// `RoadVehicle::Tick` inputs read by the facade before any service runs.
+/// The tick/front gate; non-front entries consume only these fields.
 #[repr(C)]
 pub struct TickRead {
-    pub next: Option<VehicleRef>,
-    pub next_state: *mut State,
-    pub tile: u32,
-    pub z: i32,
-    pub order_time: i32,
     pub tick: u8,
+    pub front: bool,
+}
+/// Counters/status and movement settings consumed only after the Rust front gate.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct FrontTickRead {
+    pub movement: Entry,
+    pub order_time: i32,
     pub running: u8,
     pub status: u8,
-    pub front: bool,
-    pub crossing: bool,
 }
 
 /// `GetCurrentMaxSpeed` inputs of the front part.
@@ -211,12 +212,25 @@ pub struct SpeedPart {
     pub status: u8,
 }
 
+/// Consist links, read after callbacks which can change the chain.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct Link {
+    pub next: Option<VehicleRef>,
+    pub next_state: *mut State,
+}
+/// Consist links and tile for depot traversal.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct LinkTile {
+    pub link: Link,
+    pub tile: u32,
+}
+
 /// Movement inputs of one part at the start of `IndividualRoadVehicleController`.
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct Step {
-    pub next: Option<VehicleRef>,
-    pub next_state: *mut State,
     pub tile: u32,
     pub x: i32,
     pub y: i32,
@@ -361,6 +375,7 @@ pub struct SoundRead {
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct CostRead {
+    pub engine: crate::vehicle::EngineRef,
     pub cost_class: u8,
     pub cost_factor: u8,
 }
@@ -401,6 +416,8 @@ pub struct Leaves {
     pub vehicle: *const VehicleServices,
     pub ground: *const GroundServices,
     pub shared: *const Services,
+    pub tick_front: extern "C" fn(VehicleRef) -> FrontTickRead,
+    pub max_depot_penalty: extern "C" fn() -> u32,
     pub process_orders_then_loading: extern "C" fn(VehicleRef) -> u8,
     pub visual_then_speed: extern "C" fn(VehicleRef, bool) -> SpeedRead,
     pub max_speed_read: extern "C" fn(VehicleRef) -> MaxSpeedRead,
@@ -408,6 +425,8 @@ pub struct Leaves {
     pub step: extern "C" fn(VehicleRef) -> Step,
     pub crash_part: extern "C" fn(VehicleRef) -> CrashPart,
     pub part: extern "C" fn(VehicleRef) -> PartRead,
+    pub link: extern "C" fn(VehicleRef) -> Link,
+    pub link_tile: extern "C" fn(VehicleRef) -> LinkTile,
     pub enter_tile: extern "C" fn(VehicleRef, u32, i32, i32) -> Entered,
     pub visit_close: extern "C" fn(VehicleRef, i32, i32, bool, CloseVisitor, *mut c_void),
     pub visit_trains: extern "C" fn(VehicleRef, TrainVisitor, *mut c_void),
@@ -451,7 +470,7 @@ pub struct Leaves {
     pub default_max_speed: extern "C" fn(VehicleRef) -> u16,
     pub update_cargo_age: extern "C" fn(VehicleRef),
     pub cost_read: extern "C" fn(VehicleRef) -> CostRead,
-    pub price: extern "C" fn(VehicleRef, u32) -> i64,
+    pub price: extern "C" fn(crate::vehicle::EngineRef, u32) -> i64,
     pub pay_running: extern "C" fn(VehicleRef, i64),
     pub service_read: extern "C" fn(VehicleRef) -> ServiceRead,
     pub turn_read: extern "C" fn(VehicleRef) -> TurnRead,
@@ -554,7 +573,6 @@ struct Game<'a> {
     acceleration_model: u8,
     road_side: u8,
     queue: bool,
-    max_penalty: u32,
     map: Map,
 }
 
@@ -577,16 +595,9 @@ impl Game<'_> {
     unsafe fn new<'a>(leaves: *const Leaves, entry: Option<&Entry>) -> Game<'a> {
         // SAFETY: Immutable static tables supplied by the C++ facade.
         let l = unsafe { &*leaves };
-        let (acceleration_model, road_side, queue, max_penalty, log_x) =
-            entry.map_or((0, 0, false, 0, 0), |e| {
-                (
-                    e.acceleration_model,
-                    e.road_side,
-                    e.queue,
-                    e.max_penalty,
-                    e.map_log_x,
-                )
-            });
+        let (acceleration_model, road_side, queue, log_x) = entry.map_or((0, 0, false, 0), |e| {
+            (e.acceleration_model, e.road_side, e.queue, e.map_log_x)
+        });
         // SAFETY: As above; the shared tables are static.
         unsafe {
             Game {
@@ -597,7 +608,6 @@ impl Game<'_> {
                 acceleration_model,
                 road_side,
                 queue,
-                max_penalty,
                 map: Map { log_x },
             }
         }
@@ -776,7 +786,8 @@ impl Game<'_> {
         {
             return;
         }
-        if s.next.is_some() && service!(self.l.overtake_read)(v.v).articulated {
+        if service!(self.vs.next)(v.v).is_some() && service!(self.l.overtake_read)(v.v).articulated
+        {
             return;
         }
         let u_speed = if self.original() || service!(self.gs.acceleration)(u.v) > 0 {
@@ -919,13 +930,13 @@ impl Game<'_> {
                 let mut u = Some(v.v);
                 while let Some(part) = u {
                     let random = self.random();
-                    let r = service!(self.l.speed_part)(part);
-                    service!(self.gs.turn)(part, (r.direction + DELTA[(random & 3) as usize]) & 7);
-                    u = r.next;
+                    let direction = service!(self.vs.direction)(part);
+                    service!(self.gs.turn)(part, (direction + DELTA[(random & 3) as usize]) & 7);
+                    u = service!(self.vs.next)(part);
                 }
             }
         } else if counter >= 2220 && tick & 31 == 0 {
-            let first = service!(self.l.part)(v.v);
+            let first = service!(self.l.link)(v.v);
             let alive = first.next.is_some();
             let mut previous = v;
             let mut last = v;
@@ -933,7 +944,7 @@ impl Game<'_> {
             while let Some(part) = next {
                 previous = last;
                 last = part;
-                let r = service!(self.l.part)(part.v);
+                let r = service!(self.l.link)(part.v);
                 next = Part::link(r.next, r.next_state);
             }
             service!(self.vs.detach_last)(previous.v, last.v, v.v);
@@ -1105,11 +1116,11 @@ impl Game<'_> {
             if u.state() != DEPOT {
                 return false;
             }
-            let r = service!(self.l.part)(u.v);
+            let r = service!(self.l.link_tile)(u.v);
             if r.tile != d.tile {
                 return false;
             }
-            next = Part::link(r.next, r.next_state);
+            next = Part::link(r.link.next, r.link.next_state);
         }
         let dir = service!(self.l.depot_direction)(d.tile);
         let direction = dir * 2 + 1;
@@ -1138,7 +1149,7 @@ impl Game<'_> {
     }
     /// `FollowPreviousRoadVehicle`.
     fn follow(&self, v: Part, s: &Step, prev: Part, tile: u32, entry: u8, reversed: bool) -> u8 {
-        let prev_tile = service!(self.l.part)(prev.v).tile;
+        let prev_tile = service!(self.vs.tile)(prev.v);
         if prev_tile == s.tile && !reversed {
             return REVERSE[usize::from(entry)];
         }
@@ -1399,7 +1410,8 @@ impl Game<'_> {
             self.move_to(v, s, x, y, true, true);
             return true;
         }
-        if let Some(next) = Part::link(s.next, s.next_state) {
+        let link = service!(self.l.link)(v.v);
+        if let Some(next) = Part::link(link.next, link.next_state) {
             if service!(self.l.is_road_depot_tile)(s.tile)
                 && u16::from(v.frame()) == u16::from(s.length) + 6
             {
@@ -1521,31 +1533,26 @@ impl Game<'_> {
             return false;
         }
         let mut prev = v;
-        let mut next = Part::link(s.next, s.next_state);
+        let link = service!(self.l.link)(v.v);
+        let mut next = Part::link(link.next, link.next_state);
         while let Some(u) = next {
             let mut us = service!(self.l.step)(u.v);
             if !self.individual(u, Some(prev), &mut us) {
                 return false;
             }
             prev = u;
-            next = Part::link(us.next, us.next_state);
+            let link = service!(self.l.link)(u.v);
+            next = Part::link(link.next, link.next_state);
         }
         true
     }
     /// `RoadVehController`.
-    fn controller(&self, v: Part, t: &TickRead, tick: u8) -> bool {
+    fn controller(&self, v: Part, status: u8, tick: u8) -> bool {
         let reverse = v.get(REVERSE_CTR);
         if reverse != 0 {
             v.set(REVERSE_CTR, reverse - 1);
         }
-        let first = CrashPart {
-            next: t.next,
-            next_state: t.next_state,
-            tile: t.tile,
-            z: t.z,
-            crossing: t.crossing,
-        };
-        if t.status & VS_CRASHED != 0 || self.train_crash(v, first) {
+        if status & VS_CRASHED != 0 || self.train_crash(v, service!(self.l.crash_part)(v.v)) {
             return self.crashed(v, tick);
         }
         let b = service!(self.vs.handle_breakdown)(v.v);
@@ -1569,8 +1576,6 @@ impl Game<'_> {
         }
         let r = service!(self.l.visual_then_speed)(v.v, self.realistic());
         let mut s = Step {
-            next: r.max.next,
-            next_state: r.max.next_state,
             tile: r.max.tile,
             x: r.x,
             y: r.y,
@@ -1591,16 +1596,17 @@ impl Game<'_> {
                 blocked = true;
                 break;
             }
-            if s.next.is_some() {
+            if service!(self.vs.next)(v.v).is_some() {
                 // Later parts may have changed the front; observe it again.
                 s = service!(self.l.step)(v.v);
             }
             adv = advance_distance(s.direction);
             if j >= adv {
                 let crossing = v.state() != WORMHOLE && service!(self.ss.is_level_crossing)(s.tile);
+                let link = service!(self.l.link)(v.v);
                 let first = CrashPart {
-                    next: s.next,
-                    next_state: s.next_state,
+                    next: link.next,
+                    next_state: link.next_state,
                     tile: s.tile,
                     z: s.z,
                     crossing,
@@ -1614,13 +1620,12 @@ impl Game<'_> {
         if last.status & VS_HIDDEN == 0 {
             service!(self.gs.update_viewport)(v.v, false, false);
         }
-        let mut next = s.next;
+        let mut next = service!(self.vs.next)(v.v);
         while let Some(u) = next {
-            let p = service!(self.l.speed_part)(u);
-            if p.status & VS_HIDDEN == 0 {
+            if service!(self.vs.status)(u) & VS_HIDDEN == 0 {
                 service!(self.gs.update_viewport)(u, false, false);
             }
-            next = p.next;
+            next = service!(self.vs.next)(u);
         }
         if last.progress == 0 {
             service!(self.vs.write_progress)(v.v, if blocked { adv - 1 } else { j } as u8);
@@ -1628,19 +1633,24 @@ impl Game<'_> {
         true
     }
     /// `RoadVehicle::Tick`.
-    fn tick(&self, v: Part, t: &TickRead) -> bool {
+    fn tick(&mut self, v: Part, t: &TickRead) -> bool {
         let tick = t.tick.wrapping_add(1);
         if !t.front {
-            service!(self.vs.write_counters)(v.v, tick, t.running, t.order_time);
+            service!(self.vs.write_tick)(v.v, tick);
             return true;
         }
-        let running = if t.status & VS_STOPPED == 0 {
-            t.running.wrapping_add(1)
+        let front = service!(self.l.tick_front)(v.v);
+        self.acceleration_model = front.movement.acceleration_model;
+        self.road_side = front.movement.road_side;
+        self.queue = front.movement.queue;
+        self.map.log_x = front.movement.map_log_x;
+        let running = if front.status & VS_STOPPED == 0 {
+            front.running.wrapping_add(1)
         } else {
-            t.running
+            front.running
         };
-        service!(self.vs.write_counters)(v.v, tick, running, t.order_time.wrapping_add(1));
-        self.controller(v, t, tick)
+        service!(self.vs.write_counters)(v.v, tick, running, front.order_time.wrapping_add(1));
+        self.controller(v, front.status, tick)
     }
     /// `RoadVehicle::SetDestTile`.
     fn set_dest(&self, v: Part, tile: u32, current: u32) {
@@ -1660,7 +1670,7 @@ impl Game<'_> {
         if factor == 0 {
             return 0;
         }
-        service!(self.l.price)(v.v, factor)
+        service!(self.l.price)(r.engine, factor)
     }
     /// `CheckIfRoadVehNeedsService`; `IsChainInDepot` and `FindClosestRoadDepot` inline.
     fn service(&self, v: Part) {
@@ -1675,23 +1685,23 @@ impl Game<'_> {
         }
         if all_in_depot {
             let mut next = {
-                let p = service!(self.l.part)(v.v);
+                let p = service!(self.l.link)(v.v);
                 Part::link(p.next, p.next_state)
             };
             while let Some(u) = next {
-                let p = service!(self.l.part)(u.v);
+                let p = service!(self.l.link_tile)(u.v);
                 if u.state() != DEPOT || p.tile != r.tile {
                     all_in_depot = false;
                     break;
                 }
-                next = Part::link(p.next, p.next_state);
+                next = Part::link(p.link.next, p.link.next_state);
             }
         }
         if all_in_depot {
             service!(self.vs.service_in_depot)(v.v);
             return;
         }
-        let penalty = self.max_penalty;
+        let penalty = service!(self.l.max_depot_penalty)();
         let depot = if depot_tile {
             DepotResult {
                 tile: r.tile,
@@ -1790,12 +1800,11 @@ impl Game<'_> {
         }
         let mut u = first.v;
         while u != v {
-            let p = service!(self.l.speed_part)(u);
-            if direction != p.direction {
+            if direction != service!(self.vs.direction)(u) {
                 return true;
             }
             // The walk reaches `v` before the chain ends, as in the original.
-            let Some(next) = p.next else {
+            let Some(next) = service!(self.vs.next)(u) else {
                 return false;
             };
             u = next;
@@ -1819,14 +1828,13 @@ macro_rules! entry {
 pub unsafe extern "C" fn openttd_rust_road_tick(
     v: VehicleRef,
     state: *mut State,
-    entry: *const Entry,
     read: *const TickRead,
     leaves: *const Leaves,
 ) -> bool {
     crate::witness::hit(crate::witness::ROAD_TICKS);
     // SAFETY: Records are borrowed for this call only.
-    let (e, t) = unsafe { (&*entry, &*read) };
-    entry!(leaves, Some(e)).tick(Part::new(v, state), t)
+    let t = unsafe { &*read };
+    entry!(leaves, None).tick(Part::new(v, state), t)
 }
 /// # Safety
 /// As `openttd_rust_road_tick`; `prev` is null or a live pair.
@@ -1902,14 +1910,12 @@ pub unsafe extern "C" fn openttd_rust_road_economy_day(
     v: VehicleRef,
     state: *mut State,
     front: bool,
-    entry: *const Entry,
     leaves: *const Leaves,
 ) {
     crate::witness::hit(crate::witness::ROAD_ENTRIES);
     if front {
-        // SAFETY: Entry and static tables borrowed for this call only.
-        let e = unsafe { &*entry };
-        unsafe { Game::new(leaves, Some(e)) }.economy_day(Part::new(v, state));
+        // SAFETY: Static tables borrowed for this call only; no owner borrow crosses callbacks.
+        unsafe { Game::new(leaves, None) }.economy_day(Part::new(v, state));
     }
 }
 /// # Safety
@@ -1928,13 +1934,15 @@ pub unsafe extern "C" fn openttd_rust_road_running_cost(
 pub unsafe extern "C" fn openttd_rust_road_max_speed(
     v: VehicleRef,
     state: *mut State,
-    entry: *const Entry,
+    acceleration_model: u8,
     read: *const MaxSpeedRead,
     leaves: *const Leaves,
 ) -> i32 {
     // SAFETY: Records borrowed for this call only.
-    let (e, r) = unsafe { (&*entry, *read) };
-    entry!(leaves, Some(e)).max_speed(Part::new(v, state), r)
+    let r = unsafe { *read };
+    let mut game = entry!(leaves, None);
+    game.acceleration_model = acceleration_model;
+    game.max_speed(Part::new(v, state), r)
 }
 /// # Safety
 /// As `openttd_rust_road_tick`.

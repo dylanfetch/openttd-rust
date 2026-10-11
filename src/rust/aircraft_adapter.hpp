@@ -66,7 +66,7 @@ static void OPENTTD_AIRCRAFT_CALL Aircraft_set_z(OpenTTDAircraftVehicle vehicle,
 static uint32_t OPENTTD_AIRCRAFT_CALL Aircraft_tile(OpenTTDAircraftVehicle vehicle) noexcept
 {
 	const Vehicle *v = static_cast<const Vehicle *>(vehicle.handle);
-	return v->tile.base();
+	return RustVehicleTile(v);
 }
 
 static void OPENTTD_AIRCRAFT_CALL Aircraft_set_tile(OpenTTDAircraftVehicle vehicle, uint32_t value) noexcept
@@ -78,7 +78,7 @@ static void OPENTTD_AIRCRAFT_CALL Aircraft_set_tile(OpenTTDAircraftVehicle vehic
 static uint8_t OPENTTD_AIRCRAFT_CALL Aircraft_direction(OpenTTDAircraftVehicle vehicle) noexcept
 {
 	const Vehicle *v = static_cast<const Vehicle *>(vehicle.handle);
-	return v->direction;
+	return RustVehicleDirection(v);
 }
 
 static void OPENTTD_AIRCRAFT_CALL Aircraft_set_direction(OpenTTDAircraftVehicle vehicle, uint8_t value) noexcept
@@ -90,13 +90,13 @@ static void OPENTTD_AIRCRAFT_CALL Aircraft_set_direction(OpenTTDAircraftVehicle 
 static uint8_t OPENTTD_AIRCRAFT_CALL Aircraft_tick_counter(OpenTTDAircraftVehicle vehicle) noexcept
 {
 	const Vehicle *v = static_cast<const Vehicle *>(vehicle.handle);
-	return v->tick_counter;
+	return RustVehicleTick(v);
 }
 
 static void OPENTTD_AIRCRAFT_CALL Aircraft_set_tick_counter(OpenTTDAircraftVehicle vehicle, uint8_t value) noexcept
 {
 	Vehicle *v = static_cast<Vehicle *>(vehicle.handle);
-	v->tick_counter = value;
+	RustWriteVehicleTick(v, value);
 }
 
 static uint8_t OPENTTD_AIRCRAFT_CALL Aircraft_owner(OpenTTDAircraftVehicle vehicle) noexcept
@@ -108,7 +108,7 @@ static uint8_t OPENTTD_AIRCRAFT_CALL Aircraft_owner(OpenTTDAircraftVehicle vehic
 static uint8_t OPENTTD_AIRCRAFT_CALL Aircraft_vehicle_status(OpenTTDAircraftVehicle vehicle) noexcept
 {
 	const Vehicle *v = static_cast<const Vehicle *>(vehicle.handle);
-	return v->vehstatus.base();
+	return RustVehicleStatus(v);
 }
 
 static void OPENTTD_AIRCRAFT_CALL Aircraft_set_vehicle_status(OpenTTDAircraftVehicle vehicle, uint8_t value) noexcept

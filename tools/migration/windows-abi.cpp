@@ -134,19 +134,22 @@ static void Layouts()
 	// ABI reservations: train 380-385; tree additions 386-389; fleet 390-399; company 400-429; town 430-459; shared vehicle/road 460-499; station 500-559; industry 560-619; shared CommandCost 620-629 (town-owned). Trees retain existing low IDs.
 	Layout(461, "OpenTTDVehicleNewPosition", {sizeof(OpenTTDVehicleNewPosition), alignof(OpenTTDVehicleNewPosition), offsetof(OpenTTDVehicleNewPosition, x), offsetof(OpenTTDVehicleNewPosition, y), offsetof(OpenTTDVehicleNewPosition, tile)});
 	Layout(462, "OpenTTDVehicleBreakdown", {sizeof(OpenTTDVehicleBreakdown), alignof(OpenTTDVehicleBreakdown), offsetof(OpenTTDVehicleBreakdown, broken), offsetof(OpenTTDVehicleBreakdown, status)});
-	Layout(460, "OpenTTDVehicleServices", {sizeof(OpenTTDVehicleServices), alignof(OpenTTDVehicleServices), offsetof(OpenTTDVehicleServices, write_counters), offsetof(OpenTTDVehicleServices, handle_breakdown), offsetof(OpenTTDVehicleServices, waiting_for_unbunching), offsetof(OpenTTDVehicleServices, leave_unbunching_depot), offsetof(OpenTTDVehicleServices, reset_depot_unbunching), offsetof(OpenTTDVehicleServices, service_in_depot), offsetof(OpenTTDVehicleServices, needs_automatic_servicing), offsetof(OpenTTDVehicleServices, enter_depot), offsetof(OpenTTDVehicleServices, pathfinding_result), offsetof(OpenTTDVehicleServices, new_position), offsetof(OpenTTDVehicleServices, move_then_status), offsetof(OpenTTDVehicleServices, base_viewport), offsetof(OpenTTDVehicleServices, property), offsetof(OpenTTDVehicleServices, length_callback), offsetof(OpenTTDVehicleServices, unknown_length_result), offsetof(OpenTTDVehicleServices, length_changed), offsetof(OpenTTDVehicleServices, play_start_sound), offsetof(OpenTTDVehicleServices, play_sound), offsetof(OpenTTDVehicleServices, large_explosion), offsetof(OpenTTDVehicleServices, order_free), offsetof(OpenTTDVehicleServices, order_dummy), offsetof(OpenTTDVehicleServices, start_stop_dirty), offsetof(OpenTTDVehicleServices, destroy), offsetof(OpenTTDVehicleServices, age), offsetof(OpenTTDVehicleServices, economy_age), offsetof(OpenTTDVehicleServices, decrease_value), offsetof(OpenTTDVehicleServices, check_breakdown), offsetof(OpenTTDVehicleServices, check_orders), offsetof(OpenTTDVehicleServices, write_day), offsetof(OpenTTDVehicleServices, write_direction), offsetof(OpenTTDVehicleServices, write_speed), offsetof(OpenTTDVehicleServices, write_last_station), offsetof(OpenTTDVehicleServices, write_dest), offsetof(OpenTTDVehicleServices, write_progress), offsetof(OpenTTDVehicleServices, write_max_speed), offsetof(OpenTTDVehicleServices, previous_tile), offsetof(OpenTTDVehicleServices, detach_last), offsetof(OpenTTDVehicleServices, next), offsetof(OpenTTDVehicleServices, engine_id), offsetof(OpenTTDVehicleServices, engine_for_length)});
+	Layout(460, "OpenTTDVehicleServices", {sizeof(OpenTTDVehicleServices), alignof(OpenTTDVehicleServices), offsetof(OpenTTDVehicleServices, write_counters), offsetof(OpenTTDVehicleServices, handle_breakdown), offsetof(OpenTTDVehicleServices, waiting_for_unbunching), offsetof(OpenTTDVehicleServices, leave_unbunching_depot), offsetof(OpenTTDVehicleServices, reset_depot_unbunching), offsetof(OpenTTDVehicleServices, service_in_depot), offsetof(OpenTTDVehicleServices, needs_automatic_servicing), offsetof(OpenTTDVehicleServices, enter_depot), offsetof(OpenTTDVehicleServices, pathfinding_result), offsetof(OpenTTDVehicleServices, new_position), offsetof(OpenTTDVehicleServices, move_then_status), offsetof(OpenTTDVehicleServices, base_viewport), offsetof(OpenTTDVehicleServices, property), offsetof(OpenTTDVehicleServices, length_callback), offsetof(OpenTTDVehicleServices, unknown_length_result), offsetof(OpenTTDVehicleServices, length_changed), offsetof(OpenTTDVehicleServices, play_start_sound), offsetof(OpenTTDVehicleServices, play_sound), offsetof(OpenTTDVehicleServices, large_explosion), offsetof(OpenTTDVehicleServices, order_free), offsetof(OpenTTDVehicleServices, order_dummy), offsetof(OpenTTDVehicleServices, start_stop_dirty), offsetof(OpenTTDVehicleServices, destroy), offsetof(OpenTTDVehicleServices, age), offsetof(OpenTTDVehicleServices, economy_age), offsetof(OpenTTDVehicleServices, decrease_value), offsetof(OpenTTDVehicleServices, check_breakdown), offsetof(OpenTTDVehicleServices, check_orders), offsetof(OpenTTDVehicleServices, write_day), offsetof(OpenTTDVehicleServices, write_direction), offsetof(OpenTTDVehicleServices, write_speed), offsetof(OpenTTDVehicleServices, write_last_station), offsetof(OpenTTDVehicleServices, write_dest), offsetof(OpenTTDVehicleServices, write_progress), offsetof(OpenTTDVehicleServices, write_max_speed), offsetof(OpenTTDVehicleServices, previous_tile), offsetof(OpenTTDVehicleServices, detach_last), offsetof(OpenTTDVehicleServices, next), offsetof(OpenTTDVehicleServices, engine_id), offsetof(OpenTTDVehicleServices, engine_for_length), offsetof(OpenTTDVehicleServices, write_tick), offsetof(OpenTTDVehicleServices, direction), offsetof(OpenTTDVehicleServices, status), offsetof(OpenTTDVehicleServices, tile)});
 	Layout(464, "OpenTTDGroundMoved", {sizeof(OpenTTDGroundMoved), alignof(OpenTTDGroundMoved), offsetof(OpenTTDGroundMoved, old_z), offsetof(OpenTTDGroundMoved, z), offsetof(OpenTTDGroundMoved, cur_speed), offsetof(OpenTTDGroundMoved, max_track_speed)});
 	Layout(465, "OpenTTDGroundSpeed", {sizeof(OpenTTDGroundSpeed), alignof(OpenTTDGroundSpeed), offsetof(OpenTTDGroundSpeed, distance), offsetof(OpenTTDGroundSpeed, cur_speed)});
 	Layout(466, "OpenTTDGroundLastSpeed", {sizeof(OpenTTDGroundLastSpeed), alignof(OpenTTDGroundLastSpeed), offsetof(OpenTTDGroundLastSpeed, status), offsetof(OpenTTDGroundLastSpeed, progress)});
 	Layout(467, "OpenTTDGroundCrash", {sizeof(OpenTTDGroundCrash), alignof(OpenTTDGroundCrash), offsetof(OpenTTDGroundCrash, victims), offsetof(OpenTTDGroundCrash, front)});
 	Layout(463, "OpenTTDGroundServices", {sizeof(OpenTTDGroundServices), alignof(OpenTTDGroundServices), offsetof(OpenTTDGroundServices, cache_begin), offsetof(OpenTTDGroundServices, move_incline), offsetof(OpenTTDGroundServices, update_viewport), offsetof(OpenTTDGroundServices, turn), offsetof(OpenTTDGroundServices, do_update_speed), offsetof(OpenTTDGroundServices, set_last_speed), offsetof(OpenTTDGroundServices, acceleration), offsetof(OpenTTDGroundServices, crash), offsetof(OpenTTDGroundServices, first_cargo_changed), offsetof(OpenTTDGroundServices, go_to_depot_service), offsetof(OpenTTDGroundServices, write_first_engine), offsetof(OpenTTDGroundServices, write_length), offsetof(OpenTTDGroundServices, cached_length)});
 	Layout(80, "OpenTTDRoadPathElement", {sizeof(OpenTTDRoadPathElement), alignof(OpenTTDRoadPathElement), offsetof(OpenTTDRoadPathElement, trackdir), offsetof(OpenTTDRoadPathElement, tile)});
-	Layout(81, "OpenTTDRoadEntry", {sizeof(OpenTTDRoadEntry), alignof(OpenTTDRoadEntry), offsetof(OpenTTDRoadEntry, max_penalty), offsetof(OpenTTDRoadEntry, acceleration_model), offsetof(OpenTTDRoadEntry, road_side), offsetof(OpenTTDRoadEntry, queue), offsetof(OpenTTDRoadEntry, map_log_x)});
-	Layout(215, "OpenTTDRoadTickRead", {sizeof(OpenTTDRoadTickRead), alignof(OpenTTDRoadTickRead), offsetof(OpenTTDRoadTickRead, next), offsetof(OpenTTDRoadTickRead, next_state), offsetof(OpenTTDRoadTickRead, tile), offsetof(OpenTTDRoadTickRead, z), offsetof(OpenTTDRoadTickRead, order_time), offsetof(OpenTTDRoadTickRead, tick), offsetof(OpenTTDRoadTickRead, running), offsetof(OpenTTDRoadTickRead, status), offsetof(OpenTTDRoadTickRead, front), offsetof(OpenTTDRoadTickRead, crossing)});
+	Layout(81, "OpenTTDRoadEntry", {sizeof(OpenTTDRoadEntry), alignof(OpenTTDRoadEntry), offsetof(OpenTTDRoadEntry, acceleration_model), offsetof(OpenTTDRoadEntry, road_side), offsetof(OpenTTDRoadEntry, queue), offsetof(OpenTTDRoadEntry, map_log_x)});
+	Layout(215, "OpenTTDRoadTickRead", {sizeof(OpenTTDRoadTickRead), alignof(OpenTTDRoadTickRead), offsetof(OpenTTDRoadTickRead, tick), offsetof(OpenTTDRoadTickRead, front)});
+	Layout(471, "OpenTTDRoadLink", {sizeof(OpenTTDRoadLink), alignof(OpenTTDRoadLink), offsetof(OpenTTDRoadLink, next), offsetof(OpenTTDRoadLink, next_state)});
+	Layout(472, "OpenTTDRoadLinkTile", {sizeof(OpenTTDRoadLinkTile), alignof(OpenTTDRoadLinkTile), offsetof(OpenTTDRoadLinkTile, link), offsetof(OpenTTDRoadLinkTile, tile)});
+	Layout(470, "OpenTTDRoadFrontTickRead", {sizeof(OpenTTDRoadFrontTickRead), alignof(OpenTTDRoadFrontTickRead), offsetof(OpenTTDRoadFrontTickRead, movement), offsetof(OpenTTDRoadFrontTickRead, order_time), offsetof(OpenTTDRoadFrontTickRead, running), offsetof(OpenTTDRoadFrontTickRead, status)});
 	Layout(216, "OpenTTDRoadMaxSpeedRead", {sizeof(OpenTTDRoadMaxSpeedRead), alignof(OpenTTDRoadMaxSpeedRead), offsetof(OpenTTDRoadMaxSpeedRead, next), offsetof(OpenTTDRoadMaxSpeedRead, next_state), offsetof(OpenTTDRoadMaxSpeedRead, tile), offsetof(OpenTTDRoadMaxSpeedRead, max_track_speed), offsetof(OpenTTDRoadMaxSpeedRead, order_max_speed), offsetof(OpenTTDRoadMaxSpeedRead, direction), offsetof(OpenTTDRoadMaxSpeedRead, status)});
 	Layout(217, "OpenTTDRoadSpeedRead", {sizeof(OpenTTDRoadSpeedRead), alignof(OpenTTDRoadSpeedRead), offsetof(OpenTTDRoadSpeedRead, max), offsetof(OpenTTDRoadSpeedRead, x), offsetof(OpenTTDRoadSpeedRead, y), offsetof(OpenTTDRoadSpeedRead, z), offsetof(OpenTTDRoadSpeedRead, acceleration), offsetof(OpenTTDRoadSpeedRead, length), offsetof(OpenTTDRoadSpeedRead, tram)});
 	Layout(218, "OpenTTDRoadSpeedPart", {sizeof(OpenTTDRoadSpeedPart), alignof(OpenTTDRoadSpeedPart), offsetof(OpenTTDRoadSpeedPart, next), offsetof(OpenTTDRoadSpeedPart, next_state), offsetof(OpenTTDRoadSpeedPart, tile), offsetof(OpenTTDRoadSpeedPart, direction), offsetof(OpenTTDRoadSpeedPart, status)});
-	Layout(219, "OpenTTDRoadStep", {sizeof(OpenTTDRoadStep), alignof(OpenTTDRoadStep), offsetof(OpenTTDRoadStep, next), offsetof(OpenTTDRoadStep, next_state), offsetof(OpenTTDRoadStep, tile), offsetof(OpenTTDRoadStep, x), offsetof(OpenTTDRoadStep, y), offsetof(OpenTTDRoadStep, z), offsetof(OpenTTDRoadStep, cur_speed), offsetof(OpenTTDRoadStep, direction), offsetof(OpenTTDRoadStep, length), offsetof(OpenTTDRoadStep, front), offsetof(OpenTTDRoadStep, tram)});
+	Layout(219, "OpenTTDRoadStep", {sizeof(OpenTTDRoadStep), alignof(OpenTTDRoadStep), offsetof(OpenTTDRoadStep, tile), offsetof(OpenTTDRoadStep, x), offsetof(OpenTTDRoadStep, y), offsetof(OpenTTDRoadStep, z), offsetof(OpenTTDRoadStep, cur_speed), offsetof(OpenTTDRoadStep, direction), offsetof(OpenTTDRoadStep, length), offsetof(OpenTTDRoadStep, front), offsetof(OpenTTDRoadStep, tram)});
 	Layout(220, "OpenTTDRoadCrashPart", {sizeof(OpenTTDRoadCrashPart), alignof(OpenTTDRoadCrashPart), offsetof(OpenTTDRoadCrashPart, next), offsetof(OpenTTDRoadCrashPart, next_state), offsetof(OpenTTDRoadCrashPart, tile), offsetof(OpenTTDRoadCrashPart, z), offsetof(OpenTTDRoadCrashPart, crossing)});
 	Layout(221, "OpenTTDRoadEntered", {sizeof(OpenTTDRoadEntered), alignof(OpenTTDRoadEntered), offsetof(OpenTTDRoadEntered, tile), offsetof(OpenTTDRoadEntered, cur_speed), offsetof(OpenTTDRoadEntered, flags), offsetof(OpenTTDRoadEntered, direction), offsetof(OpenTTDRoadEntered, order_type)});
 	Layout(222, "OpenTTDRoadCandidate", {sizeof(OpenTTDRoadCandidate), alignof(OpenTTDRoadCandidate), offsetof(OpenTTDRoadCandidate, vehicle), offsetof(OpenTTDRoadCandidate, state), offsetof(OpenTTDRoadCandidate, first), offsetof(OpenTTDRoadCandidate, first_state), offsetof(OpenTTDRoadCandidate, index), offsetof(OpenTTDRoadCandidate, x), offsetof(OpenTTDRoadCandidate, y), offsetof(OpenTTDRoadCandidate, z), offsetof(OpenTTDRoadCandidate, first_speed), offsetof(OpenTTDRoadCandidate, direction)});
@@ -163,11 +166,11 @@ static void Layouts()
 	Layout(233, "OpenTTDRoadArrivalRead", {sizeof(OpenTTDRoadArrivalRead), alignof(OpenTTDRoadArrivalRead), offsetof(OpenTTDRoadArrivalRead, had_vehicle_of_type), offsetof(OpenTTDRoadArrivalRead, bus)});
 	Layout(234, "OpenTTDRoadSoundRead", {sizeof(OpenTTDRoadSoundRead), alignof(OpenTTDRoadSoundRead), offsetof(OpenTTDRoadSoundRead, sound), offsetof(OpenTTDRoadSoundRead, tick)});
 	Layout(469, "OpenTTDEngineForLength", {sizeof(OpenTTDEngineForLength), alignof(OpenTTDEngineForLength), offsetof(OpenTTDEngineForLength, engine), offsetof(OpenTTDEngineForLength, grf_version)});
-	Layout(236, "OpenTTDRoadCostRead", {sizeof(OpenTTDRoadCostRead), alignof(OpenTTDRoadCostRead), offsetof(OpenTTDRoadCostRead, cost_class), offsetof(OpenTTDRoadCostRead, cost_factor)});
+	Layout(236, "OpenTTDRoadCostRead", {sizeof(OpenTTDRoadCostRead), alignof(OpenTTDRoadCostRead), offsetof(OpenTTDRoadCostRead, engine), offsetof(OpenTTDRoadCostRead, cost_class), offsetof(OpenTTDRoadCostRead, cost_factor)});
 	Layout(237, "OpenTTDRoadServiceRead", {sizeof(OpenTTDRoadServiceRead), alignof(OpenTTDRoadServiceRead), offsetof(OpenTTDRoadServiceRead, tile), offsetof(OpenTTDRoadServiceRead, servint), offsetof(OpenTTDRoadServiceRead, cur_speed)});
 	Layout(238, "OpenTTDRoadTurnRead", {sizeof(OpenTTDRoadTurnRead), alignof(OpenTTDRoadTurnRead), offsetof(OpenTTDRoadTurnRead, tile), offsetof(OpenTTDRoadTurnRead, breakdown_ctr), offsetof(OpenTTDRoadTurnRead, direction), offsetof(OpenTTDRoadTurnRead, order_type), offsetof(OpenTTDRoadTurnRead, status)});
 	Layout(239, "OpenTTDRoadTrackdirRead", {sizeof(OpenTTDRoadTrackdirRead), alignof(OpenTTDRoadTrackdirRead), offsetof(OpenTTDRoadTrackdirRead, tile), offsetof(OpenTTDRoadTrackdirRead, direction), offsetof(OpenTTDRoadTrackdirRead, status)});
-	Layout(82, "OpenTTDRoadLeaves", {sizeof(OpenTTDRoadLeaves), alignof(OpenTTDRoadLeaves), offsetof(OpenTTDRoadLeaves, vehicle), offsetof(OpenTTDRoadLeaves, ground), offsetof(OpenTTDRoadLeaves, shared), offsetof(OpenTTDRoadLeaves, process_orders_then_loading), offsetof(OpenTTDRoadLeaves, visual_then_speed), offsetof(OpenTTDRoadLeaves, max_speed_read), offsetof(OpenTTDRoadLeaves, speed_part), offsetof(OpenTTDRoadLeaves, step), offsetof(OpenTTDRoadLeaves, crash_part), offsetof(OpenTTDRoadLeaves, part), offsetof(OpenTTDRoadLeaves, enter_tile), offsetof(OpenTTDRoadLeaves, visit_close), offsetof(OpenTTDRoadLeaves, visit_trains), offsetof(OpenTTDRoadLeaves, visit_tile), offsetof(OpenTTDRoadLeaves, has_road), offsetof(OpenTTDRoadLeaves, track_status), offsetof(OpenTTDRoadLeaves, any_road_bits), offsetof(OpenTTDRoadLeaves, tram_bits), offsetof(OpenTTDRoadLeaves, is_road_depot_tile), offsetof(OpenTTDRoadLeaves, depot_direction), offsetof(OpenTTDRoadLeaves, is_normal_road), offsetof(OpenTTDRoadLeaves, has_road_works), offsetof(OpenTTDRoadLeaves, disallowed_directions), offsetof(OpenTTDRoadLeaves, is_bay_stop), offsetof(OpenTTDRoadLeaves, bay_direction), offsetof(OpenTTDRoadLeaves, is_drive_through), offsetof(OpenTTDRoadLeaves, is_station_road_stop), offsetof(OpenTTDRoadLeaves, stop_type), offsetof(OpenTTDRoadLeaves, has_free_bay), offsetof(OpenTTDRoadLeaves, continuation), offsetof(OpenTTDRoadLeaves, move_tile), offsetof(OpenTTDRoadLeaves, path_read), offsetof(OpenTTDRoadLeaves, choose_track), offsetof(OpenTTDRoadLeaves, find_depot), offsetof(OpenTTDRoadLeaves, can_build_tram), offsetof(OpenTTDRoadLeaves, disconnect), offsetof(OpenTTDRoadLeaves, stop_read), offsetof(OpenTTDRoadLeaves, should_stop), offsetof(OpenTTDRoadLeaves, stop_leave), offsetof(OpenTTDRoadLeaves, stop_entrance), offsetof(OpenTTDRoadLeaves, stop_entrance_busy), offsetof(OpenTTDRoadLeaves, arrival_read), offsetof(OpenTTDRoadLeaves, arrival_news), offsetof(OpenTTDRoadLeaves, begin_loading_at), offsetof(OpenTTDRoadLeaves, overtake_read), offsetof(OpenTTDRoadLeaves, sound_read), offsetof(OpenTTDRoadLeaves, depot_order), offsetof(OpenTTDRoadLeaves, depot_exit), offsetof(OpenTTDRoadLeaves, crash_news), offsetof(OpenTTDRoadLeaves, shorten_factor), offsetof(OpenTTDRoadLeaves, default_max_speed), offsetof(OpenTTDRoadLeaves, update_cargo_age), offsetof(OpenTTDRoadLeaves, cost_read), offsetof(OpenTTDRoadLeaves, price), offsetof(OpenTTDRoadLeaves, pay_running), offsetof(OpenTTDRoadLeaves, service_read), offsetof(OpenTTDRoadLeaves, turn_read), offsetof(OpenTTDRoadLeaves, trackdir_read)});
+	Layout(82, "OpenTTDRoadLeaves", {sizeof(OpenTTDRoadLeaves), alignof(OpenTTDRoadLeaves), offsetof(OpenTTDRoadLeaves, vehicle), offsetof(OpenTTDRoadLeaves, ground), offsetof(OpenTTDRoadLeaves, shared), offsetof(OpenTTDRoadLeaves, tick_front), offsetof(OpenTTDRoadLeaves, max_depot_penalty), offsetof(OpenTTDRoadLeaves, process_orders_then_loading), offsetof(OpenTTDRoadLeaves, visual_then_speed), offsetof(OpenTTDRoadLeaves, max_speed_read), offsetof(OpenTTDRoadLeaves, speed_part), offsetof(OpenTTDRoadLeaves, step), offsetof(OpenTTDRoadLeaves, crash_part), offsetof(OpenTTDRoadLeaves, part), offsetof(OpenTTDRoadLeaves, link), offsetof(OpenTTDRoadLeaves, link_tile), offsetof(OpenTTDRoadLeaves, enter_tile), offsetof(OpenTTDRoadLeaves, visit_close), offsetof(OpenTTDRoadLeaves, visit_trains), offsetof(OpenTTDRoadLeaves, visit_tile), offsetof(OpenTTDRoadLeaves, has_road), offsetof(OpenTTDRoadLeaves, track_status), offsetof(OpenTTDRoadLeaves, any_road_bits), offsetof(OpenTTDRoadLeaves, tram_bits), offsetof(OpenTTDRoadLeaves, is_road_depot_tile), offsetof(OpenTTDRoadLeaves, depot_direction), offsetof(OpenTTDRoadLeaves, is_normal_road), offsetof(OpenTTDRoadLeaves, has_road_works), offsetof(OpenTTDRoadLeaves, disallowed_directions), offsetof(OpenTTDRoadLeaves, is_bay_stop), offsetof(OpenTTDRoadLeaves, bay_direction), offsetof(OpenTTDRoadLeaves, is_drive_through), offsetof(OpenTTDRoadLeaves, is_station_road_stop), offsetof(OpenTTDRoadLeaves, stop_type), offsetof(OpenTTDRoadLeaves, has_free_bay), offsetof(OpenTTDRoadLeaves, continuation), offsetof(OpenTTDRoadLeaves, move_tile), offsetof(OpenTTDRoadLeaves, path_read), offsetof(OpenTTDRoadLeaves, choose_track), offsetof(OpenTTDRoadLeaves, find_depot), offsetof(OpenTTDRoadLeaves, can_build_tram), offsetof(OpenTTDRoadLeaves, disconnect), offsetof(OpenTTDRoadLeaves, stop_read), offsetof(OpenTTDRoadLeaves, should_stop), offsetof(OpenTTDRoadLeaves, stop_leave), offsetof(OpenTTDRoadLeaves, stop_entrance), offsetof(OpenTTDRoadLeaves, stop_entrance_busy), offsetof(OpenTTDRoadLeaves, arrival_read), offsetof(OpenTTDRoadLeaves, arrival_news), offsetof(OpenTTDRoadLeaves, begin_loading_at), offsetof(OpenTTDRoadLeaves, overtake_read), offsetof(OpenTTDRoadLeaves, sound_read), offsetof(OpenTTDRoadLeaves, depot_order), offsetof(OpenTTDRoadLeaves, depot_exit), offsetof(OpenTTDRoadLeaves, crash_news), offsetof(OpenTTDRoadLeaves, shorten_factor), offsetof(OpenTTDRoadLeaves, default_max_speed), offsetof(OpenTTDRoadLeaves, update_cargo_age), offsetof(OpenTTDRoadLeaves, cost_read), offsetof(OpenTTDRoadLeaves, price), offsetof(OpenTTDRoadLeaves, pay_running), offsetof(OpenTTDRoadLeaves, service_read), offsetof(OpenTTDRoadLeaves, turn_read), offsetof(OpenTTDRoadLeaves, trackdir_read)});
 	Layout(44, "OpenTTDDisasterState", {sizeof(OpenTTDDisasterState), alignof(OpenTTDDisasterState), offsetof(OpenTTDDisasterState, image_override), offsetof(OpenTTDDisasterState, target), offsetof(OpenTTDDisasterState, state), offsetof(OpenTTDDisasterState, flags)});
 	Layout(45, "OpenTTDDisasterAction", {sizeof(OpenTTDDisasterAction), alignof(OpenTTDDisasterAction), offsetof(OpenTTDDisasterAction, kind), offsetof(OpenTTDDisasterAction, id), offsetof(OpenTTDDisasterAction, other), offsetof(OpenTTDDisasterAction, a), offsetof(OpenTTDDisasterAction, b), offsetof(OpenTTDDisasterAction, c), offsetof(OpenTTDDisasterAction, d)});
 	Layout(46, "OpenTTDWaterPatch", {sizeof(OpenTTDWaterPatch), alignof(OpenTTDWaterPatch), offsetof(OpenTTDWaterPatch, x), offsetof(OpenTTDWaterPatch, y), offsetof(OpenTTDWaterPatch, label)});
@@ -890,6 +893,12 @@ struct RoadTestTables {
 	explicit RoadTestTables(const OpenTTDSharedServices *world) : shared(*world)
 	{
 		VEHICLE_UNUSED(vehicle, write_counters);
+		VEHICLE_UNUSED(vehicle, write_tick);
+		VEHICLE_UNUSED(vehicle, direction);
+		VEHICLE_UNUSED(vehicle, status);
+		VEHICLE_UNUSED(vehicle, tile);
+		VEHICLE_UNUSED(leaves, tick_front);
+		VEHICLE_UNUSED(leaves, max_depot_penalty);
 		VEHICLE_UNUSED(vehicle, handle_breakdown);
 		VEHICLE_UNUSED(leaves, process_orders_then_loading);
 		VEHICLE_UNUSED(vehicle, waiting_for_unbunching);
@@ -948,6 +957,8 @@ struct RoadTestTables {
 		VEHICLE_UNUSED(leaves, step);
 		VEHICLE_UNUSED(leaves, crash_part);
 		VEHICLE_UNUSED(leaves, part);
+		VEHICLE_UNUSED(leaves, link);
+		VEHICLE_UNUSED(leaves, link_tile);
 		VEHICLE_UNUSED(leaves, enter_tile);
 		VEHICLE_UNUSED(leaves, visit_close);
 		VEHICLE_UNUSED(leaves, visit_trains);
@@ -1015,10 +1026,10 @@ struct RoadTestTables {
 struct RoadAbiProbe {
 	OpenTTDRoadState *state = openttd_rust_road_new();
 	const OpenTTDRoadLeaves *leaves = nullptr;
-	OpenTTDRoadEntry entry{.max_penalty = 300, .acceleration_model = 0, .road_side = 0, .queue = false, .map_log_x = 8};
+	OpenTTDRoadEntry entry{.acceleration_model = 0, .road_side = 0, .queue = false, .map_log_x = 8};
 	uint32_t dest = 0, nested = 0, destroyed = 0, departures = 0, progress = 255;
 	uint8_t tick = 0, running = 0;
-	uint32_t cache_properties = 0, cargo_ages = 0, length_changes = 0;
+	uint32_t cache_properties = 0, cargo_ages = 0, length_changes = 0, viewports = 0, turns = 0, next_reads = 0;
 	bool fallback_cache = false, engine_replaced = false;
 	int32_t order_time = 0;
 };
@@ -1049,9 +1060,10 @@ static void RoadBoundary()
 		p.running = running;
 		p.order_time = order_time;
 	};
-	const OpenTTDRoadTickRead part{.next = nullptr, .next_state = nullptr, .tile = 100, .z = 0, .order_time = -1, .tick = 255, .running = 7, .status = 0, .front = false, .crossing = false};
-	CHECK(openttd_rust_road_tick(v, probe.state, &probe.entry, &part, &t.leaves));
-	CHECK(probe.tick == 0 && probe.running == 7 && probe.order_time == -1 && world.draws == 0);
+	t.vehicle.write_tick = [](OpenTTDVehicle *u, uint8_t tick) noexcept { CHECK(u == RoadAbiHandle()); road_abi_probe->tick = tick; };
+	const OpenTTDRoadTickRead part{.tick = 255, .front = false};
+	CHECK(openttd_rust_road_tick(v, probe.state, &part, &t.leaves));
+	CHECK(probe.tick == 0 && probe.running == 0 && probe.order_time == 0 && world.draws == 0);
 
 	/* A direct callback changes canonical state before Rust reobserves it. */
 	t.ground.crash = [](OpenTTDVehicle *u, bool flooded) noexcept -> OpenTTDGroundCrash {
@@ -1107,7 +1119,7 @@ static void RoadBoundary()
 			return property == 0x23 ? (u == RoadAbiHandle() ? 0xFFFF : 9) : 0;
 		}
 		const OpenTTDRoadMaxSpeedRead read = RoadAbiMaxSpeed();
-		CHECK(openttd_rust_road_max_speed(u, p.state, &p.entry, &read, p.leaves) == 80);
+		CHECK(openttd_rust_road_max_speed(u, p.state, p.entry.acceleration_model, &read, p.leaves) == 80);
 		CHECK(openttd_rust_road_trackdir(u, p.state, p.leaves) == 0);
 		++p.nested;
 		openttd_rust_road_set_dest(u, p.state, 142 + p.nested, p.dest, p.leaves);
@@ -1131,6 +1143,23 @@ static void RoadBoundary()
 	openttd_rust_road_update_cache(v, probe.state, true, &t.leaves);
 	CHECK(probe.cargo_ages == 2 && probe.length_changes == 2);
 
+	/* Running-cost property callbacks can replace the vehicle's engine. Price retains the original engine. */
+	probe.engine_replaced = false;
+	t.leaves.cost_read = [](OpenTTDVehicle *u) noexcept -> OpenTTDRoadCostRead {
+		CHECK(u == RoadAbiHandle() && !road_abi_probe->engine_replaced);
+		return {.engine = reinterpret_cast<const OpenTTDEngine *>(&road_abi_engine), .cost_class = 1, .cost_factor = 3};
+	};
+	t.vehicle.property = [](OpenTTDVehicle *u, uint8_t property, int32_t value) noexcept -> int32_t {
+		CHECK(u == RoadAbiHandle() && property == 9 && value == 3);
+		road_abi_probe->engine_replaced = true;
+		return 4;
+	};
+	t.leaves.price = [](const OpenTTDEngine *e, uint32_t factor) noexcept -> int64_t {
+		CHECK(road_abi_probe->engine_replaced && e == reinterpret_cast<const OpenTTDEngine *>(&road_abi_engine) && factor == 4);
+		return 123;
+	};
+	CHECK(openttd_rust_road_running_cost(v, probe.state, &t.leaves) == 123);
+
 	/* A front tick reenters the setter from ProcessOrders and the speed getter from ShowVisualEffect. */
 	t.vehicle.handle_breakdown = [](OpenTTDVehicle *) noexcept -> OpenTTDVehicleBreakdown { return {.broken = false, .status = 0}; };
 	t.leaves.process_orders_then_loading = [](OpenTTDVehicle *u) noexcept -> uint8_t {
@@ -1142,7 +1171,7 @@ static void RoadBoundary()
 		auto &p = *road_abi_probe;
 		CHECK(!realistic);
 		const OpenTTDRoadMaxSpeedRead read = RoadAbiMaxSpeed();
-		CHECK(openttd_rust_road_max_speed(u, p.state, &p.entry, &read, p.leaves) == 80);
+		CHECK(openttd_rust_road_max_speed(u, p.state, p.entry.acceleration_model, &read, p.leaves) == 80);
 		++p.nested;
 		return {.max = read, .x = 0, .y = 0, .z = 0, .acceleration = 0, .length = 8, .tram = false};
 	};
@@ -1151,16 +1180,29 @@ static void RoadBoundary()
 		return {.distance = 0, .cur_speed = 0};
 	};
 	t.ground.set_last_speed = [](OpenTTDVehicle *) noexcept -> OpenTTDGroundLastSpeed { return {.status = 0, .progress = 0}; };
-	t.ground.update_viewport = [](OpenTTDVehicle *, bool force, bool delta) noexcept { CHECK(!force && !delta); };
+	t.ground.update_viewport = [](OpenTTDVehicle *, bool force, bool delta) noexcept { CHECK(!force && !delta); ++road_abi_probe->viewports; };
+	t.vehicle.next = [](OpenTTDVehicle *) noexcept -> OpenTTDVehicle * { CHECK(road_abi_probe->viewports == 1); ++road_abi_probe->next_reads; return nullptr; };
 	t.vehicle.write_progress = [](OpenTTDVehicle *, uint8_t progress) noexcept { road_abi_probe->progress = progress; };
-	const OpenTTDRoadTickRead front{.next = nullptr, .next_state = nullptr, .tile = 100, .z = 0, .order_time = 5, .tick = 0, .running = 0, .status = 0, .front = true, .crossing = false};
-	CHECK(openttd_rust_road_tick(v, probe.state, &probe.entry, &front, &t.leaves));
-	CHECK(probe.nested == 3 && probe.dest == 100 && probe.order_time == 6 && probe.running == 1 && probe.progress == 0 && world.draws == 0);
+	t.leaves.tick_front = [](OpenTTDVehicle *) noexcept -> OpenTTDRoadFrontTickRead { return {.movement = road_abi_probe->entry, .order_time = 5, .running = 0, .status = 0}; };
+	t.leaves.crash_part = [](OpenTTDVehicle *) noexcept -> OpenTTDRoadCrashPart { return {.next = nullptr, .next_state = nullptr, .tile = 100, .z = 0, .crossing = false}; };
+	const OpenTTDRoadTickRead front{.tick = 0, .front = true};
+	CHECK(openttd_rust_road_tick(v, probe.state, &front, &t.leaves));
+	CHECK(probe.nested == 3 && probe.dest == 100 && probe.order_time == 6 && probe.running == 1 && probe.progress == 0 && probe.next_reads == 1 && world.draws == 0);
+
+	/* Crash animation reads the next link after the turn/viewport callback. */
+	openttd_rust_road_set(probe.state, 5, 0);
+	t.leaves.tick_front = [](OpenTTDVehicle *) noexcept -> OpenTTDRoadFrontTickRead { return {.movement = road_abi_probe->entry, .order_time = 0, .running = 0, .status = 128}; };
+	t.vehicle.direction = [](OpenTTDVehicle *u) noexcept -> uint8_t { CHECK(u == RoadAbiHandle() && road_abi_probe->turns == 0); return 1; };
+	t.ground.turn = [](OpenTTDVehicle *u, uint8_t direction) noexcept { CHECK(u == RoadAbiHandle() && direction < 8); ++road_abi_probe->turns; };
+	t.vehicle.next = [](OpenTTDVehicle *u) noexcept -> OpenTTDVehicle * { CHECK(u == RoadAbiHandle() && road_abi_probe->turns == 1); return nullptr; };
+	const OpenTTDRoadTickRead animation{.tick = 7, .front = true};
+	CHECK(openttd_rust_road_tick(v, probe.state, &animation, &t.leaves));
+	CHECK(probe.turns == 1 && world.draws == 1);
 
 	/* The final-part deletion returns its copied alive result only. */
 	openttd_rust_road_set(probe.state, 0, 0);
 	openttd_rust_road_set(probe.state, 5, 2219);
-	t.leaves.part = [](OpenTTDVehicle *) noexcept -> OpenTTDRoadPartRead { return {.next = nullptr, .next_state = nullptr, .tile = 100, .z = 0, .tram = false}; };
+	t.leaves.link = [](OpenTTDVehicle *) noexcept -> OpenTTDRoadLink { return {.next = nullptr, .next_state = nullptr}; };
 	t.vehicle.detach_last = [](OpenTTDVehicle *previous, OpenTTDVehicle *last, OpenTTDVehicle *first) noexcept {
 		CHECK(previous == RoadAbiHandle() && last == previous && first == previous);
 	};
@@ -1170,9 +1212,10 @@ static void RoadBoundary()
 		road_abi_probe->state = nullptr;
 		++road_abi_probe->destroyed;
 	};
-	const OpenTTDRoadTickRead crashed{.next = nullptr, .next_state = nullptr, .tile = 100, .z = 0, .order_time = 0, .tick = 31, .running = 0, .status = 128, .front = true, .crossing = false};
-	CHECK(!openttd_rust_road_tick(v, probe.state, &probe.entry, &crashed, &t.leaves));
-	CHECK(probe.state == nullptr && probe.destroyed == 1 && world.draws == 0);
+	t.leaves.tick_front = [](OpenTTDVehicle *) noexcept -> OpenTTDRoadFrontTickRead { return {.movement = road_abi_probe->entry, .order_time = 0, .running = 0, .status = 128}; };
+	const OpenTTDRoadTickRead crashed{.tick = 31, .front = true};
+	CHECK(!openttd_rust_road_tick(v, probe.state, &crashed, &t.leaves));
+	CHECK(probe.state == nullptr && probe.destroyed == 1 && world.draws == 1);
 	std::printf("road_native_typed_reentry_path_and_owner_destruction passed\n");
 }
 
@@ -1197,7 +1240,7 @@ static void RoadServiceBoundary()
 	effect_test_world = &world;
 	const OpenTTDSharedServices services = OpenTTDFixtureSharedServices(&world, EffectTestRandom, EffectTestIndustry);
 	RoadTestTables t(&services);
-	const OpenTTDRoadEntry entry{.max_penalty = 300, .acceleration_model = 0, .road_side = 0, .queue = false, .map_log_x = 8};
+	t.leaves.max_depot_penalty = []() noexcept -> uint32_t { return 300; };
 	t.vehicle.economy_age = [](OpenTTDVehicle *) noexcept -> uint8_t { return 0; };
 	t.vehicle.write_day = [](OpenTTDVehicle *, uint8_t day) noexcept { CHECK(day == 1); };
 	t.vehicle.check_breakdown = [](OpenTTDVehicle *) noexcept {};
@@ -1207,10 +1250,14 @@ static void RoadServiceBoundary()
 	};
 	t.vehicle.needs_automatic_servicing = [](OpenTTDVehicle *) noexcept { return true; };
 	t.leaves.is_road_depot_tile = [](uint32_t tile) noexcept { CHECK(tile == road_service_probe->tile); return road_service_probe->depot_tile; };
-	t.leaves.part = [](OpenTTDVehicle *u) noexcept -> OpenTTDRoadPartRead {
+	t.leaves.link_tile = [](OpenTTDVehicle *u) noexcept -> OpenTTDRoadLinkTile {
 		auto &p = *road_service_probe;
 		bool head = u == RoadServiceHandle(0);
-		return {.next = head ? RoadServiceHandle(1) : nullptr, .next_state = head ? p.tail : nullptr, .tile = p.tile, .z = 0, .tram = false};
+		return {.link = {.next = head ? RoadServiceHandle(1) : nullptr, .next_state = head ? p.tail : nullptr}, .tile = p.tile};
+	};
+	t.leaves.link = [](OpenTTDVehicle *u) noexcept -> OpenTTDRoadLink {
+		bool head = u == RoadServiceHandle(0);
+		return {.next = head ? RoadServiceHandle(1) : nullptr, .next_state = head ? road_service_probe->tail : nullptr};
 	};
 	t.leaves.find_depot = [](OpenTTDVehicle *, int32_t penalty) noexcept -> OpenTTDRoadDepotResult {
 		CHECK(penalty == 300);
@@ -1225,7 +1272,7 @@ static void RoadServiceBoundary()
 	t.vehicle.service_in_depot = [](OpenTTDVehicle *) noexcept { ++road_service_probe->services; };
 	t.vehicle.start_stop_dirty = [](OpenTTDVehicle *) noexcept {};
 	t.vehicle.check_orders = [](OpenTTDVehicle *) noexcept -> uint8_t { return 0; };
-	auto day = [&]() { openttd_rust_road_economy_day(RoadServiceHandle(0), probe.head, true, &entry, &t.leaves); };
+	auto day = [&]() { openttd_rust_road_economy_day(RoadServiceHandle(0), probe.head, true, &t.leaves); };
 	for (bool moving : {true, false}) {
 		probe.speed = moving ? 5 : 0;
 		probe.dest = 42;

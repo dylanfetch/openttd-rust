@@ -13,11 +13,17 @@ static_assert(PROP_ROADVEH_SHORTEN_FACTOR == 0x23 && PROP_ROADVEH_CARGO_AGE_PERI
 static RoadVehicle *RoadOf(OpenTTDVehicle *v) noexcept { return RoadVehicle::From(VehicleOf(v)); }
 static OpenTTDRoadState *RoadStateOf(const RoadVehicle *u) noexcept { return u == nullptr ? nullptr : u->GetRustState(); }
 
+static OpenTTDRoadFrontTickRead OPENTTD_VEHICLE_CALL RoadSvcTickFront(OpenTTDVehicle *v) noexcept
+{
+	const RoadVehicle *u = RoadOf(v);
+	return {.movement = GetRoadEntry(), .order_time = u->current_order_time, .running = u->running_ticks, .status = RustVehicleStatus(u)};
+}
+
 static OpenTTDRoadMaxSpeedRead RoadMaxSpeedRead(const RoadVehicle *u) noexcept
 {
 	const RoadVehicle *next = static_cast<const RoadVehicle *>(RustVehicleNext(u));
-	return {.next = RustVehicle(next), .next_state = RoadStateOf(next), .tile = u->tile.base(), .max_track_speed = u->gcache.cached_max_track_speed,
-		.order_max_speed = u->current_order.GetMaxSpeed(), .direction = u->direction, .status = u->vehstatus.base()};
+	return {.next = RustVehicle(next), .next_state = RoadStateOf(next), .tile = RustVehicleTile(u), .max_track_speed = u->gcache.cached_max_track_speed,
+		.order_max_speed = u->current_order.GetMaxSpeed(), .direction = RustVehicleDirection(u), .status = RustVehicleStatus(u)};
 }
 static OpenTTDRoadSpeedRead OPENTTD_VEHICLE_CALL RoadSvcVisualThenSpeed(OpenTTDVehicle *v, bool realistic) noexcept
 {
@@ -31,32 +37,42 @@ static OpenTTDRoadSpeedPart OPENTTD_VEHICLE_CALL RoadSvcSpeedPart(OpenTTDVehicle
 {
 	const RoadVehicle *u = RoadOf(v);
 	const RoadVehicle *next = static_cast<const RoadVehicle *>(RustVehicleNext(u));
-	return {.next = RustVehicle(next), .next_state = RoadStateOf(next), .tile = u->tile.base(), .direction = u->direction, .status = u->vehstatus.base()};
+	return {.next = RustVehicle(next), .next_state = RoadStateOf(next), .tile = RustVehicleTile(u), .direction = RustVehicleDirection(u), .status = RustVehicleStatus(u)};
 }
 static OpenTTDRoadStep OPENTTD_VEHICLE_CALL RoadSvcStep(OpenTTDVehicle *v) noexcept
 {
 	const RoadVehicle *u = RoadOf(v);
-	const RoadVehicle *next = static_cast<const RoadVehicle *>(RustVehicleNext(u));
-	return {.next = RustVehicle(next), .next_state = RoadStateOf(next), .tile = u->tile.base(), .x = u->x_pos, .y = u->y_pos, .z = u->z_pos,
-		.cur_speed = u->cur_speed, .direction = u->direction, .length = RustGroundCachedLength(u), .front = u->IsFrontEngine(), .tram = RoadTypeIsTram(u->roadtype)};
+	return {.tile = RustVehicleTile(u), .x = u->x_pos, .y = u->y_pos, .z = u->z_pos,
+		.cur_speed = u->cur_speed, .direction = RustVehicleDirection(u), .length = RustGroundCachedLength(u), .front = u->IsFrontEngine(), .tram = RoadTypeIsTram(u->roadtype)};
 }
 static OpenTTDRoadCrashPart OPENTTD_VEHICLE_CALL RoadSvcCrashPart(OpenTTDVehicle *v) noexcept
 {
 	const RoadVehicle *u = RoadOf(v);
 	const RoadVehicle *next = static_cast<const RoadVehicle *>(RustVehicleNext(u));
-	return {.next = RustVehicle(next), .next_state = RoadStateOf(next), .tile = u->tile.base(), .z = u->z_pos, .crossing = IsLevelCrossingTile(u->tile)};
+	return {.next = RustVehicle(next), .next_state = RoadStateOf(next), .tile = RustVehicleTile(u), .z = u->z_pos, .crossing = IsLevelCrossingTile(u->tile)};
 }
 static OpenTTDRoadPartRead OPENTTD_VEHICLE_CALL RoadSvcPart(OpenTTDVehicle *v) noexcept
 {
 	const RoadVehicle *u = RoadOf(v);
 	const RoadVehicle *next = static_cast<const RoadVehicle *>(RustVehicleNext(u));
-	return {.next = RustVehicle(next), .next_state = RoadStateOf(next), .tile = u->tile.base(), .z = u->z_pos, .tram = RoadTypeIsTram(u->roadtype)};
+	return {.next = RustVehicle(next), .next_state = RoadStateOf(next), .tile = RustVehicleTile(u), .z = u->z_pos, .tram = RoadTypeIsTram(u->roadtype)};
+}
+static OpenTTDRoadLink OPENTTD_VEHICLE_CALL RoadSvcLink(OpenTTDVehicle *v) noexcept
+{
+	const RoadVehicle *next = static_cast<const RoadVehicle *>(RustVehicleNext(RoadOf(v)));
+	return {.next = RustVehicle(next), .next_state = RoadStateOf(next)};
+}
+static OpenTTDRoadLinkTile OPENTTD_VEHICLE_CALL RoadSvcLinkTile(OpenTTDVehicle *v) noexcept
+{
+	const RoadVehicle *u = RoadOf(v);
+	const RoadVehicle *next = static_cast<const RoadVehicle *>(RustVehicleNext(u));
+	return {.link = {.next = RustVehicle(next), .next_state = RoadStateOf(next)}, .tile = RustVehicleTile(u)};
 }
 static OpenTTDRoadEntered OPENTTD_VEHICLE_CALL RoadSvcEnterTile(OpenTTDVehicle *v, uint32_t tile, int32_t x, int32_t y) noexcept
 {
 	RoadVehicle *u = RoadOf(v);
 	uint8_t flags = VehicleEnterTile(u, TileIndex(tile), x, y).base();
-	return {.tile = u->tile.base(), .cur_speed = u->cur_speed, .flags = flags, .direction = u->direction, .order_type = u->current_order.GetType()};
+	return {.tile = RustVehicleTile(u), .cur_speed = u->cur_speed, .flags = flags, .direction = RustVehicleDirection(u), .order_type = u->current_order.GetType()};
 }
 
 /** Pool-order traversals; C++ skips what the original predicate rejects by type or consist, Rust decides the rest. */
@@ -68,7 +84,7 @@ static void OPENTTD_VEHICLE_CALL RoadSvcVisitClose(OpenTTDVehicle *v, int32_t x,
 		const RoadVehicle *r = RoadVehicle::From(u);
 		const RoadVehicle *first = r->First();
 		OpenTTDRoadCandidate candidate{.vehicle = RustVehicle(r), .state = r->GetRustState(), .first = RustVehicle(first), .first_state = first->GetRustState(),
-			.index = r->index.base(), .x = r->x_pos, .y = r->y_pos, .z = r->z_pos, .first_speed = first->cur_speed, .direction = r->direction};
+			.index = r->index.base(), .x = r->x_pos, .y = r->y_pos, .z = r->z_pos, .first_speed = first->cur_speed, .direction = RustVehicleDirection(r)};
 		return visit(context, &candidate);
 	};
 	if (wormhole) {
@@ -212,12 +228,12 @@ static void OPENTTD_VEHICLE_CALL RoadSvcBeginLoadingAt(OpenTTDVehicle *v, uint16
 static OpenTTDRoadOvertakeRead OPENTTD_VEHICLE_CALL RoadSvcOvertakeRead(OpenTTDVehicle *v) noexcept
 {
 	const RoadVehicle *u = RoadOf(v);
-	return {.tile = u->tile.base(), .cur_speed = u->cur_speed, .direction = u->direction, .status = u->vehstatus.base(), .articulated = u->HasArticulatedPart()};
+	return {.tile = RustVehicleTile(u), .cur_speed = u->cur_speed, .direction = RustVehicleDirection(u), .status = RustVehicleStatus(u), .articulated = u->HasArticulatedPart()};
 }
 static OpenTTDRoadSoundRead OPENTTD_VEHICLE_CALL RoadSvcSoundRead(OpenTTDVehicle *v) noexcept
 {
 	const RoadVehicle *u = RoadOf(v);
-	return {.sound = RoadVehInfo(u->engine_type)->sfx, .tick = u->tick_counter};
+	return {.sound = RoadVehInfo(u->engine_type)->sfx, .tick = RustVehicleTick(u)};
 }
 static OpenTTDRoadDepotOrder OPENTTD_VEHICLE_CALL RoadSvcDepotOrder(OpenTTDVehicle *v) noexcept
 {
@@ -267,12 +283,13 @@ static void OPENTTD_VEHICLE_CALL RoadSvcUpdateCargoAge(OpenTTDVehicle *v) noexce
 }
 static OpenTTDRoadCostRead OPENTTD_VEHICLE_CALL RoadSvcCostRead(OpenTTDVehicle *v) noexcept
 {
-	const RoadVehicleInfo &info = RoadOf(v)->GetEngine()->VehInfo<RoadVehicleInfo>();
-	return {.cost_class = info.running_cost_class, .cost_factor = info.running_cost};
-}
-static int64_t OPENTTD_VEHICLE_CALL RoadSvcPrice(OpenTTDVehicle *v, uint32_t cost_factor) noexcept
-{
 	const Engine *e = RoadOf(v)->GetEngine();
+	const RoadVehicleInfo &info = e->VehInfo<RoadVehicleInfo>();
+	return {.engine = RustEngine(e), .cost_class = info.running_cost_class, .cost_factor = info.running_cost};
+}
+static int64_t OPENTTD_VEHICLE_CALL RoadSvcPrice(const OpenTTDEngine *engine, uint32_t cost_factor) noexcept
+{
+	const Engine *e = EngineOf(engine);
 	return static_cast<int64_t>(GetPrice(e->VehInfo<RoadVehicleInfo>().running_cost_class, cost_factor, e->GetGRF()));
 }
 /** The running cost tail of `RoadVehicle::OnNewEconomyDay`. */
@@ -292,17 +309,17 @@ static void OPENTTD_VEHICLE_CALL RoadSvcPayRunning(OpenTTDVehicle *v, int64_t am
 static OpenTTDRoadServiceRead OPENTTD_VEHICLE_CALL RoadSvcServiceRead(OpenTTDVehicle *v) noexcept
 {
 	const RoadVehicle *u = RoadOf(v);
-	return {.tile = u->tile.base(), .servint = Company::Get(u->owner)->settings.vehicle.servint_roadveh, .cur_speed = u->cur_speed};
+	return {.tile = RustVehicleTile(u), .servint = Company::Get(u->owner)->settings.vehicle.servint_roadveh, .cur_speed = u->cur_speed};
 }
 static OpenTTDRoadTurnRead OPENTTD_VEHICLE_CALL RoadSvcTurnRead(OpenTTDVehicle *v) noexcept
 {
 	const RoadVehicle *u = RoadOf(v);
-	return {.tile = u->tile.base(), .breakdown_ctr = u->breakdown_ctr, .direction = u->direction, .order_type = u->current_order.GetType(), .status = u->vehstatus.base()};
+	return {.tile = RustVehicleTile(u), .breakdown_ctr = u->breakdown_ctr, .direction = RustVehicleDirection(u), .order_type = u->current_order.GetType(), .status = RustVehicleStatus(u)};
 }
 static OpenTTDRoadTrackdirRead OPENTTD_VEHICLE_CALL RoadSvcTrackdirRead(OpenTTDVehicle *v) noexcept
 {
 	const RoadVehicle *u = RoadOf(v);
-	return {.tile = u->tile.base(), .direction = u->direction, .status = u->vehstatus.base()};
+	return {.tile = RustVehicleTile(u), .direction = RustVehicleDirection(u), .status = RustVehicleStatus(u)};
 }
 
 static uint8_t OPENTTD_VEHICLE_CALL RoadSvcProcessOrdersThenLoading(OpenTTDVehicle *v) noexcept
@@ -319,6 +336,8 @@ static const OpenTTDRoadLeaves &GetRoadLeaves()
 		.vehicle = &GetRustVehicleServices(),
 		.ground = &GetRustGroundServices<RoadVehicle>(),
 		.shared = &GetRustSharedServices(),
+		.tick_front = RoadSvcTickFront,
+		.max_depot_penalty = RustMaximumDepotPenalty,
 		.process_orders_then_loading = RoadSvcProcessOrdersThenLoading,
 		.visual_then_speed = RoadSvcVisualThenSpeed,
 		.max_speed_read = RoadSvcMaxSpeedRead,
@@ -326,6 +345,8 @@ static const OpenTTDRoadLeaves &GetRoadLeaves()
 		.step = RoadSvcStep,
 		.crash_part = RoadSvcCrashPart,
 		.part = RoadSvcPart,
+		.link = RoadSvcLink,
+		.link_tile = RoadSvcLinkTile,
 		.enter_tile = RoadSvcEnterTile,
 		.visit_close = RoadSvcVisitClose,
 		.visit_trains = RoadSvcVisitTrains,

@@ -402,7 +402,7 @@ static uint8_t TrainReservationUpdateOrderDest(OpenTTDTrainHandle id, uint8_t in
 static uint32_t TrainReservationReadTile(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return v->tile.base();
+	return RustVehicleTile(v);
 }
 static OpenTTDTrainHandle TrainReservationReadNext(OpenTTDTrainHandle id) noexcept
 {
@@ -417,7 +417,7 @@ static uint16_t TrainReservationReadLastStation(OpenTTDTrainHandle id) noexcept
 static uint8_t TrainReservationReadDirection(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return v->direction;
+	return RustVehicleDirection(v);
 }
 static uint8_t TrainReservationReadOrder(OpenTTDTrainHandle id) noexcept
 {
@@ -437,12 +437,12 @@ static uint8_t TrainReservationReadOrderIndex(OpenTTDTrainHandle id) noexcept
 static OpenTTDTrainReservationFreeRead TrainReservationReadFree(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return {v->tile.base()};
+	return {RustVehicleTile(v)};
 }
 static OpenTTDTrainReservationFree1Read TrainReservationReadFree1(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return {v->tile.base(), TrainHandle(static_cast<Train *>(RustVehicleNext(v)))};
+	return {RustVehicleTile(v), TrainHandle(static_cast<Train *>(RustVehicleNext(v)))};
 }
 static OpenTTDTrainReservationNewRead TrainReservationReadNew(OpenTTDTrainHandle id) noexcept
 {
@@ -452,7 +452,7 @@ static OpenTTDTrainReservationNewRead TrainReservationReadNew(OpenTTDTrainHandle
 static OpenTTDTrainReservationChooseRead TrainReservationReadChoose(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return {v->tile.base(), v->dest_tile.base(), v->current_order.GetDestination().base(), v->current_order.GetType()};
+	return {RustVehicleTile(v), v->dest_tile.base(), v->current_order.GetDestination().base(), v->current_order.GetType()};
 }
 static OpenTTDTrainReservationChoose4Read TrainReservationReadChoose4(OpenTTDTrainHandle id) noexcept
 {
@@ -462,5 +462,5 @@ static OpenTTDTrainReservationChoose4Read TrainReservationReadChoose4(OpenTTDTra
 static OpenTTDTrainReservationCheckNextRead TrainReservationReadCheckNext(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return {v->tile.base(), v->dest_tile.base(), v->current_order.GetDestination().base(), v->current_order.GetType(), v->GetNumOrders()};
+	return {RustVehicleTile(v), v->dest_tile.base(), v->current_order.GetDestination().base(), v->current_order.GetType(), v->GetNumOrders()};
 }

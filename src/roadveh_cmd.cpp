@@ -44,6 +44,7 @@
 
 #ifdef WITH_RUST
 #include "rust/vehicle_services.h"
+#include "rust/settings_services.h"
 
 static const OpenTTDRoadLeaves &GetRoadLeaves();
 static OpenTTDRoadMaxSpeedRead RoadMaxSpeedRead(const RoadVehicle *u) noexcept;
@@ -51,8 +52,8 @@ static OpenTTDRoadMaxSpeedRead RoadMaxSpeedRead(const RoadVehicle *u) noexcept;
 /** Settings and map size a road entry may consult, read once per entry. */
 static OpenTTDRoadEntry GetRoadEntry() noexcept
 {
-	return {.max_penalty = _settings_game.pf.yapf.maximum_go_to_depot_penalty, .acceleration_model = _settings_game.vehicle.roadveh_acceleration_model,
-		.road_side = _settings_game.vehicle.road_side, .queue = _settings_game.pf.roadveh_queue, .map_log_x = static_cast<uint8_t>(Map::LogX())};
+	return {.acceleration_model = RustRoadAccelerationModel(),
+		.road_side = RustRoadSide(), .queue = RustRoadQueue(), .map_log_x = static_cast<uint8_t>(Map::LogX())};
 }
 #endif
 
@@ -491,9 +492,8 @@ void RoadVehicle::UpdateDeltaXY()
 inline int RoadVehicle::GetCurrentMaxSpeed() const
 {
 #ifdef WITH_RUST
-	OpenTTDRoadEntry entry = GetRoadEntry();
 	OpenTTDRoadMaxSpeedRead read = RoadMaxSpeedRead(this);
-	return openttd_rust_road_max_speed(RustVehicle(this), this->GetRustState(), &entry, &read, &GetRoadLeaves());
+	return openttd_rust_road_max_speed(RustVehicle(this), this->GetRustState(), RustRoadAccelerationModel(), &read, &GetRoadLeaves());
 #else
 	int max_speed = this->gcache.cached_max_track_speed;
 
@@ -1777,12 +1777,8 @@ bool RoadVehicle::Tick()
 {
 #ifdef WITH_RUST
 	PerformanceAccumulator framerate(PFE_GL_ROADVEHS);
-	const RoadVehicle *next = static_cast<const RoadVehicle *>(RustVehicleNext(this));
-	OpenTTDRoadEntry entry = GetRoadEntry();
-	OpenTTDRoadTickRead read{.next = RustVehicle(next), .next_state = next == nullptr ? nullptr : next->GetRustState(), .tile = this->tile.base(), .z = this->z_pos,
-		.order_time = this->current_order_time, .tick = this->tick_counter, .running = this->running_ticks, .status = this->vehstatus.base(),
-		.front = this->IsFrontEngine(), .crossing = IsLevelCrossingTile(this->tile)};
-	return openttd_rust_road_tick(RustVehicle(this), this->GetRustState(), &entry, &read, &GetRoadLeaves());
+	OpenTTDRoadTickRead read{.tick = this->tick_counter, .front = this->IsFrontEngine()};
+	return openttd_rust_road_tick(RustVehicle(this), this->GetRustState(), &read, &GetRoadLeaves());
 #else
 	PerformanceAccumulator framerate(PFE_GL_ROADVEHS);
 
@@ -1864,8 +1860,7 @@ void RoadVehicle::OnNewCalendarDay()
 void RoadVehicle::OnNewEconomyDay()
 {
 #ifdef WITH_RUST
-	OpenTTDRoadEntry entry = GetRoadEntry();
-	openttd_rust_road_economy_day(RustVehicle(this), this->GetRustState(), this->IsFrontEngine(), &entry, &GetRoadLeaves());
+	openttd_rust_road_economy_day(RustVehicle(this), this->GetRustState(), this->IsFrontEngine(), &GetRoadLeaves());
 #else
 	if (!this->IsFrontEngine()) return;
 	EconomyAgeVehicle(this);
