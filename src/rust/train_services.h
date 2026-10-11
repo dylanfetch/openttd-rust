@@ -1161,7 +1161,7 @@ static OpenTTDTrainLocoRead TrainReadLoco(OpenTTDTrainHandle id) noexcept
 static OpenTTDTrainLoco26Read TrainReadLoco26(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return {RustVehicleTile(v), RustVehicleOrderDestination(v), RustVehicleOrderType(v), v->current_order.GetNonStopType().base()};
+	return {RustVehicleTile(v), RustVehicleOrderDestination(v), RustVehicleOrderType(v), RustVehicleOrderNonStop(v)};
 }
 static OpenTTDTrainTickRead TrainReadTickState(OpenTTDTrainHandle id) noexcept
 {

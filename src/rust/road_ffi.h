@@ -143,11 +143,6 @@ struct OpenTTDRoadDepotResult {
 	uint32_t tile;
 	uint32_t length;
 };
-struct OpenTTDRoadDepotOrder {
-	uint32_t dest;
-	uint8_t order_type;
-	uint8_t nonstop;
-};
 struct OpenTTDRoadArrivalRead {
 	uint8_t had_vehicle_of_type;
 	bool bus;
@@ -232,7 +227,6 @@ struct OpenTTDRoadLeaves {
 	void (OPENTTD_VEHICLE_CALL *begin_loading_at)(OpenTTDVehicle *, uint16_t) noexcept;
 	OpenTTDRoadOvertakeRead (OPENTTD_VEHICLE_CALL *overtake_read)(OpenTTDVehicle *) noexcept;
 	OpenTTDRoadSoundRead (OPENTTD_VEHICLE_CALL *sound_read)(OpenTTDVehicle *) noexcept;
-	OpenTTDRoadDepotOrder (OPENTTD_VEHICLE_CALL *depot_order)(OpenTTDVehicle *) noexcept;
 	void (OPENTTD_VEHICLE_CALL *depot_exit)(OpenTTDVehicle *, int32_t, int32_t) noexcept;
 	void (OPENTTD_VEHICLE_CALL *crash_news)(OpenTTDVehicle *, uint32_t) noexcept;
 	uint8_t (OPENTTD_VEHICLE_CALL *shorten_factor)(const OpenTTDEngine *) noexcept;

@@ -349,14 +349,6 @@ pub struct DepotResult {
 
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct DepotOrder {
-    pub dest: u32,
-    pub order_type: u8,
-    pub nonstop: u8,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy)]
 pub struct ArrivalRead {
     pub had_vehicle_of_type: u8,
     pub bus: bool,
@@ -460,7 +452,6 @@ pub struct Leaves {
     pub begin_loading_at: extern "C" fn(VehicleRef, u16),
     pub overtake_read: extern "C" fn(VehicleRef) -> OvertakeRead,
     pub sound_read: extern "C" fn(VehicleRef) -> SoundRead,
-    pub depot_order: extern "C" fn(VehicleRef) -> DepotOrder,
     pub depot_exit: extern "C" fn(VehicleRef, i32, i32),
     pub crash_news: extern "C" fn(VehicleRef, u32),
     pub shorten_factor: extern "C" fn(crate::vehicle::EngineRef) -> u8,
@@ -1125,8 +1116,9 @@ impl Game<'_> {
         let rd = crate::road_data::entry(d.tram, self.side() + usize::from(tdir), 6);
         let (x, y) = self.tile_xy(d.tile, (rd.0 & 15, rd.1 & 15));
         if first {
-            let o = service!(self.l.depot_order)(v.v);
-            if o.order_type == OT_GOTO_DEPOT && d.tile == o.dest {
+            if service!(self.vs.order_type)(v.v) == OT_GOTO_DEPOT
+                && d.tile == service!(self.vs.dest_tile)(v.v)
+            {
                 service!(self.vs.enter_depot)(v.v);
                 return true;
             }
@@ -1727,9 +1719,8 @@ impl Game<'_> {
             return;
         }
         let depot_id = service!(self.ss.depot_index)(depot.tile);
-        let o = service!(self.l.depot_order)(v.v);
-        if o.order_type == OT_GOTO_DEPOT
-            && o.nonstop & 1 != 0
+        if service!(self.vs.order_type)(v.v) == OT_GOTO_DEPOT
+            && service!(self.vs.order_nonstop)(v.v) & 1 != 0
             && !crate::services::chance16_i(1, 20, self.random())
         {
             return;

@@ -235,11 +235,6 @@ static OpenTTDRoadSoundRead OPENTTD_VEHICLE_CALL RoadSvcSoundRead(OpenTTDVehicle
 	const RoadVehicle *u = RoadOf(v);
 	return {.sound = RoadVehInfo(u->engine_type)->sfx, .tick = RustVehicleTick(u)};
 }
-static OpenTTDRoadDepotOrder OPENTTD_VEHICLE_CALL RoadSvcDepotOrder(OpenTTDVehicle *v) noexcept
-{
-	const RoadVehicle *u = RoadOf(v);
-	return {.dest = RustVehicleDestTile(u), .order_type = RustVehicleOrderType(u), .nonstop = u->current_order.GetNonStopType().base()};
-}
 /** The depot exit tail of `RoadVehLeaveDepot` after the state and frame stores. */
 static void OPENTTD_VEHICLE_CALL RoadSvcDepotExit(OpenTTDVehicle *v, int32_t x, int32_t y) noexcept
 {
@@ -383,7 +378,6 @@ static const OpenTTDRoadLeaves &GetRoadLeaves()
 		.begin_loading_at = RoadSvcBeginLoadingAt,
 		.overtake_read = RoadSvcOvertakeRead,
 		.sound_read = RoadSvcSoundRead,
-		.depot_order = RoadSvcDepotOrder,
 		.depot_exit = RoadSvcDepotExit,
 		.crash_news = RoadSvcCrashNews,
 		.shorten_factor = RoadSvcShortenFactor,

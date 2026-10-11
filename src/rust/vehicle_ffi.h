@@ -89,6 +89,7 @@ struct OpenTTDVehicleServices {
 	uint32_t (OPENTTD_VEHICLE_CALL *dest_tile)(OpenTTDVehicle *) noexcept;
 	uint8_t (OPENTTD_VEHICLE_CALL *order_type)(OpenTTDVehicle *) noexcept;
 	uint16_t (OPENTTD_VEHICLE_CALL *order_destination)(OpenTTDVehicle *) noexcept;
+	uint8_t (OPENTTD_VEHICLE_CALL *order_nonstop)(OpenTTDVehicle *) noexcept;
 };
 struct OpenTTDGroundMoved {
 	int32_t old_z;

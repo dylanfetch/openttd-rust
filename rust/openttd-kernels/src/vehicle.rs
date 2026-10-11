@@ -169,6 +169,7 @@ pub struct VehicleServices {
     pub dest_tile: extern "C" fn(VehicleRef) -> u32,
     pub order_type: extern "C" fn(VehicleRef) -> u8,
     pub order_destination: extern "C" fn(VehicleRef) -> u16,
+    pub order_nonstop: extern "C" fn(VehicleRef) -> u8,
 }
 
 /// Position step result: `UpdateInclination`'s old height, then the new height,

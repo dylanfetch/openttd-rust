@@ -141,6 +141,7 @@ static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcProgress(OpenTTDVehicle *v) noexce
 static uint32_t OPENTTD_VEHICLE_CALL VehicleSvcDestTile(OpenTTDVehicle *v) noexcept { return RustVehicleDestTile(VehicleOf(v)); }
 static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcOrderType(OpenTTDVehicle *v) noexcept { return RustVehicleOrderType(VehicleOf(v)); }
 static uint16_t OPENTTD_VEHICLE_CALL VehicleSvcOrderDestination(OpenTTDVehicle *v) noexcept { return RustVehicleOrderDestination(VehicleOf(v)); }
+static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcOrderNonStop(OpenTTDVehicle *v) noexcept { return RustVehicleOrderNonStop(VehicleOf(v)); }
 static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcDirection(OpenTTDVehicle *v) noexcept { return RustVehicleDirection(VehicleOf(v)); }
 static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcStatus(OpenTTDVehicle *v) noexcept { return RustVehicleStatus(VehicleOf(v)); }
 static uint32_t OPENTTD_VEHICLE_CALL VehicleSvcTile(OpenTTDVehicle *v) noexcept { return RustVehicleTile(VehicleOf(v)); }
@@ -205,6 +206,7 @@ const OpenTTDVehicleServices &GetRustVehicleServices() noexcept
 		.dest_tile = VehicleSvcDestTile,
 		.order_type = VehicleSvcOrderType,
 		.order_destination = VehicleSvcOrderDestination,
+		.order_nonstop = VehicleSvcOrderNonStop,
 	};
 	return services;
 }
