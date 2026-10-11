@@ -79,6 +79,19 @@ CHECK_TOWN_FIELD(unwanted); CHECK_TOWN_FIELD(exclusivity); CHECK_TOWN_FIELD(excl
 #undef CHECK_TOWN_FIELD
 #endif
 
+#ifdef WITH_RUST
+struct TownGrowthFields {
+	uint16_t counter = 0, rate = 0;
+	uint8_t funding = 0, road = 0;
+	TownFlags flags{};
+};
+static_assert(sizeof(TownGrowthFields) == sizeof(OpenTTDTownGrowthFields));
+static_assert(alignof(TownGrowthFields) == alignof(OpenTTDTownGrowthFields));
+#define CHECK_TOWN_GROWTH_FIELD(field) static_assert(offsetof(TownGrowthFields, field) == offsetof(OpenTTDTownGrowthFields, field))
+CHECK_TOWN_GROWTH_FIELD(counter); CHECK_TOWN_GROWTH_FIELD(rate); CHECK_TOWN_GROWTH_FIELD(funding); CHECK_TOWN_GROWTH_FIELD(road); CHECK_TOWN_GROWTH_FIELD(flags);
+#undef CHECK_TOWN_GROWTH_FIELD
+#endif
+
 /** Data structure with cached data of towns. */
 struct TownCache {
 	uint32_t num_houses = 0; ///< Amount of houses
@@ -117,6 +130,7 @@ struct RustTownCache {
 struct Town : TownPool::PoolItem<&_town_pool> {
 #ifdef WITH_RUST
 	RustTownOwner growth_owner{openttd_rust_town_new()};
+	TownGrowthFields &growth = *new (openttd_rust_town_growth(growth_owner.get())) TownGrowthFields();
 	TownSimulationFields &simulation = *new (openttd_rust_town_simulation(growth_owner.get())) TownSimulationFields();
 	TileIndex &xy = simulation.xy;
 	RustTownCache cache{simulation, growth_owner.get()};
@@ -134,7 +148,7 @@ struct Town : TownPool::PoolItem<&_town_pool> {
 	mutable std::string cached_name{}; ///< NOSAVE: Cache of the resolved name of the town, if not using a custom town name
 
 #ifdef WITH_RUST
-	RustTownFlags<TownFlags, TownFlag> flags{growth_owner.get()};
+	TownFlags &flags = growth.flags;
 #else
 	TownFlags flags{}; ///< See #TownFlags.
 #endif
@@ -267,10 +281,10 @@ struct Town : TownPool::PoolItem<&_town_pool> {
 #endif
 
 #ifdef WITH_RUST
-	RustTownScalar<uint16_t, 0> grow_counter{growth_owner.get()};
-	RustTownScalar<uint16_t, 1> growth_rate{growth_owner.get()};
-	RustTownScalar<uint8_t, 2> fund_buildings_months{growth_owner.get()};
-	RustTownScalar<uint8_t, 3> road_build_months{growth_owner.get()};
+	uint16_t &grow_counter = growth.counter;
+	uint16_t &growth_rate = growth.rate;
+	uint8_t &fund_buildings_months = growth.funding;
+	uint8_t &road_build_months = growth.road;
 #else
 	uint16_t grow_counter = 0; ///< counter to count when to grow, value is smaller than or equal to growth_rate
 	uint16_t growth_rate = 0; ///< town growth rate

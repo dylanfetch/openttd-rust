@@ -39,8 +39,8 @@ static inline uint64_t TownProtocolLeaf(uint32_t op, uint32_t id, uint32_t a, ui
 	switch (op) {
 		case 8: { uint32_t previous = w.company; w.company = a; return previous; }
 		case 10: w.writes.push_back({id, a, b, c}); break;
-		case 13: w.houses += a; break;
-		case 14: w.population += a; break;
+		case 13: w.houses += a; openttd_rust_town_simulation(w.owner)->num_houses += a; break;
+		case 14: w.population += a; openttd_rust_town_simulation(w.owner)->population += a; break;
 		case 17: return 1;
 		case 20: return UINT32_MAX;
 	}
@@ -55,7 +55,6 @@ static inline float TownProtocolTrig(uint32_t, float x) noexcept { return x; }
 static inline uint32_t TownProtocolIndustry(int32_t, int32_t, uint32_t *) noexcept { return 0; }
 
 static inline void TownProtocol_settings(uint32_t *v) noexcept { TownProtocolObserve(0, 0, v); }
-static inline void TownProtocol_town(uint32_t id, uint32_t *v) noexcept { TownProtocolObserve(1, id, v); }
 static inline void TownProtocol_tile(uint32_t id, uint32_t *v) noexcept { TownProtocolObserve(2, id, v); }
 static inline void TownProtocol_house(uint32_t id, uint32_t *v) noexcept { TownProtocolObserve(3, id, v); }
 static inline void TownProtocol_road_info(uint32_t id, uint32_t *v) noexcept { TownProtocolObserve(4, id, v); }
@@ -91,14 +90,13 @@ static inline bool TownProtocol_build_tunnel(uint32_t, uint32_t, uint32_t) noexc
 static inline void TownProtocol_clear_house_land(uint32_t) noexcept { town_protocol_world->clears++; }
 static inline bool TownProtocol_allow_construction(uint32_t, uint32_t, uint32_t, uint32_t) noexcept
 {
-	openttd_rust_town_set(town_protocol_world->owner, 4, 0x88); return true;
+	openttd_rust_town_growth(town_protocol_world->owner)->flags = 0x88; return true;
 }
 static inline void TownProtocol_construction_animation(uint32_t) noexcept { town_protocol_world->animations++; }
 static inline OpenTTDTownLeaves TownProtocolServices()
 {
 	return {
 		.settings = TownProtocol_settings,
-		.town = TownProtocol_town,
 		.tile = TownProtocol_tile,
 		.house = TownProtocol_house,
 		.road_info = TownProtocol_road_info,
@@ -141,6 +139,7 @@ template <typename Check> void CheckTownProtocol(Check check)
 	 * expansion tries 25 times; reentry mutates the canonical owner's flags. */
 	auto owner = std::unique_ptr<OpenTTDTownState, decltype(&openttd_rust_town_destroy)>(openttd_rust_town_new(), openttd_rust_town_destroy);
 	TownProtocolWorld w{}; w.owner = owner.get(); town_protocol_world = &w;
+	auto *fields = openttd_rust_town_simulation(owner.get()); fields->xy = 2080; std::fill_n(fields->radius, 5, 100);
 	const auto leaves = TownProtocolServices();
 	const OpenTTDSharedServices services{nullptr, TownProtocolRandom, TownProtocolTile, TownProtocolWrite, TownProtocolTrig, TownProtocolIndustry};
 	check(!openttd_rust_town_grow(&leaves, &services, 0, 1) && w.draws == 0 && w.company == 7);
@@ -150,7 +149,7 @@ template <typename Check> void CheckTownProtocol(Check check)
 	check(w.clears == 25 * 13 && w.company == 7 && w.draws == 1);
 	w.clear_ok = true; w.house_callback = true;
 	check(openttd_rust_town_try_house(&leaves, &services, 0, 2080, 1));
-	check(w.houses == 1 && w.writes.size() == 1 && w.animations == 1 && openttd_rust_town_get(owner.get(), 4) == 0x88);
+	check(w.houses == 1 && w.writes.size() == 1 && w.animations == 1 && openttd_rust_town_growth(owner.get())->flags == 0x88);
 	w.writes.clear(); w.house_callback = false; w.clears = 0; w.animations = 0;
 	openttd_rust_town_build_house(&leaves, &services, 0, 2080, 1, 43, true, true);
 	check(w.clears == 4 && w.animations == 4 && w.writes.size() == 4);

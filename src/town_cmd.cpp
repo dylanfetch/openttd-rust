@@ -931,19 +931,6 @@ static void RustTownSettings(uint32_t *v) noexcept
 			v[16] = TimerGameCalendar::date.base(); v[17] = CalendarTime::MAX_DATE.base();
 			return;
 }
-static void RustTownTown(uint32_t id, uint32_t *v) noexcept
-{
-	std::fill_n(v, 32, 0);
-	{
-			const Town *t = Town::Get(TownID(id));
-			v[0] = t->xy.base(); v[1] = t->index.base(); v[2] = t->cache.num_houses; v[3] = t->cache.population;
-			v[4] = t->layout; v[5] = t->larger_town;
-			std::ranges::copy(t->cache.squared_town_zone_radius, v + 6);
-			std::ranges::copy(t->goal, v + 11);
-			for (uint i = 0; i < NUM_TAE; i++) v[17 + i] = t->received[i].old_act;
-			return;
-		}
-}
 static void RustTownTile(uint32_t id, uint32_t *v) noexcept
 {
 	std::fill_n(v, 32, 0);
@@ -1151,7 +1138,6 @@ static const OpenTTDTownLeaves &GetRustTownServices()
 {
 	static const OpenTTDTownLeaves services{
 		.settings = RustTownSettings,
-		.town = RustTownTown,
 		.tile = RustTownTile,
 		.house = RustTownHouse,
 		.road_info = RustTownRoadInfo,

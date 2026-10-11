@@ -16,27 +16,6 @@ struct RustTownDelete {
 };
 using RustTownOwner = std::unique_ptr<OpenTTDTownState, RustTownDelete>;
 
-template <typename T, uint8_t Field>
-struct RustTownScalar {
-	OpenTTDTownState *owner;
-	operator T() const { return static_cast<T>(openttd_rust_town_get(this->owner, Field)); }
-	RustTownScalar &operator=(T value) { openttd_rust_town_set(this->owner, Field, value); return *this; }
-	T operator--(int) { T value = *this; *this = value - 1; return value; }
-};
-
-template <typename Flags, typename Flag>
-struct RustTownFlags {
-	OpenTTDTownState *owner;
-	operator Flags() const { return Flags(static_cast<uint8_t>(openttd_rust_town_get(this->owner, 4))); }
-	uint8_t base() const { return static_cast<Flags>(*this).base(); }
-	bool Test(Flag flag) const { return static_cast<Flags>(*this).Test(flag); }
-	bool Any(Flags flags) const { return static_cast<Flags>(*this).Any(flags); }
-	void Set(Flags flags) { Flags value = *this; value.Set(flags); openttd_rust_town_set(this->owner, 4, value.base()); }
-	void Set(Flag flag) { this->Set(Flags(flag)); }
-	void Reset(Flags flags) { Flags value = *this; value.Reset(flags); openttd_rust_town_set(this->owner, 4, value.base()); }
-	void Reset(Flag flag) { this->Reset(Flags(flag)); }
-	void Reset() { openttd_rust_town_set(this->owner, 4, 0); }
-};
 /** Nonowning native views of the sole Rust supplied-history vector. Native
  * trivial slot lifetimes start on insertion; Rust alone allocates and frees. */
 template <typename T> class RustTownSupplied {

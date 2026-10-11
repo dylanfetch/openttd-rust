@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <cstddef>
 struct OpenTTDTownState;
+struct OpenTTDTownGrowthFields { uint16_t counter, rate; uint8_t funding, road, flags; };
 struct OpenTTDTownReceived { uint16_t old_max, new_max, old_act, new_act; };
 struct OpenTTDTownSimulationFields {
 	uint64_t valid_history;
@@ -29,7 +30,6 @@ struct OpenTTDTownSlots { void *data; size_t size; };
 struct OpenTTDTownCommandResult { int64_t cost; bool success; };
 struct OpenTTDTownLeaves {
 	void (*settings)(uint32_t *) noexcept;
-	void (*town)(uint32_t, uint32_t *) noexcept;
 	void (*tile)(uint32_t, uint32_t *) noexcept;
 	void (*house)(uint32_t, uint32_t *) noexcept;
 	void (*road_info)(uint32_t, uint32_t *) noexcept;
@@ -85,8 +85,7 @@ void openttd_rust_town_increase_building(OpenTTDTownState *, uint16_t, uint16_t)
 void openttd_rust_town_decrease_building(OpenTTDTownState *, uint16_t, uint16_t);
 OpenTTDTownState *openttd_rust_town_new();
 void openttd_rust_town_destroy(OpenTTDTownState *);
-uint16_t openttd_rust_town_get(const OpenTTDTownState *, uint8_t);
-void openttd_rust_town_set(OpenTTDTownState *, uint8_t, uint16_t);
+OpenTTDTownGrowthFields *openttd_rust_town_growth(OpenTTDTownState *);
 bool openttd_rust_town_grow(const OpenTTDTownLeaves *, const OpenTTDSharedServices *, uint32_t town, uint32_t modes);
 bool openttd_rust_town_try_house(const OpenTTDTownLeaves *, const OpenTTDSharedServices *, uint32_t town, uint32_t tile, uint32_t modes);
 void openttd_rust_town_build_house(const OpenTTDTownLeaves *, const OpenTTDSharedServices *, uint32_t town, uint32_t tile, uint32_t house, uint32_t random, bool complete, bool is_protected);

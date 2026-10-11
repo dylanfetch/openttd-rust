@@ -135,7 +135,6 @@ static void WriteTile(void *, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, 
 static float Trig(uint32_t, float value) noexcept { return value; }
 static uint32_t Industry(int32_t, int32_t, uint32_t *) noexcept { return 0; }
 static void Read_settings(uint32_t *v) noexcept { Observe(0, 0, v); }
-static void Read_town(uint32_t id, uint32_t *v) noexcept { Observe(1, id, v); }
 static void Read_tile(uint32_t id, uint32_t *v) noexcept { Observe(2, id, v); }
 static void Read_house(uint32_t id, uint32_t *v) noexcept { Observe(3, id, v); }
 static void Read_road_info(uint32_t id, uint32_t *v) noexcept { Observe(4, id, v); }
@@ -144,8 +143,9 @@ static bool BuildRoad(uint32_t town, uint32_t tile, uint32_t bits, uint32_t type
 static bool BuildTunnel(uint32_t tile, uint32_t type, uint32_t execute) noexcept { return TunnelCommand(tile, type, execute != 0).Succeeded(); }
 static bool Candidate()
 {
+	openttd_rust_town_simulation(world->owner)->population = world->town.cache.population;
 	const OpenTTDTownLeaves leaves{
-		.settings = Read_settings, .town = Read_town, .tile = Read_tile, .house = Read_house, .road_info = Read_road_info,
+		.settings = Read_settings, .tile = Read_tile, .house = Read_house, .road_info = Read_road_info,
 		.state = State, .stations = Stations, .road_mask = RoadTypes, .build_road = BuildRoad, .build_tunnel = BuildTunnel,
 	};
 	const OpenTTDSharedServices services{nullptr, Random, ObserveTile, WriteTile, Trig, Industry};

@@ -44,7 +44,7 @@ struct TownGrowthSaveScope {
 			this->town->growth_rate = current.rate;
 			this->town->fund_buildings_months = current.funding;
 			this->town->road_build_months = current.road;
-			openttd_rust_town_set(this->town->growth_owner.get(), 4, current.flags);
+			this->town->flags = TownFlags(current.flags);
 		}
 		current = this->previous;
 	}

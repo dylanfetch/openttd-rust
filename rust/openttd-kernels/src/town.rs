@@ -105,17 +105,22 @@ pub struct Slots {
     pub data: *mut c_void,
     pub size: usize,
 }
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct GrowthFields {
+    pub counter: u16,
+    pub rate: u16,
+    pub funding: u8,
+    pub road: u8,
+    pub flags: u8,
+}
 #[derive(Default)]
 pub struct State {
     simulation: SimulationFields,
     supplied: Vec<Supplied>,
     id_counts: Vec<u16>,
     class_counts: Vec<u16>,
-    counter: u16,
-    rate: u16,
-    funding: u8,
-    road: u8,
-    flags: u8,
+    growth: GrowthFields,
 }
 #[unsafe(no_mangle)]
 pub extern "C" fn openttd_rust_town_new() -> *mut State {
@@ -129,28 +134,9 @@ pub unsafe extern "C" fn openttd_rust_town_destroy(state: *mut State) {
     }
 }
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_town_get(state: *const State, field: u8) -> u16 {
-    // SAFETY: Serialized live owner; this borrow ends before returning to C++.
-    let state = unsafe { &*state };
-    match field {
-        0 => state.counter,
-        1 => state.rate,
-        2 => u16::from(state.funding),
-        3 => u16::from(state.road),
-        _ => u16::from(state.flags),
-    }
-}
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_town_set(state: *mut State, field: u8, value: u16) {
-    // SAFETY: Serialized live owner; no reference survives this immediate write.
-    let state = unsafe { &mut *state };
-    match field {
-        0 => state.counter = value,
-        1 => state.rate = value,
-        2 => state.funding = value as u8,
-        3 => state.road = value as u8,
-        _ => state.flags = value as u8,
-    }
+pub unsafe extern "C" fn openttd_rust_town_growth(state: *mut State) -> *mut GrowthFields {
+    // SAFETY: Stable owner allocation; native trivial aliases live until destruction.
+    unsafe { &raw mut (*state).growth }
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_town_simulation(state: *mut State) -> *mut SimulationFields {
@@ -307,11 +293,56 @@ pub unsafe extern "C" fn openttd_rust_town_decrease_building(
         }
     });
 }
+struct HouseCandidates {
+    slots: [std::mem::MaybeUninit<(u32, u32)>; 4096],
+    len: usize,
+}
+thread_local! {
+    static HOUSE_CANDIDATES: UnsafeCell<HouseCandidates> = const { UnsafeCell::new(HouseCandidates {
+        slots: [std::mem::MaybeUninit::uninit(); 4096], len: 0,
+    }) };
+}
+fn clear_house_candidates() {
+    HOUSE_CANDIDATES.with(|cell| unsafe {
+        (*cell.get()).len = 0;
+    });
+}
+fn add_house_candidate(house: u32, weight: u32) {
+    HOUSE_CANDIDATES.with(|cell| {
+        // SAFETY: HouseSpec's original maximum is NUM_HOUSES=4096. No callback occurs.
+        let candidates = unsafe { &mut *cell.get() };
+        candidates.slots[candidates.len].write((house, weight));
+        candidates.len += 1;
+    });
+}
+fn take_house_candidate(mut random: u32) -> (u32, u32) {
+    HOUSE_CANDIDATES.with(|cell| {
+        // SAFETY: Source's positive total guarantees an initialized weighted slot.
+        // The source's static probability vector is also replaced by reentrant builds.
+        let candidates = unsafe { &mut *cell.get() };
+        let index = (0..candidates.len)
+            .find(|&at| {
+                // SAFETY: Every slot below len was written while collecting specs.
+                let (_, weight) = unsafe { candidates.slots[at].assume_init() };
+                if weight > random {
+                    true
+                } else {
+                    random -= weight;
+                    false
+                }
+            })
+            .unwrap();
+        // SAFETY: Selected and final slots are occupied. Match source swap/pop order.
+        let selected = unsafe { candidates.slots[index].assume_init() };
+        candidates.len -= 1;
+        candidates.slots[index] = candidates.slots[candidates.len];
+        selected
+    })
+}
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct Leaves {
     pub settings: extern "C" fn(*mut u32),
-    pub town: extern "C" fn(u32, *mut u32),
     pub tile: extern "C" fn(u32, *mut u32),
     pub house: extern "C" fn(u32, *mut u32),
     pub road_info: extern "C" fn(u32, *mut u32),
@@ -358,6 +389,7 @@ struct Engine {
     leaves: Leaves,
     services: Services,
     settings: Cell<[u32; 32]>,
+    owner: *mut State,
 }
 impl Engine {
     fn tile(&self, id: u32) -> [u32; 32] {
@@ -365,10 +397,37 @@ impl Engine {
         (self.leaves.tile)(id, record.as_mut_ptr());
         record
     }
-    fn town(&self, id: u32) -> [u32; 32] {
-        let mut record = [0; 32];
-        (self.leaves.town)(id, record.as_mut_ptr());
-        record
+    fn position(&self) -> u32 {
+        // SAFETY: Stable live owner; each immediate field read ends before services.
+        unsafe { (*self.owner).simulation.xy }
+    }
+    fn num_houses(&self) -> u32 {
+        // SAFETY: Stable live owner; each immediate field read ends before services.
+        unsafe { (*self.owner).simulation.num_houses }
+    }
+    fn population(&self) -> u32 {
+        // SAFETY: Stable live owner; each immediate field read ends before services.
+        unsafe { (*self.owner).simulation.population }
+    }
+    fn layout(&self) -> u8 {
+        // SAFETY: Stable live owner; each immediate field read ends before services.
+        unsafe { (*self.owner).simulation.layout }
+    }
+    fn is_city(&self) -> bool {
+        // SAFETY: Stable live owner; each immediate field read ends before services.
+        unsafe { (*self.owner).simulation.larger_town }
+    }
+    fn radius(&self) -> [u32; 5] {
+        // SAFETY: Stable live owner; each immediate field read ends before services.
+        unsafe { (*self.owner).simulation.radius }
+    }
+    fn goals(&self) -> [u32; 6] {
+        // SAFETY: Stable live owner; each immediate field read ends before services.
+        unsafe { (*self.owner).simulation.goal }
+    }
+    fn old_received(&self, at: usize) -> u32 {
+        // SAFETY: Source bounds and immediate owner access before any callback.
+        unsafe { u32::from((*self.owner).simulation.received[at].old_act) }
     }
     fn house(&self, id: u32) -> [u32; 32] {
         let mut record = [0; 32];
@@ -380,18 +439,62 @@ impl Engine {
         (self.leaves.road_info)(id, record.as_mut_ptr());
         record
     }
-    fn get(&self, town: u32, field: u8) -> u16 {
-        // SAFETY: The pool lookup yields the source's live town owner.
-        unsafe { openttd_rust_town_get((self.leaves.state)(town), field) }
+    fn bind(mut self, town: u32) -> Self {
+        self.owner = (self.leaves.state)(town);
+        self
     }
-    fn set(&self, town: u32, field: u8, value: u16) {
-        // SAFETY: Every access is immediate; no owner reference crosses callbacks.
+    fn modify_flags(&self, clear: u16, set: u16) {
+        self.set_flags((self.flags() & !clear) | set);
+    }
+    fn counter(&self) -> u16 {
+        // SAFETY: Entry resolves its live owner once; immediate access ends here.
+        unsafe { (*self.owner).growth.counter }
+    }
+    fn set_counter(&self, value: u16) {
+        // SAFETY: No owner reference spans a callback or possible reentry.
         unsafe {
-            openttd_rust_town_set((self.leaves.state)(town), field, value);
+            (*self.owner).growth.counter = value;
         }
     }
-    fn flags(&self, town: u32, clear: u16, set: u16) {
-        self.set(town, 4, (self.get(town, 4) & !clear) | set);
+    fn rate(&self) -> u16 {
+        // SAFETY: Entry resolves its live owner once; immediate access ends here.
+        unsafe { (*self.owner).growth.rate }
+    }
+    fn set_rate(&self, value: u16) {
+        // SAFETY: No owner reference spans a callback or possible reentry.
+        unsafe {
+            (*self.owner).growth.rate = value;
+        }
+    }
+    fn funding(&self) -> u16 {
+        // SAFETY: Entry resolves its live owner once; immediate access ends here.
+        unsafe { u16::from((*self.owner).growth.funding) }
+    }
+    fn set_funding(&self, value: u16) {
+        // SAFETY: No owner reference spans a callback or possible reentry.
+        unsafe {
+            (*self.owner).growth.funding = value as u8;
+        }
+    }
+    fn road_months(&self) -> u16 {
+        // SAFETY: Entry resolves its live owner once; immediate access ends here.
+        unsafe { u16::from((*self.owner).growth.road) }
+    }
+    fn set_road(&self, value: u16) {
+        // SAFETY: No owner reference spans a callback or possible reentry.
+        unsafe {
+            (*self.owner).growth.road = value as u8;
+        }
+    }
+    fn flags(&self) -> u16 {
+        // SAFETY: Entry resolves its live owner once; immediate access ends here.
+        unsafe { u16::from((*self.owner).growth.flags) }
+    }
+    fn set_flags(&self, value: u16) {
+        // SAFETY: No owner reference spans a callback or possible reentry.
+        unsafe {
+            (*self.owner).growth.flags = value as u8;
+        }
     }
     fn chance(&self, a: u32, b: u32) -> bool {
         chance16_i(a, b, self.services.random())
@@ -412,8 +515,8 @@ impl Engine {
     fn rb(&self, tile: u32) -> u32 {
         self.tile(tile)[7]
     }
-    fn gridpos(&self, town: u32, tile: u32) -> (i32, i32) {
-        let center = self.town(town)[0];
+    fn gridpos(&self, _town: u32, tile: u32) -> (i32, i32) {
+        let center = self.position();
         let sx = self.settings.get()[0];
         (
             (center % sx) as i32 - (tile % sx) as i32,
@@ -433,7 +536,7 @@ impl Engine {
     fn clear(&self, tile: u32, execute: bool) -> bool {
         (self.leaves.clear_land)(tile, u32::from(execute))
     }
-    fn count_stations(&self, town: u32) -> u32 {
+    fn count_stations(&self, _town: u32) -> u32 {
         struct StationCount {
             engine: Engine,
             center: u32,
@@ -449,91 +552,89 @@ impl Engine {
                 count.count = count.count.wrapping_add(1);
             }
         }
-        let record = self.town(town);
+        let center = self.position();
+        let radius = self.radius()[0];
         let mut count = StationCount {
             engine: self.clone(),
-            center: record[0],
-            radius: record[6],
+            center,
+            radius,
             count: 0,
         };
-        (self.leaves.stations)(record[0], record[6] / 2, (&raw mut count).cast(), visit);
+        (self.leaves.stations)(center, radius / 2, (&raw mut count).cast(), visit);
         count.count
     }
     fn update_rate(&self, town: u32) {
-        if self.get(town, 4) & 8 != 0 {
+        if self.flags() & 8 != 0 {
             return;
         }
-        let old = self.get(town, 1);
-        let record = self.town(town);
+        let old = self.rate();
         let rates = [
             [120_u32, 120, 120, 100, 80, 60],
             [320, 420, 300, 220, 160, 100],
         ];
-        let funding = self.get(town, 2) != 0;
+        let funding = self.funding() != 0;
         let mut m = rates[usize::from(!funding)][self.count_stations(town).min(5) as usize];
         m >>= if self.settings.get()[3] == 0 {
             1
         } else {
             self.settings.get()[3] - 1
         };
-        if record[5] != 0 {
+        if self.is_city() {
             m /= 2;
         }
-        let rate = ((m / (record[2] / 50 + 1)).min(930) + 1)
+        let rate = ((m / (self.num_houses() / 50 + 1)).min(930) + 1)
             .wrapping_mul(self.settings.get()[4])
             .wrapping_sub(1) as u16;
-        self.set(town, 1, rate);
+        self.set_rate(rate);
         if rate != u16::MAX {
-            let counter = self.get(town, 0);
-            self.set(
-                town,
-                0,
-                if old == u16::MAX {
-                    rate.min(counter)
-                } else {
-                    let numerator = u32::from(counter) * (u32::from(rate) + 1);
-                    round_div(numerator as i32, u32::from(old) + 1) as u16
-                },
-            );
+            let counter = self.counter();
+            self.set_counter(if old == u16::MAX {
+                rate.min(counter)
+            } else {
+                let numerator = u32::from(counter) * (u32::from(rate) + 1);
+                round_div(numerator as i32, u32::from(old) + 1) as u16
+            });
         }
         (self.leaves.dirty_town)(town);
     }
     fn update_growth(&self, town: u32) {
         self.update_rate(town);
-        self.flags(town, 1, 0);
+        self.modify_flags(1, 0);
         (self.leaves.dirty_town)(town);
-        let funding = self.get(town, 2) != 0;
+        let funding = self.funding() != 0;
         if self.settings.get()[3] == 0 && !funding {
             return;
         }
-        let t = self.town(town);
         if !funding {
             for i in 0..6 {
-                match t[11 + i] {
+                match self.goals()[i] {
                     0xffff_fffe => {
-                        if (self.leaves.tile_height)(t[0]) >= self.settings.get()[5]
-                            && t[17 + i] == 0
-                            && t[3] > 90
+                        if (self.leaves.tile_height)(self.position()) >= self.settings.get()[5]
+                            && self.old_received(i) == 0
+                            && self.population() > 90
                         {
                             return;
                         }
                     }
                     u32::MAX => {
-                        if (self.leaves.tropic_zone)(t[0]) == 1 && t[17 + i] == 0 && t[3] > 60 {
+                        if (self.leaves.tropic_zone)(self.position()) == 1
+                            && self.old_received(i) == 0
+                            && self.population() > 60
+                        {
                             return;
                         }
                     }
                     goal => {
-                        if goal > t[17 + i] {
+                        if goal > self.old_received(i) {
                             return;
                         }
                     }
                 }
             }
         }
-        if self.get(town, 4) & 8 != 0 {
-            if self.get(town, 1) != u16::MAX {
-                self.flags(town, 0, 1);
+        if self.flags() & 8 != 0 {
+            if self.rate() != u16::MAX {
+                self.modify_flags(0, 1);
             }
             (self.leaves.dirty_town)(town);
             return;
@@ -541,7 +642,7 @@ impl Engine {
         if !funding && self.count_stations(town) == 0 && !self.chance(1, 12) {
             return;
         }
-        self.flags(town, 0, 1);
+        self.modify_flags(0, 1);
         (self.leaves.dirty_town)(town);
     }
 }
@@ -565,6 +666,7 @@ fn engine(leaves: *const Leaves, services: *const Services) -> Engine {
         leaves,
         services,
         settings: Cell::new(settings),
+        owner: std::ptr::null_mut(),
     }
 }
 fn round_div(a: i32, b: u32) -> i32 {
@@ -640,7 +742,7 @@ impl Engine {
         } else {
             self.tile(tile)[1]
         };
-        let ret = !self.neighbour_road(tile, dir, if self.town(town)[4] == 0 { 1 } else { 2 });
+        let ret = !self.neighbour_road(tile, dir, if self.layout() == 0 { 1 } else { 2 });
         if slope == 0 {
             return ret;
         }
@@ -687,7 +789,7 @@ impl Engine {
     }
     fn grid(&self, town: u32, tile: u32, dir: u32) -> u32 {
         let (x, y) = self.gridpos(town, tile);
-        let spacing = if self.town(town)[4] == 2 { 3 } else { 4 };
+        let spacing = if self.layout() == 2 { 3 } else { 4 };
         let bits = if x % spacing == 0 { 5 } else { 0 } | if y % spacing == 0 { 10 } else { 0 };
         if bits != 15 {
             return bits;
@@ -749,11 +851,7 @@ impl Engine {
             }
             _ => {}
         }
-        (
-            (self.leaves.build_road)(town, next, bit(reverse(dir)), rt, 0),
-            0_i64,
-        )
-            .0
+        (self.leaves.build_road)(town, next, bit(reverse(dir)), rt, 0)
     }
     fn bridge(&self, town: u32, tile: u32, dir: u32) -> bool {
         let slope = self.tile(tile)[1];
@@ -763,7 +861,7 @@ impl Engine {
         if self.rb(self.step(tile, reverse(dir))) & bit(dir) == 0 {
             return false;
         }
-        let max = (self.town(town)[3] / 1000 + 5).min(11);
+        let max = (self.population() / 1000 + 5).min(11);
         let mut length = 0;
         let mut end = tile;
         loop {
@@ -832,7 +930,7 @@ impl Engine {
                 }
                 test = self.step(test, dir);
             }
-            self.town(town)[3] / 1000 + 7
+            self.population() / 1000 + 7
         } else {
             5
         };
@@ -911,7 +1009,7 @@ impl Engine {
 impl Engine {
     fn in_tile(&self, town: u32, tile: &mut u32, cur: u32, mut dir: u32, modes: u32) -> u32 {
         let at = *tile;
-        let layout = self.town(town)[4];
+        let layout = self.layout();
         let mut bits;
         if cur == 0 {
             if modes & 2 == 0 || (self.settings.get()[8] == 0 && self.tile(at)[0] == 1) {
@@ -1041,13 +1139,12 @@ impl Engine {
         1
     }
     fn at_road(&self, town: u32, mut tile: u32, modes: u32) -> bool {
-        let t = self.town(town);
-        let factor = match t[4] {
+        let factor = match self.layout() {
             1 => 2,
             2 | 3 => 1,
             _ => 4,
         };
-        let mut iterations = (10 + t[2].wrapping_mul(factor) / 9) as i32;
+        let mut iterations = (10 + self.num_houses().wrapping_mul(factor) / 9) as i32;
         let mut dir = 4;
         loop {
             let mut cur = self.rb(tile);
@@ -1116,10 +1213,9 @@ impl Engine {
             (2, -2),
             (0, 0),
         ];
-        // Company replacement is a shared scalar leaf; the C++ invocation facade
-        // additionally restores it on command exceptions while dropping the task.
+        // Ordinary shared commands are noexcept; restore the original company on each return.
         let company = (self.leaves.exchange_company)(self.settings.get()[11]);
-        let mut tile = self.town(town)[0];
+        let mut tile = self.position();
         for (x, y) in OFFSETS {
             if self.rb(tile) != 0 {
                 let result = self.at_road(town, tile, modes);
@@ -1129,7 +1225,7 @@ impl Engine {
             tile = self.offset(tile, x, y);
         }
         if modes & 2 != 0 {
-            tile = self.town(town)[0];
+            tile = self.position();
             for (x, y) in OFFSETS {
                 let t = self.tile(tile);
                 if t[0] != 3 && t[1] == 0 && self.clear(tile, false) {
@@ -1158,7 +1254,7 @@ impl Engine {
             return true;
         }
         let (x, y) = self.gridpos(town, tile);
-        match self.town(town)[4] {
+        match self.layout() {
             2 => {
                 if square {
                     matches!(x % 3, 2 | -1) && matches!(y % 3, 2 | -1)
@@ -1349,14 +1445,14 @@ impl Engine {
         let t = self.tile(base);
         let slope = t[1];
         let maxz = t[2];
-        let center = self.town(town);
-        let distance = self.distance(center[0], base);
+        let distance = self.distance(self.position(), base);
+        let radius = self.radius();
         let mut zone = 0;
-        if self.get(town, 2) != 0 && distance <= 25 {
+        if self.funding() != 0 && distance <= 25 {
             zone = 4;
         } else {
-            for i in 0..5 {
-                if distance < center[6 + i] {
+            for (i, r) in radius.iter().enumerate() {
+                if distance < *r {
                     zone = i as u32;
                 }
             }
@@ -1374,7 +1470,7 @@ impl Engine {
             _ => 15,
         };
         let zones = (1 << zone) | (1 << climate);
-        let mut probs = Vec::new();
+        clear_house_candidates();
         let mut max = 0_u32;
         for house in 0..(self.leaves.house_count)() {
             let h = self.house(house);
@@ -1385,23 +1481,11 @@ impl Engine {
                 continue;
             }
             max = max.wrapping_add(h[5]);
-            probs.push((house, h[5]));
+            add_house_candidate(house, h[5]);
         }
         while max > 0 {
             let mut tile = base;
-            let mut r = self.services.random_range(max);
-            let index = probs
-                .iter()
-                .position(|(_, weight)| {
-                    if *weight > r {
-                        true
-                    } else {
-                        r -= *weight;
-                        false
-                    }
-                })
-                .unwrap();
-            let (house, weight) = probs.swap_remove(index);
+            let (house, weight) = take_house_candidate(self.services.random_range(max));
             max -= weight;
             let h = self.house(house);
             if self.settings.get()[7] == 0 && self.settings.get()[6] == 0 && h[3] & 1 != 0 {
@@ -1418,7 +1502,7 @@ impl Engine {
             } else {
                 0
             };
-            if self.get(town, 4) & oneof != 0 {
+            if self.flags() & oneof != 0 {
                 continue;
             }
             let noslope = h[2] & 2 != 0;
@@ -1430,15 +1514,11 @@ impl Engine {
             }
             let random = u32::from(self.services.random() as u8);
             if self.house(house)[10] != 0
-                && !(
-                    (self.leaves.allow_construction)(town, tile, house, random),
-                    0_i64,
-                )
-                    .0
+                && !(self.leaves.allow_construction)(town, tile, house, random)
             {
                 continue;
             }
-            self.flags(town, 0, oneof);
+            self.modify_flags(0, oneof);
             self.build_house(
                 town,
                 tile,
@@ -1452,25 +1532,25 @@ impl Engine {
         false
     }
     fn tick(&self, town: u32) {
-        if self.get(town, 4) & 1 == 0 {
+        if self.flags() & 1 == 0 {
             return;
         }
         let modes = 1 | if self.settings.get()[15] != 0 { 2 } else { 0 };
-        let mut counter = i32::from(self.get(town, 0)) - 1;
+        let mut counter = i32::from(self.counter()) - 1;
         if counter < 0 {
             counter = i32::from(if self.grow(town, modes) {
-                self.get(town, 1)
+                self.rate()
             } else {
-                self.get(town, 1).min((self.settings.get()[4] - 1) as u16)
+                self.rate().min((self.settings.get()[4] - 1) as u16)
             });
         }
-        self.set(town, 0, counter as u16);
+        self.set_counter(counter as u16);
     }
     fn expand(&self, town: u32, amount: u32, modes: u32) {
         if amount == 0 {
             let amount = self
                 .services
-                .random_range((self.town(town)[2] / 10).min(u32::from(u16::MAX)))
+                .random_range((self.num_houses() / 10).min(u32::from(u16::MAX)))
                 + 3;
             (self.leaves.change_house_count)(town, amount);
             (self.leaves.update_radius)(town);
@@ -1494,50 +1574,42 @@ impl Engine {
         if self.settings.get()[6] == 0 {
             let mut id = (self.leaves.next_town)(0);
             while id != u32::MAX {
-                self.tick(id);
+                self.clone().bind(id).tick(id);
                 id = (self.leaves.next_town)(id + 1);
             }
         }
     }
-    fn monthly_counters(&self, town: u32) {
-        for field in [3, 2] {
-            let months = self.get(town, field);
-            if months != 0 {
-                self.set(town, field, months - 1);
-            }
+    fn monthly_counters(&self, _town: u32) {
+        if self.road_months() != 0 {
+            self.set_road(self.road_months() - 1);
+        }
+        if self.funding() != 0 {
+            self.set_funding(self.funding() - 1);
         }
     }
     fn custom_rate(&self, town: u32, a: u32) {
         if a == 0 {
-            self.flags(town, 8, 0);
+            self.modify_flags(8, 0);
         } else {
-            let old = u32::from(self.get(town, 1));
-            let counter = u32::from(self.get(town, 0));
-            self.set(
-                town,
-                0,
-                if counter >= old {
-                    a as u16
-                } else {
-                    (counter * a / old) as u16
-                },
-            );
-            self.set(town, 1, a as u16);
-            self.flags(town, 0, 8);
+            let old = u32::from(self.rate());
+            let counter = u32::from(self.counter());
+            self.set_counter(if counter >= old {
+                a as u16
+            } else {
+                (counter * a / old) as u16
+            });
+            self.set_rate(a as u16);
+            self.modify_flags(0, 8);
         }
         self.update_growth(town);
     }
     fn fund(&self, town: u32) {
-        self.set(town, 2, 3);
+        self.set_funding(3);
         self.update_growth(town);
-        let counter = i32::from(self.get(town, 0));
-        let rate = i32::from(self.get(town, 1));
+        let counter = i32::from(self.counter());
+        let rate = i32::from(self.rate());
         let ticks = self.settings.get()[4] as i32;
-        self.set(
-            town,
-            0,
-            (counter.min(2 * ticks - (rate - counter) % ticks)) as u16,
-        );
+        self.set_counter((counter.min(2 * ticks - (rate - counter) % ticks)) as u16);
     }
 }
 #[unsafe(no_mangle)]
@@ -1547,7 +1619,7 @@ pub unsafe extern "C" fn openttd_rust_town_grow(
     town: u32,
     modes: u32,
 ) -> bool {
-    engine(leaves, services).grow(town, modes)
+    engine(leaves, services).bind(town).grow(town, modes)
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_town_try_house(
@@ -1557,7 +1629,9 @@ pub unsafe extern "C" fn openttd_rust_town_try_house(
     tile: u32,
     modes: u32,
 ) -> bool {
-    engine(leaves, services).try_house(town, tile, modes)
+    engine(leaves, services)
+        .bind(town)
+        .try_house(town, tile, modes)
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_town_build_house(
@@ -1570,7 +1644,9 @@ pub unsafe extern "C" fn openttd_rust_town_build_house(
     complete: bool,
     protected: bool,
 ) {
-    engine(leaves, services).build_house(town, tile, house, random, complete, protected);
+    engine(leaves, services)
+        .bind(town)
+        .build_house(town, tile, house, random, complete, protected);
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_town_tick_all(
@@ -1585,7 +1661,7 @@ pub unsafe extern "C" fn openttd_rust_town_update_rate(
     services: *const Services,
     town: u32,
 ) {
-    engine(leaves, services).update_rate(town);
+    engine(leaves, services).bind(town).update_rate(town);
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_town_update_growth(
@@ -1593,7 +1669,7 @@ pub unsafe extern "C" fn openttd_rust_town_update_growth(
     services: *const Services,
     town: u32,
 ) {
-    engine(leaves, services).update_growth(town);
+    engine(leaves, services).bind(town).update_growth(town);
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_town_expand(
@@ -1603,7 +1679,9 @@ pub unsafe extern "C" fn openttd_rust_town_expand(
     amount: u32,
     modes: u32,
 ) {
-    engine(leaves, services).expand(town, amount, modes);
+    engine(leaves, services)
+        .bind(town)
+        .expand(town, amount, modes);
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_town_monthly_counters(
@@ -1611,7 +1689,7 @@ pub unsafe extern "C" fn openttd_rust_town_monthly_counters(
     services: *const Services,
     town: u32,
 ) {
-    engine(leaves, services).monthly_counters(town);
+    engine(leaves, services).bind(town).monthly_counters(town);
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_town_custom_rate(
@@ -1620,7 +1698,7 @@ pub unsafe extern "C" fn openttd_rust_town_custom_rate(
     town: u32,
     rate: u32,
 ) {
-    engine(leaves, services).custom_rate(town, rate);
+    engine(leaves, services).bind(town).custom_rate(town, rate);
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_town_fund(
@@ -1628,7 +1706,7 @@ pub unsafe extern "C" fn openttd_rust_town_fund(
     services: *const Services,
     town: u32,
 ) {
-    engine(leaves, services).fund(town);
+    engine(leaves, services).bind(town).fund(town);
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_town_road_type(
@@ -1645,5 +1723,5 @@ pub unsafe extern "C" fn openttd_rust_town_tunnel(
     tile: u32,
     dir: u32,
 ) -> bool {
-    engine(leaves, services).tunnel(town, tile, dir)
+    engine(leaves, services).bind(town).tunnel(town, tile, dir)
 }
