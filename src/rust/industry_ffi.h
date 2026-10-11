@@ -17,6 +17,7 @@ extern "C" {
 #endif
 typedef struct Industry OpenTTDIndustryShell;
 typedef struct EffectVehicle OpenTTDEffectVehicle;
+typedef struct IndustryTileSpec OpenTTDIndustryTileSpec;
 typedef struct OpenTTDIndustry OpenTTDIndustry;
 typedef struct OpenTTDIndustryBuilder OpenTTDIndustryBuilder;
 typedef struct OpenTTDIndustryFields {
@@ -295,7 +296,49 @@ void openttd_rust_industry_daily_start(OpenTTDIndustryBuilder *builder, uint32_t
 void openttd_rust_industry_daily(OpenTTDIndustryBuilder *builder, const OpenTTDIndustryServices *services);
 void openttd_rust_industry_monthly(OpenTTDIndustryBuilder *builder, const OpenTTDIndustryServices *services);
 void openttd_rust_industry_build_type_reset(OpenTTDIndustryBuildFields *fields);
-uint8_t openttd_rust_industry_command(uint16_t id, uint8_t production, uint8_t execute, uint8_t value, const OpenTTDIndustryServices *services);
+/** Temporary stack-cost adapter; replaced by canonical town services after #216. */
+typedef struct CommandCost OpenTTDIndustryCost;
+typedef struct OpenTTDIndustryCostServices {
+	void (*zero)(OpenTTDIndustryCost *) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*error)(OpenTTDIndustryCost *, uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*expense_money)(OpenTTDIndustryCost *, uint8_t, int64_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*error_param)(OpenTTDIndustryCost *, uint32_t, uint64_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*add)(OpenTTDIndustryCost *, OpenTTDIndustryCost *) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*move)(OpenTTDIndustryCost *, OpenTTDIndustryCost *) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*amount)(OpenTTDIndustryCost *, int64_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	bool (*success)(const OpenTTDIndustryCost *) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint32_t (*error_message)(const OpenTTDIndustryCost *) OPENTTD_INDUSTRY_NOEXCEPT;
+	int64_t (*money)(const OpenTTDIndustryCost *) OPENTTD_INDUSTRY_NOEXCEPT;
+} OpenTTDIndustryCostServices;
+typedef struct OpenTTDIndustryTilePolicyServices {
+	uint8_t (*current_company)(void) OPENTTD_INDUSTRY_NOEXCEPT;
+	bool (*magic_bulldozer)(void) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*object_in_way)(OpenTTDIndustryCost *, const OpenTTDIndustrySpecHandle *) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint8_t (*slopes_refused)(const OpenTTDIndustryTileSpec *) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*close_ai)(OpenTTDIndustryShell *) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*close_game)(OpenTTDIndustryShell *) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*destroy)(OpenTTDIndustryShell *) OPENTTD_INDUSTRY_NOEXCEPT;
+	int64_t (*removal_cost)(const OpenTTDIndustrySpecHandle *) OPENTTD_INDUSTRY_NOEXCEPT;
+	bool (*autoslope_enabled)(void) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint8_t (*tile_slope)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	int32_t (*tile_max_z)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	bool (*autoslope_callback)(const OpenTTDIndustryTileSpec *) OPENTTD_INDUSTRY_NOEXCEPT;
+	bool (*callback_boolean)(const OpenTTDIndustryTileSpec *, uint16_t, uint16_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	int64_t (*foundation_cost)(void) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*landscape_clear)(OpenTTDIndustryCost *, uint32_t, uint16_t) OPENTTD_INDUSTRY_NOEXCEPT;
+} OpenTTDIndustryTilePolicyServices;
+typedef struct OpenTTDIndustryCommandServices {
+	bool (*deity)(void) OPENTTD_INDUSTRY_NOEXCEPT;
+	OpenTTDIndustryShell * (*get)(uint16_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	OpenTTDIndustry * (*owner)(OpenTTDIndustryShell *) OPENTTD_INDUSTRY_NOEXCEPT;
+	bool (*valid_company)(uint8_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*invalidate_view)(uint16_t) OPENTTD_INDUSTRY_NOEXCEPT;
+} OpenTTDIndustryCommandServices;
+bool openttd_rust_industry_set_flags_command(uint16_t id, bool execute, uint8_t value, const OpenTTDIndustryCommandServices *);
+bool openttd_rust_industry_set_production_command(uint16_t id, bool execute, uint8_t level, const OpenTTDIndustryCommandServices *, const OpenTTDIndustryServices *);
+bool openttd_rust_industry_set_exclusivity_command(uint16_t id, bool execute, uint8_t company, bool consumer, const OpenTTDIndustryCommandServices *);
+bool openttd_rust_industry_set_text_command(uint16_t id, bool execute, OpenTTDByteSpan text, const OpenTTDIndustryCommandServices *);
+void openttd_rust_industry_change_owner(OpenTTDIndustry *, uint8_t old_owner, uint8_t new_owner);
 void openttd_rust_industry_build_reset(OpenTTDIndustryBuilder *builder, const OpenTTDIndustryServices *services);
 void openttd_rust_industry_build_monthly(OpenTTDIndustryBuilder *builder, const OpenTTDIndustryServices *services);
 void openttd_rust_industry_build_targets(OpenTTDIndustryBuilder *builder, const OpenTTDIndustryServices *services);
@@ -303,7 +346,6 @@ void openttd_rust_industry_build_try(OpenTTDIndustryBuilder *builder, const Open
 uint8_t openttd_rust_industry_build_type(OpenTTDIndustryBuildFields *fields, uint8_t type, const OpenTTDIndustryServices *services);
 void *openttd_rust_industry_place(uint8_t type, uint8_t creation, uint8_t hard, const OpenTTDIndustryServices *services);
 void openttd_rust_industry_trim(OpenTTDIndustry *industry);
-void openttd_rust_industry_set_production(void *industry, uint8_t level, const OpenTTDIndustryServices *services);
 typedef struct OpenTTDIndustryProductionResult {
 	int32_t subtract[256], add[256], again;
 	uint8_t cargo_input[256], cargo_output[256], version, num_input, num_output, present;
@@ -315,6 +357,12 @@ typedef struct OpenTTDIndustryTileOwner {
 	OpenTTDIndustryShell *shell;
 	OpenTTDIndustry *owner;
 } OpenTTDIndustryTileOwner;
+/** Consumed immutable tile acceptance properties, not a live industry view. */
+typedef struct OpenTTDIndustryTileAcceptance {
+	uint8_t cargo[16];
+	int8_t amount[16];
+	bool accepts_all, accepts_callback, amount_callback;
+} OpenTTDIndustryTileAcceptance;
 /** Consumed direct leaves; generic animation/map leaves share native definitions. */
 typedef struct OpenTTDIndustryTileServices {
 	uint16_t (*gfx)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
@@ -346,9 +394,96 @@ typedef struct OpenTTDIndustryTileServices {
 	OpenTTDEffectVehicle * (*create_effect)(int32_t, int32_t, int32_t, uint8_t) OPENTTD_INDUSTRY_NOEXCEPT;
 	OpenTTDEffectVehicle * (*create_effect_above)(int32_t, int32_t, int32_t, uint8_t) OPENTTD_INDUSTRY_NOEXCEPT;
 	void (*set_effect_substate)(OpenTTDEffectVehicle *, uint8_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	const OpenTTDIndustryTileSpec * (*spec)(uint16_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	OpenTTDIndustryTileAcceptance (*acceptance)(const OpenTTDIndustryTileSpec *) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint16_t (*callback)(uint32_t, uint16_t, uint16_t, uint32_t, uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint8_t (*cargo_translation)(const OpenTTDIndustryTileSpec *, uint8_t) OPENTTD_INDUSTRY_NOEXCEPT;
 } OpenTTDIndustryTileServices;
+void openttd_rust_industry_tile_clear(OpenTTDIndustryCost *, uint32_t tile, uint16_t flags, const OpenTTDIndustryTileServices *, const OpenTTDIndustryTilePolicyServices *, const OpenTTDIndustryCostServices *, const OpenTTDIndustryGenerationServices *);
+void openttd_rust_industry_tile_terraform(OpenTTDIndustryCost *, uint32_t tile, uint16_t flags, int32_t z_new, uint8_t slope_new, const OpenTTDIndustryTileServices *, const OpenTTDIndustryTilePolicyServices *, const OpenTTDIndustryCostServices *);
+void openttd_rust_industry_tile_acceptance(uint32_t tile, uint32_t *acceptance, uint64_t *always_accepted, const OpenTTDIndustryTileServices *);
 void openttd_rust_industry_tile_animate(uint32_t tile, const OpenTTDIndustryServices *, const OpenTTDIndustryConstructionServices *, const OpenTTDIndustryLifecycleServices *, const OpenTTDIndustryTileServices *);
 void openttd_rust_industry_tile_loop(uint32_t tile, const OpenTTDIndustryServices *, const OpenTTDIndustryConstructionServices *, const OpenTTDIndustryLifecycleServices *, const OpenTTDIndustryTileServices *, const OpenTTDIndustryGenerationServices *);
+/** Industry-owned scratch value, matching the actual shared cleared-object entry. */
+typedef struct OpenTTDIndustryClearArea { uint32_t first_tile; OpenTTDIndustryLocation area; } OpenTTDIndustryClearArea;
+typedef struct OpenTTDIndustryClearAreas { const OpenTTDIndustryClearArea *data; size_t size; } OpenTTDIndustryClearAreas;
+typedef struct OpenTTDIndustryAllocation { OpenTTDIndustryShell *shell; OpenTTDIndustry *owner; uint16_t id; } OpenTTDIndustryAllocation;
+typedef struct OpenTTDIndustryConflictKinds { uint8_t kinds[3]; } OpenTTDIndustryConflictKinds;
+typedef struct OpenTTDIndustryConstructionErrors {
+	uint32_t site, forest, positioned, desert, rainforest, lowland, one_per_town, town, population, near_town, conflict, too_many;
+} OpenTTDIndustryConstructionErrors;
+typedef struct OpenTTDIndustryLocationResult { uint16_t callback; int32_t registers[16]; } OpenTTDIndustryLocationResult;
+typedef void (*OpenTTDIndustryTemporaryVisit)(void *, OpenTTDIndustryShell *);
+OpenTTDIndustryLocationResult openttd_industry_resolve_location(OpenTTDIndustryShell *, uint32_t tile, uint8_t type, uint32_t seed, uint8_t creation) OPENTTD_INDUSTRY_NOEXCEPT;
+OpenTTDIndustryLocationResult openttd_industry_resolve_shape(OpenTTDIndustryShell *, uint32_t tile, uint16_t gfx, uint32_t parameter) OPENTTD_INDUSTRY_NOEXCEPT;
+void openttd_industry_location_error(OpenTTDIndustryCost *, const OpenTTDIndustryLocationResult *, const OpenTTDIndustrySpecHandle *) OPENTTD_INDUSTRY_NOEXCEPT;
+void openttd_industry_shape_error(OpenTTDIndustryCost *, const OpenTTDIndustryLocationResult *, const OpenTTDIndustryTileSpec *) OPENTTD_INDUSTRY_NOEXCEPT;
+typedef struct OpenTTDIndustryTransactionServices {
+	bool (*enabled)(const OpenTTDIndustrySpecHandle *) OPENTTD_INDUSTRY_NOEXCEPT;
+	size_t (*layout_count)(const OpenTTDIndustrySpecHandle *) OPENTTD_INDUSTRY_NOEXCEPT;
+	const OpenTTDIndustryLayoutHandle * (*layout)(const OpenTTDIndustrySpecHandle *, size_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	bool (*raw)(const OpenTTDIndustrySpecHandle *) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint8_t (*raw_setting)(void) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint8_t (*check_proc)(const OpenTTDIndustrySpecHandle *) OPENTTD_INDUSTRY_NOEXCEPT;
+	OpenTTDIndustryConflictKinds (*conflicting)(const OpenTTDIndustrySpecHandle *) OPENTTD_INDUSTRY_NOEXCEPT;
+	bool (*multiple_per_town)(void) OPENTTD_INDUSTRY_NOEXCEPT;
+	const OpenTTDTownHandle * (*closest_town)(uint32_t, uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	const OpenTTDTownHandle * (*town)(OpenTTDIndustryShell *) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint32_t (*population)(const OpenTTDTownHandle *) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint32_t (*town_position)(const OpenTTDTownHandle *) OPENTTD_INDUSTRY_NOEXCEPT;
+	OpenTTDIndustryShell * (*industry)(uint16_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint8_t (*highest_snow_line)(void) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint32_t (*edge_distance)(uint32_t, uint8_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint8_t (*refinery_limit)(void) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint32_t (*tile_height)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint8_t (*tropic_zone)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	bool (*water_tile)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	bool (*bridge_above)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	bool (*has_water_class)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint8_t (*tile_type)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*ensure_no_vehicle)(OpenTTDIndustryCost *, uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*set_company)(uint8_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	/* Owner/context live on the Rust stack; visit and resolver cannot retain them. */
+	void (*temporary_shell)(OpenTTDIndustry *, void *, OpenTTDIndustryTemporaryVisit) OPENTTD_INDUSTRY_NOEXCEPT;
+	OpenTTDIndustryLocationResult (*resolve_location)(OpenTTDIndustryShell *, uint32_t, uint8_t, uint32_t, uint8_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	OpenTTDIndustryLocationResult (*resolve_shape)(OpenTTDIndustryShell *, uint32_t, uint16_t, uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*location_error)(OpenTTDIndustryCost *, const OpenTTDIndustryLocationResult *, const OpenTTDIndustrySpecHandle *) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*shape_error)(OpenTTDIndustryCost *, const OpenTTDIndustryLocationResult *, const OpenTTDIndustryTileSpec *) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint8_t (*tile_grf_version)(const OpenTTDIndustryTileSpec *) OPENTTD_INDUSTRY_NOEXCEPT;
+	bool (*shape_callback)(const OpenTTDIndustryTileSpec *) OPENTTD_INDUSTRY_NOEXCEPT;
+	bool (*terragenesis)(void) OPENTTD_INDUSTRY_NOEXCEPT;
+	bool (*ignore_restrictions)(void) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint8_t (*platform)(void) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*terraform)(OpenTTDIndustryCost *, uint32_t, uint16_t, bool) OPENTTD_INDUSTRY_NOEXCEPT;
+	bool (*can_allocate)(void) OPENTTD_INDUSTRY_NOEXCEPT;
+	OpenTTDIndustryAllocation (*allocate)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint32_t (*prospecting_chance)(const OpenTTDIndustrySpecHandle *) OPENTTD_INDUSTRY_NOEXCEPT;
+	bool (*local_company)(void) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*prospect_no_place)(void) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*prospect_unlucky)(void) OPENTTD_INDUSTRY_NOEXCEPT;
+	int64_t (*construction_cost)(const OpenTTDIndustrySpecHandle *) OPENTTD_INDUSTRY_NOEXCEPT;
+} OpenTTDIndustryTransactionServices;
+/** Stack-only immutable service context; no live owner observation. */
+typedef struct OpenTTDIndustryTransactionContext {
+	OpenTTDIndustryBuilder *builder;
+	const OpenTTDIndustryServices *production;
+	const OpenTTDIndustryGenerationServices *generation;
+	const OpenTTDIndustryConstructionServices *construction;
+	const OpenTTDIndustryLifecycleServices *lifecycle;
+	const OpenTTDIndustryTileServices *tiles;
+	const OpenTTDIndustryTilePolicyServices *tile_policy;
+	const OpenTTDIndustryCommandServices *commands;
+	const OpenTTDIndustryCostServices *costs;
+	const OpenTTDIndustryTransactionServices *transaction;
+	const OpenTTDIndustryConstructionErrors *errors;
+	OpenTTDIndustryClearAreas (*clear_areas)(void) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*restore_clear_areas)(const OpenTTDIndustryClearArea *, size_t) OPENTTD_INDUSTRY_NOEXCEPT;
+} OpenTTDIndustryTransactionContext;
+void openttd_rust_industry_build(OpenTTDIndustryCost *, uint32_t tile, uint8_t type, uint16_t flags, uint32_t first_layout, bool fund, uint32_t seed, const OpenTTDIndustryTransactionContext *);
+void openttd_rust_industry_create(OpenTTDIndustryCost *, OpenTTDIndustryShell **industry, uint32_t tile, uint8_t type, uint8_t creation_type, const OpenTTDIndustryTransactionContext *);
+void openttd_rust_industry_location_check(OpenTTDIndustryCost *, uint32_t tile, uint8_t type, size_t layout, uint32_t random, uint16_t bits, uint8_t founder, uint8_t creation, const OpenTTDIndustryTransactionContext *);
+void openttd_rust_industry_shape_check(OpenTTDIndustryCost *, uint32_t tile, uint32_t current, const OpenTTDIndustryTileSpec *, uint8_t type, uint16_t gfx, size_t layout, uint16_t bits, uint8_t founder, uint8_t creation, const OpenTTDIndustryTransactionContext *);
+bool openttd_rust_industry_slope_refused(uint8_t current, uint8_t refused);
 #ifdef __cplusplus
 }
 #endif

@@ -229,6 +229,7 @@ extern bool IsSlopeRefused(Slope current, Slope refused);
  * @param creation_type The circumstances the industry is created under.
  * @return Succeeded or failed command.
  */
+#ifndef WITH_RUST
 CommandCost PerformIndustryTileSlopeCheck(TileIndex ind_base_tile, TileIndex ind_tile, const IndustryTileSpec *its, IndustryType type, IndustryGfx gfx, size_t layout_index, uint16_t initial_random_bits, Owner founder, IndustryAvailabilityCallType creation_type)
 {
 	Industry ind;
@@ -252,6 +253,18 @@ CommandCost PerformIndustryTileSlopeCheck(TileIndex ind_base_tile, TileIndex ind
 
 	return GetErrorMessageFromLocationCallbackResult(callback_res, regs100, its->grf_prop.grffile, STR_ERROR_SITE_UNSUITABLE);
 }
+#else
+extern "C" OpenTTDIndustryLocationResult openttd_industry_resolve_shape(Industry *industry, uint32_t tile, uint16_t gfx, uint32_t parameter) noexcept
+{
+	OpenTTDIndustryLocationResult result{};
+	result.callback = GetIndustryTileCallback(CBID_INDTILE_SHAPE_CHECK, 0, parameter, gfx, industry, TileIndex(tile), result.registers);
+	return result;
+}
+extern "C" void openttd_industry_shape_error(OpenTTDIndustryCost *out, const OpenTTDIndustryLocationResult *result, const OpenTTDIndustryTileSpec *spec) noexcept
+{
+	*out = GetErrorMessageFromLocationCallbackResult(result->callback, result->registers, spec->grf_prop.grffile, STR_ERROR_SITE_UNSUITABLE);
+}
+#endif
 
 /* Simple wrapper for GetHouseCallback to keep the animation unified. */
 uint16_t GetSimpleIndustryCallback(CallbackID callback, uint32_t param1, uint32_t param2, const IndustryTileSpec *spec, Industry *ind, TileIndex tile, int)

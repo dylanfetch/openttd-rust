@@ -14,6 +14,8 @@
 #include "../sound_type.h"
 #include "../rust/abi_ffi.h"
 #include "../rust/industry_generation_adapter.hpp"
+#include "../object_base.h"
+#include "../industrytype.h"
 static_assert(EV_CHIMNEY_SMOKE == 0 && EV_BUBBLE == 9 && EV_COPPER_MINE_SMOKE == 11);
 static_assert(SND_0B_MINE == 9 && SND_0C_POWER_STATION == 10 && SND_29_SUGAR_MINE_2 == 41);
 static_assert(SND_2A_TOY_FACTORY_3 == 42 && SND_2B_TOY_FACTORY_2 == 43 && SND_2C_TOY_FACTORY_1 == 44);
@@ -21,6 +23,11 @@ static_assert(SND_2D_SUGAR_MINE_1 == 45 && SND_2E_BUBBLE_GENERATOR == 46 && SND_
 static_assert(OWNER_NONE.base() == 16 && INVALID_OWNER.base() == 255);
 static_assert(ICT_NORMAL_GAMEPLAY == 1 && ICT_MAP_GENERATION == 2 && ICT_SCENARIO_EDITOR == 3);
 static_assert(INDUSTRY_NUM_INPUTS == 16 && INDUSTRY_NUM_OUTPUTS == 16);
+static_assert(sizeof(ClearedObjectArea) == sizeof(OpenTTDIndustryClearArea));
+static_assert(alignof(ClearedObjectArea) == alignof(OpenTTDIndustryClearArea));
+static_assert(offsetof(ClearedObjectArea, first_tile) == offsetof(OpenTTDIndustryClearArea, first_tile));
+static_assert(offsetof(ClearedObjectArea, area) == offsetof(OpenTTDIndustryClearArea, area));
+static_assert(sizeof(CargoArray::value_type) == sizeof(uint32_t) && sizeof(CargoTypes) == sizeof(uint64_t));
 static_assert(std::is_trivially_destructible_v<TileArea>);
 static_assert(sizeof(TileArea) == sizeof(OpenTTDIndustryLocation));
 static_assert(alignof(TileArea) == alignof(OpenTTDIndustryMetadata));
@@ -39,8 +46,20 @@ TEST_CASE("Industry - canonical native layouts")
 		for (size_t expected : fields) CHECK(openttd_rust_abi_layout(type, item++) == expected);
 		CHECK(openttd_rust_abi_layout(type, item) == SIZE_MAX);
 	};
+	layout(586, {sizeof(OpenTTDIndustryLocationResult), alignof(OpenTTDIndustryLocationResult), offsetof(OpenTTDIndustryLocationResult, callback), offsetof(OpenTTDIndustryLocationResult, registers)});
+	layout(579, {sizeof(OpenTTDIndustryClearArea), alignof(OpenTTDIndustryClearArea), offsetof(OpenTTDIndustryClearArea, first_tile), offsetof(OpenTTDIndustryClearArea, area)});
+	layout(580, {sizeof(OpenTTDIndustryClearAreas), alignof(OpenTTDIndustryClearAreas), offsetof(OpenTTDIndustryClearAreas, data), offsetof(OpenTTDIndustryClearAreas, size)});
+	layout(581, {sizeof(OpenTTDIndustryAllocation), alignof(OpenTTDIndustryAllocation), offsetof(OpenTTDIndustryAllocation, shell), offsetof(OpenTTDIndustryAllocation, owner), offsetof(OpenTTDIndustryAllocation, id)});
+	layout(582, {sizeof(OpenTTDIndustryConflictKinds), alignof(OpenTTDIndustryConflictKinds), offsetof(OpenTTDIndustryConflictKinds, kinds)});
+	layout(583, {sizeof(OpenTTDIndustryConstructionErrors), alignof(OpenTTDIndustryConstructionErrors), offsetof(OpenTTDIndustryConstructionErrors, site), offsetof(OpenTTDIndustryConstructionErrors, forest), offsetof(OpenTTDIndustryConstructionErrors, positioned), offsetof(OpenTTDIndustryConstructionErrors, desert), offsetof(OpenTTDIndustryConstructionErrors, rainforest), offsetof(OpenTTDIndustryConstructionErrors, lowland), offsetof(OpenTTDIndustryConstructionErrors, one_per_town), offsetof(OpenTTDIndustryConstructionErrors, town), offsetof(OpenTTDIndustryConstructionErrors, population), offsetof(OpenTTDIndustryConstructionErrors, near_town), offsetof(OpenTTDIndustryConstructionErrors, conflict), offsetof(OpenTTDIndustryConstructionErrors, too_many)});
+	layout(584, {sizeof(OpenTTDIndustryTransactionServices), alignof(OpenTTDIndustryTransactionServices), offsetof(OpenTTDIndustryTransactionServices, enabled), offsetof(OpenTTDIndustryTransactionServices, layout_count), offsetof(OpenTTDIndustryTransactionServices, layout), offsetof(OpenTTDIndustryTransactionServices, raw), offsetof(OpenTTDIndustryTransactionServices, raw_setting), offsetof(OpenTTDIndustryTransactionServices, check_proc), offsetof(OpenTTDIndustryTransactionServices, conflicting), offsetof(OpenTTDIndustryTransactionServices, multiple_per_town), offsetof(OpenTTDIndustryTransactionServices, closest_town), offsetof(OpenTTDIndustryTransactionServices, town), offsetof(OpenTTDIndustryTransactionServices, population), offsetof(OpenTTDIndustryTransactionServices, town_position), offsetof(OpenTTDIndustryTransactionServices, industry), offsetof(OpenTTDIndustryTransactionServices, highest_snow_line), offsetof(OpenTTDIndustryTransactionServices, edge_distance), offsetof(OpenTTDIndustryTransactionServices, refinery_limit), offsetof(OpenTTDIndustryTransactionServices, tile_height), offsetof(OpenTTDIndustryTransactionServices, tropic_zone), offsetof(OpenTTDIndustryTransactionServices, water_tile), offsetof(OpenTTDIndustryTransactionServices, bridge_above), offsetof(OpenTTDIndustryTransactionServices, has_water_class), offsetof(OpenTTDIndustryTransactionServices, tile_type), offsetof(OpenTTDIndustryTransactionServices, ensure_no_vehicle), offsetof(OpenTTDIndustryTransactionServices, set_company), offsetof(OpenTTDIndustryTransactionServices, temporary_shell), offsetof(OpenTTDIndustryTransactionServices, resolve_location), offsetof(OpenTTDIndustryTransactionServices, resolve_shape), offsetof(OpenTTDIndustryTransactionServices, location_error), offsetof(OpenTTDIndustryTransactionServices, shape_error), offsetof(OpenTTDIndustryTransactionServices, tile_grf_version), offsetof(OpenTTDIndustryTransactionServices, shape_callback), offsetof(OpenTTDIndustryTransactionServices, terragenesis), offsetof(OpenTTDIndustryTransactionServices, ignore_restrictions), offsetof(OpenTTDIndustryTransactionServices, platform), offsetof(OpenTTDIndustryTransactionServices, terraform), offsetof(OpenTTDIndustryTransactionServices, can_allocate), offsetof(OpenTTDIndustryTransactionServices, allocate), offsetof(OpenTTDIndustryTransactionServices, prospecting_chance), offsetof(OpenTTDIndustryTransactionServices, local_company), offsetof(OpenTTDIndustryTransactionServices, prospect_no_place), offsetof(OpenTTDIndustryTransactionServices, prospect_unlucky), offsetof(OpenTTDIndustryTransactionServices, construction_cost)});
+	layout(585, {sizeof(OpenTTDIndustryTransactionContext), alignof(OpenTTDIndustryTransactionContext), offsetof(OpenTTDIndustryTransactionContext, builder), offsetof(OpenTTDIndustryTransactionContext, production), offsetof(OpenTTDIndustryTransactionContext, generation), offsetof(OpenTTDIndustryTransactionContext, construction), offsetof(OpenTTDIndustryTransactionContext, lifecycle), offsetof(OpenTTDIndustryTransactionContext, tiles), offsetof(OpenTTDIndustryTransactionContext, tile_policy), offsetof(OpenTTDIndustryTransactionContext, commands), offsetof(OpenTTDIndustryTransactionContext, costs), offsetof(OpenTTDIndustryTransactionContext, transaction), offsetof(OpenTTDIndustryTransactionContext, errors), offsetof(OpenTTDIndustryTransactionContext, clear_areas), offsetof(OpenTTDIndustryTransactionContext, restore_clear_areas)});
+	layout(577, {sizeof(OpenTTDIndustryCostServices), alignof(OpenTTDIndustryCostServices), offsetof(OpenTTDIndustryCostServices, zero), offsetof(OpenTTDIndustryCostServices, error), offsetof(OpenTTDIndustryCostServices, expense_money), offsetof(OpenTTDIndustryCostServices, error_param), offsetof(OpenTTDIndustryCostServices, add), offsetof(OpenTTDIndustryCostServices, move), offsetof(OpenTTDIndustryCostServices, amount), offsetof(OpenTTDIndustryCostServices, success), offsetof(OpenTTDIndustryCostServices, error_message), offsetof(OpenTTDIndustryCostServices, money)});
+	layout(578, {sizeof(OpenTTDIndustryTilePolicyServices), alignof(OpenTTDIndustryTilePolicyServices), offsetof(OpenTTDIndustryTilePolicyServices, current_company), offsetof(OpenTTDIndustryTilePolicyServices, magic_bulldozer), offsetof(OpenTTDIndustryTilePolicyServices, object_in_way), offsetof(OpenTTDIndustryTilePolicyServices, slopes_refused), offsetof(OpenTTDIndustryTilePolicyServices, close_ai), offsetof(OpenTTDIndustryTilePolicyServices, close_game), offsetof(OpenTTDIndustryTilePolicyServices, destroy), offsetof(OpenTTDIndustryTilePolicyServices, removal_cost), offsetof(OpenTTDIndustryTilePolicyServices, autoslope_enabled), offsetof(OpenTTDIndustryTilePolicyServices, tile_slope), offsetof(OpenTTDIndustryTilePolicyServices, tile_max_z), offsetof(OpenTTDIndustryTilePolicyServices, autoslope_callback), offsetof(OpenTTDIndustryTilePolicyServices, callback_boolean), offsetof(OpenTTDIndustryTilePolicyServices, foundation_cost), offsetof(OpenTTDIndustryTilePolicyServices, landscape_clear)});
+	layout(576, {sizeof(OpenTTDIndustryCommandServices), alignof(OpenTTDIndustryCommandServices), offsetof(OpenTTDIndustryCommandServices, deity), offsetof(OpenTTDIndustryCommandServices, get), offsetof(OpenTTDIndustryCommandServices, owner), offsetof(OpenTTDIndustryCommandServices, valid_company), offsetof(OpenTTDIndustryCommandServices, invalidate_view)});
+	layout(575, {sizeof(OpenTTDIndustryTileAcceptance), alignof(OpenTTDIndustryTileAcceptance), offsetof(OpenTTDIndustryTileAcceptance, cargo), offsetof(OpenTTDIndustryTileAcceptance, amount), offsetof(OpenTTDIndustryTileAcceptance, accepts_all), offsetof(OpenTTDIndustryTileAcceptance, accepts_callback), offsetof(OpenTTDIndustryTileAcceptance, amount_callback)});
 	layout(573, {sizeof(OpenTTDIndustryTileOwner), alignof(OpenTTDIndustryTileOwner), offsetof(OpenTTDIndustryTileOwner, shell), offsetof(OpenTTDIndustryTileOwner, owner)});
-	layout(574, {sizeof(OpenTTDIndustryTileServices), alignof(OpenTTDIndustryTileServices), offsetof(OpenTTDIndustryTileServices, gfx), offsetof(OpenTTDIndustryTileServices, set_gfx), offsetof(OpenTTDIndustryTileServices, frame), offsetof(OpenTTDIndustryTileServices, set_frame), offsetof(OpenTTDIndustryTileServices, animation_loop), offsetof(OpenTTDIndustryTileServices, set_animation_loop), offsetof(OpenTTDIndustryTileServices, delete_animated), offsetof(OpenTTDIndustryTileServices, tick_counter), offsetof(OpenTTDIndustryTileServices, ambient), offsetof(OpenTTDIndustryTileServices, animate_new), offsetof(OpenTTDIndustryTileServices, construction_counter), offsetof(OpenTTDIndustryTileServices, construction_stage), offsetof(OpenTTDIndustryTileServices, completed), offsetof(OpenTTDIndustryTileServices, set_completed), offsetof(OpenTTDIndustryTileServices, reset_construction), offsetof(OpenTTDIndustryTileServices, industry), offsetof(OpenTTDIndustryTileServices, industry_index), offsetof(OpenTTDIndustryTileServices, toffee_offset), offsetof(OpenTTDIndustryTileServices, on_water), offsetof(OpenTTDIndustryTileServices, water_loop), offsetof(OpenTTDIndustryTileServices, is_industry), offsetof(OpenTTDIndustryTileServices, transport), offsetof(OpenTTDIndustryTileServices, anim_production), offsetof(OpenTTDIndustryTileServices, anim_next), offsetof(OpenTTDIndustryTileServices, build_oilrig), offsetof(OpenTTDIndustryTileServices, pixel_max_z), offsetof(OpenTTDIndustryTileServices, create_effect), offsetof(OpenTTDIndustryTileServices, create_effect_above), offsetof(OpenTTDIndustryTileServices, set_effect_substate)});
+	layout(574, {sizeof(OpenTTDIndustryTileServices), alignof(OpenTTDIndustryTileServices), offsetof(OpenTTDIndustryTileServices, gfx), offsetof(OpenTTDIndustryTileServices, set_gfx), offsetof(OpenTTDIndustryTileServices, frame), offsetof(OpenTTDIndustryTileServices, set_frame), offsetof(OpenTTDIndustryTileServices, animation_loop), offsetof(OpenTTDIndustryTileServices, set_animation_loop), offsetof(OpenTTDIndustryTileServices, delete_animated), offsetof(OpenTTDIndustryTileServices, tick_counter), offsetof(OpenTTDIndustryTileServices, ambient), offsetof(OpenTTDIndustryTileServices, animate_new), offsetof(OpenTTDIndustryTileServices, construction_counter), offsetof(OpenTTDIndustryTileServices, construction_stage), offsetof(OpenTTDIndustryTileServices, completed), offsetof(OpenTTDIndustryTileServices, set_completed), offsetof(OpenTTDIndustryTileServices, reset_construction), offsetof(OpenTTDIndustryTileServices, industry), offsetof(OpenTTDIndustryTileServices, industry_index), offsetof(OpenTTDIndustryTileServices, toffee_offset), offsetof(OpenTTDIndustryTileServices, on_water), offsetof(OpenTTDIndustryTileServices, water_loop), offsetof(OpenTTDIndustryTileServices, is_industry), offsetof(OpenTTDIndustryTileServices, transport), offsetof(OpenTTDIndustryTileServices, anim_production), offsetof(OpenTTDIndustryTileServices, anim_next), offsetof(OpenTTDIndustryTileServices, build_oilrig), offsetof(OpenTTDIndustryTileServices, pixel_max_z), offsetof(OpenTTDIndustryTileServices, create_effect), offsetof(OpenTTDIndustryTileServices, create_effect_above), offsetof(OpenTTDIndustryTileServices, set_effect_substate), offsetof(OpenTTDIndustryTileServices, spec), offsetof(OpenTTDIndustryTileServices, acceptance), offsetof(OpenTTDIndustryTileServices, callback), offsetof(OpenTTDIndustryTileServices, cargo_translation)});
 	layout(572, {sizeof(OpenTTDByteSpan), alignof(OpenTTDByteSpan), offsetof(OpenTTDByteSpan, data), offsetof(OpenTTDByteSpan, size)});
 	layout(568, {sizeof(OpenTTDIndustryCargoLists), alignof(OpenTTDIndustryCargoLists), offsetof(OpenTTDIndustryCargoLists, produced), offsetof(OpenTTDIndustryCargoLists, accepted)});
 	layout(569, {sizeof(OpenTTDIndustryLayoutTile), alignof(OpenTTDIndustryLayoutTile), offsetof(OpenTTDIndustryLayoutTile, x), offsetof(OpenTTDIndustryLayoutTile, y), offsetof(OpenTTDIndustryLayoutTile, gfx)});
@@ -224,5 +243,93 @@ TEST_CASE("Industry - generation cancellation restores company before return")
 		CHECK(fields->wanted_inds == (complete ? 0 : 123));
 		openttd_rust_industry_builder_destroy(builder);
 	}
+}
+
+namespace IndustryTemporaryFixture {
+static std::vector<uint8_t> trace;
+static uint16_t result;
+static uint8_t slope, refused, version;
+static IndustrySpec industry_spec;
+static IndustryTileSpec tile_spec;
+static OpenTTDIndustry *active_owner;
+static OpenTTDIndustryLocationResult Observe(Industry *shell)
+{
+	CHECK(shell->production_owner.get() == active_owner);
+	CHECK(shell->index == IndustryID::Invalid());
+	CHECK(shell->location.tile == TileIndex(123));
+	CHECK(shell->location.w == 0);
+	CHECK(shell->type == 7);
+	CHECK(shell->random == 0xABCD);
+	CHECK(shell->founder == Owner(2));
+	CHECK(shell->accepted.empty());
+	CHECK(shell->produced.empty());
+	trace.push_back(3);
+	OpenTTDIndustryLocationResult output{};
+	output.callback = result;
+	output.registers[3] = 456;
+	return output;
+}
+}
+TEST_CASE("Industry - borrowed stack resolver shell and callback policy")
+{
+	using namespace IndustryTemporaryFixture;
+	OpenTTDIndustryServices production{};
+	OpenTTDIndustryGenerationServices generation{};
+	OpenTTDIndustryConstructionServices construction{};
+	OpenTTDIndustryLifecycleServices lifecycle{};
+	OpenTTDIndustryTileServices tiles{};
+	OpenTTDIndustryTilePolicyServices policy{};
+	OpenTTDIndustryCommandServices commands{};
+	OpenTTDIndustryCostServices costs{};
+	OpenTTDIndustryTransactionServices transaction{};
+	OpenTTDIndustryConstructionErrors errors{};
+	errors.site = 1234;
+	generation.spec = [](uint8_t kind) noexcept -> const OpenTTDIndustrySpecHandle * { CHECK(kind == 7); trace.push_back(0); return reinterpret_cast<const OpenTTDIndustrySpecHandle *>(&industry_spec); };
+	commands.owner = [](Industry *shell) noexcept -> OpenTTDIndustry * { return shell->production_owner.get(); };
+	construction.set_town = [](void *shell, const OpenTTDTownHandle *town) noexcept { CHECK(town == nullptr); static_cast<Industry *>(shell)->town = nullptr; };
+	transaction.closest_town = [](uint32_t tile, uint32_t threshold) noexcept -> const OpenTTDTownHandle * { CHECK(tile == 123); CHECK(threshold == UINT32_MAX); CHECK(openttd_rust_industry_metadata(active_owner)->random == 0); trace.push_back(2); return nullptr; };
+	transaction.temporary_shell = [](OpenTTDIndustry *owner, void *context, OpenTTDIndustryTemporaryVisit visit) noexcept {
+		active_owner = owner;
+		trace.push_back(1);
+		{ Industry shell(owner); shell.index = IndustryID::Invalid(); visit(context, &shell); }
+		trace.push_back(5);
+		/* The owner still lives after the actual native destructor returns. */
+		CHECK(openttd_rust_industry_metadata(owner)->width == 0);
+		active_owner = nullptr;
+	};
+	transaction.resolve_location = [](Industry *shell, uint32_t tile, uint8_t kind, uint32_t seed, uint8_t creation) noexcept -> OpenTTDIndustryLocationResult { CHECK(tile == 123); CHECK(kind == 7); CHECK(seed == 0x12345678); CHECK(creation == 2); CHECK(shell->selected_layout == 2); return Observe(shell); };
+	transaction.resolve_shape = [](Industry *shell, uint32_t tile, uint16_t gfx, uint32_t parameter) noexcept -> OpenTTDIndustryLocationResult { CHECK(tile == 456); CHECK(gfx == 8); CHECK(parameter == 0x302); CHECK(shell->selected_layout == 0); return Observe(shell); };
+	transaction.location_error = [](CommandCost *out, const OpenTTDIndustryLocationResult *callback, const OpenTTDIndustrySpecHandle *spec) noexcept { CHECK(spec == reinterpret_cast<const OpenTTDIndustrySpecHandle *>(&industry_spec)); CHECK(callback->registers[3] == 456); trace.push_back(4); *out = CommandCost(EXPENSES_OTHER, Money(789)); };
+	transaction.shape_error = [](CommandCost *out, const OpenTTDIndustryLocationResult *callback, const IndustryTileSpec *spec) noexcept { CHECK(spec == &tile_spec); CHECK(callback->registers[3] == 456); trace.push_back(4); *out = CommandCost(EXPENSES_OTHER, Money(789)); };
+	transaction.tile_grf_version = [](const IndustryTileSpec *spec) noexcept -> uint8_t { CHECK(spec == &tile_spec); trace.push_back(6); return version; };
+	policy.tile_slope = [](uint32_t tile) noexcept -> uint8_t { CHECK(tile == 456); trace.push_back(7); return slope; };
+	policy.slopes_refused = [](const IndustryTileSpec *spec) noexcept -> uint8_t { CHECK(spec == &tile_spec); trace.push_back(8); return refused; };
+	costs.zero = [](CommandCost *out) noexcept { *out = CommandCost(); };
+	costs.error = [](CommandCost *out, uint32_t message) noexcept { *out = CommandCost(message); };
+	OpenTTDIndustryTransactionContext context{
+		.builder = nullptr, .production = &production, .generation = &generation,
+		.construction = &construction, .lifecycle = &lifecycle, .tiles = &tiles,
+		.tile_policy = &policy, .commands = &commands, .costs = &costs,
+		.transaction = &transaction, .errors = &errors,
+		.clear_areas = nullptr, .restore_clear_areas = nullptr,
+	};
+	const auto pool_count = Industry::GetNumItems();
+	for (uint16_t callback : {uint16_t{0}, uint16_t{1}, uint16_t{0xFFFF}}) {
+		result = callback; trace.clear(); CommandCost cost;
+		openttd_rust_industry_location_check(&cost, 123, 7, 258, 0x12345678, 0xABCD, 2, 2, &context);
+		CHECK(cost.Succeeded());
+		CHECK(cost.GetCost() == (callback == 0xFFFF ? 0 : 789));
+		CHECK(trace == (callback == 0xFFFF ? std::vector<uint8_t>{0, 1, 2, 3, 5} : std::vector<uint8_t>{0, 1, 2, 3, 4, 5}));
+		for (uint8_t grf_version : {6, 7, 8}) for (uint8_t current_slope : {0, 16}) {
+			version = grf_version; slope = current_slope; refused = 0; trace.clear();
+			openttd_rust_industry_shape_check(&cost, 123, 456, &tile_spec, 7, 8, 258, 0xABCD, 2, 3, &context);
+			CHECK(cost.Succeeded() == (callback == 0xFFFF ? slope == 0 : version >= 7 || callback != 0));
+			CHECK(cost.GetCost() == (callback != 0xFFFF && version >= 7 ? 789 : 0));
+			if (callback == 0xFFFF) { CHECK(cost.GetErrorMessage() == (slope == 0 ? INVALID_STRING_ID : errors.site)); CHECK(trace == (std::vector<uint8_t>{1, 3, 7, 8, 5})); }
+			else if (version < 7) { CHECK(trace == (std::vector<uint8_t>{1, 3, 6, 5})); }
+			else { CHECK(trace == (std::vector<uint8_t>{1, 3, 6, 4, 5})); }
+		}
+	}
+	CHECK(Industry::GetNumItems() == pool_count);
 }
 #endif

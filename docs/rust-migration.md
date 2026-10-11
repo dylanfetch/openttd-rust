@@ -1646,24 +1646,26 @@ NewGRF resolver programs or every industry layout; native tests check ABI/lifeti
 
 ### Industry construction and tile lifecycle (#150, in progress)
 
-The first checkpoint extends the production owner with native-layout location,
-construction metadata, colour, founder, layout, exclusivity, random bits and
-encoded-text bytes. Its builder owns ascending per-type ID registries. Native
-field aliases and scoped modern/old-load adapters retain saved field names,
-reference fixups and partial initialization. Rust owns destruction cleanup and
-industry-wide/tile animation and rerandomisation traversal; the pinned-body
-industry comparison checks unavailable NewGRF tile/parent triggers and RNG.
-Initial generation owns land/water probabilities, forced and weighted traversal.
+Rust owns industry metadata/text, ordered type registries, builder scratch,
+destruction, initial generation, full validation/funding/prospecting transactions,
+initialization, construction-stage completion, tile loops, builtin animation,
+acceptance, clear/terraform policy and NewGRF tile/parent trigger traversal.
+Native aliases and scoped load adapters preserve saved names/reference fixups,
+partial initialization and ID reuse. Water destruction retains the tile-type recheck.
+Packed map/pool shells, rendering, specs, resolvers and persistent storage stay C++.
 Only progress cancellation (`AbortGenerateWorldSignal`) returns to the native
-stack exception frame after source-order restoration; default native tests cover
-this handoff. Fund-only/custom-zero and four climates compare semantic generation.
-Initialization owns cargo slots, ordered callback validation, native-wrap location
-expansion, tile planting, construction triggers, fields and nearby-station policy.
-Builtin animation, construction-stage completion and tile-loop control are Rust
-owned, including the type recheck after water-driven destruction. Default industry
-comparisons probe rare tick/frame/sound transitions against unchanged bodies.
-Construction validation/funding/prospecting and tile acceptance/clear/terraform
-remain required before this component is complete.
+exception frame after source-order restoration. Direct synchronous services use
+native stack costs; temporary resolver shells borrow a Rust stack owner through
+the original constructor/destructor scope. No state borrow survives reentry.
+`python3 tools/migration.py simulate industry-command-fund industry-command-prospect
+industry-command-clear industry-command-terraform --jobs 2` compares command tests,
+execution, ID reuse and autoslope; default industry scenarios also cover four
+climates, lumber, generation and builder/farm cleanup. Default industry comparisons
+check absent NewGRF acceptance/triggers and rare animation against unchanged bodies;
+native tests check cancellation/restoration, callback policy and borrowed lifetimes.
+Shared-interface consolidation after #209/#215/#216/#217, complete self/soak checks,
+independent review and exact-head full CI remain required. Legacy saves, resolver
+programs and exhaustive industry layouts remain corpus limits tracked by #156.
 
 ### Aircraft controllers and airport movement
 

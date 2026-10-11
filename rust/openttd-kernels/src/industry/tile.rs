@@ -10,7 +10,10 @@
 //! fields are read through short raw accesses, never borrowed across callbacks.
 // Retain the original tick masks for source comparison.
 #![allow(clippy::verbose_bit_mask)]
-use super::{ConstructionServices, GenerationServices, Industry, LifecycleServices, Services};
+use super::{
+    ConstructionServices, GenerationServices, Industry, IndustryCost, IndustryCostServices,
+    LifecycleServices, Services, SpecHandle,
+};
 use std::{ffi::c_void, ptr};
 
 #[repr(C)]
@@ -25,6 +28,18 @@ pub struct ShellHandle {
 pub struct TileIndustry {
     pub shell: *mut ShellHandle,
     pub owner: *mut Industry,
+}
+#[repr(C)]
+pub struct TileSpec {
+    _private: [u8; 0],
+}
+#[repr(C)]
+pub struct TileAcceptance {
+    pub cargo: [u8; 16],
+    pub amount: [i8; 16],
+    pub accepts_all: bool,
+    pub accepts_callback: bool,
+    pub amount_callback: bool,
 }
 #[repr(C)]
 pub struct TileServices {
@@ -57,6 +72,10 @@ pub struct TileServices {
     pub create_effect: unsafe extern "C" fn(i32, i32, i32, u8) -> *mut EffectHandle,
     pub create_effect_above: unsafe extern "C" fn(i32, i32, i32, u8) -> *mut EffectHandle,
     pub set_effect_substate: unsafe extern "C" fn(*mut EffectHandle, u8),
+    pub spec: unsafe extern "C" fn(u16) -> *const TileSpec,
+    pub acceptance: unsafe extern "C" fn(*const TileSpec) -> TileAcceptance,
+    pub callback: unsafe extern "C" fn(u32, u16, u16, u32, u32) -> u16,
+    pub cargo_translation: unsafe extern "C" fn(*const TileSpec, u8) -> u8,
 }
 fn chance(s: &Services, a: u32, b: u32) -> bool {
     crate::services::chance16_i(a, b, unsafe { (s.random)() })
@@ -467,4 +486,184 @@ pub unsafe extern "C" fn openttd_rust_industry_tile_loop(
         }
         _ => {}
     }
+}
+
+/// # Safety
+/// Live industry tile, 64 native `CargoArray` entries and a live `CargoTypes` mask.
+/// Immutable specs outlive the call. Resolver callbacks retain no owner borrow;
+/// each final membership test reads the current accepted list at its source point.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_industry_tile_acceptance(
+    tile: u32,
+    acceptance: *mut u32,
+    always_accepted: *mut u64,
+    services: *const TileServices,
+) {
+    let t = unsafe { &*services };
+    let gfx = unsafe { (t.gfx)(tile) };
+    let spec = unsafe { (t.spec)(gfx) };
+    let industry = unsafe { (t.industry)(tile) };
+    let mut info = unsafe { (t.acceptance)(spec) };
+    if info.accepts_all {
+        for n in 0..super::accepted_count(industry.owner) {
+            let cargo = unsafe { (*super::accepted(industry.owner, n)).cargo };
+            let Some(slot) = info
+                .cargo
+                .iter()
+                .position(|&c| c == cargo)
+                .or_else(|| info.cargo.iter().position(|&c| c == 255))
+            else {
+                continue;
+            };
+            info.cargo[slot] = cargo;
+            info.amount[slot] = info.amount[slot].wrapping_add(8);
+        }
+    }
+    if info.accepts_callback {
+        let result = unsafe { (t.callback)(tile, gfx, 0x2c, 0, 0) };
+        if result != 0xffff {
+            info.cargo.fill(255);
+            for n in 0..3 {
+                info.cargo[n] =
+                    unsafe { (t.cargo_translation)(spec, ((result >> (n * 5)) & 31) as u8) };
+            }
+        }
+    }
+    if info.amount_callback {
+        let result = unsafe { (t.callback)(tile, gfx, 0x2b, 0, 0) };
+        if result != 0xffff {
+            info.amount.fill(0);
+            for n in 0..3 {
+                info.amount[n] = ((result >> (n * 4)) & 15) as i8;
+            }
+        }
+    }
+    for n in 0..16 {
+        let cargo = info.cargo[n];
+        let amount = info.amount[n];
+        if cargo == 255 || amount <= 0 {
+            continue;
+        }
+        unsafe {
+            let entry = acceptance.add(usize::from(cargo));
+            *entry = (*entry).wrapping_add(amount as u32);
+        }
+        let bit = 1_u64.wrapping_shl(u32::from(cargo));
+        if unsafe { *always_accepted } & bit != 0 {
+            continue;
+        }
+        if (0..super::accepted_count(industry.owner))
+            .any(|slot| unsafe { (*super::accepted(industry.owner, slot)).cargo == cargo })
+        {
+            continue;
+        }
+        unsafe { *always_accepted |= bit };
+    }
+}
+
+#[repr(C)]
+pub struct TilePolicyServices {
+    pub current_company: unsafe extern "C" fn() -> u8,
+    pub magic_bulldozer: unsafe extern "C" fn() -> bool,
+    pub object_in_way: unsafe extern "C" fn(*mut IndustryCost, *const SpecHandle),
+    pub slopes_refused: unsafe extern "C" fn(*const TileSpec) -> u8,
+    pub close_ai: unsafe extern "C" fn(*mut ShellHandle),
+    pub close_game: unsafe extern "C" fn(*mut ShellHandle),
+    pub destroy: unsafe extern "C" fn(*mut ShellHandle),
+    pub removal_cost: unsafe extern "C" fn(*const SpecHandle) -> i64,
+    pub autoslope_enabled: unsafe extern "C" fn() -> bool,
+    pub tile_slope: unsafe extern "C" fn(u32) -> u8,
+    pub tile_max_z: unsafe extern "C" fn(u32) -> i32,
+    pub autoslope_callback: unsafe extern "C" fn(*const TileSpec) -> bool,
+    pub callback_boolean: unsafe extern "C" fn(*const TileSpec, u16, u16) -> bool,
+    pub foundation_cost: unsafe extern "C" fn() -> i64,
+    pub landscape_clear: unsafe extern "C" fn(*mut IndustryCost, u32, u16),
+}
+/// # Safety
+/// Live tile and native stack result. Event and destruction callbacks may reenter;
+/// immutable specs remain live after owner destruction, with no owner borrow held.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_industry_tile_clear(
+    out: *mut IndustryCost,
+    tile: u32,
+    flags: u16,
+    tiles: *const TileServices,
+    policy: *const TilePolicyServices,
+    costs: *const IndustryCostServices,
+    generation: *const GenerationServices,
+) {
+    let (t, p, c, g) = unsafe { (&*tiles, &*policy, &*costs, &*generation) };
+    let industry = unsafe { (t.industry)(tile) };
+    let kind = unsafe { (*industry.owner).metadata.kind };
+    let spec = unsafe { (g.spec)(kind) };
+    if (unsafe { (p.current_company)() } != 17
+        && !unsafe { (g.editor)() }
+        && !unsafe { (p.magic_bulldozer)() })
+        || flags & 2 != 0
+        || (unsafe { (p.current_company)() } == 17
+            && (unsafe { (g.spec_behaviour)(spec) } & 4 != 0
+                || unsafe { (p.slopes_refused)((t.spec)((t.gfx)(tile))) } & 32 != 0))
+    {
+        if flags & 2 != 0 {
+            unsafe { (p.object_in_way)(out, spec) };
+        } else {
+            unsafe { (c.error)(out, 0xffff) };
+        }
+        return;
+    }
+    if flags & 1 != 0 {
+        unsafe {
+            (p.close_ai)(industry.shell);
+            (p.close_game)(industry.shell);
+            (p.destroy)(industry.shell);
+        }
+    }
+    let removal = unsafe { (p.removal_cost)(spec) };
+    unsafe { (c.expense_money)(out, 0, removal) };
+}
+/// # Safety
+/// Native complete cost sink and live tile. The resolver can reenter; no owner or
+/// map reference survives it. `LandscapeClear` returns its original full cost.
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn openttd_rust_industry_tile_terraform(
+    out: *mut IndustryCost,
+    tile: u32,
+    flags: u16,
+    z_new: i32,
+    slope_new: u8,
+    tiles: *const TileServices,
+    policy: *const TilePolicyServices,
+    costs: *const IndustryCostServices,
+) {
+    let (t, p, c) = unsafe { (&*tiles, &*policy, &*costs) };
+    if unsafe { (p.autoslope_enabled)() } {
+        let old_slope = unsafe { (p.tile_slope)(tile) };
+        let max_z = if slope_new == 0 {
+            0
+        } else if slope_new & 16 != 0 {
+            2
+        } else {
+            1
+        };
+        if old_slope & 16 == 0
+            && slope_new & 16 == 0
+            && unsafe { (p.tile_max_z)(tile) } == z_new.wrapping_add(max_z)
+        {
+            let gfx = unsafe { (t.gfx)(tile) };
+            let spec = unsafe { (t.spec)(gfx) };
+            let allowed = if unsafe { (p.autoslope_callback)(spec) } {
+                let result = unsafe { (t.callback)(tile, gfx, 0x3c, 0, 0) };
+                result == 0xffff || !unsafe { (p.callback_boolean)(spec, 0x3c, result) }
+            } else {
+                true
+            };
+            if allowed {
+                let foundation = unsafe { (p.foundation_cost)() };
+                unsafe { (c.expense_money)(out, 0, foundation) };
+                return;
+            }
+        }
+    }
+    unsafe { (p.landscape_clear)(out, tile, flags) };
 }

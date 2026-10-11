@@ -26,6 +26,10 @@
 )]
 use std::ffi::c_void;
 use std::ptr;
+mod transaction;
+pub use transaction::*;
+mod commands;
+pub use commands::*;
 mod tile;
 pub use tile::*;
 mod construction;
@@ -1274,23 +1278,6 @@ pub unsafe extern "C" fn openttd_rust_industry_trim(i: *mut Industry) {
         p.shrink_to_fit();
     }
 }
-/// # Safety
-/// Live industry and validated original-economy command arguments. The original
-/// compares the requested level after assigning it, so its news branch is unreachable.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_industry_set_production(
-    i: *mut c_void,
-    level: u8,
-    s: *const Services,
-) {
-    let s = unsafe { &*s };
-    let o = observe(s, i);
-    unsafe {
-        (*fields(o.owner)).ctlflags |= 8;
-        (*fields(o.owner)).prod_level = level;
-    }
-    recompute(i, o.owner, s);
-}
 
 fn tile_xy(x: u32, y: u32, map: Map) -> u32 {
     y.wrapping_mul(map.size_x).wrapping_add(x)
@@ -1584,43 +1571,6 @@ pub unsafe extern "C" fn openttd_rust_industry_build_type_reset(fields: *mut Bui
         };
     }
 }
-/// # Safety
-/// Synchronous command services with the same live lookup and current-company
-/// contract as the native command facade. Returns failure before any mutation.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_industry_command(
-    id: u16,
-    production: u8,
-    execute: u8,
-    value: u8,
-    services: *const Services,
-) -> u8 {
-    let s = unsafe { &*services };
-    if unsafe { !(s.deity)() } {
-        return 0;
-    }
-    if production != 0 && !(4..=128).contains(&value) {
-        return 0;
-    }
-    let i = unsafe { (s.get)(id) };
-    if i.is_null() || (production == 0 && value & !15 != 0) {
-        return 0;
-    }
-    if execute != 0 {
-        if production != 0 {
-            unsafe {
-                openttd_rust_industry_set_production(i, value, services);
-            }
-        } else {
-            let o = observe(s, i);
-            unsafe {
-                (*fields(o.owner)).ctlflags = value;
-            }
-        }
-    }
-    1
-}
-
 /// # Safety
 /// Live builder; native map-size preconditions constrain the original shift.
 #[unsafe(no_mangle)]

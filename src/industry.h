@@ -229,7 +229,8 @@ struct Industry : IndustryPool::PoolItem<&_industry_pool> {
 		auto view = openttd_rust_industry_text(this->production_owner.get());
 		return EncodedString(std::string(reinterpret_cast<const char *>(view.data), view.size));
 	}
-	void SetText(const EncodedString &value) { openttd_rust_industry_set_text(this->production_owner.get(), reinterpret_cast<const uint8_t *>(value.string.data()), value.string.size()); }
+	static OpenTTDByteSpan TextView(const EncodedString &value) { return {reinterpret_cast<const uint8_t *>(value.string.data()), value.string.size()}; }
+	void SetText(const EncodedString &value) { auto text = TextView(value); openttd_rust_industry_set_text(this->production_owner.get(), text.data, text.size); }
 #else
 	bool HasText() const { return !this->text.empty(); }
 	EncodedString GetText() const { return this->text; }
@@ -247,6 +248,8 @@ struct Industry : IndustryPool::PoolItem<&_industry_pool> {
 
 #ifdef WITH_RUST
 	Industry(TileIndex tile = INVALID_TILE) { std::construct_at(&this->location, tile, 0, 0); }
+	/** Synchronous resolver shell; its Rust stack owner outlives this shell. */
+	explicit Industry(OpenTTDIndustry *borrowed) : production_owner(borrowed, [](OpenTTDIndustry *) {}) { std::construct_at(&this->location, INVALID_TILE, 0, 0); }
 #else
 	Industry(TileIndex tile = INVALID_TILE) : location(tile, 0, 0) {}
 #endif

@@ -14,13 +14,15 @@
 #include "rust/industry_ffi.h"
 using TileIndex = uint32_t;
 using IndustryGfx = uint16_t;
+enum class IndustryTileSpecialFlag : uint8_t { AcceptsAllCargo = 1 };
+enum class IndustryTileCallbackMask : uint8_t { CargoAcceptance = 2, AcceptCargo = 3 };
 enum class IndustryRandomTrigger : uint8_t { TileLoop, IndustryTick, CargoReceived };
 enum class IndustryAnimationTrigger : uint8_t { ConstructionStageChanged, TileLoop, IndustryTick, CargoReceived, CargoDistributed };
 struct Bits {
 	uint8_t value = 0;
 	void Set(IndustryRandomTrigger trigger) { this->value |= 1U << static_cast<uint8_t>(trigger); }
 	void Reset(Bits used) { this->value &= ~used.value; }
-	bool Test(IndustryAnimationTrigger trigger) const { return (this->value & (1U << static_cast<uint8_t>(trigger))) != 0; }
+	template <typename T> bool Test(T trigger) const { return (this->value & (1U << static_cast<uint8_t>(trigger))) != 0; }
 };
 using IndustryRandomTriggers = Bits;
 constexpr int MP_INDUSTRY = 8, CBID_RANDOM_TRIGGER = 1, CBID_INDTILE_ANIMATION_TRIGGER = 0x25, VSG_SCOPE_SELF = 0, VSG_SCOPE_PARENT = 1;
@@ -32,8 +34,11 @@ struct BuiltinState { uint16_t gfx; uint8_t frame, loop, stage; bool operator==(
 static BuiltinState builtin{};
 static bool builtin_mode;
 struct IndustryTileSpec {
-	struct { bool enabled; bool HasSpriteGroups() const { return enabled; } } grf_prop;
+	struct { bool enabled; void *grffile = nullptr; bool HasSpriteGroups() const { return enabled; } } grf_prop;
 	struct { Bits triggers; AnimationStatus status = AnimationStatus::NoAnimation; } animation;
+	std::array<uint8_t, 16> accepts_cargo{};
+	std::array<int8_t, 16> acceptance{};
+	Bits special_flags, callback_mask;
 };
 static std::array<Tile, 6> tiles;
 static std::array<IndustryTileSpec, 6> specs;
@@ -53,6 +58,9 @@ static void MarkTileDirtyByTile(TileIndex tile) { trace.push_back({3, tile, 0, 0
 struct Industry {
 	std::array<TileIndex, 6> location{0, 1, 2, 3, 4, 5};
 	uint16_t random;
+	struct Accepted { uint8_t cargo; };
+	std::vector<Accepted> accepted;
+	bool IsCargoAccepted(uint8_t cargo) const { return std::ranges::any_of(accepted, [cargo](const auto &a) { return a.cargo == cargo; }); }
 	bool TileBelongsToIndustry(TileIndex tile) const { return tiles[tile].belongs; }
 	static Industry *GetByTile(TileIndex) { return active; }
 };
@@ -88,6 +96,86 @@ static void SndPlayTileFx(uint16_t sound, TileIndex tile) { trace.push_back({11,
 static void AnimateNewIndustryTile(TileIndex tile) { trace.push_back({12, tile, 0, 0}); }
 static bool Chance16(uint32_t a, uint32_t b) { return (((Random() & 65535) * b + b / 2) >> 16) < a; }
 #include "industry-animation-reference.inc"
+
+using CargoType = uint8_t;
+using CargoArray = std::array<uint32_t, 64>;
+using CargoTypes = uint64_t;
+constexpr uint8_t INVALID_CARGO = 255;
+constexpr uint16_t CALLBACK_FAILED = 0xFFFF, CBID_INDTILE_ACCEPT_CARGO = 0x2C, CBID_INDTILE_CARGO_ACCEPTANCE = 0x2B;
+constexpr uint INDUSTRY_ORIGINAL_NUM_INPUTS = 3;
+static bool IsValidCargoType(CargoType cargo) { return cargo != INVALID_CARGO; }
+struct AcceptedSlot { uint8_t cargo; uint16_t waiting; uint32_t accumulated; int32_t date; void *history; };
+static OpenTTDIndustry *acceptance_owner;
+static uint16_t accept_result, amount_result;
+static bool mutate_accepted;
+static uint8_t GetCargoTranslation(uint8_t cargo, void *)
+{
+	uint8_t result = cargo == 31 ? 255 : (cargo * 3 + 2) % 64;
+	trace.push_back({13, cargo, result, 0});
+	return result;
+}
+static uint16_t GetIndustryTileCallback(uint16_t callback, uint32_t, uint32_t, IndustryGfx, Industry *, TileIndex tile)
+{
+	trace.push_back({14, tile, callback, 0});
+	if (callback == CBID_INDTILE_CARGO_ACCEPTANCE && mutate_accepted) {
+		active->accepted[0].cargo = 63;
+		if (acceptance_owner != nullptr) static_cast<AcceptedSlot *>(openttd_rust_industry_accepted_view(acceptance_owner).data)[0].cargo = 63;
+	}
+	return callback == CBID_INDTILE_ACCEPT_CARGO ? accept_result : amount_result;
+}
+#include "industry-acceptance-reference.inc"
+static void CheckAcceptance()
+{
+	OpenTTDIndustryTileServices service{};
+	service.gfx = [](uint32_t tile) noexcept -> uint16_t { return GetIndustryGfx(tile); };
+	service.industry = [](uint32_t tile) noexcept -> OpenTTDIndustryTileOwner { return {Industry::GetByTile(tile), acceptance_owner}; };
+	service.spec = [](uint16_t gfx) noexcept -> const OpenTTDIndustryTileSpec * { return GetIndustryTileSpec(gfx); };
+	service.acceptance = [](const OpenTTDIndustryTileSpec *spec) noexcept -> OpenTTDIndustryTileAcceptance {
+		OpenTTDIndustryTileAcceptance result;
+		std::ranges::copy(spec->accepts_cargo, result.cargo);
+		std::ranges::copy(spec->acceptance, result.amount);
+		result.accepts_all = spec->special_flags.Test(IndustryTileSpecialFlag::AcceptsAllCargo);
+		result.accepts_callback = spec->callback_mask.Test(IndustryTileCallbackMask::AcceptCargo);
+		result.amount_callback = spec->callback_mask.Test(IndustryTileCallbackMask::CargoAcceptance);
+		return result;
+	};
+	service.callback = [](uint32_t tile, uint16_t gfx, uint16_t callback, uint32_t p1, uint32_t p2) noexcept -> uint16_t { return GetIndustryTileCallback(callback, p1, p2, gfx, Industry::GetByTile(tile), tile); };
+	service.cargo_translation = [](const OpenTTDIndustryTileSpec *spec, uint8_t cargo) noexcept -> uint8_t { return GetCargoTranslation(cargo, spec->grf_prop.grffile); };
+	Industry industry{}; active = &industry;
+	OpenTTDIndustry *owner = openttd_rust_industry_new();
+	uint cases = 0;
+	for (uint8_t flags = 0; flags < 8; flags++) for (uint8_t pattern = 0; pattern < 4; pattern++) {
+		for (uint16_t accepted : {0U, 0x7FFFU, 0x0401U, 0xFFFFU}) for (uint16_t amounts : {0U, 0x0FFFU, 0x0312U, 0xFFFFU}) {
+			for (int8_t amount : {-128, -9, -8, -1, 0, 1, 119, 120, 127}) for (bool mutation : {false, true}) {
+				auto setup = [&](bool candidate) {
+					trace.clear(); acceptance_owner = candidate ? owner : nullptr;
+					accept_result = accepted; amount_result = amounts; mutate_accepted = mutation;
+					industry.accepted = {{2}, {5}, {255}, {2}};
+					openttd_rust_industry_accepted_resize(owner, industry.accepted.size());
+					auto *slots = static_cast<AcceptedSlot *>(openttd_rust_industry_accepted_view(owner).data);
+					for (size_t n = 0; n < industry.accepted.size(); n++) slots[n].cargo = industry.accepted[n].cargo;
+					auto &spec = specs[2]; spec.special_flags.value = (flags & 1) << 1; spec.callback_mask.value = ((flags & 2) << 2) | (flags & 4);
+					for (uint n = 0; n < 16; n++) {
+						spec.accepts_cargo[n] = pattern == 0 ? INVALID_CARGO : pattern == 1 ? n : pattern == 2 ? 2 : n % 3 == 0 ? INVALID_CARGO : n;
+						spec.acceptance[n] = amount;
+					}
+				};
+				CargoArray initial; initial.fill(UINT32_MAX - 4);
+				setup(false); auto expected = initial; CargoTypes expected_always = 4;
+				AddAcceptedCargo_Industry(2, expected, expected_always); const auto expected_trace = trace;
+				setup(true); auto actual = initial; CargoTypes actual_always = 4;
+				openttd_rust_industry_tile_acceptance(2, actual.data(), &actual_always, &service);
+				if (actual != expected || actual_always != expected_always || trace != expected_trace) {
+					std::fprintf(stderr, "acceptance flags %u pattern %u result %u/%u signed amount %d mutation %d\n", flags, pattern, accepted, amounts, amount, mutation);
+					std::abort();
+				}
+				cases++;
+			}
+		}
+	}
+	openttd_rust_industry_destroy(owner); acceptance_owner = nullptr;
+	std::printf("Industry acceptance absent-NewGRF reference cases: %u\n", cases);
+}
 static void CheckBuiltinAnimation(const OpenTTDIndustryServices &services, const OpenTTDIndustryLifecycleServices &lifecycle)
 {
 	OpenTTDIndustryConstructionServices construction{};
@@ -198,4 +286,5 @@ int main()
 	}
 	std::printf("Industry lifecycle absent-NewGRF reference cases: %u\n", cases);
 	CheckBuiltinAnimation(services, lifecycle);
+	CheckAcceptance();
 }

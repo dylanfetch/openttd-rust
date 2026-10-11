@@ -10,12 +10,23 @@ AI_FOLDER = "industry-scenario-ai"
 
 
 def uses_ai(scenario):
-    return scenario.get("industry") == "lumber"
+    return scenario.get("industry") in (
+        "lumber",
+        "fund",
+        "prospect",
+        "clear",
+        "terraform",
+    )
 
 
 def install(scenario, run_dir):
     if uses_ai(scenario):
-        shutil.copytree(scenario["scenario_ai"], run_dir / "ai/industry-scenarios")
+        folder = run_dir / "ai/industry-scenarios"
+        shutil.copytree(scenario["scenario_ai"], folder)
+        (folder / "parameters.nut").write_text(
+            f'INDUSTRY_MODE <- "{scenario["industry"]}";\n'
+            f"INDUSTRY_TARGET <- {scenario.get('industry_target', 0)};\n"
+        )
 
 
 def game_args(scenario):
@@ -90,11 +101,70 @@ def scenarios(soak):
                 "industry_generation_empty": density == 0,
             }
         )
+    for mode in ("fund", "prospect", "clear", "terraform"):
+        result.append(
+            {
+                "name": "industry-command-" + mode,
+                "kind": "generate",
+                "seed": 12345,
+                "map_log2": 7,
+                "land_generator": 1,
+                "industry": mode,
+                "ticks": (12 if soak else 6) * SNAPSHOT_TICKS,
+                "settings": {
+                    "difficulty": {
+                        "industry_density": 0 if mode in ("fund", "prospect") else 4,
+                        "max_loan": 5000000,
+                    },
+                    "construction": {
+                        "raw_industry_construction": 2 if mode == "prospect" else 1,
+                        "autoslope": True,
+                    },
+                },
+                "console": [
+                    "setting difficulty.disasters 0",
+                    "start_ai MigrationIndustries",
+                ],
+            }
+        )
     return result
 
 
 def prepare(scenario, binaries, builds, out, timeout, env, result):
     mode = scenario.get("industry")
+    if mode in ("clear", "terraform"):
+        folder = out / scenario["name"] / "input"
+        setup = dict(
+            scenario,
+            industry="input",
+            ticks=2 * SNAPSHOT_TICKS,
+            console=[
+                line for line in scenario["console"] if not line.startswith("start_ai")
+            ],
+        )
+        run = run_game(
+            setup,
+            binaries["reference"],
+            builds["reference"],
+            folder / "reference",
+            timeout,
+            env,
+        )
+        if run["exit"] or not run["snapshots"]:
+            raise RuntimeError("industry command reference input failed")
+        source = run["snapshots"][-1]
+        industries = economy.rows(read_save(source), "INDY")
+        chosen = next(index for index, row in industries.items() if row["type"] == 0)
+        edits = {"CHTS": {0: {"magic_bulldozer.value": int(mode == "clear")}}}
+        target = folder / "input.sav"
+        result["industry_input"] = disasters.patch(source, target, edits)
+        result["industry_chosen"] = chosen
+        return dict(
+            scenario,
+            kind="save",
+            save=str(target),
+            industry_target=industries[chosen]["location.tile"],
+        )
     if mode == "lumber":
         setup = dict(
             scenario,
@@ -259,13 +329,39 @@ def check(scenario, run, mode, role, result):
         )
         if not facts["lumber_harvest"]:
             result["problems"].append(f"{mode}/{role}: no actual lumber harvest")
+    if kind in ("fund", "prospect", "clear", "terraform"):
+        marker = f"INDUSTRY-COMMAND {kind} ready true"
+        facts["command_completed"] = any(marker in line for line in run["log"])
+        if not facts["command_completed"]:
+            result["problems"].append(f"{mode}/{role}: {kind} command branch missing")
+        if kind in ("fund", "prospect") and not any(
+            row["type"] == 0 and row["founder"] < 15
+            for sample in rows
+            for row in sample.values()
+        ):
+            result["problems"].append(f"{mode}/{role}: no player-funded raw industry")
+        if kind == "clear":
+            before = economy.rows(read_save(Path(scenario["save"])), "INDY")
+            chosen = result["industry_chosen"]
+            facts["reused_id"] = (
+                chosen in rows[-1]
+                and rows[-1][chosen]["founder"] < 15
+                and before[chosen]["founder"] == 16
+            )
+            if not facts["reused_id"]:
+                result["problems"].append(
+                    f"{mode}/{role}: industry ID not reused after clear"
+                )
     result[f"{mode}_{role}_industry"] = facts
     if kind == "generation":
         if bool(facts["industries"] == 0) != scenario["industry_generation_empty"]:
             result["problems"].append(
                 f"{mode}/{role}: generation density branch missing"
             )
-    if kind not in ("cargo", "generation") and facts["produced_history"] == 0:
+    if (
+        kind not in ("cargo", "generation", "fund", "prospect", "clear", "terraform")
+        and facts["produced_history"] == 0
+    ):
         result["problems"].append(f"{mode}/{role}: no industry production history")
     if scenario.get("industry_soak") and not facts["year_history"]:
         result["problems"].append(f"{mode}/{role}: no yearly industry history")
@@ -404,6 +500,16 @@ def lifecycle_gap():
         cwd=ROOT,
         text=True,
     )
+    start = tile_source.index("static void AddAcceptedCargo_Industry(")
+    end = tile_source.index("{", start) + 1
+    depth = 1
+    while depth:
+        if tile_source[end] == "{":
+            depth += 1
+        elif tile_source[end] == "}":
+            depth -= 1
+        end += 1
+    (out / "industry-acceptance-reference.inc").write_text(tile_source[start:end])
     animation = []
     for name in (
         "AnimateSugarSieve",
