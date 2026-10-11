@@ -4,23 +4,23 @@ Root owns selection here; `AGENTS.md` and `docs/rust-migration.md` define proces
 If an issue conflicts, follow this roadmap and report it to root. Keep this
 forward-looking, about 200 lines; completed work is one row, with evidence in PRs.
 
-## Where the fork stands (2026-10-11, `0e459aa81f`)
+## Where the fork stands (2026-10-11, `4b130309a5`)
 
 - Twenty-two ownership ports record 31,359 retired C++ lines in the table below.
   These counts include town-name and movement tables, comments and blanks;
   they do not measure complete simulation coverage. Against the pinned original,
-  the whole-fork metric is Rust 51,097 / tooling 26,088 / C++ glue 23,139 /
-  original C++ retired 34,418. Recent conversions add no new owner. Town #148
-  and industry construction #150 are active; tile loops and base vehicle
+  the whole-fork metric is Rust 51,602 / tooling 26,279 / C++ glue 22,752 /
+  original C++ retired 34,429. Recent conversions add no new owner. Town #148
+  and industry construction #150 remain drafts; tile loops and base vehicle
   maintenance remain in C++, with #212/#213 selected to extend ownership.
-- Latest independent idle-host timing in #208: Opus 1.358x, Grok 1.356x,
-  Padhattan-1996 1.284x, Padhattan-2000 1.348x and TGP 1.181x. The five caps
-  now follow those measurements. Play saves meet the 1.5x target; TGP remains
-  above the 1.15x generation target. The prior glue profile was 27% of reference
-  time at `271fdfea2e`; #199 will remeasure it and classify road crossings.
-- Five unintegrated branches remain. #156 still tracks script exceptions,
-  multiplayer and scenario gaps; company startup scenarios now exercise both
-  Post paths, with mandatory common witnesses pending integrated #215.
+- Latest independent idle-host timing in #215: Opus 1.279x, Grok 1.243x,
+  Padhattan-1996 1.285x, Padhattan-2000 1.367x and TGP 1.174x. All five pass
+  their ratchets; improved caps fell. Play saves meet 1.5x; TGP still misses
+  1.15x. Road crossings meet both budgets; the planned instruction diagnostic
+  misses. The prior 27% whole-glue wall-time profile was not remeasured (#199).
+- Four unintegrated component branches remain. #156 tracks script exceptions,
+  multiplayer and scenario gaps; startup cases exercise both company Post paths,
+  with mandatory common witnesses still pending in #209.
 
 ## Seventh steering review (2026-10-09)
 
@@ -116,6 +116,7 @@ Earlier maintenance: #109/#112, #107/#113/#115, #86/#110/#132, #108/#116,
 | #206 (YAPF hasher) | #207 | direct | `65ff465080` | 95 / 0 / 0 / 0 |
 | #210 (default probes) | #211 | direct | `cbebf6e5fe` | 0 / 25 / 0 / 0 |
 | #202 (#168 trees) | #208 | direct | `0e459aa81f` | 1604 / 91 / 347 / 53 |
+| #199 (shared road services) | #215 | direct | `4b130309a5` | 2288 / 565 / 1331 / 1354 |
 
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -140,43 +141,42 @@ go in `KNOWN_FAILURES` with an issue, never in masks (`docs/rust-migration.md`).
 Integrate reviewed work first; at most six unintegrated branches (#157).
 Independent items (#156, #210) may run in parallel.
 
-1. **Integrate:** shared road #215, then company #209. Trees #208 with lowered
-   caps, default probes #211 and the company reset doc fix are integrated.
-2. **#199 shared vehicle and map layer**, one PR per vehicle type: road PR1 from
-   `shared-layer-road-199` (fixes listed on #199), then aircraft (about 150
-   crossings per tick), train, ship. Each PR deletes that port's accessor copies
+1. **Integrate:** finish company #209 first. Shared road #215, trees #208 with
+   lowered caps, default probes #211 and the company reset doc fix are integrated.
+2. **#199 shared vehicle and map layer**, one PR per vehicle type: road #215
+   integrated; next aircraft (about 150 crossings per tick), train, ship. Delete accessor copies
    and reports crossings per vehicle tick.
 3. **#148 town lifecycle (#216)** owns state, custom-name/text bytes and control in the direct typed
    form. Reuse integrated #217 station activity and #209 company context before review.
 4. **#168 station tick and loading (#214 / #217)**: consolidate typed handles and
    reuse integrated #215 vehicle/engine and #209 company-context services. Then disaster and the cold
    cargo/orders conversions, which never block new ownership work.
-5. **New ownership:** #150 industry construction is active, then #212 landscape tile
+5. **New ownership:** finish #150 industry construction; then #212 landscape tile
    scheduling and clear/water/rail/road/tunnel-bridge loops, then #213 base
    vehicle tick and maintenance. #212/#213 start after integrated #208 and
    #199 road; retain canonical map/shared Vehicle fields behind the typed layer.
-   A fresh high-effort planner replenishes selection when fewer than two
-   unstarted components remain. Whole simulation owners take priority.
+   Then selected #219 owns complete signal-block updates/worksets; #220 owns
+   engine-design lifecycle/name state, including unpooled load prototypes.
+   #220 also needs integrated #209/#148; prefer starting after #213.
 
 The #108 decision keeps C++ map arrays and direct bundled `noexcept` services.
-#199 decides vehicle state access: a typed shared layer with per-operation reads,
-not a pinned-offset field view.
+#199 selects a typed shared vehicle layer with per-operation reads.
 
 ## Resume checkpoint
 
-Root resumed 2026-10-11; #211/#208 are integrated. Five unintegrated branches
-remain; passing heads and evidence are on linked issues/PRs. Integration order:
-#215, #209; #209 precedes final #217, both precede #216, whose shared boundaries precede final #218.
+Stopped at the user's request on 2026-10-11. #211/#208/#215 are integrated.
+Four drafts are clean and pushed; all agents stopped. No new components, base updates or full-CI requests during wind-down.
+Resume #209 first, then final #217, #216 and #218 in that dependency order.
+Evidence and exact validation status stay on the linked PRs/issues.
 
 | Issue / PR | Branch (worktree suffix), head | State and next step |
 | --- | --- | --- |
-| #192 / #209 | `company-direct-192`, `aaeafc9b69` | `/root/company_startup_coverage_156`: startup pair/self/soak and mutation pass; common Post witnesses/context helpers after #215, then fresh review/full CI. |
-| #199 / #215 | `shared-layer-road-199`, `842d8a4e0a` | Two fixing reviews and local checks pass. Profiles preserve state and meet crossing caps; instruction target misses, recorded as a limit. Idle timing/full CI pending. |
-| #148 / #216 | `town-lifecycle-148`, `bcff8c58e9` | `/root/town_lifecycle_148`: house/yearly/create comparisons and portable build pass; placement/names WIP. Full lifecycle and integrated services remain. |
-| #214 / #217 | `station-loading-direct-214`, `d456668553` | `/root/station_loading_direct_214`: typed station/domain handles, map/timer reuse and 16-case pair pass; consume integrated #215/#209, then final checks/review. |
-| #150 / #218 | `industry-construction-150`, `8cb227cb75` | `/root/industry_construction_150`: whole construction/command batch passes 13 pairs; narrow observation/map consolidation WIP. Integrated services and final checks remain. |
+| #192 / #209 | `company-direct-192`, `aaeafc9b69` | Draft; startup pair/self/soak and mutation pass. Add common Post witnesses, natural timer provenance and canonical company context, then fresh review/full CI. |
+| #148 / #216 | `town-lifecycle-148`, `0e98404f21` | Draft; latest name retry batch passes Cargo/Ruff/preflight but native build was interrupted. Last fully verified `e0a1132aba`; finish full lifecycle/containers and integrated services, then review/full CI. |
+| #214 / #217 | `station-loading-direct-214`, `d456668553` | Draft; typed station handles, map/timer reuse and 16-case pair pass. Consume integrated #215 and future #209; finish shared station contracts, final checks/review/full CI. |
+| #150 / #218 | `industry-construction-150`, `8bf3a71c90` | Draft; construction/tile lifecycle and company-transfer scenarios pass; founder mutation fails as required. Consolidate integrated shared services/dimension captures, then final checks/review/full CI. |
 
-Planning complete: #212/#213 selected after #150. ABI blocks: train through 385,
+Selected but unstarted: #212/#213, then #219/#220. ABI blocks: train through 385,
 tree additions 386-389, fleet 390-399, company 400-429, town 430-459, road 460-499,
 station/loading 500-559, industry 560-619 (572 shared ByteSpan lands with town), CommandCost 620-629,
 and additional town lifecycle 630-669. Allocate only consumed layouts.
