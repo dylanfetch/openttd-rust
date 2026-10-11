@@ -255,7 +255,7 @@ pub fn layout(type_id: u16, item: u8) -> usize {
             layout!(crate::station_service::Fields, item; always_accepted, delete_ctr, time_since_load, time_since_unload, last_vehicle_type)
         }
         112 => {
-            layout!(crate::station_service::World, item; base_station, station, station_owner, station_exclusivity, station_next, rating_counts, get, owner, pool_size, tick_counter, editor, facilities, in_use, is_station, local_owner, rectangle_empty, town_statue, select_goods, rating_cheat, available, cargo_valid, rating_callback_enabled, passenger_cargo, packet_available, house_tile, rating_redraw, set_demand, acceptance_news, acceptance_redraw, delete_station, acceptance_animation, watched_animation, append_packet, update_supply, station_list_invalidation, new_cargo_animation, waiting_redraw, rating_callback, with_tiles, tile_next, accept_tile, acceptance_amounts, with_truncation, truncate_next, shared)
+            layout!(crate::station_service::World, item; base_station, station, station_owner, station_exclusivity, station_next, rating_counts, get, owner, pool_size, tick_counter, editor, facilities, in_use, is_station, local_owner, rectangle_empty, town_statue, select_goods, rating_cheat, available, cargo_valid, rating_callback_enabled, passenger_cargo, packet_available, rating_redraw, set_demand, acceptance_news, acceptance_redraw, delete_station, acceptance_animation, watched_animation, append_packet, update_supply, station_list_invalidation, new_cargo_animation, waiting_redraw, rating_callback, with_tiles, tile_next, accept_tile, acceptance_amounts, with_truncation, truncate_next, shared)
         }
         113 => {
             layout!(crate::station_service::Edge, item; destination, last_update, distance)

@@ -333,7 +333,6 @@ pub struct World {
     pub(crate) rating_callback_enabled: extern "C" fn(u8) -> bool,
     pub(crate) passenger_cargo: extern "C" fn(u8) -> bool,
     pub(crate) packet_available: extern "C" fn() -> bool,
-    pub(crate) house_tile: extern "C" fn(u32) -> bool,
     pub(crate) rating_redraw: extern "C" fn(*mut BaseStation, bool),
     pub(crate) set_demand: extern "C" fn(*mut BaseStation, u8, u32),
     pub(crate) acceptance_news: extern "C" fn(*mut BaseStation, u64, bool),
@@ -501,13 +500,15 @@ pub unsafe extern "C" fn openttd_rust_station_watched(st: *mut BaseStation, worl
     if cargoes == 0 {
         return;
     }
+    // The immutable shared table outlives this entry and every native tile frame.
+    let shared = unsafe { &*w.shared };
     let mut body = |tiles| {
         loop {
             let tile = (w.tile_next)(tiles);
             if tile == u32::MAX {
                 break;
             }
-            if u32::from((w.house_tile)(tile)) != 0 {
+            if (shared.tile_type)(tile) == crate::services::MP_HOUSE {
                 (w.watched_animation)(tile, cargoes);
             }
         }

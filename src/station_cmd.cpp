@@ -707,10 +707,6 @@ static const OpenTTDStationServices _rust_station_services = {
 		CountStationBoundary<bool>(StationBoundary::Station);
 		return CargoPacket::CanAllocateItem();
 	},
-	.house_tile = [](uint32_t tile) noexcept -> bool {
-		CountStationBoundary<bool>(StationBoundary::Station);
-		return IsTileType(TileIndex(tile), MP_HOUSE);
-	},
 	.rating_redraw = [](OpenTTDBaseStation *handle, bool waiting_changed) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Station);
 		BaseStation *st = static_cast<BaseStation *>(handle);

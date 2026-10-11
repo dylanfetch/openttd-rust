@@ -10,6 +10,9 @@
 #![allow(unsafe_code, clippy::cast_possible_truncation)]
 use std::ffi::c_void;
 
+/// Source `TileType::MP_HOUSE`.
+pub const MP_HOUSE: u8 = 3;
+
 /// Immutable call table supplied by the game (or isolated test world). No global
 /// registration or game symbol imports are needed by standalone Cargo binaries.
 /// The context and function addresses outlive the component invocation; callbacks

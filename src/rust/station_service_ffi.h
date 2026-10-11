@@ -130,7 +130,6 @@ struct OpenTTDStationServices {
 	bool (*rating_callback_enabled)(uint8_t) noexcept;
 	bool (*passenger_cargo)(uint8_t) noexcept;
 	bool (*packet_available)() noexcept;
-	bool (*house_tile)(uint32_t) noexcept;
 	void (*rating_redraw)(OpenTTDBaseStation *, bool) noexcept;
 	void (*set_demand)(OpenTTDBaseStation *, uint8_t, uint32_t) noexcept;
 	void (*acceptance_news)(OpenTTDBaseStation *, uint64_t, bool) noexcept;
