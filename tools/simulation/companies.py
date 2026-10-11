@@ -330,11 +330,15 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
         # There are already two actor AIs. Cap four requires two successive
         # OnTick Posts; interval one instead exercises the timer's single Post.
         timer = operation == "competitor-timer"
-        changes["DATE"][0].update(
-            competitors_interval=1 if timer else 0,
-            competitors_interval_elapsed=0,
-            competitors_interval_fired=not timer,
-        )
+        # Keep the fixture's dates: startup needs no monthly boundary, and moving
+        # time backwards makes existing link-graph edge dates invalid in a soak.
+        changes["DATE"] = {
+            0: {
+                "competitors_interval": 1 if timer else 0,
+                "competitors_interval_elapsed": 0,
+                "competitors_interval_fired": not timer,
+            }
+        }
         scenario = dict(
             scenario,
             console=[
