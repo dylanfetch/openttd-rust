@@ -97,6 +97,60 @@ pub struct Services {
     pub closest_town: extern "C" fn(u32, u32) -> *const TownHandle,
     /// Resolve the single Rust owner of a live native town shell.
     pub town_owner: extern "C" fn(*const TownHandle) -> *mut crate::town::State,
+    /// Original native `tile_valid` map observation.
+    pub tile_valid: extern "C" fn(u32) -> bool,
+    /// Original native `distance_from_edge` map observation.
+    pub distance_from_edge: extern "C" fn(u32) -> u32,
+    /// Original native `tile_max_z` map observation.
+    pub tile_max_z: extern "C" fn(u32) -> i32,
+    /// Original native `tile_height` map observation.
+    pub tile_height: extern "C" fn(u32) -> u32,
+    /// Original native `bridge_axis` map observation.
+    pub bridge_axis: extern "C" fn(u32) -> u8,
+    /// Original native `has_water_ground` map observation.
+    pub has_water_ground: extern "C" fn(u32) -> bool,
+    /// Original native `is_water` map observation.
+    pub is_water: extern "C" fn(u32) -> bool,
+    /// Original native `is_sea` map observation.
+    pub is_sea: extern "C" fn(u32) -> bool,
+    /// Original native `is_plain_rail` map observation.
+    pub is_plain_rail: extern "C" fn(u32) -> bool,
+    /// Original native `is_bridge` map observation.
+    pub is_bridge: extern "C" fn(u32) -> bool,
+    /// Original native `tunnel_transport` map observation.
+    pub tunnel_transport: extern "C" fn(u32) -> u8,
+    /// Original native `other_tunnel_end` map observation.
+    pub other_tunnel_end: extern "C" fn(u32) -> u32,
+    /// Original native `tunnel_bridge_direction` map observation.
+    pub tunnel_bridge_direction: extern "C" fn(u32) -> u8,
+    /// Original native `is_road_depot` map observation.
+    pub is_road_depot: extern "C" fn(u32) -> bool,
+    /// Original native `road_depot_direction` map observation.
+    pub road_depot_direction: extern "C" fn(u32) -> u8,
+    /// Original native `is_normal_road` map observation.
+    pub is_normal_road: extern "C" fn(u32) -> bool,
+    /// Original native `disallowed_road_directions` map observation.
+    pub disallowed_road_directions: extern "C" fn(u32) -> u8,
+    /// Original native `is_bay_stop` map observation.
+    pub is_bay_stop: extern "C" fn(u32) -> bool,
+    /// Original native `bay_stop_direction` map observation.
+    pub bay_stop_direction: extern "C" fn(u32) -> u8,
+    /// Original native `is_drive_through_stop` map observation.
+    pub is_drive_through_stop: extern "C" fn(u32) -> bool,
+    /// Original native `drive_through_axis` map observation.
+    pub drive_through_axis: extern "C" fn(u32) -> u8,
+    /// Original native `is_any_road_stop` map observation.
+    pub is_any_road_stop: extern "C" fn(u32) -> bool,
+    /// Original native `road_type` map observation.
+    pub road_type: extern "C" fn(u32) -> u8,
+    /// Original native `has_road_type` map observation.
+    pub has_road_type: extern "C" fn(u32) -> bool,
+    /// Original native `road_owner` map observation.
+    pub road_owner: extern "C" fn(u32) -> u8,
+    /// Original native `town_index` map observation.
+    pub town_index: extern "C" fn(u32) -> u16,
+    /// Original `GetAnyRoadBits`, parameterized by `RoadTramType`.
+    pub road_bits: extern "C" fn(u32, u8, bool) -> u8,
 }
 impl Services {
     /// Draw one shared random word.
@@ -129,6 +183,15 @@ pub fn fixture(
     }
     extern "C" fn tile(_: u32) {}
     extern "C" fn zone(_: u32, _: u8) {}
+    extern "C" fn word(_: u32) -> u32 {
+        0
+    }
+    extern "C" fn index(_: u32) -> u16 {
+        0
+    }
+    extern "C" fn bits(_: u32, _: u8, _: bool) -> u8 {
+        0
+    }
     Services {
         context,
         random,
@@ -145,6 +208,33 @@ pub fn fixture(
         current_company: unused_current_company,
         closest_town: unused_closest_town,
         town_owner: unused_town_owner,
+        tile_valid: flag,
+        distance_from_edge: word,
+        tile_max_z: height,
+        tile_height: word,
+        bridge_axis: byte,
+        has_water_ground: flag,
+        is_water: flag,
+        is_sea: flag,
+        is_plain_rail: flag,
+        is_bridge: flag,
+        tunnel_transport: byte,
+        other_tunnel_end: word,
+        tunnel_bridge_direction: byte,
+        is_road_depot: flag,
+        road_depot_direction: byte,
+        is_normal_road: flag,
+        disallowed_road_directions: byte,
+        is_bay_stop: flag,
+        bay_stop_direction: byte,
+        is_drive_through_stop: flag,
+        drive_through_axis: byte,
+        is_any_road_stop: flag,
+        road_type: byte,
+        has_road_type: flag,
+        road_owner: byte,
+        town_index: index,
+        road_bits: bits,
     }
 }
 /// Source `Chance16I` uses uint32 multiplication/addition after uint16 truncation.

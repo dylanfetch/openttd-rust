@@ -156,28 +156,17 @@ static Town *ClosestTownFromTile(TileIndex tile, uint32_t threshold)
 
 #include "town-tunnel-original.hpp"
 
-static void Observe(uint32_t kind, uint32_t id, uint32_t *v) noexcept
-{
-	std::fill_n(v, 32, 0);
-	switch (kind) {
-		case 0: v[0] = v[1] = 1024; v[8] = _settings_game.economy.allow_town_level_crossings; v[17] = INT32_MAX; break;
-		case 1: v[3] = world->town.cache.population; break;
-		case 2: {
-			auto tile = At(id);
-			v[0] = tile.type; v[1] = tile.slope; v[3] = tile.z; v[4] = tile.valid; v[7] = tile.roads;
-			v[12] = tile.stop == 3 ? tile.facing : UINT32_MAX;
-			v[13] = tile.stop < 3 ? tile.stop : 0; v[14] = tile.facing; v[15] = tile.transport; v[16] = tile.facing;
-			break;
-		}
-	}
-}
 static uint64_t Leaf(uint32_t op, uint32_t, uint32_t, uint32_t, uint32_t) noexcept { assert(op == 21); RoadMask(); return 1; }
 static OpenTTDTownState *State(uint32_t id) noexcept { assert(id == world->town.index); return world->owner; }
 static void Stations(uint32_t, uint32_t, void *, void (*)(void *, const void *, uint32_t)) noexcept {}
 static uint32_t Random(void *) noexcept { world->draws++; return 0; }
 static uint32_t Industry(int32_t, int32_t, uint32_t *) noexcept { return 0; }
-static void Read_settings(uint32_t *v) noexcept { Observe(0, 0, v); }
-static void Read_tile(uint32_t id, uint32_t *v) noexcept { Observe(2, id, v); }
+static uint32_t Read_map_log_x() noexcept { return 10; }
+static uint8_t Read_tile_type(uint32_t id) noexcept { return uint8_t(At(id).type); }
+static bool Read_tile_valid(uint32_t id) noexcept { return IsValidTile(id); }
+static uint8_t Read_tile_slope(uint32_t id) noexcept { return uint8_t(GetTileSlope(id)); }
+static int32_t Read_tile_z(uint32_t id) noexcept { return int32_t(GetTileZ(id)); }
+static uint8_t Read_road_bits(uint32_t id, uint8_t type, bool straight) noexcept { assert(type == 0 && straight); return uint8_t(GetTownRoadBits(id)); }
 static OpenTTDTownRoadChoice Read_road_info(uint8_t id) noexcept { RoadInfo(id); return {.introduction_date = 0, .max_speed = 50, .town_build = true}; }
 static uint64_t RoadTypes() noexcept { return Leaf(21, 0, 0, 0, 0); }
 static bool BuildRoad(uint32_t town, uint32_t tile, uint32_t bits, uint32_t type, uint32_t mode) noexcept { assert(mode == 0); return RoadCommand(tile, bits, type, town).Succeeded(); }
@@ -186,9 +175,20 @@ static bool Candidate()
 {
 	openttd_rust_town_simulation(world->owner)->population = world->town.cache.population;
 	auto leaves = TownProtocolServices();
-	leaves.settings = Read_settings; leaves.tile = Read_tile; leaves.road_info = Read_road_info;
+	leaves.map_log_x = Read_map_log_x; leaves.road_info = Read_road_info;
 	leaves.state = State; leaves.stations = Stations; leaves.road_mask = RoadTypes; leaves.build_road = BuildRoad; leaves.build_tunnel = BuildTunnel;
-	const OpenTTDSharedServices services = OpenTTDFixtureSharedServices(nullptr, Random, Industry);
+	OpenTTDSharedServices services = OpenTTDFixtureSharedServices(nullptr, Random, Industry);
+	services.tile_type = Read_tile_type; services.tile_valid = Read_tile_valid;
+	services.tile_slope = Read_tile_slope; services.tile_z = Read_tile_z; services.road_bits = Read_road_bits;
+	services.tunnel_transport = [](uint32_t id) noexcept { return uint8_t(GetTunnelBridgeTransportType(id)); };
+	services.tunnel_bridge_direction = [](uint32_t id) noexcept { return uint8_t(GetTunnelBridgeDirection(id)); };
+	services.is_drive_through_stop = [](uint32_t id) noexcept { return IsDriveThroughStopTile(id); };
+	services.drive_through_axis = [](uint32_t id) noexcept { return uint8_t(GetDriveThroughStopAxis(id)); };
+	services.is_bay_stop = [](uint32_t id) noexcept { return IsBayRoadStopTile(id); };
+	services.bay_stop_direction = [](uint32_t id) noexcept { return uint8_t(GetBayRoadStopDir(id)); };
+	services.is_road_depot = [](uint32_t id) noexcept { return IsRoadDepot(id); };
+	services.road_depot_direction = [](uint32_t id) noexcept { return uint8_t(GetRoadDepotDirection(id)); };
+	leaves.allow_crossings = []() noexcept { return _settings_game.economy.allow_town_level_crossings; };
 	return openttd_rust_town_tunnel(&leaves, &services, world->town.index, world->start, world->direction);
 }
 static uint32_t Along(const World &w, int distance) { return w.start + distance * TileOffsByDiagDir(w.direction); }

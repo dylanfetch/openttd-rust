@@ -930,59 +930,24 @@ static void ChangeTileOwner_Town(TileIndex, Owner, Owner)
 }
 
 #ifdef WITH_RUST
-static void RustTownSettings(uint32_t *v) noexcept
-{
-	std::fill_n(v, 32, 0);
-	v[0] = Map::SizeX(); v[1] = Map::SizeY();
-			v[2] = _settings_game.construction.build_on_slopes;
-			v[3] = _settings_game.economy.town_growth_rate;
-			v[4] = Ticks::TOWN_GROWTH_TICKS; v[5] = GetSnowLine();
-			v[6] = _game_mode == GM_EDITOR; v[7] = _generating_world;
-			v[8] = _settings_game.economy.allow_town_level_crossings;
-			v[9] = MAX_BRIDGES; v[10] = to_underlying(_settings_game.game_creation.landscape);
-			v[11] = OWNER_TOWN.base(); v[12] = OWNER_NONE.base();
-			v[13] = HighestSnowLine(); v[14] = TimerGameCalendar::year.base();
-			v[15] = _settings_game.economy.allow_town_roads;
-			v[16] = TimerGameCalendar::date.base(); v[17] = CalendarTime::MAX_DATE.base();
-			return;
-}
-static void RustTownTile(uint32_t id, uint32_t *v) noexcept
-{
-	std::fill_n(v, 32, 0);
-	{
-			TileIndex tile{id};
-			v[6] = UINT32_MAX; v[8] = INVALID_ROADTYPE; v[12] = UINT32_MAX;
-			v[0] = MP_VOID; v[4] = IsValidTile(tile);
-			if (!v[4]) return;
-			v[0] = GetTileType(tile); v[1] = GetTileSlope(tile); v[2] = GetTileMaxZ(tile); v[3] = GetTileZ(tile);
-			v[5] = DistanceFromEdge(tile);
-			if (IsBridgeAbove(tile)) v[6] = GetBridgeAxis(tile);
-			v[7] = (IsRoadDepotTile(tile) || IsBayRoadStopTile(tile)) ? ROAD_NONE : GetAnyRoadBits(tile, RTT_ROAD, true);
-			if (IsTileType(tile, MP_ROAD) || IsAnyRoadStopTile(tile)) {
-				RoadType rt = GetRoadTypeRoad(tile); v[8] = rt;
-				if (rt != INVALID_ROADTYPE) {
-					const auto *rti = GetRoadTypeInfo(rt);
-					v[9] = (rti->flags.Test(RoadTypeFlag::NoHouses) ? 1 : 0) | (rti->flags.Test(RoadTypeFlag::TownBuild) ? 2 : 0);
-				}
-			}
-			if (IsTileType(tile, MP_ROAD)) {
-				if (HasTileRoadType(tile, RTT_ROAD)) v[10] = GetRoadOwner(tile, RTT_ROAD).base();
-				if (IsRoadDepot(tile)) v[12] = GetRoadDepotDirection(tile);
-				else v[11] = GetTownIndex(tile).base();
-			}
-			if (IsDriveThroughStopTile(tile)) { v[13] = 1; v[14] = GetDriveThroughStopAxis(tile); }
-			if (IsBayRoadStopTile(tile)) { v[13] = 2; v[14] = GetBayRoadStopDir(tile); }
-			if (IsTileType(tile, MP_TUNNELBRIDGE)) {
-				v[15] = GetTunnelBridgeTransportType(tile); v[16] = GetTunnelBridgeDirection(tile);
-				v[17] = GetOtherTunnelBridgeEnd(tile).base();
-			}
-			v[18] = HasTileWaterGround(tile); v[19] = IsWaterTile(tile) && IsSea(tile);
-			v[20] = IsPlainRailTile(tile); v[21] = IsNormalRoadTile(tile);
-			if (v[21]) v[22] = GetDisallowedRoadDirections(tile);
-			v[23] = TileHeight(tile); v[24] = IsWaterTile(tile); v[25] = IsBridgeTile(tile);
-			return;
-		}
-}
+/* Constants consumed by the Rust policy retain their original values. */
+static_assert(Ticks::TOWN_GROWTH_TICKS == 70 && MAX_BRIDGES == 13);
+static_assert(OWNER_TOWN.base() == 15 && OWNER_NONE.base() == 16);
+static_assert(CalendarTime::MAX_DATE.base() == 1826212865);
+static uint32_t RustTown_map_log_x() noexcept { return Map::LogX(); }
+static uint32_t RustTown_map_size_y() noexcept { return Map::SizeY(); }
+static bool RustTown_build_on_slopes() noexcept { return _settings_game.construction.build_on_slopes; }
+static uint8_t RustTown_growth_rate() noexcept { return _settings_game.economy.town_growth_rate; }
+static uint8_t RustTown_snow_line() noexcept { return GetSnowLine(); }
+static bool RustTown_editor() noexcept { return _game_mode == GM_EDITOR; }
+static bool RustTown_generating_world() noexcept { return _generating_world; }
+static bool RustTown_allow_crossings() noexcept { return _settings_game.economy.allow_town_level_crossings; }
+static uint8_t RustTown_climate() noexcept { return to_underlying(_settings_game.game_creation.landscape); }
+static uint8_t RustTown_highest_snow_line() noexcept { return HighestSnowLine(); }
+static int32_t RustTown_calendar_year() noexcept { return TimerGameCalendar::year.base(); }
+static bool RustTown_allow_roads() noexcept { return _settings_game.economy.allow_town_roads; }
+static int32_t RustTown_calendar_date() noexcept { return TimerGameCalendar::date.base(); }
+static uint8_t RustTownRoadFlags(uint8_t id) noexcept { return GetRoadTypeInfo(static_cast<RoadType>(id))->flags.base(); }
 static OpenTTDTownHouseAvailability RustTownHouseAvailability(uint16_t id) noexcept
 {
 	const auto *hs = HouseSpec::Get(id);
@@ -1009,14 +974,6 @@ static OpenTTDTownRoadChoice RustTownRoadInfo(uint8_t id) noexcept
 static void RustTown_dirty_town(uint32_t town) noexcept
 {
 	SetWindowDirty(WC_TOWN_VIEW, TownID(town));
-}
-static uint32_t RustTown_tropic_zone(uint32_t tile) noexcept
-{
-	return GetTropicZone(TileIndex{tile});
-}
-static uint32_t RustTown_tile_height(uint32_t tile) noexcept
-{
-	return TileHeight(TileIndex{tile});
 }
 static uint32_t RustTown_foundation_slope(uint32_t tile) noexcept
 {
@@ -1049,10 +1006,6 @@ static void RustTown_make_house(uint32_t tile, uint32_t town, uint32_t house, ui
 static void RustTown_add_animation(uint32_t tile) noexcept
 {
 	AddAnimatedTile(TileIndex{tile}, false);
-}
-static void RustTown_dirty_tile(uint32_t tile) noexcept
-{
-	MarkTileDirtyByTile(TileIndex{tile});
 }
 static void RustTown_population_changed(uint32_t town) noexcept
 {
@@ -1157,8 +1110,20 @@ static void RustTownDirtyAuthority(uint32_t town) noexcept { SetWindowDirty(WC_T
 static const OpenTTDTownLeaves &GetRustTownServices() noexcept
 {
 	static const OpenTTDTownLeaves services{
-		.settings = RustTownSettings,
-		.tile = RustTownTile,
+		.map_log_x = RustTown_map_log_x,
+		.map_size_y = RustTown_map_size_y,
+		.build_on_slopes = RustTown_build_on_slopes,
+		.growth_rate = RustTown_growth_rate,
+		.snow_line = RustTown_snow_line,
+		.editor = RustTown_editor,
+		.generating_world = RustTown_generating_world,
+		.allow_crossings = RustTown_allow_crossings,
+		.climate = RustTown_climate,
+		.highest_snow_line = RustTown_highest_snow_line,
+		.calendar_year = RustTown_calendar_year,
+		.allow_roads = RustTown_allow_roads,
+		.calendar_date = RustTown_calendar_date,
+		.road_flags = RustTownRoadFlags,
 		.house_availability = RustTownHouseAvailability,
 		.house_placement = RustTownHousePlacement,
 		.house_construction = RustTownHouseConstruction,
@@ -1172,8 +1137,6 @@ static const OpenTTDTownLeaves &GetRustTownServices() noexcept
 		.station_owner = RustTownStationOwner,
 		.dirty_authority = RustTownDirtyAuthority,
 		.dirty_town = RustTown_dirty_town,
-		.tropic_zone = RustTown_tropic_zone,
-		.tile_height = RustTown_tile_height,
 		.foundation_slope = RustTown_foundation_slope,
 		.terraform_price = RustTown_terraform_price,
 		.clean_road_bits = RustTown_clean_road_bits,
@@ -1182,7 +1145,6 @@ static const OpenTTDTownLeaves &GetRustTownServices() noexcept
 		.increase_building_count = RustTown_increase_building_count,
 		.make_house = RustTown_make_house,
 		.add_animation = RustTown_add_animation,
-		.dirty_tile = RustTown_dirty_tile,
 		.population_changed = RustTown_population_changed,
 		.nearby_stations = RustTown_nearby_stations,
 		.house_count = RustTown_house_count,

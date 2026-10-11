@@ -12,6 +12,11 @@
 #ifdef WITH_RUST
 #include "../industry_map.h"
 #include "../bridge_map.h"
+#include "../rail_map.h"
+#include "../road_map.h"
+#include "../station_map.h"
+#include "../tunnelbridge_map.h"
+#include "../water_map.h"
 #include "../landscape.h"
 #include "../viewport_func.h"
 #include "../core/random_func.hpp"
@@ -95,6 +100,33 @@ static OpenTTDTownState *SharedTownOwner(const OpenTTDTownHandle *town) noexcept
 	return reinterpret_cast<const Town *>(town)->growth_owner.get();
 }
 
+static bool Shared_tile_valid(uint32_t tile) noexcept { return IsValidTile(TileIndex{tile}); }
+static uint32_t Shared_distance_from_edge(uint32_t tile) noexcept { return DistanceFromEdge(TileIndex{tile}); }
+static int32_t Shared_tile_max_z(uint32_t tile) noexcept { return GetTileMaxZ(TileIndex{tile}); }
+static uint32_t Shared_tile_height(uint32_t tile) noexcept { return TileHeight(TileIndex{tile}); }
+static uint8_t Shared_bridge_axis(uint32_t tile) noexcept { return GetBridgeAxis(TileIndex{tile}); }
+static bool Shared_has_water_ground(uint32_t tile) noexcept { return HasTileWaterGround(TileIndex{tile}); }
+static bool Shared_is_water(uint32_t tile) noexcept { return IsWaterTile(TileIndex{tile}); }
+static bool Shared_is_sea(uint32_t tile) noexcept { return IsSea(TileIndex{tile}); }
+static bool Shared_is_plain_rail(uint32_t tile) noexcept { return IsPlainRailTile(TileIndex{tile}); }
+static bool Shared_is_bridge(uint32_t tile) noexcept { return IsBridgeTile(TileIndex{tile}); }
+static uint8_t Shared_tunnel_transport(uint32_t tile) noexcept { return GetTunnelBridgeTransportType(TileIndex{tile}); }
+static uint32_t Shared_other_tunnel_end(uint32_t tile) noexcept { return GetOtherTunnelBridgeEnd(TileIndex{tile}).base(); }
+static uint8_t Shared_tunnel_bridge_direction(uint32_t tile) noexcept { return GetTunnelBridgeDirection(TileIndex{tile}); }
+static bool Shared_is_road_depot(uint32_t tile) noexcept { return IsRoadDepotTile(TileIndex{tile}); }
+static uint8_t Shared_road_depot_direction(uint32_t tile) noexcept { return GetRoadDepotDirection(TileIndex{tile}); }
+static bool Shared_is_normal_road(uint32_t tile) noexcept { return IsNormalRoadTile(TileIndex{tile}); }
+static uint8_t Shared_disallowed_road_directions(uint32_t tile) noexcept { return GetDisallowedRoadDirections(TileIndex{tile}); }
+static bool Shared_is_bay_stop(uint32_t tile) noexcept { return IsBayRoadStopTile(TileIndex{tile}); }
+static uint8_t Shared_bay_stop_direction(uint32_t tile) noexcept { return GetBayRoadStopDir(TileIndex{tile}); }
+static bool Shared_is_drive_through_stop(uint32_t tile) noexcept { return IsDriveThroughStopTile(TileIndex{tile}); }
+static uint8_t Shared_drive_through_axis(uint32_t tile) noexcept { return GetDriveThroughStopAxis(TileIndex{tile}); }
+static bool Shared_is_any_road_stop(uint32_t tile) noexcept { return IsAnyRoadStopTile(TileIndex{tile}); }
+static uint8_t Shared_road_type(uint32_t tile) noexcept { return GetRoadTypeRoad(TileIndex{tile}); }
+static bool Shared_has_road_type(uint32_t tile) noexcept { return HasTileRoadType(TileIndex{tile}, RTT_ROAD); }
+static uint8_t Shared_road_owner(uint32_t tile) noexcept { return GetRoadOwner(TileIndex{tile}, RTT_ROAD).base(); }
+static uint16_t Shared_town_index(uint32_t tile) noexcept { return GetTownIndex(TileIndex{tile}).base(); }
+static uint8_t Shared_road_bits(uint32_t tile, uint8_t type, bool straight) noexcept { return GetAnyRoadBits(TileIndex{tile}, static_cast<RoadTramType>(type), straight); }
 const OpenTTDSharedServices &GetRustSharedServices() noexcept
 {
 	static const OpenTTDSharedServices services{
@@ -110,6 +142,33 @@ const OpenTTDSharedServices &GetRustSharedServices() noexcept
 		.set_tropic_zone = SharedSetTropicZone,
 		.company_valid = SharedCompanyValid, .next_company = SharedNextCompany, .current_company = SharedCurrentCompany,
 		.closest_town = SharedClosestTown, .town_owner = SharedTownOwner,
+		.tile_valid = Shared_tile_valid,
+		.distance_from_edge = Shared_distance_from_edge,
+		.tile_max_z = Shared_tile_max_z,
+		.tile_height = Shared_tile_height,
+		.bridge_axis = Shared_bridge_axis,
+		.has_water_ground = Shared_has_water_ground,
+		.is_water = Shared_is_water,
+		.is_sea = Shared_is_sea,
+		.is_plain_rail = Shared_is_plain_rail,
+		.is_bridge = Shared_is_bridge,
+		.tunnel_transport = Shared_tunnel_transport,
+		.other_tunnel_end = Shared_other_tunnel_end,
+		.tunnel_bridge_direction = Shared_tunnel_bridge_direction,
+		.is_road_depot = Shared_is_road_depot,
+		.road_depot_direction = Shared_road_depot_direction,
+		.is_normal_road = Shared_is_normal_road,
+		.disallowed_road_directions = Shared_disallowed_road_directions,
+		.is_bay_stop = Shared_is_bay_stop,
+		.bay_stop_direction = Shared_bay_stop_direction,
+		.is_drive_through_stop = Shared_is_drive_through_stop,
+		.drive_through_axis = Shared_drive_through_axis,
+		.is_any_road_stop = Shared_is_any_road_stop,
+		.road_type = Shared_road_type,
+		.has_road_type = Shared_has_road_type,
+		.road_owner = Shared_road_owner,
+		.town_index = Shared_town_index,
+		.road_bits = Shared_road_bits,
 	};
 	return services;
 }

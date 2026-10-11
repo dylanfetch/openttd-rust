@@ -121,7 +121,7 @@ pub fn layout(type_id: u16, item: u8) -> usize {
             layout!(crate::effect::Leaves, item; observe, write, viewport, sound, animated)
         }
         42 => {
-            layout!(crate::services::Services, item; context, random, industry, tile_type, bridge_above, tropic_zone, tile_z, tile_slope, mark_dirty, set_tropic_zone, company_valid, next_company, current_company, closest_town, town_owner)
+            layout!(crate::services::Services, item; context, random, industry, tile_type, bridge_above, tropic_zone, tile_z, tile_slope, mark_dirty, set_tropic_zone, company_valid, next_company, current_company, closest_town, town_owner, tile_valid, distance_from_edge, tile_max_z, tile_height, bridge_axis, has_water_ground, is_water, is_sea, is_plain_rail, is_bridge, tunnel_transport, other_tunnel_end, tunnel_bridge_direction, is_road_depot, road_depot_direction, is_normal_road, disallowed_road_directions, is_bay_stop, bay_stop_direction, is_drive_through_stop, drive_through_axis, is_any_road_stop, road_type, has_road_type, road_owner, town_index, road_bits)
         }
         80 => layout!(crate::road::PathElement, item; trackdir, tile),
         81 => layout!(crate::road::SpeedLimits, item; max_track_speed, order_max_speed),
@@ -203,7 +203,7 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         436 => layout!(crate::town::Slots, item; data, size),
         430 => layout!(crate::town::CommandResult, item; cost, success),
         431 => {
-            layout!(crate::town::Leaves, item; settings, tile, house_availability, house_placement, house_construction, house_flags, house_extra_flags, house_allows_callback, road_info, state, stations, station_activity, station_owner, dirty_authority, dirty_town, tropic_zone, tile_height, foundation_slope, terraform_price, clean_road_bits, set_road_town, exchange_company, increase_building_count, make_house, add_animation, dirty_tile, population_changed, nearby_stations, house_count, building_count, update_max_pass, next_town, road_mask, build_road, clear_land, terraform_land, build_bridge, build_tunnel, clear_house_land, allow_construction, construction_animation)
+            layout!(crate::town::Leaves, item; map_log_x, map_size_y, build_on_slopes, growth_rate, snow_line, editor, generating_world, allow_crossings, climate, highest_snow_line, calendar_year, allow_roads, calendar_date, road_flags, house_availability, house_placement, house_construction, house_flags, house_extra_flags, house_allows_callback, road_info, state, stations, station_activity, station_owner, dirty_authority, dirty_town, foundation_slope, terraform_price, clean_road_bits, set_road_town, exchange_company, increase_building_count, make_house, add_animation, population_changed, nearby_stations, house_count, building_count, update_max_pass, next_town, road_mask, build_road, clear_land, terraform_land, build_bridge, build_tunnel, clear_house_land, allow_construction, construction_animation)
         }
         90 => {
             layout!(crate::rail_yapf::Settings, item; max_nodes, firstred, firstred_exit, lastred, lastred_exit, station, slope, curve45, curve90, depot_reverse, crossing, lookahead, p0, p1, p2, pbs_cross, pbs_station, pbs_back, doubleslip, longer, longer_tile, shorter, shorter_tile, firstred_eol)

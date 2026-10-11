@@ -46,8 +46,20 @@ struct OpenTTDTownAuthorityServices {
 	uint32_t refusal;
 };
 struct OpenTTDTownLeaves {
-	void (*settings)(uint32_t *) noexcept;
-	void (*tile)(uint32_t, uint32_t *) noexcept;
+	uint32_t (*map_log_x)() noexcept;
+	uint32_t (*map_size_y)() noexcept;
+	bool (*build_on_slopes)() noexcept;
+	uint8_t (*growth_rate)() noexcept;
+	uint8_t (*snow_line)() noexcept;
+	bool (*editor)() noexcept;
+	bool (*generating_world)() noexcept;
+	bool (*allow_crossings)() noexcept;
+	uint8_t (*climate)() noexcept;
+	uint8_t (*highest_snow_line)() noexcept;
+	int32_t (*calendar_year)() noexcept;
+	bool (*allow_roads)() noexcept;
+	int32_t (*calendar_date)() noexcept;
+	uint8_t (*road_flags)(uint8_t) noexcept;
 	OpenTTDTownHouseAvailability (*house_availability)(uint16_t) noexcept;
 	OpenTTDTownHousePlacement (*house_placement)(uint16_t) noexcept;
 	OpenTTDTownHouseConstruction (*house_construction)(uint16_t) noexcept;
@@ -61,8 +73,6 @@ struct OpenTTDTownLeaves {
 	uint8_t (*station_owner)(const void *) noexcept;
 	void (*dirty_authority)(uint32_t) noexcept;
 	void (*dirty_town)(uint32_t town) noexcept;
-	uint32_t (*tropic_zone)(uint32_t tile) noexcept;
-	uint32_t (*tile_height)(uint32_t tile) noexcept;
 	uint32_t (*foundation_slope)(uint32_t tile) noexcept;
 	int64_t (*terraform_price)() noexcept;
 	uint32_t (*clean_road_bits)(uint32_t tile, uint32_t bits) noexcept;
@@ -71,7 +81,6 @@ struct OpenTTDTownLeaves {
 	void (*increase_building_count)(uint32_t town, uint32_t house) noexcept;
 	void (*make_house)(uint32_t tile, uint32_t town, uint32_t house, uint32_t construction) noexcept;
 	void (*add_animation)(uint32_t tile) noexcept;
-	void (*dirty_tile)(uint32_t tile) noexcept;
 	void (*population_changed)(uint32_t town) noexcept;
 	void (*nearby_stations)(uint32_t town, uint32_t tile, uint32_t size) noexcept;
 	uint32_t (*house_count)() noexcept;
