@@ -67,7 +67,7 @@ pub struct LifecycleServices {
     pub change_frame: unsafe extern "C" fn(*const c_void, u32, u32, u32),
 }
 
-unsafe fn location(owner: *mut Industry) -> Location {
+pub(super) unsafe fn location(owner: *mut Industry) -> Location {
     unsafe {
         Location {
             tile: ptr::read(ptr::addr_of!((*owner).metadata.tile)),
@@ -76,7 +76,7 @@ unsafe fn location(owner: *mut Industry) -> Location {
         }
     }
 }
-fn tiles(area: Location, size_x: u32, mut operation: impl FnMut(u32)) {
+pub(super) fn tiles(area: Location, size_x: u32, mut operation: impl FnMut(u32)) {
     for y in 0..u32::from(area.height) {
         let row = area.tile.wrapping_add(y.wrapping_mul(size_x));
         for x in 0..u32::from(area.width) {

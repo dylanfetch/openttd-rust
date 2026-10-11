@@ -228,6 +228,19 @@ pub fn layout(type_id: u16, item: u8) -> usize {
             layout!(crate::station_service::Loading, item; read, write, next, next_stations, next_stations_destroy, cargo, load_callback, payment, effect, refit)
         }
 
+        572 => layout!(crate::services::ByteSpan, item; data, size),
+        568 => {
+            layout!(crate::industry::CargoLists, item; produced, accepted)
+        }
+        569 => {
+            layout!(crate::industry::LayoutTile, item; x, y, gfx)
+        }
+        570 => {
+            layout!(crate::industry::ConstructionRequest, item; layout, town, layout_index, tile, size_x, id, random_bits, kind, founder)
+        }
+        571 => {
+            layout!(crate::industry::ConstructionServices, item; cargo_lists, callback_mask, set_town, calendar_date, generating, callback, callback_error, grf_version, cargo_translation, layout_size, layout_tile, water_class, clear_tile, make_industry, set_construction_counter, set_construction_stage, translated_gfx, animation_enabled, add_animated, map, build_window_dirty, neutral_station, serve_neutral, insert_near_station, clear_near_industries, insert_neutral_industry, stations_around, add_delivery)
+        }
         566 => layout!(crate::industry::GenerationInfo, item; appear, enabled, layouts),
         567 => {
             layout!(crate::industry::GenerationServices, item; spec, spec_behaviour, info, coastal, editor, density, custom_number, scale_by_size_1d, scale_by_land_proportion, set_progress, increase_progress, missing_warning)

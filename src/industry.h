@@ -223,14 +223,15 @@ struct Industry : IndustryPool::PoolItem<&_industry_pool> {
 	Owner exclusive_consumer = INVALID_OWNER;
 #endif ///< Which company has exclusive rights to take cargo (INVALID_OWNER = anyone)
 #ifdef WITH_RUST
+	bool HasText() const { return openttd_rust_industry_text(this->production_owner.get()).size != 0; }
 	EncodedString GetText() const
 	{
-		std::string value(openttd_rust_industry_text(this->production_owner.get(), nullptr, 0), '\0');
-		openttd_rust_industry_text(this->production_owner.get(), reinterpret_cast<uint8_t *>(value.data()), value.size());
-		return EncodedString(std::move(value));
+		auto view = openttd_rust_industry_text(this->production_owner.get());
+		return EncodedString(std::string(reinterpret_cast<const char *>(view.data), view.size));
 	}
 	void SetText(const EncodedString &value) { openttd_rust_industry_set_text(this->production_owner.get(), reinterpret_cast<const uint8_t *>(value.string.data()), value.string.size()); }
 #else
+	bool HasText() const { return !this->text.empty(); }
 	EncodedString GetText() const { return this->text; }
 	void SetText(const EncodedString &value) { this->text = value; }
 	EncodedString text{};

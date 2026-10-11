@@ -979,7 +979,7 @@ public:
 			}
 		}
 
-		if (!i->GetText().empty()) {
+		if (i->HasText()) {
 			ir.top += WidgetDimensions::scaled.vsep_wide;
 			ir.top = DrawStringMultiLine(ir, i->GetText().GetDecodedString(), TC_BLACK);
 		}

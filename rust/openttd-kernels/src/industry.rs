@@ -26,6 +26,8 @@
 )]
 use std::ffi::c_void;
 use std::ptr;
+mod construction;
+pub use construction::*;
 mod generation;
 pub use generation::*;
 mod lifecycle;
@@ -435,7 +437,7 @@ pub struct Services {
     pub scale_by_map_size: unsafe extern "C" fn(u32) -> u32,
     pub company_none: unsafe extern "C" fn() -> u8,
     pub restore_company: unsafe extern "C" fn(u8),
-    pub directory_dirty: unsafe extern "C" fn(),
+    pub directory_dirty: unsafe extern "C" fn(u8),
     pub recession: unsafe extern "C" fn() -> bool,
     pub economy_month: unsafe extern "C" fn() -> u8,
     pub economy_year: unsafe extern "C" fn() -> i32,
@@ -1221,7 +1223,7 @@ pub unsafe extern "C" fn openttd_rust_industry_daily(
     }
     unsafe {
         (s.restore_company)(company);
-        (s.directory_dirty)();
+        (s.directory_dirty)(1);
     }
 }
 /// # Safety
@@ -1252,7 +1254,7 @@ pub unsafe extern "C" fn openttd_rust_industry_monthly(
     }
     unsafe {
         (s.restore_company)(company);
-        (s.directory_dirty)();
+        (s.directory_dirty)(1);
     }
 }
 /// # Safety
@@ -1642,18 +1644,17 @@ pub unsafe extern "C" fn openttd_rust_industry_metadata(owner: *mut Industry) ->
     unsafe { ptr::addr_of_mut!((*owner).metadata) }
 }
 /// # Safety
-/// Live owner; output is null or writable for capacity bytes and disjoint from it.
+/// Live owner. The returned full byte span stays valid until text mutation or
+/// owner destruction. Copy or inspect it before any callback that can mutate it.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_industry_text(
-    owner: *mut Industry,
-    output: *mut u8,
-    capacity: usize,
-) -> usize {
+    owner: *const Industry,
+) -> crate::services::ByteSpan {
     let text = unsafe { &(*owner).text };
-    if !output.is_null() {
-        unsafe { ptr::copy_nonoverlapping(text.as_ptr(), output, text.len().min(capacity)) };
+    crate::services::ByteSpan {
+        data: text.as_ptr(),
+        size: text.len(),
     }
-    text.len()
 }
 /// # Safety
 /// Live owner; text points to length initialized bytes, disjoint from this owner.

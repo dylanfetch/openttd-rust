@@ -47,8 +47,8 @@ fn probability(
     g: &GenerationServices,
 ) -> u32 {
     let spec = unsafe { (g.spec)(kind) };
-    let behaviour = unsafe { (g.spec_behaviour)(spec) };
-    if water.is_some_and(|water| (behaviour & (1 << 2) != 0) != water) {
+    let behaviour = water.map(|_| unsafe { (g.spec_behaviour)(spec) });
+    if water.is_some_and(|water| (behaviour.unwrap_or(0) & (1 << 2) != 0) != water) {
         return 0; // Source deliberately leaves the force output untouched here.
     }
     let info = unsafe { (g.info)(spec) };
@@ -68,7 +68,9 @@ fn probability(
     } else {
         unsafe { (s.scale_by_map_size)(chance) }
     };
-    *forced = chance > 0 && behaviour & (1 << 16) == 0 && !unsafe { (g.editor)() };
+    *forced = chance > 0
+        && behaviour.unwrap_or_else(|| unsafe { (g.spec_behaviour)(spec) }) & (1 << 16) == 0
+        && !unsafe { (g.editor)() };
     chance
 }
 struct Probabilities {

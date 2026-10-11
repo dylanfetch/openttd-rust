@@ -12,6 +12,9 @@
 #include "../industry.h"
 #include "../rust/abi_ffi.h"
 #include "../rust/industry_generation_adapter.hpp"
+static_assert(OWNER_NONE.base() == 16 && INVALID_OWNER.base() == 255);
+static_assert(ICT_NORMAL_GAMEPLAY == 1 && ICT_MAP_GENERATION == 2 && ICT_SCENARIO_EDITOR == 3);
+static_assert(INDUSTRY_NUM_INPUTS == 16 && INDUSTRY_NUM_OUTPUTS == 16);
 static_assert(std::is_trivially_destructible_v<TileArea>);
 static_assert(sizeof(TileArea) == sizeof(OpenTTDIndustryLocation));
 static_assert(alignof(TileArea) == alignof(OpenTTDIndustryMetadata));
@@ -30,6 +33,11 @@ TEST_CASE("Industry - canonical native layouts")
 		for (size_t expected : fields) CHECK(openttd_rust_abi_layout(type, item++) == expected);
 		CHECK(openttd_rust_abi_layout(type, item) == SIZE_MAX);
 	};
+	layout(572, {sizeof(OpenTTDByteSpan), alignof(OpenTTDByteSpan), offsetof(OpenTTDByteSpan, data), offsetof(OpenTTDByteSpan, size)});
+	layout(568, {sizeof(OpenTTDIndustryCargoLists), alignof(OpenTTDIndustryCargoLists), offsetof(OpenTTDIndustryCargoLists, produced), offsetof(OpenTTDIndustryCargoLists, accepted)});
+	layout(569, {sizeof(OpenTTDIndustryLayoutTile), alignof(OpenTTDIndustryLayoutTile), offsetof(OpenTTDIndustryLayoutTile, x), offsetof(OpenTTDIndustryLayoutTile, y), offsetof(OpenTTDIndustryLayoutTile, gfx)});
+	layout(570, {sizeof(OpenTTDIndustryConstructionRequest), alignof(OpenTTDIndustryConstructionRequest), offsetof(OpenTTDIndustryConstructionRequest, layout), offsetof(OpenTTDIndustryConstructionRequest, town), offsetof(OpenTTDIndustryConstructionRequest, layout_index), offsetof(OpenTTDIndustryConstructionRequest, tile), offsetof(OpenTTDIndustryConstructionRequest, size_x), offsetof(OpenTTDIndustryConstructionRequest, id), offsetof(OpenTTDIndustryConstructionRequest, random_bits), offsetof(OpenTTDIndustryConstructionRequest, type), offsetof(OpenTTDIndustryConstructionRequest, founder)});
+	layout(571, {sizeof(OpenTTDIndustryConstructionServices), alignof(OpenTTDIndustryConstructionServices), offsetof(OpenTTDIndustryConstructionServices, cargo_lists), offsetof(OpenTTDIndustryConstructionServices, callback_mask), offsetof(OpenTTDIndustryConstructionServices, set_town), offsetof(OpenTTDIndustryConstructionServices, calendar_date), offsetof(OpenTTDIndustryConstructionServices, generating), offsetof(OpenTTDIndustryConstructionServices, callback), offsetof(OpenTTDIndustryConstructionServices, callback_error), offsetof(OpenTTDIndustryConstructionServices, grf_version), offsetof(OpenTTDIndustryConstructionServices, cargo_translation), offsetof(OpenTTDIndustryConstructionServices, layout_size), offsetof(OpenTTDIndustryConstructionServices, layout_tile), offsetof(OpenTTDIndustryConstructionServices, water_class), offsetof(OpenTTDIndustryConstructionServices, clear_tile), offsetof(OpenTTDIndustryConstructionServices, make_industry), offsetof(OpenTTDIndustryConstructionServices, set_construction_counter), offsetof(OpenTTDIndustryConstructionServices, set_construction_stage), offsetof(OpenTTDIndustryConstructionServices, translated_gfx), offsetof(OpenTTDIndustryConstructionServices, animation_enabled), offsetof(OpenTTDIndustryConstructionServices, add_animated), offsetof(OpenTTDIndustryConstructionServices, map), offsetof(OpenTTDIndustryConstructionServices, build_window_dirty), offsetof(OpenTTDIndustryConstructionServices, neutral_station), offsetof(OpenTTDIndustryConstructionServices, serve_neutral), offsetof(OpenTTDIndustryConstructionServices, insert_near_station), offsetof(OpenTTDIndustryConstructionServices, clear_near_industries), offsetof(OpenTTDIndustryConstructionServices, insert_neutral_industry), offsetof(OpenTTDIndustryConstructionServices, stations_around), offsetof(OpenTTDIndustryConstructionServices, add_delivery)});
 	layout(566, {sizeof(OpenTTDIndustryGenerationInfo), alignof(OpenTTDIndustryGenerationInfo), offsetof(OpenTTDIndustryGenerationInfo, appear), offsetof(OpenTTDIndustryGenerationInfo, enabled), offsetof(OpenTTDIndustryGenerationInfo, layouts)});
 	layout(567, {sizeof(OpenTTDIndustryGenerationServices), alignof(OpenTTDIndustryGenerationServices), offsetof(OpenTTDIndustryGenerationServices, spec), offsetof(OpenTTDIndustryGenerationServices, spec_behaviour), offsetof(OpenTTDIndustryGenerationServices, info), offsetof(OpenTTDIndustryGenerationServices, coastal), offsetof(OpenTTDIndustryGenerationServices, editor), offsetof(OpenTTDIndustryGenerationServices, density), offsetof(OpenTTDIndustryGenerationServices, custom_number), offsetof(OpenTTDIndustryGenerationServices, scale_by_size_1d), offsetof(OpenTTDIndustryGenerationServices, scale_by_land_proportion), offsetof(OpenTTDIndustryGenerationServices, set_progress), offsetof(OpenTTDIndustryGenerationServices, increase_progress), offsetof(OpenTTDIndustryGenerationServices, missing_warning)});
 	layout(560, {sizeof(OpenTTDIndustryMetadata), alignof(OpenTTDIndustryMetadata), offsetof(OpenTTDIndustryMetadata, tile), offsetof(OpenTTDIndustryMetadata, width), offsetof(OpenTTDIndustryMetadata, height), offsetof(OpenTTDIndustryMetadata, construction_date), offsetof(OpenTTDIndustryMetadata, random), offsetof(OpenTTDIndustryMetadata, type), offsetof(OpenTTDIndustryMetadata, owner), offsetof(OpenTTDIndustryMetadata, random_colour), offsetof(OpenTTDIndustryMetadata, founder), offsetof(OpenTTDIndustryMetadata, construction_type), offsetof(OpenTTDIndustryMetadata, selected_layout), offsetof(OpenTTDIndustryMetadata, exclusive_supplier), offsetof(OpenTTDIndustryMetadata, exclusive_consumer)});
@@ -104,11 +112,11 @@ TEST_CASE("Industry - construction owner and ascending type registry")
 	CHECK(metadata->height == 9);
 	const uint8_t text[] = {0, 0xFF, 0x1E, 'a'};
 	openttd_rust_industry_set_text(owner.get(), text, sizeof(text));
-	uint8_t output[sizeof(text)]{};
-	CHECK(openttd_rust_industry_text(owner.get(), output, sizeof(output)) == sizeof(text));
-	CHECK(std::equal(std::begin(text), std::end(text), std::begin(output)));
+	auto text_view = openttd_rust_industry_text(owner.get());
+	CHECK(text_view.size == sizeof(text));
+	CHECK(std::equal(std::begin(text), std::end(text), text_view.data));
 	openttd_rust_industry_set_text(owner.get(), nullptr, 0);
-	CHECK(openttd_rust_industry_text(owner.get(), nullptr, 0) == 0);
+	CHECK(openttd_rust_industry_text(owner.get()).size == 0);
 	RustIndustryBuilderOwner builder{openttd_rust_industry_builder_new(), openttd_rust_industry_builder_destroy};
 	for (uint16_t id : {9, 1, 9, 5}) openttd_rust_industry_registry_insert(builder.get(), 3, id);
 	const uint16_t expected[] = {1, 5, 9};

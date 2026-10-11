@@ -1657,8 +1657,10 @@ Initial generation owns land/water probabilities, forced and weighted traversal.
 Only progress cancellation (`AbortGenerateWorldSignal`) returns to the native
 stack exception frame after source-order restoration; default native tests cover
 this handoff. Fund-only/custom-zero and four climates compare semantic generation.
-Construction/funding/prospecting and remaining tile policy are still native and
-remain required before this component is complete.
+Initialization owns cargo slots, ordered callback validation, native-wrap location
+expansion, tile planting, construction triggers, fields and nearby-station policy.
+Construction validation/funding/prospecting and remaining tile policy are still
+native and remain required before this component is complete.
 
 ### Aircraft controllers and airport movement
 
