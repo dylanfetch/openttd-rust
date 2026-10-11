@@ -227,6 +227,7 @@ inline uint8_t GetHouseConstructionTick(Tile t)
  * @param t the tile of the house to increment the construction stage of
  * @pre IsTileType(t, MP_HOUSE)
  */
+#ifndef WITH_RUST
 inline void IncHouseConstructionTick(Tile t)
 {
 	assert(IsTileType(t, MP_HOUSE));
@@ -238,6 +239,7 @@ inline void IncHouseConstructionTick(Tile t)
 		SetHouseCompleted(t, true);
 	}
 }
+#endif
 
 /**
  * Sets the age of the house to zero.
@@ -256,11 +258,13 @@ inline void ResetHouseAge(Tile t)
  * @param t the tile of this house
  * @pre IsTileType(t, MP_HOUSE)
  */
+#ifndef WITH_RUST
 inline void IncrementHouseAge(Tile t)
 {
 	assert(IsTileType(t, MP_HOUSE));
 	if (IsHouseCompleted(t) && t.m5() < 0xFF) t.m5()++;
 }
+#endif
 
 /**
  * Get the age of the house

@@ -227,6 +227,9 @@ def tunnel_reference_gap(out, archive=None):
     signatures = {
         "CanRoadContinueIntoNextTile": "static bool CanRoadContinueIntoNextTile(",
         "GrowTownWithTunnel": "static bool GrowTownWithTunnel(",
+        "GetHouseNorthPart": "TileIndexDiff GetHouseNorthPart(",
+        "AdvanceSingleHouseConstruction": "static void AdvanceSingleHouseConstruction(",
+        "AdvanceHouseConstruction": "static void AdvanceHouseConstruction(",
         "SumHistory": "template <>\nTown::SuppliedHistory SumHistory(",
         "SetTownRatingTestMode": "void SetTownRatingTestMode(",
         "GetRating": "static int GetRating(",
@@ -244,6 +247,63 @@ def tunnel_reference_gap(out, archive=None):
             depth += (source[end] == "{") - (source[end] == "}")
             end += 1
         bodies[name] = source[start:end]
+
+    def unchanged_body(text, signature):
+        start = text.index(signature)
+        end = text.index("{", start) + 1
+        depth = 1
+        while depth:
+            depth += (text[end] == "{") - (text[end] == "}")
+            end += 1
+        return text[start:end]
+
+    map_source = (migration.REFERENCE / "src/town_map.h").read_text()
+    map_bodies = {}
+    for name in (
+        "GetHouseConstructionTick",
+        "IncHouseConstructionTick",
+        "IncrementHouseAge",
+        "ResetHouseAge",
+    ):
+        result = "uint8_t" if name == "GetHouseConstructionTick" else "void"
+        map_bodies[name] = unchanged_body(map_source, f"inline {result} {name}(")
+    bits_source = (migration.REFERENCE / "src/core/bitmath_func.hpp").read_text()
+    for name, signature in (
+        (
+            "GB",
+            "template <typename T>\n[[debug_inline]] inline constexpr static uint GB(",
+        ),
+        ("AB", "template <typename T, typename U>\nconstexpr T AB("),
+    ):
+        map_bodies[name] = unchanged_body(bits_source, signature)
+    # Template bit helpers precede the unchanged map bodies that call them.
+    map_bodies = {
+        name: map_bodies[name]
+        for name in (
+            "GB",
+            "AB",
+            "GetHouseConstructionTick",
+            "IncHouseConstructionTick",
+            "IncrementHouseAge",
+            "ResetHouseAge",
+        )
+    }
+    house_bodies = {
+        name: bodies.pop(name)
+        for name in (
+            "AdvanceSingleHouseConstruction",
+            "AdvanceHouseConstruction",
+            "GetHouseNorthPart",
+        )
+    }
+    yearly_start = source.index("_economy_towns_yearly")
+    yearly_start = source.index("{", source.index("[](auto)", yearly_start))
+    yearly_body = unchanged_body(source[yearly_start:], "{")
+    house_bodies["Yearly"] = "static void ReferenceYearly() " + yearly_body
+    (out / "town-house-original.hpp").write_text(
+        "\n\n".join([*map_bodies.values(), *house_bodies.values()]) + "\n"
+    )
+    bodies.update(map_bodies | house_bodies)
     header = (migration.REFERENCE / "src/town.h").read_text()
     start = header.index("uint8_t PctTransported() const")
     end = header.index("{", start) + 1
@@ -253,7 +313,14 @@ def tunnel_reference_gap(out, archive=None):
         end += 1
     percent_body = header[start:end]
     (out / "town-percent-original.hpp").write_text(percent_body + "\n")
-    (out / "town-tunnel-original.hpp").write_text("\n\n".join(bodies.values()) + "\n")
+    (out / "town-tunnel-original.hpp").write_text(
+        "\n\n".join(
+            body
+            for name, body in bodies.items()
+            if name not in map_bodies and name not in house_bodies
+        )
+        + "\n"
+    )
     bodies["PctTransported"] = percent_body
     build = ROOT / "build-rust"
     configuration = migration.rust_configuration(build)
@@ -315,6 +382,9 @@ def tunnel_reference_gap(out, archive=None):
         raise RuntimeError(
             "town transported-percent gap omitted completion/count marker"
         )
+    house = re.search(rb"\nPASS (\d+) unchanged-reference house cases\n", run.stdout)
+    if not house or int(house[1]) == 0:
+        raise RuntimeError("town house reference gap omitted completion/count marker")
     migration.ensure_reference()
     report = {
         "passed": True,
@@ -323,6 +393,7 @@ def tunnel_reference_gap(out, archive=None):
         "radius_cases": int(radius[1]),
         "authority_cases": int(authority[1]),
         "percent_cases": int(percent[1]),
+        "house_cases": int(house[1]),
         "cases": int(match[1]),
         "successful_tunnel_cases": len(re.findall(rb" result=1 ", run.stdout)),
         "execute_effect_cases": len(re.findall(rb" effects=1 ", run.stdout)),
@@ -342,7 +413,8 @@ def tunnel_reference_gap(out, archive=None):
             "Nested rating scratch, company changes, shell reuse and early-return service ordering are absent from ordinary console saves.",
             "Radius table/linear boundary and full house-count widths supplement the ordinary generated-town populations.",
             "Ordered road-mask/info services, command arguments, result, RNG and partial execute effects compare exactly.",
-            "Pure C++ map getter calls and Rust bundled records have different granularity; their call counts/order are not compared.",
+            "Pure C++ map getter calls and typed Rust predicates have different granularity; their call counts/order are not compared.",
+            "Packed-byte construction/age boundaries, multi-tile order and animation reentry supplement the ordinary house-growth snapshots.",
             "One active town-buildable road type; shared command internals and road-type selection are outside this gap check.",
         ],
         "agent": "/root/town_lifecycle_148",

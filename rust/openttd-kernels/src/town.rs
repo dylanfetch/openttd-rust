@@ -22,6 +22,8 @@
     clippy::collapsible_match,
     clippy::decimal_bitwise_operands
 )]
+pub(crate) mod house;
+pub(crate) mod lifecycle;
 use crate::services::{Services, chance16_i};
 use std::{
     cell::{Cell, OnceCell, UnsafeCell},

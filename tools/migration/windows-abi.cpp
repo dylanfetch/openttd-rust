@@ -9,6 +9,8 @@
 #include "rust/abi_ffi.h"
 #include "rust/command_cost_ffi.h"
 #include "rust/command_services_ffi.h"
+#include "rust/town_house_ffi.h"
+#include "rust/town_lifecycle_ffi.h"
 #include "rust/water_regions_ffi.h"
 #include "rust/cargo_payment_ffi.h"
 #include "rust/cargo_storage_ffi.h"
@@ -83,6 +85,11 @@ static void Layout(uint16_t type, const char *name, std::initializer_list<size_t
 static void Layouts()
 {
 	Layout(444, "OpenTTDTownSuppliedEntry", {sizeof(OpenTTDTownSuppliedEntry), alignof(OpenTTDTownSuppliedEntry), offsetof(OpenTTDTownSuppliedEntry, entry), offsetof(OpenTTDTownSuppliedEntry, created)});
+	Layout(449, "OpenTTDTownCountSizes", {sizeof(OpenTTDTownCountSizes), alignof(OpenTTDTownCountSizes), offsetof(OpenTTDTownCountSizes, houses), offsetof(OpenTTDTownCountSizes, classes)});
+	Layout(448, "OpenTTDTownNameParams", {sizeof(OpenTTDTownNameParams), alignof(OpenTTDTownNameParams), offsetof(OpenTTDTownNameParams, grfid), offsetof(OpenTTDTownNameParams, kind)});
+	Layout(447, "OpenTTDTownCreateServices", {sizeof(OpenTTDTownCreateServices), alignof(OpenTTDTownCreateServices), offsetof(OpenTTDTownCreateServices, count_sizes), offsetof(OpenTTDTownCreateServices, insert_spatial), offsetof(OpenTTDTownCreateServices, acceptance_cargo), offsetof(OpenTTDTownCreateServices, name_params), offsetof(OpenTTDTownCreateServices, initial_city_size), offsetof(OpenTTDTownCreateServices, show_zone), offsetof(OpenTTDTownCreateServices, virt_coord), offsetof(OpenTTDTownCreateServices, dirty_directory), offsetof(OpenTTDTownCreateServices, update_noise)});
+	Layout(446, "OpenTTDTownHouseNorth", {sizeof(OpenTTDTownHouseNorth), alignof(OpenTTDTownHouseNorth), offsetof(OpenTTDTownHouseNorth, house), offsetof(OpenTTDTownHouseNorth, diff)});
+	Layout(445, "OpenTTDTownHouseServices", {sizeof(OpenTTDTownHouseServices), alignof(OpenTTDTownHouseServices), offsetof(OpenTTDTownHouseServices, byte), offsetof(OpenTTDTownHouseServices, completed), offsetof(OpenTTDTownHouseServices, set_byte), offsetof(OpenTTDTownHouseServices, set_completed), offsetof(OpenTTDTownHouseServices, house), offsetof(OpenTTDTownHouseServices, population), offsetof(OpenTTDTownHouseServices, construction_animation)});
 	Layout(443, "OpenTTDTownAuthorityServices", {sizeof(OpenTTDTownAuthorityServices), alignof(OpenTTDTownAuthorityServices), offsetof(OpenTTDTownAuthorityServices, council_tolerance), offsetof(OpenTTDTownAuthorityServices, bulldozer), offsetof(OpenTTDTownAuthorityServices, authority_distance), offsetof(OpenTTDTownAuthorityServices, town_index), offsetof(OpenTTDTownAuthorityServices, refusal)});
 	Layout(621, "OpenTTDCommandServices", {sizeof(OpenTTDCommandServices), alignof(OpenTTDCommandServices), offsetof(OpenTTDCommandServices, landscape_clear)});
 	Layout(620, "OpenTTDCommandCostServices", {sizeof(OpenTTDCommandCostServices), alignof(OpenTTDCommandCostServices), offsetof(OpenTTDCommandCostServices, zero), offsetof(OpenTTDCommandCostServices, error), offsetof(OpenTTDCommandCostServices, expense_money), offsetof(OpenTTDCommandCostServices, error_param), offsetof(OpenTTDCommandCostServices, add), offsetof(OpenTTDCommandCostServices, move), offsetof(OpenTTDCommandCostServices, amount), offsetof(OpenTTDCommandCostServices, success), offsetof(OpenTTDCommandCostServices, error_message), offsetof(OpenTTDCommandCostServices, money)});

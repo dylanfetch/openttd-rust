@@ -26,6 +26,15 @@ macro_rules! layout {
 #[allow(clippy::too_many_lines)]
 pub fn layout(type_id: u16, item: u8) -> usize {
     match type_id {
+        449 => layout!(crate::town::lifecycle::CountSizes, item; houses, classes),
+        448 => layout!(crate::town::lifecycle::NameParams, item; grfid, kind),
+        447 => {
+            layout!(crate::town::lifecycle::World, item; count_sizes, insert_spatial, acceptance_cargo, name_params, initial_city_size, show_zone, virt_coord, dirty_directory, update_noise)
+        }
+        446 => layout!(crate::town::house::North, item; house, diff),
+        445 => {
+            layout!(crate::town::house::World, item; byte, completed, set_byte, set_completed, house, population, construction_animation)
+        }
         444 => layout!(crate::town::SuppliedEntry, item; entry, created),
         443 => {
             layout!(crate::town::AuthorityServices, item; council_tolerance, bulldozer, authority_distance, town_index, refusal)

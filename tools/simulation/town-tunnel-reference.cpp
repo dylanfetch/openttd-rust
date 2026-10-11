@@ -8,6 +8,7 @@
 /** @file town-tunnel-reference.cpp Controlled services for unchanged town tunnel bodies, absent from the save corpus. */
 #include "../../src/tests/town_protocol.hpp"
 #include "../../src/rust/town_ffi.h"
+#include "../../src/rust/town_house_ffi.h"
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -18,6 +19,7 @@
 #include <map>
 #include <numeric>
 #include <span>
+#include <ranges>
 #include <limits>
 #include <unordered_map>
 #include <vector>
@@ -410,8 +412,139 @@ static void ComparePercentTransported()
 	}
 	std::printf("\nPASS %u unchanged-reference percent cases\n", checked);
 }
+namespace house_probe {
+using uint = unsigned int;
+constexpr uint32_t MP_HOUSE = 3, TOWN_HOUSE_COMPLETED = 3;
+struct Map { static auto Iterate() { return std::views::iota(uint32_t(0), uint32_t(256)); } };
+enum class BuildingFlag : uint8_t { Size2x1 = 2 };
+using HouseID = uint16_t;
+struct BuildingFlags { uint8_t bits; bool Test(BuildingFlag flag) const { return (this->bits & (1 << static_cast<uint8_t>(flag))) != 0; } bool Any(BuildingFlags other) const { return (this->bits & other.bits) != 0; } };
+constexpr BuildingFlags BUILDING_HAS_1_TILE{29}, BUILDING_2_TILES_Y{24}, BUILDING_2_TILES_X{20}, BUILDING_HAS_4_TILES{16};
+struct Cell { uint8_t byte = 0, type = 3; bool completed = false; uint16_t house = 0; bool operator ==(const Cell &) const = default; };
+struct Town { uint32_t population = 0; static Town *GetByTile(uint32_t); };
+struct HouseSpec { BuildingFlags building_flags{1}; uint8_t population = 10; static const HouseSpec *Get(uint16_t); };
+struct World {
+	std::array<Cell, 256> cells{};
+	Town town;
+	HouseSpec spec;
+	bool candidate = false;
+	uint8_t reentry = 0;
+	OpenTTDTownState *owner = nullptr;
+	std::vector<std::array<uint32_t, 3>> events;
+};
+static World *w;
+static std::array<HouseSpec, 3> north_specs;
+static uint16_t north_house;
+static bool north_mode;
+Town *Town::GetByTile(uint32_t) { return &w->town; }
+const HouseSpec *HouseSpec::Get(uint16_t house) {
+	if (north_mode && house < north_house && north_house - house <= 3) return &north_specs[north_house - house - 1];
+	return &w->spec;
+}
+struct Tile {
+	uint32_t index;
+	Tile(uint32_t index) : index(index) {}
+	uint8_t &m5() { return w->cells[this->index].byte; }
+};
+static bool IsTileType(Tile tile, uint32_t type) { return w->cells[tile.index].type == type; }
+static bool IsHouseCompleted(Tile tile) { return w->cells[tile.index].completed; }
+static void SetHouseCompleted(Tile tile, bool value) { w->cells[tile.index].completed = value; }
+static uint16_t GetHouseType(uint32_t tile) { return w->cells[tile].house; }
+static TileIndexDiff TileDiffXY(int x, int y) { return x + y * 64; }
+static uint32_t TileAddXY(uint32_t tile, int x, int y) { return tile + TileDiffXY(x, y); }
+static void ChangePopulation(Town *town, int mod) { town->population += mod; w->events.push_back({2, 0, town->population}); }
+static void TriggerHouseAnimation_ConstructionStageChanged(uint32_t tile, bool initial)
+{
+	assert(!initial); w->events.push_back({1, tile, initial});
+	if (w->reentry) {
+		/* An ordinary presentation/native callback reenters the same owner. */
+		if (w->candidate) openttd_rust_town_simulation(w->owner)->population += 100;
+		else w->town.population += 100;
+		if (w->reentry == 2) w->cells[tile].completed = !w->cells[tile].completed;
+	}
+}
+static void MarkTileDirtyByTile(uint32_t tile) { w->events.push_back({3, tile, 0}); }
+#define debug_inline gnu::always_inline
+#include "town-house-original.hpp"
+#undef debug_inline
+static OpenTTDTownHouseServices Services()
+{
+	return {
+		.byte = [](uint32_t tile) noexcept { return w->cells[tile].byte; },
+		.completed = [](uint32_t tile) noexcept { return w->cells[tile].completed; },
+		.set_byte = [](uint32_t tile, uint8_t byte) noexcept { w->cells[tile].byte = byte; },
+		.set_completed = [](uint32_t tile, bool value) noexcept { w->cells[tile].completed = value; },
+		.house = [](uint32_t tile) noexcept { return w->cells[tile].house; },
+		.population = [](uint16_t) noexcept { return w->spec.population; },
+		.construction_animation = [](uint32_t tile, bool initial) noexcept { TriggerHouseAnimation_ConstructionStageChanged(tile, initial); },
+	};
+}
+static void Compare()
+{
+	uint32_t checked = 0;
+	auto owner = std::unique_ptr<OpenTTDTownState, decltype(&openttd_rust_town_destroy)>(openttd_rust_town_new(), openttd_rust_town_destroy);
+	auto leaves = TownProtocolServices();
+	leaves.state = [](uint32_t) noexcept { return w->owner; };
+	leaves.house_flags = [](uint16_t house) noexcept { return HouseSpec::Get(house)->building_flags.bits; };
+	leaves.population_changed = [](uint32_t) noexcept { w->events.push_back({2, 0, openttd_rust_town_simulation(w->owner)->population}); };
+	auto shared = OpenTTDFixtureSharedServices(nullptr, Random, Industry);
+	shared.town_index = [](uint32_t) noexcept { return uint16_t(0); };
+	shared.mark_dirty = [](uint32_t tile) noexcept { MarkTileDirtyByTile(tile); };
+	shared.tile_type = [](uint32_t tile) noexcept { return w->cells[tile].type; };
+	const auto services = Services();
+	for (uint8_t flags : {1, 4, 8, 16}) {
+		for (uint8_t reentry : {0, 1, 2}) {
+			for (bool complete : {false, true}) {
+				for (uint32_t byte = 0; byte < 256; byte++) {
+					World original; original.owner = owner.get(); original.reentry = reentry; original.spec.building_flags.bits = flags; original.town.population = 7;
+					for (uint32_t tile : {128, 129, 192, 193}) { original.cells[tile].byte = static_cast<uint8_t>(byte); original.cells[tile].completed = complete; }
+					World candidate = original; candidate.candidate = true;
+					w = &original; AdvanceHouseConstruction(128);
+					openttd_rust_town_simulation(owner.get())->population = candidate.town.population;
+					w = &candidate; openttd_rust_town_advance_house(&leaves, &shared, &services, 128);
+					if (original.cells != candidate.cells || original.town.population != openttd_rust_town_simulation(owner.get())->population || original.events != candidate.events) {
+						std::fprintf(stderr, "house construction mismatch flags=%u byte=%u reentry=%u complete=%u\n", flags, byte, reentry, complete); std::exit(1);
+					}
+					checked++;
+				}
+			}
+		}
+	}
+	for (bool complete : {false, true}) {
+		for (uint8_t pattern : {0, 1, 2}) {
+			World original; original.owner = owner.get();
+			for (uint32_t tile = 0; tile < 256; tile++) original.cells[tile] = {static_cast<uint8_t>(tile), uint8_t(pattern == 0 || (pattern == 1 && tile % 2 == 0) ? MP_HOUSE : 0), complete};
+			World candidate = original;
+			w = &original; ReferenceYearly();
+			w = &candidate; openttd_rust_town_yearly(&shared, &services, 256);
+			if (original.cells != candidate.cells) { std::fprintf(stderr, "house yearly mismatch complete=%u pattern=%u\n", complete, pattern); std::exit(1); }
+			checked += 256;
+		}
+	}
+	north_mode = true;
+	World north_world; w = &north_world;
+	for (uint16_t house : {0, 1, 2, 3, 4, 35, 110, 256, 1024, 4095}) {
+		north_house = house;
+		for (size_t slot = 0; slot < 3; slot++) {
+			for (uint32_t flags = 0; flags < 256; flags++) {
+				for (auto &spec : north_specs) spec.building_flags.bits = 0;
+				north_specs[slot].building_flags.bits = static_cast<uint8_t>(flags);
+				HouseID expected = house;
+				const auto diff = GetHouseNorthPart(expected);
+				const auto actual = openttd_rust_town_house_north(&leaves, &shared, house);
+				if (expected != actual.house || diff != actual.diff) { std::fprintf(stderr, "house north mismatch house=%u slot=%zu flags=%u\n", house, slot, flags); std::exit(1); }
+				checked++;
+			}
+		}
+	}
+	north_mode = false;
+	std::printf("\nPASS %u unchanged-reference house cases\n", checked);
+}
+} // namespace house_probe
+
 int main()
 {
+	house_probe::Compare();
 	CompareHistories();
 	CompareRatings();
 	CompareRadii();
