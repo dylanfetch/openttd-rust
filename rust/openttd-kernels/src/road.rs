@@ -29,13 +29,13 @@
     clippy::collapsible_if,
     clippy::if_not_else
 )]
-use crate::services::Services;
+use crate::services::{Map, Services};
 use crate::vehicle::{
     AM_REALISTIC, CALLBACK_FAILED, GroundServices, HVOT_BUS, HVOT_TRUCK, INVALID_ENGINE,
-    INVALID_PRICE, INVALID_TRACKDIR, MP_ROAD, MP_STATION, MP_TUNNELBRIDGE, Map, MapServices,
-    OT_GOTO_DEPOT, OT_GOTO_STATION, OT_LEAVESTATION, OT_LOADING, SND_DEPARTURE_OLD_RV_1,
-    SND_DEPARTURE_OLD_RV_2, VEHICLE_LENGTH, VETS_CANNOT_ENTER, VETS_ENTERED_WORMHOLE, VS_CRASHED,
-    VS_HIDDEN, VS_STOPPED, VehicleRef, VehicleServices, YEAR_TICKS, advance_distance,
+    INVALID_PRICE, INVALID_TRACKDIR, MP_ROAD, MP_STATION, MP_TUNNELBRIDGE, OT_GOTO_DEPOT,
+    OT_GOTO_STATION, OT_LEAVESTATION, OT_LOADING, SND_DEPARTURE_OLD_RV_1, SND_DEPARTURE_OLD_RV_2,
+    VEHICLE_LENGTH, VETS_CANNOT_ENTER, VETS_ENTERED_WORMHOLE, VS_CRASHED, VS_HIDDEN, VS_STOPPED,
+    VehicleRef, VehicleServices, YEAR_TICKS, advance_distance,
 };
 use std::ffi::c_void;
 use std::ptr::NonNull;
@@ -324,13 +324,6 @@ pub struct RoadTypes {
 
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct PreviousTile {
-    pub tile: u32,
-    pub exists: bool,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy)]
 pub struct TrackChoice {
     pub trackdir: u8,
     pub found: bool,
@@ -418,8 +411,8 @@ pub type TileVisitor = extern "C" fn(*mut c_void, *const TileVehicle) -> bool;
 pub struct Leaves {
     pub vehicle: *const VehicleServices,
     pub ground: *const GroundServices,
-    pub map: *const MapServices,
     pub shared: *const Services,
+    pub process_orders_then_loading: extern "C" fn(VehicleRef) -> u8,
     pub visual_then_speed: extern "C" fn(VehicleRef, bool) -> SpeedRead,
     pub max_speed_read: extern "C" fn(VehicleRef) -> MaxSpeedRead,
     pub speed_part: extern "C" fn(VehicleRef) -> SpeedPart,
@@ -451,7 +444,6 @@ pub struct Leaves {
     pub choose_track: extern "C" fn(VehicleRef, u32, u8, u16) -> TrackChoice,
     pub find_depot: extern "C" fn(VehicleRef, i32) -> DepotResult,
     pub can_build_tram: extern "C" fn(VehicleRef, u32, u8) -> bool,
-    pub previous_tile: extern "C" fn(VehicleRef) -> PreviousTile,
     pub disconnect: extern "C" fn(),
     pub stop_read: extern "C" fn(VehicleRef) -> StopRead,
     pub should_stop: extern "C" fn(VehicleRef, u32) -> bool,
@@ -466,11 +458,8 @@ pub struct Leaves {
     pub depot_order: extern "C" fn(VehicleRef) -> DepotOrder,
     pub depot_exit: extern "C" fn(VehicleRef, i32, i32),
     pub crash_news: extern "C" fn(VehicleRef, u32),
-    pub detach_last: extern "C" fn(VehicleRef, VehicleRef, VehicleRef),
-    pub cache_begin: extern "C" fn(VehicleRef),
     pub cache_part: extern "C" fn(VehicleRef) -> CachePart,
     pub update_cargo_age: extern "C" fn(VehicleRef),
-    pub write_max_speed: extern "C" fn(VehicleRef, u16),
     pub cost_read: extern "C" fn(VehicleRef) -> CostRead,
     pub price: extern "C" fn(VehicleRef, u32) -> i64,
     pub pay_running: extern "C" fn(VehicleRef, i64),
@@ -551,16 +540,26 @@ fn visit<T, F: FnMut(&T) -> bool>(
     extern "C" fn dispatch<T, F: FnMut(&T) -> bool>(context: *mut c_void, item: *const T) -> bool {
         // SAFETY: Native traversal calls synchronously and once at a time; item is
         // borrowed for this dispatch only.
-        unsafe { (*context.cast::<F>())(&*item) }
+        {
+            crate::witness::hit(crate::witness::ROAD_VISITORS);
+            unsafe { (*context.cast::<F>())(&*item) }
+        }
     }
     call(dispatch::<T, F>, (&raw mut visitor).cast());
+}
+
+/// Count one actual typed outgoing call; returns the unchanged function pointer.
+macro_rules! service {
+    ($function:expr) => {{
+        crate::witness::hit(crate::witness::ROAD_SERVICES);
+        $function
+    }};
 }
 
 struct Game<'a> {
     l: &'a Leaves,
     vs: &'a VehicleServices,
     gs: &'a GroundServices,
-    ms: &'a MapServices,
     ss: &'a Services,
     acceleration_model: u8,
     road_side: u8,
@@ -604,7 +603,6 @@ impl Game<'_> {
                 l,
                 vs: &*l.vehicle,
                 gs: &*l.ground,
-                ms: &*l.map,
                 ss: &*l.shared,
                 acceleration_model,
                 road_side,
@@ -625,7 +623,7 @@ impl Game<'_> {
         usize::from(self.road_side) << 4
     }
     fn random(&self) -> u32 {
-        (self.ss.random)(self.ss.context)
+        service!(self.ss.random)(self.ss.context)
     }
     fn tile_xy(&self, tile: u32, pos: (u8, u8)) -> (i32, i32) {
         (
@@ -634,7 +632,7 @@ impl Game<'_> {
         )
     }
     fn set_speed(&self, v: Part, s: &mut Step, speed: u16) {
-        (self.vs.write_speed)(v.v, speed);
+        service!(self.vs.write_speed)(v.v, speed);
         s.cur_speed = speed;
     }
     fn observe(s: &mut Step, e: Entered) {
@@ -665,13 +663,13 @@ impl Game<'_> {
                 }
             }
             if part.state() == WORMHOLE && u.status & VS_HIDDEN == 0 {
-                speed = speed.min(i32::from((self.ms.bridge_speed)(u.tile)) * 2);
+                speed = speed.min(i32::from(service!(self.ss.bridge_speed)(u.tile)) * 2);
             }
             let Some(next) = Part::link(u.next, u.next_state) else {
                 break;
             };
             part = next;
-            u = (self.l.speed_part)(next.v);
+            u = service!(self.l.speed_part)(next.v);
         }
         speed.min(i32::from(r.order_max_speed) * 2)
     }
@@ -686,7 +684,8 @@ impl Game<'_> {
         } else {
             (if over { 512 } else { 256 }, 0)
         };
-        let speed = (self.gs.do_update_speed)(front.v, accel, min, self.max_speed(front, r.max));
+        let speed =
+            service!(self.gs.do_update_speed)(front.v, accel, min, self.max_speed(front, r.max));
         (speed.distance, speed.cur_speed)
     }
     /// `RoadVehFindCloseTo`; `v` is always the front part.
@@ -698,7 +697,9 @@ impl Game<'_> {
         let mut best_diff = u32::MAX;
         let wormhole = v.state() == WORMHOLE;
         visit(
-            |dispatch, context| (self.l.visit_close)(v.v, x, y, wormhole, dispatch, context),
+            |dispatch, context| {
+                service!(self.l.visit_close)(v.v, x, y, wormhole, dispatch, context);
+            },
             |u: &Candidate| {
                 // FindClosestBlockingRoadVeh; C++ already skipped other types and our consist.
                 if state_of(u.state) == DEPOT {
@@ -747,10 +748,10 @@ impl Game<'_> {
     }
     /// `CheckRoadBlockedForOvertaking`.
     fn overtake_blocked(&self, v: Part, u: VehicleRef, tile: u32, trackdir: u8) -> bool {
-        if !(self.l.has_road)(v.v, tile) {
+        if !service!(self.l.has_road)(v.v, tile) {
             return true;
         }
-        let ts = (self.l.track_status)(v.v, tile);
+        let ts = service!(self.l.track_status)(v.v, tile);
         let trackdirs = ts & 0x3f3f;
         let red = (ts >> 16) & 0x3f3f;
         let trackbits = (trackdirs | (trackdirs >> 8)) & 0x3f;
@@ -759,7 +760,7 @@ impl Game<'_> {
         }
         let mut blocked = false;
         visit(
-            |dispatch, context| (self.l.visit_tile)(tile, dispatch, context),
+            |dispatch, context| service!(self.l.visit_tile)(tile, dispatch, context),
             |w: &TileVehicle| {
                 blocked = w.first == w.vehicle && w.vehicle != u && w.vehicle != v.v;
                 !blocked
@@ -772,7 +773,7 @@ impl Game<'_> {
         if s.tram {
             return;
         }
-        let ur = (self.l.overtake_read)(u.v);
+        let ur = service!(self.l.overtake_read)(u.v);
         if s.direction != ur.direction || s.direction & 1 == 0 {
             return;
         }
@@ -780,18 +781,20 @@ impl Game<'_> {
         if state >= STOP || !straight(state & 15) {
             return;
         }
-        if (self.ms.tile_type)(s.tile) == MP_STATION || (self.ms.tile_type)(ur.tile) == MP_STATION {
+        if service!(self.ss.tile_type)(s.tile) == MP_STATION
+            || service!(self.ss.tile_type)(ur.tile) == MP_STATION
+        {
             return;
         }
-        if s.next.is_some() && (self.l.overtake_read)(v.v).articulated {
+        if s.next.is_some() && service!(self.l.overtake_read)(v.v).articulated {
             return;
         }
-        let u_speed = if self.original() || (self.gs.acceleration)(u.v) > 0 {
-            self.max_speed(u, (self.l.max_speed_read)(u.v))
+        let u_speed = if self.original() || service!(self.gs.acceleration)(u.v) > 0 {
+            self.max_speed(u, service!(self.l.max_speed_read)(u.v))
         } else {
             i32::from(ur.cur_speed)
         };
-        if u_speed >= self.max_speed(v, (self.l.max_speed_read)(v.v))
+        if u_speed >= self.max_speed(v, service!(self.l.max_speed_read)(v.v))
             && ur.status & VS_STOPPED == 0
             && ur.cur_speed != 0
         {
@@ -837,7 +840,7 @@ impl Game<'_> {
     }
     /// Direction store with the original-acceleration curve slowdown.
     fn set_direction(&self, v: Part, s: &mut Step, dir: u8) {
-        (self.vs.write_direction)(v.v, dir);
+        service!(self.vs.write_direction)(v.v, dir);
         s.direction = dir;
         if self.original() {
             self.set_speed(v, s, s.cur_speed - (s.cur_speed >> 2));
@@ -845,7 +848,7 @@ impl Game<'_> {
     }
     /// x/y store, `UpdatePosition`, `UpdateInclination` and `RoadZPosAffectSpeed`.
     fn move_to(&self, v: Part, s: &mut Step, x: i32, y: i32, new_tile: bool, delta: bool) {
-        let m = (self.gs.move_incline)(v.v, x, y, new_tile, delta);
+        let m = service!(self.gs.move_incline)(v.v, x, y, new_tile, delta);
         s.x = x;
         s.y = y;
         s.z = m.z;
@@ -864,23 +867,23 @@ impl Game<'_> {
     }
     /// `StartRoadVehSound`.
     fn start_sound(&self, v: Part) {
-        if !(self.vs.play_start_sound)(v.v) {
-            let r = (self.l.sound_read)(v.v);
+        if !service!(self.vs.play_start_sound)(v.v) {
+            let r = service!(self.l.sound_read)(v.v);
             let mut sound = r.sound;
             if sound == SND_DEPARTURE_OLD_RV_1 && r.tick & 3 == 0 {
                 sound = SND_DEPARTURE_OLD_RV_2;
             }
-            (self.vs.play_sound)(v.v, sound);
+            service!(self.vs.play_sound)(v.v, sound);
         }
     }
     /// `RoadVehicle::Crash`.
     fn crash(&self, v: Part, flooded: bool) -> u32 {
-        let c = (self.gs.crash)(v.v, flooded);
+        let c = service!(self.gs.crash)(v.v, flooded);
         let mut victims = c.victims;
         if c.front {
             victims = victims.wrapping_add(1);
             if in_range(v.state(), DT_STOP, DT_STOP + 16) {
-                (self.l.stop_leave)(v.v);
+                service!(self.l.stop_leave)(v.v);
             }
         }
         v.set(CRASHED, if flooded { 2000 } else { 1 });
@@ -895,7 +898,7 @@ impl Game<'_> {
                 let z = u.z;
                 let mut hit = false;
                 visit(
-                    |dispatch, context| (self.l.visit_trains)(v.v, dispatch, context),
+                    |dispatch, context| service!(self.l.visit_trains)(v.v, dispatch, context),
                     |tz: &i32| {
                         hit = tz.wrapping_sub(z).wrapping_abs() <= 6;
                         !hit
@@ -903,7 +906,7 @@ impl Game<'_> {
                 );
                 if hit {
                     let victims = self.crash(v, false);
-                    (self.l.crash_news)(v.v, victims);
+                    service!(self.l.crash_news)(v.v, victims);
                     return true;
                 }
             }
@@ -911,7 +914,7 @@ impl Game<'_> {
                 return false;
             };
             part = next;
-            u = (self.l.crash_part)(next.v);
+            u = service!(self.l.crash_part)(next.v);
         }
     }
     /// `RoadVehIsCrashed` with this tick's counter.
@@ -919,20 +922,20 @@ impl Game<'_> {
         let counter = v.get(CRASHED).wrapping_add(1);
         v.set(CRASHED, counter);
         if counter == 2 {
-            (self.vs.large_explosion)(v.v);
+            service!(self.vs.large_explosion)(v.v);
         } else if counter <= 45 {
             if tick & 7 == 0 {
                 const DELTA: [u8; 4] = [7, 0, 0, 1];
                 let mut u = Some(v.v);
                 while let Some(part) = u {
                     let random = self.random();
-                    let r = (self.l.speed_part)(part);
-                    (self.gs.turn)(part, (r.direction + DELTA[(random & 3) as usize]) & 7);
+                    let r = service!(self.l.speed_part)(part);
+                    service!(self.gs.turn)(part, (r.direction + DELTA[(random & 3) as usize]) & 7);
                     u = r.next;
                 }
             }
         } else if counter >= 2220 && tick & 31 == 0 {
-            let first = (self.l.part)(v.v);
+            let first = service!(self.l.part)(v.v);
             let alive = first.next.is_some();
             let mut previous = v;
             let mut last = v;
@@ -940,27 +943,27 @@ impl Game<'_> {
             while let Some(part) = next {
                 previous = last;
                 last = part;
-                let r = (self.l.part)(part.v);
+                let r = service!(self.l.part)(part.v);
                 next = Part::link(r.next, r.next_state);
             }
-            (self.l.detach_last)(previous.v, last.v, v.v);
+            service!(self.vs.detach_last)(previous.v, last.v, v.v);
             if in_range(last.state(), STOP, STOP + 16) {
-                (self.l.stop_leave)(last.v);
+                service!(self.l.stop_leave)(last.v);
             }
-            (self.vs.destroy)(last.v);
+            service!(self.vs.destroy)(last.v);
             return alive;
         }
         true
     }
     /// `RoadVehUpdateCache`.
     fn update_cache(&self, v: Part, same_length: bool) {
-        (self.l.cache_begin)(v.v);
-        let first = (self.l.cache_part)(v.v);
+        service!(self.gs.cache_begin)(v.v);
+        let first = service!(self.l.cache_part)(v.v);
         let mut total: u16 = 0;
         let mut u = v.v;
         let mut r = first;
         loop {
-            (self.gs.write_first_engine)(
+            service!(self.gs.write_first_engine)(
                 u,
                 if u == v.v {
                     INVALID_ENGINE
@@ -970,13 +973,13 @@ impl Game<'_> {
             );
             let mut length = VEHICLE_LENGTH;
             let mut factor = if r.grf_version >= 8 {
-                let value = (self.vs.property)(u, 0x23, i32::from(CALLBACK_FAILED)) as u16;
+                let value = service!(self.vs.property)(u, 0x23, i32::from(CALLBACK_FAILED)) as u16;
                 if value != CALLBACK_FAILED && value >= u16::from(VEHICLE_LENGTH) {
-                    (self.vs.unknown_length_result)(u, value);
+                    service!(self.vs.unknown_length_result)(u, value);
                 }
                 value
             } else {
-                (self.vs.length_callback)(u)
+                service!(self.vs.length_callback)(u)
             };
             if factor == CALLBACK_FAILED {
                 factor = u16::from(r.shorten);
@@ -985,19 +988,19 @@ impl Game<'_> {
                 length -= factor.min(u16::from(VEHICLE_LENGTH - 1)) as u8;
             }
             if same_length && length != r.length {
-                (self.vs.length_changed)(u);
+                service!(self.vs.length_changed)(u);
             }
             total = total.wrapping_add(u16::from(length));
-            (self.gs.write_length)(u, length, v.v, total);
-            (self.l.update_cargo_age)(u);
+            service!(self.gs.write_length)(u, length, v.v, total);
+            service!(self.l.update_cargo_age)(u);
             let Some(next) = r.next else {
                 break;
             };
             u = next;
-            r = (self.l.cache_part)(u);
+            r = service!(self.l.cache_part)(u);
         }
-        let speed = (self.vs.property)(v.v, 0x15, 0) as u32;
-        (self.l.write_max_speed)(
+        let speed = service!(self.vs.property)(v.v, 0x15, 0) as u32;
+        service!(self.vs.write_max_speed)(
             v.v,
             if speed != 0 {
                 speed.wrapping_mul(4)
@@ -1008,26 +1011,26 @@ impl Game<'_> {
     }
     /// `RoadFindPathToDest`.
     fn path(&self, v: Part, s: &Step, tile: u32, entry: u8) -> u8 {
-        let ts = (self.l.track_status)(v.v, tile);
+        let ts = service!(self.l.track_status)(v.v, tile);
         let red = (ts >> 16) & 0x3f3f;
         let mut trackdirs = ts & 0x3f3f;
-        let p = (self.l.path_read)(v.v);
-        let kind = (self.ms.tile_type)(tile);
+        let p = service!(self.l.path_read)(v.v);
+        let kind = service!(self.ss.tile_type)(tile);
         if kind == MP_ROAD {
-            if (self.l.is_road_depot_tile)(tile)
-                && ((self.ms.tile_owner)(tile) != p.owner
-                    || (self.l.depot_direction)(tile) == entry)
+            if service!(self.l.is_road_depot_tile)(tile)
+                && (service!(self.ss.tile_owner)(tile) != p.owner
+                    || service!(self.l.depot_direction)(tile) == entry)
             {
                 trackdirs = 0;
             }
-        } else if kind == MP_STATION && (self.l.is_bay_stop)(tile) {
-            if (self.ms.tile_owner)(tile) != p.owner
-                || (self.l.bay_direction)(tile) == entry
+        } else if kind == MP_STATION && service!(self.l.is_bay_stop)(tile) {
+            if service!(self.ss.tile_owner)(tile) != p.owner
+                || service!(self.l.bay_direction)(tile) == entry
                 || p.articulated
             {
                 trackdirs = 0;
-            } else if (self.l.stop_type)(tile) != u8::from(!p.bus)
-                || (!self.queue && !(self.l.has_free_bay)(tile))
+            } else if service!(self.l.stop_type)(tile) != u8::from(!p.bus)
+                || (!self.queue && !service!(self.l.has_free_bay)(tile))
             {
                 trackdirs = 0;
             }
@@ -1043,7 +1046,7 @@ impl Game<'_> {
             if v.get(REVERSE_CTR) != 0 {
                 let mut reverse = true;
                 if s.tram {
-                    let bits = (self.l.any_road_bits)(v.v, tile, false);
+                    let bits = service!(self.l.any_road_bits)(v.v, tile, false);
                     let straight = if entry & 1 == 0 { 10 } else { 5 };
                     reverse = (bits & straight) == straight || bits == (8 >> entry);
                 }
@@ -1093,8 +1096,8 @@ impl Game<'_> {
                 if let Some(dir) = cached {
                     dir
                 } else {
-                    let r = (self.l.choose_track)(v.v, tile, entry, trackdirs as u16);
-                    (self.vs.pathfinding_result)(v.v, r.found);
+                    let r = service!(self.l.choose_track)(v.v, tile, entry, trackdirs as u16);
+                    service!(self.vs.pathfinding_result)(v.v, r.found);
                     r.trackdir
                 }
             }
@@ -1110,56 +1113,56 @@ impl Game<'_> {
         if v.state() != DEPOT {
             return false;
         }
-        let d = (self.l.part)(v.v);
+        let d = service!(self.l.part)(v.v);
         let mut next = Part::link(d.next, d.next_state);
         while let Some(u) = next {
             if u.state() != DEPOT {
                 return false;
             }
-            let r = (self.l.part)(u.v);
+            let r = service!(self.l.part)(u.v);
             if r.tile != d.tile {
                 return false;
             }
             next = Part::link(r.next, r.next_state);
         }
-        let dir = (self.l.depot_direction)(d.tile);
+        let dir = service!(self.l.depot_direction)(d.tile);
         let direction = dir * 2 + 1;
-        (self.vs.write_direction)(v.v, direction);
+        service!(self.vs.write_direction)(v.v, direction);
         let tdir = DIAG_TRACK[usize::from(dir)];
         let rd = crate::road_data::entry(d.tram, self.side() + usize::from(tdir), 6);
         let (x, y) = self.tile_xy(d.tile, (rd.0 & 15, rd.1 & 15));
         if first {
-            let o = (self.l.depot_order)(v.v);
+            let o = service!(self.l.depot_order)(v.v);
             if o.order_type == OT_GOTO_DEPOT && d.tile == o.dest {
-                (self.vs.enter_depot)(v.v);
+                service!(self.vs.enter_depot)(v.v);
                 return true;
             }
             if self.close(v, d.z, x, y, direction, false).is_some() {
                 return true;
             }
-            (self.vs.service_in_depot)(v.v);
-            (self.vs.leave_unbunching_depot)(v.v);
+            service!(self.vs.service_in_depot)(v.v);
+            service!(self.vs.leave_unbunching_depot)(v.v);
             self.start_sound(v);
-            (self.vs.write_speed)(v.v, 0);
+            service!(self.vs.write_speed)(v.v, 0);
         }
         v.set(STATE, u16::from(tdir));
         v.set(FRAME, 6);
-        (self.l.depot_exit)(v.v, x, y);
+        service!(self.l.depot_exit)(v.v, x, y);
         true
     }
     /// `FollowPreviousRoadVehicle`.
     fn follow(&self, v: Part, s: &Step, prev: Part, tile: u32, entry: u8, reversed: bool) -> u8 {
-        let prev_tile = (self.l.part)(prev.v).tile;
+        let prev_tile = service!(self.l.part)(prev.v).tile;
         if prev_tile == s.tile && !reversed {
             return REVERSE[usize::from(entry)];
         }
         let state = prev.state();
         let dir;
         if state == WORMHOLE || state == DEPOT {
-            let diagonal = if (self.ms.tile_type)(tile) == MP_TUNNELBRIDGE {
-                (self.ms.tunnel_bridge_direction)(tile)
-            } else if (self.l.is_road_depot_tile)(tile) {
-                (self.l.depot_direction)(tile) ^ 2
+            let diagonal = if service!(self.ss.tile_type)(tile) == MP_TUNNELBRIDGE {
+                service!(self.ss.tunnel_bridge_direction)(tile)
+            } else if service!(self.l.is_road_depot_tile)(tile) {
+                service!(self.l.depot_direction)(tile) ^ 2
             } else {
                 return INVALID_TRACKDIR;
             };
@@ -1179,7 +1182,7 @@ impl Game<'_> {
             return INVALID_TRACKDIR;
         }
         const REQUIRED: [u8; 8] = [10, 5, 9, 6, 3, 12, 10, 5];
-        let bits = (self.l.any_road_bits)(v.v, tile, true);
+        let bits = service!(self.l.any_road_bits)(v.v, tile, true);
         if REQUIRED[usize::from(dir & 7)] & bits == 0 {
             INVALID_TRACKDIR
         } else {
@@ -1188,25 +1191,25 @@ impl Game<'_> {
     }
     /// `RoadVehArrivesAt`, `BeginLoading` and the road stop arrival triggers.
     fn arrive_load(&self, v: Part, s: &Step, station: u16) {
-        let r = (self.l.arrival_read)(v.v, station);
+        let r = service!(self.l.arrival_read)(v.v, station);
         let bit = if r.bus { HVOT_BUS } else { HVOT_TRUCK };
         if r.had_vehicle_of_type & bit == 0 {
             let headline = if r.bus { 0 } else { 2 } + u8::from(s.tram);
-            (self.l.arrival_news)(v.v, station, bit, headline);
+            service!(self.l.arrival_news)(v.v, station, bit, headline);
         }
-        (self.l.begin_loading_at)(v.v, station);
+        service!(self.l.begin_loading_at)(v.v, station);
     }
     /// Drive-through stop test shared by the blocked and stop-frame paths.
     fn stops_here(&self, v: Part, tile: u32) -> bool {
-        let r = (self.l.stop_read)(v.v);
-        (self.l.should_stop)(v.v, tile)
-            && r.owner == (self.ms.tile_owner)(tile)
-            && (self.l.stop_type)(tile) == u8::from(!r.bus)
+        let r = service!(self.l.stop_read)(v.v);
+        service!(self.l.should_stop)(v.v, tile)
+            && r.owner == service!(self.ss.tile_owner)(tile)
+            && service!(self.l.stop_type)(tile) == u8::from(!r.bus)
     }
     /// `IndividualRoadVehicleController`; `s` is a fresh observation of `v`.
     fn individual(&self, v: Part, prev: Option<Part>, s: &mut Step) -> bool {
         if v.overtaking() != 0 {
-            if (self.ms.tile_type)(s.tile) == MP_STATION {
+            if service!(self.ss.tile_type)(s.tile) == MP_STATION {
                 v.set(OVERTAKING, 0);
             } else {
                 let counter = v.get(OVERTAKING_CTR).wrapping_add(1) as u8;
@@ -1220,26 +1223,26 @@ impl Game<'_> {
             return true;
         }
         if v.state() == WORMHOLE {
-            let gp = (self.vs.new_position)(v.v);
+            let gp = service!(self.vs.new_position)(v.v);
             if s.front {
                 if let Some(u) = self.close(v, s.z, gp.x, gp.y, s.direction, true) {
                     self.set_speed(v, s, u.first_speed);
                     return false;
                 }
             }
-            if (self.ms.tile_type)(gp.tile) == MP_TUNNELBRIDGE {
-                let e = (self.l.enter_tile)(v.v, gp.tile, gp.x, gp.y);
+            if service!(self.ss.tile_type)(gp.tile) == MP_TUNNELBRIDGE {
+                let e = service!(self.l.enter_tile)(v.v, gp.tile, gp.x, gp.y);
                 Self::observe(s, e);
                 if e.flags & VETS_ENTERED_WORMHOLE != 0 {
                     self.move_without_speed(v, s, gp.x, gp.y);
                     return true;
                 }
             }
-            let status = (self.vs.move_then_status)(v.v, gp.x, gp.y);
+            let status = service!(self.vs.move_then_status)(v.v, gp.x, gp.y);
             s.x = gp.x;
             s.y = gp.y;
             if status & VS_HIDDEN == 0 {
-                (self.vs.base_viewport)(v.v);
+                service!(self.vs.base_viewport)(v.v);
             }
             return true;
         }
@@ -1254,7 +1257,7 @@ impl Game<'_> {
         if rd.0 & 128 != 0 {
             let mut tile = self.map.add_diag(s.tile, entry);
             let mut dir = if s.front {
-                if (self.l.has_road)(v.v, tile) {
+                if service!(self.l.has_road)(v.v, tile) {
                     self.path(v, s, tile, entry)
                 } else {
                     REVERSE[usize::from(entry)]
@@ -1267,7 +1270,7 @@ impl Game<'_> {
             };
             if dir == INVALID_TRACKDIR {
                 if !s.front {
-                    (self.l.disconnect)();
+                    service!(self.l.disconnect)();
                 }
                 self.set_speed(v, s, 0);
                 return false;
@@ -1278,17 +1281,18 @@ impl Game<'_> {
                     v.set(OVERTAKING, 0);
                     if s.tram {
                         let needed: u8 = [2, 1, 8, 4][usize::from(((dir >> 2) & 2) | (dir & 1))];
-                        let previous = (self.l.previous_tile)(v.v);
+                        let previous = service!(self.vs.previous_tile)(v.v);
                         let big = (previous.exists && previous.tile == tile)
                             || (s.front
-                                && (self.l.is_normal_road)(tile)
-                                && !(self.l.has_road_works)(tile)
-                                && (self.l.has_road)(v.v, tile)
-                                && needed & (self.l.tram_bits)(tile) != 0);
+                                && service!(self.l.is_normal_road)(tile)
+                                && !service!(self.l.has_road_works)(tile)
+                                && service!(self.l.has_road)(v.v, tile)
+                                && needed & service!(self.l.tram_bits)(tile) != 0);
                         if !big {
                             if !s.front
-                                || !(self.l.can_build_tram)(v.v, tile, needed)
-                                || (!needed & (self.l.any_road_bits)(v.v, s.tile, false)) == 0
+                                || !service!(self.l.can_build_tram)(v.v, tile, needed)
+                                || (!needed & service!(self.l.any_road_bits)(v.v, s.tile, false))
+                                    == 0
                             {
                                 tile = s.tile;
                                 start_frame = 16;
@@ -1297,8 +1301,8 @@ impl Game<'_> {
                                 return false;
                             }
                         }
-                    } else if (self.l.is_normal_road)(s.tile)
-                        && (self.l.disallowed_directions)(s.tile) != 0
+                    } else if service!(self.l.is_normal_road)(s.tile)
+                        && service!(self.l.disallowed_directions)(s.tile) != 0
                     {
                         self.set_speed(v, s, 0);
                         return false;
@@ -1320,10 +1324,10 @@ impl Game<'_> {
                         return false;
                     }
                 }
-                let e = (self.l.enter_tile)(v.v, tile, x, y);
+                let e = service!(self.l.enter_tile)(v.v, tile, x, y);
                 Self::observe(s, e);
                 if e.flags & VETS_CANNOT_ENTER != 0 {
-                    if (self.ms.tile_type)(tile) != MP_TUNNELBRIDGE {
+                    if service!(self.ss.tile_type)(tile) != MP_TUNNELBRIDGE {
                         self.set_speed(v, s, 0);
                         return false;
                     }
@@ -1331,23 +1335,24 @@ impl Game<'_> {
                     continue;
                 }
                 let state = v.state();
-                if in_range(state, STOP, DT_STOP + 16) && (self.ms.tile_type)(s.tile) == MP_STATION
+                if in_range(state, STOP, DT_STOP + 16)
+                    && service!(self.ss.tile_type)(s.tile) == MP_STATION
                 {
                     if reversing(dir) && in_range(state, STOP, STOP + 16) {
                         self.set_speed(v, s, 0);
                         return false;
                     }
-                    if (self.l.is_drive_through)(s.tile)
-                        && (self.l.continuation)(s.tile, tile)
+                    if service!(self.l.is_drive_through)(s.tile)
+                        && service!(self.l.continuation)(s.tile, tile)
                         && s.tile != tile
                     {
                         dir = v.state();
-                    } else if (self.l.is_station_road_stop)(s.tile) {
-                        (self.l.stop_leave)(v.v);
+                    } else if service!(self.l.is_station_road_stop)(s.tile) {
+                        service!(self.l.stop_leave)(v.v);
                     }
                 }
                 if e.flags & VETS_ENTERED_WORMHOLE == 0 {
-                    let types = (self.l.move_tile)(v.v, tile);
+                    let types = service!(self.l.move_tile)(v.v, tile);
                     s.tile = tile;
                     v.set(STATE, u16::from(dir));
                     v.set(FRAME, start_frame as u16);
@@ -1355,7 +1360,7 @@ impl Game<'_> {
                         if s.front {
                             self.update_cache(v, false);
                         }
-                        (self.gs.first_cargo_changed)(v.v);
+                        service!(self.gs.first_cargo_changed)(v.v);
                     }
                 }
                 if new_dir != s.direction {
@@ -1367,8 +1372,8 @@ impl Game<'_> {
         }
         if rd.0 & 64 != 0 {
             let mut start_frame = 1;
-            let dir = if s.tram && !(self.l.is_road_depot_tile)(s.tile) && {
-                let bits = (self.l.any_road_bits)(v.v, s.tile, true);
+            let dir = if s.tram && !service!(self.l.is_road_depot_tile)(s.tile) && {
+                let bits = service!(self.l.any_road_bits)(v.v, s.tile, true);
                 bits != 0 && bits & (bits - 1) == 0
             } {
                 start_frame = 21;
@@ -1394,7 +1399,7 @@ impl Game<'_> {
                     return false;
                 }
             }
-            let e = (self.l.enter_tile)(v.v, s.tile, x, y);
+            let e = service!(self.l.enter_tile)(v.v, s.tile, x, y);
             Self::observe(s, e);
             if e.flags & VETS_CANNOT_ENTER != 0 {
                 self.set_speed(v, s, 0);
@@ -1409,7 +1414,7 @@ impl Game<'_> {
             return true;
         }
         if let Some(next) = Part::link(s.next, s.next_state) {
-            if (self.l.is_road_depot_tile)(s.tile)
+            if service!(self.l.is_road_depot_tile)(s.tile)
                 && u16::from(v.frame()) == u16::from(s.length) + 6
             {
                 self.leave_depot(next, false);
@@ -1429,15 +1434,15 @@ impl Game<'_> {
                 }
                 if s.cur_speed == 0
                     && in_range(v.state(), DT_STOP, DT_STOP + 16)
-                    && (self.l.should_stop)(v.v, s.tile)
+                    && service!(self.l.should_stop)(v.v, s.tile)
                 {
-                    let r = (self.l.stop_read)(v.v);
-                    if r.owner == (self.ms.tile_owner)(s.tile)
+                    let r = service!(self.l.stop_read)(v.v);
+                    if r.owner == service!(self.ss.tile_owner)(s.tile)
                         && r.order_type != OT_LEAVESTATION
-                        && (self.l.stop_type)(s.tile) == u8::from(!r.bus)
+                        && service!(self.l.stop_type)(s.tile) == u8::from(!r.bus)
                     {
-                        let station = (self.ms.station_index)(s.tile);
-                        (self.vs.write_last_station)(v.v, station);
+                        let station = service!(self.ss.station_index)(s.tile);
+                        service!(self.vs.write_last_station)(v.v, station);
                         self.arrive_load(v, s, station);
                     }
                 }
@@ -1448,7 +1453,7 @@ impl Game<'_> {
             if self.original() {
                 self.set_speed(v, s, s.cur_speed - (s.cur_speed >> 2));
             }
-            (self.gs.turn)(v.v, new_dir);
+            service!(self.gs.turn)(v.v, new_dir);
             s.direction = new_dir;
             return true;
         }
@@ -1464,49 +1469,51 @@ impl Game<'_> {
                     && frame == 11
                     && self.stops_here(v, s.tile)))
         {
-            let station = (self.ms.station_index)(s.tile);
+            let station = service!(self.ss.station_index)(s.tile);
             if state & 4 == 0 {
-                if (self.l.is_drive_through)(s.tile) {
+                if service!(self.l.is_drive_through)(s.tile) {
                     let next = self.map.add_dir(s.tile, s.direction);
-                    if (self.l.continuation)(s.tile, next) && (self.l.has_road)(v.v, next) {
+                    if service!(self.l.continuation)(s.tile, next)
+                        && service!(self.l.has_road)(v.v, next)
+                    {
                         v.set(FRAME, u16::from(frame) + 1);
                         self.move_to(v, s, x, y, true, false);
                         return true;
                     }
                 }
-                (self.l.stop_entrance)(v.v, false);
+                service!(self.l.stop_entrance)(v.v, false);
                 v.set(STATE, u16::from(state | 4));
-                (self.vs.write_last_station)(v.v, station);
-                if (self.l.is_drive_through)(s.tile) || {
-                    let r = (self.l.stop_read)(v.v);
+                service!(self.vs.write_last_station)(v.v, station);
+                if service!(self.l.is_drive_through)(s.tile) || {
+                    let r = service!(self.l.stop_read)(v.v);
                     r.order_type == OT_GOTO_STATION && r.order_destination == station
                 } {
                     self.arrive_load(v, s, station);
                     return false;
                 }
             } else {
-                if (self.l.stop_entrance_busy)(v.v) {
+                if service!(self.l.stop_entrance_busy)(v.v) {
                     self.set_speed(v, s, 0);
                     return false;
                 }
-                if (self.l.stop_read)(v.v).order_type == OT_LEAVESTATION {
-                    (self.vs.order_free)(v.v);
+                if service!(self.l.stop_read)(v.v).order_type == OT_LEAVESTATION {
+                    service!(self.vs.order_free)(v.v);
                 }
             }
-            if (self.l.is_bay_stop)(s.tile) {
-                (self.l.stop_entrance)(v.v, true);
+            if service!(self.l.is_bay_stop)(s.tile) {
+                service!(self.l.stop_entrance)(v.v, true);
             }
             self.start_sound(v);
-            (self.vs.start_stop_dirty)(v.v);
+            service!(self.vs.start_stop_dirty)(v.v);
         }
-        let e = (self.l.enter_tile)(v.v, s.tile, x, y);
+        let e = service!(self.l.enter_tile)(v.v, s.tile, x, y);
         Self::observe(s, e);
         if e.flags & VETS_CANNOT_ENTER != 0 {
             self.set_speed(v, s, 0);
             return false;
         }
-        if e.order_type == OT_LEAVESTATION && (self.l.is_drive_through)(s.tile) {
-            (self.vs.order_free)(v.v);
+        if e.order_type == OT_LEAVESTATION && service!(self.l.is_drive_through)(s.tile) {
+            service!(self.vs.order_free)(v.v);
         }
         if e.flags & VETS_ENTERED_WORMHOLE == 0 {
             v.set(FRAME, u16::from(v.frame()) + 1);
@@ -1516,7 +1523,7 @@ impl Game<'_> {
     }
     /// Wormhole entry: x/y, `UpdatePosition`, `UpdateInclination(true, true)`.
     fn move_without_speed(&self, v: Part, s: &mut Step, x: i32, y: i32) {
-        let m = (self.gs.move_incline)(v.v, x, y, true, true);
+        let m = service!(self.gs.move_incline)(v.v, x, y, true, true);
         s.x = x;
         s.y = y;
         s.z = m.z;
@@ -1530,7 +1537,7 @@ impl Game<'_> {
         let mut prev = v;
         let mut next = Part::link(s.next, s.next_state);
         while let Some(u) = next {
-            let mut us = (self.l.step)(u.v);
+            let mut us = service!(self.l.step)(u.v);
             if !self.individual(u, Some(prev), &mut us) {
                 return false;
             }
@@ -1555,26 +1562,26 @@ impl Game<'_> {
         if t.status & VS_CRASHED != 0 || self.train_crash(v, first) {
             return self.crashed(v, tick);
         }
-        let b = (self.vs.handle_breakdown)(v.v);
+        let b = service!(self.vs.handle_breakdown)(v.v);
         if b.broken {
             return true;
         }
         if b.status & VS_STOPPED != 0 {
-            (self.gs.set_last_speed)(v.v);
+            service!(self.gs.set_last_speed)(v.v);
             return true;
         }
-        if (self.vs.process_orders_then_loading)(v.v) == OT_LOADING {
+        if service!(self.l.process_orders_then_loading)(v.v) == OT_LOADING {
             return true;
         }
         if v.state() == DEPOT {
-            if (self.vs.waiting_for_unbunching)(v.v) {
+            if service!(self.vs.waiting_for_unbunching)(v.v) {
                 return true;
             }
             if self.leave_depot(v, true) {
                 return true;
             }
         }
-        let r = (self.l.visual_then_speed)(v.v, self.realistic());
+        let r = service!(self.l.visual_then_speed)(v.v, self.realistic());
         let mut s = Step {
             next: r.max.next,
             next_state: r.max.next_state,
@@ -1600,11 +1607,11 @@ impl Game<'_> {
             }
             if s.next.is_some() {
                 // Later parts may have changed the front; observe it again.
-                s = (self.l.step)(v.v);
+                s = service!(self.l.step)(v.v);
             }
             adv = advance_distance(s.direction);
             if j >= adv {
-                let crossing = v.state() != WORMHOLE && (self.ms.is_level_crossing)(s.tile);
+                let crossing = v.state() != WORMHOLE && service!(self.ss.is_level_crossing)(s.tile);
                 let first = CrashPart {
                     next: s.next,
                     next_state: s.next_state,
@@ -1617,20 +1624,20 @@ impl Game<'_> {
                 }
             }
         }
-        let last = (self.gs.set_last_speed)(v.v);
+        let last = service!(self.gs.set_last_speed)(v.v);
         if last.status & VS_HIDDEN == 0 {
-            (self.gs.update_viewport)(v.v, false, false);
+            service!(self.gs.update_viewport)(v.v, false, false);
         }
         let mut next = s.next;
         while let Some(u) = next {
-            let p = (self.l.speed_part)(u);
+            let p = service!(self.l.speed_part)(u);
             if p.status & VS_HIDDEN == 0 {
-                (self.gs.update_viewport)(u, false, false);
+                service!(self.gs.update_viewport)(u, false, false);
             }
             next = p.next;
         }
         if last.progress == 0 {
-            (self.vs.write_progress)(v.v, if blocked { adv - 1 } else { j } as u8);
+            service!(self.vs.write_progress)(v.v, if blocked { adv - 1 } else { j } as u8);
         }
         true
     }
@@ -1638,7 +1645,7 @@ impl Game<'_> {
     fn tick(&self, v: Part, t: &TickRead) -> bool {
         let tick = t.tick.wrapping_add(1);
         if !t.front {
-            (self.vs.write_counters)(v.v, tick, t.running, t.order_time);
+            service!(self.vs.write_counters)(v.v, tick, t.running, t.order_time);
             return true;
         }
         let running = if t.status & VS_STOPPED == 0 {
@@ -1646,7 +1653,7 @@ impl Game<'_> {
         } else {
             t.running
         };
-        (self.vs.write_counters)(v.v, tick, running, t.order_time.wrapping_add(1));
+        service!(self.vs.write_counters)(v.v, tick, running, t.order_time.wrapping_add(1));
         self.controller(v, t, tick)
     }
     /// `RoadVehicle::SetDestTile`.
@@ -1655,38 +1662,38 @@ impl Game<'_> {
             return;
         }
         v.path_clear();
-        (self.vs.write_dest)(v.v, tile);
+        service!(self.vs.write_dest)(v.v, tile);
     }
     /// `RoadVehicle::GetRunningCost`.
     fn running_cost(&self, v: Part) -> i64 {
-        let r = (self.l.cost_read)(v.v);
+        let r = service!(self.l.cost_read)(v.v);
         if r.cost_class == INVALID_PRICE {
             return 0;
         }
-        let factor = (self.vs.property)(v.v, 9, i32::from(r.cost_factor)) as u32;
+        let factor = service!(self.vs.property)(v.v, 9, i32::from(r.cost_factor)) as u32;
         if factor == 0 {
             return 0;
         }
-        (self.l.price)(v.v, factor)
+        service!(self.l.price)(v.v, factor)
     }
     /// `CheckIfRoadVehNeedsService`; `IsChainInDepot` and `FindClosestRoadDepot` inline.
     fn service(&self, v: Part) {
-        let r = (self.l.service_read)(v.v);
-        if r.servint == 0 || !(self.vs.needs_automatic_servicing)(v.v) {
+        let r = service!(self.l.service_read)(v.v);
+        if r.servint == 0 || !service!(self.vs.needs_automatic_servicing)(v.v) {
             return;
         }
-        let depot_tile = (self.l.is_road_depot_tile)(r.tile);
+        let depot_tile = service!(self.l.is_road_depot_tile)(r.tile);
         let mut all_in_depot = depot_tile && r.cur_speed == 0;
         if all_in_depot && v.state() != DEPOT {
             all_in_depot = false;
         }
         if all_in_depot {
             let mut next = {
-                let p = (self.l.part)(v.v);
+                let p = service!(self.l.part)(v.v);
                 Part::link(p.next, p.next_state)
             };
             while let Some(u) = next {
-                let p = (self.l.part)(u.v);
+                let p = service!(self.l.part)(u.v);
                 if u.state() != DEPOT || p.tile != r.tile {
                     all_in_depot = false;
                     break;
@@ -1695,7 +1702,7 @@ impl Game<'_> {
             }
         }
         if all_in_depot {
-            (self.vs.service_in_depot)(v.v);
+            service!(self.vs.service_in_depot)(v.v);
             return;
         }
         let penalty = self.max_penalty;
@@ -1705,47 +1712,47 @@ impl Game<'_> {
                 length: 0,
             }
         } else {
-            (self.l.find_depot)(v.v, penalty as i32)
+            service!(self.l.find_depot)(v.v, penalty as i32)
         };
         if depot.length == u32::MAX || depot.length > penalty {
-            if (self.l.depot_order)(v.v).order_type == OT_GOTO_DEPOT {
-                (self.vs.order_dummy)(v.v);
+            if service!(self.l.depot_order)(v.v).order_type == OT_GOTO_DEPOT {
+                service!(self.vs.order_dummy)(v.v);
             }
             return;
         }
-        let depot_id = (self.ms.depot_index)(depot.tile);
-        let o = (self.l.depot_order)(v.v);
+        let depot_id = service!(self.ss.depot_index)(depot.tile);
+        let o = service!(self.l.depot_order)(v.v);
         if o.order_type == OT_GOTO_DEPOT
             && o.nonstop & 1 != 0
             && !crate::services::chance16_i(1, 20, self.random())
         {
             return;
         }
-        (self.gs.go_to_depot_service)(v.v, depot_id);
-        self.set_dest(v, depot.tile, (self.l.path_read)(v.v).dest);
-        (self.vs.start_stop_dirty)(v.v);
+        service!(self.gs.go_to_depot_service)(v.v, depot_id);
+        self.set_dest(v, depot.tile, service!(self.l.path_read)(v.v).dest);
+        service!(self.vs.start_stop_dirty)(v.v);
     }
     /// `RoadVehicle::OnNewEconomyDay`.
     fn economy_day(&self, v: Part) {
-        let day = (self.vs.economy_age)(v.v).wrapping_add(1);
-        (self.vs.write_day)(v.v, day);
+        let day = service!(self.vs.economy_age)(v.v).wrapping_add(1);
+        service!(self.vs.write_day)(v.v, day);
         if day & 7 == 0 {
-            (self.vs.decrease_value)(v.v);
+            service!(self.vs.decrease_value)(v.v);
         }
         if v.get(BLOCKED) == 0 {
-            (self.vs.check_breakdown)(v.v);
+            service!(self.vs.check_breakdown)(v.v);
         }
         self.service(v);
-        let running = (self.vs.check_orders)(v.v);
+        let running = service!(self.vs.check_orders)(v.v);
         if running == 0 {
             return;
         }
         let cost = self.running_cost(v).saturating_mul(i64::from(running)) / YEAR_TICKS;
-        (self.l.pay_running)(v.v, cost);
+        service!(self.l.pay_running)(v.v, cost);
     }
     /// `CmdTurnRoadVeh` after the ownership checks.
     fn turn(&self, v: Part, execute: bool) -> bool {
-        let r = (self.l.turn_read)(v.v);
+        let r = service!(self.l.turn_read)(v.v);
         if r.status & (VS_STOPPED | VS_CRASHED) != 0
             || r.breakdown_ctr != 0
             || v.overtaking() != 0
@@ -1755,31 +1762,33 @@ impl Game<'_> {
         {
             return false;
         }
-        if (self.l.is_normal_road)(r.tile) && (self.l.disallowed_directions)(r.tile) != 0 {
+        if service!(self.l.is_normal_road)(r.tile)
+            && service!(self.l.disallowed_directions)(r.tile) != 0
+        {
             return false;
         }
-        if (self.ms.tile_type)(r.tile) == MP_TUNNELBRIDGE
-            && diag(r.direction) == (self.ms.tunnel_bridge_direction)(r.tile)
+        if service!(self.ss.tile_type)(r.tile) == MP_TUNNELBRIDGE
+            && diag(r.direction) == service!(self.ss.tunnel_bridge_direction)(r.tile)
         {
             return false;
         }
         if execute {
             v.set(REVERSE_CTR, 180);
-            (self.vs.reset_depot_unbunching)(v.v);
+            service!(self.vs.reset_depot_unbunching)(v.v);
         }
         true
     }
     /// `RoadVehicle::GetVehicleTrackdir`.
     fn trackdir(&self, v: Part) -> u8 {
-        let r = (self.l.trackdir_read)(v.v);
+        let r = service!(self.l.trackdir_read)(v.v);
         if r.status & VS_CRASHED != 0 {
             return INVALID_TRACKDIR;
         }
         if v.state() == DEPOT {
-            return DIAG_TRACK[usize::from((self.l.depot_direction)(r.tile))];
+            return DIAG_TRACK[usize::from(service!(self.l.depot_direction)(r.tile))];
         }
-        if (self.l.is_bay_stop)(r.tile) {
-            return DIAG_TRACK[usize::from((self.l.bay_direction)(r.tile))];
+        if service!(self.l.is_bay_stop)(r.tile) {
+            return DIAG_TRACK[usize::from(service!(self.l.bay_direction)(r.tile))];
         }
         let state = v.state();
         if state > 15 {
@@ -1795,7 +1804,7 @@ impl Game<'_> {
         }
         let mut u = first.v;
         while u != v {
-            let p = (self.l.speed_part)(u);
+            let p = service!(self.l.speed_part)(u);
             if direction != p.direction {
                 return true;
             }
@@ -1827,6 +1836,7 @@ pub unsafe extern "C" fn openttd_rust_road_tick(
     read: *const TickRead,
     leaves: *const Leaves,
 ) -> bool {
+    crate::witness::hit(crate::witness::ROAD_TICKS);
     // SAFETY: Records are borrowed for this call only.
     let (e, t) = unsafe { (&*entry, &*read) };
     entry!(leaves, Some(e)).tick(Part::new(v, state), t)
@@ -1845,7 +1855,7 @@ pub unsafe extern "C" fn openttd_rust_road_individual(
     // SAFETY: Entry record borrowed for this call only.
     let e = unsafe { &*entry };
     let g = entry!(leaves, Some(e));
-    let mut s = (g.l.step)(v);
+    let mut s = service!(g.l.step)(v);
     g.individual(Part::new(v, state), Part::link(prev, prev_state), &mut s)
 }
 /// # Safety
@@ -1894,7 +1904,7 @@ pub unsafe extern "C" fn openttd_rust_road_calendar_day(
 ) {
     if front {
         // SAFETY: Static tables.
-        unsafe { ((*(*leaves).vehicle).age)(v) };
+        unsafe { service!((*(*leaves).vehicle).age)(v) };
     }
 }
 /// # Safety

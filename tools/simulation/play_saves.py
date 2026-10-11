@@ -6,6 +6,8 @@ from .core import (
     ROOT,
     SNAPSHOT_TICKS,
     TICKS_PER_DAY,
+    WITNESS_ENVIRONMENT,
+    branch_witnesses,
     decode_element,
     read_save,
     run_game,
@@ -175,3 +177,33 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
 
 
 PREPARE_ORDER = 3
+
+
+def counted_road_save(scenario):
+    return any(
+        scenario["name"].startswith(f"play-{save}-")
+        for save in (*PLAY_SAVES, "padhattan-ridge-2000")
+    )
+
+
+def game_environment(scenario):
+    return (
+        WITNESS_ENVIRONMENT
+        if counted_road_save(scenario) and scenario.get("witnesses")
+        else {}
+    )
+
+
+def check(scenario, run, mode, role, result):
+    if not counted_road_save(scenario):
+        return
+    counts = branch_witnesses(scenario, run, role, "road", ("ticks", "services"))
+    if counts is None:
+        return
+    crossings = counts["services"] + counts["visitors"]
+    density = crossings / counts["ticks"]
+    result[f"{mode}_{role}_road_crossings"] = dict(counts, per_tick=density)
+    # The fixed Padhattan-2000 network measured ~44 outgoing calls/tick before
+    # #199. The shared road slice budgets 13 including callback visitor entries.
+    if scenario["name"] == "play-padhattan-ridge-2000-manual" and density > 13:
+        raise RuntimeError(f"road boundary exceeds 13 crossings/tick: {density:.3f}")

@@ -364,7 +364,7 @@ impl Search {
             }
         };
         if flushed {
-            witness::hit(witness::RAIL + 11);
+            witness::hit(witness::RAIL_CACHE_FLUSHES);
             unsafe {
                 (leaves.debug)(input.context, 2, std::ptr::null(), 0);
             }
@@ -1065,7 +1065,7 @@ impl Search {
             let max = self.input.settings.max_nodes as i32;
             // ClosedCount is checked AFTER following, BEFORE closing the node.
             if max != 0 && self.closed.len() as i32 >= max {
-                witness::hit(witness::RAIL + 20);
+                witness::hit(witness::RAIL_LIMIT_STOPS);
                 let p = [0_u32];
                 unsafe {
                     (self.leaves.debug)(self.input.context, 5, p.as_ptr(), 1);
@@ -1097,15 +1097,30 @@ impl Search {
             (self.leaves.debug)(self.input.context, 0, stats.as_ptr(), stats.len() as u32);
         }
         if witness::enabled() {
-            witness::hit(witness::RAIL + usize::from(self.input.kind));
-            witness::hit(witness::RAIL + if self.disabled { 5 } else { 4 });
+            witness::hit(
+                [
+                    witness::RAIL_CHOOSE,
+                    witness::RAIL_REVERSE,
+                    witness::RAIL_DEPOT,
+                    witness::RAIL_SAFE,
+                ][usize::from(self.input.kind)],
+            );
+            witness::hit(if self.disabled {
+                witness::RAIL_UNCACHED
+            } else {
+                witness::RAIL_CACHED
+            });
             witness::add(
-                witness::RAIL + 6,
+                witness::RAIL_PARTIAL_PATHS,
                 u64::from(!found && self.intermediate.is_some()),
             );
-            witness::add(witness::RAIL + 7, u64::from(self.max_cost != 0));
-            witness::add(witness::RAIL + 8, u64::from(found));
-            witness::hit(witness::RAIL + if self.input.forbid90 != 0 { 10 } else { 9 });
+            witness::add(witness::RAIL_BOUNDED_DEPOT, u64::from(self.max_cost != 0));
+            witness::add(witness::RAIL_FOUND, u64::from(found));
+            witness::hit(if self.input.forbid90 != 0 {
+                witness::RAIL_FORBID90
+            } else {
+                witness::RAIL_ALLOW90
+            });
         }
         found
     }
@@ -1349,7 +1364,7 @@ impl Reservation {
         // The original restores in insertion order, without dirtying again.
         for &(tile, td) in &self.signals {
             search.write(tile, td, 6);
-            witness::hit(witness::RAIL + 22);
+            witness::hit(witness::RAIL_SIGNALS_RESTORED);
             let p = [2_u32];
             unsafe {
                 (search.leaves.debug)(search.input.context, 5, p.as_ptr(), 1);
@@ -1364,9 +1379,9 @@ impl Reservation {
                 search.output(8, &self.target_output(false));
             }
             // TryReservePath uses the default forbid90=false free-position query.
-            witness::hit(witness::RAIL + 12);
+            witness::hit(witness::RAIL_RESERVE_ATTEMPTS);
             if !search.free(self.target_tile, self.target_td, 0) {
-                witness::hit(witness::RAIL + 13);
+                witness::hit(witness::RAIL_TARGET_BUSY);
                 return Some(false);
             }
         }
@@ -1378,7 +1393,7 @@ impl Reservation {
                 if search.global_for(&search.arena[self.target_node]) {
                     invalidate();
                 }
-                witness::hit(witness::RAIL + 14);
+                witness::hit(witness::RAIL_RESERVE_SUCCESS);
                 return Some(true);
             }
             let (tile, td) = (self.cursor.tile, self.cursor.td);
@@ -1425,7 +1440,7 @@ impl Reservation {
                         {
                             self.signals.push((tile, td ^ 8));
                             search.write(tile, td ^ 8, 5);
-                            witness::hit(witness::RAIL + 21);
+                            witness::hit(witness::RAIL_SIGNALS_RED);
                             let p = [1_u32];
                             unsafe {
                                 (search.leaves.debug)(search.input.context, 5, p.as_ptr(), 1);
@@ -1445,7 +1460,7 @@ impl Reservation {
             }
             if self.fail_tile != INVALID {
                 self.rollback(search, self.cursor.node);
-                witness::hit(witness::RAIL + 15);
+                witness::hit(witness::RAIL_ROLLBACK);
                 return Some(false);
             }
             let parent = search.arena[self.cursor.node].parent.unwrap();
@@ -1667,7 +1682,14 @@ pub unsafe extern "C" fn openttd_rust_rail_step(owner: *mut Owner) -> Step {
             _ => false,
         };
         if chosen {
-            witness::hit(witness::RAIL + 16 + usize::from(owner.input.kind));
+            witness::hit(
+                [
+                    witness::RAIL_INVALIDATIONS,
+                    witness::RAIL_REVERSE_CHOSEN,
+                    witness::RAIL_DEPOT_FOUND,
+                    witness::RAIL_SAFE_FOUND,
+                ][usize::from(owner.input.kind)],
+            );
         }
     }
     step
@@ -1682,5 +1704,5 @@ pub unsafe extern "C" fn openttd_rust_rail_destroy(owner: *mut Owner) {
 #[unsafe(no_mangle)]
 pub extern "C" fn openttd_rust_rail_invalidate() {
     invalidate();
-    witness::hit(witness::RAIL + 16);
+    witness::hit(witness::RAIL_INVALIDATIONS);
 }

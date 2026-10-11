@@ -1419,10 +1419,10 @@ C++ keeps shared physics, map/pools, orders/loading, construction and rendering;
 #199 makes road the first user of the shared vehicle layer (`vehicle.rs`,
 `vehicle_ffi.h`, `vehicle_services.{h,cpp}`): entries take an `OpenTTDVehicle *`
 handle and its owner, consist links carry both, and designated-initializer tables
-of typed vehicle, GroundVehicle (one template instance per type) and map services
-are defined once. Facades pass settings and the first observations; services
+of typed vehicle and GroundVehicle (one template instance per type) services
+are defined once. Map predicates use the single `OpenTTDSharedServices` table. Facades pass settings and the first observations; services
 resolve the vehicle once, return only consumed fields and bundle only consecutive
-original calls. Map offsets and advance distance are Rust arithmetic. No
+original calls. `services::Map` provides shared Rust map arithmetic. No
 owner/path/world borrow spans a service, including nested cache, destination,
 speed, slope and trackdir entries. Deletion follows PreDestructor and returns a
 copied result; wrappers are noexcept, and panics or escaping exceptions abort.
@@ -1431,6 +1431,8 @@ Paired `simulate roads-` and soak runs compare saved fields/logs for acceleratio
 service, blocking/overtaking, path, RNG, crossing/flooding, crash expiry and reload;
 `--self` controls reference determinism. Native checks cover typed ABI, nested
 getter/cache/destination/path mutation, destruction, movement data and save staging.
+Default play scenarios count actual road service calls and visitor entries;
+Padhattan-2000 requires at most 13 crossings/tick. Benchmarks disable counters.
 Legacy saves, NewGRFs, articulated/tram turns, sounds and viewport pixels remain
 unexercised domains tracked by #156.
 
@@ -1608,7 +1610,8 @@ stack snapshots restore temporary orders once; ordered signal rollback scratch
 remains local. No ordinary-play service unwinds here.
 Validation uses the existing Padhattan manual/cargodist, realistic acceleration,
 90-degree reservation, live reload and real command-built controller scenarios;
-each candidate run requires its `rails.TRAIN_BRANCHES` `train.*` witness counts (extension rollback is distinct from #122's search rollback).
+each candidate run requires its `rails.TRAIN_BRANCHES` `train.*` witness counts
+(extension rollback is distinct from #122's search rollback).
 Unreached branches (wormhole swap, unequal/articulated moves, red two-way,
 force-signal, free-wagon deletion, depot re-entry, opposing PBS restore) are #156.
 A narrow unchanged-source comparison covers variable-length curve/reversal inputs

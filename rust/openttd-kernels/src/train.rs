@@ -1885,9 +1885,6 @@ impl Game<'_> {
     }
 }
 /// Train branch witness `index` (`crate::witness::NAMES` train order).
-pub(crate) fn count(index: u64) {
-    crate::witness::hit(crate::witness::TRAIN + index as usize);
-}
 const BREAKDOWN_SPEEDS: [u16; 16] = [
     225, 210, 195, 180, 165, 150, 135, 120, 105, 90, 75, 60, 45, 30, 15, 15,
 ];
@@ -1984,7 +1981,11 @@ impl Game<'_> {
     fn update_crossing_tile(&self, tile: u32, sound: bool, force: bool) {
         let barred = force || self.check_crossing(tile);
         if barred != (self.svc_crossing_barred(Handle::NONE, u64::from(tile)) != 0) {
-            count(if barred { 13 } else { 14 });
+            crate::witness::hit(if barred {
+                crate::witness::TRAIN_CROSS_BAR
+            } else {
+                crate::witness::TRAIN_CROSS_UNBAR
+            });
             if barred && sound && self.svc_ambient_sound(Handle::NONE) != 0 {
                 self.svc_crossing_sound(Handle::NONE, u64::from(tile));
             }
@@ -2111,7 +2112,7 @@ impl Game<'_> {
     }
     fn after_swap(&self, id: Handle) {
         if id.track() == WORMHOLE {
-            count(3);
+            crate::witness::hit(crate::witness::TRAIN_WORMHOLE_SWAP);
         }
         if id.track() != DEPOT {
             (self.leaves.write_direction)(id, (u64::from(self.read_direction(id) ^ 4)) as u8);
@@ -2193,7 +2194,7 @@ impl Game<'_> {
             first = self.read_next(first);
             let diff = self.next_offset(base) - self.next_offset(last);
             for _ in 0..diff {
-                count(4);
+                crate::witness::hit(crate::witness::TRAIN_UNEQUAL_BEFORE);
                 self.controller(first, self.read_next(last), true);
             }
             base = first;
@@ -2236,7 +2237,7 @@ impl Game<'_> {
             first = self.read_next(first);
             let diff = self.next_offset(last) - self.next_offset(base);
             for _ in 0..diff {
-                count(5);
+                crate::witness::hit(crate::witness::TRAIN_UNEQUAL_AFTER);
                 self.controller(
                     first,
                     if nomove {
@@ -2252,7 +2253,7 @@ impl Game<'_> {
         }
     }
     fn reverse(&self, id: Handle) {
-        count(2);
+        crate::witness::hit(crate::witness::TRAIN_REVERSAL);
         if self.svc_is_depot(Handle::NONE, u64::from(self.read_tile(id))) != 0 {
             if self.whole_in_depot(id) {
                 return;
@@ -2490,7 +2491,7 @@ impl Game<'_> {
     fn move_vehicle(&self, id: Handle, prev: Handle, reverse: bool) -> (u8, bool) {
         let v = self.read_move_vehicle(id);
         if v.articulated != 0 {
-            count(18);
+            crate::witness::hit(crate::witness::TRAIN_ARTICULATED_MOVE);
         }
         let delta = [
             (-1, -1),
@@ -2570,7 +2571,7 @@ impl Game<'_> {
                                 && self.svc_signal_type(id, u64::from(new), u64::from(td & 7))
                                     != self.svc_pbs_signal_type(id))
                         {
-                            count(10);
+                            crate::witness::hit(crate::witness::TRAIN_FORCE_SIGNAL);
                             id.set_force_proceed(u64::from(id.get_force_proceed() == 2));
                             self.svc_view_window(id);
                         }
@@ -2584,7 +2585,7 @@ impl Game<'_> {
                             (self.leaves.write_speed)(id, 0_u16);
                             (self.leaves.write_subspeed)(id, 0_u8);
                             (self.leaves.write_progress)(id, 255_u8);
-                            count(8);
+                            crate::witness::hit(crate::witness::TRAIN_RED_ONEWAY);
                             if self.svc_reverse_at_signals(id) == 0
                                 || u64::from(id.wait_inc())
                                     < self.svc_wait_oneway(id) * self.svc_day_ticks(id) * 2
@@ -2595,7 +2596,7 @@ impl Game<'_> {
                             (self.leaves.write_speed)(id, 0_u16);
                             (self.leaves.write_subspeed)(id, 0_u8);
                             (self.leaves.write_progress)(id, 255_u8);
-                            count(9);
+                            crate::witness::hit(crate::witness::TRAIN_RED_TWOWAY);
                             if self.svc_reverse_at_signals(id) == 0
                                 || u64::from(id.wait_inc())
                                     < self.svc_wait_twoway(id) * self.svc_day_ticks(id) * 2
@@ -2663,7 +2664,7 @@ impl Game<'_> {
                 }
                 if vets & 2 == 0 {
                     if self.read_front(id) != 0 {
-                        count(19);
+                        crate::witness::hit(crate::witness::TRAIN_FIRST_TILE_RAIL);
                     }
                     let td = self.svc_track_direction(
                         id,
@@ -2726,7 +2727,7 @@ impl Game<'_> {
                 && self.svc_enter_tile(id, u64::from(new), x as u64, y as u64) & 2 != 0
             {
                 if self.read_front(id) != 0 {
-                    count(20);
+                    crate::witness::hit(crate::witness::TRAIN_WORMHOLE_EXIT);
                     self.reserve_track(
                         id,
                         new,
@@ -2905,7 +2906,7 @@ impl Game<'_> {
         if victims == 0 {
             return false;
         }
-        count(15);
+        crate::witness::hit(crate::witness::TRAIN_COLLISION);
         self.svc_crash_news(id, u64::from(victims));
         self.svc_crash_rating(id);
         if self.svc_disaster_sound(id) != 0 {
@@ -2935,7 +2936,7 @@ impl Game<'_> {
         false
     }
     fn delete_last(&self, mut id: Handle) {
-        count(16);
+        crate::witness::hit(crate::witness::TRAIN_CRASH_DELETE);
         let first = self.read_first(id);
         let mut last = id;
         while self.read_next(id) != Handle::NONE {
@@ -3118,7 +3119,7 @@ impl Game<'_> {
         }
         if self.read_order(id) == 2 && self.read_tile(id) == self.read_dest(id) {
             if self.svc_has_depot_res(Handle::NONE, u64::from(self.read_tile(id))) == 0 {
-                count(21);
+                crate::witness::hit(crate::witness::TRAIN_DEPOT_REENTRY);
                 self.svc_enter_depot(id);
             }
             return true;
@@ -3135,7 +3136,7 @@ impl Game<'_> {
         if self.svc_show_reservation(id) != 0 {
             self.svc_dirty_tile(Handle::NONE, u64::from(self.read_tile(id)));
         }
-        count(6);
+        crate::witness::hit(crate::witness::TRAIN_DEPOT_START);
         self.svc_service(id);
         self.svc_leave_unbunch(id);
         self.svc_leave_sound(id);
@@ -3155,7 +3156,11 @@ impl Game<'_> {
         false
     }
     fn loco(&self, id: Handle, mode: bool) -> bool {
-        count(u64::from(mode));
+        crate::witness::hit(if mode {
+            crate::witness::TRAIN_TICK_SECOND
+        } else {
+            crate::witness::TRAIN_TICK_FIRST
+        });
         if self.read_status(id) & 128 != 0 {
             return if mode { true } else { self.handle_crashed(id) };
         }
@@ -3208,7 +3213,7 @@ impl Game<'_> {
             self.svc_check_next(id);
         }
         if !mode && id.flag(8) {
-            count(11);
+            crate::witness::hit(crate::witness::TRAIN_STUCK_RETRY);
             let wait = u64::from(id.wait_inc());
             let turn = wait % (self.svc_wait_pbs(id) * self.svc_day_ticks(id)) == 0
                 && self.svc_reverse_at_signals(id) != 0;
@@ -3217,7 +3222,7 @@ impl Game<'_> {
             }
             if self.svc_try_path(id, 0, 0) == 0 {
                 if turn {
-                    count(12);
+                    crate::witness::hit(crate::witness::TRAIN_STUCK_REVERSE);
                     self.reverse(id);
                 }
                 if id.flag(8)
@@ -3308,7 +3313,7 @@ impl Game<'_> {
             let state = (id.get_crash_anim_pos() as u16).wrapping_add(1);
             id.set_crash_anim_pos(u64::from(state));
             if state >= 4400 {
-                count(17);
+                crate::witness::hit(crate::witness::TRAIN_FREE_WAGON_DELETE);
                 self.svc_delete_vehicle(id);
                 return false;
             }
@@ -3320,7 +3325,7 @@ impl Game<'_> {
             return;
         }
         if self.svc_chain_depot(id) != 0 {
-            count(7);
+            crate::witness::hit(crate::witness::TRAIN_DEPOT_SERVICE);
             self.svc_service(id);
             return;
         }

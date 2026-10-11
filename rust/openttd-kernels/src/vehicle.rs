@@ -6,8 +6,8 @@
  */
 
 //! Shared vehicle boundary used by every vehicle port: one opaque handle, the
-//! base-`Vehicle`, `GroundVehicle` and map service tables, constants and map
-//! arithmetic. The tables are defined once in `src/rust/vehicle_ffi.h` and filled
+//! base-`Vehicle` and `GroundVehicle` service tables and constants. Shared map
+//! operations and arithmetic live in `services.rs`. The tables are defined once in `src/rust/vehicle_ffi.h` and filled
 //! with designated initializers in `src/rust/vehicle_services.cpp`.
 //!
 //! A handle is a live `Vehicle *`, valid until the service that deletes it.
@@ -80,6 +80,14 @@ pub struct Breakdown {
     pub status: u8,
 }
 
+/// Previous chain tile observed for the follower step.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct PreviousTile {
+    pub tile: u32,
+    pub exists: bool,
+}
+
 /// Base `Vehicle` operations and writes shared by every vehicle type.
 #[repr(C)]
 pub struct VehicleServices {
@@ -87,8 +95,6 @@ pub struct VehicleServices {
     pub write_counters: extern "C" fn(VehicleRef, u8, u8, i32),
     /// `HandleBreakdown()`, then observe `vehstatus`.
     pub handle_breakdown: extern "C" fn(VehicleRef) -> Breakdown,
-    /// `ProcessOrders(v); v->HandleLoading();` then observe the order type.
-    pub process_orders_then_loading: extern "C" fn(VehicleRef) -> u8,
     pub waiting_for_unbunching: extern "C" fn(VehicleRef) -> bool,
     pub leave_unbunching_depot: extern "C" fn(VehicleRef),
     pub reset_depot_unbunching: extern "C" fn(VehicleRef),
@@ -132,6 +138,9 @@ pub struct VehicleServices {
     pub write_last_station: extern "C" fn(VehicleRef, u16),
     pub write_dest: extern "C" fn(VehicleRef, u32),
     pub write_progress: extern "C" fn(VehicleRef, u8),
+    pub write_max_speed: extern "C" fn(VehicleRef, u16),
+    pub previous_tile: extern "C" fn(VehicleRef) -> PreviousTile,
+    pub detach_last: extern "C" fn(VehicleRef, VehicleRef, VehicleRef),
 }
 
 /// Position step result: `UpdateInclination`'s old height, then the new height,
@@ -172,6 +181,8 @@ pub struct Crash {
 /// `GroundVehicle<T>` members, one C++ template instance per vehicle type.
 #[repr(C)]
 pub struct GroundServices {
+    /// Invalidate the chain `NewGRF` cache, then reset total length.
+    pub cache_begin: extern "C" fn(VehicleRef),
     /// Store x/y, `UpdatePosition()`, `UpdateInclination(new_tile, delta)`.
     pub move_incline: extern "C" fn(VehicleRef, i32, i32, bool, bool) -> Moved,
     /// `UpdateViewport(force, delta)`.
@@ -191,69 +202,6 @@ pub struct GroundServices {
     pub write_length: extern "C" fn(VehicleRef, u8, VehicleRef, u16),
 }
 
-/// Map predicates shared by the vehicle ports.
-#[repr(C)]
-pub struct MapServices {
-    pub tile_type: extern "C" fn(u32) -> u8,
-    pub tile_owner: extern "C" fn(u32) -> u8,
-    pub station_index: extern "C" fn(u32) -> u16,
-    pub depot_index: extern "C" fn(u32) -> u16,
-    pub is_level_crossing: extern "C" fn(u32) -> bool,
-    pub tunnel_bridge_direction: extern "C" fn(u32) -> u8,
-    /// `GetBridgeSpec(GetBridgeType(tile))->speed`.
-    pub bridge_speed: extern "C" fn(u32) -> u16,
-}
-
-/// Map dimensions read once per entry.
-#[derive(Clone, Copy)]
-pub struct Map {
-    pub log_x: u8,
-}
-impl Map {
-    fn size_x(self) -> u32 {
-        1_u32 << self.log_x
-    }
-    /// `TileX`.
-    #[must_use]
-    pub fn tile_x(self, tile: u32) -> u32 {
-        tile & (self.size_x() - 1)
-    }
-    /// `TileY`.
-    #[must_use]
-    pub fn tile_y(self, tile: u32) -> u32 {
-        tile >> self.log_x
-    }
-    /// `TileDiffXY`: `y * Map::SizeX() + x` in unsigned arithmetic.
-    fn diff(self, x: i32, y: i32) -> u32 {
-        y.cast_unsigned()
-            .wrapping_mul(self.size_x())
-            .wrapping_add(x.cast_unsigned())
-    }
-    /// `tile + TileOffsByDiagDir(dir)`.
-    #[must_use]
-    pub fn add_diag(self, tile: u32, dir: u8) -> u32 {
-        const OFFSETS: [(i32, i32); 4] = [(-1, 0), (0, 1), (1, 0), (0, -1)];
-        let (x, y) = OFFSETS[usize::from(dir)];
-        tile.wrapping_add(self.diff(x, y))
-    }
-    /// `TileAddByDir(tile, dir)`.
-    #[must_use]
-    pub fn add_dir(self, tile: u32, dir: u8) -> u32 {
-        const OFFSETS: [(i32, i32); 8] = [
-            (-1, -1),
-            (-1, 0),
-            (-1, 1),
-            (0, 1),
-            (1, 1),
-            (1, 0),
-            (1, -1),
-            (0, -1),
-        ];
-        let (x, y) = OFFSETS[usize::from(dir)];
-        tile.wrapping_add(self.diff(x, y))
-    }
-}
-
 /// `GetAdvanceDistance()`.
 #[must_use]
 pub fn advance_distance(direction: u8) -> i32 {
@@ -263,6 +211,7 @@ pub fn advance_distance(direction: u8) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::services::Map;
     #[test]
     fn map_offsets_follow_the_original_tables() {
         let map = Map { log_x: 8 };

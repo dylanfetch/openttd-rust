@@ -23,12 +23,9 @@ use crate::services::Services;
 use crate::water_regions::Patch;
 use std::cell::UnsafeCell;
 use std::collections::{HashSet, VecDeque};
-fn witness(branch: usize) {
-    crate::witness::hit(crate::witness::SHIP + branch);
-}
 #[unsafe(no_mangle)]
 pub extern "C" fn openttd_rust_ship_control_reload_rotation() {
-    witness(10);
+    crate::witness::hit(crate::witness::SHIP_ROTATION_RELOAD);
 }
 
 const INVALID: u32 = u32::MAX;
@@ -365,7 +362,7 @@ impl Game<'_> {
         self.set_rotation_y(observed_y as u16);
     }
     fn reverse(&self, id: u32, trackdir: u32) {
-        witness(2);
+        crate::witness::hit(crate::witness::SHIP_REVERSE);
         if trackdir == INVALID {
             (self.leaves.set_direction)(id, (((self.leaves.direction)(id) + 4) & 7) as u8);
         } else {
@@ -380,7 +377,7 @@ impl Game<'_> {
         self.viewport(id);
     }
     fn depot(&self, id: u32, max_distance: u32) -> Option<Depot> {
-        witness(11);
+        crate::witness::hit(crate::witness::SHIP_DEPOT_SEARCH);
         let scratch = DEPOT_SCRATCH.with(UnsafeCell::get);
         let observed_tile = (self.leaves.tile)(id);
         let observed_owner = (self.leaves.owner)(id);
@@ -449,7 +446,7 @@ impl Game<'_> {
         }
         let distance = (self.leaves.max_distance)();
         if let Some(depot) = self.depot(id, distance) {
-            witness(5);
+            crate::witness::hit(crate::witness::SHIP_AUTO_SERVICE);
             (self.leaves.order_depot)(id, depot.id);
             self.destination(id, depot.tile);
             (self.leaves.start_dirty)(id);
@@ -497,7 +494,7 @@ impl Game<'_> {
             direction = (direction + 4) & 7;
             (self.leaves.set_direction)(id, direction as u8);
         }
-        witness(4);
+        crate::witness::hit(crate::witness::SHIP_DEPOT_LEAVE);
         self.set_state(1 << (self.leaves.depot_axis)(observed_tile));
         self.set_rotation(direction as u16);
         (self.leaves.set_hidden)(id, false);
@@ -529,9 +526,9 @@ impl Game<'_> {
     fn move_lock(&self, id: u32) -> bool {
         let delta = self.lock_delta(id);
         if delta > 0 {
-            witness(0);
+            crate::witness::hit(crate::witness::SHIP_LOCK_UP);
         } else if delta < 0 {
-            witness(1);
+            crate::witness::hit(crate::witness::SHIP_LOCK_DOWN);
         }
         if delta == 0 {
             return false;
@@ -590,7 +587,7 @@ impl Game<'_> {
             found = false;
         } else {
             if (self.leaves.path_size)(id) != 0 {
-                witness(14);
+                crate::witness::hit(crate::witness::SHIP_PATH_CACHE);
                 let cached = (self.leaves.path_back)(id) & 7;
                 if tracks & (1 << cached) != 0 {
                     (self.leaves.path_pop)(id);
@@ -662,7 +659,7 @@ impl Game<'_> {
         let observed_tick = (self.leaves.tick)(id);
         let rotation = u32::from(self.rotation());
         if observed_direction != rotation {
-            witness(3);
+            crate::witness::hit(crate::witness::SHIP_ROTATE);
             if observed_tick & 7 == 0 {
                 let diff = observed_direction.wrapping_sub(rotation) & 7;
                 self.set_rotation(((rotation + if diff > 4 { 7 } else { 1 }) & 7) as u16);
@@ -713,13 +710,13 @@ impl Game<'_> {
                             if observed_order_type == 6
                                 && (self.leaves.dist_manhattan)(observed_dest, new_tile) <= 3
                             {
-                                witness(6);
+                                crate::witness::hit(crate::witness::SHIP_BUOY);
                                 (self.leaves.timetable)(id);
                                 (self.leaves.order_increment)(id);
                                 (self.leaves.order_dummy)(id);
                             } else if observed_order_type == 2 && observed_dest == new_tile {
                                 if x & 15 == 8 && y & 15 == 8 {
-                                    witness(15);
+                                    crate::witness::hit(crate::witness::SHIP_DEPOT_ENTER);
                                     (self.leaves.enter_depot)(id);
                                     return;
                                 }
@@ -730,7 +727,7 @@ impl Game<'_> {
                                 {
                                     (self.leaves.set_last_station)(id, station as u16);
                                     if (self.leaves.station_dock)(station) {
-                                        witness(7);
+                                        crate::witness::hit(crate::witness::SHIP_LOADING);
                                         self.arrives(id, station);
                                         (self.leaves.begin_loading)(id);
                                     } else {
@@ -774,7 +771,7 @@ impl Game<'_> {
                         if (self.leaves.water_class)(old_tile)
                             != (self.leaves.water_class)(new_tile)
                         {
-                            witness(8);
+                            crate::witness::hit(crate::witness::SHIP_WATER_CHANGE);
                             (self.leaves.cache)(id);
                         }
                     }
@@ -789,7 +786,7 @@ impl Game<'_> {
                     }
                 }
             } else {
-                witness(9);
+                crate::witness::hit(crate::witness::SHIP_AQUEDUCT);
                 if (self.leaves.tile_type)(new_tile) != 9
                     || (self.leaves.enter_tile)(id, new_tile, x, y) & 2 == 0
                 {
@@ -895,7 +892,7 @@ pub unsafe extern "C" fn openttd_rust_ship_economy_day(
         services: unsafe { &*services },
         owner: (leaves.state_owner)(id),
     };
-    witness(13);
+    crate::witness::hit(crate::witness::SHIP_ECONOMY_DAY);
     (game.leaves.economy_age)(id);
     let day = (game.leaves.day)(id).wrapping_add(1);
     (game.leaves.set_day)(id, day as u8);
@@ -1049,7 +1046,7 @@ pub unsafe extern "C" fn openttd_rust_ship_build(
         services: unsafe { &*services },
         owner: (leaves.state_owner)(id),
     };
-    witness(12);
+    crate::witness::hit(crate::witness::SHIP_BUILD);
     let tile = (game.leaves.tile)(id);
     let x = (game.leaves.tile_x)(tile).wrapping_mul(16) + 8;
     let y = (game.leaves.tile_y)(tile).wrapping_mul(16) + 8;

@@ -29,6 +29,20 @@ pub struct Services {
     pub trig: extern "C" fn(u32, f32) -> f32,
     /// `TileVirtXY` query: 0 not industry, 1 industry, 2 bubble catcher; writes tile.
     pub industry: extern "C" fn(i32, i32, *mut u32) -> u32,
+    /// `GetTileType` at the original observation point.
+    pub tile_type: extern "C" fn(u32) -> u8,
+    /// `GetTileOwner` at the original observation point.
+    pub tile_owner: extern "C" fn(u32) -> u8,
+    /// `GetStationIndex` at the original observation point.
+    pub station_index: extern "C" fn(u32) -> u16,
+    /// `GetDepotIndex` at the original observation point.
+    pub depot_index: extern "C" fn(u32) -> u16,
+    /// `IsLevelCrossingTile` at the original observation point.
+    pub is_level_crossing: extern "C" fn(u32) -> bool,
+    /// `GetTunnelBridgeDirection` at the original observation point.
+    pub tunnel_bridge_direction: extern "C" fn(u32) -> u8,
+    /// `GetBridgeSpec(GetBridgeType(tile))->speed`.
+    pub bridge_speed: extern "C" fn(u32) -> u16,
 }
 impl Services {
     /// Draw one shared random word.
@@ -53,10 +67,77 @@ impl Services {
         (self.write_tile)(self.context, op, tile, args[0], args[1], args[2], args[3]);
     }
 }
+/// Map dimensions read once per entry.
+#[derive(Clone, Copy)]
+pub struct Map {
+    /// `Map::LogX()` captured for this synchronous entry.
+    pub log_x: u8,
+}
+impl Map {
+    /// `Map::SizeX()`, from the dimension captured at entry.
+    #[must_use]
+    pub fn size_x(self) -> u32 {
+        1_u32 << self.log_x
+    }
+    /// `TileX`.
+    #[must_use]
+    pub fn tile_x(self, tile: u32) -> u32 {
+        tile & (self.size_x() - 1)
+    }
+    /// `TileY`.
+    #[must_use]
+    pub fn tile_y(self, tile: u32) -> u32 {
+        tile >> self.log_x
+    }
+    /// `TileDiffXY`: `y * Map::SizeX() + x` in unsigned arithmetic.
+    #[must_use]
+    pub fn diff(self, x: i32, y: i32) -> u32 {
+        y.cast_unsigned()
+            .wrapping_mul(self.size_x())
+            .wrapping_add(x.cast_unsigned())
+    }
+    /// `tile + TileOffsByDiagDir(dir)`.
+    #[must_use]
+    pub fn add_diag(self, tile: u32, dir: u8) -> u32 {
+        const OFFSETS: [(i32, i32); 4] = [(-1, 0), (0, 1), (1, 0), (0, -1)];
+        let (x, y) = OFFSETS[usize::from(dir)];
+        tile.wrapping_add(self.diff(x, y))
+    }
+    /// `TileAddByDir(tile, dir)`.
+    #[must_use]
+    pub fn add_dir(self, tile: u32, dir: u8) -> u32 {
+        const OFFSETS: [(i32, i32); 8] = [
+            (-1, -1),
+            (-1, 0),
+            (-1, 1),
+            (0, 1),
+            (1, 1),
+            (1, 0),
+            (1, -1),
+            (0, -1),
+        ];
+        let (x, y) = OFFSETS[usize::from(dir)];
+        tile.wrapping_add(self.diff(x, y))
+    }
+}
+
 /// Source `Chance16I` uses uint32 multiplication/addition after uint16 truncation.
 #[must_use]
 pub fn chance16_i(a: u32, b: u32, r: u32) -> bool {
     (((r & 65535).wrapping_mul(b).wrapping_add(b / 2)) >> 16) < a
+}
+
+#[cfg(test)]
+pub(crate) extern "C" fn unexpected_byte(_: u32) -> u8 {
+    panic!("unexpected map byte query")
+}
+#[cfg(test)]
+pub(crate) extern "C" fn unexpected_word(_: u32) -> u16 {
+    panic!("unexpected map word query")
+}
+#[cfg(test)]
+pub(crate) extern "C" fn unexpected_predicate(_: u32) -> bool {
+    panic!("unexpected map predicate query")
 }
 
 #[cfg(test)]

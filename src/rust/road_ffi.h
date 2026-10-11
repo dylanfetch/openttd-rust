@@ -135,10 +135,6 @@ struct OpenTTDRoadRoadTypes {
 	uint8_t before;
 	uint8_t after;
 };
-struct OpenTTDRoadPreviousTile {
-	uint32_t tile;
-	bool exists;
-};
 struct OpenTTDRoadTrackChoice {
 	uint8_t trackdir;
 	bool found;
@@ -195,8 +191,8 @@ using OpenTTDRoadTileVisitor = bool (OPENTTD_VEHICLE_CALL *)(void *, const OpenT
 struct OpenTTDRoadLeaves {
 	const OpenTTDVehicleServices *vehicle;
 	const OpenTTDGroundServices *ground;
-	const OpenTTDMapServices *map;
 	const OpenTTDSharedServices *shared;
+	uint8_t (OPENTTD_VEHICLE_CALL *process_orders_then_loading)(OpenTTDVehicle *) noexcept;
 	OpenTTDRoadSpeedRead (OPENTTD_VEHICLE_CALL *visual_then_speed)(OpenTTDVehicle *, bool) noexcept;
 	OpenTTDRoadMaxSpeedRead (OPENTTD_VEHICLE_CALL *max_speed_read)(OpenTTDVehicle *) noexcept;
 	OpenTTDRoadSpeedPart (OPENTTD_VEHICLE_CALL *speed_part)(OpenTTDVehicle *) noexcept;
@@ -228,7 +224,6 @@ struct OpenTTDRoadLeaves {
 	OpenTTDRoadTrackChoice (OPENTTD_VEHICLE_CALL *choose_track)(OpenTTDVehicle *, uint32_t, uint8_t, uint16_t) noexcept;
 	OpenTTDRoadDepotResult (OPENTTD_VEHICLE_CALL *find_depot)(OpenTTDVehicle *, int32_t) noexcept;
 	bool (OPENTTD_VEHICLE_CALL *can_build_tram)(OpenTTDVehicle *, uint32_t, uint8_t) noexcept;
-	OpenTTDRoadPreviousTile (OPENTTD_VEHICLE_CALL *previous_tile)(OpenTTDVehicle *) noexcept;
 	void (OPENTTD_VEHICLE_CALL *disconnect)() noexcept;
 	OpenTTDRoadStopRead (OPENTTD_VEHICLE_CALL *stop_read)(OpenTTDVehicle *) noexcept;
 	bool (OPENTTD_VEHICLE_CALL *should_stop)(OpenTTDVehicle *, uint32_t) noexcept;
@@ -243,11 +238,8 @@ struct OpenTTDRoadLeaves {
 	OpenTTDRoadDepotOrder (OPENTTD_VEHICLE_CALL *depot_order)(OpenTTDVehicle *) noexcept;
 	void (OPENTTD_VEHICLE_CALL *depot_exit)(OpenTTDVehicle *, int32_t, int32_t) noexcept;
 	void (OPENTTD_VEHICLE_CALL *crash_news)(OpenTTDVehicle *, uint32_t) noexcept;
-	void (OPENTTD_VEHICLE_CALL *detach_last)(OpenTTDVehicle *, OpenTTDVehicle *, OpenTTDVehicle *) noexcept;
-	void (OPENTTD_VEHICLE_CALL *cache_begin)(OpenTTDVehicle *) noexcept;
 	OpenTTDRoadCachePart (OPENTTD_VEHICLE_CALL *cache_part)(OpenTTDVehicle *) noexcept;
 	void (OPENTTD_VEHICLE_CALL *update_cargo_age)(OpenTTDVehicle *) noexcept;
-	void (OPENTTD_VEHICLE_CALL *write_max_speed)(OpenTTDVehicle *, uint16_t) noexcept;
 	OpenTTDRoadCostRead (OPENTTD_VEHICLE_CALL *cost_read)(OpenTTDVehicle *) noexcept;
 	int64_t (OPENTTD_VEHICLE_CALL *price)(OpenTTDVehicle *, uint32_t) noexcept;
 	void (OPENTTD_VEHICLE_CALL *pay_running)(OpenTTDVehicle *, int64_t) noexcept;

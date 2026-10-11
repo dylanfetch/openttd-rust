@@ -625,7 +625,7 @@ fn clear(g: &Game, id: Handle, tile: u32, td: u8) {
     }
 }
 fn free(g: &Game, id: Handle) {
-    crate::train::count(27);
+    crate::witness::hit(crate::witness::TRAIN_FREE_PATH);
     let v = g.read_free(id);
     let mut tile = v.tile;
     let mut td = g.td(id);
@@ -697,7 +697,7 @@ fn free(g: &Game, id: Handle) {
     g.svc_update_buffer(id);
 }
 fn extend(g: &Game, id: Handle, new_tracks: &mut u8, enterdir: &mut u8) -> Pbs {
-    crate::train::count(22);
+    crate::witness::hit(crate::witness::TRAIN_CONTROLLER_EXTENSION);
     let origin = g.origin(id, false);
     let types = id.get_compatible_railtypes();
     let mut ft = Follow::default();
@@ -755,7 +755,7 @@ fn extend(g: &Game, id: Handle, new_tracks: &mut u8, enterdir: &mut u8) -> Pbs {
             if (g.svc_has_pbs(id, u64::from(tile), u64::from(rev)) != 0)
                 && (g.svc_green(id, u64::from(tile), u64::from(rev)) != 0)
             {
-                crate::train::count(25);
+                crate::witness::hit(crate::witness::TRAIN_EXTENSION_OPPOSING_RED);
                 red.push((tile, rev));
                 g.signal(id, tile, rev, false);
                 g.svc_mark_tile(id, u64::from(tile));
@@ -773,7 +773,7 @@ fn extend(g: &Game, id: Handle, new_tracks: &mut u8, enterdir: &mut u8) -> Pbs {
         if (g.svc_has_pbs(id, u64::from(tile), u64::from(rev)) != 0)
             && (g.svc_green(id, u64::from(tile), u64::from(rev)) != 0)
         {
-            crate::train::count(25);
+            crate::witness::hit(crate::witness::TRAIN_EXTENSION_OPPOSING_RED);
             red.push((tile, rev));
             g.signal(id, tile, rev, false);
             g.svc_mark_tile(id, u64::from(tile));
@@ -787,7 +787,7 @@ fn extend(g: &Game, id: Handle, new_tracks: &mut u8, enterdir: &mut u8) -> Pbs {
             other: Handle::NONE,
         };
     }
-    crate::train::count(23);
+    crate::witness::hit(crate::witness::TRAIN_EXTENSION_FAIL);
     tile = origin.tile;
     td = origin.td;
     let stopped = ft.old_tile;
@@ -801,11 +801,11 @@ fn extend(g: &Game, id: Handle, new_tracks: &mut u8, enterdir: &mut u8) -> Pbs {
         }
         tile = ft.new_tile;
         td = first(ft.dirs);
-        crate::train::count(24);
+        crate::witness::hit(crate::witness::TRAIN_EXTENSION_ROLLBACK);
         g.unreserve(id, tile, td);
     }
     for (tile, td) in red {
-        crate::train::count(26);
+        crate::witness::hit(crate::witness::TRAIN_EXTENSION_RESTORE);
         g.signal(id, tile, td, true);
     }
     Pbs::default()
@@ -834,7 +834,7 @@ impl<'a> Orders<'a> {
         }
     }
     fn restore(&mut self) {
-        crate::train::count(30);
+        crate::witness::hit(crate::witness::TRAIN_ORDER_RESTORE);
         self.g.svc_restore_order(self.id);
         self.g.svc_write_dest(self.id, u64::from(self.dest));
         self.g.svc_write_last(self.id, u64::from(self.last));
@@ -842,7 +842,7 @@ impl<'a> Orders<'a> {
         self.restored = true;
     }
     fn next(&mut self, skip: bool) -> bool {
-        crate::train::count(29);
+        crate::witness::hit(crate::witness::TRAIN_ORDER_LOOKAHEAD);
         let g = self.g;
         let id = self.id;
         if g.read_num_orders(id) == 0 {
@@ -906,7 +906,7 @@ fn choose(
     force: bool,
     mark: bool,
 ) -> (u8, bool) {
-    crate::train::count(28);
+    crate::witness::hit(crate::witness::TRAIN_CHOOSE_TRACK);
     let mut best = 0xff;
     let mut reserve = g.svc_reserve_paths(id) != 0 || force;
     let mut changed = false;

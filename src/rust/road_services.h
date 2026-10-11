@@ -159,11 +159,6 @@ static bool OPENTTD_VEHICLE_CALL RoadSvcCanBuildTram(OpenTTDVehicle *v, uint32_t
 	cur_company.Restore();
 	return ret.Succeeded();
 }
-static OpenTTDRoadPreviousTile OPENTTD_VEHICLE_CALL RoadSvcPreviousTile(OpenTTDVehicle *v) noexcept
-{
-	const Vehicle *previous = RoadOf(v)->Previous();
-	return {.tile = previous == nullptr ? 0 : previous->tile.base(), .exists = previous != nullptr};
-}
 static void OPENTTD_VEHICLE_CALL RoadSvcDisconnect() noexcept { FatalError("Disconnecting road vehicle."); }
 static OpenTTDRoadStopRead OPENTTD_VEHICLE_CALL RoadSvcStopRead(OpenTTDVehicle *v) noexcept
 {
@@ -257,19 +252,6 @@ static void OPENTTD_VEHICLE_CALL RoadSvcCrashNews(OpenTTDVehicle *v, uint32_t vi
 	ModifyStationRatingAround(u->tile, u->owner, -160, 22);
 	if (_settings_client.sound.disaster) SndPlayVehicleFx(SND_12_EXPLOSION, u);
 }
-/** `DeleteLastRoadVeh` before the road stop check: unlink the last part and copy the station. */
-static void OPENTTD_VEHICLE_CALL RoadSvcDetachLast(OpenTTDVehicle *previous, OpenTTDVehicle *last, OpenTTDVehicle *first) noexcept
-{
-	VehicleOf(previous)->SetNext(nullptr);
-	VehicleOf(last)->last_station_visited = VehicleOf(first)->last_station_visited;
-}
-/** The head of `RoadVehUpdateCache`. */
-static void OPENTTD_VEHICLE_CALL RoadSvcCacheBegin(OpenTTDVehicle *v) noexcept
-{
-	RoadVehicle *u = RoadOf(v);
-	u->InvalidateNewGRFCacheOfChain();
-	u->gcache.cached_total_length = 0;
-}
 static OpenTTDRoadCachePart OPENTTD_VEHICLE_CALL RoadSvcCachePart(OpenTTDVehicle *v) noexcept
 {
 	const RoadVehicle *u = RoadOf(v);
@@ -283,7 +265,6 @@ static void OPENTTD_VEHICLE_CALL RoadSvcUpdateCargoAge(OpenTTDVehicle *v) noexce
 	RoadVehicle *u = RoadOf(v);
 	u->vcache.cached_cargo_age_period = GetVehicleProperty(u, PROP_ROADVEH_CARGO_AGE_PERIOD, EngInfo(u->engine_type)->cargo_age_period);
 }
-static void OPENTTD_VEHICLE_CALL RoadSvcWriteMaxSpeed(OpenTTDVehicle *v, uint16_t speed) noexcept { RoadOf(v)->vcache.cached_max_speed = speed; }
 static OpenTTDRoadCostRead OPENTTD_VEHICLE_CALL RoadSvcCostRead(OpenTTDVehicle *v) noexcept
 {
 	const RoadVehicleInfo &info = RoadOf(v)->GetEngine()->VehInfo<RoadVehicleInfo>();
@@ -324,13 +305,21 @@ static OpenTTDRoadTrackdirRead OPENTTD_VEHICLE_CALL RoadSvcTrackdirRead(OpenTTDV
 	return {.tile = u->tile.base(), .direction = u->direction, .status = u->vehstatus.base()};
 }
 
+static uint8_t OPENTTD_VEHICLE_CALL RoadSvcProcessOrdersThenLoading(OpenTTDVehicle *v) noexcept
+{
+	Vehicle *u = VehicleOf(v);
+	ProcessOrders(u);
+	u->HandleLoading();
+	return u->current_order.GetType();
+}
+
 static const OpenTTDRoadLeaves &GetRoadLeaves()
 {
 	static const OpenTTDRoadLeaves leaves{
 		.vehicle = &GetRustVehicleServices(),
 		.ground = &GetRustGroundServices<RoadVehicle>(),
-		.map = &GetRustMapServices(),
 		.shared = &GetRustSharedServices(),
+		.process_orders_then_loading = RoadSvcProcessOrdersThenLoading,
 		.visual_then_speed = RoadSvcVisualThenSpeed,
 		.max_speed_read = RoadSvcMaxSpeedRead,
 		.speed_part = RoadSvcSpeedPart,
@@ -362,7 +351,6 @@ static const OpenTTDRoadLeaves &GetRoadLeaves()
 		.choose_track = RoadSvcChooseTrack,
 		.find_depot = RoadSvcFindDepot,
 		.can_build_tram = RoadSvcCanBuildTram,
-		.previous_tile = RoadSvcPreviousTile,
 		.disconnect = RoadSvcDisconnect,
 		.stop_read = RoadSvcStopRead,
 		.should_stop = RoadSvcShouldStop,
@@ -377,11 +365,8 @@ static const OpenTTDRoadLeaves &GetRoadLeaves()
 		.depot_order = RoadSvcDepotOrder,
 		.depot_exit = RoadSvcDepotExit,
 		.crash_news = RoadSvcCrashNews,
-		.detach_last = RoadSvcDetachLast,
-		.cache_begin = RoadSvcCacheBegin,
 		.cache_part = RoadSvcCachePart,
 		.update_cargo_age = RoadSvcUpdateCargoAge,
-		.write_max_speed = RoadSvcWriteMaxSpeed,
 		.cost_read = RoadSvcCostRead,
 		.price = RoadSvcPrice,
 		.pay_running = RoadSvcPayRunning,

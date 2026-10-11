@@ -55,13 +55,6 @@ static OpenTTDVehicleBreakdown OPENTTD_VEHICLE_CALL VehicleSvcHandleBreakdown(Op
 	bool broken = u->HandleBreakdown();
 	return {.broken = broken, .status = u->vehstatus.base()};
 }
-static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcProcessOrdersThenLoading(OpenTTDVehicle *v) noexcept
-{
-	Vehicle *u = VehicleOf(v);
-	ProcessOrders(u);
-	u->HandleLoading();
-	return u->current_order.GetType();
-}
 static bool OPENTTD_VEHICLE_CALL VehicleSvcWaitingForUnbunching(OpenTTDVehicle *v) noexcept { return VehicleOf(v)->IsWaitingForUnbunching(); }
 static void OPENTTD_VEHICLE_CALL VehicleSvcLeaveUnbunchingDepot(OpenTTDVehicle *v) noexcept { VehicleOf(v)->LeaveUnbunchingDepot(); }
 static void OPENTTD_VEHICLE_CALL VehicleSvcResetDepotUnbunching(OpenTTDVehicle *v) noexcept { VehicleOf(v)->ResetDepotUnbunching(); }
@@ -131,12 +124,24 @@ static void OPENTTD_VEHICLE_CALL VehicleSvcWriteLastStation(OpenTTDVehicle *v, u
 static void OPENTTD_VEHICLE_CALL VehicleSvcWriteDest(OpenTTDVehicle *v, uint32_t tile) noexcept { VehicleOf(v)->dest_tile = TileIndex(tile); }
 static void OPENTTD_VEHICLE_CALL VehicleSvcWriteProgress(OpenTTDVehicle *v, uint8_t progress) noexcept { VehicleOf(v)->progress = progress; }
 
+static OpenTTDVehiclePreviousTile OPENTTD_VEHICLE_CALL VehicleSvcPreviousTile(OpenTTDVehicle *v) noexcept
+{
+	const Vehicle *previous = VehicleOf(v)->Previous();
+	return {.tile = previous == nullptr ? 0 : previous->tile.base(), .exists = previous != nullptr};
+}
+/** `DeleteLastRoadVeh` before the road stop check: unlink the last part and copy the station. */
+static void OPENTTD_VEHICLE_CALL VehicleSvcDetachLast(OpenTTDVehicle *previous, OpenTTDVehicle *last, OpenTTDVehicle *first) noexcept
+{
+	VehicleOf(previous)->SetNext(nullptr);
+	VehicleOf(last)->last_station_visited = VehicleOf(first)->last_station_visited;
+}
+static void OPENTTD_VEHICLE_CALL VehicleSvcWriteMaxSpeed(OpenTTDVehicle *v, uint16_t speed) noexcept { VehicleOf(v)->vcache.cached_max_speed = speed; }
+
 const OpenTTDVehicleServices &GetRustVehicleServices() noexcept
 {
 	static const OpenTTDVehicleServices services{
 		.write_counters = VehicleSvcWriteCounters,
 		.handle_breakdown = VehicleSvcHandleBreakdown,
-		.process_orders_then_loading = VehicleSvcProcessOrdersThenLoading,
 		.waiting_for_unbunching = VehicleSvcWaitingForUnbunching,
 		.leave_unbunching_depot = VehicleSvcLeaveUnbunchingDepot,
 		.reset_depot_unbunching = VehicleSvcResetDepotUnbunching,
@@ -169,29 +174,11 @@ const OpenTTDVehicleServices &GetRustVehicleServices() noexcept
 		.write_last_station = VehicleSvcWriteLastStation,
 		.write_dest = VehicleSvcWriteDest,
 		.write_progress = VehicleSvcWriteProgress,
+		.write_max_speed = VehicleSvcWriteMaxSpeed,
+		.previous_tile = VehicleSvcPreviousTile,
+		.detach_last = VehicleSvcDetachLast,
 	};
 	return services;
 }
 
-static uint8_t OPENTTD_VEHICLE_CALL MapSvcTileType(uint32_t tile) noexcept { return GetTileType(TileIndex(tile)); }
-static uint8_t OPENTTD_VEHICLE_CALL MapSvcTileOwner(uint32_t tile) noexcept { return GetTileOwner(TileIndex(tile)).base(); }
-static uint16_t OPENTTD_VEHICLE_CALL MapSvcStationIndex(uint32_t tile) noexcept { return GetStationIndex(TileIndex(tile)).base(); }
-static uint16_t OPENTTD_VEHICLE_CALL MapSvcDepotIndex(uint32_t tile) noexcept { return GetDepotIndex(TileIndex(tile)).base(); }
-static bool OPENTTD_VEHICLE_CALL MapSvcIsLevelCrossing(uint32_t tile) noexcept { return IsLevelCrossingTile(TileIndex(tile)); }
-static uint8_t OPENTTD_VEHICLE_CALL MapSvcTunnelBridgeDirection(uint32_t tile) noexcept { return GetTunnelBridgeDirection(TileIndex(tile)); }
-static uint16_t OPENTTD_VEHICLE_CALL MapSvcBridgeSpeed(uint32_t tile) noexcept { return GetBridgeSpec(GetBridgeType(TileIndex(tile)))->speed; }
-
-const OpenTTDMapServices &GetRustMapServices() noexcept
-{
-	static const OpenTTDMapServices services{
-		.tile_type = MapSvcTileType,
-		.tile_owner = MapSvcTileOwner,
-		.station_index = MapSvcStationIndex,
-		.depot_index = MapSvcDepotIndex,
-		.is_level_crossing = MapSvcIsLevelCrossing,
-		.tunnel_bridge_direction = MapSvcTunnelBridgeDirection,
-		.bridge_speed = MapSvcBridgeSpeed,
-	};
-	return services;
-}
 #endif /* WITH_RUST */

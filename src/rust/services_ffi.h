@@ -28,6 +28,13 @@ struct OpenTTDSharedServices {
 	void (*write_tile)(void *, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) noexcept;
 	float (*trig)(uint32_t, float) noexcept;
 	uint32_t (*industry)(int32_t, int32_t, uint32_t *) noexcept;
+	uint8_t (*tile_type)(uint32_t) noexcept;
+	uint8_t (*tile_owner)(uint32_t) noexcept;
+	uint16_t (*station_index)(uint32_t) noexcept;
+	uint16_t (*depot_index)(uint32_t) noexcept;
+	bool (*is_level_crossing)(uint32_t) noexcept;
+	uint8_t (*tunnel_bridge_direction)(uint32_t) noexcept;
+	uint16_t (*bridge_speed)(uint32_t) noexcept;
 };
 const OpenTTDSharedServices &GetRustSharedServices() noexcept;
 #endif /* RUST_SERVICES_FFI_H */

@@ -90,11 +90,21 @@ static void OPENTTD_VEHICLE_CALL GroundSvcWriteLength(OpenTTDVehicle *part, uint
 	u->UpdateVisualEffect();
 }
 
+template <class T>
+/** The head of `RoadVehUpdateCache`. */
+static void OPENTTD_VEHICLE_CALL GroundSvcCacheBegin(OpenTTDVehicle *v) noexcept
+{
+	T *u = T::From(VehicleOf(v));
+	u->InvalidateNewGRFCacheOfChain();
+	u->gcache.cached_total_length = 0;
+}
+
 /** One GroundVehicle service table per vehicle type. */
 template <class T>
 const OpenTTDGroundServices &GetRustGroundServices() noexcept
 {
 	static const OpenTTDGroundServices services{
+		.cache_begin = GroundSvcCacheBegin<T>,
 		.move_incline = GroundSvcMoveIncline<T>,
 		.update_viewport = GroundSvcUpdateViewport<T>,
 		.turn = GroundSvcTurn<T>,

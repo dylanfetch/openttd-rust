@@ -16,6 +16,11 @@
 #include "../landscape.h"
 #include "../viewport_func.h"
 #include "../core/random_func.hpp"
+#include "../station_map.h"
+#include "../depot_map.h"
+#include "../rail_map.h"
+#include "../tunnelbridge_map.h"
+#include "../bridge.h"
 #include "../safeguards.h"
 
 static uint32_t SharedRandom(void *) noexcept { return Random(); }
@@ -61,9 +66,31 @@ static uint32_t SharedIndustry(int32_t x, int32_t y, uint32_t *index) noexcept
 	return GetIndustryGfx(tile) == GFX_BUBBLE_CATCHER ? 2 : 1;
 }
 
+static uint8_t MapSvcTileType(uint32_t tile) noexcept { return GetTileType(TileIndex(tile)); }
+static uint8_t MapSvcTileOwner(uint32_t tile) noexcept { return GetTileOwner(TileIndex(tile)).base(); }
+static uint16_t MapSvcStationIndex(uint32_t tile) noexcept { return GetStationIndex(TileIndex(tile)).base(); }
+static uint16_t MapSvcDepotIndex(uint32_t tile) noexcept { return GetDepotIndex(TileIndex(tile)).base(); }
+static bool MapSvcIsLevelCrossing(uint32_t tile) noexcept { return IsLevelCrossingTile(TileIndex(tile)); }
+static uint8_t MapSvcTunnelBridgeDirection(uint32_t tile) noexcept { return GetTunnelBridgeDirection(TileIndex(tile)); }
+static uint16_t MapSvcBridgeSpeed(uint32_t tile) noexcept { return GetBridgeSpec(GetBridgeType(TileIndex(tile)))->speed; }
+
 const OpenTTDSharedServices &GetRustSharedServices() noexcept
 {
-	static const OpenTTDSharedServices services{nullptr, SharedRandom, ObserveTile, WriteTile, SharedTrig, SharedIndustry};
+	static const OpenTTDSharedServices services{
+		.context = nullptr,
+		.random = SharedRandom,
+		.observe_tile = ObserveTile,
+		.write_tile = WriteTile,
+		.trig = SharedTrig,
+		.industry = SharedIndustry,
+		.tile_type = MapSvcTileType,
+		.tile_owner = MapSvcTileOwner,
+		.station_index = MapSvcStationIndex,
+		.depot_index = MapSvcDepotIndex,
+		.is_level_crossing = MapSvcIsLevelCrossing,
+		.tunnel_bridge_direction = MapSvcTunnelBridgeDirection,
+		.bridge_speed = MapSvcBridgeSpeed,
+	};
 	return services;
 }
 #endif /* WITH_RUST */

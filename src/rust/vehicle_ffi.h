@@ -30,10 +30,13 @@ struct OpenTTDVehicleBreakdown {
 	bool broken;
 	uint8_t status;
 };
+struct OpenTTDVehiclePreviousTile {
+	uint32_t tile;
+	bool exists;
+};
 struct OpenTTDVehicleServices {
 	void (OPENTTD_VEHICLE_CALL *write_counters)(OpenTTDVehicle *, uint8_t, uint8_t, int32_t) noexcept;
 	OpenTTDVehicleBreakdown (OPENTTD_VEHICLE_CALL *handle_breakdown)(OpenTTDVehicle *) noexcept;
-	uint8_t (OPENTTD_VEHICLE_CALL *process_orders_then_loading)(OpenTTDVehicle *) noexcept;
 	bool (OPENTTD_VEHICLE_CALL *waiting_for_unbunching)(OpenTTDVehicle *) noexcept;
 	void (OPENTTD_VEHICLE_CALL *leave_unbunching_depot)(OpenTTDVehicle *) noexcept;
 	void (OPENTTD_VEHICLE_CALL *reset_depot_unbunching)(OpenTTDVehicle *) noexcept;
@@ -66,6 +69,9 @@ struct OpenTTDVehicleServices {
 	void (OPENTTD_VEHICLE_CALL *write_last_station)(OpenTTDVehicle *, uint16_t) noexcept;
 	void (OPENTTD_VEHICLE_CALL *write_dest)(OpenTTDVehicle *, uint32_t) noexcept;
 	void (OPENTTD_VEHICLE_CALL *write_progress)(OpenTTDVehicle *, uint8_t) noexcept;
+	void (OPENTTD_VEHICLE_CALL *write_max_speed)(OpenTTDVehicle *, uint16_t) noexcept;
+	OpenTTDVehiclePreviousTile (OPENTTD_VEHICLE_CALL *previous_tile)(OpenTTDVehicle *) noexcept;
+	void (OPENTTD_VEHICLE_CALL *detach_last)(OpenTTDVehicle *, OpenTTDVehicle *, OpenTTDVehicle *) noexcept;
 };
 struct OpenTTDGroundMoved {
 	int32_t old_z;
@@ -86,6 +92,7 @@ struct OpenTTDGroundCrash {
 	bool front;
 };
 struct OpenTTDGroundServices {
+	void (OPENTTD_VEHICLE_CALL *cache_begin)(OpenTTDVehicle *) noexcept;
 	OpenTTDGroundMoved (OPENTTD_VEHICLE_CALL *move_incline)(OpenTTDVehicle *, int32_t, int32_t, bool, bool) noexcept;
 	void (OPENTTD_VEHICLE_CALL *update_viewport)(OpenTTDVehicle *, bool, bool) noexcept;
 	void (OPENTTD_VEHICLE_CALL *turn)(OpenTTDVehicle *, uint8_t) noexcept;
@@ -98,15 +105,5 @@ struct OpenTTDGroundServices {
 	void (OPENTTD_VEHICLE_CALL *write_first_engine)(OpenTTDVehicle *, uint16_t) noexcept;
 	void (OPENTTD_VEHICLE_CALL *write_length)(OpenTTDVehicle *, uint8_t, OpenTTDVehicle *, uint16_t) noexcept;
 };
-struct OpenTTDMapServices {
-	uint8_t (OPENTTD_VEHICLE_CALL *tile_type)(uint32_t) noexcept;
-	uint8_t (OPENTTD_VEHICLE_CALL *tile_owner)(uint32_t) noexcept;
-	uint16_t (OPENTTD_VEHICLE_CALL *station_index)(uint32_t) noexcept;
-	uint16_t (OPENTTD_VEHICLE_CALL *depot_index)(uint32_t) noexcept;
-	bool (OPENTTD_VEHICLE_CALL *is_level_crossing)(uint32_t) noexcept;
-	uint8_t (OPENTTD_VEHICLE_CALL *tunnel_bridge_direction)(uint32_t) noexcept;
-	uint16_t (OPENTTD_VEHICLE_CALL *bridge_speed)(uint32_t) noexcept;
-};
 const OpenTTDVehicleServices &GetRustVehicleServices() noexcept;
-const OpenTTDMapServices &GetRustMapServices() noexcept;
 #endif /* RUST_VEHICLE_FFI_H */
