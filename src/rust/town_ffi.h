@@ -60,10 +60,8 @@ struct OpenTTDTownLeaves {
 	void (*make_house)(uint32_t tile, uint32_t town, uint32_t house, uint32_t construction) noexcept;
 	void (*add_animation)(uint32_t tile) noexcept;
 	void (*dirty_tile)(uint32_t tile) noexcept;
-	void (*change_house_count)(uint32_t town, uint32_t amount) noexcept;
-	void (*change_population)(uint32_t town, uint32_t amount) noexcept;
+	void (*population_changed)(uint32_t town) noexcept;
 	void (*nearby_stations)(uint32_t town, uint32_t tile, uint32_t size) noexcept;
-	void (*update_radius)(uint32_t town) noexcept;
 	uint32_t (*house_count)() noexcept;
 	uint16_t (*building_count)(uint32_t town, uint32_t house, uint32_t house_class) noexcept;
 	void (*update_max_pass)(uint32_t town) noexcept;
@@ -82,6 +80,10 @@ struct OpenTTDTownLeaves {
  * and bounded NewGRF resolution may reenter; ordinary gameplay does not throw.
  * Environmental failures and Rust panics abort. Save/load staging stays native. */
 extern "C" {
+bool openttd_rust_town_generating_exchange(bool);
+void openttd_rust_town_update_radius(OpenTTDTownState *);
+void openttd_rust_town_change_population(const OpenTTDTownLeaves *, OpenTTDTownState *, uint32_t, int32_t);
+uint32_t openttd_rust_town_world_population(const OpenTTDTownLeaves *);
 OpenTTDTownSimulationFields *openttd_rust_town_simulation(OpenTTDTownState *);
 OpenTTDTownSlots openttd_rust_town_supplied_view(OpenTTDTownState *);
 void openttd_rust_town_supplied_reserve(OpenTTDTownState *, size_t);

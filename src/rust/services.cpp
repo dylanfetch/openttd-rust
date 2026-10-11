@@ -17,6 +17,7 @@
 #include "../viewport_func.h"
 #include "../core/random_func.hpp"
 #include "../company_base.h"
+#include "../town.h"
 #include "../safeguards.h"
 
 static uint32_t SharedRandom(void *) noexcept { return Random(); }
@@ -70,12 +71,22 @@ static uint8_t SharedNextCompany(uint8_t from) noexcept
 	return it == range.end() ? CompanyID::Invalid().base() : (*it)->index.base();
 }
 
+static const OpenTTDTownHandle *SharedClosestTown(uint32_t tile, uint32_t threshold) noexcept
+{
+	return reinterpret_cast<const OpenTTDTownHandle *>(ClosestTownFromTile(TileIndex{tile}, threshold));
+}
+static OpenTTDTownState *SharedTownOwner(const OpenTTDTownHandle *town) noexcept
+{
+	return reinterpret_cast<const Town *>(town)->growth_owner.get();
+}
+
 const OpenTTDSharedServices &GetRustSharedServices() noexcept
 {
 	static const OpenTTDSharedServices services{
 		.context = nullptr, .random = SharedRandom, .observe_tile = ObserveTile,
 		.write_tile = WriteTile, .trig = SharedTrig, .industry = SharedIndustry,
 		.company_valid = SharedCompanyValid, .next_company = SharedNextCompany,
+		.closest_town = SharedClosestTown, .town_owner = SharedTownOwner,
 	};
 	return services;
 }

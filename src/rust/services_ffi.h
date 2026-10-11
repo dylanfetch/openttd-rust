@@ -21,6 +21,8 @@
  * Industry query returns 0 not industry,1 industry,2 bubble catcher and writes
  * TileVirtXY(x,y). It observes only type and industry graphics.
  * An environmental exception terminates rather than unwinding through Rust. */
+struct OpenTTDTownHandle; // Opaque native Town shell; never dereferenced in Rust.
+struct OpenTTDTownState;
 struct OpenTTDSharedServices {
 	void *context;
 	uint32_t (*random)(void *) noexcept;
@@ -30,6 +32,8 @@ struct OpenTTDSharedServices {
 	uint32_t (*industry)(int32_t, int32_t, uint32_t *) noexcept;
 	bool (*company_valid)(uint8_t) noexcept;
 	uint8_t (*next_company)(uint8_t) noexcept;
+	const OpenTTDTownHandle *(*closest_town)(uint32_t, uint32_t) noexcept;
+	OpenTTDTownState *(*town_owner)(const OpenTTDTownHandle *) noexcept;
 };
 const OpenTTDSharedServices &GetRustSharedServices() noexcept;
 #endif /* RUST_SERVICES_FFI_H */

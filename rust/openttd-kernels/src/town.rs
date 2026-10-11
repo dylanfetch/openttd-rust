@@ -7,7 +7,7 @@
 
 //! Complete town growth policy; canonical map, pools and shared caches remain C++.
 //! Commands and `NewGRF` callbacks run directly after all owner access ends.
-//! No private-state reference survives a shared service or a yielded action.
+//! No private-state reference survives a shared service or reentry.
 #![allow(
     unsafe_code,
     missing_docs,
@@ -121,6 +121,111 @@ pub struct State {
     id_counts: Vec<u16>,
     class_counts: Vec<u16>,
     growth: GrowthFields,
+}
+/// Read only the canonical position at the original observation point.
+/// SAFETY: The caller supplies a live owner; this immediate copied read retains no borrow.
+pub(crate) unsafe fn position(state: *const State) -> u32 {
+    // SAFETY: Caller establishes owner lifetime and serialized access.
+    unsafe { (*state).simulation.xy }
+}
+/// Read only the canonical population at the original observation point.
+/// SAFETY: The caller supplies a live owner; this immediate copied read retains no borrow.
+pub(crate) unsafe fn population(state: *const State) -> u32 {
+    // SAFETY: Caller establishes owner lifetime and serialized access.
+    unsafe { (*state).simulation.population }
+}
+thread_local! { static GENERATING_TOWN: Cell<bool> = const { Cell::new(false) }; }
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_town_generating_exchange(generating: bool) -> bool {
+    GENERATING_TOWN.with(|flag| flag.replace(generating))
+}
+unsafe fn update_radius(state: *mut State) {
+    const RADII: [[u32; 5]; 23] = [
+        [4, 0, 0, 0, 0],
+        [16, 0, 0, 0, 0],
+        [25, 0, 0, 0, 0],
+        [36, 0, 0, 0, 0],
+        [49, 0, 4, 0, 0],
+        [64, 0, 4, 0, 0],
+        [64, 0, 9, 0, 1],
+        [64, 0, 9, 0, 4],
+        [64, 0, 16, 0, 4],
+        [81, 0, 16, 0, 4],
+        [81, 0, 16, 0, 4],
+        [81, 0, 25, 0, 9],
+        [81, 36, 25, 0, 9],
+        [81, 36, 25, 16, 9],
+        [81, 49, 0, 25, 9],
+        [81, 64, 0, 25, 9],
+        [81, 64, 0, 36, 9],
+        [81, 64, 0, 36, 16],
+        [100, 81, 0, 49, 16],
+        [100, 81, 0, 49, 25],
+        [121, 81, 0, 49, 25],
+        [121, 81, 0, 49, 25],
+        [121, 81, 0, 49, 36],
+    ];
+    // SAFETY: Immediate field accesses on live owner; this helper invokes no services.
+    let houses = unsafe { (*state).simulation.num_houses };
+    let radius = if houses < 92 {
+        RADII[(houses / 4) as usize]
+    } else {
+        let mass = (houses / 8) as i32;
+        [
+            mass.wrapping_mul(15).wrapping_sub(40) as u32,
+            mass.wrapping_mul(9).wrapping_sub(15) as u32,
+            0,
+            mass.wrapping_mul(5).wrapping_sub(5) as u32,
+            mass.wrapping_mul(3).wrapping_add(5) as u32,
+        ]
+    };
+    // SAFETY: No callback or competing native access during this owner mutation.
+    unsafe {
+        (*state).simulation.radius = radius;
+    }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_update_radius(state: *mut State) {
+    // SAFETY: Native shell supplies its live single owner.
+    unsafe {
+        update_radius(state);
+    }
+}
+unsafe fn change_population(leaves: &Leaves, state: *mut State, town: u32, amount: i32) {
+    // SAFETY: Field mutation ends before the presentation service can reenter.
+    unsafe {
+        (*state).simulation.population = population(state).wrapping_add(amount as u32);
+    }
+    if GENERATING_TOWN.with(Cell::get) {
+        return;
+    }
+    (leaves.population_changed)(town);
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_change_population(
+    leaves: *const Leaves,
+    state: *mut State,
+    town: u32,
+    amount: i32,
+) {
+    // SAFETY: Immutable table and live owner outlive the synchronous invocation.
+    unsafe {
+        change_population(&*leaves, state, town, amount);
+    }
+}
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_world_population(leaves: *const Leaves) -> u32 {
+    // SAFETY: Immutable table remains live; no owner access spans pool iteration.
+    let leaves = unsafe { &*leaves };
+    let mut total = 0_u32;
+    let mut town = (leaves.next_town)(0);
+    while town != u32::MAX {
+        let owner = (leaves.state)(town);
+        // SAFETY: Iterator supplied a live shell; copy read ends before next callback.
+        total = total.wrapping_add(unsafe { population(owner) });
+        town = (leaves.next_town)(town.wrapping_add(1));
+    }
+    total
 }
 #[unsafe(no_mangle)]
 pub extern "C" fn openttd_rust_town_new() -> *mut State {
@@ -399,10 +504,8 @@ pub struct Leaves {
     pub make_house: extern "C" fn(u32, u32, u32, u32),
     pub add_animation: extern "C" fn(u32),
     pub dirty_tile: extern "C" fn(u32),
-    pub change_house_count: extern "C" fn(u32, u32),
-    pub change_population: extern "C" fn(u32, u32),
+    pub population_changed: extern "C" fn(u32),
     pub nearby_stations: extern "C" fn(u32, u32, u32),
-    pub update_radius: extern "C" fn(u32),
     pub house_count: extern "C" fn() -> u32,
     pub building_count: extern "C" fn(u32, u32, u32) -> u16,
     pub update_max_pass: extern "C" fn(u32),
@@ -444,15 +547,21 @@ impl Engine {
     }
     fn position(&self) -> u32 {
         // SAFETY: Stable live owner; each immediate field read ends before services.
-        unsafe { (*self.owner).simulation.xy }
+        unsafe { position(self.owner) }
     }
     fn num_houses(&self) -> u32 {
         // SAFETY: Stable live owner; each immediate field read ends before services.
         unsafe { (*self.owner).simulation.num_houses }
     }
+    fn change_house_count(&self, amount: u32) {
+        // SAFETY: Immediate owner mutation ends before every native callback.
+        unsafe {
+            (*self.owner).simulation.num_houses = self.num_houses().wrapping_add(amount);
+        }
+    }
     fn population(&self) -> u32 {
         // SAFETY: Stable live owner; each immediate field read ends before services.
-        unsafe { (*self.owner).simulation.population }
+        unsafe { population(self.owner) }
     }
     fn layout(&self) -> u8 {
         // SAFETY: Stable live owner; each immediate field read ends before services.
@@ -1398,7 +1507,10 @@ impl Engine {
         complete: bool,
         protected: bool,
     ) {
-        (self.leaves.change_house_count)(town, 1);
+        // SAFETY: Entry bound its owner once; this mutation ends before spec queries.
+        unsafe {
+            (*self.owner).simulation.num_houses = self.num_houses().wrapping_add(1);
+        }
         let h = (self.leaves.house_construction)(house as u16);
         let mut counter = 0;
         let mut stage = 0;
@@ -1409,7 +1521,10 @@ impl Engine {
                 stage = construction & 3;
             }
             if stage == 3 {
-                (self.leaves.change_population)(town, u32::from(h.population));
+                // SAFETY: Owner mutation ends before possible presentation reentry.
+                unsafe {
+                    change_population(&self.leaves, self.owner, town, i32::from(h.population));
+                }
             } else {
                 counter = (construction >> 2) & 3;
             }
@@ -1454,7 +1569,10 @@ impl Engine {
             );
         }
         (self.leaves.nearby_stations)(town, tile, size);
-        (self.leaves.update_radius)(town);
+        // SAFETY: Pure immediate owner mutation, without native callbacks.
+        unsafe {
+            update_radius(self.owner);
+        }
         self.update_rate(town);
         let size = u32::from((self.leaves.house_flags)(house as u16));
         (self.leaves.construction_animation)(tile);
@@ -1583,12 +1701,15 @@ impl Engine {
                 .services
                 .random_range((self.num_houses() / 10).min(u32::from(u16::MAX)))
                 + 3;
-            (self.leaves.change_house_count)(town, amount);
-            (self.leaves.update_radius)(town);
+            self.change_house_count(amount);
+            // SAFETY: Pure immediate owner mutation, without native callbacks.
+            unsafe {
+                update_radius(self.owner);
+            }
             for _ in 0..amount * 10 {
                 self.grow(town, modes);
             }
-            (self.leaves.change_house_count)(town, amount.wrapping_neg());
+            self.change_house_count(amount.wrapping_neg());
         } else {
             for _ in 0..amount {
                 for _ in 0..25 {
@@ -1598,7 +1719,10 @@ impl Engine {
                 }
             }
         }
-        (self.leaves.update_radius)(town);
+        // SAFETY: Pure immediate owner mutation, without native callbacks.
+        unsafe {
+            update_radius(self.owner);
+        }
         (self.leaves.update_max_pass)(town);
     }
     fn tick_all(&self) {

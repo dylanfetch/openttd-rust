@@ -31,9 +31,12 @@ using RoadType = uint32_t;
 using Slope = uint32_t;
 constexpr uint32_t DIAGDIR_END = 4, MP_ROAD = 2, MP_RAILWAY = 1, MP_STATION = 5, MP_TUNNELBRIDGE = 9;
 constexpr uint32_t TRANSPORT_ROAD = 1, DRD_NONE = 0;
+constexpr size_t NUM_HOUSE_ZONES = 5;
+enum class HouseZone : uint8_t { TownEdge, TownOutskirt, TownOuterSuburb, TownInnerSuburb, TownCentre };
+static uint8_t to_underlying(HouseZone zone) { return static_cast<uint8_t>(zone); }
 struct Town {
 	uint32_t index = 17;
-	struct { uint32_t population = 0; } cache;
+	struct { uint32_t population = 0, num_houses = 0; std::array<uint32_t, 5> squared_town_zone_radius{}; } cache;
 	struct SuppliedHistory { uint32_t production = 0, transported = 0; };
 	std::array<int16_t, 15> ratings{};
 	struct { uint16_t bits = 0; void Set(uint8_t company) { this->bits |= 1 << company; } } have_ratings;
@@ -169,7 +172,7 @@ static bool Candidate()
 	auto leaves = TownProtocolServices();
 	leaves.settings = Read_settings; leaves.tile = Read_tile; leaves.road_info = Read_road_info;
 	leaves.state = State; leaves.stations = Stations; leaves.road_mask = RoadTypes; leaves.build_road = BuildRoad; leaves.build_tunnel = BuildTunnel;
-	const OpenTTDSharedServices services{.context = nullptr, .random = Random, .observe_tile = ObserveTile, .write_tile = WriteTile, .trig = Trig, .industry = Industry, .company_valid = UnusedCompanyValid, .next_company = UnusedNextCompany};
+	const OpenTTDSharedServices services{.context = nullptr, .random = Random, .observe_tile = ObserveTile, .write_tile = WriteTile, .trig = Trig, .industry = Industry, .company_valid = UnusedCompanyValid, .next_company = UnusedNextCompany, .closest_town = UnusedClosestTown, .town_owner = UnusedTownOwner};
 	return openttd_rust_town_tunnel(&leaves, &services, world->town.index, world->start, world->direction);
 }
 static uint32_t Along(const World &w, int distance) { return w.start + distance * TileOffsByDiagDir(w.direction); }
@@ -249,7 +252,7 @@ static void CompareRatings()
 	Town town;
 	auto owner = std::unique_ptr<OpenTTDTownState, decltype(&openttd_rust_town_destroy)>(openttd_rust_town_new(), openttd_rust_town_destroy);
 	auto leaves = TownProtocolServices(); leaves.dirty_authority = RatingDirty;
-	const OpenTTDSharedServices services{.context = nullptr, .random = Random, .observe_tile = ObserveTile, .write_tile = WriteTile, .trig = Trig, .industry = Industry, .company_valid = RatingCompanyValid, .next_company = UnusedNextCompany};
+	const OpenTTDSharedServices services{.context = nullptr, .random = Random, .observe_tile = ObserveTile, .write_tile = WriteTile, .trig = Trig, .industry = Industry, .company_valid = RatingCompanyValid, .next_company = UnusedNextCompany, .closest_town = UnusedClosestTown, .town_owner = UnusedTownOwner};
 	uint32_t checked = 0;
 	auto reset = [&](int16_t initial) {
 		town.ratings.fill(initial); town.have_ratings.bits = 0;
@@ -291,10 +294,28 @@ static void CompareRatings()
 	mode(true); check(1, 1000, 4); mode(false);
 	std::printf("\nPASS %u unchanged-reference rating cases\n", checked);
 }
+static void CompareRadii()
+{
+	Town town;
+	auto owner = std::unique_ptr<OpenTTDTownState, decltype(&openttd_rust_town_destroy)>(openttd_rust_town_new(), openttd_rust_town_destroy);
+	std::vector<uint32_t> counts;
+	for (uint32_t houses = 0; houses <= 100; ++houses) counts.push_back(houses);
+	for (uint32_t houses : {1000U, 10000U, 0x1000000U, 0x7FFFFFFFU, 0x80000000U, UINT32_MAX}) counts.push_back(houses);
+	for (uint32_t houses : counts) {
+		town.cache.num_houses = houses; UpdateTownRadius(&town);
+		auto *state = openttd_rust_town_simulation(owner.get()); state->num_houses = houses;
+		openttd_rust_town_update_radius(owner.get());
+		if (!std::equal(town.cache.squared_town_zone_radius.begin(), town.cache.squared_town_zone_radius.end(), state->radius)) {
+			std::fprintf(stderr, "radius mismatch houses=%u\n", houses); std::exit(1);
+		}
+	}
+	std::printf("\nPASS %zu unchanged-reference radius cases\n", counts.size());
+}
 int main()
 {
 	CompareHistories();
 	CompareRatings();
+	CompareRadii();
 	for (uint32_t dir = 0; dir < 4; dir++) {
 		for (bool mountain : {false, true}) {
 			for (uint32_t length : {1, 2, 4, 5, 6, 7, 8, 9, 255, 256, 257}) {

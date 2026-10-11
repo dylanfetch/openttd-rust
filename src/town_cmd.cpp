@@ -85,7 +85,11 @@ void RebuildTownKdtree()
 }
 
 /** Set if a town is being generated. */
+#ifndef WITH_RUST
 static bool _generating_town = false;
+#else
+static const OpenTTDTownLeaves &GetRustTownServices() noexcept;
+#endif
 
 /**
  * Check if a town 'owns' a bridge.
@@ -441,6 +445,9 @@ void ClearAllTownCachedNames()
  * @param t The town which has changed.
  * @param mod The population change (can be positive or negative).
  */
+#ifdef WITH_RUST
+static void ChangePopulation(Town *t, int mod) { openttd_rust_town_change_population(&GetRustTownServices(), t->growth_owner.get(), t->index.base(), mod); }
+#else
 static void ChangePopulation(Town *t, int mod)
 {
 	t->cache.population += mod;
@@ -451,17 +458,22 @@ static void ChangePopulation(Town *t, int mod)
 
 	InvalidateWindowData(WC_TOWN_DIRECTORY, 0, TDIWD_POPULATION_CHANGE);
 }
+#endif
 
 /**
  * Get the total population, the sum of all towns in the world.
  * @return The calculated population of the world
  */
+#ifdef WITH_RUST
+uint32_t GetWorldPopulation() { return openttd_rust_town_world_population(&GetRustTownServices()); }
+#else
 uint32_t GetWorldPopulation()
 {
 	uint32_t pop = 0;
 	for (const Town *t : Town::Iterate()) pop += t->cache.population;
 	return pop;
 }
+#endif
 
 /**
  * Remove stations from nearby station list if a town is no longer in the catchment area of each.
@@ -1039,13 +1051,12 @@ static void RustTown_dirty_tile(uint32_t tile) noexcept
 {
 	MarkTileDirtyByTile(TileIndex{tile});
 }
-static void RustTown_change_house_count(uint32_t town, uint32_t amount) noexcept
+static void RustTown_population_changed(uint32_t town) noexcept
 {
-	Town::Get(TownID(town))->cache.num_houses += amount;
-}
-static void RustTown_change_population(uint32_t town, uint32_t amount) noexcept
-{
-	ChangePopulation(Town::Get(TownID(town)), amount);
+	Town *t = Town::Get(TownID(town));
+	InvalidateWindowData(WC_TOWN_VIEW, t->index);
+	if (_settings_client.gui.population_in_label) t->UpdateVirtCoord();
+	InvalidateWindowData(WC_TOWN_DIRECTORY, 0, TDIWD_POPULATION_CHANGE);
 }
 static void RustTown_nearby_stations(uint32_t town, uint32_t tile, uint32_t size) noexcept
 {
@@ -1055,10 +1066,6 @@ static void RustTown_nearby_stations(uint32_t town, uint32_t tile, uint32_t size
 			ForAllStationsAroundTiles(TileArea(TileIndex{tile}, flags.Any(BUILDING_2_TILES_X) ? 2 : 1, flags.Any(BUILDING_2_TILES_Y) ? 2 : 1), [t](Station *st, TileIndex) { t->stations_near.insert(st); return true; });
 
 		}
-}
-static void RustTown_update_radius(uint32_t town) noexcept
-{
-	UpdateTownRadius(Town::Get(TownID(town)));
 }
 static uint32_t RustTown_house_count() noexcept
 {
@@ -1127,7 +1134,7 @@ static bool RustTown_allow_construction(uint32_t town, uint32_t tile, uint32_t h
 	return cb == CALLBACK_FAILED || Convert8bitBooleanCallback(hs->grf_prop.grffile, CBID_HOUSE_ALLOW_CONSTRUCTION, cb);
 }
 static void RustTown_construction_animation(uint32_t tile) noexcept { TriggerHouseAnimation_ConstructionStageChanged(TileIndex{tile}, true); }
-static OpenTTDTownState *RustTownState(uint32_t id) noexcept { return Town::Get(TownID(id))->growth_owner.get(); }
+static OpenTTDTownState *RustTownState(uint32_t id) noexcept { return GetRustSharedServices().town_owner(reinterpret_cast<const OpenTTDTownHandle *>(Town::Get(TownID(id)))); }
 static void RustTownStations(uint32_t tile, uint32_t radius, void *context, void (*visit)(void *, const void *, uint32_t)) noexcept
 {
 	ForAllStationsRadius(TileIndex{tile}, radius, [context, visit](const Station *st) { visit(context, st, st->xy.base()); });
@@ -1141,7 +1148,7 @@ static OpenTTDTownStationActivity RustTownStationActivity(const void *station) n
 static uint8_t RustTownStationOwner(const void *station) noexcept { return static_cast<const Station *>(station)->owner.base(); }
 static void RustTownDirtyAuthority(uint32_t town) noexcept { SetWindowDirty(WC_TOWN_AUTHORITY, TownID(town)); }
 
-static const OpenTTDTownLeaves &GetRustTownServices()
+static const OpenTTDTownLeaves &GetRustTownServices() noexcept
 {
 	static const OpenTTDTownLeaves services{
 		.settings = RustTownSettings,
@@ -1170,10 +1177,8 @@ static const OpenTTDTownLeaves &GetRustTownServices()
 		.make_house = RustTown_make_house,
 		.add_animation = RustTown_add_animation,
 		.dirty_tile = RustTown_dirty_tile,
-		.change_house_count = RustTown_change_house_count,
-		.change_population = RustTown_change_population,
+		.population_changed = RustTown_population_changed,
 		.nearby_stations = RustTown_nearby_stations,
-		.update_radius = RustTown_update_radius,
 		.house_count = RustTown_house_count,
 		.building_count = RustTown_building_count,
 		.update_max_pass = RustTown_update_max_pass,
@@ -2250,6 +2255,9 @@ static bool GrowTown(Town *t, TownExpandModes modes)
  * Update the cached town zone radii of a town, based on the number of houses.
  * @param t The town to update.
  */
+#ifdef WITH_RUST
+void UpdateTownRadius(Town *t) { openttd_rust_town_update_radius(t->growth_owner.get()); }
+#else
 void UpdateTownRadius(Town *t)
 {
 	static const std::array<std::array<uint32_t, NUM_HOUSE_ZONES>, 23> _town_squared_town_zone_radius_data = {{
@@ -2292,6 +2300,7 @@ void UpdateTownRadius(Town *t)
 		t->cache.squared_town_zone_radius[to_underlying(HouseZone::TownCentre)] = mass * 3 + 5;
 	}
 }
+#endif
 
 /**
  * Update the maximum amount of monthly passengers and mail for a town, based on its population.
@@ -2332,7 +2341,15 @@ static void UpdateTownGrowth(Town *t);
  */
 static void DoCreateTown(Town *t, TileIndex tile, uint32_t townnameparts, TownSize size, bool city, TownLayout layout, bool manual)
 {
+#ifdef WITH_RUST
+	/* Native scope cleanup survives ordinary generation unwinding; flag state is Rust-owned. */
+	struct GeneratingScope {
+		bool previous = openttd_rust_town_generating_exchange(true);
+		~GeneratingScope() { openttd_rust_town_generating_exchange(this->previous); }
+	} backup;
+#else
 	AutoRestoreBackup backup(_generating_town, true);
+#endif
 
 	t->xy = tile;
 	t->cache.num_houses = 0;

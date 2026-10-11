@@ -10,6 +10,12 @@
 #![allow(unsafe_code, clippy::cast_possible_truncation)]
 use std::ffi::c_void;
 
+/// Opaque native town shell. Its address identifies the shell, not the Rust owner.
+#[repr(C)]
+pub struct TownHandle {
+    _private: [u8; 0],
+}
+
 /// Immutable call table supplied by the game (or isolated test world). No global
 /// registration or game symbol imports are needed by standalone Cargo binaries.
 /// The context and function addresses outlive the component invocation; callbacks
@@ -33,6 +39,10 @@ pub struct Services {
     pub company_valid: extern "C" fn(u8) -> bool,
     /// Next live company at or after this ID; 255 denotes end.
     pub next_company: extern "C" fn(u8) -> u8,
+    /// Original native nearest-town spatial lookup; the result may be null.
+    pub closest_town: extern "C" fn(u32, u32) -> *const TownHandle,
+    /// Resolve the single Rust owner of a live native town shell.
+    pub town_owner: extern "C" fn(*const TownHandle) -> *mut crate::town::State,
 }
 impl Services {
     /// Draw one shared random word.
@@ -70,6 +80,15 @@ pub(crate) extern "C" fn unused_company_valid(_: u8) -> bool {
 #[cfg(test)]
 pub(crate) extern "C" fn unused_next_company(_: u8) -> u8 {
     u8::MAX
+}
+
+#[cfg(test)]
+pub(crate) extern "C" fn unused_closest_town(_: u32, _: u32) -> *const TownHandle {
+    std::ptr::null()
+}
+#[cfg(test)]
+pub(crate) extern "C" fn unused_town_owner(_: *const TownHandle) -> *mut crate::town::State {
+    std::ptr::null_mut()
 }
 
 #[cfg(test)]
