@@ -48,9 +48,6 @@ static inline uint64_t TownProtocolLeaf(uint32_t op, uint32_t id, uint32_t a, ui
 static inline OpenTTDTownState *TownProtocolState(uint32_t) noexcept { return town_protocol_world->owner; }
 static inline void TownProtocolStations(uint32_t, uint32_t, void *, void (*)(void *, uint32_t, uint32_t, uint32_t)) noexcept {}
 static inline uint32_t TownProtocolRandom(void *) noexcept { town_protocol_world->draws++; return 0xABCDEF01; }
-static inline void TownProtocolTile(void *, uint32_t, uint32_t *) noexcept {}
-static inline void TownProtocolWrite(void *, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) noexcept {}
-static inline float TownProtocolTrig(uint32_t, float x) noexcept { return x; }
 static inline uint32_t TownProtocolIndustry(int32_t, int32_t, uint32_t *) noexcept { return 0; }
 
 template <typename Check> void CheckTownProtocol(Check check)
@@ -62,7 +59,7 @@ template <typename Check> void CheckTownProtocol(Check check)
 	auto owner = std::unique_ptr<OpenTTDTownState, decltype(&openttd_rust_town_destroy)>(openttd_rust_town_new(), openttd_rust_town_destroy);
 	TownProtocolWorld w{}; w.owner = owner.get(); town_protocol_world = &w;
 	const OpenTTDTownLeaves leaves{TownProtocolObserve, TownProtocolLeaf, TownProtocolState, TownProtocolStations};
-	const OpenTTDSharedServices services{nullptr, TownProtocolRandom, TownProtocolTile, TownProtocolWrite, TownProtocolTrig, TownProtocolIndustry};
+	const OpenTTDSharedServices services = OpenTTDFixtureSharedServices(nullptr, TownProtocolRandom, TownProtocolIndustry);
 	auto begin = [&](uint32_t op, uint32_t a = 0, uint32_t b = 0, uint32_t c = 0, uint32_t d = 0) {
 		return std::unique_ptr<OpenTTDTownTask, decltype(&openttd_rust_town_task_destroy)>(openttd_rust_town_begin(&leaves, &services, op, 0, 2080, a, b, c, d), openttd_rust_town_task_destroy);
 	};

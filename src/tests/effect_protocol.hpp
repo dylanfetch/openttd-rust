@@ -55,9 +55,6 @@ static inline uint32_t EffectTestRandom(void *context) noexcept
 	w.Record(16);
 	return w.random;
 }
-static inline void EffectTestTile(void *, uint32_t, uint32_t *) noexcept {}
-static inline void EffectTestMapWrite(void *, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) noexcept {}
-static inline float EffectTestTrig(uint32_t, float value) noexcept { return value; }
 
 template <typename Check> void CheckEffectProtocol(Check check)
 {
@@ -66,7 +63,7 @@ template <typename Check> void CheckEffectProtocol(Check check)
 	EffectTestWorld w;
 	effect_test_world = &w;
 	const OpenTTDEffectLeaves leaves{EffectTestObserve, EffectTestWrite, EffectTestViewport, EffectTestSound, EffectTestAnimated};
-	const OpenTTDSharedServices services{&w, EffectTestRandom, EffectTestTile, EffectTestMapWrite, EffectTestTrig, EffectTestIndustry};
+	const OpenTTDSharedServices services = OpenTTDFixtureSharedServices(&w, EffectTestRandom, EffectTestIndustry);
 	auto owner = std::unique_ptr<OpenTTDEffectState, decltype(&openttd_rust_effect_destroy)>(openttd_rust_effect_new(), openttd_rust_effect_destroy);
 	check(openttd_rust_effect_get(owner.get(), 0) == 0 && openttd_rust_effect_get(owner.get(), 1) == 0);
 	openttd_rust_effect_set(owner.get(), 0, 65535);
