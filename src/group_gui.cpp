@@ -147,7 +147,7 @@ static void GuiGroupListAddChildren(GUIGroupList &list, GUIGroupListItem &item, 
 	if (item.group->children.empty()) return;
 
 	std::vector<GUIGroupListItem> sublist;
-	for (const GroupID &group : item.group->children) {
+	for (const GroupID &group : item.group->ChildGroups()) {
 		sublist.emplace_back(Group::Get(group), indent);
 	}
 	SortGUIGroupList(sublist);
