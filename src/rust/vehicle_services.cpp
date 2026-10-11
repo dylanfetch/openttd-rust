@@ -122,7 +122,7 @@ static void OPENTTD_VEHICLE_CALL VehicleSvcWriteDirection(OpenTTDVehicle *v, uin
 static void OPENTTD_VEHICLE_CALL VehicleSvcWriteSpeed(OpenTTDVehicle *v, uint16_t speed) noexcept { VehicleOf(v)->cur_speed = speed; }
 static void OPENTTD_VEHICLE_CALL VehicleSvcWriteLastStation(OpenTTDVehicle *v, uint16_t station) noexcept { VehicleOf(v)->last_station_visited = StationID(station); }
 static void OPENTTD_VEHICLE_CALL VehicleSvcWriteDest(OpenTTDVehicle *v, uint32_t tile) noexcept { VehicleOf(v)->dest_tile = TileIndex(tile); }
-static void OPENTTD_VEHICLE_CALL VehicleSvcWriteProgress(OpenTTDVehicle *v, uint8_t progress) noexcept { VehicleOf(v)->progress = progress; }
+static void OPENTTD_VEHICLE_CALL VehicleSvcWriteProgress(OpenTTDVehicle *v, uint8_t progress) noexcept { RustWriteVehicleProgress(VehicleOf(v), progress); }
 
 static OpenTTDVehiclePreviousTile OPENTTD_VEHICLE_CALL VehicleSvcPreviousTile(OpenTTDVehicle *v) noexcept
 {
@@ -137,6 +137,7 @@ static void OPENTTD_VEHICLE_CALL VehicleSvcDetachLast(OpenTTDVehicle *previous, 
 }
 static void OPENTTD_VEHICLE_CALL VehicleSvcWriteMaxSpeed(OpenTTDVehicle *v, uint16_t speed) noexcept { VehicleOf(v)->vcache.cached_max_speed = speed; }
 
+static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcProgress(OpenTTDVehicle *v) noexcept { return RustVehicleProgress(VehicleOf(v)); }
 static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcDirection(OpenTTDVehicle *v) noexcept { return RustVehicleDirection(VehicleOf(v)); }
 static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcStatus(OpenTTDVehicle *v) noexcept { return RustVehicleStatus(VehicleOf(v)); }
 static uint32_t OPENTTD_VEHICLE_CALL VehicleSvcTile(OpenTTDVehicle *v) noexcept { return RustVehicleTile(VehicleOf(v)); }
@@ -197,6 +198,7 @@ const OpenTTDVehicleServices &GetRustVehicleServices() noexcept
 		.direction = VehicleSvcDirection,
 		.status = VehicleSvcStatus,
 		.tile = VehicleSvcTile,
+		.progress = VehicleSvcProgress,
 	};
 	return services;
 }

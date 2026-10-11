@@ -49,7 +49,7 @@ static OpenTTDRoadCrashPart OPENTTD_VEHICLE_CALL RoadSvcCrashPart(OpenTTDVehicle
 {
 	const RoadVehicle *u = RoadOf(v);
 	const RoadVehicle *next = static_cast<const RoadVehicle *>(RustVehicleNext(u));
-	return {.next = RustVehicle(next), .next_state = RoadStateOf(next), .tile = RustVehicleTile(u), .z = u->z_pos, .crossing = IsLevelCrossingTile(u->tile)};
+	return {.next = RustVehicle(next), .next_state = RoadStateOf(next), .tile = RustVehicleTile(u), .z = u->z_pos, .crossing = GetRustSharedServices().is_level_crossing(u->tile.base())};
 }
 static OpenTTDRoadPartRead OPENTTD_VEHICLE_CALL RoadSvcPart(OpenTTDVehicle *v) noexcept
 {
@@ -184,7 +184,7 @@ static OpenTTDRoadStopRead OPENTTD_VEHICLE_CALL RoadSvcStopRead(OpenTTDVehicle *
 static bool OPENTTD_VEHICLE_CALL RoadSvcShouldStop(OpenTTDVehicle *v, uint32_t tile) noexcept
 {
 	const RoadVehicle *u = RoadOf(v);
-	return u->current_order.ShouldStopAtStation(u, GetStationIndex(TileIndex(tile)));
+	return u->current_order.ShouldStopAtStation(u, StationID(GetRustSharedServices().station_index(tile)));
 }
 static void OPENTTD_VEHICLE_CALL RoadSvcStopLeave(OpenTTDVehicle *v) noexcept
 {

@@ -22,6 +22,8 @@ inline Vehicle *VehicleOf(OpenTTDVehicle *v) noexcept { return reinterpret_cast<
 inline Vehicle *RustVehicleNext(const Vehicle *v) noexcept { return v->Next(); }
 inline uint32_t RustVehicleTile(const Vehicle *v) noexcept { return v->tile.base(); }
 inline Direction RustVehicleDirection(const Vehicle *v) noexcept { return v->direction; }
+inline uint8_t RustVehicleProgress(const Vehicle *v) noexcept { return v->progress; }
+inline void RustWriteVehicleProgress(Vehicle *v, uint8_t progress) noexcept { v->progress = progress; }
 inline uint8_t RustVehicleTick(const Vehicle *v) noexcept { return v->tick_counter; }
 inline uint8_t RustVehicleStatus(const Vehicle *v) noexcept { return v->vehstatus.base(); }
 inline void RustWriteVehicleTick(Vehicle *v, uint8_t tick) noexcept { v->tick_counter = tick; }
@@ -49,9 +51,14 @@ static OpenTTDGroundMoved OPENTTD_VEHICLE_CALL GroundSvcMoveIncline(OpenTTDVehic
 	return {.old_z = old_z, .z = u->z_pos, .cur_speed = u->cur_speed, .max_track_speed = u->gcache.cached_max_track_speed};
 }
 template <class T>
-static void OPENTTD_VEHICLE_CALL GroundSvcUpdateViewport(OpenTTDVehicle *v, bool force_update, bool update_delta) noexcept
+static OpenTTDGroundViewportNext OPENTTD_VEHICLE_CALL GroundSvcUpdateViewportThenNext(OpenTTDVehicle *part, OpenTTDVehicle *front) noexcept
 {
-	T::From(VehicleOf(v))->UpdateViewport(force_update, update_delta);
+	T *u = T::From(VehicleOf(part));
+	/* UpdateViewport may reenter Rust; no Rust borrow survives this call. */
+	u->UpdateViewport(false, false);
+	Vehicle *next = RustVehicleNext(u);
+	/* Only the final iteration consumes front progress, after every viewport. */
+	return {.next = RustVehicle(next), .final_progress = next == nullptr ? RustVehicleProgress(VehicleOf(front)) : uint8_t(0)};
 }
 template <class T>
 static void OPENTTD_VEHICLE_CALL GroundSvcTurn(OpenTTDVehicle *v, uint8_t direction) noexcept
@@ -72,7 +79,7 @@ static OpenTTDGroundLastSpeed OPENTTD_VEHICLE_CALL GroundSvcSetLastSpeed(OpenTTD
 {
 	T *u = T::From(VehicleOf(v));
 	u->SetLastSpeed();
-	return {.status = RustVehicleStatus(u), .progress = u->progress};
+	return {.status = RustVehicleStatus(u)};
 }
 template <class T>
 static int32_t OPENTTD_VEHICLE_CALL GroundSvcAcceleration(OpenTTDVehicle *v) noexcept
@@ -134,7 +141,7 @@ const OpenTTDGroundServices &GetRustGroundServices() noexcept
 	static const OpenTTDGroundServices services{
 		.cache_begin = GroundSvcCacheBegin<T>,
 		.move_incline = GroundSvcMoveIncline<T>,
-		.update_viewport = GroundSvcUpdateViewport<T>,
+		.update_viewport_then_next = GroundSvcUpdateViewportThenNext<T>,
 		.turn = GroundSvcTurn<T>,
 		.do_update_speed = GroundSvcDoUpdateSpeed<T>,
 		.set_last_speed = GroundSvcSetLastSpeed<T>,

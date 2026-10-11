@@ -144,13 +144,13 @@ static void OPENTTD_AIRCRAFT_CALL Aircraft_set_subspeed(OpenTTDAircraftVehicle v
 static uint8_t OPENTTD_AIRCRAFT_CALL Aircraft_progress(OpenTTDAircraftVehicle vehicle) noexcept
 {
 	const Vehicle *v = static_cast<const Vehicle *>(vehicle.handle);
-	return v->progress;
+	return RustVehicleProgress(v);
 }
 
 static void OPENTTD_AIRCRAFT_CALL Aircraft_set_progress(OpenTTDAircraftVehicle vehicle, uint8_t value) noexcept
 {
 	Vehicle *v = static_cast<Vehicle *>(vehicle.handle);
-	v->progress = value;
+	RustWriteVehicleProgress(v, value);
 }
 
 static uint8_t OPENTTD_AIRCRAFT_CALL Aircraft_acceleration(OpenTTDAircraftVehicle vehicle) noexcept

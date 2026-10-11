@@ -85,6 +85,7 @@ struct OpenTTDVehicleServices {
 	uint8_t (OPENTTD_VEHICLE_CALL *direction)(OpenTTDVehicle *) noexcept;
 	uint8_t (OPENTTD_VEHICLE_CALL *status)(OpenTTDVehicle *) noexcept;
 	uint32_t (OPENTTD_VEHICLE_CALL *tile)(OpenTTDVehicle *) noexcept;
+	uint8_t (OPENTTD_VEHICLE_CALL *progress)(OpenTTDVehicle *) noexcept;
 };
 struct OpenTTDGroundMoved {
 	int32_t old_z;
@@ -96,9 +97,12 @@ struct OpenTTDGroundSpeed {
 	int32_t distance;
 	uint16_t cur_speed;
 };
+struct OpenTTDGroundViewportNext {
+	OpenTTDVehicle *next;
+	uint8_t final_progress;
+};
 struct OpenTTDGroundLastSpeed {
 	uint8_t status;
-	uint8_t progress;
 };
 struct OpenTTDGroundCrash {
 	uint32_t victims;
@@ -107,7 +111,7 @@ struct OpenTTDGroundCrash {
 struct OpenTTDGroundServices {
 	void (OPENTTD_VEHICLE_CALL *cache_begin)(OpenTTDVehicle *) noexcept;
 	OpenTTDGroundMoved (OPENTTD_VEHICLE_CALL *move_incline)(OpenTTDVehicle *, int32_t, int32_t, bool, bool) noexcept;
-	void (OPENTTD_VEHICLE_CALL *update_viewport)(OpenTTDVehicle *, bool, bool) noexcept;
+	OpenTTDGroundViewportNext (OPENTTD_VEHICLE_CALL *update_viewport_then_next)(OpenTTDVehicle *, OpenTTDVehicle *) noexcept;
 	void (OPENTTD_VEHICLE_CALL *turn)(OpenTTDVehicle *, uint8_t) noexcept;
 	OpenTTDGroundSpeed (OPENTTD_VEHICLE_CALL *do_update_speed)(OpenTTDVehicle *, uint32_t, int32_t, int32_t) noexcept;
 	OpenTTDGroundLastSpeed (OPENTTD_VEHICLE_CALL *set_last_speed)(OpenTTDVehicle *) noexcept;

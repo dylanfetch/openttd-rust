@@ -5,6 +5,8 @@
  * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
  */
 
+#include "services_ffi.h"
+
 /** @file train_services.h Direct shared-world operations; no train policy. */
 #include "vehicle_services.h"
 #include "settings_services.h"
@@ -32,7 +34,7 @@ static void TrainWriteDay(OpenTTDTrainHandle id, uint8_t value) noexcept
 static void TrainWriteOrderTime(OpenTTDTrainHandle id, int32_t value) noexcept
 {Train *v=static_cast<Train *>(id.shell); v->current_order_time = static_cast<int32_t>(value);}
 static void TrainWriteProgress(OpenTTDTrainHandle id, uint8_t value) noexcept
-{Train *v=static_cast<Train *>(id.shell); v->progress = static_cast<uint8_t>(value);}
+{Train *v=static_cast<Train *>(id.shell); RustWriteVehicleProgress(v, static_cast<uint8_t>(value));}
 static void TrainWriteSubspeed(OpenTTDTrainHandle id, uint8_t value) noexcept
 {Train *v=static_cast<Train *>(id.shell); v->subspeed = static_cast<uint8_t>(value);}
 static void TrainWriteGvFlags(OpenTTDTrainHandle id, uint16_t value) noexcept
@@ -121,7 +123,7 @@ static void TrainBeginLoading(OpenTTDTrainHandle id) noexcept
 }
 static uint64_t TrainBridgeSpeed(OpenTTDTrainHandle, uint32_t a) noexcept
 {
-	return GetBridgeSpec(GetBridgeType(TileIndex(a)))->speed;
+	return GetRustSharedServices().bridge_speed(a);
 }
 static void TrainCacheOverride(OpenTTDTrainHandle id) noexcept
 {
@@ -297,7 +299,7 @@ static void TrainDepotDirty(OpenTTDTrainHandle id) noexcept
 }
 static uint64_t TrainDepotIndex(OpenTTDTrainHandle, uint32_t a) noexcept
 {
-	return GetDepotIndex(TileIndex(a)).base();
+	return GetRustSharedServices().depot_index(a);
 }
 static uint64_t TrainDepotTrack(OpenTTDTrainHandle, uint32_t a) noexcept
 {
@@ -325,7 +327,7 @@ static uint64_t TrainDiagTrackdir(OpenTTDTrainHandle, uint8_t a) noexcept
 }
 static void TrainDirtyTile(OpenTTDTrainHandle, uint32_t a) noexcept
 {
-	MarkTileDirtyByTile(TileIndex(a));
+	GetRustSharedServices().mark_dirty(a);
 }
 static uint64_t TrainDirDiag(OpenTTDTrainHandle, uint8_t a) noexcept
 {
@@ -428,7 +430,7 @@ static uint64_t TrainIsBridge(OpenTTDTrainHandle, uint32_t a) noexcept
 }
 static uint64_t TrainIsCrossing(OpenTTDTrainHandle, uint32_t a) noexcept
 {
-	return IsLevelCrossingTile(TileIndex(a));
+	return GetRustSharedServices().is_level_crossing(a);
 }
 static uint64_t TrainIsDepot(OpenTTDTrainHandle, uint32_t a) noexcept
 {
@@ -747,7 +749,7 @@ static void TrainStartStopDirty(OpenTTDTrainHandle id) noexcept
 }
 static uint64_t TrainStation(OpenTTDTrainHandle, uint32_t a) noexcept
 {
-	return GetStationIndex(TileIndex(a)).base();
+	return GetRustSharedServices().station_index(a);
 }
 static uint64_t TrainStationAxis(OpenTTDTrainHandle, uint32_t a) noexcept
 {
@@ -801,7 +803,7 @@ static uint64_t TrainTileOffsetDiag(OpenTTDTrainHandle, uint8_t a) noexcept
 }
 static uint64_t TrainTileOwner(OpenTTDTrainHandle, uint32_t a) noexcept
 {
-	return GetTileOwner(TileIndex(a)).base();
+	return GetRustSharedServices().tile_owner(a);
 }
 static uint64_t TrainTileRailType(OpenTTDTrainHandle, uint32_t a) noexcept
 {
@@ -859,7 +861,7 @@ static uint64_t TrainTryReserve(OpenTTDTrainHandle, uint32_t a, uint8_t b, uint8
 }
 static uint64_t TrainTunnelDir(OpenTTDTrainHandle, uint32_t a) noexcept
 {
-	return GetTunnelBridgeDirection(TileIndex(a));
+	return GetRustSharedServices().tunnel_bridge_direction(a);
 }
 static void TrainUnreserve(OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
@@ -1059,7 +1061,7 @@ static uint8_t TrainReadDay(OpenTTDTrainHandle id) noexcept
 static uint8_t TrainReadProgress(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return v->progress;
+	return RustVehicleProgress(v);
 }
 static uint8_t TrainReadOrder(OpenTTDTrainHandle id) noexcept
 {

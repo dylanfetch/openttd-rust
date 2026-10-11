@@ -165,6 +165,7 @@ pub struct VehicleServices {
     pub direction: extern "C" fn(VehicleRef) -> u8,
     pub status: extern "C" fn(VehicleRef) -> u8,
     pub tile: extern "C" fn(VehicleRef) -> u32,
+    pub progress: extern "C" fn(VehicleRef) -> u8,
 }
 
 /// Position step result: `UpdateInclination`'s old height, then the new height,
@@ -186,12 +187,19 @@ pub struct Speed {
     pub cur_speed: u16,
 }
 
-/// `SetLastSpeed`, then the status and progress it leaves.
+/// Post-viewport link; progress is consumed only when this link ends the loop.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct ViewportNext {
+    pub next: Option<VehicleRef>,
+    pub final_progress: u8,
+}
+
+/// `SetLastSpeed`, then the status it leaves before viewport updates.
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct LastSpeed {
     pub status: u8,
-    pub progress: u8,
 }
 
 /// `GroundVehicleBase::Crash` victims, then `IsFrontEngine()`.
@@ -210,7 +218,7 @@ pub struct GroundServices {
     /// Store x/y, `UpdatePosition()`, `UpdateInclination(new_tile, delta)`.
     pub move_incline: extern "C" fn(VehicleRef, i32, i32, bool, bool) -> Moved,
     /// `UpdateViewport(force, delta)`.
-    pub update_viewport: extern "C" fn(VehicleRef, bool, bool),
+    pub update_viewport_then_next: extern "C" fn(VehicleRef, VehicleRef) -> ViewportNext,
     /// Store the direction, then `UpdateViewport(true, true)`.
     pub turn: extern "C" fn(VehicleRef, u8),
     pub do_update_speed: extern "C" fn(VehicleRef, u32, i32, i32) -> Speed,

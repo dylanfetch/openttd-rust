@@ -1528,23 +1528,24 @@ impl Game<'_> {
         s.cur_speed = m.cur_speed;
     }
     /// One `IndividualRoadVehicleController` pass over the consist.
-    fn consist_step(&self, v: Part, s: &mut Step) -> bool {
+    fn consist_step(&self, v: Part, s: &mut Step) -> Option<bool> {
         if !self.individual(v, None, s) {
-            return false;
+            return None;
         }
         let mut prev = v;
         let link = service!(self.l.link)(v.v);
         let mut next = Part::link(link.next, link.next_state);
+        let traversed_tail = next.is_some();
         while let Some(u) = next {
             let mut us = service!(self.l.step)(u.v);
             if !self.individual(u, Some(prev), &mut us) {
-                return false;
+                return None;
             }
             prev = u;
             let link = service!(self.l.link)(u.v);
             next = Part::link(link.next, link.next_state);
         }
-        true
+        Some(traversed_tail)
     }
     /// `RoadVehController`.
     fn controller(&self, v: Part, status: u8, tick: u8) -> bool {
@@ -1592,12 +1593,12 @@ impl Game<'_> {
         let mut blocked = false;
         while j >= adv {
             j -= adv;
-            if !self.consist_step(v, &mut s) {
+            let Some(traversed_tail) = self.consist_step(v, &mut s) else {
                 blocked = true;
                 break;
-            }
-            if service!(self.vs.next)(v.v).is_some() {
-                // Later parts may have changed the front; observe it again.
+            };
+            if traversed_tail {
+                // A traversed tail may have changed the front, including by detaching itself.
                 s = service!(self.l.step)(v.v);
             }
             adv = advance_distance(s.direction);
@@ -1617,17 +1618,30 @@ impl Game<'_> {
             }
         }
         let last = service!(self.gs.set_last_speed)(v.v);
-        if last.status & VS_HIDDEN == 0 {
-            service!(self.gs.update_viewport)(v.v, false, false);
-        }
-        let mut next = service!(self.vs.next)(v.v);
-        while let Some(u) = next {
-            if service!(self.vs.status)(u) & VS_HIDDEN == 0 {
-                service!(self.gs.update_viewport)(u, false, false);
+        let mut final_progress = None;
+        let mut next = if last.status & VS_HIDDEN == 0 {
+            let r = service!(self.gs.update_viewport_then_next)(v.v, v.v);
+            if r.next.is_none() {
+                final_progress = Some(r.final_progress);
             }
-            next = service!(self.vs.next)(u);
+            r.next
+        } else {
+            service!(self.vs.next)(v.v)
+        };
+        while let Some(u) = next {
+            next = if service!(self.vs.status)(u) & VS_HIDDEN == 0 {
+                let r = service!(self.gs.update_viewport_then_next)(u, v.v);
+                if r.next.is_none() {
+                    final_progress = Some(r.final_progress);
+                }
+                r.next
+            } else {
+                service!(self.vs.next)(u)
+            };
         }
-        if last.progress == 0 {
+        // A hidden final part has no viewport observation; read progress now.
+        let progress = final_progress.unwrap_or_else(|| service!(self.vs.progress)(v.v));
+        if progress == 0 {
             service!(self.vs.write_progress)(v.v, if blocked { adv - 1 } else { j } as u8);
         }
         true

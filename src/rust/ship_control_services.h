@@ -5,6 +5,8 @@
  * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
  */
 
+#include "services_ffi.h"
+
 /** @file ship_control_services.h Typed synchronous shared-world services. */
 #include "settings_services.h"
 #include "vehicle_services.h"
@@ -19,7 +21,7 @@ static uint32_t Ship_depot_axis(uint32_t tile) noexcept { return GetShipDepotAxi
 
 static bool Ship_is_depot(uint32_t tile) noexcept { return IsShipDepotTile(TileIndex(tile)); }
 
-static uint32_t Ship_depot_index(uint32_t tile) noexcept { return GetDepotIndex(TileIndex(tile)).base(); }
+static uint32_t Ship_depot_index(uint32_t tile) noexcept { return GetRustSharedServices().depot_index(tile); }
 
 static bool Ship_wait_unbunch(uint32_t id) noexcept { Ship *v = Ship::Get(VehicleID(id)); return v->IsWaitingForUnbunching(); }
 
@@ -33,7 +35,7 @@ static uint32_t Ship_max_distance() noexcept { return RustMaximumDepotPenalty() 
 
 static bool Ship_tile_valid(uint32_t tile) noexcept { return IsValidTile(TileIndex(tile)); }
 
-static uint32_t Ship_tile_type(uint32_t tile) noexcept { return GetTileType(TileIndex(tile)); }
+static uint32_t Ship_tile_type(uint32_t tile) noexcept { return GetRustSharedServices().tile_type(tile); }
 
 static uint32_t Ship_water_class(uint32_t tile) noexcept { return to_underlying(GetEffectiveWaterClass(TileIndex(tile))); }
 
@@ -42,9 +44,9 @@ static bool Ship_lock_middle(uint32_t tile) noexcept
 	return IsTileType(TileIndex(tile), MP_WATER) && IsLock(TileIndex(tile)) && GetLockPart(TileIndex(tile)) == LockPart::Middle;
 }
 
-static uint32_t Ship_lock_dir(uint32_t tile) noexcept { return GetInclinedSlopeDirection(GetTileSlope(TileIndex(tile))); }
+static uint32_t Ship_lock_dir(uint32_t tile) noexcept { return GetInclinedSlopeDirection(static_cast<Slope>(GetRustSharedServices().tile_slope(tile))); }
 
-static uint32_t Ship_tile_min_z(uint32_t tile) noexcept { return GetTileZ(TileIndex(tile)); }
+static uint32_t Ship_tile_min_z(uint32_t tile) noexcept { return GetRustSharedServices().tile_z(tile); }
 
 static uint32_t Ship_tile_max_z(uint32_t tile) noexcept { return GetTileMaxZ(TileIndex(tile)); }
 
@@ -67,7 +69,7 @@ static bool Ship_dock(uint32_t tile) noexcept { return IsDockTile(TileIndex(tile
 
 static bool Ship_dock_water(uint32_t tile) noexcept { return IsDockWaterPart(TileIndex(tile)); }
 
-static uint32_t Ship_station(uint32_t tile) noexcept { return GetStationIndex(TileIndex(tile)).base(); }
+static uint32_t Ship_station(uint32_t tile) noexcept { return GetRustSharedServices().station_index(tile); }
 
 static uint32_t Ship_industry_station(uint32_t tile) noexcept
 {
@@ -333,7 +335,7 @@ static void Ship_set_day(uint32_t id, uint8_t value) noexcept { Ship *v = Ship::
 
 static void Ship_set_order_time(uint32_t id, int32_t value) noexcept { Ship *v = Ship::Get(VehicleID(id)); v->current_order_time = static_cast<int32_t>(value); }
 
-static void Ship_set_progress(uint32_t id, uint8_t value) noexcept { Ship *v = Ship::Get(VehicleID(id)); v->progress = static_cast<uint8_t>(value); }
+static void Ship_set_progress(uint32_t id, uint8_t value) noexcept { Ship *v = Ship::Get(VehicleID(id)); RustWriteVehicleProgress(v, static_cast<uint8_t>(value)); }
 
 static void Ship_set_last_station(uint32_t id, uint16_t value) noexcept { Ship *v = Ship::Get(VehicleID(id)); v->last_station_visited = StationID(static_cast<uint16_t>(value)); }
 
@@ -367,7 +369,7 @@ static uint32_t Ship_day(uint32_t id) noexcept { const Ship *v = Ship::Get(Vehic
 
 static uint32_t Ship_order_time(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(v->current_order_time); }
 
-static uint32_t Ship_progress(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(v->progress); }
+static uint32_t Ship_progress(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(RustVehicleProgress(v)); }
 
 static uint32_t Ship_status(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(RustVehicleStatus(v)); }
 
@@ -397,7 +399,7 @@ static size_t Ship_neighbours(OpenTTDWaterPatch patch, OpenTTDWaterPatch *out) n
 static bool Ship_next_depot(uint32_t first, OpenTTDShipDepot *out) noexcept
 {
 	for (const Depot *d : Depot::Iterate(first)) {
-		*out = {d->index.base(), d->xy.base(), IsShipDepotTile(d->xy) ? GetTileOwner(d->xy).base() : UINT32_MAX, static_cast<uint32_t>(IsShipDepotTile(d->xy))};
+		*out = {d->index.base(), d->xy.base(), IsShipDepotTile(d->xy) ? GetRustSharedServices().tile_owner(d->xy.base()) : UINT32_MAX, static_cast<uint32_t>(IsShipDepotTile(d->xy))};
 		return true;
 	}
 	return false;

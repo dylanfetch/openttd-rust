@@ -5,6 +5,8 @@
 	* See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
 	*/
 
+#include "services_ffi.h"
+
 /** @file train_reservation_services.h Direct map/PBS/follower services. */
 
 static uint64_t TrainReservationAllCompat(void *, OpenTTDTrainHandle id) noexcept
@@ -162,7 +164,7 @@ static void TrainReservationMarkBridge(void *, OpenTTDTrainHandle, uint32_t a) n
 static void TrainReservationMarkTile(void *, OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
-	MarkTileDirtyByTile(t);
+	GetRustSharedServices().mark_dirty(t.base());
 }
 static uint64_t TrainReservationNeedsService(void *, OpenTTDTrainHandle id) noexcept
 {
@@ -292,7 +294,7 @@ static void TrainReservationStartStop(void *, OpenTTDTrainHandle id) noexcept
 static uint64_t TrainReservationStation(void *, OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
-	return GetStationIndex(t).base();
+	return GetRustSharedServices().station_index(t.base());
 }
 static uint64_t TrainReservationStationTrain(void *, OpenTTDTrainHandle, uint16_t a) noexcept
 {
@@ -334,7 +336,7 @@ static uint64_t TrainReservationTryTrack(void *, OpenTTDTrainHandle, uint32_t a,
 static uint64_t TrainReservationTunnelDir(void *, OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
-	return GetTunnelBridgeDirection(t);
+	return GetRustSharedServices().tunnel_bridge_direction(t.base());
 }
 static uint64_t TrainReservationTunnelFree(void *, OpenTTDTrainHandle id, uint32_t a, uint32_t b) noexcept
 {
