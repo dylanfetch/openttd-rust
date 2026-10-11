@@ -627,7 +627,7 @@ static const OpenTTDStationServices _rust_station_services = {
 			ge.AvailableCount(), ge.HasData() ? static_cast<uint32_t>(ge.GetData().cargo.MapSize()) : 0
 		};
 	},
-	.get = [](uint32_t id) noexcept -> void * {
+	.get = [](uint16_t id) noexcept -> void * {
 		CountStationBoundary<void *>(StationBoundary::Station);
 		return BaseStation::GetIfValid(StationID(id));
 	},
@@ -635,9 +635,9 @@ static const OpenTTDStationServices _rust_station_services = {
 		CountStationBoundary<OpenTTDStationService *>(StationBoundary::Station);
 		return static_cast<BaseStation *>(handle)->rust_service.get();
 	},
-	.pool_size = []() noexcept -> uint32_t {
-		CountStationBoundary<uint32_t>(StationBoundary::Station);
-		return static_cast<uint32_t>(BaseStation::GetPoolSize());
+	.pool_size = []() noexcept -> size_t {
+		CountStationBoundary<size_t>(StationBoundary::Station);
+		return BaseStation::GetPoolSize();
 	},
 	.tick_counter = []() noexcept -> uint64_t {
 		CountStationBoundary<uint64_t>(StationBoundary::Station);
@@ -737,12 +737,12 @@ static const OpenTTDStationServices _rust_station_services = {
 		CountStationBoundary<void>(StationBoundary::Station);
 		TriggerHouseAnimation_WatchedCargoAccepted(TileIndex(tile), cargoes);
 	},
-	.append_packet = [](void *handle, uint8_t cargo, uint32_t amount, uint32_t source) noexcept -> void {
+	.append_packet = [](void *handle, uint8_t cargo, uint32_t amount, Source source) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Station);
 		Station *st = Station::From(static_cast<BaseStation *>(handle));
 		GoodsEntry &ge = st->goods[cargo];
 		StationID next = ge.GetVia(st->index);
-		ge.GetOrCreateData().cargo.Append(new CargoPacket(st->index, amount, Source(SourceID(source & 0xFFFF), static_cast<SourceType>(source >> 16))), next);
+		ge.GetOrCreateData().cargo.Append(new CargoPacket(st->index, amount, source), next);
 	},
 	.update_supply = [](void *handle, uint8_t cargo, uint32_t amount) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Station);
@@ -814,12 +814,12 @@ static const OpenTTDStationServices _rust_station_services = {
 		CountStationScope();
 		body(context, &result);
 	},
-	.truncate_next = [](void *handle, uint32_t *amount) noexcept -> uint32_t {
-		CountStationBoundary<uint32_t>(StationBoundary::Station);
+	.truncate_next = [](void *handle) noexcept -> OpenTTDTruncatedSource {
+		CountStationBoundary<OpenTTDTruncatedSource>(StationBoundary::Station, true);
 		auto *result = static_cast<RustStationTruncation *>(handle);
-		if (result->iterator == result->amounts.end()) return UINT32_MAX;
-		*amount = result->iterator->second;
-		return (result->iterator++)->first.base();
+		if (result->iterator == result->amounts.end()) return {0, 0, false};
+		const auto &[source, amount] = *result->iterator++;
+		return {amount, source.base(), true};
 	},
 	.shared = &GetRustSharedServices(),
 };
@@ -856,33 +856,39 @@ static const OpenTTDStationLinks _rust_station_links = {
 		CountStationBoundary<int32_t>(StationBoundary::Links);
 		return static_cast<LinkGraph *>(handle)->LastCompression().base();
 	},
-	.edge = [](void *handle, uint16_t node, size_t index, OpenTTDStationEdge *out) noexcept -> void {
-		CountStationBoundary<void>(StationBoundary::Links);
+	.edge = [](void *handle, uint16_t node, size_t index, void *from_handle) noexcept -> OpenTTDStationEdge {
+		CountStationBoundary<OpenTTDStationEdge>(StationBoundary::Links, true);
 		LinkGraph *graph = static_cast<LinkGraph *>(handle);
 		const Edge &edge = (*graph)[node].edges[index];
-		Station *from = Station::Get((*graph)[node].station);
+		Station *from = static_cast<Station *>(from_handle);
 		Station *to = Station::Get((*graph)[edge.dest_node].station);
-		*out = {
-			to, edge.LastUpdate().base(), edge.last_unrestricted_update.base(), edge.last_restricted_update.base(), DistanceManhattan(from->xy, to->xy), edge.dest_node
-		};
+		return {to, edge.LastUpdate().base(), DistanceManhattan(from->xy, to->xy)};
+	},
+	.edge_unrestricted = [](void *handle, uint16_t node, size_t index) noexcept -> int32_t {
+		CountStationBoundary<int32_t>(StationBoundary::Links);
+		return (*static_cast<LinkGraph *>(handle))[node].edges[index].last_unrestricted_update.base();
+	},
+	.edge_restricted = [](void *handle, uint16_t node, size_t index) noexcept -> int32_t {
+		CountStationBoundary<int32_t>(StationBoundary::Links);
+		return (*static_cast<LinkGraph *>(handle))[node].edges[index].last_restricted_update.base();
 	},
 	.delete_flows = [](void *handle, uint8_t cargo, uint16_t destination) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Links);
 		GoodsEntry &ge = static_cast<Station *>(handle)->goods[cargo];
 		if (ge.HasData()) ge.GetData().flows.DeleteFlows(StationID(destination));
 	},
-	.restrict_edge = [](void *handle, uint16_t from, uint16_t to) noexcept -> void {
+	.restrict_edge = [](void *handle, uint16_t from, size_t index) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Links);
-		(*static_cast<LinkGraph *>(handle))[from][to].Restrict();
+		(*static_cast<LinkGraph *>(handle))[from].edges[index].Restrict();
 	},
 	.restrict_flows = [](void *handle, uint8_t cargo, uint16_t destination) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Links);
 		GoodsEntry &ge = static_cast<Station *>(handle)->goods[cargo];
 		if (ge.HasData()) ge.GetData().flows.RestrictFlows(StationID(destination));
 	},
-	.release_edge = [](void *handle, uint16_t from, uint16_t to) noexcept -> void {
+	.release_edge = [](void *handle, uint16_t from, size_t index) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Links);
-		(*static_cast<LinkGraph *>(handle))[from][to].Release();
+		(*static_cast<LinkGraph *>(handle))[from].edges[index].Release();
 	},
 	.remove_edge = [](void *handle, uint16_t from, uint16_t to) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Links);
@@ -892,7 +898,7 @@ static const OpenTTDStationLinks _rust_station_links = {
 		CountStationBoundary<void>(StationBoundary::Links);
 		static_cast<LinkGraph *>(handle)->Compress();
 	},
-	.order_list = [](uint32_t id) noexcept -> void * {
+	.order_list = [](uint16_t id) noexcept -> void * {
 		CountStationBoundary<void *>(StationBoundary::Links);
 		return OrderList::GetIfValid(OrderListID(id));
 	},
@@ -904,10 +910,11 @@ static const OpenTTDStationLinks _rust_station_links = {
 		CountStationBoundary<size_t>(StationBoundary::Links);
 		return static_cast<OrderList *>(handle)->GetOrders().size();
 	},
-	.order_destination = [](void *handle, size_t index) noexcept -> uint32_t {
-		CountStationBoundary<uint32_t>(StationBoundary::Links);
+	.order_destination = [](void *handle, size_t index) noexcept -> OpenTTDOrderDestination {
+		CountStationBoundary<OpenTTDOrderDestination>(StationBoundary::Links, true);
 		const Order *order = &static_cast<OrderList *>(handle)->GetOrders()[index];
-		return order->IsType(OT_GOTO_STATION) || order->IsType(OT_IMPLICIT) ? order->GetDestination().base() : UINT32_MAX;
+		if (!order->IsType(OT_GOTO_STATION) && !order->IsType(OT_IMPLICIT)) return {0, false};
+		return {order->GetDestination().base(), true};
 	},
 	.order_vehicle = [](void *handle) noexcept -> void * {
 		CountStationBoundary<void *>(StationBoundary::Links);
@@ -5014,7 +5021,7 @@ uint MoveGoodsToStation(CargoType cargo, uint amount, Source source, const Stati
 {
 #ifdef WITH_RUST
 	std::pair cursor(all_stations.begin(), all_stations.end());
-	return openttd_rust_station_distribute(cargo, amount, source.id | uint32_t(source.type) << 16, &cursor, exclusivity.base(), &_rust_station_services);
+	return openttd_rust_station_distribute(cargo, amount, source, &cursor, exclusivity.base(), &_rust_station_services);
 #else
 	/* Return if nothing to do. Also the rounding below fails for 0. */
 	if (all_stations.empty()) return 0;

@@ -1543,7 +1543,7 @@ acceptance, ratings/truncation, admission/distribution and periodic/stale-link
 control. Packet, flow, link-graph, map and geometry storage remain C++.
 
 Issue #214 replaces numeric dispatch with borrowed typed noexcept tables (ABI
-110-115), narrow observations (500-508), and caller-owned native iterator/container
+110-115), narrow observations (500-511), and caller-owned native iterator/container
 frames. Raw field access ends before callbacks; refit and payment/industry reentry
 see current state. Stable queue nodes preserve iterator identity. Native save
 scopes retain partial changes on failure. #117 production flush remains once at

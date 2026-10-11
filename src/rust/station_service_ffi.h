@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <cstddef>
 #include "services_ffi.h"
+#include "../source_type.h"
 struct OpenTTDStationService;
 struct OpenTTDStationCargo {
 	uint32_t max_waiting_cargo;
@@ -44,6 +45,9 @@ struct OpenTTDStationFields {
  * invalidation may read the owner; unrestricted GUI-scope runs later in C++.
  * Opaque world handles obey the original pool lifetimes. Panics and environmental
  * service failures abort. Packet, flow, geometry and map storage remain C++.
+ * with_* bodies run synchronously once while native iterator/container frames
+ * live on the caller's stack. Immutable engine/GRF handles retain native registry
+ * lifetime; conditional fields are observed only at their original read points.
  */
 struct OpenTTDRatingCounts {
 	uint32_t available;
@@ -88,14 +92,23 @@ struct OpenTTDLoadingWait {
 	uint16_t wait;
 };
 using OpenTTDStationScope = void (*)(void *, void *) noexcept;
+struct OpenTTDOrderDestination {
+	uint16_t destination;
+	bool is_station;
+};
+struct OpenTTDTruncatedSource {
+	uint32_t amount;
+	uint16_t source;
+	bool present;
+};
 struct OpenTTDStationServices {
 	uint8_t (*station_owner)(void *) noexcept;
 	OpenTTDStationExclusivity (*station_exclusivity)(void *) noexcept;
 	void *(*station_next)(void *) noexcept;
 	OpenTTDRatingCounts (*rating_counts)(void *, uint8_t) noexcept;
-	void *(*get)(uint32_t) noexcept;
+	void *(*get)(uint16_t) noexcept;
 	OpenTTDStationService * (*owner)(void *) noexcept;
-	uint32_t (*pool_size)() noexcept;
+	size_t (*pool_size)() noexcept;
 	uint64_t (*tick_counter)() noexcept;
 	bool (*editor)() noexcept;
 	uint8_t (*facilities)(void *) noexcept;
@@ -119,7 +132,7 @@ struct OpenTTDStationServices {
 	void (*delete_station)(void *) noexcept;
 	void (*acceptance_animation)(void *) noexcept;
 	void (*watched_animation)(uint32_t, uint64_t) noexcept;
-	void (*append_packet)(void *, uint8_t, uint32_t, uint32_t) noexcept;
+	void (*append_packet)(void *, uint8_t, uint32_t, Source) noexcept;
 	void (*update_supply)(void *, uint8_t, uint32_t) noexcept;
 	void (*station_list_invalidation)(void *) noexcept;
 	void (*new_cargo_animation)(void *, uint8_t) noexcept;
@@ -130,15 +143,14 @@ struct OpenTTDStationServices {
 	void (*accept_tile)(void *, uint32_t, uint64_t *) noexcept;
 	const uint32_t *(*acceptance_amounts)(void *) noexcept;
 	void (*with_truncation)(void *, uint8_t, uint32_t, void *, OpenTTDStationScope) noexcept;
-	uint32_t (*truncate_next)(void *, uint32_t *) noexcept;
+	OpenTTDTruncatedSource (*truncate_next)(void *) noexcept;
 	const OpenTTDSharedServices *shared;
 };
 
 struct OpenTTDStationEdge {
 	void *destination;
-	int32_t last_update, unrestricted, restricted;
+	int32_t last_update;
 	uint32_t distance;
-	uint16_t node;
 };
 struct OpenTTDStationLinks {
 	void *(*graph)(void *, uint8_t) noexcept;
@@ -149,17 +161,19 @@ struct OpenTTDStationLinks {
 	uint16_t (*station_id)(void *) noexcept;
 	int32_t (*edge_last_update)(void *, uint16_t, size_t) noexcept;
 	int32_t (*last_compression)(void *) noexcept;
-	void (*edge)(void *, uint16_t, size_t, OpenTTDStationEdge *) noexcept;
+	OpenTTDStationEdge (*edge)(void *, uint16_t, size_t, void *) noexcept;
+	int32_t (*edge_unrestricted)(void *, uint16_t, size_t) noexcept;
+	int32_t (*edge_restricted)(void *, uint16_t, size_t) noexcept;
 	void (*delete_flows)(void *, uint8_t, uint16_t) noexcept;
-	void (*restrict_edge)(void *, uint16_t, uint16_t) noexcept;
+	void (*restrict_edge)(void *, uint16_t, size_t) noexcept;
 	void (*restrict_flows)(void *, uint8_t, uint16_t) noexcept;
-	void (*release_edge)(void *, uint16_t, uint16_t) noexcept;
+	void (*release_edge)(void *, uint16_t, size_t) noexcept;
 	void (*remove_edge)(void *, uint16_t, uint16_t) noexcept;
 	void (*compress)(void *) noexcept;
-	void *(*order_list)(uint32_t) noexcept;
+	void *(*order_list)(uint16_t) noexcept;
 	size_t (*order_pool_size)() noexcept;
 	size_t (*order_count)(void *) noexcept;
-	uint32_t (*order_destination)(void *, size_t) noexcept;
+	OpenTTDOrderDestination (*order_destination)(void *, size_t) noexcept;
 	void *(*order_vehicle)(void *) noexcept;
 	void *(*next_vehicle)(void *) noexcept;
 	void *(*next_shared)(void *) noexcept;
@@ -293,7 +307,7 @@ void openttd_rust_station_stale(void *, const OpenTTDStationServices *, const Op
 void openttd_rust_station_reroute(void *, uint8_t, uint16_t, uint16_t, const OpenTTDStationServices *, const OpenTTDStationLinks *);
 void openttd_rust_station_monthly(const OpenTTDStationServices *);
 void openttd_rust_station_modify_rating(OpenTTDStationService *, int32_t);
-uint32_t openttd_rust_station_distribute(uint8_t, uint32_t, uint32_t, void *, uint8_t, const OpenTTDStationServices *);
+uint32_t openttd_rust_station_distribute(uint8_t, uint32_t, Source, void *, uint8_t, const OpenTTDStationServices *);
 
 }
 #endif

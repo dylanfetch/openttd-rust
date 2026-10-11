@@ -224,6 +224,9 @@ pub fn layout(type_id: u16, item: u8) -> usize {
             layout!(crate::station_service::LoadEngine, item; engine, amount)
         }
         508 => layout!(crate::station_service::LoadingWait, item; lateness, wait),
+        509 => layout!(crate::station_service::OrderDestination, item; destination, is_station),
+        510 => layout!(crate::station_service::TruncatedSource, item; amount, source, present),
+        511 => layout!(crate::cargo_storage::Source, item; id, source_type),
         110 => {
             layout!(crate::station_service::CargoFields, item; max_waiting_cargo, status, time_since_pickup, rating, last_speed, last_age, amount_fract)
         }
@@ -234,10 +237,10 @@ pub fn layout(type_id: u16, item: u8) -> usize {
             layout!(crate::station_service::World, item; station_owner, station_exclusivity, station_next, rating_counts, get, owner, pool_size, tick_counter, editor, facilities, in_use, is_station, local_owner, rectangle_empty, town_statue, select_goods, rating_cheat, available, cargo_valid, rating_callback_enabled, passenger_cargo, packet_available, house_tile, rating_redraw, set_demand, acceptance_news, acceptance_redraw, delete_station, acceptance_animation, watched_animation, append_packet, update_supply, station_list_invalidation, new_cargo_animation, waiting_redraw, rating_callback, with_tiles, tile_next, accept_tile, acceptance_amounts, with_truncation, truncate_next, shared)
         }
         113 => {
-            layout!(crate::station_service::Edge, item; destination, last_update, unrestricted, restricted, distance, node)
+            layout!(crate::station_service::Edge, item; destination, last_update, distance)
         }
         114 => {
-            layout!(crate::station_service::Links, item; graph, automatic_distribution, node, edge_count, date, station_id, edge_last_update, last_compression, edge, delete_flows, restrict_edge, restrict_flows, release_edge, remove_edge, compress, order_list, order_pool_size, order_count, order_destination, order_vehicle, next_vehicle, next_shared, stopped_in_depot, last_service, cargo_type, refresh, reroute)
+            layout!(crate::station_service::Links, item; graph, automatic_distribution, node, edge_count, date, station_id, edge_last_update, last_compression, edge, edge_unrestricted, edge_restricted, delete_flows, restrict_edge, restrict_flows, release_edge, remove_edge, compress, order_list, order_pool_size, order_count, order_destination, order_vehicle, next_vehicle, next_shared, stopped_in_depot, last_service, cargo_type, refresh, reroute)
         }
         115 => {
             layout!(crate::station_service::Loading, item; wait_observation, load_engine, engine_grf, grf_version, engine_load_callback, engine_no_multiplier, delivery_remaining, cargo_stored, cargo_reservation, cargo_remaining, capacity_remaining, vehicle_type, cargo_type, cargo_cap, stored_count, unload_count, deliver_count, transfer_count, load_count, cargo_unloading, unload_type, load_type, is_refit, refit_cargo, has_orders, load_unload_ticks, stopped_or_crashed, has_articulated_part, is_articulated_part, is_rear_dualheaded, is_normal_aircraft, is_multiheaded, cached_max_speed, cargo_multiplier, cached_total_length, full_load_order, vehicle_owner, aircraft_old_speed, passenger_cargo, gradual, improved_load, station_length_penalty, stop, current_company, last_station_visited, total_count, build_year, calendar_year, order_time, refit_mask, set_cargo_unloading, set_loading_finished, set_stop, set_load_ticks, set_speed, set_refit_capacity, subtract_profit, unknown_load_result, refresh_capacity, vehicle_dirty, update_indicator, set_current_company, next_vehicle, next_articulated, other_multiheaded, first_engine_part, first_vehicle, previous_vehicle, with_next_stations, stage, return_cargo, unload_cargo, load_cargo, reserve_cargo, deliver_to_transfer, deliver_to_keep, has_cargo_for, platform_length, train_at_station, station_cargo_total, load_property, load_callback, get_payment, create_payment, delete_payment, flush_delivery, vehicle_new_cargo, cargo_taken, train_loads, road_loads, vehicle_empty, station_dirty, test_refit, execute_refit)
