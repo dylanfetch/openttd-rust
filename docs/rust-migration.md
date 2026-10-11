@@ -80,7 +80,9 @@ cache and recorded in the report; a C++ fallback cannot pass as a migrated candi
 The `tools` action builds the native Rust generators alone into
 `.local/build-tools-rust` (`OPTION_TOOLS_ONLY=ON`, `OPTION_RUST=ON`), using the
 bootstrapped toolchain when present. `tools/run-comparisons.py` then runs every
-reference comparison tool in parallel; CI runs all three steps.
+reference comparison tool in parallel, including the company financial-command,
+industry NewGRF-production, cargo income/destination and cargo queue-scaling probes;
+CI runs all three steps.
 
 ```sh
 python3 tools/migration.py rust-checks --jobs 2

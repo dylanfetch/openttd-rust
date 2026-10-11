@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Compare the unreachable pool-limit Split failure with the unchanged reference."""
+"""Check the pool-limit Split failure and large queues absent from play saves."""
 
 import hashlib
 import json
 import runpy
 import subprocess
 from pathlib import Path
+
+from simulation.cargo_storage import scaling_probe
 
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATION = runpy.run_path(str(ROOT / "tools/migration.py"))
@@ -72,3 +74,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    scaling_probe()
