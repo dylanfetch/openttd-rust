@@ -1777,7 +1777,7 @@ bool RoadVehicle::Tick()
 {
 #ifdef WITH_RUST
 	PerformanceAccumulator framerate(PFE_GL_ROADVEHS);
-	const RoadVehicle *next = this->Next();
+	const RoadVehicle *next = static_cast<const RoadVehicle *>(RustVehicleNext(this));
 	OpenTTDRoadEntry entry = GetRoadEntry();
 	OpenTTDRoadTickRead read{.next = RustVehicle(next), .next_state = next == nullptr ? nullptr : next->GetRustState(), .tile = this->tile.base(), .z = this->z_pos,
 		.order_time = this->current_order_time, .tick = this->tick_counter, .running = this->running_ticks, .status = this->vehstatus.base(),

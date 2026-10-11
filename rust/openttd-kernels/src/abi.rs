@@ -83,7 +83,28 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         37 => {
             layout!(crate::linkgraph::OutputShare, item; node, origin, via, cumulative, unrestricted, has_share)
         }
-        38 => layout!(crate::trees::Action, item; kind, tile, a, b, cost),
+        38 => {
+            layout!(crate::trees::TreeServices, item; plant_observation, tree_observation, tree_count, clear_observation, snow_line, sin, cos, make_tree, set_ground_density, add_count, add_growth, set_growth, make_clear, make_shore, make_snow, clear_neighbour_flooding, tile_loop_water, ambient, play_sound, progress, progress_total, clear_square, town_rating, command_begin, command_tile, command_next, command_debit, landscape_clear)
+        }
+        28 => {
+            layout!(crate::trees::PlantObservation, item; tile_type, bridge, ground, density, snow, coast, zone)
+        }
+        31 => {
+            layout!(crate::trees::TreeObservation, item; ground, density, species, count, growth, zone)
+        }
+        386 => layout!(crate::trees::ClearObservation, item; count, species),
+        32 => {
+            layout!(crate::trees::LoopSettings, item; tick_counter, size_x, climate, extra, ambient)
+        }
+        33 => layout!(crate::trees::TickSettings, item; tick_counter, size, climate, extra),
+        43 => {
+            layout!(crate::trees::GenerateSettings, item; size, size_x, size_y, climate, placer, height_limit, editor, freeform_edges)
+        }
+        57 => {
+            layout!(crate::trees::CommandSettings, item; build_price, size, climate, editor, execute, company_valid)
+        }
+        58 => layout!(crate::trees::CommandResult, item; cost, status, message),
+        59 => layout!(crate::trees::LandscapeClear, item; cost, failed),
         39 => {
             layout!(crate::effect::View, item; x, y, z, sprite, progress, spritenum, subtype, ambient)
         }
@@ -92,7 +113,7 @@ pub fn layout(type_id: u16, item: u8) -> usize {
             layout!(crate::effect::Leaves, item; observe, write, viewport, sound, animated)
         }
         42 => {
-            layout!(crate::services::Services, item; context, random, observe_tile, write_tile, trig, industry, tile_type, tile_owner, station_index, depot_index, is_level_crossing, tunnel_bridge_direction, bridge_speed)
+            layout!(crate::services::Services, item; context, random, industry, tile_type, bridge_above, tropic_zone, tile_z, tile_slope, mark_dirty, set_tropic_zone, tile_owner, station_index, depot_index, is_level_crossing, tunnel_bridge_direction, bridge_speed)
         }
         // ABI reservations: train 380-385; tree additions 386-389; fleet 390-399; company 400-429; town 430-459; shared vehicle/road 460-499; station 500-559; industry 560-619; shared CommandCost 620-629 (town-owned). Trees retain existing low IDs.
         461 => layout!(crate::vehicle::NewPosition, item; x, y, tile),
