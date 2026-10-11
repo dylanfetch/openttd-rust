@@ -228,6 +228,10 @@ pub fn layout(type_id: u16, item: u8) -> usize {
             layout!(crate::station_service::Loading, item; read, write, next, next_stations, next_stations_destroy, cargo, load_callback, payment, effect, refit)
         }
 
+        566 => layout!(crate::industry::GenerationInfo, item; appear, enabled, layouts),
+        567 => {
+            layout!(crate::industry::GenerationServices, item; spec, spec_behaviour, info, coastal, editor, density, custom_number, scale_by_size_1d, scale_by_land_proportion, set_progress, increase_progress, missing_warning)
+        }
         560 => {
             layout!(crate::industry::Metadata, item; tile, width, height, construction_date, random, kind, owner, random_colour, founder, construction_type, selected_layout, exclusive_supplier, exclusive_consumer)
         }

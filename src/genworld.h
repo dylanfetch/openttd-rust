@@ -75,6 +75,9 @@ enum GenWorldProgress : uint8_t {
 	GWP_CLASS_COUNT
 };
 
+/** Named ordinary cancellation signal; never unwinds through Rust. */
+class AbortGenerateWorldSignal { };
+
 /* genworld.cpp */
 void GenerateWorldSetCallback(GWDoneProc *proc);
 void GenerateWorldSetAbortCallback(GWAbortProc *proc);

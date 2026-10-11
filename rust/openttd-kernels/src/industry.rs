@@ -26,6 +26,8 @@
 )]
 use std::ffi::c_void;
 use std::ptr;
+mod generation;
+pub use generation::*;
 mod lifecycle;
 pub use lifecycle::*;
 const RECORDS: usize = 61;
@@ -429,7 +431,7 @@ pub struct Services {
     pub type_count: unsafe extern "C" fn(u8) -> u16,
     pub total: unsafe extern "C" fn() -> u32,
     pub type_info: unsafe extern "C" fn(u8) -> TypeInfo,
-    pub probability_callback: unsafe extern "C" fn(u8, u32) -> u32,
+    pub probability_callback: unsafe extern "C" fn(u8, u8, u32) -> u32,
     pub scale_by_map_size: unsafe extern "C" fn(u32) -> u32,
     pub company_none: unsafe extern "C" fn() -> u8,
     pub restore_company: unsafe extern "C" fn(u8),
@@ -965,7 +967,7 @@ fn game_probability(kind: u8, s: &Services) -> u64 {
     {
         return 0;
     }
-    let probability = unsafe { (s.probability_callback)(kind, u32::from(info.appear)) } as u8;
+    let probability = unsafe { (s.probability_callback)(kind, 1, u32::from(info.appear)) } as u8;
     if probability == 0 {
         return 0;
     }

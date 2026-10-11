@@ -72,6 +72,24 @@ def scenarios(soak):
                 "console": ["setting difficulty.disasters 0"],
             }
         )
+    for name, density in (("fund-only", 0), ("custom-forced", 6)):
+        result.append(
+            {
+                "name": "industry-generation-" + name,
+                "kind": "generate",
+                "seed": 12345,
+                "map_log2": 7,
+                "land_generator": 1,
+                "industry": "generation",
+                "ticks": 2 * SNAPSHOT_TICKS,
+                "settings": {
+                    "difficulty": {"industry_density": density},
+                    "game_creation": {"custom_industry_number": 0},
+                },
+                "console": ["setting difficulty.disasters 0"],
+                "industry_generation_empty": density == 0,
+            }
+        )
     return result
 
 
@@ -242,7 +260,12 @@ def check(scenario, run, mode, role, result):
         if not facts["lumber_harvest"]:
             result["problems"].append(f"{mode}/{role}: no actual lumber harvest")
     result[f"{mode}_{role}_industry"] = facts
-    if kind != "cargo" and facts["produced_history"] == 0:
+    if kind == "generation":
+        if bool(facts["industries"] == 0) != scenario["industry_generation_empty"]:
+            result["problems"].append(
+                f"{mode}/{role}: generation density branch missing"
+            )
+    if kind not in ("cargo", "generation") and facts["produced_history"] == 0:
         result["problems"].append(f"{mode}/{role}: no industry production history")
     if scenario.get("industry_soak") and not facts["year_history"]:
         result["problems"].append(f"{mode}/{role}: no yearly industry history")

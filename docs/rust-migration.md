@@ -1653,8 +1653,12 @@ field aliases and scoped modern/old-load adapters retain saved field names,
 reference fixups and partial initialization. Rust owns destruction cleanup and
 industry-wide/tile animation and rerandomisation traversal; the pinned-body
 industry comparison checks unavailable NewGRF tile/parent triggers and RNG.
-Construction/funding/prospecting, generation traversal and remaining tile policy
-are still native and remain required before this component is complete.
+Initial generation owns land/water probabilities, forced and weighted traversal.
+Only progress cancellation (`AbortGenerateWorldSignal`) returns to the native
+stack exception frame after source-order restoration; default native tests cover
+this handoff. Fund-only/custom-zero and four climates compare semantic generation.
+Construction/funding/prospecting and remaining tile policy are still native and
+remain required before this component is complete.
 
 ### Aircraft controllers and airport movement
 

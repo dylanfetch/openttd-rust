@@ -55,6 +55,10 @@
 #include "table/industry_land.h"
 #include "table/build_industry.h"
 
+#ifdef WITH_RUST
+#include "rust/industry_generation_adapter.hpp"
+#endif
+
 #include "safeguards.h"
 
 IndustryPool _industry_pool("Industry");
@@ -2353,6 +2357,7 @@ static Industry *CreateNewIndustry(TileIndex tile, IndustryType type, IndustryAv
  * @param[out] force_at_least_one Returns whether at least one instance should be forced on map creation.
  * @return Relative probability for the industry to appear.
  */
+#ifndef WITH_RUST
 static uint32_t GetScaledIndustryGenerationProbability(IndustryType it, std::optional<bool> water, bool *force_at_least_one)
 {
 	const IndustrySpec *ind_spc = GetIndustrySpec(it);
@@ -2374,6 +2379,8 @@ static uint32_t GetScaledIndustryGenerationProbability(IndustryType it, std::opt
 		return chance;
 	}
 }
+
+#endif
 
 /**
  * Compute the probability for constructing a new industry during game play.
@@ -2408,6 +2415,7 @@ static uint16_t GetIndustryGamePlayProbability(IndustryType it, uint8_t *min_num
  */
 #endif
 
+#ifndef WITH_RUST
 static uint GetNumberOfIndustries()
 {
 	/* Number of industries on a 256x256 map. */
@@ -2428,6 +2436,8 @@ static uint GetNumberOfIndustries()
 
 	return std::min<uint>(IndustryPool::MAX_SIZE, Map::ScaleBySize(numof_industry_table[difficulty]));
 }
+
+#endif
 
 /**
  * Try to place the industry in the game.
@@ -2456,6 +2466,7 @@ static Industry *PlaceIndustry(IndustryType type, IndustryAvailabilityCallType c
  * @param type IndustryType of the desired industry
  * @param try_hard Try very hard to find a place. (Used to place at least one industry per type)
  */
+#ifndef WITH_RUST
 static void PlaceInitialIndustry(IndustryType type, bool water, bool try_hard)
 {
 	Backup<CompanyID> cur_company(_current_company, OWNER_NONE);
@@ -2465,6 +2476,8 @@ static void PlaceInitialIndustry(IndustryType type, bool water, bool try_hard)
 
 	cur_company.Restore();
 }
+
+#endif
 
 /**
  * Get total number of industries existing in the game.
@@ -2526,6 +2539,7 @@ void IndustryBuildData::EconomyMonthlyLoop()
 #endif
 }
 
+#ifndef WITH_RUST
 struct IndustryGenerationProbabilities {
 	std::array<uint32_t, NUM_INDUSTRYTYPES> probs{};
 	std::array<bool, NUM_INDUSTRYTYPES> force_one{};
@@ -2551,12 +2565,22 @@ static IndustryGenerationProbabilities GetScaledProbabilities(bool water)
 	return p;
 }
 
+#endif
+
+#ifdef WITH_RUST
+static const OpenTTDIndustryGenerationServices &GetIndustryGenerationServices();
+#endif
+
 /**
  * This function will create random industries during game creation.
  * It will scale the amount of industries by mapsize and difficulty level.
  */
 void GenerateIndustries()
 {
+#ifdef WITH_RUST
+	OpenTTDIndustryGenerationContext context;
+	if (!openttd_rust_industry_generate(_industry_builder.owner.get(), &context, &GetIndustryRustServices(), &GetIndustryGenerationServices())) std::rethrow_exception(context.cancellation);
+#else
 	if (_game_mode != GM_EDITOR && _settings_game.difficulty.industry_density == ID_FUND_ONLY) return; // No industries in the game.
 
 	/* Get the probabilities for all industries. This is done first as we need the total of
@@ -2609,6 +2633,7 @@ void GenerateIndustries()
 	}
 
 	_industry_builder.Reset();
+#endif
 }
 
 template <>
@@ -3270,6 +3295,9 @@ void InitializeIndustries()
 /** Verify whether the generated industries are complete, and warn the user if not. */
 void CheckIndustries()
 {
+#ifdef WITH_RUST
+	openttd_rust_industry_check(&GetIndustryRustServices(), &GetIndustryGenerationServices());
+#else
 	int count = 0;
 	for (IndustryType it = 0; it < NUM_INDUSTRYTYPES; it++) {
 		if (Industry::GetIndustryTypeCount(it) > 0) continue; // Types of existing industries can be skipped.
@@ -3285,6 +3313,7 @@ void CheckIndustries()
 		count++;
 		if (count >= 3) break; // Don't swamp the user with errors.
 	}
+#endif
 }
 
 /**
@@ -3563,7 +3592,7 @@ static const OpenTTDIndustryServices _industry_services = {
 		const IndustrySpec *spec = GetIndustrySpec(type);
 		return {spec->behaviour.base(), spec->enabled, !spec->layouts.empty(), spec->appear_ingame[to_underlying(_settings_game.game_creation.landscape)]};
 	},
-	.probability_callback = [](uint8_t type, uint32_t chance) noexcept -> uint32_t { return GetIndustryProbabilityCallback(type, IACT_RANDOMCREATION, chance); },
+	.probability_callback = [](uint8_t type, uint8_t creation, uint32_t chance) noexcept -> uint32_t { return GetIndustryProbabilityCallback(type, static_cast<IndustryAvailabilityCallType>(creation), chance); },
 	.scale_by_map_size = [](uint32_t n) noexcept -> uint32_t { return Map::ScaleBySize(n); },
 	.company_none = []() noexcept -> uint8_t {
 		CompanyID old = _current_company;
@@ -3628,4 +3657,41 @@ static const OpenTTDIndustryLifecycleServices _industry_lifecycle_services = {
 	.change_frame = IndustryChangeAnimationFrame,
 };
 const OpenTTDIndustryLifecycleServices &GetIndustryLifecycleRustServices() { return _industry_lifecycle_services; }
+#endif
+
+#ifdef WITH_RUST
+static const OpenTTDIndustryGenerationServices &GetIndustryGenerationServices()
+{
+	static const OpenTTDIndustryGenerationServices services = {
+		.spec = [](uint8_t type) noexcept -> const OpenTTDIndustrySpecHandle * { return reinterpret_cast<const OpenTTDIndustrySpecHandle *>(GetIndustrySpec(type)); },
+		.spec_behaviour = [](const OpenTTDIndustrySpecHandle *spec) noexcept -> uint32_t { return reinterpret_cast<const IndustrySpec *>(spec)->behaviour.base(); },
+		.info = [](const OpenTTDIndustrySpecHandle *handle) noexcept -> OpenTTDIndustryGenerationInfo {
+			const auto *spec = reinterpret_cast<const IndustrySpec *>(handle);
+			return {spec->appear_creation[to_underlying(_settings_game.game_creation.landscape)], spec->enabled, !spec->layouts.empty()};
+		},
+		.coastal = [](const OpenTTDIndustrySpecHandle *handle) noexcept -> bool {
+			auto proc = reinterpret_cast<const IndustrySpec *>(handle)->check_proc;
+			return proc == CHECK_REFINERY || proc == CHECK_OIL_RIG;
+		},
+		.editor = []() noexcept -> bool { return _game_mode == GM_EDITOR; },
+		.density = []() noexcept -> uint8_t { return _settings_game.difficulty.industry_density; },
+		.custom_number = []() noexcept -> uint32_t { return _settings_game.game_creation.custom_industry_number; },
+		.scale_by_size_1d = [](uint32_t n) noexcept -> uint32_t { return Map::ScaleBySize1D(n); },
+		.scale_by_land_proportion = [](uint32_t n) noexcept -> uint32_t { return Map::ScaleByLandProportion(n); },
+		/* Only AbortGenerateWorldSignal is ordinary here. Retain the native
+		 * exception on this stack frame and rethrow after the Rust entry returns. */
+		.set_progress = [](OpenTTDIndustryGenerationContext *context, bool water, uint32_t total) noexcept -> bool {
+			return RunIndustryGenerationProgress(context, [&] { SetGeneratingWorldProgress(water ? GWP_WATER_INDUSTRY : GWP_LAND_INDUSTRY, total); });
+		},
+		.increase_progress = [](OpenTTDIndustryGenerationContext *context, bool water) noexcept -> bool {
+			return RunIndustryGenerationProgress(context, [&] { IncreaseGeneratingWorldProgress(water ? GWP_WATER_INDUSTRY : GWP_LAND_INDUSTRY); });
+		},
+		.missing_warning = [](const OpenTTDIndustrySpecHandle *handle) noexcept {
+			const auto *spec = reinterpret_cast<const IndustrySpec *>(handle);
+			ShowErrorMessage(GetEncodedString(STR_ERROR_NO_SUITABLE_PLACES_FOR_INDUSTRIES, spec->name),
+				GetEncodedString(STR_ERROR_NO_SUITABLE_PLACES_FOR_INDUSTRIES_EXPLANATION), WL_WARNING);
+		},
+	};
+	return services;
+}
 #endif

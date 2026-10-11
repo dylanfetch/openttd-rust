@@ -157,7 +157,7 @@ typedef struct OpenTTDIndustryServices {
 	uint16_t (*type_count)(uint8_t type) OPENTTD_INDUSTRY_NOEXCEPT;
 	uint32_t (*total)(void) OPENTTD_INDUSTRY_NOEXCEPT;
 	OpenTTDIndustryTypeInfo (*type_info)(uint8_t type) OPENTTD_INDUSTRY_NOEXCEPT;
-	uint32_t (*probability_callback)(uint8_t type, uint32_t chance) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint32_t (*probability_callback)(uint8_t type, uint8_t creation, uint32_t chance) OPENTTD_INDUSTRY_NOEXCEPT;
 	uint32_t (*scale_by_map_size)(uint32_t n) OPENTTD_INDUSTRY_NOEXCEPT;
 	uint8_t (*company_none)(void) OPENTTD_INDUSTRY_NOEXCEPT;
 	void (*restore_company)(uint8_t company) OPENTTD_INDUSTRY_NOEXCEPT;
@@ -215,6 +215,28 @@ void openttd_rust_industry_randomise_tile(uint32_t, uint8_t, void *, OpenTTDIndu
 void openttd_rust_industry_randomise(void *, OpenTTDIndustry *, uint16_t, uint8_t, uint32_t, const OpenTTDIndustryServices *, const OpenTTDIndustryLifecycleServices *);
 bool openttd_rust_industry_animate_tile(uint32_t, uint8_t, uint32_t, const OpenTTDIndustryServices *, const OpenTTDIndustryLifecycleServices *);
 bool openttd_rust_industry_animate(OpenTTDIndustry *, uint16_t, uint8_t, uint32_t, const OpenTTDIndustryServices *, const OpenTTDIndustryLifecycleServices *);
+typedef struct OpenTTDIndustrySpecHandle OpenTTDIndustrySpecHandle;
+typedef struct OpenTTDIndustryGenerationContext OpenTTDIndustryGenerationContext;
+typedef struct OpenTTDIndustryGenerationInfo {
+	uint8_t appear;
+	bool enabled, layouts;
+} OpenTTDIndustryGenerationInfo;
+typedef struct OpenTTDIndustryGenerationServices {
+	const OpenTTDIndustrySpecHandle *(*spec)(uint8_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint32_t (*spec_behaviour)(const OpenTTDIndustrySpecHandle *) OPENTTD_INDUSTRY_NOEXCEPT;
+	OpenTTDIndustryGenerationInfo (*info)(const OpenTTDIndustrySpecHandle *) OPENTTD_INDUSTRY_NOEXCEPT;
+	bool (*coastal)(const OpenTTDIndustrySpecHandle *) OPENTTD_INDUSTRY_NOEXCEPT;
+	bool (*editor)(void) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint8_t (*density)(void) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint32_t (*custom_number)(void) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint32_t (*scale_by_size_1d)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	uint32_t (*scale_by_land_proportion)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	bool (*set_progress)(OpenTTDIndustryGenerationContext *, bool, uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
+	bool (*increase_progress)(OpenTTDIndustryGenerationContext *, bool) OPENTTD_INDUSTRY_NOEXCEPT;
+	void (*missing_warning)(const OpenTTDIndustrySpecHandle *) OPENTTD_INDUSTRY_NOEXCEPT;
+} OpenTTDIndustryGenerationServices;
+bool openttd_rust_industry_generate(OpenTTDIndustryBuilder *, OpenTTDIndustryGenerationContext *, const OpenTTDIndustryServices *, const OpenTTDIndustryGenerationServices *);
+void openttd_rust_industry_check(const OpenTTDIndustryServices *, const OpenTTDIndustryGenerationServices *);
 void openttd_rust_industry_tick(OpenTTDIndustryBuilder *builder, const OpenTTDIndustryTickRecord *record, const OpenTTDIndustryServices *services);
 bool openttd_rust_industry_transport(void *industry, OpenTTDIndustry *owner, uint8_t minimal_cargo, bool recession, const OpenTTDIndustryServices *services);
 void openttd_rust_industry_farm(void *industry, uint16_t id, OpenTTDIndustryMap map, const OpenTTDIndustryServices *services);

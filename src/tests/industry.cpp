@@ -11,6 +11,7 @@
 #ifdef WITH_RUST
 #include "../industry.h"
 #include "../rust/abi_ffi.h"
+#include "../rust/industry_generation_adapter.hpp"
 static_assert(std::is_trivially_destructible_v<TileArea>);
 static_assert(sizeof(TileArea) == sizeof(OpenTTDIndustryLocation));
 static_assert(alignof(TileArea) == alignof(OpenTTDIndustryMetadata));
@@ -29,6 +30,8 @@ TEST_CASE("Industry - canonical native layouts")
 		for (size_t expected : fields) CHECK(openttd_rust_abi_layout(type, item++) == expected);
 		CHECK(openttd_rust_abi_layout(type, item) == SIZE_MAX);
 	};
+	layout(566, {sizeof(OpenTTDIndustryGenerationInfo), alignof(OpenTTDIndustryGenerationInfo), offsetof(OpenTTDIndustryGenerationInfo, appear), offsetof(OpenTTDIndustryGenerationInfo, enabled), offsetof(OpenTTDIndustryGenerationInfo, layouts)});
+	layout(567, {sizeof(OpenTTDIndustryGenerationServices), alignof(OpenTTDIndustryGenerationServices), offsetof(OpenTTDIndustryGenerationServices, spec), offsetof(OpenTTDIndustryGenerationServices, spec_behaviour), offsetof(OpenTTDIndustryGenerationServices, info), offsetof(OpenTTDIndustryGenerationServices, coastal), offsetof(OpenTTDIndustryGenerationServices, editor), offsetof(OpenTTDIndustryGenerationServices, density), offsetof(OpenTTDIndustryGenerationServices, custom_number), offsetof(OpenTTDIndustryGenerationServices, scale_by_size_1d), offsetof(OpenTTDIndustryGenerationServices, scale_by_land_proportion), offsetof(OpenTTDIndustryGenerationServices, set_progress), offsetof(OpenTTDIndustryGenerationServices, increase_progress), offsetof(OpenTTDIndustryGenerationServices, missing_warning)});
 	layout(560, {sizeof(OpenTTDIndustryMetadata), alignof(OpenTTDIndustryMetadata), offsetof(OpenTTDIndustryMetadata, tile), offsetof(OpenTTDIndustryMetadata, width), offsetof(OpenTTDIndustryMetadata, height), offsetof(OpenTTDIndustryMetadata, construction_date), offsetof(OpenTTDIndustryMetadata, random), offsetof(OpenTTDIndustryMetadata, type), offsetof(OpenTTDIndustryMetadata, owner), offsetof(OpenTTDIndustryMetadata, random_colour), offsetof(OpenTTDIndustryMetadata, founder), offsetof(OpenTTDIndustryMetadata, construction_type), offsetof(OpenTTDIndustryMetadata, selected_layout), offsetof(OpenTTDIndustryMetadata, exclusive_supplier), offsetof(OpenTTDIndustryMetadata, exclusive_consumer)});
 	layout(561, {sizeof(OpenTTDIndustryCleanupTile), alignof(OpenTTDIndustryCleanupTile), offsetof(OpenTTDIndustryCleanupTile, industry), offsetof(OpenTTDIndustryCleanupTile, type), offsetof(OpenTTDIndustryCleanupTile, oilrig)});
 	layout(562, {sizeof(OpenTTDIndustryReseed), alignof(OpenTTDIndustryReseed), offsetof(OpenTTDIndustryReseed, self), offsetof(OpenTTDIndustryReseed, parent), offsetof(OpenTTDIndustryReseed, used)});
@@ -120,5 +123,90 @@ TEST_CASE("Industry - construction owner and ascending type registry")
 	CHECK(openttd_rust_industry_registry_view(builder.get(), 3).size == 3);
 	openttd_rust_industry_registry_clear(builder.get(), 3);
 	CHECK(openttd_rust_industry_registry_view(builder.get(), 3).size == 0);
+}
+
+TEST_CASE("Industry - native generation handoff retains named cancellation")
+{
+	OpenTTDIndustryGenerationContext context;
+	CHECK(RunIndustryGenerationProgress(&context, [] { }));
+	CHECK(context.cancellation == nullptr);
+	CHECK_FALSE(RunIndustryGenerationProgress(&context, [] { throw AbortGenerateWorldSignal(); }));
+	REQUIRE(context.cancellation != nullptr);
+	bool aborted = false;
+	try { std::rethrow_exception(context.cancellation); }
+	catch (AbortGenerateWorldSignal &) { aborted = true; }
+	CHECK(aborted);
+}
+
+namespace {
+struct IndustryGenerationFixture {
+	static inline uint8_t company;
+	static inline uint32_t draws, created, increases, sets;
+	static inline int cancel_set, cancel_increase;
+	static inline int shell;
+
+	static OpenTTDIndustryServices World()
+	{
+		auto world = GetIndustryRustServices();
+		world.create = [](uint8_t, uint8_t creation) noexcept -> void * { CHECK(creation == 0); ++created; return &shell; };
+		world.type_count = [](uint8_t) noexcept -> uint16_t { return 0; };
+		world.total = []() noexcept -> uint32_t { return 0; };
+		world.probability_callback = [](uint8_t, uint8_t creation, uint32_t chance) noexcept -> uint32_t { CHECK(creation == 0); return chance; };
+		world.scale_by_map_size = [](uint32_t n) noexcept -> uint32_t { return n; };
+		world.random_range = [](uint32_t limit) noexcept -> uint32_t { CHECK(limit == 16); ++draws; return 0; };
+		world.company_none = []() noexcept -> uint8_t { uint8_t previous = company; company = 255; return previous; };
+		world.restore_company = [](uint8_t previous) noexcept { CHECK(company == 255); company = previous; };
+		return world;
+	}
+	static OpenTTDIndustryGenerationServices Generation()
+	{
+		return {
+			.spec = [](uint8_t type) noexcept -> const OpenTTDIndustrySpecHandle * { return reinterpret_cast<const OpenTTDIndustrySpecHandle *>(uintptr_t(type) + 1); },
+			.spec_behaviour = [](const OpenTTDIndustrySpecHandle *spec) noexcept -> uint32_t { return uintptr_t(spec) == 2 ? 1U << 2 : 0; },
+			.info = [](const OpenTTDIndustrySpecHandle *spec) noexcept -> OpenTTDIndustryGenerationInfo { return {1, uintptr_t(spec) <= 2, true}; },
+			.coastal = [](const OpenTTDIndustrySpecHandle *) noexcept -> bool { return false; },
+			.editor = []() noexcept -> bool { return false; },
+			.density = []() noexcept -> uint8_t { return 4; },
+			.custom_number = []() noexcept -> uint32_t { return 0; },
+			.scale_by_size_1d = [](uint32_t n) noexcept -> uint32_t { return n; },
+			.scale_by_land_proportion = [](uint32_t n) noexcept -> uint32_t { return n; },
+			.set_progress = [](OpenTTDIndustryGenerationContext *, bool water, uint32_t total) noexcept -> bool { CHECK(company == 9); CHECK(total == 27); ++sets; return cancel_set != int(water); },
+			.increase_progress = [](OpenTTDIndustryGenerationContext *, bool) noexcept -> bool { CHECK(company == 255); return int(++increases) != cancel_increase; },
+			.missing_warning = [](const OpenTTDIndustrySpecHandle *) noexcept { },
+		};
+	}
+};
+}
+
+TEST_CASE("Industry - generation cancellation restores company before return")
+{
+	using F = IndustryGenerationFixture;
+	const auto world = F::World();
+	const auto generation = F::Generation();
+	for (const auto [cancel_set, cancel_increase, draws, created, increases, sets] : {
+		std::tuple{0, -1, 0U, 0U, 0U, 1U},
+		std::tuple{-1, 1, 0U, 0U, 1U, 1U},
+		std::tuple{-1, 2, 1U, 1U, 2U, 1U},
+		std::tuple{1, -1, 26U, 27U, 27U, 2U},
+		std::tuple{-1, 28, 26U, 27U, 28U, 2U},
+		std::tuple{-1, -1, 52U, 54U, 54U, 2U},
+	}) {
+		F::company = 9;
+		F::draws = F::created = F::increases = F::sets = 0;
+		F::cancel_set = cancel_set;
+		F::cancel_increase = cancel_increase;
+		auto *builder = openttd_rust_industry_builder_new();
+		auto *fields = openttd_rust_industry_builder_fields(builder);
+		fields->wanted_inds = 123;
+		const bool complete = openttd_rust_industry_generate(builder, nullptr, &world, &generation);
+		CHECK(complete == (cancel_set == -1 && cancel_increase == -1));
+		CHECK(F::company == 9);
+		CHECK(F::draws == draws);
+		CHECK(F::created == created);
+		CHECK(F::increases == increases);
+		CHECK(F::sets == sets);
+		CHECK(fields->wanted_inds == (complete ? 0 : 123));
+		openttd_rust_industry_builder_destroy(builder);
+	}
 }
 #endif
