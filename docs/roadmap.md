@@ -148,8 +148,8 @@ Independent items (#156, #210) may run in parallel.
    and reports crossings per vehicle tick.
 3. **#148 town lifecycle (#216)** owns state and control in the direct typed
    form. Reuse integrated #217 station activity and #209 company context before review.
-4. **#168 station tick and loading (#214 / #217)**: field-number reads (`RustStationRead`,
-   `RustLoadingRead`) become typed narrow reads. Then disaster and the cold
+4. **#168 station tick and loading (#214 / #217)**: consolidate typed handles and
+   reuse integrated #215 vehicle/engine and #209 company-context services. Then disaster and the cold
    cargo/orders conversions, which never block new ownership work.
 5. **New ownership:** #150 industry construction is active, then #212 landscape tile
    scheduling and clear/water/rail/road/tunnel-bridge loops, then #213 base
@@ -166,15 +166,15 @@ not a pinned-offset field view.
 
 Root resumed 2026-10-11; #211/#208 are integrated. Five agents own five unintegrated
 branches; passing heads and evidence are on linked issues/PRs. Integration order:
-#215, #209; #217/#209 precede #216, whose shared boundaries precede final #218.
+#215, #209; #209 precedes final #217, both precede #216, whose shared boundaries precede final #218.
 
 | Issue / PR | Branch (worktree suffix), head | State and next step |
 | --- | --- | --- |
 | #192 / #209 | `company-direct-192`, `aaeafc9b69` | `/root/company_startup_coverage_156`: startup pair/self/soak and mutation pass; common Post witnesses/context helpers after #215, then fresh review/full CI. |
-| #199 / #215 | `shared-layer-road-199`, `d5eb0b108d` | `/root/shared_road_199_resume`: narrow cache sequencing fix in validation; merge integrated #208, complete canonical helpers/checks, profile and fresh review. |
-| #148 / #216 | `town-lifecycle-148`, `4b421de42d` | `/root/town_lifecycle_148`: storage/monthly/rating/population/radius pass; shared CommandCost, remaining lifecycle/house policy and integrated #217/#209 reuse next. |
-| #214 / #217 | `station-loading-direct-214`, `4ef1fe8a12` | `/root/station_loading_direct_214`: narrow services/soak/default comparisons pass; frozen default running before wait-read fix, then integrated #199 reuse and final checks. |
-| #150 / #218 | `industry-construction-150`, `f3d92bb274` | `/root/industry_construction_150`: metadata/registry/cleanup/NewGRF/generation pass; complete initialization, transactions/tile policy and integrated #216 reuse next. |
+| #199 / #215 | `shared-layer-road-199`, `d492122884` | `/root/shared_road_199_resume`: integrated tree table/native checks pass; Pad2000 exceeds 13 crossing budget. Faithful callback grouping, final checks/profile and fresh review next. |
+| #148 / #216 | `town-lifecycle-148`, `9802708fa2` | `/root/town_lifecycle_148`: storage/monthly/authority/population/radius/supplied/name metadata pass; tree-table merge, house/yearly/lifecycle and integrated services remain. |
+| #214 / #217 | `station-loading-direct-214`, `d456668553` | `/root/station_loading_direct_214`: typed station/domain handles, map/timer reuse and 16-case pair pass; consume integrated #215/#209, then final checks/review. |
+| #150 / #218 | `industry-construction-150`, `b6df981594` | `/root/industry_construction_150`: initialization/text span pass; builtin tile policy validating, transactions and integrated #216 services remain. |
 
 Planning complete: #212/#213 selected after #150. ABI blocks: train through 385,
 tree additions 386-389, fleet 390-399, company 400-429, town 430-459, road 460-499,
