@@ -62,6 +62,7 @@
 
 #ifdef WITH_RUST
 #include "rust/company_adapter.h"
+#include "rust/station_boundary_profile.hpp"
 #endif
 
 #include "safeguards.h"
@@ -1483,12 +1484,14 @@ void CargoPayment::AfterLoad()
 #ifdef WITH_RUST
 static const OpenTTDStationLoading _rust_station_loading = {
 	.wait_observation = [](void *handle) noexcept -> OpenTTDLoadingWait {
+		CountStationBoundary<OpenTTDLoadingWait>(StationBoundary::Loading, true);
 		Vehicle *v = static_cast<Vehicle *>(handle);
 		return {
 			v->lateness_counter, v->current_order.GetTimetabledWait()
 		};
 	},
 	.load_engine = [](void *handle) noexcept -> OpenTTDLoadEngine {
+		CountStationBoundary<OpenTTDLoadEngine>(StationBoundary::Loading, true);
 		const Engine *engine = static_cast<Vehicle *>(handle)->GetEngine();
 		return {
 			engine->info.load_amount, engine->GetGRF() == nullptr ? uint8_t{
@@ -1497,161 +1500,266 @@ static const OpenTTDStationLoading _rust_station_loading = {
 		};
 	},
 	.delivery_remaining = [](void *handle) noexcept -> OpenTTDDeliveryRemaining {
+		CountStationBoundary<OpenTTDDeliveryRemaining>(StationBoundary::Loading, true);
 		Vehicle *v = static_cast<Vehicle *>(handle);
 		return {
 			v->cargo.RemainingCount(), v->cargo.ActionCount(VehicleCargoList::MTA_DELIVER), v->cargo_cap
 		};
 	},
 	.cargo_stored = [](void *handle) noexcept -> OpenTTDCargoStored {
+		CountStationBoundary<OpenTTDCargoStored>(StationBoundary::Loading, true);
 		Vehicle *v = static_cast<Vehicle *>(handle);
 		return {
 			v->cargo.StoredCount(), v->cargo_cap
 		};
 	},
 	.cargo_reservation = [](void *handle) noexcept -> OpenTTDCargoReservation {
+		CountStationBoundary<OpenTTDCargoReservation>(StationBoundary::Loading, true);
 		Vehicle *v = static_cast<Vehicle *>(handle);
 		return {
 			static_cast<uint64_t>(EngInfo(v->engine_type)->refit_mask), v->cargo.ReservedCount(), v->cargo_cap, v->cargo_type
 		};
 	},
 	.cargo_remaining = [](void *handle) noexcept -> OpenTTDCargoRemaining {
+		CountStationBoundary<OpenTTDCargoRemaining>(StationBoundary::Loading, true);
 		Vehicle *v = static_cast<Vehicle *>(handle);
 		return {
 			v->cargo.RemainingCount(), v->cargo_cap, v->cargo_type
 		};
 	},
 	.capacity_remaining = [](void *handle) noexcept -> OpenTTDCapacityRemaining {
+		CountStationBoundary<OpenTTDCapacityRemaining>(StationBoundary::Loading, true);
 		Vehicle *v = static_cast<Vehicle *>(handle);
 		return {
 			v->cargo.RemainingCount(), v->cargo_cap
 		};
 	},
-	.vehicle_type = [](void *handle) noexcept -> uint8_t { Vehicle *v = static_cast<Vehicle *>(handle); return v->type; },
-	.cargo_type = [](void *handle) noexcept -> uint8_t { Vehicle *v = static_cast<Vehicle *>(handle); return v->cargo_type; },
-	.cargo_cap = [](void *handle) noexcept -> uint16_t { Vehicle *v = static_cast<Vehicle *>(handle); return v->cargo_cap; },
-	.stored_count = [](void *handle) noexcept -> uint32_t { Vehicle *v = static_cast<Vehicle *>(handle); return v->cargo.StoredCount(); },
-	.unload_count = [](void *handle) noexcept -> uint32_t { Vehicle *v = static_cast<Vehicle *>(handle); return v->cargo.UnloadCount(); },
+	.vehicle_type = [](void *handle) noexcept -> uint8_t {
+		CountStationBoundary<uint8_t>(StationBoundary::Loading);
+		Vehicle *v = static_cast<Vehicle *>(handle); return v->type;
+	},
+	.cargo_type = [](void *handle) noexcept -> uint8_t {
+		CountStationBoundary<uint8_t>(StationBoundary::Loading);
+		Vehicle *v = static_cast<Vehicle *>(handle); return v->cargo_type;
+	},
+	.cargo_cap = [](void *handle) noexcept -> uint16_t {
+		CountStationBoundary<uint16_t>(StationBoundary::Loading);
+		Vehicle *v = static_cast<Vehicle *>(handle); return v->cargo_cap;
+	},
+	.stored_count = [](void *handle) noexcept -> uint32_t {
+		CountStationBoundary<uint32_t>(StationBoundary::Loading);
+		Vehicle *v = static_cast<Vehicle *>(handle); return v->cargo.StoredCount();
+	},
+	.unload_count = [](void *handle) noexcept -> uint32_t {
+		CountStationBoundary<uint32_t>(StationBoundary::Loading);
+		Vehicle *v = static_cast<Vehicle *>(handle); return v->cargo.UnloadCount();
+	},
 	.deliver_count = [](void *handle) noexcept -> uint32_t {
+		CountStationBoundary<uint32_t>(StationBoundary::Loading);
 		Vehicle *v = static_cast<Vehicle *>(handle);
 		return v->cargo.ActionCount(VehicleCargoList::MTA_DELIVER);
 	},
 	.transfer_count = [](void *handle) noexcept -> uint32_t {
+		CountStationBoundary<uint32_t>(StationBoundary::Loading);
 		Vehicle *v = static_cast<Vehicle *>(handle);
 		return v->cargo.ActionCount(VehicleCargoList::MTA_TRANSFER);
 	},
 	.load_count = [](void *handle) noexcept -> uint32_t {
+		CountStationBoundary<uint32_t>(StationBoundary::Loading);
 		Vehicle *v = static_cast<Vehicle *>(handle);
 		return v->cargo.ActionCount(VehicleCargoList::MTA_LOAD);
 	},
 	.cargo_unloading = [](void *handle) noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Loading);
 		Vehicle *v = static_cast<Vehicle *>(handle);
 		return v->vehicle_flags.Test(VehicleFlag::CargoUnloading);
 	},
 	.unload_type = [](void *handle) noexcept -> uint8_t {
+		CountStationBoundary<uint8_t>(StationBoundary::Loading);
 		Vehicle *v = static_cast<Vehicle *>(handle);
 		return to_underlying(v->current_order.GetUnloadType());
 	},
 	.load_type = [](void *handle) noexcept -> uint8_t {
+		CountStationBoundary<uint8_t>(StationBoundary::Loading);
 		Vehicle *v = static_cast<Vehicle *>(handle);
 		return to_underlying(v->current_order.GetLoadType());
 	},
-	.is_refit = [](void *handle) noexcept -> bool { Vehicle *v = static_cast<Vehicle *>(handle); return v->current_order.IsRefit(); },
-	.refit_cargo = [](void *handle) noexcept -> uint8_t { Vehicle *v = static_cast<Vehicle *>(handle); return v->current_order.GetRefitCargo(); },
-	.has_orders = [](void *handle) noexcept -> bool { Vehicle *v = static_cast<Vehicle *>(handle); return v->orders != nullptr; },
-	.load_unload_ticks = [](void *handle) noexcept -> uint16_t { Vehicle *v = static_cast<Vehicle *>(handle); return v->load_unload_ticks; },
+	.is_refit = [](void *handle) noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Loading);
+		Vehicle *v = static_cast<Vehicle *>(handle); return v->current_order.IsRefit();
+	},
+	.refit_cargo = [](void *handle) noexcept -> uint8_t {
+		CountStationBoundary<uint8_t>(StationBoundary::Loading);
+		Vehicle *v = static_cast<Vehicle *>(handle); return v->current_order.GetRefitCargo();
+	},
+	.has_orders = [](void *handle) noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Loading);
+		Vehicle *v = static_cast<Vehicle *>(handle); return v->orders != nullptr;
+	},
+	.load_unload_ticks = [](void *handle) noexcept -> uint16_t {
+		CountStationBoundary<uint16_t>(StationBoundary::Loading);
+		Vehicle *v = static_cast<Vehicle *>(handle); return v->load_unload_ticks;
+	},
 	.stopped_or_crashed = [](void *handle) noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Loading);
 		Vehicle *v = static_cast<Vehicle *>(handle);
 		return v->vehstatus.Any({
 			VehState::Stopped, VehState::Crashed
 		});
 	},
-	.has_articulated_part = [](void *handle) noexcept -> bool { Vehicle *v = static_cast<Vehicle *>(handle); return v->HasArticulatedPart(); },
-	.is_articulated_part = [](void *handle) noexcept -> bool { Vehicle *v = static_cast<Vehicle *>(handle); return v->IsArticulatedPart(); },
+	.has_articulated_part = [](void *handle) noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Loading);
+		Vehicle *v = static_cast<Vehicle *>(handle); return v->HasArticulatedPart();
+	},
+	.is_articulated_part = [](void *handle) noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Loading);
+		Vehicle *v = static_cast<Vehicle *>(handle); return v->IsArticulatedPart();
+	},
 	.is_rear_dualheaded = [](void *handle) noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Loading);
 		Vehicle *v = static_cast<Vehicle *>(handle);
 		return Train::From(v)->IsRearDualheaded();
 	},
 	.is_normal_aircraft = [](void *handle) noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Loading);
 		Vehicle *v = static_cast<Vehicle *>(handle);
 		return Aircraft::From(v)->IsNormalAircraft();
 	},
-	.is_multiheaded = [](void *handle) noexcept -> bool { Vehicle *v = static_cast<Vehicle *>(handle); return Train::From(v)->IsMultiheaded(); },
-	.cached_max_speed = [](void *handle) noexcept -> uint16_t { Vehicle *v = static_cast<Vehicle *>(handle); return v->vcache.cached_max_speed; },
+	.is_multiheaded = [](void *handle) noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Loading);
+		Vehicle *v = static_cast<Vehicle *>(handle); return Train::From(v)->IsMultiheaded();
+	},
+	.cached_max_speed = [](void *handle) noexcept -> uint16_t {
+		CountStationBoundary<uint16_t>(StationBoundary::Loading);
+		Vehicle *v = static_cast<Vehicle *>(handle); return v->vcache.cached_max_speed;
+	},
 	.cargo_multiplier = [](void *handle) noexcept -> uint16_t {
+		CountStationBoundary<uint16_t>(StationBoundary::Loading);
 		Vehicle *v = static_cast<Vehicle *>(handle);
 		return CargoSpec::Get(v->cargo_type)->multiplier;
 	},
 	.cached_total_length = [](void *handle) noexcept -> uint16_t {
+		CountStationBoundary<uint16_t>(StationBoundary::Loading);
 		Vehicle *v = static_cast<Vehicle *>(handle);
 		return v->GetGroundVehicleCache()->cached_total_length;
 	},
-	.full_load_order = [](void *handle) noexcept -> bool { Vehicle *v = static_cast<Vehicle *>(handle); return v->current_order.IsFullLoadOrder(); },
-	.vehicle_owner = [](void *handle) noexcept -> uint8_t { Vehicle *v = static_cast<Vehicle *>(handle); return v->owner.base(); },
+	.full_load_order = [](void *handle) noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Loading);
+		Vehicle *v = static_cast<Vehicle *>(handle); return v->current_order.IsFullLoadOrder();
+	},
+	.vehicle_owner = [](void *handle) noexcept -> uint8_t {
+		CountStationBoundary<uint8_t>(StationBoundary::Loading);
+		Vehicle *v = static_cast<Vehicle *>(handle); return v->owner.base();
+	},
 	.aircraft_old_speed = [](void *handle) noexcept -> int32_t {
+		CountStationBoundary<int32_t>(StationBoundary::Loading);
 		Vehicle *v = static_cast<Vehicle *>(handle);
 		return Aircraft::From(v)->GetSpeedOldUnits();
 	},
 	.passenger_cargo = [](void *handle) noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Loading);
 		Vehicle *v = static_cast<Vehicle *>(handle);
 		return IsCargoInClass(v->cargo_type, CargoClass::Passengers);
 	},
-	.gradual = []() noexcept -> bool { return _settings_game.order.gradual_loading; },
-	.improved_load = []() noexcept -> bool { return _settings_game.order.improved_load; },
-	.station_length_penalty = []() noexcept -> bool { return _settings_game.order.station_length_loading_penalty; },
+	.gradual = []() noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Loading);
+		return _settings_game.order.gradual_loading;
+	},
+	.improved_load = []() noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Loading);
+		return _settings_game.order.improved_load;
+	},
+	.station_length_penalty = []() noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Loading);
+		return _settings_game.order.station_length_loading_penalty;
+	},
 	.stop = [](void *handle) noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Loading);
 		Vehicle *v = static_cast<Vehicle *>(handle);
 		return v->vehicle_flags.Test(VehicleFlag::StopLoading);
 	},
-	.current_company = []() noexcept -> uint8_t { return _current_company.base(); },
+	.current_company = []() noexcept -> uint8_t {
+		CountStationBoundary<uint8_t>(StationBoundary::Loading);
+		return _current_company.base();
+	},
 	.last_station_visited = [](void *handle) noexcept -> uint16_t {
+		CountStationBoundary<uint16_t>(StationBoundary::Loading);
 		Vehicle *v = static_cast<Vehicle *>(handle);
 		return v->last_station_visited.base();
 	},
-	.total_count = [](void *handle) noexcept -> uint32_t { Vehicle *v = static_cast<Vehicle *>(handle); return v->cargo.TotalCount(); },
-	.build_year = [](void *handle) noexcept -> int32_t { Vehicle *v = static_cast<Vehicle *>(handle); return v->build_year.base(); },
-	.calendar_year = []() noexcept -> int32_t { return TimerGameCalendar::year.base(); },
-	.order_time = [](void *handle) noexcept -> int32_t { Vehicle *v = static_cast<Vehicle *>(handle); return v->current_order_time; },
+	.total_count = [](void *handle) noexcept -> uint32_t {
+		CountStationBoundary<uint32_t>(StationBoundary::Loading);
+		Vehicle *v = static_cast<Vehicle *>(handle); return v->cargo.TotalCount();
+	},
+	.build_year = [](void *handle) noexcept -> int32_t {
+		CountStationBoundary<int32_t>(StationBoundary::Loading);
+		Vehicle *v = static_cast<Vehicle *>(handle); return v->build_year.base();
+	},
+	.calendar_year = []() noexcept -> int32_t {
+		CountStationBoundary<int32_t>(StationBoundary::Loading);
+		return TimerGameCalendar::year.base();
+	},
+	.order_time = [](void *handle) noexcept -> int32_t {
+		CountStationBoundary<int32_t>(StationBoundary::Loading);
+		Vehicle *v = static_cast<Vehicle *>(handle); return v->current_order_time;
+	},
 	.refit_mask = [](void *handle) noexcept -> uint64_t {
+		CountStationBoundary<uint64_t>(StationBoundary::Loading);
 		Vehicle *v = static_cast<Vehicle *>(handle);
 		return static_cast<uint64_t>(EngInfo(v->engine_type)->refit_mask);
 	},
 	.set_cargo_unloading = [](void *handle, bool value) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Loading);
 		Vehicle *front = static_cast<Vehicle *>(handle);
 		front->vehicle_flags.Set(VehicleFlag::CargoUnloading, value);
 	},
 	.set_loading_finished = [](void *handle, bool value) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Loading);
 		Vehicle *front = static_cast<Vehicle *>(handle);
 		front->vehicle_flags.Set(VehicleFlag::LoadingFinished, value);
 	},
 	.set_stop = [](void *handle, bool value) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Loading);
 		Vehicle *front = static_cast<Vehicle *>(handle);
 		front->vehicle_flags.Set(VehicleFlag::StopLoading, value);
 	},
 	.set_load_ticks = [](void *handle, uint16_t value) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Loading);
 		Vehicle *front = static_cast<Vehicle *>(handle);
 		front->load_unload_ticks = value;
 	},
-	.set_speed = [](void *handle, uint16_t value) noexcept -> void { Vehicle *front = static_cast<Vehicle *>(handle); front->cur_speed = value; },
+	.set_speed = [](void *handle, uint16_t value) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Loading);
+		Vehicle *front = static_cast<Vehicle *>(handle); front->cur_speed = value;
+	},
 	.set_refit_capacity = [](void *handle, uint16_t value) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Loading);
 		Vehicle *front = static_cast<Vehicle *>(handle);
 		front->refit_cap = value;
 	},
 	.subtract_profit = [](void *handle, int64_t value) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Loading);
 		Vehicle *front = static_cast<Vehicle *>(handle);
 		front->profit_this_year -= value;
 	},
 	.unknown_load_result = [](void *handle, uint16_t value) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Loading);
 		Vehicle *front = static_cast<Vehicle *>(handle);
 		ErrorUnknownCallbackResult(front->GetEngine()->GetGRFID(), CBID_VEHICLE_LOAD_AMOUNT, value);
 	},
-	.refresh_capacity = [](void *handle) noexcept -> void { Vehicle *front = static_cast<Vehicle *>(handle); LinkRefresher::Run(front, true, true); },
+	.refresh_capacity = [](void *handle) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Loading);
+		Vehicle *front = static_cast<Vehicle *>(handle); LinkRefresher::Run(front, true, true);
+	},
 	.vehicle_dirty = [](void *handle) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Loading);
 		Vehicle *front = static_cast<Vehicle *>(handle);
 		SetWindowDirty(GetWindowClassForVehicleType(front->type), front->owner);
 		SetWindowDirty(WC_VEHICLE_DETAILS, front->index);
 		front->MarkDirty();
 	},
 	.update_indicator = [](void *handle) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Loading);
 		Vehicle *front = static_cast<Vehicle *>(handle);
 		if (_game_mode != GM_MENU && (_settings_client.gui.loading_indicators > (uint)(front->owner != _local_company && _local_company != COMPANY_SPECTATOR))) {
 			StringID percent_up_down = STR_NULL;
@@ -1663,22 +1771,44 @@ static const OpenTTDStationLoading _rust_station_loading = {
 			}
 		}
 	},
-	.set_current_company = [](uint8_t value) noexcept -> void { _current_company = CompanyID(value); },
-	.next_vehicle = [](void *handle) noexcept -> void * { Vehicle *v = static_cast<Vehicle *>(handle); return v->Next(); },
-	.next_articulated = [](void *handle) noexcept -> void * { Vehicle *v = static_cast<Vehicle *>(handle); return v->GetNextArticulatedPart(); },
+	.set_current_company = [](uint8_t value) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Loading);
+		_current_company = CompanyID(value);
+	},
+	.next_vehicle = [](void *handle) noexcept -> void * {
+		CountStationBoundary<void *>(StationBoundary::Loading);
+		Vehicle *v = static_cast<Vehicle *>(handle); return v->Next();
+	},
+	.next_articulated = [](void *handle) noexcept -> void * {
+		CountStationBoundary<void *>(StationBoundary::Loading);
+		Vehicle *v = static_cast<Vehicle *>(handle); return v->GetNextArticulatedPart();
+	},
 	.other_multiheaded = [](void *handle) noexcept -> void * {
+		CountStationBoundary<void *>(StationBoundary::Loading);
 		Vehicle *v = static_cast<Vehicle *>(handle);
 		return Train::From(v)->other_multiheaded_part;
 	},
-	.first_engine_part = [](void *handle) noexcept -> void * { Vehicle *v = static_cast<Vehicle *>(handle); return v->GetFirstEnginePart(); },
-	.first_vehicle = [](void *handle) noexcept -> void * { Vehicle *v = static_cast<Vehicle *>(handle); return v->First(); },
-	.previous_vehicle = [](void *handle) noexcept -> void * { Vehicle *v = static_cast<Vehicle *>(handle); return v->Previous(); },
+	.first_engine_part = [](void *handle) noexcept -> void * {
+		CountStationBoundary<void *>(StationBoundary::Loading);
+		Vehicle *v = static_cast<Vehicle *>(handle); return v->GetFirstEnginePart();
+	},
+	.first_vehicle = [](void *handle) noexcept -> void * {
+		CountStationBoundary<void *>(StationBoundary::Loading);
+		Vehicle *v = static_cast<Vehicle *>(handle); return v->First();
+	},
+	.previous_vehicle = [](void *handle) noexcept -> void * {
+		CountStationBoundary<void *>(StationBoundary::Loading);
+		Vehicle *v = static_cast<Vehicle *>(handle); return v->Previous();
+	},
 	.with_next_stations = [](void *handle, void *context, OpenTTDStationScope body) noexcept {
+		CountStationBoundary<void>(StationBoundary::Loading);
 		std::vector<StationID> next;
 		static_cast<Vehicle *>(handle)->GetNextStoppingStation(next);
+		CountStationScope();
 		body(context, &next);
 	},
 	.stage = [](void *station, void *vehicle, uint8_t unload, void *next_stations, void *payment) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Loading);
 		Station *st = static_cast<Station *>(station);
 		Vehicle *v = static_cast<Vehicle *>(vehicle);
 		GoodsEntry &ge = st->goods[v->cargo_type];
@@ -1686,18 +1816,21 @@ static const OpenTTDStationLoading _rust_station_loading = {
 		v->cargo.Stage(ge.status.Test(GoodsEntry::State::Acceptance), st->index, next, static_cast<OrderUnloadType>(unload), &ge, v->cargo_type, static_cast<CargoPayment *>(payment), v->GetCargoTile());
 	},
 	.return_cargo = [](void *station, void *vehicle, uint32_t amount) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Loading);
 		Station *st = static_cast<Station *>(station);
 		Vehicle *v = static_cast<Vehicle *>(vehicle);
 		GoodsEntry &ge = st->goods[v->cargo_type];
 		v->cargo.Return(amount, &ge.GetOrCreateData().cargo, StationID::Invalid(), v->GetCargoTile());
 	},
 	.unload_cargo = [](void *station, void *vehicle, uint32_t amount, void *payment) noexcept -> uint32_t {
+		CountStationBoundary<uint32_t>(StationBoundary::Loading);
 		Station *st = static_cast<Station *>(station);
 		Vehicle *v = static_cast<Vehicle *>(vehicle);
 		GoodsEntry &ge = st->goods[v->cargo_type];
 		return v->cargo.Unload(amount, &ge.GetOrCreateData().cargo, v->cargo_type, static_cast<CargoPayment *>(payment), v->GetCargoTile());
 	},
 	.load_cargo = [](void *station, void *vehicle, uint32_t amount, void *next_stations) noexcept -> uint32_t {
+		CountStationBoundary<uint32_t>(StationBoundary::Loading);
 		Station *st = static_cast<Station *>(station);
 		Vehicle *v = static_cast<Vehicle *>(vehicle);
 		GoodsEntry &ge = st->goods[v->cargo_type];
@@ -1705,6 +1838,7 @@ static const OpenTTDStationLoading _rust_station_loading = {
 		return ge.GetOrCreateData().cargo.Load(amount, &v->cargo, next, v->GetCargoTile());
 	},
 	.reserve_cargo = [](void *station, void *vehicle, uint32_t amount, void *next_stations) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Loading);
 		Station *st = static_cast<Station *>(station);
 		Vehicle *v = static_cast<Vehicle *>(vehicle);
 		GoodsEntry &ge = st->goods[v->cargo_type];
@@ -1712,36 +1846,48 @@ static const OpenTTDStationLoading _rust_station_loading = {
 		ge.GetOrCreateData().cargo.Reserve(amount, &v->cargo, next, v->GetCargoTile());
 	},
 	.deliver_to_transfer = [](void *vehicle, uint32_t amount) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Loading);
 		static_cast<Vehicle *>(vehicle)->cargo.Reassign<VehicleCargoList::MTA_DELIVER, VehicleCargoList::MTA_TRANSFER>(amount);
 	},
 	.deliver_to_keep = [](void *vehicle, uint32_t amount) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Loading);
 		static_cast<Vehicle *>(vehicle)->cargo.Reassign<VehicleCargoList::MTA_DELIVER, VehicleCargoList::MTA_KEEP>(amount);
 	},
 	.has_cargo_for = [](void *station, uint8_t cargo, void *next_stations) noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Loading);
 		GoodsEntry &ge = static_cast<Station *>(station)->goods[cargo];
 		return ge.HasData() && ge.GetData().cargo.HasCargoFor(*static_cast<std::vector<StationID> *>(next_stations));
 	},
 	.platform_length = [](void *station, void *vehicle) noexcept -> uint32_t {
+		CountStationBoundary<uint32_t>(StationBoundary::Loading);
 		return static_cast<Station *>(station)->GetPlatformLength(static_cast<Vehicle *>(vehicle)->tile);
 	},
 	.train_at_station = [](void *station, void *vehicle) noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Loading);
 		Station *st = static_cast<Station *>(station);
 		Vehicle *v = static_cast<Vehicle *>(vehicle);
 		return IsTileType(v->tile, MP_STATION) && GetStationIndex(v->tile) == st->index;
 	},
 	.station_cargo_total = [](void *station, uint8_t cargo) noexcept -> uint32_t {
+		CountStationBoundary<uint32_t>(StationBoundary::Loading);
 		return static_cast<Station *>(station)->goods[cargo].GetData().cargo.TotalCount();
 	},
 	.load_property = [](void *handle) noexcept -> uint16_t {
+		CountStationBoundary<uint16_t>(StationBoundary::Loading);
 		Vehicle *v = static_cast<Vehicle *>(handle);
 		return GetVehicleProperty(v, PROP_VEHICLE_LOAD_AMOUNT, CALLBACK_FAILED);
 	},
 	.load_callback = [](void *handle) noexcept -> uint16_t {
+		CountStationBoundary<uint16_t>(StationBoundary::Loading);
 		Vehicle *v = static_cast<Vehicle *>(handle);
 		return GetVehicleCallback(CBID_VEHICLE_LOAD_AMOUNT, 0, 0, v->engine_type, v);
 	},
-	.get_payment = [](void *handle) noexcept -> void * { return static_cast<Vehicle *>(handle)->cargo_payment; },
+	.get_payment = [](void *handle) noexcept -> void * {
+		CountStationBoundary<void *>(StationBoundary::Loading);
+		return static_cast<Vehicle *>(handle)->cargo_payment;
+	},
 	.create_payment = [](void *handle) noexcept -> void * {
+		CountStationBoundary<void *>(StationBoundary::Loading);
 		Vehicle *v = static_cast<Vehicle *>(handle);
 		assert(v->cargo_payment == nullptr);
 		static_assert(CargoPaymentPool::MAX_SIZE == VehiclePool::MAX_SIZE);
@@ -1749,13 +1895,21 @@ static const OpenTTDStationLoading _rust_station_loading = {
 		v->cargo_payment = new CargoPayment(v);
 		return v->cargo_payment;
 	},
-	.delete_payment = [](void *handle) noexcept -> void { delete static_cast<CargoPayment *>(handle); },
-	.flush_delivery = []() noexcept -> void { openttd_rust_cargo_delivery_flush(GetCargoDeliveryState(), &_cargo_services); },
+	.delete_payment = [](void *handle) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Loading);
+		delete static_cast<CargoPayment *>(handle);
+	},
+	.flush_delivery = []() noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Loading);
+		openttd_rust_cargo_delivery_flush(GetCargoDeliveryState(), &_cargo_services);
+	},
 	.vehicle_new_cargo = [](void *vehicle) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Loading);
 		Vehicle *v = static_cast<Vehicle *>(vehicle);
 		TriggerVehicleRandomisation(v, VehicleRandomTrigger::NewCargo);
 	},
 	.cargo_taken = [](void *station, uint8_t cargo) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Loading);
 		Station *st = static_cast<Station *>(station);
 		TriggerStationRandomisation(st, st->xy, StationRandomTrigger::CargoTaken, cargo);
 		TriggerStationAnimation(st, st->xy, StationAnimationTrigger::CargoTaken, cargo);
@@ -1764,33 +1918,39 @@ static const OpenTTDStationLoading _rust_station_loading = {
 		TriggerRoadStopAnimation(st, st->xy, StationAnimationTrigger::CargoTaken, cargo);
 	},
 	.train_loads = [](void *station, void *vehicle) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Loading);
 		Station *st = static_cast<Station *>(station);
 		Vehicle *v = static_cast<Vehicle *>(vehicle);
 		TriggerStationRandomisation(st, v->tile, StationRandomTrigger::VehicleLoads);
 		TriggerStationAnimation(st, v->tile, StationAnimationTrigger::VehicleLoads);
 	},
 	.road_loads = [](void *station, void *vehicle) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Loading);
 		Station *st = static_cast<Station *>(station);
 		Vehicle *v = static_cast<Vehicle *>(vehicle);
 		TriggerRoadStopRandomisation(st, v->tile, StationRandomTrigger::VehicleLoads);
 		TriggerRoadStopAnimation(st, v->tile, StationAnimationTrigger::VehicleLoads);
 	},
 	.vehicle_empty = [](void *vehicle) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Loading);
 		Vehicle *v = static_cast<Vehicle *>(vehicle);
 		TriggerVehicleRandomisation(v, VehicleRandomTrigger::Empty);
 	},
 	.station_dirty = [](void *station) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Loading);
 		Station *st = static_cast<Station *>(station);
 		st->MarkTilesDirty(true);
 		SetWindowDirty(WC_STATION_VIEW, st->index);
 		SetWindowDirty(WC_STATION_LIST, st->owner);
 	},
 	.test_refit = [](void *handle, uint8_t cargo) noexcept -> uint32_t {
+		CountStationBoundary<uint32_t>(StationBoundary::Loading);
 		Vehicle *v = static_cast<Vehicle *>(handle);
 		auto [result, capacity, mail_capacity, cargo_capacities] = Command<CMD_REFIT_VEHICLE>::Do(DoCommandFlag::QueryCost, v->index, cargo, 0xFF, true, false, 1);
 		return capacity;
 	},
 	.execute_refit = [](void *handle, uint8_t cargo, int64_t *cost) noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Loading);
 		Vehicle *v = static_cast<Vehicle *>(handle);
 		auto [result, capacity, mail_capacity, cargo_capacities] = Command<CMD_REFIT_VEHICLE>::Do(DoCommandFlag::Execute, v->index, cargo, 0xFF, true, false, 1);
 		*cost = result.GetCost();

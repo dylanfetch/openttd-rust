@@ -1540,18 +1540,19 @@ PrepareUnload, complete station/vehicle loading, refit/reservation/completion,
 acceptance, ratings/truncation, admission/distribution and periodic/stale-link
 control. Packet, flow, link-graph, map and geometry storage remain C++.
 
-ABI IDs 110-115 pin layouts and direct noexcept service tables. Raw field-sized
-access ends before every service; native refit/cache/command-scope GUI readers and
-payment/industry reentry see current canonical state. Stable raw-owned queue nodes
-preserve list iterator identity. Save/fixup errors unwind through a native stack
-scope and retain partial list changes. #117 production flush remains once at the
-original end of LoadUnloadStation. Original bodies remain in portable builds.
+Issue #214 replaces numeric dispatch with borrowed typed noexcept tables (ABI
+110-115), narrow observations (500-508), and caller-owned native iterator/container
+frames. Raw field access ends before callbacks; refit and payment/industry reentry
+see current state. Stable queue nodes preserve iterator identity. Native save
+scopes retain partial changes on failure. #117 production flush remains once at
+the original end of LoadUnloadStation. Portable bodies remain unchanged.
 
 `python3 tools/migration.py simulate stations economy` uses the existing road/CAPY
 inputs for loading queues, fractional admission, acceptance loss, full/gradual
 loading, rating expiry/decay/capping, stale-link refresh/removal and active reload.
-`--self` and `--soak` reuse these cases. Native tests cover ABI, stable aliases,
-queue mutation, partial/nested save failure and actual retirement/indexed reuse.
+`--self` and `--soak` reuse these cases. Default station runs require crossing,
+grouped-read and stack-scope counters; timing disables them. Native tests cover
+ABI, aliases, queue/reentry order, save failure and retirement/indexed reuse.
 The corpus is not exhaustive for legacy versions, NewGRF cargo callbacks,
 articulated/multiheaded refits or every transport combination.
 

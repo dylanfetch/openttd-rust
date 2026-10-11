@@ -79,6 +79,10 @@
 
 #include <bitset>
 
+#ifdef WITH_RUST
+#include "rust/station_boundary_profile.hpp"
+#endif
+
 #include "safeguards.h"
 
 /**
@@ -599,81 +603,149 @@ struct RustStationTruncation {
 	StationCargoAmountMap::iterator iterator;
 };
 static const OpenTTDStationServices _rust_station_services = {
-	.station_owner = [](void *handle) noexcept -> uint8_t { return static_cast<BaseStation *>(handle)->owner.base(); },
+	.station_owner = [](void *handle) noexcept -> uint8_t {
+		CountStationBoundary<uint8_t>(StationBoundary::Station);
+		return static_cast<BaseStation *>(handle)->owner.base();
+	},
 	.station_exclusivity = [](void *handle) noexcept -> OpenTTDStationExclusivity {
+		CountStationBoundary<OpenTTDStationExclusivity>(StationBoundary::Station, true);
 		BaseStation *st = static_cast<BaseStation *>(handle);
 		return {
 			st->town->exclusive_counter, st->town->exclusivity.base()
 		};
 	},
 	.station_next = [](void *handle) noexcept -> void * {
+		CountStationBoundary<void *>(StationBoundary::Station);
 		auto *cursor = static_cast<std::pair<StationList::const_iterator, StationList::const_iterator> *>(handle);
 		if (cursor->first == cursor->second) return nullptr;
 		return *cursor->first++;
 	},
 	.rating_counts = [](void *handle, uint8_t cargo) noexcept -> OpenTTDRatingCounts {
+		CountStationBoundary<OpenTTDRatingCounts>(StationBoundary::Station, true);
 		GoodsEntry &ge = Station::From(static_cast<BaseStation *>(handle))->goods[cargo];
 		return {
 			ge.AvailableCount(), ge.HasData() ? static_cast<uint32_t>(ge.GetData().cargo.MapSize()) : 0
 		};
 	},
-	.get = [](uint32_t id) noexcept -> void * { return BaseStation::GetIfValid(StationID(id)); },
-	.owner = [](void *handle) noexcept -> OpenTTDStationService * { return static_cast<BaseStation *>(handle)->rust_service.get(); },
-	.pool_size = []() noexcept -> uint32_t { return static_cast<uint32_t>(BaseStation::GetPoolSize()); },
-	.tick_counter = []() noexcept -> uint64_t { return TimerGameTick::counter; },
-	.editor = []() noexcept -> bool { return _game_mode == GM_EDITOR; },
-	.facilities = [](void *handle) noexcept -> uint8_t { return static_cast<BaseStation *>(handle)->facilities.base(); },
-	.in_use = [](void *handle) noexcept -> bool { return static_cast<BaseStation *>(handle)->IsInUse(); },
-	.is_station = [](void *handle) noexcept -> bool { return Station::IsExpected(static_cast<BaseStation *>(handle)); },
-	.local_owner = [](void *handle) noexcept -> bool { return static_cast<BaseStation *>(handle)->owner == _local_company; },
-	.rectangle_empty = [](void *handle) noexcept -> bool { return static_cast<BaseStation *>(handle)->rect.IsEmpty(); },
+	.get = [](uint32_t id) noexcept -> void * {
+		CountStationBoundary<void *>(StationBoundary::Station);
+		return BaseStation::GetIfValid(StationID(id));
+	},
+	.owner = [](void *handle) noexcept -> OpenTTDStationService * {
+		CountStationBoundary<OpenTTDStationService *>(StationBoundary::Station);
+		return static_cast<BaseStation *>(handle)->rust_service.get();
+	},
+	.pool_size = []() noexcept -> uint32_t {
+		CountStationBoundary<uint32_t>(StationBoundary::Station);
+		return static_cast<uint32_t>(BaseStation::GetPoolSize());
+	},
+	.tick_counter = []() noexcept -> uint64_t {
+		CountStationBoundary<uint64_t>(StationBoundary::Station);
+		return TimerGameTick::counter;
+	},
+	.editor = []() noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Station);
+		return _game_mode == GM_EDITOR;
+	},
+	.facilities = [](void *handle) noexcept -> uint8_t {
+		CountStationBoundary<uint8_t>(StationBoundary::Station);
+		return static_cast<BaseStation *>(handle)->facilities.base();
+	},
+	.in_use = [](void *handle) noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Station);
+		return static_cast<BaseStation *>(handle)->IsInUse();
+	},
+	.is_station = [](void *handle) noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Station);
+		return Station::IsExpected(static_cast<BaseStation *>(handle));
+	},
+	.local_owner = [](void *handle) noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Station);
+		return static_cast<BaseStation *>(handle)->owner == _local_company;
+	},
+	.rectangle_empty = [](void *handle) noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Station);
+		return static_cast<BaseStation *>(handle)->rect.IsEmpty();
+	},
 	.town_statue = [](void *handle) noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Station);
 		return Company::IsValidID(static_cast<BaseStation *>(handle)->owner) && static_cast<BaseStation *>(handle)->town->statues.Test(static_cast<BaseStation *>(handle)->owner);
 	},
-	.select_goods = []() noexcept -> bool { return _settings_game.order.selectgoods; },
-	.rating_cheat = []() noexcept -> bool { return _cheats.station_rating.value; },
+	.select_goods = []() noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Station);
+		return _settings_game.order.selectgoods;
+	},
+	.rating_cheat = []() noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Station);
+		return _cheats.station_rating.value;
+	},
 	.available = [](void *handle, uint8_t cargo) noexcept -> uint32_t {
+		CountStationBoundary<uint32_t>(StationBoundary::Station);
 		return Station::From(static_cast<BaseStation *>(handle))->goods[cargo].AvailableCount();
 	},
-	.cargo_valid = [](uint8_t cargo) noexcept -> bool { return CargoSpec::Get(cargo)->IsValid(); },
+	.cargo_valid = [](uint8_t cargo) noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Station);
+		return CargoSpec::Get(cargo)->IsValid();
+	},
 	.rating_callback_enabled = [](uint8_t cargo) noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Station);
 		return CargoSpec::Get(cargo)->callback_mask.Test(CargoCallbackMask::StationRatingCalc);
 	},
-	.passenger_cargo = [](uint8_t cargo) noexcept -> bool { return IsCargoInClass(cargo, CargoClass::Passengers); },
-	.packet_available = []() noexcept -> bool { return CargoPacket::CanAllocateItem(); },
-	.house_tile = [](uint32_t tile) noexcept -> bool { return IsTileType(TileIndex(tile), MP_HOUSE); },
+	.passenger_cargo = [](uint8_t cargo) noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Station);
+		return IsCargoInClass(cargo, CargoClass::Passengers);
+	},
+	.packet_available = []() noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Station);
+		return CargoPacket::CanAllocateItem();
+	},
+	.house_tile = [](uint32_t tile) noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Station);
+		return IsTileType(TileIndex(tile), MP_HOUSE);
+	},
 	.rating_redraw = [](void *handle, bool waiting_changed) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Station);
 		BaseStation *st = static_cast<BaseStation *>(handle);
 		if (waiting_changed) SetWindowDirty(WC_STATION_VIEW, st->index);
 		else SetWindowWidgetDirty(WC_STATION_VIEW, st->index, WID_SV_ACCEPT_RATING_LIST);
 	},
 	.set_demand = [](void *handle, uint8_t cargo, uint32_t amount) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Station);
 		GoodsEntry &ge = Station::From(static_cast<BaseStation *>(handle))->goods[cargo];
 		if (LinkGraph::IsValidID(ge.link_graph)) (*LinkGraph::Get(ge.link_graph))[ge.node].SetDemand(amount);
 	},
 	.acceptance_news = [](void *handle, uint64_t cargoes, bool reject) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Station);
 		ShowRejectOrAcceptNews(Station::From(static_cast<BaseStation *>(handle)), cargoes, reject);
 	},
 	.acceptance_redraw = [](void *handle) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Station);
 		SetWindowWidgetDirty(WC_STATION_VIEW, static_cast<BaseStation *>(handle)->index, WID_SV_ACCEPT_RATING_LIST);
 	},
-	.delete_station = [](void *handle) noexcept -> void { delete static_cast<BaseStation *>(handle); },
+	.delete_station = [](void *handle) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Station);
+		delete static_cast<BaseStation *>(handle);
+	},
 	.acceptance_animation = [](void *handle) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Station);
 		BaseStation *bst = static_cast<BaseStation *>(handle);
 		TriggerStationAnimation(bst, bst->xy, StationAnimationTrigger::AcceptanceTick);
 		TriggerRoadStopAnimation(bst, bst->xy, StationAnimationTrigger::AcceptanceTick);
 		if (Station::IsExpected(bst)) TriggerAirportAnimation(Station::From(bst), AirportAnimationTrigger::AcceptanceTick);
 	},
 	.watched_animation = [](uint32_t tile, uint64_t cargoes) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Station);
 		TriggerHouseAnimation_WatchedCargoAccepted(TileIndex(tile), cargoes);
 	},
 	.append_packet = [](void *handle, uint8_t cargo, uint32_t amount, uint32_t source) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Station);
 		Station *st = Station::From(static_cast<BaseStation *>(handle));
 		GoodsEntry &ge = st->goods[cargo];
 		StationID next = ge.GetVia(st->index);
 		ge.GetOrCreateData().cargo.Append(new CargoPacket(st->index, amount, Source(SourceID(source & 0xFFFF), static_cast<SourceType>(source >> 16))), next);
 	},
 	.update_supply = [](void *handle, uint8_t cargo, uint32_t amount) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Station);
 		Station *st = Station::From(static_cast<BaseStation *>(handle));
 		GoodsEntry &ge = st->goods[cargo];
 		LinkGraph *lg = nullptr;
@@ -691,9 +763,11 @@ static const OpenTTDStationServices _rust_station_services = {
 		} if (lg != nullptr) (*lg)[ge.node].UpdateSupply(amount);
 	},
 	.station_list_invalidation = [](void *handle) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Station);
 		InvalidateWindowData(WC_STATION_LIST, static_cast<BaseStation *>(handle)->owner);
 	},
 	.new_cargo_animation = [](void *handle, uint8_t cargo) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Station);
 		Station *st = Station::From(static_cast<BaseStation *>(handle));
 		TriggerStationRandomisation(st, st->xy, StationRandomTrigger::NewCargo, cargo);
 		TriggerStationAnimation(st, st->xy, StationAnimationTrigger::NewCargo, cargo);
@@ -702,34 +776,46 @@ static const OpenTTDStationServices _rust_station_services = {
 		TriggerRoadStopAnimation(st, st->xy, StationAnimationTrigger::NewCargo, cargo);
 	},
 	.waiting_redraw = [](void *handle) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Station);
 		SetWindowDirty(WC_STATION_VIEW, static_cast<BaseStation *>(handle)->index);
 		Station::From(static_cast<BaseStation *>(handle))->MarkTilesDirty(true);
 	},
 	.rating_callback = [](void *handle, uint8_t cargo, uint32_t var10, uint32_t var18) noexcept -> uint16_t {
+		CountStationBoundary<uint16_t>(StationBoundary::Station);
 		return GetCargoCallback(CBID_CARGO_STATION_RATING_CALC, var10, var18, CargoSpec::Get(cargo));
 	},
 	.with_tiles = [](void *handle, void *context, OpenTTDStationScope body) noexcept {
+		CountStationBoundary<void>(StationBoundary::Station);
 		RustStationTileCursor cursor(Station::From(static_cast<BaseStation *>(handle)));
+		CountStationScope();
 		body(context, &cursor);
 	},
 	.tile_next = [](void *handle) noexcept -> uint32_t {
+		CountStationBoundary<uint32_t>(StationBoundary::Station);
 		auto *cursor = static_cast<RustStationTileCursor *>(handle);
 		if (cursor->started) ++cursor->iterator;
 		cursor->started = true;
 		return static_cast<TileIndex>(cursor->iterator).base();
 	},
 	.accept_tile = [](void *handle, uint32_t tile, uint64_t *always) noexcept {
+		CountStationBoundary<void>(StationBoundary::Station);
 		AddAcceptedCargo(TileIndex(tile), static_cast<RustStationTileCursor *>(handle)->acceptance, always);
 	},
-	.acceptance_amounts = [](void *handle) noexcept -> const uint32_t * { return static_cast<RustStationTileCursor *>(handle)->acceptance.data(); },
+	.acceptance_amounts = [](void *handle) noexcept -> const uint32_t * {
+		CountStationBoundary<const uint32_t *>(StationBoundary::Station);
+		return static_cast<RustStationTileCursor *>(handle)->acceptance.data();
+	},
 	.with_truncation = [](void *handle, uint8_t cargo, uint32_t amount, void *context, OpenTTDStationScope body) noexcept {
+		CountStationBoundary<void>(StationBoundary::Station);
 		RustStationTruncation result;
 		GoodsEntry &ge = static_cast<Station *>(handle)->goods[cargo];
 		if (ge.HasData()) ge.GetData().cargo.Truncate(amount, &result.amounts);
 		result.iterator = result.amounts.begin();
+		CountStationScope();
 		body(context, &result);
 	},
 	.truncate_next = [](void *handle, uint32_t *amount) noexcept -> uint32_t {
+		CountStationBoundary<uint32_t>(StationBoundary::Station);
 		auto *result = static_cast<RustStationTruncation *>(handle);
 		if (result->iterator == result->amounts.end()) return UINT32_MAX;
 		*amount = result->iterator->second;
@@ -739,18 +825,39 @@ static const OpenTTDStationServices _rust_station_services = {
 };
 static const OpenTTDStationLinks _rust_station_links = {
 	.graph = [](void *handle, uint8_t cargo) noexcept -> void * {
+		CountStationBoundary<void *>(StationBoundary::Links);
 		return LinkGraph::GetIfValid(static_cast<Station *>(handle)->goods[cargo].link_graph);
 	},
-	.automatic_distribution = [](uint8_t cargo) noexcept -> bool { return _settings_game.linkgraph.GetDistributionType(cargo) != DT_MANUAL; },
-	.node = [](void *handle, uint8_t cargo) noexcept -> uint16_t { return static_cast<Station *>(handle)->goods[cargo].node; },
-	.edge_count = [](void *handle, uint16_t node) noexcept -> size_t { return (*static_cast<LinkGraph *>(handle))[node].edges.size(); },
-	.date = []() noexcept -> int32_t { return TimerGameEconomy::date.base(); },
-	.station_id = [](void *handle) noexcept -> uint16_t { return static_cast<Station *>(handle)->index.base(); },
+	.automatic_distribution = [](uint8_t cargo) noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Links);
+		return _settings_game.linkgraph.GetDistributionType(cargo) != DT_MANUAL;
+	},
+	.node = [](void *handle, uint8_t cargo) noexcept -> uint16_t {
+		CountStationBoundary<uint16_t>(StationBoundary::Links);
+		return static_cast<Station *>(handle)->goods[cargo].node;
+	},
+	.edge_count = [](void *handle, uint16_t node) noexcept -> size_t {
+		CountStationBoundary<size_t>(StationBoundary::Links);
+		return (*static_cast<LinkGraph *>(handle))[node].edges.size();
+	},
+	.date = []() noexcept -> int32_t {
+		CountStationBoundary<int32_t>(StationBoundary::Links);
+		return TimerGameEconomy::date.base();
+	},
+	.station_id = [](void *handle) noexcept -> uint16_t {
+		CountStationBoundary<uint16_t>(StationBoundary::Links);
+		return static_cast<Station *>(handle)->index.base();
+	},
 	.edge_last_update = [](void *handle, uint16_t node, size_t index) noexcept -> int32_t {
+		CountStationBoundary<int32_t>(StationBoundary::Links);
 		return (*static_cast<LinkGraph *>(handle))[node].edges[index].LastUpdate().base();
 	},
-	.last_compression = [](void *handle) noexcept -> int32_t { return static_cast<LinkGraph *>(handle)->LastCompression().base(); },
+	.last_compression = [](void *handle) noexcept -> int32_t {
+		CountStationBoundary<int32_t>(StationBoundary::Links);
+		return static_cast<LinkGraph *>(handle)->LastCompression().base();
+	},
 	.edge = [](void *handle, uint16_t node, size_t index, OpenTTDStationEdge *out) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Links);
 		LinkGraph *graph = static_cast<LinkGraph *>(handle);
 		const Edge &edge = (*graph)[node].edges[index];
 		Station *from = Station::Get((*graph)[node].station);
@@ -760,32 +867,78 @@ static const OpenTTDStationLinks _rust_station_links = {
 		};
 	},
 	.delete_flows = [](void *handle, uint8_t cargo, uint16_t destination) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Links);
 		GoodsEntry &ge = static_cast<Station *>(handle)->goods[cargo];
 		if (ge.HasData()) ge.GetData().flows.DeleteFlows(StationID(destination));
 	},
-	.restrict_edge = [](void *handle, uint16_t from, uint16_t to) noexcept -> void { (*static_cast<LinkGraph *>(handle))[from][to].Restrict(); },
+	.restrict_edge = [](void *handle, uint16_t from, uint16_t to) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Links);
+		(*static_cast<LinkGraph *>(handle))[from][to].Restrict();
+	},
 	.restrict_flows = [](void *handle, uint8_t cargo, uint16_t destination) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Links);
 		GoodsEntry &ge = static_cast<Station *>(handle)->goods[cargo];
 		if (ge.HasData()) ge.GetData().flows.RestrictFlows(StationID(destination));
 	},
-	.release_edge = [](void *handle, uint16_t from, uint16_t to) noexcept -> void { (*static_cast<LinkGraph *>(handle))[from][to].Release(); },
-	.remove_edge = [](void *handle, uint16_t from, uint16_t to) noexcept -> void { (*static_cast<LinkGraph *>(handle))[from].RemoveEdge(to); },
-	.compress = [](void *handle) noexcept -> void { static_cast<LinkGraph *>(handle)->Compress(); },
-	.order_list = [](uint32_t id) noexcept -> void * { return OrderList::GetIfValid(OrderListID(id)); },
-	.order_pool_size = []() noexcept -> size_t { return OrderList::GetPoolSize(); },
-	.order_count = [](void *handle) noexcept -> size_t { return static_cast<OrderList *>(handle)->GetOrders().size(); },
+	.release_edge = [](void *handle, uint16_t from, uint16_t to) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Links);
+		(*static_cast<LinkGraph *>(handle))[from][to].Release();
+	},
+	.remove_edge = [](void *handle, uint16_t from, uint16_t to) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Links);
+		(*static_cast<LinkGraph *>(handle))[from].RemoveEdge(to);
+	},
+	.compress = [](void *handle) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Links);
+		static_cast<LinkGraph *>(handle)->Compress();
+	},
+	.order_list = [](uint32_t id) noexcept -> void * {
+		CountStationBoundary<void *>(StationBoundary::Links);
+		return OrderList::GetIfValid(OrderListID(id));
+	},
+	.order_pool_size = []() noexcept -> size_t {
+		CountStationBoundary<size_t>(StationBoundary::Links);
+		return OrderList::GetPoolSize();
+	},
+	.order_count = [](void *handle) noexcept -> size_t {
+		CountStationBoundary<size_t>(StationBoundary::Links);
+		return static_cast<OrderList *>(handle)->GetOrders().size();
+	},
 	.order_destination = [](void *handle, size_t index) noexcept -> uint32_t {
+		CountStationBoundary<uint32_t>(StationBoundary::Links);
 		const Order *order = &static_cast<OrderList *>(handle)->GetOrders()[index];
 		return order->IsType(OT_GOTO_STATION) || order->IsType(OT_IMPLICIT) ? order->GetDestination().base() : UINT32_MAX;
 	},
-	.order_vehicle = [](void *handle) noexcept -> void * { return static_cast<OrderList *>(handle)->GetFirstSharedVehicle(); },
-	.next_vehicle = [](void *handle) noexcept -> void * { return static_cast<Vehicle *>(handle)->Next(); },
-	.next_shared = [](void *handle) noexcept -> void * { return static_cast<Vehicle *>(handle)->NextShared(); },
-	.stopped_in_depot = [](void *handle) noexcept -> bool { return static_cast<Vehicle *>(handle)->IsStoppedInDepot(); },
-	.last_service = [](void *handle) noexcept -> int32_t { return static_cast<Vehicle *>(handle)->date_of_last_service.base(); },
-	.cargo_type = [](void *handle) noexcept -> uint8_t { return static_cast<Vehicle *>(handle)->cargo_type; },
-	.refresh = [](void *handle) noexcept -> void { LinkRefresher::Run(static_cast<Vehicle *>(handle), false); },
+	.order_vehicle = [](void *handle) noexcept -> void * {
+		CountStationBoundary<void *>(StationBoundary::Links);
+		return static_cast<OrderList *>(handle)->GetFirstSharedVehicle();
+	},
+	.next_vehicle = [](void *handle) noexcept -> void * {
+		CountStationBoundary<void *>(StationBoundary::Links);
+		return static_cast<Vehicle *>(handle)->Next();
+	},
+	.next_shared = [](void *handle) noexcept -> void * {
+		CountStationBoundary<void *>(StationBoundary::Links);
+		return static_cast<Vehicle *>(handle)->NextShared();
+	},
+	.stopped_in_depot = [](void *handle) noexcept -> bool {
+		CountStationBoundary<bool>(StationBoundary::Links);
+		return static_cast<Vehicle *>(handle)->IsStoppedInDepot();
+	},
+	.last_service = [](void *handle) noexcept -> int32_t {
+		CountStationBoundary<int32_t>(StationBoundary::Links);
+		return static_cast<Vehicle *>(handle)->date_of_last_service.base();
+	},
+	.cargo_type = [](void *handle) noexcept -> uint8_t {
+		CountStationBoundary<uint8_t>(StationBoundary::Links);
+		return static_cast<Vehicle *>(handle)->cargo_type;
+	},
+	.refresh = [](void *handle) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Links);
+		LinkRefresher::Run(static_cast<Vehicle *>(handle), false);
+	},
 	.reroute = [](void *handle, void *vehicle, uint8_t cargo, uint16_t avoid, uint16_t avoid2) noexcept -> void {
+		CountStationBoundary<void>(StationBoundary::Links);
 		GoodsEntry &ge = static_cast<Station *>(handle)->goods[cargo];
 		if (vehicle == nullptr) {
 			if (ge.HasData()) ge.GetData().cargo.Reroute(UINT_MAX, &ge.GetData().cargo, StationID(avoid), StationID(avoid2), &ge);
@@ -2536,8 +2689,10 @@ static CommandCost RemoveRoadStop(TileIndex tile, DoCommandFlags flags, int repl
 		 * this station, then look for any currently heading to the tile. */
 		StationID station_id = st->index;
 		FindVehiclesWithOrder(
-			[](const Vehicle *v) { return v->type == VEH_ROAD; },
-			[station_id](const Order *order) { return order->IsType(OT_GOTO_STATION) && order->GetDestination() == station_id; },
+			[](const Vehicle *v) { return v->type == VEH_ROAD;
+	},
+			[station_id](const Order *order) { return order->IsType(OT_GOTO_STATION) && order->GetDestination() == station_id;
+	},
 			[station_id, tile](Vehicle *v) {
 				if (v->current_order.IsType(OT_GOTO_STATION) && v->dest_tile == tile) {
 					v->SetDestTile(v->GetOrderStationLocation(station_id));

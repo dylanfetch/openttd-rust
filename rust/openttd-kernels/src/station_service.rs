@@ -56,6 +56,25 @@ pub struct Service {
     // temporary Box/&mut reborrow on a surviving entry would invalidate them.
     queue: Vec<*mut QueueEntry>,
 }
+
+/// Activity fields consumed together after a station-radius filter.
+pub(crate) struct StationActivity {
+    pub time_since_load: u8,
+    pub time_since_unload: u8,
+}
+
+/// Read the canonical fields without retaining a borrow across native callbacks.
+///
+/// # Safety
+/// `state` is a live station owner whose fields are not being accessed concurrently.
+pub(crate) unsafe fn activity(state: *const Service) -> StationActivity {
+    unsafe {
+        StationActivity {
+            time_since_load: (&raw const (*state).fields.time_since_load).read(),
+            time_since_unload: (&raw const (*state).fields.time_since_unload).read(),
+        }
+    }
+}
 #[unsafe(no_mangle)]
 pub extern "C" fn openttd_rust_station_service_new() -> *mut Service {
     Box::into_raw(Box::new(Service {
@@ -491,11 +510,12 @@ pub unsafe extern "C" fn openttd_rust_station_rating(st: *mut c_void, world: *co
     let w = unsafe { &*world };
     let state = (w.owner)(st);
     let mut waiting_changed = false;
+    let activity = unsafe { activity(state) };
     unsafe {
         let p = &raw mut (*state).fields.time_since_load;
-        p.write(p.read().saturating_add(1));
+        p.write(activity.time_since_load.saturating_add(1));
         let p = &raw mut (*state).fields.time_since_unload;
-        p.write(p.read().saturating_add(1));
+        p.write(activity.time_since_unload.saturating_add(1));
     }
     for cargo in 0..64_u8 {
         if u32::from((w.cargo_valid)(cargo)) == 0 {
