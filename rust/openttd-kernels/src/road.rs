@@ -1919,10 +1919,11 @@ pub unsafe extern "C" fn openttd_rust_road_economy_day(
     entry: *const Entry,
     leaves: *const Leaves,
 ) {
+    crate::witness::hit(crate::witness::ROAD_ENTRIES);
     if front {
-        // SAFETY: Entry record borrowed for this call only.
+        // SAFETY: Entry and static tables borrowed for this call only.
         let e = unsafe { &*entry };
-        entry!(leaves, Some(e)).economy_day(Part::new(v, state));
+        unsafe { Game::new(leaves, Some(e)) }.economy_day(Part::new(v, state));
     }
 }
 /// # Safety
