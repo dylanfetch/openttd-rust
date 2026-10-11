@@ -10,6 +10,7 @@
 #define RUST_STATION_SERVICE_FFI_H
 #include <cstdint>
 #include <cstddef>
+#include "services_ffi.h"
 struct OpenTTDStationService;
 struct OpenTTDStationCargo {
 	uint32_t max_waiting_cargo;
@@ -44,35 +45,95 @@ struct OpenTTDStationFields {
  * Opaque world handles obey the original pool lifetimes. Panics and environmental
  * service failures abort. Packet, flow, geometry and map storage remain C++.
  */
-/* Station read: 0 pool bound,1 tick counter(low32),2 mode editor,
- * 3 facilities,4 in-use,5 is-real-station,6 owner,7 local-owner,
- * 8 rectangle-empty,9 town statue,10 selectgoods,11 rating cheat,
- * 12 available,13 packet-destination-count,14 cargo valid,
- * 15 cargo rating callback,16 passenger class,17 exclusivity counter,
- * 18 exclusivity owner,19 cargo packet allocation available,20 house tile,
- * 21 tick counter high32.
- * Effects:0 rating redraw,1 demand,2 acceptance news,3 acceptance redraw,
- * 4 delete shell,5 periodic animation,6 watched house animation,
- * 7 append incoming packet,8 update link supply,9 station-list invalidation,
- * 10 new-cargo animation/randomisation,11 waiting redraw.
- * Temporary native iterator handles contain shared geometry/map/packet storage
- * operations only; the Rust caller owns traversal and releases them on exit.
- */
-struct OpenTTDStationServices {
-	void *(*get)(uint32_t) noexcept;
-	OpenTTDStationService *(*owner)(void *) noexcept;
-	uint32_t (*read)(void *, uint8_t, uint32_t) noexcept;
-	void (*effect)(void *, uint8_t, uint32_t, uint32_t, uint32_t) noexcept;
-	uint16_t (*rating_callback)(void *, uint8_t, uint32_t, uint32_t) noexcept;
-	void *(*tiles)(void *) noexcept;
-	uint32_t (*tile_next)(void *, uint8_t) noexcept;
-	void (*tile_destroy)(void *) noexcept;
-	void (*accept_tile)(uint32_t, uint32_t *, uint64_t *) noexcept;
-	void *(*truncate)(void *, uint8_t, uint32_t) noexcept;
-	uint32_t (*truncate_next)(void *, uint32_t *) noexcept;
-	void (*truncate_destroy)(void *) noexcept;
-	uint32_t (*random)() noexcept;
+struct OpenTTDRatingCounts {
+	uint32_t available;
+	uint32_t destinations;
 };
+struct OpenTTDStationExclusivity {
+	uint8_t counter;
+	uint8_t exclusive;
+};
+struct OpenTTDCapacityRemaining {
+	uint32_t remaining;
+	uint16_t capacity;
+};
+struct OpenTTDCargoRemaining {
+	uint32_t remaining;
+	uint16_t capacity;
+	uint8_t cargo;
+};
+struct OpenTTDCargoReservation {
+	uint64_t mask;
+	uint32_t reserved;
+	uint16_t capacity;
+	uint8_t cargo;
+};
+struct OpenTTDCargoStored {
+	uint32_t stored;
+	uint16_t capacity;
+};
+struct OpenTTDDeliveryRemaining {
+	uint32_t remaining;
+	uint32_t deliver;
+	uint16_t capacity;
+};
+struct OpenTTDLoadEngine {
+	uint8_t amount;
+	uint8_t version;
+	bool callback;
+	bool no_multiplier;
+};
+struct OpenTTDLoadingWait {
+	int32_t lateness;
+	uint16_t wait;
+};
+using OpenTTDStationScope = void (*)(void *, void *) noexcept;
+struct OpenTTDStationServices {
+	uint8_t (*station_owner)(void *) noexcept;
+	OpenTTDStationExclusivity (*station_exclusivity)(void *) noexcept;
+	void *(*station_next)(void *) noexcept;
+	OpenTTDRatingCounts (*rating_counts)(void *, uint8_t) noexcept;
+	void *(*get)(uint32_t) noexcept;
+	OpenTTDStationService * (*owner)(void *) noexcept;
+	uint32_t (*pool_size)() noexcept;
+	uint64_t (*tick_counter)() noexcept;
+	bool (*editor)() noexcept;
+	uint8_t (*facilities)(void *) noexcept;
+	bool (*in_use)(void *) noexcept;
+	bool (*is_station)(void *) noexcept;
+	bool (*local_owner)(void *) noexcept;
+	bool (*rectangle_empty)(void *) noexcept;
+	bool (*town_statue)(void *) noexcept;
+	bool (*select_goods)() noexcept;
+	bool (*rating_cheat)() noexcept;
+	uint32_t (*available)(void *, uint8_t) noexcept;
+	bool (*cargo_valid)(uint8_t) noexcept;
+	bool (*rating_callback_enabled)(uint8_t) noexcept;
+	bool (*passenger_cargo)(uint8_t) noexcept;
+	bool (*packet_available)() noexcept;
+	bool (*house_tile)(uint32_t) noexcept;
+	void (*rating_redraw)(void *, bool) noexcept;
+	void (*set_demand)(void *, uint8_t, uint32_t) noexcept;
+	void (*acceptance_news)(void *, uint64_t, bool) noexcept;
+	void (*acceptance_redraw)(void *) noexcept;
+	void (*delete_station)(void *) noexcept;
+	void (*acceptance_animation)(void *) noexcept;
+	void (*watched_animation)(uint32_t, uint64_t) noexcept;
+	void (*append_packet)(void *, uint8_t, uint32_t, uint32_t) noexcept;
+	void (*update_supply)(void *, uint8_t, uint32_t) noexcept;
+	void (*station_list_invalidation)(void *) noexcept;
+	void (*new_cargo_animation)(void *, uint8_t) noexcept;
+	void (*waiting_redraw)(void *) noexcept;
+	uint16_t (*rating_callback)(void *, uint8_t, uint32_t, uint32_t) noexcept;
+	void (*with_tiles)(void *, void *, OpenTTDStationScope) noexcept;
+	uint32_t (*tile_next)(void *) noexcept;
+	void (*accept_tile)(void *, uint32_t, uint64_t *) noexcept;
+	const uint32_t *(*acceptance_amounts)(void *) noexcept;
+	void (*with_truncation)(void *, uint8_t, uint32_t, void *, OpenTTDStationScope) noexcept;
+	uint32_t (*truncate_next)(void *, uint32_t *) noexcept;
+	const OpenTTDSharedServices *shared;
+};
+
 struct OpenTTDStationEdge {
 	void *destination;
 	int32_t last_update, unrestricted, restricted;
@@ -81,29 +142,127 @@ struct OpenTTDStationEdge {
 };
 struct OpenTTDStationLinks {
 	void *(*graph)(void *, uint8_t) noexcept;
-	uint32_t (*read)(void *, uint8_t, uint32_t, uint32_t) noexcept;
-	void (*edge)(void *, uint16_t, uint32_t, OpenTTDStationEdge *) noexcept;
-	void (*effect)(void *, uint8_t, uint16_t, uint16_t) noexcept;
+	bool (*automatic_distribution)(uint8_t) noexcept;
+	uint16_t (*node)(void *, uint8_t) noexcept;
+	size_t (*edge_count)(void *, uint16_t) noexcept;
+	int32_t (*date)() noexcept;
+	uint16_t (*station_id)(void *) noexcept;
+	int32_t (*edge_last_update)(void *, uint16_t, size_t) noexcept;
+	int32_t (*last_compression)(void *) noexcept;
+	void (*edge)(void *, uint16_t, size_t, OpenTTDStationEdge *) noexcept;
+	void (*delete_flows)(void *, uint8_t, uint16_t) noexcept;
+	void (*restrict_edge)(void *, uint16_t, uint16_t) noexcept;
+	void (*restrict_flows)(void *, uint8_t, uint16_t) noexcept;
+	void (*release_edge)(void *, uint16_t, uint16_t) noexcept;
+	void (*remove_edge)(void *, uint16_t, uint16_t) noexcept;
+	void (*compress)(void *) noexcept;
 	void *(*order_list)(uint32_t) noexcept;
-	size_t (*order_read)(void *, uint8_t, size_t) noexcept;
+	size_t (*order_pool_size)() noexcept;
+	size_t (*order_count)(void *) noexcept;
+	uint32_t (*order_destination)(void *, size_t) noexcept;
 	void *(*order_vehicle)(void *) noexcept;
-	void *(*next_vehicle)(void *, uint8_t) noexcept;
-	uint32_t (*vehicle_read)(void *, uint8_t) noexcept;
+	void *(*next_vehicle)(void *) noexcept;
+	void *(*next_shared)(void *) noexcept;
+	bool (*stopped_in_depot)(void *) noexcept;
+	int32_t (*last_service)(void *) noexcept;
+	uint8_t (*cargo_type)(void *) noexcept;
 	void (*refresh)(void *) noexcept;
 	void (*reroute)(void *, void *, uint8_t, uint16_t, uint16_t) noexcept;
 };
+
 struct OpenTTDStationLoading {
-	int64_t (*read)(void *, uint8_t) noexcept;
-	void (*write)(void *, uint8_t, int64_t) noexcept;
-	void *(*next)(void *, uint8_t) noexcept;
-	void *(*next_stations)(void *) noexcept;
-	void (*next_stations_destroy)(void *) noexcept;
-	uint32_t (*cargo)(void *, void *, uint8_t, uint32_t, void *, void *) noexcept;
-	uint16_t (*load_callback)(void *, uint8_t) noexcept;
-	void *(*payment)(void *, uint8_t) noexcept;
-	void (*effect)(void *, void *, uint8_t, uint8_t) noexcept;
-	uint64_t (*refit)(void *, uint8_t, uint8_t, int64_t *) noexcept;
+	OpenTTDLoadingWait (*wait_observation)(void *) noexcept;
+	OpenTTDLoadEngine (*load_engine)(void *) noexcept;
+	OpenTTDDeliveryRemaining (*delivery_remaining)(void *) noexcept;
+	OpenTTDCargoStored (*cargo_stored)(void *) noexcept;
+	OpenTTDCargoReservation (*cargo_reservation)(void *) noexcept;
+	OpenTTDCargoRemaining (*cargo_remaining)(void *) noexcept;
+	OpenTTDCapacityRemaining (*capacity_remaining)(void *) noexcept;
+	uint8_t (*vehicle_type)(void *) noexcept;
+	uint8_t (*cargo_type)(void *) noexcept;
+	uint16_t (*cargo_cap)(void *) noexcept;
+	uint32_t (*stored_count)(void *) noexcept;
+	uint32_t (*unload_count)(void *) noexcept;
+	uint32_t (*deliver_count)(void *) noexcept;
+	uint32_t (*transfer_count)(void *) noexcept;
+	uint32_t (*load_count)(void *) noexcept;
+	bool (*cargo_unloading)(void *) noexcept;
+	uint8_t (*unload_type)(void *) noexcept;
+	uint8_t (*load_type)(void *) noexcept;
+	bool (*is_refit)(void *) noexcept;
+	uint8_t (*refit_cargo)(void *) noexcept;
+	bool (*has_orders)(void *) noexcept;
+	uint16_t (*load_unload_ticks)(void *) noexcept;
+	bool (*stopped_or_crashed)(void *) noexcept;
+	bool (*has_articulated_part)(void *) noexcept;
+	bool (*is_articulated_part)(void *) noexcept;
+	bool (*is_rear_dualheaded)(void *) noexcept;
+	bool (*is_normal_aircraft)(void *) noexcept;
+	bool (*is_multiheaded)(void *) noexcept;
+	uint16_t (*cached_max_speed)(void *) noexcept;
+	uint16_t (*cargo_multiplier)(void *) noexcept;
+	uint16_t (*cached_total_length)(void *) noexcept;
+	bool (*full_load_order)(void *) noexcept;
+	uint8_t (*vehicle_owner)(void *) noexcept;
+	int32_t (*aircraft_old_speed)(void *) noexcept;
+	bool (*passenger_cargo)(void *) noexcept;
+	bool (*gradual)() noexcept;
+	bool (*improved_load)() noexcept;
+	bool (*station_length_penalty)() noexcept;
+	bool (*stop)(void *) noexcept;
+	uint8_t (*current_company)() noexcept;
+	uint16_t (*last_station_visited)(void *) noexcept;
+	uint32_t (*total_count)(void *) noexcept;
+	int32_t (*build_year)(void *) noexcept;
+	int32_t (*calendar_year)() noexcept;
+	int32_t (*order_time)(void *) noexcept;
+	uint64_t (*refit_mask)(void *) noexcept;
+	void (*set_cargo_unloading)(void *, bool) noexcept;
+	void (*set_loading_finished)(void *, bool) noexcept;
+	void (*set_stop)(void *, bool) noexcept;
+	void (*set_load_ticks)(void *, uint16_t) noexcept;
+	void (*set_speed)(void *, uint16_t) noexcept;
+	void (*set_refit_capacity)(void *, uint16_t) noexcept;
+	void (*subtract_profit)(void *, int64_t) noexcept;
+	void (*unknown_load_result)(void *, uint16_t) noexcept;
+	void (*refresh_capacity)(void *) noexcept;
+	void (*vehicle_dirty)(void *) noexcept;
+	void (*update_indicator)(void *) noexcept;
+	void (*set_current_company)(uint8_t) noexcept;
+	void *(*next_vehicle)(void *) noexcept;
+	void *(*next_articulated)(void *) noexcept;
+	void *(*other_multiheaded)(void *) noexcept;
+	void *(*first_engine_part)(void *) noexcept;
+	void *(*first_vehicle)(void *) noexcept;
+	void *(*previous_vehicle)(void *) noexcept;
+	void (*with_next_stations)(void *, void *, OpenTTDStationScope) noexcept;
+	void (*stage)(void *, void *, uint8_t, void *, void *) noexcept;
+	void (*return_cargo)(void *, void *, uint32_t) noexcept;
+	uint32_t (*unload_cargo)(void *, void *, uint32_t, void *) noexcept;
+	uint32_t (*load_cargo)(void *, void *, uint32_t, void *) noexcept;
+	void (*reserve_cargo)(void *, void *, uint32_t, void *) noexcept;
+	void (*deliver_to_transfer)(void *, uint32_t) noexcept;
+	void (*deliver_to_keep)(void *, uint32_t) noexcept;
+	bool (*has_cargo_for)(void *, uint8_t, void *) noexcept;
+	uint32_t (*platform_length)(void *, void *) noexcept;
+	bool (*train_at_station)(void *, void *) noexcept;
+	uint32_t (*station_cargo_total)(void *, uint8_t) noexcept;
+	uint16_t (*load_property)(void *) noexcept;
+	uint16_t (*load_callback)(void *) noexcept;
+	void *(*get_payment)(void *) noexcept;
+	void *(*create_payment)(void *) noexcept;
+	void (*delete_payment)(void *) noexcept;
+	void (*flush_delivery)() noexcept;
+	void (*vehicle_new_cargo)(void *) noexcept;
+	void (*cargo_taken)(void *, uint8_t) noexcept;
+	void (*train_loads)(void *, void *) noexcept;
+	void (*road_loads)(void *, void *) noexcept;
+	void (*vehicle_empty)(void *) noexcept;
+	void (*station_dirty)(void *) noexcept;
+	uint32_t (*test_refit)(void *, uint8_t) noexcept;
+	bool (*execute_refit)(void *, uint8_t, int64_t *) noexcept;
 };
+
 const OpenTTDStationServices &GetRustStationServices() noexcept;
 extern "C" {
 OpenTTDStationService *openttd_rust_station_service_new();
@@ -130,7 +289,7 @@ void openttd_rust_station_stale(void *, const OpenTTDStationServices *, const Op
 void openttd_rust_station_reroute(void *, uint8_t, uint16_t, uint16_t, const OpenTTDStationServices *, const OpenTTDStationLinks *);
 void openttd_rust_station_monthly(const OpenTTDStationServices *);
 void openttd_rust_station_modify_rating(OpenTTDStationService *, int32_t);
-uint32_t openttd_rust_station_distribute(uint8_t, uint32_t, uint32_t, void *const *, size_t, uint8_t, const OpenTTDStationServices *);
+uint32_t openttd_rust_station_distribute(uint8_t, uint32_t, uint32_t, void *, uint8_t, const OpenTTDStationServices *);
 
 }
 #endif
