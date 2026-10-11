@@ -10,6 +10,35 @@
 #![allow(unsafe_code, clippy::cast_possible_truncation)]
 use std::ffi::c_void;
 
+/// Synchronously borrowed raw bytes, including embedded NULs. The producer
+/// specifies the lifetime; consume before mutation, destruction, or reentry.
+/// Empty spans may contain a null pointer and require no dereference.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct ByteSpan {
+    /// Borrowed first byte, never retained beyond the producer's contract.
+    pub data: *const u8,
+    /// Full byte length, independent of NUL termination or UTF-8 validity.
+    pub size: usize,
+}
+impl ByteSpan {
+    /// Borrow live bytes for this immediate use.
+    ///
+    /// # Safety
+    /// Nonempty spans must designate a live contiguous allocation for the
+    /// returned lifetime, with length at most `isize::MAX`; no mutation or callback
+    /// may invalidate that allocation.
+    #[must_use]
+    pub unsafe fn bytes<'a>(self) -> &'a [u8] {
+        if self.size == 0 {
+            &[]
+        } else {
+            // SAFETY: The caller establishes the span's validity and lifetime.
+            unsafe { std::slice::from_raw_parts(self.data, self.size) }
+        }
+    }
+}
+
 /// Native stack-owned command result, including encoded error parameters.
 /// Rust only borrows its address and invokes the native operations below.
 #[repr(C)]
@@ -264,6 +293,13 @@ pub(crate) extern "C" fn unused_town_owner(_: *const TownHandle) -> *mut crate::
 #[cfg(test)]
 pub(crate) extern "C" fn unused_current_company() -> u8 {
     u8::MAX
+}
+
+/// `Map::ScaleBySize`: `CeilDiv(n << (LogX + LogY - 12), 16)` in uint arithmetic.
+pub(crate) fn scale_by_size(size: u32, n: u32) -> u32 {
+    n.wrapping_shl(size.trailing_zeros().wrapping_sub(12))
+        .wrapping_add(15)
+        / 16
 }
 
 #[cfg(test)]

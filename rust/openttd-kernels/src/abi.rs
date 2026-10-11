@@ -26,6 +26,11 @@ macro_rules! layout {
 #[allow(clippy::too_many_lines)]
 pub fn layout(type_id: u16, item: u8) -> usize {
     match type_id {
+        572 => layout!(crate::services::ByteSpan, item; data, size),
+        451 => layout!(crate::townname::StackOutput, item; words),
+        450 => {
+            layout!(crate::town::placement::World, item; spatial_empty, nearest_town, clear_ground, tree_ground, water_distance, number_towns, custom_towns, edge_error, town_error, site_error)
+        }
         449 => layout!(crate::town::lifecycle::CountSizes, item; houses, classes),
         448 => layout!(crate::town::lifecycle::NameParams, item; grfid, kind),
         447 => {

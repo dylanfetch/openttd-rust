@@ -1372,30 +1372,28 @@ exhaustive.
 
 ### Town growth and lifecycle state
 
-Issue #120 owns town tick traversal, road walking/build choices,
-bridge/tunnel/terraform retries, house selection/layout/placement and expansion.
-The partial #148 extension owns metadata, population/house counts, radii, ratings,
-masks, goals, received/supplied histories, rebuild counters and building counts.
-Population/radius policy, monthly histories, authority checks and rating scratch
-run in Rust, with founding initialization, house construction and yearly aging.
-Remaining placement/deletion, house cargo/rebuild and commands are pending.
-C++ shells expose native field aliases to the single Rust owner; scoped save
-staging preserves modern/legacy formats, nested loads and partial load commits.
-Growth entries call named synchronous `noexcept` services; fixed probability
-scratch preserves original candidate order without per-attempt heap allocation.
-Native stack CommandCost services preserve full errors/params/expense/move state;
-owner accesses end before commands and NewGRF callbacks that may reenter.
-Portable original bodies remain under the non-Rust branches. Panics and
-exceptional environmental failures abort; save/load errors stay native.
-`python3 tools/migration.py simulate town-growth --jobs 2` compares house/road,
-bridge/terrain, growth state, funding expiry, cargo goals, layouts/climates and
-modern reload; `--self`/`--soak` extend the same component scenarios. Native tests
-cover expansion modes, first-road failures, reentry, multi-tile writes, canonical
-aliases, count reuse and partial save staging. Mandatory component reference
-probes compare unchanged tunnels, histories/radii, rating/authority thresholds,
-packed construction/age bytes, multi-tile order and animation reentry.
-Natural tunnel construction, real custom NewGRF callbacks and complete historical
-saves remain evidence limits; #148 is not yet a complete lifecycle ownership port.
+Issue #120 owns town ticks, road walking/build choices, bridge/tunnel/terraform
+retries, house selection/layout/placement and expansion. Partial #148 adds
+metadata, population/house counts, radii, ratings/masks, goals, cargo histories,
+rebuild/building counts, monthly policy, authority checks and rating scratch.
+Rust owns founding initialization, site/coastal searches and house progression.
+Custom names and encoded text have one Rust byte owner; native name references
+use derived caches and the selected name renderer has stack-owned output.
+Generation/deletion, house cargo/rebuild and commands remain pending.
+Native aliases and scoped save staging preserve modern/legacy formats, nested
+loads and partial commits. Named synchronous noexcept services and fixed house
+probability scratch avoid per-attempt bridges/heap allocation. Native stack
+CommandCost preserves errors/params/expense/move state; owner access ends before
+commands and NewGRF reentry. Portable original bodies remain in non-Rust branches.
+Panics/environmental exceptions abort; ordinary save/load errors stay native.
+`python3 tools/migration.py simulate town-growth --jobs 2` compares physical
+growth, control transitions, layouts/climates and reload; `--self`/`--soak` extend
+these scenarios. Native tests cover modes, failures, reentry, aliases/count reuse
+and partial staging. Mandatory component probes compare unchanged tunnels,
+history/rating/radius/authority boundaries, packed construction/age bytes,
+multi-tile/reentry, placement searches and raw-byte/cached-reference lifetimes.
+Natural tunnels, actual custom NewGRF paths and complete historical saves remain
+limits; #148 is not yet a complete lifecycle ownership port.
 
 ### Road vehicle control and private state
 

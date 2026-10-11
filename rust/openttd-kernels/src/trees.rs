@@ -23,7 +23,7 @@
     clippy::many_single_char_names,
     clippy::too_many_lines
 )]
-use crate::services::{Services, chance16_i};
+use crate::services::{Services, chance16_i, scale_by_size};
 
 const INVALID_TILE: u32 = u32::MAX;
 const MP_CLEAR: u8 = 0;
@@ -262,13 +262,6 @@ pub struct TreeServices {
     pub command_next: extern "C" fn(*mut Command) -> u32,
     pub command_debit: extern "C" fn(*mut Command),
     pub landscape_clear: extern "C" fn(*mut Command, u32) -> LandscapeClear,
-}
-
-/// `Map::ScaleBySize`: `CeilDiv(n << (LogX + LogY - 12), 16)` in uint arithmetic.
-fn scale_by_size(size: u32, n: u32) -> u32 {
-    n.wrapping_shl(size.trailing_zeros().wrapping_sub(12))
-        .wrapping_add(15)
-        / 16
 }
 
 /// `TileAddWrap` for the generation map geometry.

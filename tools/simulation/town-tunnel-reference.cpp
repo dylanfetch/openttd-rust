@@ -9,6 +9,7 @@
 #include "../../src/tests/town_protocol.hpp"
 #include "../../src/rust/town_ffi.h"
 #include "../../src/rust/town_house_ffi.h"
+#include "../../src/rust/town_placement_ffi.h"
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -23,6 +24,10 @@
 #include <limits>
 #include <unordered_map>
 #include <vector>
+#include <bit>
+#include <variant>
+#define EMPTY_BASES
+#include "../../src/rust/town_bytes.hpp"
 
 using TileIndex = uint32_t;
 using TileIndexDiff = int32_t;
@@ -542,8 +547,175 @@ static void Compare()
 }
 } // namespace house_probe
 
+namespace placement_probe {
+using uint = unsigned int;
+constexpr uint32_t MP_CLEAR = 0, MP_TREES = 4, CLEAR_ROUGH = 1, TREE_GROUND_ROUGH = 1;
+constexpr uint32_t DIAGDIR_BEGIN = 0, INVALID_DIAGDIR = 255, DIR_W = 0, INVALID_TILE = UINT32_MAX;
+enum TownLayout : uint8_t { TL_ORIGINAL, TL_BETTER_ROADS, TL_2X2_GRID, TL_3X3_GRID, TL_RANDOM };
+enum ExpensesType : uint8_t { EXPENSES_OTHER = 12 };
+constexpr uint32_t STR_ERROR_TOO_CLOSE_TO_EDGE_OF_MAP_SUB = 31, STR_ERROR_TOO_CLOSE_TO_ANOTHER_TOWN = 32, STR_ERROR_SITE_UNSUITABLE = 33;
+constexpr uint32_t CUSTOM_TOWN_NUMBER_DIFFICULTY = 4;
+struct CommandCost {
+	bool ok = true; uint32_t error = 0; uint8_t expense = 255;
+	CommandCost() = default;
+	explicit CommandCost(uint32_t error) : ok(false), error(error) {}
+	explicit CommandCost(ExpensesType expense) : expense(expense) {}
+	bool Failed() const { return !this->ok; }
+	bool operator ==(const CommandCost &) const = default;
+};
+struct Cell { uint8_t type = MP_CLEAR, slope = 0, ground = 0; int z = 4, max_z = 4; };
+struct Town { uint32_t xy = 0; static Town *Get(uint32_t); };
+struct World {
+	uint32_t width = 64, height = 64, pattern = 0;
+	bool empty = true;
+	Town town;
+	OpenTTDTownState *owner = nullptr;
+	std::map<uint32_t, Cell> cells;
+	std::vector<uint32_t> nearest, water;
+};
+static World *w;
+static Cell At(uint32_t tile) {
+	auto found = w->cells.find(tile); if (found != w->cells.end()) return found->second;
+	if (w->pattern == 1) return {.type = 6};
+	if (w->pattern == 2) return {.slope = 1};
+	if (w->pattern == 3) return {.type = uint8_t(tile % 7), .slope = uint8_t(tile % 5 == 0), .ground = uint8_t(tile % 3 == 0), .z = int(tile % 3 + 3), .max_z = int(tile % 3 + 3)};
+	return {};
+}
+static uint32_t TileX(uint32_t tile) { return tile & (w->width - 1); }
+static uint32_t TileY(uint32_t tile) { return tile / w->width; }
+static uint32_t TileXY(uint32_t x, uint32_t y) { return x + y * w->width; }
+struct Diff { int x, y; };
+static Diff TileIndexDiffCByDir(uint32_t) { return {1, -1}; }
+static Diff TileIndexDiffCByDiagDir(uint32_t dir) { return std::array<Diff, 4>{{{-1, 0}, {0, 1}, {1, 0}, {0, -1}}}[dir]; }
+#include "town-ceil-original.hpp"
+struct Map {
+	static uint32_t SizeX() { return w->width; } static uint32_t SizeY() { return w->height; }
+	static uint32_t MaxX() { return w->width - 1; } static uint32_t MaxY() { return w->height - 1; }
+	static uint32_t LogX() { return std::countr_zero(w->width); } static uint32_t LogY() { return std::countr_zero(w->height); }
+#include "town-scale-original.hpp"
+};
+struct Index {
+	size_t Count() const { return !w->empty; }
+	uint32_t FindNearest(uint32_t x, uint32_t y) const { w->nearest.push_back(TileXY(x, y)); return 0; }
+};
+static Index _town_kdtree;
+Town *Town::Get(uint32_t) { return &w->town; }
+static uint32_t DistanceManhattan(uint32_t tile, uint32_t town) { return std::abs(int(TileX(tile)) - int(TileX(town))) + std::abs(int(TileY(tile)) - int(TileY(town))); }
+static uint8_t GetTileType(uint32_t tile) { return At(tile).type; }
+static bool IsTileType(uint32_t tile, uint32_t type) { return GetTileType(tile) == type; }
+static bool IsTileFlat(uint32_t tile) { return At(tile).slope == 0; }
+static uint8_t GetClearGround(uint32_t tile) { return At(tile).ground; }
+static uint8_t GetTreeGround(uint32_t tile) { return At(tile).ground; }
+static int GetTileZ(uint32_t tile) { return At(tile).z; }
+static int GetTileMaxZ(uint32_t tile) { return At(tile).max_z; }
+static uint32_t GetClosestWaterDistance(uint32_t tile, bool water) { assert(water); w->water.push_back(tile); return (tile * 2654435761U) >> 28; }
+static struct { struct { uint8_t number_towns = 0; } difficulty; } _settings_game;
+static struct { struct { uint16_t custom_town_number = 0; } game_creation; } _settings_newgame;
+#include "town-placement-original.hpp"
+static OpenTTDTownPlacementServices Services() {
+	return {
+		.spatial_empty = []() noexcept { return _town_kdtree.Count() == 0; },
+		.nearest_town = [](uint32_t tile) noexcept { auto id = _town_kdtree.FindNearest(TileX(tile), TileY(tile)); return reinterpret_cast<const OpenTTDTownHandle *>(Town::Get(id)); },
+		.clear_ground = [](uint32_t tile) noexcept { return GetClearGround(tile); },
+		.tree_ground = [](uint32_t tile) noexcept { return GetTreeGround(tile); },
+		.water_distance = [](uint32_t tile, bool water) noexcept { return GetClosestWaterDistance(tile, water); },
+		.number_towns = []() noexcept { return _settings_game.difficulty.number_towns; },
+		.custom_towns = []() noexcept { return _settings_newgame.game_creation.custom_town_number; },
+		.edge_error = STR_ERROR_TOO_CLOSE_TO_EDGE_OF_MAP_SUB, .town_error = STR_ERROR_TOO_CLOSE_TO_ANOTHER_TOWN, .site_error = STR_ERROR_SITE_UNSUITABLE,
+	};
+}
+static void Compare() {
+	uint32_t checked = 0;
+	auto owner = std::unique_ptr<OpenTTDTownState, decltype(&openttd_rust_town_destroy)>(openttd_rust_town_new(), openttd_rust_town_destroy);
+	auto leaves = TownProtocolServices();
+	leaves.map_log_x = []() noexcept { return Map::LogX(); }; leaves.map_size_y = []() noexcept { return Map::SizeY(); };
+	auto shared = OpenTTDFixtureSharedServices(nullptr, Random, Industry);
+	shared.town_owner = [](const OpenTTDTownHandle *) noexcept { return w->owner; };
+	shared.distance_from_edge = [](uint32_t tile) noexcept { return DistanceFromEdge(tile); };
+	shared.tile_type = [](uint32_t tile) noexcept { return GetTileType(tile); };
+	shared.tile_slope = [](uint32_t tile) noexcept { return At(tile).slope; };
+	shared.tile_z = [](uint32_t tile) noexcept { return GetTileZ(tile); };
+	shared.tile_max_z = [](uint32_t tile) noexcept { return GetTileMaxZ(tile); };
+	const auto services = Services();
+	OpenTTDCommandCostServices costs{};
+	costs.error = [](OpenTTDCommandCost *out, uint32_t error) noexcept { *reinterpret_cast<CommandCost *>(out) = CommandCost(error); };
+	costs.expense_money = [](OpenTTDCommandCost *out, uint8_t expense, int64_t amount) noexcept { assert(expense == EXPENSES_OTHER && amount == 0); *reinterpret_cast<CommandCost *>(out) = CommandCost(EXPENSES_OTHER); };
+	for (uint32_t width : {64, 128}) for (uint32_t height : {64, 128}) {
+		World base; base.width = width; base.height = height; base.owner = owner.get(); w = &base;
+		const auto center = TileXY(24, 24);
+		for (uint32_t valid : {0, 11, 12, 13, 25}) for (uint8_t type : {uint8_t(MP_CLEAR), uint8_t(MP_TREES), uint8_t(2)}) for (int level : {0, 4, 255}) {
+			base.cells.clear(); uint32_t index = 0;
+			for (auto tile : SpiralTileSequence(center, 5)) { base.cells[tile] = {.type = type, .ground = uint8_t(index++ >= valid), .z = level, .max_z = level}; }
+			for (uint32_t distance : {0, 19, 20, 21}) for (uint8_t slope : {0, 1, 16}) for (bool surrounding : {false, true}) {
+				World original = base; original.empty = distance == 0; original.town.xy = center + distance; original.cells[center].slope = slope;
+				World candidate = original;
+				w = &original; const auto expected = TownCanBePlacedHere(center, surrounding);
+				openttd_rust_town_simulation(owner.get())->xy = candidate.town.xy;
+				w = &candidate; CommandCost actual; openttd_rust_town_site(&leaves, &shared, &services, &costs, reinterpret_cast<OpenTTDCommandCost *>(&actual), center, surrounding);
+				if (expected != actual || original.nearest != candidate.nearest) { std::fprintf(stderr, "town site mismatch valid=%u type=%u level=%d distance=%u slope=%u surrounding=%u\n", valid, type, level, distance, slope, surrounding); std::exit(1); } checked++;
+			}
+		}
+		for (uint32_t edge : {0, 11, 12}) for (TownLayout layout : {TL_ORIGINAL, TL_BETTER_ROADS, TL_2X2_GRID, TL_3X3_GRID, TL_RANDOM}) for (uint32_t pattern : {0, 1, 2, 3}) {
+			World original; original.width = width; original.height = height; original.owner = owner.get(); original.pattern = pattern;
+			const auto tile = TileXY(edge, height / 2); World candidate = original;
+			w = &original; const auto expected = FindNearestGoodCoastalTownSpot(tile, layout); const auto alignment = AlignTileToGrid(tile, layout);
+			w = &candidate; const auto actual = openttd_rust_town_coastal(&leaves, &shared, &services, tile, layout);
+			if (expected != actual || original.nearest != candidate.nearest || original.water != candidate.water || alignment != openttd_rust_town_align(&leaves, &shared, tile, layout)) { std::fprintf(stderr, "town coastal mismatch width=%u height=%u edge=%u layout=%u pattern=%u\n", width, height, edge, layout, pattern); std::exit(1); } checked++;
+		}
+		for (uint8_t number = 0; number <= 4; number++) for (uint16_t custom : {0, 1, 5000, 65535}) {
+			_settings_game.difficulty.number_towns = number; _settings_newgame.game_creation.custom_town_number = custom;
+			w = &base; if (GetDefaultTownsForMapSize() != openttd_rust_town_default_number(&leaves, &shared, &services)) { std::fprintf(stderr, "town default count mismatch\n"); std::exit(1); } checked++;
+		}
+	}
+	std::printf("\nPASS %u unchanged-reference placement cases\n", checked);
+}
+} // namespace placement_probe
+
+namespace town_bytes_probe {
+struct Original {
+	std::string name{}, cached_name{};
+	void FillCachedName() const { const_cast<Original *>(this)->cached_name = "Generated"; }
+#include "town-cached-name-original.hpp"
+};
+struct Candidate {
+	RustTownName name;
+	std::string cached_name{};
+	explicit Candidate(OpenTTDTownState *owner) : name(owner) {}
+	void FillCachedName() const { const_cast<Candidate *>(this)->cached_name = "Generated"; }
+#include "town-cached-name-original.hpp"
+};
+static void Compare()
+{
+	auto owner = std::unique_ptr<OpenTTDTownState, decltype(&openttd_rust_town_destroy)>(openttd_rust_town_new(), openttd_rust_town_destroy);
+	const std::array<std::string, 8> corpus = {"", "A", "Renamed town", std::string("A\0B", 3), std::string("\0", 1), std::string("\xff\x80\0Z", 4), std::string("\xe2\x82\xac"), std::string(4096, 'X')};
+	uint32_t checked = 0;
+	for (const auto &bytes : corpus) {
+		Original original; Candidate candidate(owner.get());
+		original.name = "Initial"; candidate.name = "Initial";
+		const auto &reference = original.GetCachedName(); const auto &actual = candidate.GetCachedName();
+		original.name = bytes; candidate.name = bytes;
+		if (reference != actual || candidate.name.empty() != original.name.empty() || candidate.name.view() != original.name || candidate.name != std::string_view(original.name) || std::string_view(original.name) != candidate.name) std::abort();
+		if (original.GetCachedName() != candidate.GetCachedName() || &actual != &static_cast<const std::string &>(candidate.name)) std::abort();
+		/* Copy an aliased owner input before replacing its allocation. */
+		auto alias = openttd_rust_town_name(owner.get()); openttd_rust_town_set_name(owner.get(), alias);
+		if (candidate.name.view() != original.name) std::abort();
+		original.cached_name.clear(); candidate.cached_name.clear(); original.name.clear(); candidate.name.clear();
+		if (!reference.empty() || !actual.empty() || original.GetCachedName() != candidate.GetCachedName()) std::abort();
+		RustTownText text(owner.get()); const auto encoded = EncodedString::FromEncodedView(bytes);
+		text = encoded; if (text.empty() != encoded.empty() || text.encoded().GetEncodedView() != encoded.GetEncodedView()) std::abort();
+		alias = openttd_rust_town_text(owner.get()); openttd_rust_town_set_text(owner.get(), alias);
+		if (text.encoded().GetEncodedView() != bytes) std::abort();
+		text.clear(); if (!text.empty() || !text.encoded().empty()) std::abort();
+		checked++;
+	}
+	std::printf("\nPASS %u unchanged-reference town-byte cases\n", checked);
+}
+} // namespace town_bytes_probe
+
 int main()
 {
+	town_bytes_probe::Compare();
+	placement_probe::Compare();
 	house_probe::Compare();
 	CompareHistories();
 	CompareRatings();

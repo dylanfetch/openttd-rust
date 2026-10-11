@@ -984,10 +984,14 @@ void GenerateTownNameString(StringBuilder &builder, size_t lang, uint32_t seed)
 #ifdef WITH_RUST
 	static_assert(BUILTIN_TOWNNAME_GENERATOR_COUNT == 21);
 	assert(lang < BUILTIN_TOWNNAME_GENERATOR_COUNT);
-	/* Append outside Rust; RAII also frees the result if the C++ allocation throws. */
-	auto result = std::unique_ptr<OpenTTDTownNameResult, decltype(&openttd_rust_townname_destroy)>(openttd_rust_townname_generate(lang, seed), openttd_rust_townname_destroy);
+	/* Append outside Rust; stack RAII frees source output bytes if allocation throws. */
+	struct Output {
+		OpenTTDTownNameStackOutput storage;
+		Output(size_t lang, uint32_t seed) { openttd_rust_townname_stack_init(&this->storage, lang, seed); }
+		~Output() { openttd_rust_townname_stack_destroy(&this->storage); }
+	} result(lang, seed);
 	size_t length;
-	const char *data = openttd_rust_townname_data(result.get(), &length);
+	const char *data = openttd_rust_townname_stack_data(&result.storage, &length);
 	builder.Put(std::string_view(data, length));
 #else
 	assert(lang < std::size(_town_name_generators));

@@ -7,10 +7,12 @@
 
 /** @file windows-abi.cpp Bounded first-32-bit layout and real C ABI call checks. */
 #include "rust/abi_ffi.h"
+#include "rust/byte_span_ffi.h"
 #include "rust/command_cost_ffi.h"
 #include "rust/command_services_ffi.h"
 #include "rust/town_house_ffi.h"
 #include "rust/town_lifecycle_ffi.h"
+#include "rust/town_placement_ffi.h"
 #include "rust/water_regions_ffi.h"
 #include "rust/cargo_payment_ffi.h"
 #include "rust/cargo_storage_ffi.h"
@@ -84,6 +86,9 @@ static void Layout(uint16_t type, const char *name, std::initializer_list<size_t
 
 static void Layouts()
 {
+	Layout(572, "OpenTTDByteSpan", {sizeof(OpenTTDByteSpan), alignof(OpenTTDByteSpan), offsetof(OpenTTDByteSpan, data), offsetof(OpenTTDByteSpan, size)});
+	Layout(451, "OpenTTDTownNameStackOutput", {sizeof(OpenTTDTownNameStackOutput), alignof(OpenTTDTownNameStackOutput), offsetof(OpenTTDTownNameStackOutput, words)});
+	Layout(450, "OpenTTDTownPlacementServices", {sizeof(OpenTTDTownPlacementServices), alignof(OpenTTDTownPlacementServices), offsetof(OpenTTDTownPlacementServices, spatial_empty), offsetof(OpenTTDTownPlacementServices, nearest_town), offsetof(OpenTTDTownPlacementServices, clear_ground), offsetof(OpenTTDTownPlacementServices, tree_ground), offsetof(OpenTTDTownPlacementServices, water_distance), offsetof(OpenTTDTownPlacementServices, number_towns), offsetof(OpenTTDTownPlacementServices, custom_towns), offsetof(OpenTTDTownPlacementServices, edge_error), offsetof(OpenTTDTownPlacementServices, town_error), offsetof(OpenTTDTownPlacementServices, site_error)});
 	Layout(444, "OpenTTDTownSuppliedEntry", {sizeof(OpenTTDTownSuppliedEntry), alignof(OpenTTDTownSuppliedEntry), offsetof(OpenTTDTownSuppliedEntry, entry), offsetof(OpenTTDTownSuppliedEntry, created)});
 	Layout(449, "OpenTTDTownCountSizes", {sizeof(OpenTTDTownCountSizes), alignof(OpenTTDTownCountSizes), offsetof(OpenTTDTownCountSizes, houses), offsetof(OpenTTDTownCountSizes, classes)});
 	Layout(448, "OpenTTDTownNameParams", {sizeof(OpenTTDTownNameParams), alignof(OpenTTDTownNameParams), offsetof(OpenTTDTownNameParams, grfid), offsetof(OpenTTDTownNameParams, kind)});
@@ -1572,6 +1577,13 @@ int main()
 	size_t name_length;
 	const char *name = openttd_rust_townname_data(townname, &name_length);
 	CHECK(name_length == 8 && std::memcmp(name, "Alen\xc3\xa7on", name_length) == 0);
+	OpenTTDTownNameStackOutput stack_name;
+	openttd_rust_townname_stack_init(&stack_name, 1, UINT32_MAX);
+	size_t stack_length;
+	const char *stack_data = openttd_rust_townname_stack_data(&stack_name, &stack_length);
+	CHECK(stack_length == name_length);
+	CHECK(std::memcmp(stack_data, name, name_length) == 0);
+	openttd_rust_townname_stack_destroy(&stack_name);
 	openttd_rust_townname_destroy(townname);
 	Calls();
 	Encoded();

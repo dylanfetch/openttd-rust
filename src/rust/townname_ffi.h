@@ -21,6 +21,14 @@
 extern "C" {
 #endif
 typedef struct OpenTTDTownNameResult OpenTTDTownNameResult;
+/* Original byte allocation belongs to the output String; its owner itself is
+ * placed in native stack storage with no extra heap object. Rust initializes and
+ * destroys it once. Byte views are call-scoped and die before native cleanup. */
+typedef struct OpenTTDTownNameStackOutput { uintptr_t words[3]; } OpenTTDTownNameStackOutput;
+void OPENTTD_TOWNNAME_CALL openttd_rust_townname_stack_init(OpenTTDTownNameStackOutput *, size_t lang, uint32_t seed);
+const char *OPENTTD_TOWNNAME_CALL openttd_rust_townname_stack_data(const OpenTTDTownNameStackOutput *, size_t *length);
+void OPENTTD_TOWNNAME_CALL openttd_rust_townname_stack_destroy(OpenTTDTownNameStackOutput *);
+
 /* lang is an original valid built-in ID (0..20), seed any uint32_t.
  * Generate owns all output in an opaque Rust allocation; no world/string pointer,
  * callback or shared RNG enters Rust. Data returns immutable bytes (not NUL

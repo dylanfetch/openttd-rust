@@ -9,10 +9,15 @@
 #ifndef RUST_TOWN_FFI_H
 #define RUST_TOWN_FFI_H
 #include "services_ffi.h"
+#include "byte_span_ffi.h"
 #include <cstdint>
 #include "command_cost_ffi.h"
 #include <cstddef>
 struct OpenTTDTownState;
+extern "C" OpenTTDByteSpan openttd_rust_town_name(const OpenTTDTownState *);
+extern "C" void openttd_rust_town_set_name(OpenTTDTownState *, OpenTTDByteSpan);
+extern "C" OpenTTDByteSpan openttd_rust_town_text(const OpenTTDTownState *);
+extern "C" void openttd_rust_town_set_text(OpenTTDTownState *, OpenTTDByteSpan);
 struct OpenTTDTownGrowthFields { uint16_t counter, rate; uint8_t funding, road, flags; };
 struct OpenTTDTownReceived { uint16_t old_max, new_max, old_act, new_act; };
 struct OpenTTDTownSimulationFields {

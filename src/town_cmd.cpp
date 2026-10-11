@@ -12,6 +12,7 @@
 #ifdef WITH_RUST
 #include "rust/town_house_ffi.h"
 #include "rust/town_lifecycle_ffi.h"
+#include "rust/town_placement_ffi.h"
 #endif
 #include "misc/history_func.hpp"
 #include "road.h"
@@ -97,6 +98,7 @@ static bool _generating_town = false;
 #else
 static const OpenTTDTownLeaves &GetRustTownServices() noexcept;
 static const OpenTTDTownHouseServices &GetRustTownHouseServices() noexcept;
+static const OpenTTDTownPlacementServices &GetRustTownPlacementServices() noexcept;
 #endif
 
 /**
@@ -406,12 +408,14 @@ static void AnimateTile_Town(TileIndex tile)
  * @param dist The maximum distance to be accepted.
  * @returns true if the tile is within the specified distance.
  */
+#ifndef WITH_RUST
 static bool IsCloseToTown(TileIndex tile, uint dist)
 {
 	if (_town_kdtree.Count() == 0) return false;
 	Town *t = Town::Get(_town_kdtree.FindNearest(TileX(tile), TileY(tile)));
 	return DistanceManhattan(tile, t->xy) < dist;
 }
+#endif
 
 /** Resize the sign (label) of the town after it changes population. */
 void Town::UpdateVirtCoord()
@@ -1141,6 +1145,23 @@ static const OpenTTDTownHouseServices &GetRustTownHouseServices() noexcept
 		.set_byte = RustTownHouseSetByte, .set_completed = RustTownHouseSetCompleted,
 		.house = RustTownHouseType, .population = RustTownHousePopulation,
 		.construction_animation = RustTownHouseConstructionAnimation,
+	};
+	return services;
+}
+static const OpenTTDTownPlacementServices &GetRustTownPlacementServices() noexcept
+{
+	static_assert(EXPENSES_OTHER == 12 && CLEAR_ROUGH == 1 && TREE_GROUND_ROUGH == 1 && CUSTOM_TOWN_NUMBER_DIFFICULTY == 4);
+	static const OpenTTDTownPlacementServices services{
+		.spatial_empty = []() noexcept { return _town_kdtree.Count() == 0; },
+		.nearest_town = [](uint32_t tile) noexcept { return reinterpret_cast<const OpenTTDTownHandle *>(Town::Get(_town_kdtree.FindNearest(TileX(TileIndex{tile}), TileY(TileIndex{tile})))); },
+		.clear_ground = [](uint32_t tile) noexcept { return static_cast<uint8_t>(GetClearGround(TileIndex{tile})); },
+		.tree_ground = [](uint32_t tile) noexcept { return static_cast<uint8_t>(GetTreeGround(TileIndex{tile})); },
+		.water_distance = [](uint32_t tile, bool water) noexcept { return GetClosestWaterDistance(TileIndex{tile}, water); },
+		.number_towns = []() noexcept { return _settings_game.difficulty.number_towns; },
+		.custom_towns = []() noexcept { return _settings_newgame.game_creation.custom_town_number; },
+		.edge_error = STR_ERROR_TOO_CLOSE_TO_EDGE_OF_MAP_SUB,
+		.town_error = STR_ERROR_TOO_CLOSE_TO_ANOTHER_TOWN,
+		.site_error = STR_ERROR_SITE_UNSUITABLE,
 	};
 	return services;
 }
@@ -2461,6 +2482,11 @@ static void DoCreateTown(Town *t, TileIndex tile, uint32_t townnameparts, TownSi
  */
 static CommandCost TownCanBePlacedHere(TileIndex tile, bool check_surrounding)
 {
+#ifdef WITH_RUST
+	CommandCost result;
+	openttd_rust_town_site(&GetRustTownServices(), &GetRustSharedServices(), &GetRustTownPlacementServices(), &GetRustCommandCostServices(), RustCommandCost(&result), tile.base(), check_surrounding);
+	return result;
+#else
 	/* Check if too close to the edge of map */
 	if (DistanceFromEdge(tile) < 12) {
 		return CommandCost(STR_ERROR_TOO_CLOSE_TO_EDGE_OF_MAP_SUB);
@@ -2509,6 +2535,7 @@ static CommandCost TownCanBePlacedHere(TileIndex tile, bool check_surrounding)
 	}
 
 	return CommandCost(EXPENSES_OTHER);
+#endif
 }
 
 /**
@@ -2640,11 +2667,15 @@ std::tuple<CommandCost, Money, TownID> CmdFoundTown(DoCommandFlags flags, TileIn
  */
 static TileIndex AlignTileToGrid(TileIndex tile, TownLayout layout)
 {
+#ifdef WITH_RUST
+	return TileIndex{openttd_rust_town_align(&GetRustTownServices(), &GetRustSharedServices(), tile.base(), layout)};
+#else
 	switch (layout) {
 		case TL_2X2_GRID: return TileXY(TileX(tile) - TileX(tile) % 3, TileY(tile) - TileY(tile) % 3);
 		case TL_3X3_GRID: return TileXY(TileX(tile) & ~3, TileY(tile) & ~3);
 		default:          return tile;
 	}
+#endif
 }
 
 /**
@@ -2656,6 +2687,7 @@ static TileIndex AlignTileToGrid(TileIndex tile, TownLayout layout)
  * @param layout The town layout in effect.
  * @return true if the tile is in the correct location.
  */
+#ifndef WITH_RUST
 static bool IsTileAlignedToGrid(TileIndex tile, TownLayout layout)
 {
 	switch (layout) {
@@ -2664,6 +2696,7 @@ static bool IsTileAlignedToGrid(TileIndex tile, TownLayout layout)
 		default:          return true;
 	}
 }
+#endif
 
 /**
  * Given a spot on the map (presumed to be a water tile), find a good
@@ -2679,6 +2712,9 @@ static bool IsTileAlignedToGrid(TileIndex tile, TownLayout layout)
  */
 static TileIndex FindNearestGoodCoastalTownSpot(TileIndex tile, TownLayout layout)
 {
+#ifdef WITH_RUST
+	return TileIndex{openttd_rust_town_coastal(&GetRustTownServices(), &GetRustSharedServices(), &GetRustTownPlacementServices(), tile.base(), layout)};
+#else
 	for (auto coast : SpiralTileSequence(tile, 40)) {
 		/* Find nearest land tile */
 		if (!IsTileType(coast, MP_CLEAR)) continue;
@@ -2700,6 +2736,7 @@ static TileIndex FindNearestGoodCoastalTownSpot(TileIndex tile, TownLayout layou
 
 	/* if we get here just give up */
 	return INVALID_TILE;
+#endif
 }
 
 /**
@@ -2774,11 +2811,15 @@ static Town *CreateRandomTown(uint attempts, uint32_t townnameparts, TownSize si
  */
 uint GetDefaultTownsForMapSize()
 {
+#ifdef WITH_RUST
+	return openttd_rust_town_default_number(&GetRustTownServices(), &GetRustSharedServices(), &GetRustTownPlacementServices());
+#else
 	static const uint8_t num_initial_towns[4] = {5, 11, 23, 46};  // very low, low, normal, high
 	if (_settings_game.difficulty.number_towns == static_cast<uint>(CUSTOM_TOWN_NUMBER_DIFFICULTY)) {
 		return _settings_newgame.game_creation.custom_town_number;
 	}
 	return Map::ScaleBySize(num_initial_towns[_settings_game.difficulty.number_towns]);
+#endif
 }
 
 /**

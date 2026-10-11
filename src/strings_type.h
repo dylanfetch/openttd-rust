@@ -106,11 +106,19 @@ public:
 
 	inline void clear() { this->string.clear(); }
 	inline bool empty() const { return this->string.empty(); }
+#ifdef WITH_RUST
+	/** Borrow full encoded bytes until mutation or destruction; no decoding. */
+	inline std::string_view GetEncodedView() const { return this->string; }
+	/** Reconstruct preserved encoded bytes at a native presentation/save boundary. */
+	static EncodedString FromEncodedView(std::string_view bytes) { return EncodedString(std::string(bytes)); }
+#endif
+
 
 private:
 	std::string string; ///< The encoded string.
 
-	/* An EncodedString can only be created by GetEncodedStringWithArgs(). */
+	/* Encoding is created by GetEncodedStringWithArgs(); the Rust storage
+	 * boundary can also restore already encoded bytes without transforming them. */
 	explicit EncodedString(std::string &&string) : string(std::move(string)) {}
 
 	friend EncodedString GetEncodedStringWithArgs(StringID str, std::span<const StringParameter> params);

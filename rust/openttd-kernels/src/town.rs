@@ -24,7 +24,8 @@
 )]
 pub(crate) mod house;
 pub(crate) mod lifecycle;
-use crate::services::{Services, chance16_i};
+pub(crate) mod placement;
+use crate::services::{ByteSpan, Services, chance16_i};
 use std::{
     cell::{Cell, OnceCell, UnsafeCell},
     ffi::c_void,
@@ -125,10 +126,54 @@ pub struct GrowthFields {
 #[derive(Default)]
 pub struct State {
     simulation: SimulationFields,
+    name: Vec<u8>,
+    text: Vec<u8>,
     supplied: Vec<Supplied>,
     id_counts: Vec<u16>,
     class_counts: Vec<u16>,
     growth: GrowthFields,
+}
+/// Borrow custom name bytes until owner mutation or destruction. No Rust borrow
+/// crosses this return; native callers obey the synchronous byte-span contract.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_name(state: *const State) -> ByteSpan {
+    // SAFETY: The shell supplies its live owner; this immediate read has no callback.
+    let name = unsafe { &(*state).name };
+    ByteSpan {
+        data: name.as_ptr(),
+        size: name.len(),
+    }
+}
+/// Replace raw custom name bytes, preserving NULs and non-UTF8 save data.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_set_name(state: *mut State, input: ByteSpan) {
+    // SAFETY: The input is live through this immediate copy, even if it aliases
+    // this owner's previous bytes. Copy completes before the old allocation drops.
+    let bytes = unsafe { input.bytes() }.to_vec();
+    // SAFETY: Serialized live owner; no callback or native alias during mutation.
+    unsafe {
+        (*state).name = bytes;
+    }
+}
+/// Borrow encoded text bytes under the same synchronous lifetime as custom names.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_text(state: *const State) -> ByteSpan {
+    // SAFETY: Live owner; no callback while observing this field.
+    let text = unsafe { &(*state).text };
+    ByteSpan {
+        data: text.as_ptr(),
+        size: text.len(),
+    }
+}
+/// Replace encoded text without validation, normalization, or decoding.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_set_text(state: *mut State, input: ByteSpan) {
+    // SAFETY: Copy ends before any owner mutation; aliased inputs remain valid.
+    let bytes = unsafe { input.bytes() }.to_vec();
+    // SAFETY: Serialized live owner; no callback during mutation.
+    unsafe {
+        (*state).text = bytes;
+    }
 }
 /// Read only the canonical position at the original observation point.
 /// SAFETY: The caller supplies a live owner; this immediate copied read retains no borrow.
