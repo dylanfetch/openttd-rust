@@ -1819,7 +1819,7 @@ static const OpenTTDStationLoading _rust_station_loading = {
 		CountStationScope();
 		body(context, &next);
 	},
-	.stage = [](void *station, void *vehicle, uint8_t unload, void *next_stations, void *payment) noexcept -> void {
+	.stage = [](OpenTTDStation *station, void *vehicle, uint8_t unload, void *next_stations, OpenTTDNativeCargoPayment *payment) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Loading);
 		Station *st = static_cast<Station *>(station);
 		Vehicle *v = static_cast<Vehicle *>(vehicle);
@@ -1827,21 +1827,21 @@ static const OpenTTDStationLoading _rust_station_loading = {
 		std::span<const StationID> next = *static_cast<std::vector<StationID> *>(next_stations);
 		v->cargo.Stage(ge.status.Test(GoodsEntry::State::Acceptance), st->index, next, static_cast<OrderUnloadType>(unload), &ge, v->cargo_type, static_cast<CargoPayment *>(payment), v->GetCargoTile());
 	},
-	.return_cargo = [](void *station, void *vehicle, uint32_t amount) noexcept -> void {
+	.return_cargo = [](OpenTTDStation *station, void *vehicle, uint32_t amount) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Loading);
 		Station *st = static_cast<Station *>(station);
 		Vehicle *v = static_cast<Vehicle *>(vehicle);
 		GoodsEntry &ge = st->goods[v->cargo_type];
 		v->cargo.Return(amount, &ge.GetOrCreateData().cargo, StationID::Invalid(), v->GetCargoTile());
 	},
-	.unload_cargo = [](void *station, void *vehicle, uint32_t amount, void *payment) noexcept -> uint32_t {
+	.unload_cargo = [](OpenTTDStation *station, void *vehicle, uint32_t amount, OpenTTDNativeCargoPayment *payment) noexcept -> uint32_t {
 		CountStationBoundary<uint32_t>(StationBoundary::Loading);
 		Station *st = static_cast<Station *>(station);
 		Vehicle *v = static_cast<Vehicle *>(vehicle);
 		GoodsEntry &ge = st->goods[v->cargo_type];
 		return v->cargo.Unload(amount, &ge.GetOrCreateData().cargo, v->cargo_type, static_cast<CargoPayment *>(payment), v->GetCargoTile());
 	},
-	.load_cargo = [](void *station, void *vehicle, uint32_t amount, void *next_stations) noexcept -> uint32_t {
+	.load_cargo = [](OpenTTDStation *station, void *vehicle, uint32_t amount, void *next_stations) noexcept -> uint32_t {
 		CountStationBoundary<uint32_t>(StationBoundary::Loading);
 		Station *st = static_cast<Station *>(station);
 		Vehicle *v = static_cast<Vehicle *>(vehicle);
@@ -1849,7 +1849,7 @@ static const OpenTTDStationLoading _rust_station_loading = {
 		std::span<const StationID> next = *static_cast<std::vector<StationID> *>(next_stations);
 		return ge.GetOrCreateData().cargo.Load(amount, &v->cargo, next, v->GetCargoTile());
 	},
-	.reserve_cargo = [](void *station, void *vehicle, uint32_t amount, void *next_stations) noexcept -> void {
+	.reserve_cargo = [](OpenTTDStation *station, void *vehicle, uint32_t amount, void *next_stations) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Loading);
 		Station *st = static_cast<Station *>(station);
 		Vehicle *v = static_cast<Vehicle *>(vehicle);
@@ -1865,22 +1865,22 @@ static const OpenTTDStationLoading _rust_station_loading = {
 		CountStationBoundary<void>(StationBoundary::Loading);
 		static_cast<Vehicle *>(vehicle)->cargo.Reassign<VehicleCargoList::MTA_DELIVER, VehicleCargoList::MTA_KEEP>(amount);
 	},
-	.has_cargo_for = [](void *station, uint8_t cargo, void *next_stations) noexcept -> bool {
+	.has_cargo_for = [](OpenTTDStation *station, uint8_t cargo, void *next_stations) noexcept -> bool {
 		CountStationBoundary<bool>(StationBoundary::Loading);
 		GoodsEntry &ge = static_cast<Station *>(station)->goods[cargo];
 		return ge.HasData() && ge.GetData().cargo.HasCargoFor(*static_cast<std::vector<StationID> *>(next_stations));
 	},
-	.platform_length = [](void *station, void *vehicle) noexcept -> uint32_t {
+	.platform_length = [](OpenTTDStation *station, void *vehicle) noexcept -> uint32_t {
 		CountStationBoundary<uint32_t>(StationBoundary::Loading);
 		return static_cast<Station *>(station)->GetPlatformLength(static_cast<Vehicle *>(vehicle)->tile);
 	},
-	.train_at_station = [](void *station, void *vehicle) noexcept -> bool {
+	.train_at_station = [](OpenTTDStation *station, void *vehicle) noexcept -> bool {
 		CountStationBoundary<bool>(StationBoundary::Loading);
 		Station *st = static_cast<Station *>(station);
 		Vehicle *v = static_cast<Vehicle *>(vehicle);
 		return IsTileType(v->tile, MP_STATION) && GetStationIndex(v->tile) == st->index;
 	},
-	.station_cargo_total = [](void *station, uint8_t cargo) noexcept -> uint32_t {
+	.station_cargo_total = [](OpenTTDStation *station, uint8_t cargo) noexcept -> uint32_t {
 		CountStationBoundary<uint32_t>(StationBoundary::Loading);
 		return static_cast<Station *>(station)->goods[cargo].GetData().cargo.TotalCount();
 	},
@@ -1894,12 +1894,12 @@ static const OpenTTDStationLoading _rust_station_loading = {
 		Vehicle *v = static_cast<Vehicle *>(handle);
 		return GetVehicleCallback(CBID_VEHICLE_LOAD_AMOUNT, 0, 0, v->engine_type, v);
 	},
-	.get_payment = [](void *handle) noexcept -> void * {
-		CountStationBoundary<void *>(StationBoundary::Loading);
+	.get_payment = [](void *handle) noexcept -> OpenTTDNativeCargoPayment * {
+		CountStationBoundary<OpenTTDNativeCargoPayment *>(StationBoundary::Loading);
 		return static_cast<Vehicle *>(handle)->cargo_payment;
 	},
-	.create_payment = [](void *handle) noexcept -> void * {
-		CountStationBoundary<void *>(StationBoundary::Loading);
+	.create_payment = [](void *handle) noexcept -> OpenTTDNativeCargoPayment * {
+		CountStationBoundary<OpenTTDNativeCargoPayment *>(StationBoundary::Loading);
 		Vehicle *v = static_cast<Vehicle *>(handle);
 		assert(v->cargo_payment == nullptr);
 		static_assert(CargoPaymentPool::MAX_SIZE == VehiclePool::MAX_SIZE);
@@ -1907,7 +1907,7 @@ static const OpenTTDStationLoading _rust_station_loading = {
 		v->cargo_payment = new CargoPayment(v);
 		return v->cargo_payment;
 	},
-	.delete_payment = [](void *handle) noexcept -> void {
+	.delete_payment = [](OpenTTDNativeCargoPayment *handle) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Loading);
 		delete static_cast<CargoPayment *>(handle);
 	},
@@ -1920,7 +1920,7 @@ static const OpenTTDStationLoading _rust_station_loading = {
 		Vehicle *v = static_cast<Vehicle *>(vehicle);
 		TriggerVehicleRandomisation(v, VehicleRandomTrigger::NewCargo);
 	},
-	.cargo_taken = [](void *station, uint8_t cargo) noexcept -> void {
+	.cargo_taken = [](OpenTTDStation *station, uint8_t cargo) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Loading);
 		Station *st = static_cast<Station *>(station);
 		TriggerStationRandomisation(st, st->xy, StationRandomTrigger::CargoTaken, cargo);
@@ -1929,14 +1929,14 @@ static const OpenTTDStationLoading _rust_station_loading = {
 		TriggerRoadStopRandomisation(st, st->xy, StationRandomTrigger::CargoTaken, cargo);
 		TriggerRoadStopAnimation(st, st->xy, StationAnimationTrigger::CargoTaken, cargo);
 	},
-	.train_loads = [](void *station, void *vehicle) noexcept -> void {
+	.train_loads = [](OpenTTDStation *station, void *vehicle) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Loading);
 		Station *st = static_cast<Station *>(station);
 		Vehicle *v = static_cast<Vehicle *>(vehicle);
 		TriggerStationRandomisation(st, v->tile, StationRandomTrigger::VehicleLoads);
 		TriggerStationAnimation(st, v->tile, StationAnimationTrigger::VehicleLoads);
 	},
-	.road_loads = [](void *station, void *vehicle) noexcept -> void {
+	.road_loads = [](OpenTTDStation *station, void *vehicle) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Loading);
 		Station *st = static_cast<Station *>(station);
 		Vehicle *v = static_cast<Vehicle *>(vehicle);
@@ -1948,7 +1948,7 @@ static const OpenTTDStationLoading _rust_station_loading = {
 		Vehicle *v = static_cast<Vehicle *>(vehicle);
 		TriggerVehicleRandomisation(v, VehicleRandomTrigger::Empty);
 	},
-	.station_dirty = [](void *station) noexcept -> void {
+	.station_dirty = [](OpenTTDStation *station) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Loading);
 		Station *st = static_cast<Station *>(station);
 		st->MarkTilesDirty(true);

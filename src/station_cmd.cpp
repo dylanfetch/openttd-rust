@@ -603,35 +603,43 @@ struct RustStationTruncation {
 	StationCargoAmountMap::iterator iterator;
 };
 static const OpenTTDStationServices _rust_station_services = {
-	.station_owner = [](void *handle) noexcept -> uint8_t {
+	.base_station = [](OpenTTDStation *station) noexcept -> OpenTTDBaseStation * {
+		CountStationBoundary<OpenTTDBaseStation *>(StationBoundary::Station);
+		return station;
+	},
+	.station = [](uint16_t id) noexcept -> OpenTTDStation * {
+		CountStationBoundary<OpenTTDStation *>(StationBoundary::Station);
+		return Station::Get(StationID(id));
+	},
+	.station_owner = [](OpenTTDBaseStation *handle) noexcept -> uint8_t {
 		CountStationBoundary<uint8_t>(StationBoundary::Station);
 		return static_cast<BaseStation *>(handle)->owner.base();
 	},
-	.station_exclusivity = [](void *handle) noexcept -> OpenTTDStationExclusivity {
+	.station_exclusivity = [](OpenTTDBaseStation *handle) noexcept -> OpenTTDStationExclusivity {
 		CountStationBoundary<OpenTTDStationExclusivity>(StationBoundary::Station, true);
 		BaseStation *st = static_cast<BaseStation *>(handle);
 		return {
 			st->town->exclusive_counter, st->town->exclusivity.base()
 		};
 	},
-	.station_next = [](void *handle) noexcept -> void * {
-		CountStationBoundary<void *>(StationBoundary::Station);
+	.station_next = [](void *handle) noexcept -> OpenTTDBaseStation * {
+		CountStationBoundary<OpenTTDBaseStation *>(StationBoundary::Station);
 		auto *cursor = static_cast<std::pair<StationList::const_iterator, StationList::const_iterator> *>(handle);
 		if (cursor->first == cursor->second) return nullptr;
 		return *cursor->first++;
 	},
-	.rating_counts = [](void *handle, uint8_t cargo) noexcept -> OpenTTDRatingCounts {
+	.rating_counts = [](OpenTTDBaseStation *handle, uint8_t cargo) noexcept -> OpenTTDRatingCounts {
 		CountStationBoundary<OpenTTDRatingCounts>(StationBoundary::Station, true);
 		GoodsEntry &ge = Station::From(static_cast<BaseStation *>(handle))->goods[cargo];
 		return {
 			ge.AvailableCount(), ge.HasData() ? static_cast<uint32_t>(ge.GetData().cargo.MapSize()) : 0
 		};
 	},
-	.get = [](uint16_t id) noexcept -> void * {
-		CountStationBoundary<void *>(StationBoundary::Station);
+	.get = [](uint16_t id) noexcept -> OpenTTDBaseStation * {
+		CountStationBoundary<OpenTTDBaseStation *>(StationBoundary::Station);
 		return BaseStation::GetIfValid(StationID(id));
 	},
-	.owner = [](void *handle) noexcept -> OpenTTDStationService * {
+	.owner = [](OpenTTDBaseStation *handle) noexcept -> OpenTTDStationService * {
 		CountStationBoundary<OpenTTDStationService *>(StationBoundary::Station);
 		return static_cast<BaseStation *>(handle)->rust_service.get();
 	},
@@ -647,27 +655,27 @@ static const OpenTTDStationServices _rust_station_services = {
 		CountStationBoundary<bool>(StationBoundary::Station);
 		return _game_mode == GM_EDITOR;
 	},
-	.facilities = [](void *handle) noexcept -> uint8_t {
+	.facilities = [](OpenTTDBaseStation *handle) noexcept -> uint8_t {
 		CountStationBoundary<uint8_t>(StationBoundary::Station);
 		return static_cast<BaseStation *>(handle)->facilities.base();
 	},
-	.in_use = [](void *handle) noexcept -> bool {
+	.in_use = [](OpenTTDBaseStation *handle) noexcept -> bool {
 		CountStationBoundary<bool>(StationBoundary::Station);
 		return static_cast<BaseStation *>(handle)->IsInUse();
 	},
-	.is_station = [](void *handle) noexcept -> bool {
+	.is_station = [](OpenTTDBaseStation *handle) noexcept -> bool {
 		CountStationBoundary<bool>(StationBoundary::Station);
 		return Station::IsExpected(static_cast<BaseStation *>(handle));
 	},
-	.local_owner = [](void *handle) noexcept -> bool {
+	.local_owner = [](OpenTTDBaseStation *handle) noexcept -> bool {
 		CountStationBoundary<bool>(StationBoundary::Station);
 		return static_cast<BaseStation *>(handle)->owner == _local_company;
 	},
-	.rectangle_empty = [](void *handle) noexcept -> bool {
+	.rectangle_empty = [](OpenTTDBaseStation *handle) noexcept -> bool {
 		CountStationBoundary<bool>(StationBoundary::Station);
 		return static_cast<BaseStation *>(handle)->rect.IsEmpty();
 	},
-	.town_statue = [](void *handle) noexcept -> bool {
+	.town_statue = [](OpenTTDBaseStation *handle) noexcept -> bool {
 		CountStationBoundary<bool>(StationBoundary::Station);
 		return Company::IsValidID(static_cast<BaseStation *>(handle)->owner) && static_cast<BaseStation *>(handle)->town->statues.Test(static_cast<BaseStation *>(handle)->owner);
 	},
@@ -679,7 +687,7 @@ static const OpenTTDStationServices _rust_station_services = {
 		CountStationBoundary<bool>(StationBoundary::Station);
 		return _cheats.station_rating.value;
 	},
-	.available = [](void *handle, uint8_t cargo) noexcept -> uint32_t {
+	.available = [](OpenTTDBaseStation *handle, uint8_t cargo) noexcept -> uint32_t {
 		CountStationBoundary<uint32_t>(StationBoundary::Station);
 		return Station::From(static_cast<BaseStation *>(handle))->goods[cargo].AvailableCount();
 	},
@@ -703,30 +711,30 @@ static const OpenTTDStationServices _rust_station_services = {
 		CountStationBoundary<bool>(StationBoundary::Station);
 		return IsTileType(TileIndex(tile), MP_HOUSE);
 	},
-	.rating_redraw = [](void *handle, bool waiting_changed) noexcept -> void {
+	.rating_redraw = [](OpenTTDBaseStation *handle, bool waiting_changed) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Station);
 		BaseStation *st = static_cast<BaseStation *>(handle);
 		if (waiting_changed) SetWindowDirty(WC_STATION_VIEW, st->index);
 		else SetWindowWidgetDirty(WC_STATION_VIEW, st->index, WID_SV_ACCEPT_RATING_LIST);
 	},
-	.set_demand = [](void *handle, uint8_t cargo, uint32_t amount) noexcept -> void {
+	.set_demand = [](OpenTTDBaseStation *handle, uint8_t cargo, uint32_t amount) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Station);
 		GoodsEntry &ge = Station::From(static_cast<BaseStation *>(handle))->goods[cargo];
 		if (LinkGraph::IsValidID(ge.link_graph)) (*LinkGraph::Get(ge.link_graph))[ge.node].SetDemand(amount);
 	},
-	.acceptance_news = [](void *handle, uint64_t cargoes, bool reject) noexcept -> void {
+	.acceptance_news = [](OpenTTDBaseStation *handle, uint64_t cargoes, bool reject) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Station);
 		ShowRejectOrAcceptNews(Station::From(static_cast<BaseStation *>(handle)), cargoes, reject);
 	},
-	.acceptance_redraw = [](void *handle) noexcept -> void {
+	.acceptance_redraw = [](OpenTTDBaseStation *handle) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Station);
 		SetWindowWidgetDirty(WC_STATION_VIEW, static_cast<BaseStation *>(handle)->index, WID_SV_ACCEPT_RATING_LIST);
 	},
-	.delete_station = [](void *handle) noexcept -> void {
+	.delete_station = [](OpenTTDBaseStation *handle) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Station);
 		delete static_cast<BaseStation *>(handle);
 	},
-	.acceptance_animation = [](void *handle) noexcept -> void {
+	.acceptance_animation = [](OpenTTDBaseStation *handle) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Station);
 		BaseStation *bst = static_cast<BaseStation *>(handle);
 		TriggerStationAnimation(bst, bst->xy, StationAnimationTrigger::AcceptanceTick);
@@ -737,14 +745,14 @@ static const OpenTTDStationServices _rust_station_services = {
 		CountStationBoundary<void>(StationBoundary::Station);
 		TriggerHouseAnimation_WatchedCargoAccepted(TileIndex(tile), cargoes);
 	},
-	.append_packet = [](void *handle, uint8_t cargo, uint32_t amount, OpenTTDCargoSource source) noexcept -> void {
+	.append_packet = [](OpenTTDBaseStation *handle, uint8_t cargo, uint32_t amount, OpenTTDCargoSource source) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Station);
 		Station *st = Station::From(static_cast<BaseStation *>(handle));
 		GoodsEntry &ge = st->goods[cargo];
 		StationID next = ge.GetVia(st->index);
 		ge.GetOrCreateData().cargo.Append(new CargoPacket(st->index, amount, Source(source.id, source.type)), next);
 	},
-	.update_supply = [](void *handle, uint8_t cargo, uint32_t amount) noexcept -> void {
+	.update_supply = [](OpenTTDBaseStation *handle, uint8_t cargo, uint32_t amount) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Station);
 		Station *st = Station::From(static_cast<BaseStation *>(handle));
 		GoodsEntry &ge = st->goods[cargo];
@@ -762,11 +770,11 @@ static const OpenTTDStationServices _rust_station_services = {
 			lg = LinkGraph::Get(ge.link_graph);
 		} if (lg != nullptr) (*lg)[ge.node].UpdateSupply(amount);
 	},
-	.station_list_invalidation = [](void *handle) noexcept -> void {
+	.station_list_invalidation = [](OpenTTDBaseStation *handle) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Station);
 		InvalidateWindowData(WC_STATION_LIST, static_cast<BaseStation *>(handle)->owner);
 	},
-	.new_cargo_animation = [](void *handle, uint8_t cargo) noexcept -> void {
+	.new_cargo_animation = [](OpenTTDBaseStation *handle, uint8_t cargo) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Station);
 		Station *st = Station::From(static_cast<BaseStation *>(handle));
 		TriggerStationRandomisation(st, st->xy, StationRandomTrigger::NewCargo, cargo);
@@ -775,16 +783,16 @@ static const OpenTTDStationServices _rust_station_services = {
 		TriggerRoadStopRandomisation(st, st->xy, StationRandomTrigger::NewCargo, cargo);
 		TriggerRoadStopAnimation(st, st->xy, StationAnimationTrigger::NewCargo, cargo);
 	},
-	.waiting_redraw = [](void *handle) noexcept -> void {
+	.waiting_redraw = [](OpenTTDBaseStation *handle) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Station);
 		SetWindowDirty(WC_STATION_VIEW, static_cast<BaseStation *>(handle)->index);
 		Station::From(static_cast<BaseStation *>(handle))->MarkTilesDirty(true);
 	},
-	.rating_callback = [](void *, uint8_t cargo, uint32_t var10, uint32_t var18) noexcept -> uint16_t {
+	.rating_callback = [](OpenTTDBaseStation *, uint8_t cargo, uint32_t var10, uint32_t var18) noexcept -> uint16_t {
 		CountStationBoundary<uint16_t>(StationBoundary::Station);
 		return GetCargoCallback(CBID_CARGO_STATION_RATING_CALC, var10, var18, CargoSpec::Get(cargo));
 	},
-	.with_tiles = [](void *handle, void *context, OpenTTDStationScope body) noexcept {
+	.with_tiles = [](OpenTTDBaseStation *handle, void *context, OpenTTDStationScope body) noexcept {
 		CountStationBoundary<void>(StationBoundary::Station);
 		RustStationTileCursor cursor(Station::From(static_cast<BaseStation *>(handle)));
 		CountStationScope();
@@ -805,7 +813,7 @@ static const OpenTTDStationServices _rust_station_services = {
 		CountStationBoundary<const uint32_t *>(StationBoundary::Station);
 		return static_cast<RustStationTileCursor *>(handle)->acceptance.data();
 	},
-	.with_truncation = [](void *handle, uint8_t cargo, uint32_t amount, void *context, OpenTTDStationScope body) noexcept {
+	.with_truncation = [](OpenTTDBaseStation *handle, uint8_t cargo, uint32_t amount, void *context, OpenTTDStationScope body) noexcept {
 		CountStationBoundary<void>(StationBoundary::Station);
 		RustStationTruncation result;
 		GoodsEntry &ge = static_cast<Station *>(handle)->goods[cargo];
@@ -824,19 +832,19 @@ static const OpenTTDStationServices _rust_station_services = {
 	.shared = &GetRustSharedServices(),
 };
 static const OpenTTDStationLinks _rust_station_links = {
-	.graph = [](void *handle, uint8_t cargo) noexcept -> void * {
-		CountStationBoundary<void *>(StationBoundary::Links);
+	.graph = [](OpenTTDBaseStation *handle, uint8_t cargo) noexcept -> OpenTTDLinkGraph * {
+		CountStationBoundary<OpenTTDLinkGraph *>(StationBoundary::Links);
 		return LinkGraph::GetIfValid(static_cast<Station *>(handle)->goods[cargo].link_graph);
 	},
 	.automatic_distribution = [](uint8_t cargo) noexcept -> bool {
 		CountStationBoundary<bool>(StationBoundary::Links);
 		return _settings_game.linkgraph.GetDistributionType(cargo) != DT_MANUAL;
 	},
-	.node = [](void *handle, uint8_t cargo) noexcept -> uint16_t {
+	.node = [](OpenTTDBaseStation *handle, uint8_t cargo) noexcept -> uint16_t {
 		CountStationBoundary<uint16_t>(StationBoundary::Links);
 		return static_cast<Station *>(handle)->goods[cargo].node;
 	},
-	.edge_count = [](void *handle, uint16_t node) noexcept -> size_t {
+	.edge_count = [](OpenTTDLinkGraph *handle, uint16_t node) noexcept -> size_t {
 		CountStationBoundary<size_t>(StationBoundary::Links);
 		return (*static_cast<LinkGraph *>(handle))[node].edges.size();
 	},
@@ -844,19 +852,19 @@ static const OpenTTDStationLinks _rust_station_links = {
 		CountStationBoundary<int32_t>(StationBoundary::Links);
 		return TimerGameEconomy::date.base();
 	},
-	.station_id = [](void *handle) noexcept -> uint16_t {
+	.station_id = [](OpenTTDBaseStation *handle) noexcept -> uint16_t {
 		CountStationBoundary<uint16_t>(StationBoundary::Links);
 		return static_cast<Station *>(handle)->index.base();
 	},
-	.edge_last_update = [](void *handle, uint16_t node, size_t index) noexcept -> int32_t {
+	.edge_last_update = [](OpenTTDLinkGraph *handle, uint16_t node, size_t index) noexcept -> int32_t {
 		CountStationBoundary<int32_t>(StationBoundary::Links);
 		return (*static_cast<LinkGraph *>(handle))[node].edges[index].LastUpdate().base();
 	},
-	.last_compression = [](void *handle) noexcept -> int32_t {
+	.last_compression = [](OpenTTDLinkGraph *handle) noexcept -> int32_t {
 		CountStationBoundary<int32_t>(StationBoundary::Links);
 		return static_cast<LinkGraph *>(handle)->LastCompression().base();
 	},
-	.edge = [](void *handle, uint16_t node, size_t index, void *from_handle) noexcept -> OpenTTDStationEdge {
+	.edge = [](OpenTTDLinkGraph *handle, uint16_t node, size_t index, OpenTTDBaseStation *from_handle) noexcept -> OpenTTDStationEdge {
 		CountStationBoundary<OpenTTDStationEdge>(StationBoundary::Links, true);
 		LinkGraph *graph = static_cast<LinkGraph *>(handle);
 		const Edge &edge = (*graph)[node].edges[index];
@@ -864,59 +872,59 @@ static const OpenTTDStationLinks _rust_station_links = {
 		Station *to = Station::Get((*graph)[edge.dest_node].station);
 		return {to, edge.LastUpdate().base(), DistanceManhattan(from->xy, to->xy)};
 	},
-	.edge_unrestricted = [](void *handle, uint16_t node, size_t index) noexcept -> int32_t {
+	.edge_unrestricted = [](OpenTTDLinkGraph *handle, uint16_t node, size_t index) noexcept -> int32_t {
 		CountStationBoundary<int32_t>(StationBoundary::Links);
 		return (*static_cast<LinkGraph *>(handle))[node].edges[index].last_unrestricted_update.base();
 	},
-	.edge_restricted = [](void *handle, uint16_t node, size_t index) noexcept -> int32_t {
+	.edge_restricted = [](OpenTTDLinkGraph *handle, uint16_t node, size_t index) noexcept -> int32_t {
 		CountStationBoundary<int32_t>(StationBoundary::Links);
 		return (*static_cast<LinkGraph *>(handle))[node].edges[index].last_restricted_update.base();
 	},
-	.delete_flows = [](void *handle, uint8_t cargo, uint16_t destination) noexcept -> void {
+	.delete_flows = [](OpenTTDBaseStation *handle, uint8_t cargo, uint16_t destination) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Links);
 		GoodsEntry &ge = static_cast<Station *>(handle)->goods[cargo];
 		if (ge.HasData()) ge.GetData().flows.DeleteFlows(StationID(destination));
 	},
-	.restrict_edge = [](void *handle, uint16_t from, size_t index) noexcept -> void {
+	.restrict_edge = [](OpenTTDLinkGraph *handle, uint16_t from, size_t index) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Links);
 		(*static_cast<LinkGraph *>(handle))[from].edges[index].Restrict();
 	},
-	.restrict_flows = [](void *handle, uint8_t cargo, uint16_t destination) noexcept -> void {
+	.restrict_flows = [](OpenTTDBaseStation *handle, uint8_t cargo, uint16_t destination) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Links);
 		GoodsEntry &ge = static_cast<Station *>(handle)->goods[cargo];
 		if (ge.HasData()) ge.GetData().flows.RestrictFlows(StationID(destination));
 	},
-	.release_edge = [](void *handle, uint16_t from, size_t index) noexcept -> void {
+	.release_edge = [](OpenTTDLinkGraph *handle, uint16_t from, size_t index) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Links);
 		(*static_cast<LinkGraph *>(handle))[from].edges[index].Release();
 	},
-	.remove_edge = [](void *handle, uint16_t from, uint16_t to) noexcept -> void {
+	.remove_edge = [](OpenTTDLinkGraph *handle, uint16_t from, uint16_t to) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Links);
 		(*static_cast<LinkGraph *>(handle))[from].RemoveEdge(to);
 	},
-	.compress = [](void *handle) noexcept -> void {
+	.compress = [](OpenTTDLinkGraph *handle) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Links);
 		static_cast<LinkGraph *>(handle)->Compress();
 	},
-	.order_list = [](uint16_t id) noexcept -> void * {
-		CountStationBoundary<void *>(StationBoundary::Links);
+	.order_list = [](uint16_t id) noexcept -> OpenTTDOrderList * {
+		CountStationBoundary<OpenTTDOrderList *>(StationBoundary::Links);
 		return OrderList::GetIfValid(OrderListID(id));
 	},
 	.order_pool_size = []() noexcept -> size_t {
 		CountStationBoundary<size_t>(StationBoundary::Links);
 		return OrderList::GetPoolSize();
 	},
-	.order_count = [](void *handle) noexcept -> size_t {
+	.order_count = [](OpenTTDOrderList *handle) noexcept -> size_t {
 		CountStationBoundary<size_t>(StationBoundary::Links);
 		return static_cast<OrderList *>(handle)->GetOrders().size();
 	},
-	.order_destination = [](void *handle, size_t index) noexcept -> OpenTTDOrderDestination {
+	.order_destination = [](OpenTTDOrderList *handle, size_t index) noexcept -> OpenTTDOrderDestination {
 		CountStationBoundary<OpenTTDOrderDestination>(StationBoundary::Links, true);
 		const Order *order = &static_cast<OrderList *>(handle)->GetOrders()[index];
 		if (!order->IsType(OT_GOTO_STATION) && !order->IsType(OT_IMPLICIT)) return {0, false};
 		return {order->GetDestination().base(), true};
 	},
-	.order_vehicle = [](void *handle) noexcept -> void * {
+	.order_vehicle = [](OpenTTDOrderList *handle) noexcept -> void * {
 		CountStationBoundary<void *>(StationBoundary::Links);
 		return static_cast<OrderList *>(handle)->GetFirstSharedVehicle();
 	},
@@ -944,7 +952,7 @@ static const OpenTTDStationLinks _rust_station_links = {
 		CountStationBoundary<void>(StationBoundary::Links);
 		LinkRefresher::Run(static_cast<Vehicle *>(handle), false);
 	},
-	.reroute = [](void *handle, void *vehicle, uint8_t cargo, uint16_t avoid, uint16_t avoid2) noexcept -> void {
+	.reroute = [](OpenTTDBaseStation *handle, void *vehicle, uint8_t cargo, uint16_t avoid, uint16_t avoid2) noexcept -> void {
 		CountStationBoundary<void>(StationBoundary::Links);
 		GoodsEntry &ge = static_cast<Station *>(handle)->goods[cargo];
 		if (vehicle == nullptr) {

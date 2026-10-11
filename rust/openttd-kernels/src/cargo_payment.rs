@@ -22,6 +22,12 @@
 )]
 use std::ffi::c_void;
 
+/// Opaque live native `CargoPayment`; never dereferenced by Rust.
+#[repr(C)]
+pub struct NativePayment {
+    _private: [u8; 0],
+}
+
 #[repr(C)]
 #[derive(Default)]
 pub struct Spec {

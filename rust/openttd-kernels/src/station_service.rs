@@ -16,6 +16,10 @@
     clippy::cast_sign_loss,
     clippy::too_many_arguments
 )]
+use crate::cargo_payment::NativePayment;
+use crate::linkgraph::NativeGraph;
+use crate::orders::NativeOrderList;
+use crate::station::{BaseStation, Station};
 use std::ffi::c_void;
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -197,7 +201,9 @@ pub unsafe extern "C" fn openttd_rust_station_queue_clear(state: *mut Service) {
     }
 }
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_station_queue_first(state: *const Service) -> *mut c_void {
+pub unsafe extern "C" fn openttd_rust_station_queue_first(
+    state: *const Service,
+) -> *mut QueueEntry {
     unsafe {
         (*state)
             .queue
@@ -210,35 +216,27 @@ pub unsafe extern "C" fn openttd_rust_station_queue_first(state: *const Service)
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_station_queue_next(
     _state: *const Service,
-    entry: *const c_void,
-) -> *mut c_void {
-    unsafe {
-        (&raw const (*entry.cast::<QueueEntry>()).next)
-            .read()
-            .cast()
-    }
+    entry: *const QueueEntry,
+) -> *mut QueueEntry {
+    unsafe { (&raw const (*entry).next).read().cast() }
 }
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_station_queue_value(entry: *const c_void) -> *mut c_void {
-    unsafe { (&raw const (*entry.cast::<QueueEntry>()).vehicle).read() }
+pub unsafe extern "C" fn openttd_rust_station_queue_value(entry: *const QueueEntry) -> *mut c_void {
+    unsafe { (&raw const (*entry).vehicle).read() }
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_station_queue_erase_node(
     state: *mut Service,
-    entry: *mut c_void,
-) -> *mut c_void {
-    let successor = unsafe {
-        (&raw const (*entry.cast::<QueueEntry>()).next)
-            .read()
-            .cast()
-    };
+    entry: *mut QueueEntry,
+) -> *mut QueueEntry {
+    let successor = unsafe { (&raw const (*entry).next).read().cast() };
     // Original erase requires a live iterator from this owner; no new rejection
     // or fatal path is introduced for an input outside that precondition.
     let index = unsafe {
         (*state)
             .queue
             .iter()
-            .position(|&node| node.cast::<c_void>() == entry)
+            .position(|&node| node == entry)
             .unwrap_unchecked()
     };
     unsafe {
@@ -311,47 +309,50 @@ pub struct TruncatedSource {
 }
 #[repr(C)]
 pub struct World {
-    pub(crate) station_owner: extern "C" fn(*mut c_void) -> u8,
-    pub(crate) station_exclusivity: extern "C" fn(*mut c_void) -> StationExclusivity,
-    pub(crate) station_next: extern "C" fn(*mut c_void) -> *mut c_void,
-    pub(crate) rating_counts: extern "C" fn(*mut c_void, u8) -> RatingCounts,
-    pub(crate) get: extern "C" fn(u16) -> *mut c_void,
-    pub(crate) owner: extern "C" fn(*mut c_void) -> *mut Service,
+    pub(crate) base_station: extern "C" fn(*mut Station) -> *mut BaseStation,
+    pub(crate) station: extern "C" fn(u16) -> *mut Station,
+    pub(crate) station_owner: extern "C" fn(*mut BaseStation) -> u8,
+    pub(crate) station_exclusivity: extern "C" fn(*mut BaseStation) -> StationExclusivity,
+    pub(crate) station_next: extern "C" fn(*mut c_void) -> *mut BaseStation,
+    pub(crate) rating_counts: extern "C" fn(*mut BaseStation, u8) -> RatingCounts,
+    pub(crate) get: extern "C" fn(u16) -> *mut BaseStation,
+    pub(crate) owner: extern "C" fn(*mut BaseStation) -> *mut Service,
     pub(crate) pool_size: extern "C" fn() -> usize,
     pub(crate) tick_counter: extern "C" fn() -> u64,
     pub(crate) editor: extern "C" fn() -> bool,
-    pub(crate) facilities: extern "C" fn(*mut c_void) -> u8,
-    pub(crate) in_use: extern "C" fn(*mut c_void) -> bool,
-    pub(crate) is_station: extern "C" fn(*mut c_void) -> bool,
-    pub(crate) local_owner: extern "C" fn(*mut c_void) -> bool,
-    pub(crate) rectangle_empty: extern "C" fn(*mut c_void) -> bool,
-    pub(crate) town_statue: extern "C" fn(*mut c_void) -> bool,
+    pub(crate) facilities: extern "C" fn(*mut BaseStation) -> u8,
+    pub(crate) in_use: extern "C" fn(*mut BaseStation) -> bool,
+    pub(crate) is_station: extern "C" fn(*mut BaseStation) -> bool,
+    pub(crate) local_owner: extern "C" fn(*mut BaseStation) -> bool,
+    pub(crate) rectangle_empty: extern "C" fn(*mut BaseStation) -> bool,
+    pub(crate) town_statue: extern "C" fn(*mut BaseStation) -> bool,
     pub(crate) select_goods: extern "C" fn() -> bool,
     pub(crate) rating_cheat: extern "C" fn() -> bool,
-    pub(crate) available: extern "C" fn(*mut c_void, u8) -> u32,
+    pub(crate) available: extern "C" fn(*mut BaseStation, u8) -> u32,
     pub(crate) cargo_valid: extern "C" fn(u8) -> bool,
     pub(crate) rating_callback_enabled: extern "C" fn(u8) -> bool,
     pub(crate) passenger_cargo: extern "C" fn(u8) -> bool,
     pub(crate) packet_available: extern "C" fn() -> bool,
     pub(crate) house_tile: extern "C" fn(u32) -> bool,
-    pub(crate) rating_redraw: extern "C" fn(*mut c_void, bool),
-    pub(crate) set_demand: extern "C" fn(*mut c_void, u8, u32),
-    pub(crate) acceptance_news: extern "C" fn(*mut c_void, u64, bool),
-    pub(crate) acceptance_redraw: extern "C" fn(*mut c_void),
-    pub(crate) delete_station: extern "C" fn(*mut c_void),
-    pub(crate) acceptance_animation: extern "C" fn(*mut c_void),
+    pub(crate) rating_redraw: extern "C" fn(*mut BaseStation, bool),
+    pub(crate) set_demand: extern "C" fn(*mut BaseStation, u8, u32),
+    pub(crate) acceptance_news: extern "C" fn(*mut BaseStation, u64, bool),
+    pub(crate) acceptance_redraw: extern "C" fn(*mut BaseStation),
+    pub(crate) delete_station: extern "C" fn(*mut BaseStation),
+    pub(crate) acceptance_animation: extern "C" fn(*mut BaseStation),
     pub(crate) watched_animation: extern "C" fn(u32, u64),
-    pub(crate) append_packet: extern "C" fn(*mut c_void, u8, u32, crate::cargo_storage::Source),
-    pub(crate) update_supply: extern "C" fn(*mut c_void, u8, u32),
-    pub(crate) station_list_invalidation: extern "C" fn(*mut c_void),
-    pub(crate) new_cargo_animation: extern "C" fn(*mut c_void, u8),
-    pub(crate) waiting_redraw: extern "C" fn(*mut c_void),
-    pub(crate) rating_callback: extern "C" fn(*mut c_void, u8, u32, u32) -> u16,
-    pub(crate) with_tiles: extern "C" fn(*mut c_void, *mut c_void, Scope),
+    pub(crate) append_packet:
+        extern "C" fn(*mut BaseStation, u8, u32, crate::cargo_storage::Source),
+    pub(crate) update_supply: extern "C" fn(*mut BaseStation, u8, u32),
+    pub(crate) station_list_invalidation: extern "C" fn(*mut BaseStation),
+    pub(crate) new_cargo_animation: extern "C" fn(*mut BaseStation, u8),
+    pub(crate) waiting_redraw: extern "C" fn(*mut BaseStation),
+    pub(crate) rating_callback: extern "C" fn(*mut BaseStation, u8, u32, u32) -> u16,
+    pub(crate) with_tiles: extern "C" fn(*mut BaseStation, *mut c_void, Scope),
     pub(crate) tile_next: extern "C" fn(*mut c_void) -> u32,
     pub(crate) accept_tile: extern "C" fn(*mut c_void, u32, *mut u64),
     pub(crate) acceptance_amounts: extern "C" fn(*mut c_void) -> *const u32,
-    pub(crate) with_truncation: extern "C" fn(*mut c_void, u8, u32, *mut c_void, Scope),
+    pub(crate) with_truncation: extern "C" fn(*mut BaseStation, u8, u32, *mut c_void, Scope),
     pub(crate) truncate_next: extern "C" fn(*mut c_void) -> TruncatedSource,
     pub(crate) shared: *const crate::services::Services,
 }
@@ -404,7 +405,7 @@ unsafe fn acceptance_mask(state: *mut Service) -> u64 {
     }
     mask
 }
-unsafe fn truncate(st: *mut c_void, cargo: u8, amount: u32, w: &World) {
+unsafe fn truncate(st: *mut BaseStation, cargo: u8, amount: u32, w: &World) {
     let mut body = |map| {
         loop {
             let observed = (w.truncate_next)(map);
@@ -427,7 +428,7 @@ unsafe fn truncate(st: *mut c_void, cargo: u8, amount: u32, w: &World) {
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_station_acceptance(
-    st: *mut c_void,
+    st: *mut BaseStation,
     world: *const World,
     show: u8,
 ) {
@@ -488,7 +489,7 @@ pub unsafe extern "C" fn openttd_rust_station_acceptance(
     (w.acceptance_redraw)(st);
 }
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_station_watched(st: *mut c_void, world: *const World) {
+pub unsafe extern "C" fn openttd_rust_station_watched(st: *mut BaseStation, world: *const World) {
     let w = unsafe { &*world };
     let state = (w.owner)(st);
     let mut cargoes = 0_u64;
@@ -517,7 +518,7 @@ pub unsafe extern "C" fn openttd_rust_station_watched(st: *mut c_void, world: *c
 #[unsafe(no_mangle)]
 // Preserve the complete source rating loop and its immediate mutation order.
 #[allow(clippy::too_many_lines)]
-pub unsafe extern "C" fn openttd_rust_station_rating(st: *mut c_void, world: *const World) {
+pub unsafe extern "C" fn openttd_rust_station_rating(st: *mut BaseStation, world: *const World) {
     let w = unsafe { &*world };
     let state = (w.owner)(st);
     let mut waiting_changed = false;
@@ -700,7 +701,7 @@ pub unsafe extern "C" fn openttd_rust_station_monthly(world: *const World) {
 }
 
 unsafe fn admit(
-    st: *mut c_void,
+    st: *mut BaseStation,
     cargo: u8,
     mut amount: u32,
     source: crate::cargo_storage::Source,
@@ -828,43 +829,43 @@ pub unsafe extern "C" fn openttd_rust_station_distribute(
 #[repr(C)]
 #[derive(Default)]
 pub struct Edge {
-    pub(crate) destination: *mut c_void,
+    pub(crate) destination: *mut BaseStation,
     pub(crate) last_update: i32,
     pub(crate) distance: u32,
 }
 #[repr(C)]
 pub struct Links {
-    pub(crate) graph: extern "C" fn(*mut c_void, u8) -> *mut c_void,
+    pub(crate) graph: extern "C" fn(*mut BaseStation, u8) -> *mut NativeGraph,
     pub(crate) automatic_distribution: extern "C" fn(u8) -> bool,
-    pub(crate) node: extern "C" fn(*mut c_void, u8) -> u16,
-    pub(crate) edge_count: extern "C" fn(*mut c_void, u16) -> usize,
+    pub(crate) node: extern "C" fn(*mut BaseStation, u8) -> u16,
+    pub(crate) edge_count: extern "C" fn(*mut NativeGraph, u16) -> usize,
     pub(crate) date: extern "C" fn() -> i32,
-    pub(crate) station_id: extern "C" fn(*mut c_void) -> u16,
-    pub(crate) edge_last_update: extern "C" fn(*mut c_void, u16, usize) -> i32,
-    pub(crate) last_compression: extern "C" fn(*mut c_void) -> i32,
-    pub(crate) edge: extern "C" fn(*mut c_void, u16, usize, *mut c_void) -> Edge,
-    pub(crate) edge_unrestricted: extern "C" fn(*mut c_void, u16, usize) -> i32,
-    pub(crate) edge_restricted: extern "C" fn(*mut c_void, u16, usize) -> i32,
-    pub(crate) delete_flows: extern "C" fn(*mut c_void, u8, u16),
-    pub(crate) restrict_edge: extern "C" fn(*mut c_void, u16, usize),
-    pub(crate) restrict_flows: extern "C" fn(*mut c_void, u8, u16),
-    pub(crate) release_edge: extern "C" fn(*mut c_void, u16, usize),
-    pub(crate) remove_edge: extern "C" fn(*mut c_void, u16, u16),
-    pub(crate) compress: extern "C" fn(*mut c_void),
-    pub(crate) order_list: extern "C" fn(u16) -> *mut c_void,
+    pub(crate) station_id: extern "C" fn(*mut BaseStation) -> u16,
+    pub(crate) edge_last_update: extern "C" fn(*mut NativeGraph, u16, usize) -> i32,
+    pub(crate) last_compression: extern "C" fn(*mut NativeGraph) -> i32,
+    pub(crate) edge: extern "C" fn(*mut NativeGraph, u16, usize, *mut BaseStation) -> Edge,
+    pub(crate) edge_unrestricted: extern "C" fn(*mut NativeGraph, u16, usize) -> i32,
+    pub(crate) edge_restricted: extern "C" fn(*mut NativeGraph, u16, usize) -> i32,
+    pub(crate) delete_flows: extern "C" fn(*mut BaseStation, u8, u16),
+    pub(crate) restrict_edge: extern "C" fn(*mut NativeGraph, u16, usize),
+    pub(crate) restrict_flows: extern "C" fn(*mut BaseStation, u8, u16),
+    pub(crate) release_edge: extern "C" fn(*mut NativeGraph, u16, usize),
+    pub(crate) remove_edge: extern "C" fn(*mut NativeGraph, u16, u16),
+    pub(crate) compress: extern "C" fn(*mut NativeGraph),
+    pub(crate) order_list: extern "C" fn(u16) -> *mut NativeOrderList,
     pub(crate) order_pool_size: extern "C" fn() -> usize,
-    pub(crate) order_count: extern "C" fn(*mut c_void) -> usize,
-    pub(crate) order_destination: extern "C" fn(*mut c_void, usize) -> OrderDestination,
-    pub(crate) order_vehicle: extern "C" fn(*mut c_void) -> *mut c_void,
+    pub(crate) order_count: extern "C" fn(*mut NativeOrderList) -> usize,
+    pub(crate) order_destination: extern "C" fn(*mut NativeOrderList, usize) -> OrderDestination,
+    pub(crate) order_vehicle: extern "C" fn(*mut NativeOrderList) -> *mut c_void,
     pub(crate) next_vehicle: extern "C" fn(*mut c_void) -> *mut c_void,
     pub(crate) next_shared: extern "C" fn(*mut c_void) -> *mut c_void,
     pub(crate) stopped_in_depot: extern "C" fn(*mut c_void) -> bool,
     pub(crate) last_service: extern "C" fn(*mut c_void) -> i32,
     pub(crate) cargo_type: extern "C" fn(*mut c_void) -> u8,
     pub(crate) refresh: extern "C" fn(*mut c_void),
-    pub(crate) reroute: extern "C" fn(*mut c_void, *mut c_void, u8, u16, u16),
+    pub(crate) reroute: extern "C" fn(*mut BaseStation, *mut c_void, u8, u16, u16),
 }
-unsafe fn reroute(st: *mut c_void, cargo: u8, avoid: u16, avoid2: u16, w: &World, l: &Links) {
+unsafe fn reroute(st: *mut BaseStation, cargo: u8, avoid: u16, avoid2: u16, w: &World, l: &Links) {
     (l.reroute)(st, std::ptr::null_mut(), cargo, avoid, avoid2);
     let state = (w.owner)(st);
     let mut node = unsafe { openttd_rust_station_queue_first(state) };
@@ -881,7 +882,7 @@ unsafe fn reroute(st: *mut c_void, cargo: u8, avoid: u16, avoid2: u16, w: &World
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_station_reroute(
-    st: *mut c_void,
+    st: *mut BaseStation,
     cargo: u8,
     avoid: u16,
     avoid2: u16,
@@ -896,7 +897,7 @@ pub unsafe extern "C" fn openttd_rust_station_reroute(
 }
 // Keep the source edge/vehicle iteration and its immediate mutation order together.
 #[allow(clippy::too_many_lines)]
-unsafe fn stale(from: *mut c_void, w: &World, l: &Links) {
+unsafe fn stale(from: *mut BaseStation, w: &World, l: &Links) {
     for cargo in 0..64 {
         let auto = u32::from((l.automatic_distribution)(cargo)) != 0;
         let graph = (l.graph)(from, cargo);
@@ -1007,7 +1008,7 @@ unsafe fn stale(from: *mut c_void, w: &World, l: &Links) {
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_station_stale(
-    st: *mut c_void,
+    st: *mut BaseStation,
     world: *const World,
     links: *const Links,
 ) {
@@ -1157,29 +1158,30 @@ pub struct Loading {
     pub(crate) first_vehicle: extern "C" fn(*mut c_void) -> *mut c_void,
     pub(crate) previous_vehicle: extern "C" fn(*mut c_void) -> *mut c_void,
     pub(crate) with_next_stations: extern "C" fn(*mut c_void, *mut c_void, Scope),
-    pub(crate) stage: extern "C" fn(*mut c_void, *mut c_void, u8, *mut c_void, *mut c_void),
-    pub(crate) return_cargo: extern "C" fn(*mut c_void, *mut c_void, u32),
-    pub(crate) unload_cargo: extern "C" fn(*mut c_void, *mut c_void, u32, *mut c_void) -> u32,
-    pub(crate) load_cargo: extern "C" fn(*mut c_void, *mut c_void, u32, *mut c_void) -> u32,
-    pub(crate) reserve_cargo: extern "C" fn(*mut c_void, *mut c_void, u32, *mut c_void),
+    pub(crate) stage: extern "C" fn(*mut Station, *mut c_void, u8, *mut c_void, *mut NativePayment),
+    pub(crate) return_cargo: extern "C" fn(*mut Station, *mut c_void, u32),
+    pub(crate) unload_cargo:
+        extern "C" fn(*mut Station, *mut c_void, u32, *mut NativePayment) -> u32,
+    pub(crate) load_cargo: extern "C" fn(*mut Station, *mut c_void, u32, *mut c_void) -> u32,
+    pub(crate) reserve_cargo: extern "C" fn(*mut Station, *mut c_void, u32, *mut c_void),
     pub(crate) deliver_to_transfer: extern "C" fn(*mut c_void, u32),
     pub(crate) deliver_to_keep: extern "C" fn(*mut c_void, u32),
-    pub(crate) has_cargo_for: extern "C" fn(*mut c_void, u8, *mut c_void) -> bool,
-    pub(crate) platform_length: extern "C" fn(*mut c_void, *mut c_void) -> u32,
-    pub(crate) train_at_station: extern "C" fn(*mut c_void, *mut c_void) -> bool,
-    pub(crate) station_cargo_total: extern "C" fn(*mut c_void, u8) -> u32,
+    pub(crate) has_cargo_for: extern "C" fn(*mut Station, u8, *mut c_void) -> bool,
+    pub(crate) platform_length: extern "C" fn(*mut Station, *mut c_void) -> u32,
+    pub(crate) train_at_station: extern "C" fn(*mut Station, *mut c_void) -> bool,
+    pub(crate) station_cargo_total: extern "C" fn(*mut Station, u8) -> u32,
     pub(crate) load_property: extern "C" fn(*mut c_void) -> u16,
     pub(crate) load_callback: extern "C" fn(*mut c_void) -> u16,
-    pub(crate) get_payment: extern "C" fn(*mut c_void) -> *mut c_void,
-    pub(crate) create_payment: extern "C" fn(*mut c_void) -> *mut c_void,
-    pub(crate) delete_payment: extern "C" fn(*mut c_void),
+    pub(crate) get_payment: extern "C" fn(*mut c_void) -> *mut NativePayment,
+    pub(crate) create_payment: extern "C" fn(*mut c_void) -> *mut NativePayment,
+    pub(crate) delete_payment: extern "C" fn(*mut NativePayment),
     pub(crate) flush_delivery: extern "C" fn(),
     pub(crate) vehicle_new_cargo: extern "C" fn(*mut c_void),
-    pub(crate) cargo_taken: extern "C" fn(*mut c_void, u8),
-    pub(crate) train_loads: extern "C" fn(*mut c_void, *mut c_void),
-    pub(crate) road_loads: extern "C" fn(*mut c_void, *mut c_void),
+    pub(crate) cargo_taken: extern "C" fn(*mut Station, u8),
+    pub(crate) train_loads: extern "C" fn(*mut Station, *mut c_void),
+    pub(crate) road_loads: extern "C" fn(*mut Station, *mut c_void),
     pub(crate) vehicle_empty: extern "C" fn(*mut c_void),
-    pub(crate) station_dirty: extern "C" fn(*mut c_void),
+    pub(crate) station_dirty: extern "C" fn(*mut Station),
     pub(crate) test_refit: extern "C" fn(*mut c_void, u8) -> u32,
     pub(crate) execute_refit: extern "C" fn(*mut c_void, u8, *mut i64) -> bool,
 }
@@ -1315,15 +1317,22 @@ fn parts(l: &Loading, v: *mut c_void, mut action: impl FnMut(*mut c_void) -> boo
     }
     true
 }
-fn may_load(st: *mut c_void, v: *mut c_void, w: &World, l: &Loading) -> bool {
-    if (w.station_owner)(st) != 16 {
+/// Native identities retained for one loading entry; no field borrow crosses a callback.
+#[derive(Clone, Copy)]
+struct LoadingStation {
+    native: *mut Station,
+    base: *mut BaseStation,
+    state: *mut Service,
+}
+fn may_load(st: LoadingStation, v: *mut c_void, w: &World, l: &Loading) -> bool {
+    if (w.station_owner)(st.base) != 16 {
         return true;
     }
-    let observed = (w.station_exclusivity)(st);
+    let observed = (w.station_exclusivity)(st.base);
     observed.counter == 0 || u32::from(observed.exclusive) == l.vehicle_owner(v)
 }
 fn reserve_consist(
-    st: *mut c_void,
+    st: LoadingStation,
     front: *mut c_void,
     mut capleft: Option<&mut [u32; 64]>,
     next: *mut c_void,
@@ -1343,7 +1352,7 @@ fn reserve_consist(
                 let cap = u32::from(observed.capacity);
                 let remaining = observed.remaining;
                 if cap > remaining && may_load(st, part, w, l) {
-                    (l.reserve_cargo)(st, part, cap - remaining, next);
+                    (l.reserve_cargo)(st.native, part, cap - remaining, next);
                 }
                 true
             });
@@ -1394,7 +1403,7 @@ fn load_amount(v: *mut c_void, l: &Loading) -> u32 {
 fn refit_vehicle(
     v: *mut c_void,
     capleft: &mut [u32; 64],
-    st: *mut c_void,
+    st: LoadingStation,
     next: *mut c_void,
     mut new_cargo: u8,
     w: &World,
@@ -1419,14 +1428,16 @@ fn refit_vehicle(
     if auto {
         new_cargo = l.cargo_type(start) as u8;
         for cargo in 0..64_u8 {
-            if mask & (1_u64 << cargo) == 0 || u32::from((l.has_cargo_for)(st, cargo, next)) == 0 {
+            if mask & (1_u64 << cargo) == 0
+                || u32::from((l.has_cargo_for)(st.native, cargo, next)) == 0
+            {
                 continue;
             }
             let capacity = (l.test_refit)(start, cargo);
             if capacity > 0
                 && (capleft[usize::from(cargo)] < capleft[usize::from(new_cargo)]
                     || (capleft[usize::from(cargo)] == capleft[usize::from(new_cargo)]
-                        && (w.available)(st, cargo) > (w.available)(st, new_cargo)))
+                        && (w.available)(st.base, cargo) > (w.available)(st.base, new_cargo)))
             {
                 new_cargo = cargo;
             }
@@ -1434,7 +1445,7 @@ fn refit_vehicle(
     }
     if new_cargo < 64 && u32::from(new_cargo) != l.cargo_type(start) {
         parts(l, start, |part| {
-            (l.return_cargo)(st, part, u32::MAX);
+            (l.return_cargo)(st.native, part, u32::MAX);
             true
         });
         let mut cost = 0;
@@ -1448,7 +1459,7 @@ fn refit_vehicle(
         let observed = (l.cargo_remaining)(part);
         let remaining = u32::from(observed.capacity).wrapping_sub(observed.remaining);
         if do_reserve {
-            (l.reserve_cargo)(st, part, remaining, next);
+            (l.reserve_cargo)(st.native, part, remaining, next);
         }
         // Reserve changes RemainingCount; observe again at the original point.
         let observed = (l.cargo_remaining)(part);
@@ -1467,9 +1478,15 @@ pub unsafe extern "C" fn openttd_rust_station_prepare(
 ) {
     let w = unsafe { &*world };
     let l = unsafe { &*loading };
-    let st = (w.get)((l.last_station_visited)(front));
+    let native = (w.station)((l.last_station_visited)(front));
+    let base = (w.base_station)(native);
+    let st = LoadingStation {
+        native,
+        base,
+        state: (w.owner)(base),
+    };
     unsafe {
-        openttd_rust_station_queue_push((w.owner)(st), front);
+        openttd_rust_station_queue_push(st.state, front);
     }
     (l.set_loading_finished)(front, false);
     (l.set_load_ticks)(front, 1);
@@ -1479,7 +1496,7 @@ pub unsafe extern "C" fn openttd_rust_station_prepare(
             let mut v = front;
             while !v.is_null() {
                 if l.cargo_cap(v) > 0 && l.total_count(v) > 0 {
-                    (l.stage)(st, v, l.unload_type(front) as u8, next, payment);
+                    (l.stage)(st.native, v, l.unload_type(front) as u8, next, payment);
                     if l.unload_count(v) > 0 {
                         (l.set_cargo_unloading)(v, true);
                     }
@@ -1491,12 +1508,13 @@ pub unsafe extern "C" fn openttd_rust_station_prepare(
     let (context, callback) = scope_context(&mut body);
     (l.with_next_stations)(front, context, callback);
 }
-fn update_ticks(front: *mut c_void, st: *mut c_void, mut ticks: i32, l: &Loading) {
+fn update_ticks(front: *mut c_void, st: LoadingStation, mut ticks: i32, l: &Loading) {
     if l.vehicle_type(front) == 0 && l.station_length_penalty(front) != 0 {
         // Platform length is a world-geometry query on the native station shell.
-        let overhang =
-            l.cached_total_length(front)
-                .wrapping_sub((l.platform_length)(st, front).wrapping_mul(16)) as i32;
+        let overhang = l
+            .cached_total_length(front)
+            .wrapping_sub((l.platform_length)(st.native, front).wrapping_mul(16))
+            as i32;
         if overhang > 0 {
             ticks = ticks.wrapping_shl(1);
             ticks = ticks.wrapping_add(overhang.wrapping_mul(ticks) / 8);
@@ -1506,7 +1524,7 @@ fn update_ticks(front: *mut c_void, st: *mut c_void, mut ticks: i32, l: &Loading
 }
 // Preserve complete loading control at the source observation points.
 #[allow(clippy::too_many_lines)]
-unsafe fn load_vehicle(front: *mut c_void, st: *mut c_void, w: &World, l: &Loading) {
+unsafe fn load_vehicle(front: *mut c_void, st: LoadingStation, w: &World, l: &Loading) {
     let mut body = |next| {
         let auto = l.is_refit(front) != 0 && l.refit_cargo(front) == 253;
         let mut capleft = [0_u32; 64];
@@ -1532,12 +1550,12 @@ unsafe fn load_vehicle(front: *mut c_void, st: *mut c_void, w: &World, l: &Loadi
         if l.load_unload_ticks(front) != 0 {
             return;
         }
-        if l.vehicle_type(front) == 0 && u32::from((l.train_at_station)(st, front)) == 0 {
+        if l.vehicle_type(front) == 0 && u32::from((l.train_at_station)(st.native, front)) == 0 {
             (l.set_loading_finished)(front, true);
             (l.set_load_ticks)(front, 1);
             return;
         }
-        let state = (w.owner)(st);
+        let state = st.state;
         let mut ticks = 0_i32;
         let mut dirty_vehicle = false;
         let mut dirty_station = false;
@@ -1578,7 +1596,11 @@ unsafe fn load_vehicle(front: *mut c_void, st: *mut c_void, w: &World, l: &Loadi
                         let observed = (l.delivery_remaining)(v);
                         let remaining = observed.remaining.wrapping_add(observed.deliver);
                         if u32::from(observed.capacity) < remaining {
-                            (l.return_cargo)(st, v, remaining - u32::from(observed.capacity));
+                            (l.return_cargo)(
+                                st.native,
+                                v,
+                                remaining - u32::from(observed.capacity),
+                            );
                         }
                         (l.deliver_to_keep)(v, l.deliver_count(v));
                         unloaded = true;
@@ -1593,7 +1615,7 @@ unsafe fn load_vehicle(front: *mut c_void, st: *mut c_void, w: &World, l: &Loadi
                         }
                     }
                 }
-                amount = (l.unload_cargo)(st, v, amount, payment);
+                amount = (l.unload_cargo)(st.native, v, amount, payment);
                 let remaining = l.unload_count(v) > 0;
                 if amount > 0 {
                     dirty_vehicle = true;
@@ -1642,14 +1664,16 @@ unsafe fn load_vehicle(front: *mut c_void, st: *mut c_void, w: &World, l: &Loadi
                 unsafe {
                     (&raw mut (*ge).time_since_pickup).write(0);
                 }
-                if (l.load_count(v) > 0 || (w.available)(st, cargo) > 0) && may_load(st, v, w, l) {
+                if (l.load_count(v) > 0 || (w.available)(st.base, cargo) > 0)
+                    && may_load(st, v, w, l)
+                {
                     if l.stored_count(v) == 0 {
                         (l.vehicle_new_cargo)(v);
                     }
                     if l.gradual(v) != 0 {
                         cap = cap.min(load_amount(v, l));
                     }
-                    let loaded = (l.load_cargo)(st, v, cap, next);
+                    let loaded = (l.load_cargo)(st.native, v, cap, next);
                     if l.load_count(v) > 0 {
                         reservation_left |= 1 << cargo;
                     }
@@ -1666,8 +1690,8 @@ unsafe fn load_vehicle(front: *mut c_void, st: *mut c_void, w: &World, l: &Loadi
                             (&raw mut (*state).fields.last_vehicle_type)
                                 .write(l.vehicle_type(v) as u8);
                         }
-                        if (l.station_cargo_total)(st, cargo) == 0 {
-                            (l.cargo_taken)(st, cargo);
+                        if (l.station_cargo_total)(st.native, cargo) == 0 {
+                            (l.cargo_taken)(st.native, cargo);
                         }
                         ticks = ticks.wrapping_add(loaded as i32);
                         dirty_vehicle = true;
@@ -1685,9 +1709,9 @@ unsafe fn load_vehicle(front: *mut c_void, st: *mut c_void, w: &World, l: &Loadi
         }
         if loaded_any || unloaded {
             if l.vehicle_type(front) == 0 {
-                (l.train_loads)(st, front);
+                (l.train_loads)(st.native, front);
             } else if l.vehicle_type(front) == 1 {
-                (l.road_loads)(st, front);
+                (l.road_loads)(st.native, front);
             }
         }
         emptied &= unloaded;
@@ -1744,7 +1768,7 @@ unsafe fn load_vehicle(front: *mut c_void, st: *mut c_void, w: &World, l: &Loadi
             (l.vehicle_dirty)(front);
         }
         if dirty_station {
-            (l.station_dirty)(st);
+            (l.station_dirty)(st.native);
         }
     };
     let (context, callback) = scope_context(&mut body);
@@ -1752,13 +1776,19 @@ unsafe fn load_vehicle(front: *mut c_void, st: *mut c_void, w: &World, l: &Loadi
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_station_load(
-    st: *mut c_void,
+    native: *mut Station,
     world: *const World,
     loading: *const Loading,
 ) {
     let w = unsafe { &*world };
     let l = unsafe { &*loading };
-    let state = (w.owner)(st);
+    let base = (w.base_station)(native);
+    let st = LoadingStation {
+        native,
+        base,
+        state: (w.owner)(base),
+    };
+    let state = st.state;
     let mut node = unsafe { openttd_rust_station_queue_first(state) };
     if node.is_null() {
         return;
