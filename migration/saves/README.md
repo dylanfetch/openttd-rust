@@ -102,12 +102,32 @@ python3 tools/migration.py simulate play-padhattan-ridge-2006 --soak --jobs 2
 
 ## Later owner-built electrified save (#221)
 
-`padhattan-ridge-2016.sav` continues the owner's game, supplied as
-`Padhattan Ridge Transport, May 26th, 2016.sav` (53,108 bytes). GLOG identifies
-OpenTTD 15.3 / save version 362. SHA-256:
-`16d78671c5665e7d59cb2ac0edbf8698cf2ff03c5a50ebd4c5b1c9b32a1a19c9`.
-The original is distributed under the fork's GPLv2 license with the owner's
-permission and stays unchanged. Scenario coverage is pending.
+`padhattan-ridge-2016.sav` continues the same game, supplied as
+`Padhattan Ridge Transport, May 26th, 2016.sav` (53,108 bytes; GLOG: OpenTTD
+15.3 / save version 362; same company, settings and license terms as #183).
+SHA-256: `16d78671c5665e7d59cb2ac0edbf8698cf2ff03c5a50ebd4c5b1c9b32a1a19c9`.
+Normalization removes only GLOG (61 chunks byte-checked); older saves are unchanged.
+
+Inventory: 24 road vehicles, three trains (16 parts), five ships, 13 aircraft
+(34 parts); 126 rail (eight signal, two depot), 42 monorail (one depot) and,
+new since 2006, 41 electrified tiles (one depot); two monorail tunnels, six road
+bridges, two crossings, one canal tile, two locks and six ship depots. There is
+no rail bridge, road tunnel or aqueduct. The two older passenger trains are gone.
+In the reference, aircraft 26, 48 and 57 crash (only 48 with cargodist) and are
+deleted; every other head moves, carries cargo and earns delivery revenue,
+including the nine-part electric train 5 and new ship 70. `HEADS_2016` requires
+these in `play-padhattan-ridge-2016-manual`/`-cargodist` (two years, six with
+`--soak`), with the #183 monorail/tunnel/road-bridge/lock occupancy checks and
+the `TRAIN_BRANCHES` witnesses both distributions reach. Occupancy is sampled
+every 32 days, so the new road bridge (heads 15037/15041), tunnel entry at tile
+1217 and the canal tile (cargodist only) are not required; branch gaps stay in
+[#156](https://github.com/dylanfetch/openttd-rust/issues/156).
+
+```sh
+python3 tools/migration.py simulate play-padhattan-ridge-2016 --self --jobs 2
+python3 tools/migration.py simulate play-padhattan-ridge-2016 --jobs 2
+python3 tools/migration.py simulate play-padhattan-ridge-2016 --soak --jobs 2
+```
 
 ## Reference-built supplemental aircraft save (#86)
 
