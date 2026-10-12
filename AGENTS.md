@@ -35,6 +35,11 @@ fork; the remaining upstream documentation explains behavior and architecture.
   casts; Rust overflow checks (enabled in release, with `panic = "abort"`) may
   only back up operations that cannot overflow in the original. This applies to
   new work; known divergences in existing ports are tracked as issues (#75).
+- Keep state at the original's scope. A C++ global or static becomes a
+  process-wide Rust static, never `thread_local!`: GUI builds run input and
+  single-player commands on the main thread and the game loop on `ottd:game`,
+  serialized by the game-state mutex. The `-vnull` harness runs one thread and
+  cannot see the difference.
 - Call shared services directly. Rust calls `Random`, map and pool accessors and
   other shared services through `noexcept` C++ wrappers and keeps the original's
   control flow, so a port reads like the C++ body it replaces. Environmental
@@ -169,7 +174,12 @@ For substantive changes:
 Keep at most six unintegrated component branches, counting drafts and WIP
 (#157). Integrating reviewed work comes before starting a new component, and a
 component starts from integrated `rust-migration`, not from an unmerged
-component branch, unless the roadmap names the dependency.
+component branch, unless the roadmap names the dependency. A shared accessor
+or service is never such a dependency: the first PR to integrate adds it to the
+shared layer in its final typed form, and other drafts adopt it when they next
+update from base. Integrate drafts in order of readiness: none waits for
+another draft's services, and a reviewed PR gains no new scope before it
+integrates.
 
 Do not self-approve or imply that agents sharing GitHub credentials are independent
 GitHub accounts. With shared credentials, publish an explicitly attributed review
