@@ -231,9 +231,15 @@ and limits.
 
 Before pushing, run `python3 tools/preflight.py --base origin/rust-migration` for
 the inherited commit checker. Check receipts with `tools/evidence.py` rather than
-a hand-written script, and remove merged worktrees with `tools/worktrees.py`
-(`plan`, then `archive`). Until #173 baselines preflight's warning scan, compare
+a hand-written script. Until #173 baselines preflight's warning scan, compare
 its warnings against the reference build log instead of cleaning them up.
+
+A worktree exists only while its branch is unmerged. Once the PR merges, remove
+it with `git worktree remove PATH` and `git branch -d BRANCH`, both of which
+refuse dirty, locked or unmerged state. Do not archive or copy anything out of
+it first: evidence belongs in the PR or issue, and `.local/` holds only caches
+and rebuildable output. Delete ad hoc `.local/` output (downloaded CI artifacts,
+probe runs, logs) once the PR or issue records what it showed.
 
 Docs-only changes (only `docs/` or `*.md` files, such as roadmap updates) are
 committed directly to `rust-migration` as a single commit, without a PR.

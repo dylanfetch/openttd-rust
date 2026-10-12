@@ -410,16 +410,10 @@ verification and optional repeated simulation receipts with committed port metri
 and agent attribution; unsupported, failed or mismatched receipts fail. Narrow
 checks, legacy receipts, dirty source and unknown provenance remain labelled.
 
-After a clean task head has merged, `tools/worktrees.py plan|archive|resume
-/absolute/task --repo /surviving/clone --expected-head FULL_COMMIT` preserves
-ignored evidence, checksums and raw symlinks in a versioned journal before removing
-the worktree. Rebuildable `build-rust`, `.local/build-tools-rust` and
-`.local/build-reference` output is discarded. Lock paused and evidence worktrees
-with `git worktree lock --reason REASON PATH`. `plan` is read-only. `resume` continues the same journal after
-interruption. The helper protects the main/reference/locked worktrees and rejects
-dirty or unmerged heads. It requires POSIX locking and a single filesystem;
-an interrupted removal leaving an unregistered directory needs manual inspection.
-These tools require no T3 Code or host lifecycle API.
+After a task's PR merges, remove its worktree with `git worktree remove PATH`
+and its branch with `git branch -d BRANCH`. Nothing under the worktree is
+preserved: evidence lives in the PR or issue, and ignored output is rebuildable.
+Lock a paused worktree with `git worktree lock --reason REASON PATH`.
 
 Preserve OpenTTD copyright notices, credits, and GPLv2. Agent-generated work is welcome
 in this fork; upstream submission policies govern contributions to OpenTTD itself.

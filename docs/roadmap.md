@@ -52,6 +52,12 @@ Corrections, in order:
    measure the per-tile and per-vehicle-tick path against the original first.
 8. **Start a new component only after two of the four drafts integrate.**
 
+## Ninth steering review (2026-10-12, disk)
+
+Deleted 231 GB of merged-work cruft (`tools/worktrees.py` archives, `simulate`
+runtime copies, CI artifacts). Merged worktrees are now removed with plain git
+and nothing archived (AGENTS.md); land #224 (Phase 1 item 4).
+
 ## Earlier steering, still in force
 
 First review (10-04): call shared services directly (#107); measure before map
@@ -138,6 +144,8 @@ go in `KNOWN_FAILURES` with an issue, never in masks (`docs/rust-migration.md`).
    station refit and loading callbacks, industry NewGRF construction callbacks
    and candidate-side town generation.
 3. **#223 metric.** Original C++ retired apart from removed glue; small.
+4. **#224 disk hygiene.** Delete `tools/worktrees.py`; `simulate` drops its
+   runtime copies and keeps the newest 10 runs. Small; does not wait on ports.
 
 ## Phase 2: current work, in order
 
