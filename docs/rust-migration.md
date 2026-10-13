@@ -202,10 +202,13 @@ or complete log/stdout difference fails. Both modes compare their exit saves.
   id, build revision/NewGRF version, and `round_trip_time`, which the original
   saves uninitialized (#83); ports touching it need their own check.
 - Port divergences go in `KNOWN_FAILURES` by first divergence and issue.
-- Cited branch witnesses (#198): a module's `game_environment` enables its
-  counters when `scenario["witnesses"]` is set (distinct candidate, not
-  `--benchmark`), and its `check` calls `core.branch_witnesses`, which fails on
-  a missing profile or a zero required branch. Rail and water scenarios do so.
+- Cited branch witnesses (#198): one Rust facility (`witness.rs`) holds named
+  counters for every port; hits never cross into C++, and `OPENTTD_WITNESS`
+  makes `src/rust/witness.cpp` write `branch-witnesses.json` at exit. A module's
+  `game_environment` sets it when `scenario["witnesses"]` is set (distinct
+  candidate, not `--benchmark`), and its `check` calls `core.branch_witnesses`
+  with a counter prefix; a missing file or zero required branch fails. Rail and
+  water scenarios do so.
 - Games launch on Linux as an unprivileged user with child-only
   `RLIMIT_NPROC=0`. The original `StartNewThread` failure paths compute link
   graphs and write saves synchronously; graph scheduling, join dates and loaded
@@ -246,16 +249,6 @@ games wait directly for child exit with a timeout watchdog; ordinary runs retain
 subprocess timeout polling, which can add about 50 ms.
 The lock excludes harness games, not unrelated host activity. Port PRs record
 before/after ratios and commits; the roadmap sets the regression budget.
-
-Tree map-access measurements (#108) use the same scenarios and comparisons:
-`OPENTTD_TREE_PROFILE=1 python3 tools/migration.py simulate trees --jobs 1`;
-`PYTHONPATH=tools python3 -m simulation.trees <report.json>` summarizes the
-profile. Repeat the scenario command without the environment variable for timing
-without counters. Counts include generation warm-up; one tile-loop batch visits
-`Map::Size()/256` tiles, so 256 batches are a full-map sweep equivalent. The table
-separates generation and tree-tile-loop calls, counts FFI calls once (not returns),
-and reports copied record bytes. Elapsed times include startup, other components
-and save I/O; they neither isolate FFI cost nor establish a raw-map speedup.
 
 ## Native macOS arm64 Rust linkage
 
@@ -417,16 +410,10 @@ verification and optional repeated simulation receipts with committed port metri
 and agent attribution; unsupported, failed or mismatched receipts fail. Narrow
 checks, legacy receipts, dirty source and unknown provenance remain labelled.
 
-After a clean task head has merged, `tools/worktrees.py plan|archive|resume
-/absolute/task --repo /surviving/clone --expected-head FULL_COMMIT` preserves
-ignored evidence, checksums and raw symlinks in a versioned journal before removing
-the worktree. Rebuildable `build-rust`, `.local/build-tools-rust` and
-`.local/build-reference` output is discarded. Lock paused and evidence worktrees
-with `git worktree lock --reason REASON PATH`. `plan` is read-only. `resume` continues the same journal after
-interruption. The helper protects the main/reference/locked worktrees and rejects
-dirty or unmerged heads. It requires POSIX locking and a single filesystem;
-an interrupted removal leaving an unregistered directory needs manual inspection.
-These tools require no T3 Code or host lifecycle API.
+After a task's PR merges, remove its worktree with `git worktree remove PATH`
+and its branch with `git branch -d BRANCH`. Nothing under the worktree is
+preserved: evidence lives in the PR or issue, and ignored output is rebuildable.
+Lock a paused worktree with `git worktree lock --reason REASON PATH`.
 
 Preserve OpenTTD copyright notices, credits, and GPLv2. Agent-generated work is welcome
 in this fork; upstream submission policies govern contributions to OpenTTD itself.
@@ -1225,22 +1212,23 @@ limits, costs and errors (#99/#107). Original bodies compile only in portable
 builds. Map/pools, rendering and the editor forest-brush loop remain C++; the brush
 calls Rust placement.
 
-Straight-line Rust calls shared `noexcept` RNG/map/trigonometry leaves and component
-progress, sound, town-rating, iterator and company-debit leaves. Only water flooding
-(nested clears), NewGRF ambient callbacks (arbitrary code) and landscape-clear
-commands (reentry) and progress cancellation (abort callback + throw) return to C++;
-no world borrow survives them. Environmental failures terminate; `RANDOM_DEBUG` records the wrapper location. ABI IDs 38/42
-cover actions and the copied shared-service table; no global registration is needed.
-Save/load reaches only counter-address/reset exports, with no shared callback;
-DATE/TTD/TTO keep the original byte and DATE LoadCheck omission.
+Each entry (tile loop, tick, generate, scatter, place, plant, command, clear) is one
+plain call with a by-value settings record (#202). It reads typed plant/tree records
+and calls typed `noexcept` services from a designated `OpenTTDTreeServices` table and
+the shared map predicates (`GetTileZ` only where the original calls it) at the
+original points. Water flooding, the NewGRF ambient callback and nested landscape
+clears may reenter; no Rust borrow survives them and the tile is read again
+afterwards. World-generation abort is the only handoff: the progress wrapper keeps
+the exception, Rust returns with no further draw or write, and the facade rethrows.
+Save/load reaches only counter-address/reset exports; DATE/TTD/TTO keep the
+original byte and DATE LoadCheck omission.
 
 `python3 tools/migration.py simulate trees` covers four climates, tree placers,
 extra-placement modes, growth/ground/count states, counter reloads and commands;
-`--self` and `--soak` check reproducibility and longer runs. All saved fields and
-ordered command outcomes compare against the pinned original. Rust/native ABI
-checks cover explicit/editor policy, Money bounds, bitpattern7, table/counter
-lifetime, cancellation propagation and reentry. Actual editor interaction, diagonal map
-traversal, legacy saves and custom NewGRF ambient callbacks remain evidence limits.
+`--self` and `--soak` check reproducibility and longer runs. Cargo tests and the
+native ABI probe cover explicit/editor policy, Money bounds, bitpattern 7, abort
+return order, reentry and `GetTileZ` call points. Editor interaction, diagonal
+traversal, legacy saves, NewGRF ambient callbacks and the abort rethrow are unreached.
 
 ### Effect vehicles
 
@@ -1375,7 +1363,7 @@ depot reversals and reference-produced live-path reload. Native checks compare
 2,000 heap operations to unchanged CBinaryHeapT and check path copy/lifetime and
 reversal and fixed/map-derived limit control against unchanged CYapfBaseT.
 Each candidate run requires alternate docking, retries and cache/reversal
-witnesses (`ship-yapf-profile.json`); node limits use injected graphs, not
+witnesses (`ship_yapf.*` counters); node limits use injected graphs, not
 reachable-map claims. Arbitrary maps/NewGRFs and complete legacy saves are not
 exhaustive.
 
@@ -1408,30 +1396,29 @@ real custom NewGRF callbacks and complete historical saves remain evidence limit
 
 ### Road vehicle control and private state
 
-Issue #121 moves road tick/day control, movement, blocking/overtaking, reversal,
-station/depot transitions, crash expiry, service, speed/cache policy and turns to
-Rust. Each shell owns seven scalars and the canonical path; modern, split-vector
-and TTD/TTO adapters stage them in C++. Original algorithms/data stay portable.
-C++ keeps shared physics, map/pools, orders/loading, construction and rendering;
-#124 YAPF writes the same canonical path.
+#121 moves tick/day control, movement, blocking/overtaking, reversal, station/depot
+transitions, crash expiry, servicing and cache policy to Rust. Each shell owns
+seven scalars and the canonical path; #124 YAPF writes that same path. Modern,
+split-vector and TTD/TTO adapters retain field widths through C++ staging.
+Original bodies remain portable; C++ keeps physics, map/pools, orders/loading,
+construction, NewGRF callbacks and rendering.
 
-#155 replaces all fourteen allocated invocation kinds and twenty-two actions
-with typed synchronous entries/services. Native tables are borrowed; reads return
-only consumed fields, and nearby visitors traverse once without an ID vector.
-Bus classification runs only where needed; each entry resolves its owner once.
-No owner/path/world borrow spans callbacks, including nested cache, destination,
-speed, slope and trackdir calls. Deletion follows PreDestructor and returns a
-copied result. Commands return CommandCost, NewGRF resolution is bounded, and
-AI/Game events enqueue. Wrappers are noexcept; panic and escaping exceptions abort.
+#199 adds shared typed vehicle and GroundVehicle services (`vehicle.rs`,
+`vehicle_ffi.h`, `vehicle_services.{h,cpp}`). Entries take an opaque vehicle handle
+and owner; links carry both. Designated tables return only consumed fields and
+bundle consecutive original calls. One `OpenTTDSharedServices` supplies map
+predicates; `services::Map` provides arithmetic over entry dimensions. No owner,
+path or world borrow spans callbacks, reentry or deletion. Wrappers are noexcept;
+panics/escaping exceptions abort; ProcessOrders plus loading stays road-specific.
 
-Paired `simulate roads` and soak runs compare saved fields/logs for acceleration,
-service, blocking/overtaking, path, RNG, crossing/flooding, crash expiry and reload;
-`--self` controls reference determinism. Native checks cover typed ABI, nested
-getter/cache/destination/path mutation, destruction, movement data and save staging.
-Five idle exact benchmarks pass current caps +3% (#155/#186); CI timings are
-reporting only. Remaining boundary cleanup stays in #168 without integration exceptions.
-Actual legacy saves, NewGRFs, articulated/tram turns, sounds and viewport pixels
-remain unexercised domains tracked by #156.
+`simulate roads-`, `--self` and `--soak` compare acceleration, servicing,
+blocking/overtaking, path, RNG, crossing/flooding, crash expiry and reload.
+Native checks cover typed ABI, nested cache/destination/path mutation,
+destruction, movement data and save staging. Default player saves count actual
+outgoing services plus native visitor callbacks; plain Padhattan-2000 budgets
+13 per tick. Selected controller ingress and snapshot cache checks are reported
+separately; benchmarks disable counters. Legacy saves, custom NewGRFs,
+articulated/tram turns, sounds and viewport pixels remain limits tracked by #156.
 
 ### Company finances and economy lifecycle
 
@@ -1580,7 +1567,7 @@ Unexpected environmental exceptions terminate inside their wrappers; Rust panics
 native ABI checks for scalar widths, native C++ transient coordinate narrowing,
 direct callback order and nested owner mutation. `python3 tools/migration.py
 simulate water --jobs 2` (also `--soak`; `--self` counts nothing) requires the
-candidate's `ship-control-profile.json` branches in the water corpus for locks,
+candidate's `ship.*` witness branches in the water corpus for locks,
 aqueducts, rotation/reload, service, buoy/loading, depot restart, and moving
 build/sell/ID-reuse owners. The class case changes one existing clear
 canal input byte to `MakeRiver` class/owner encoding for both games and requires an
@@ -1607,8 +1594,8 @@ stack snapshots restore temporary orders once; ordered signal rollback scratch
 remains local. No ordinary-play service unwinds here.
 Validation uses the existing Padhattan manual/cargodist, realistic acceleration,
 90-degree reservation, live reload and real command-built controller scenarios;
-each candidate run requires its `rails.TRAIN_BRANCHES` counts in
-`train-profile.json` (extension rollback is distinct from #122's search rollback).
+each candidate run requires its `rails.TRAIN_BRANCHES` `train.*` witness counts
+(extension rollback is distinct from #122's search rollback).
 Unreached branches (wormhole swap, unequal/articulated moves, red two-way,
 force-signal, free-wagon deletion, depot re-entry, opposing PBS restore) are #156.
 A narrow unchanged-source comparison covers variable-length curve/reversal inputs
