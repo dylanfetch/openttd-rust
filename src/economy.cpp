@@ -1492,9 +1492,6 @@ void CargoPayment::AfterLoad()
 #endif /* WITH_RUST */
 
 #ifdef WITH_RUST
-static uint8_t RustLoadingCurrentCompany() noexcept { return OpenTTDCurrentCompany().base(); }
-static void RustLoadingSetCurrentCompany(uint8_t company) noexcept { OpenTTDSetCurrentCompany(CompanyID(company)); }
-
 static const OpenTTDStationLoading _rust_station_loading = {
 	.control = [](OpenTTDVehicle *handle) noexcept -> OpenTTDLoadingControl {
 		Vehicle *v = VehicleOf(handle);
@@ -1586,16 +1583,10 @@ static const OpenTTDStationLoading _rust_station_loading = {
 			static_cast<uint64_t>(EngInfo(v->engine_type)->refit_mask), v->cargo.ReservedCount(), v->cargo_cap, v->cargo_type
 		};
 	},
-	.cargo_remaining = [](OpenTTDVehicle *handle) noexcept -> OpenTTDCargoRemaining {
+	.cargo_capacity = [](OpenTTDVehicle *handle) noexcept -> OpenTTDCargoCapacity {
 		Vehicle *v = VehicleOf(handle);
 		return {
-			v->cargo.RemainingCount(), v->cargo_cap, v->cargo_type
-		};
-	},
-	.capacity_remaining = [](OpenTTDVehicle *handle) noexcept -> OpenTTDCapacityRemaining {
-		Vehicle *v = VehicleOf(handle);
-		return {
-			v->cargo.RemainingCount(), v->cargo_cap
+			v->cargo.RustOwner(), v->cargo_cap, v->cargo_type
 		};
 	},
 	.vehicle_type = [](OpenTTDVehicle *handle) noexcept -> uint8_t {
@@ -1668,11 +1659,8 @@ static const OpenTTDStationLoading _rust_station_loading = {
 	.station_length_penalty = []() noexcept -> bool {
 		return _settings_game.order.station_length_loading_penalty;
 	},
-	.current_company = RustLoadingCurrentCompany,
-	.last_station_visited = [](OpenTTDVehicle *handle) noexcept -> uint16_t {
-		Vehicle *v = VehicleOf(handle);
-		return v->last_station_visited.base();
-	},
+	.current_company = GetRustCompanyFinanceServices().current_company,
+	.vehicle = &GetRustVehicleServices(),
 	.total_count = [](OpenTTDVehicle *handle) noexcept -> uint32_t {
 		Vehicle *v = VehicleOf(handle); return v->cargo.TotalCount();
 	},
@@ -1729,7 +1717,7 @@ static const OpenTTDStationLoading _rust_station_loading = {
 			}
 		}
 	},
-	.set_current_company = RustLoadingSetCurrentCompany,
+	.set_current_company = GetRustCompanyFinanceServices().set_current_company,
 	.next_vehicle = GetRustVehicleServices().next,
 	.next_articulated = [](OpenTTDVehicle *handle) noexcept -> OpenTTDVehicle * {
 		Vehicle *v = VehicleOf(handle); return RustVehicle(v->GetNextArticulatedPart());
@@ -2564,7 +2552,7 @@ static void LoadUnloadVehicle(Vehicle *front)
 void LoadUnloadStation(Station *st)
 {
 #ifdef WITH_RUST
-	openttd_rust_station_load(st, &GetRustStationServices(), &_rust_station_loading);
+	openttd_rust_station_load(st->rust_service.get(), &GetRustStationServices(), &_rust_station_loading);
 #else
 	/* No vehicle is here... */
 	if (st->loading_vehicles.empty()) return;

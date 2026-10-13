@@ -604,11 +604,9 @@ struct RustStationTruncation {
 	StationCargoAmountMap::iterator iterator;
 };
 static const OpenTTDStationServices _rust_station_services = {
-	.base_station = [](OpenTTDStation *station) noexcept -> OpenTTDBaseStation * {
-		return station;
-	},
-	.station = [](uint16_t id) noexcept -> OpenTTDStation * {
-		return Station::Get(StationID(id));
+	.station = [](uint16_t id) noexcept -> OpenTTDLoadingStation {
+		Station *st = Station::Get(StationID(id));
+		return {.native = st, .base = st, .state = st->rust_service.get()};
 	},
 	.station_owner = [](OpenTTDBaseStation *handle) noexcept -> uint8_t {
 		return OpenTTDStationOwner(handle).base();

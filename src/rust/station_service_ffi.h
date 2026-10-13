@@ -62,12 +62,10 @@ struct OpenTTDStationExclusivity {
 	uint8_t counter;
 	uint8_t exclusive;
 };
-struct OpenTTDCapacityRemaining {
-	uint32_t remaining;
-	uint16_t capacity;
-};
-struct OpenTTDCargoRemaining {
-	uint32_t remaining;
+/* Stable Rust cargo owner and the native capacity/type used at this read point.
+ * Rust reads remaining counts directly; refresh after refit or reservation. */
+struct OpenTTDCargoCapacity {
+	const OpenTTDCargoList *owner;
 	uint16_t capacity;
 	uint8_t cargo;
 };
@@ -123,9 +121,15 @@ struct OpenTTDTruncatedSource {
 	uint16_t source;
 	bool present;
 };
+/* Station lookup identities and canonical owner, resolved together before
+ * next-station discovery. No borrowed station fields cross a callback. */
+struct OpenTTDLoadingStation {
+	OpenTTDStation *native;
+	OpenTTDBaseStation *base;
+	OpenTTDStationService *state;
+};
 struct OpenTTDStationServices {
-	OpenTTDBaseStation *(*base_station)(OpenTTDStation *) noexcept;
-	OpenTTDStation *(*station)(uint16_t) noexcept;
+	OpenTTDLoadingStation (*station)(uint16_t) noexcept;
 	uint8_t (*station_owner)(OpenTTDBaseStation *) noexcept;
 	OpenTTDStationExclusivity (*station_exclusivity)(OpenTTDBaseStation *) noexcept;
 	OpenTTDBaseStation * (*station_next)(void *) noexcept;
@@ -219,8 +223,7 @@ struct OpenTTDStationLoading {
 	OpenTTDDeliveryRemaining (*delivery_remaining)(OpenTTDVehicle *) noexcept;
 	OpenTTDCargoStored (*cargo_stored)(OpenTTDVehicle *) noexcept;
 	OpenTTDCargoReservation (*cargo_reservation)(OpenTTDVehicle *) noexcept;
-	OpenTTDCargoRemaining (*cargo_remaining)(OpenTTDVehicle *) noexcept;
-	OpenTTDCapacityRemaining (*capacity_remaining)(OpenTTDVehicle *) noexcept;
+	OpenTTDCargoCapacity (*cargo_capacity)(OpenTTDVehicle *) noexcept;
 	uint8_t (*vehicle_type)(OpenTTDVehicle *) noexcept;
 	uint8_t (*cargo_type)(OpenTTDVehicle *) noexcept;
 	uint16_t (*cargo_cap)(OpenTTDVehicle *) noexcept;
@@ -245,7 +248,7 @@ struct OpenTTDStationLoading {
 	bool (*passenger_cargo)(OpenTTDVehicle *) noexcept;
 	bool (*station_length_penalty)() noexcept;
 	uint8_t (*current_company)() noexcept;
-	uint16_t (*last_station_visited)(OpenTTDVehicle *) noexcept;
+	const OpenTTDVehicleServices *vehicle;
 	uint32_t (*total_count)(OpenTTDVehicle *) noexcept;
 	int32_t (*order_time)(OpenTTDVehicle *) noexcept;
 	uint64_t (*refit_mask)(OpenTTDVehicle *) noexcept;
@@ -312,7 +315,8 @@ OpenTTDStationQueueEntry *openttd_rust_station_queue_next(const OpenTTDStationSe
 void *openttd_rust_station_queue_value(const OpenTTDStationQueueEntry *);
 OpenTTDStationQueueEntry *openttd_rust_station_queue_erase_node(OpenTTDStationService *, OpenTTDStationQueueEntry *);
 void openttd_rust_station_prepare(OpenTTDVehicle *, const OpenTTDStationServices *, const OpenTTDStationLoading *);
-void openttd_rust_station_load(OpenTTDStation *, const OpenTTDStationServices *, const OpenTTDStationLoading *);
+/* An empty queue touches only its Rust owner; service tables may be null then. */
+void openttd_rust_station_load(OpenTTDStationService *, const OpenTTDStationServices *, const OpenTTDStationLoading *);
 void openttd_rust_station_acceptance(OpenTTDBaseStation *, const OpenTTDStationServices *, uint8_t);
 void openttd_rust_station_rating(OpenTTDBaseStation *, const OpenTTDStationServices *);
 void openttd_rust_station_watched(OpenTTDBaseStation *, const OpenTTDStationServices *);

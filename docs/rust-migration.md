@@ -1529,9 +1529,11 @@ acceptance, ratings/truncation, admission/distribution and periodic/stale-link
 control. Packet, flow, link-graph, map and geometry storage remain C++.
 
 Issue #214 replaces numeric dispatch with borrowed typed noexcept tables (ABI
-110-115), narrow observations (500-514), and caller-owned native iterator/container
+110-115), narrow observations (500-515), and caller-owned native iterator/container
 frames. Raw field access ends before callbacks; refit and payment/industry reentry
-see current state. Stable queue nodes preserve iterator identity. Native save
+see current state. Empty station ticks enter Rust with the queue owner directly; per-vehicle
+lookup precedes next-station discovery. Cargo remaining counts read their Rust
+owner at each original observation. Stable queue nodes preserve iterator identity. Native save
 scopes retain partial changes on failure. #117 production flush remains once at
 the original end of LoadUnloadStation. Portable bodies remain unchanged.
 

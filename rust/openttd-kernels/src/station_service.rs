@@ -259,15 +259,18 @@ pub struct StationExclusivity {
     pub(crate) exclusive: u8,
 }
 #[repr(C)]
-pub struct CapacityRemaining {
-    pub(crate) remaining: u32,
-    pub(crate) capacity: u16,
-}
-#[repr(C)]
-pub struct CargoRemaining {
-    pub(crate) remaining: u32,
+pub struct CargoCapacity {
+    pub(crate) owner: *const crate::cargo_storage::List,
     pub(crate) capacity: u16,
     pub(crate) cargo: u8,
+}
+impl CargoCapacity {
+    fn remaining(&self) -> u32 {
+        // SAFETY: the synchronous native observation supplies the stable cargo
+        // owner of a live vehicle. This scalar read ends before any callback;
+        // callers obtain a new observation after refit/reservation mutations.
+        unsafe { crate::cargo_storage::openttd_rust_cargo_list_remaining(self.owner) }
+    }
 }
 #[repr(C)]
 pub struct CargoReservation {
@@ -339,8 +342,7 @@ pub struct TruncatedSource {
 }
 #[repr(C)]
 pub struct World {
-    pub(crate) base_station: extern "C" fn(*mut Station) -> *mut BaseStation,
-    pub(crate) station: extern "C" fn(u16) -> *mut Station,
+    pub(crate) station: extern "C" fn(u16) -> LoadingStation,
     pub(crate) station_owner: extern "C" fn(*mut BaseStation) -> u8,
     pub(crate) station_exclusivity: extern "C" fn(*mut BaseStation) -> StationExclusivity,
     pub(crate) station_next: extern "C" fn(*mut c_void) -> *mut BaseStation,
@@ -1135,8 +1137,7 @@ pub struct Loading {
     pub(crate) delivery_remaining: extern "C" fn(VehicleRef) -> DeliveryRemaining,
     pub(crate) cargo_stored: extern "C" fn(VehicleRef) -> CargoStored,
     pub(crate) cargo_reservation: extern "C" fn(VehicleRef) -> CargoReservation,
-    pub(crate) cargo_remaining: extern "C" fn(VehicleRef) -> CargoRemaining,
-    pub(crate) capacity_remaining: extern "C" fn(VehicleRef) -> CapacityRemaining,
+    pub(crate) cargo_capacity: extern "C" fn(VehicleRef) -> CargoCapacity,
     pub(crate) vehicle_type: extern "C" fn(VehicleRef) -> u8,
     pub(crate) cargo_type: extern "C" fn(VehicleRef) -> u8,
     pub(crate) cargo_cap: extern "C" fn(VehicleRef) -> u16,
@@ -1161,7 +1162,7 @@ pub struct Loading {
     pub(crate) passenger_cargo: extern "C" fn(VehicleRef) -> bool,
     pub(crate) station_length_penalty: extern "C" fn() -> bool,
     pub(crate) current_company: extern "C" fn() -> u8,
-    pub(crate) last_station_visited: extern "C" fn(VehicleRef) -> u16,
+    pub(crate) vehicle: *const crate::vehicle::VehicleServices,
     pub(crate) total_count: extern "C" fn(VehicleRef) -> u32,
     pub(crate) order_time: extern "C" fn(VehicleRef) -> i32,
     pub(crate) refit_mask: extern "C" fn(VehicleRef) -> u64,
@@ -1236,11 +1237,12 @@ fn parts(l: &Loading, v: VehicleRef, mut action: impl FnMut(VehicleRef) -> bool)
     true
 }
 /// Native identities retained for one loading entry; no field borrow crosses a callback.
+#[repr(C)]
 #[derive(Clone, Copy)]
-struct LoadingStation {
-    native: *mut Station,
-    base: *mut BaseStation,
-    state: *mut Service,
+pub struct LoadingStation {
+    pub(crate) native: *mut Station,
+    pub(crate) base: *mut BaseStation,
+    pub(crate) state: *mut Service,
 }
 fn may_load(st: LoadingStation, v: VehicleRef, w: &World, l: &Loading) -> bool {
     if (w.station_owner)(st.base) != 16 {
@@ -1271,9 +1273,9 @@ fn reserve_consist(
         };
         if reserve_part {
             parts(l, v, |part| {
-                let observed = (l.capacity_remaining)(part);
+                let observed = (l.cargo_capacity)(part);
                 let cap = u32::from(observed.capacity);
-                let remaining = observed.remaining;
+                let remaining = observed.remaining();
                 if cap > remaining && may_load(st, part, w, l) {
                     (l.reserve_cargo)(st.native, part, cap - remaining, next);
                 }
@@ -1283,10 +1285,10 @@ fn reserve_consist(
         if let Some(ref mut capleft) = capleft
             && (l.cargo_cap)(v) != 0
         {
-            let observed = (l.cargo_remaining)(v);
+            let observed = (l.cargo_capacity)(v);
             let cargo = usize::from(observed.cargo);
             capleft[cargo] = capleft[cargo]
-                .wrapping_add(u32::from(observed.capacity).wrapping_sub(observed.remaining));
+                .wrapping_add(u32::from(observed.capacity).wrapping_sub(observed.remaining()));
         }
         current = (l.next_vehicle)(v);
     }
@@ -1380,16 +1382,16 @@ fn refit_vehicle(
     }
     let do_reserve = auto || (l.full_load_order)((l.first_vehicle)(v));
     parts(l, start, |part| {
-        let observed = (l.cargo_remaining)(part);
-        let remaining = u32::from(observed.capacity).wrapping_sub(observed.remaining);
+        let observed = (l.cargo_capacity)(part);
+        let remaining = u32::from(observed.capacity).wrapping_sub(observed.remaining());
         if do_reserve {
             (l.reserve_cargo)(st.native, part, remaining, next);
         }
         // Reserve changes RemainingCount; observe again at the original point.
-        let observed = (l.cargo_remaining)(part);
+        let observed = (l.cargo_capacity)(part);
         let cargo = usize::from(observed.cargo);
         capleft[cargo] = capleft[cargo]
-            .wrapping_add(u32::from(observed.capacity).wrapping_sub(observed.remaining));
+            .wrapping_add(u32::from(observed.capacity).wrapping_sub(observed.remaining()));
         true
     });
     (l.set_current_company)(old_company);
@@ -1402,13 +1404,10 @@ pub unsafe extern "C" fn openttd_rust_station_prepare(
 ) {
     let w = unsafe { &*world };
     let l = unsafe { &*loading };
-    let native = (w.station)((l.last_station_visited)(front));
-    let base = (w.base_station)(native);
-    let st = LoadingStation {
-        native,
-        base,
-        state: (w.owner)(base),
-    };
+    // SAFETY: the shared immutable vehicle table outlives this entry. Station
+    // identities and owner are resolved before next-station discovery (#228).
+    let vehicle = unsafe { &*l.vehicle };
+    let st = (w.station)((vehicle.last_station)(front));
     unsafe {
         openttd_rust_station_queue_push(st.state, front.0.as_ptr().cast());
     }
@@ -1448,13 +1447,10 @@ fn update_ticks(front: VehicleRef, st: LoadingStation, kind: u8, mut ticks: i32,
 // Preserve complete loading control at the source observation points.
 #[allow(clippy::too_many_lines)]
 unsafe fn load_vehicle(front: VehicleRef, w: &World, l: &Loading) {
-    let native = (w.station)((l.last_station_visited)(front));
-    let base = (w.base_station)(native);
-    let st = LoadingStation {
-        native,
-        base,
-        state: (w.owner)(base),
-    };
+    // SAFETY: the shared immutable vehicle table outlives this entry. Station
+    // identities and owner are resolved before next-station discovery (#228).
+    let vehicle = unsafe { &*l.vehicle };
+    let st = (w.station)((vehicle.last_station)(front));
     let mut body = |next| {
         let control = (l.control)(front);
         let auto = control.refit && control.refit_cargo == 253;
@@ -1713,23 +1709,18 @@ unsafe fn load_vehicle(front: VehicleRef, w: &World, l: &Loading) {
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_station_load(
-    native: *mut Station,
+    state: *mut Service,
     world: *const World,
     loading: *const Loading,
 ) {
-    let w = unsafe { &*world };
-    let l = unsafe { &*loading };
-    let base = (w.base_station)(native);
-    let st = LoadingStation {
-        native,
-        base,
-        state: (w.owner)(base),
-    };
-    let state = st.state;
+    // C++ supplies the queue owner directly: no callback precedes the empty
+    // queue check, and the queue station is not the vehicles' loading station.
     let mut node = unsafe { openttd_rust_station_queue_first(state) };
     if node.is_null() {
         return;
     }
+    let w = unsafe { &*world };
+    let l = unsafe { &*loading };
     let mut last = None;
     while !node.is_null() {
         let v = VehicleRef(unsafe {
