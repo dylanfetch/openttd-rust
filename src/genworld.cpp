@@ -73,7 +73,6 @@ struct GenWorldInfo {
 /** Whether we are generating the map or not. */
 bool _generating_world;
 
-class AbortGenerateWorldSignal { };
 
 /**
  * Generation is done; show windows again and delete the progress window.

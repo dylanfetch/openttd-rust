@@ -116,13 +116,19 @@ struct Industry : IndustryPool::PoolItem<&_industry_pool> {
 	using ProducedCargoes = RustIndustryVector<ProducedCargo, true>;
 	using AcceptedCargoes = RustIndustryVector<AcceptedCargo, false>;
 	RustIndustryOwner production_owner{openttd_rust_industry_new(), openttd_rust_industry_destroy};
+	OpenTTDIndustryMetadata &construction_fields = *openttd_rust_industry_metadata(this->production_owner.get());
+	OpenTTDIndustryMetadata &Metadata() const { return this->construction_fields; }
 	OpenTTDIndustryFields &ProductionFields() const { return *openttd_rust_industry_fields(this->production_owner.get()); }
 #else
 	using ProducedCargoes = std::vector<ProducedCargo>;
 	using AcceptedCargoes = std::vector<AcceptedCargo>;
 #endif
 
-	TileArea location{INVALID_TILE, 0, 0}; ///< Location of the industry
+#ifdef WITH_RUST
+	TileArea &location = *reinterpret_cast<TileArea *>(&this->Metadata().tile);
+#else
+	TileArea location{INVALID_TILE, 0, 0};
+#endif ///< Location of the industry
 	Town *town = nullptr; ///< Nearest town
 	Station *neutral_station = nullptr; ///< Associated neutral station
 #ifdef WITH_RUST
@@ -151,9 +157,21 @@ struct Industry : IndustryPool::PoolItem<&_industry_pool> {
 	uint16_t counter = 0;
 #endif ///< used for animation and/or production (if available cargo)
 
-	IndustryType type = 0; ///< type of industry.
-	Owner owner = INVALID_OWNER; ///< owner of the industry.  Which SHOULD always be (imho) OWNER_NONE
-	Colours random_colour = COLOUR_BEGIN; ///< randomized colour of the industry, for display purpose
+#ifdef WITH_RUST
+	IndustryType &type = this->Metadata().type;
+#else
+	IndustryType type = 0;
+#endif ///< type of industry.
+#ifdef WITH_RUST
+	Owner &owner = *reinterpret_cast<Owner *>(&this->Metadata().owner);
+#else
+	Owner owner = INVALID_OWNER;
+#endif ///< owner of the industry.  Which SHOULD always be (imho) OWNER_NONE
+#ifdef WITH_RUST
+	Colours &random_colour = *reinterpret_cast<Colours *>(&this->Metadata().random_colour);
+#else
+	Colours random_colour = COLOUR_BEGIN;
+#endif ///< randomized colour of the industry, for display purpose
 #ifdef WITH_RUST
 	TimerGameEconomy::Year &last_prod_year = *reinterpret_cast<TimerGameEconomy::Year *>(&this->ProductionFields().last_prod_year);
 #else
@@ -174,19 +192,67 @@ struct Industry : IndustryPool::PoolItem<&_industry_pool> {
 	StationList stations_near{}; ///< NOSAVE: List of nearby stations.
 	mutable std::string cached_name{}; ///< NOSAVE: Cache of the resolved name of the industry
 
-	Owner founder = INVALID_OWNER; ///< Founder of the industry
-	TimerGameCalendar::Date construction_date{}; ///< Date of the construction of the industry
-	uint8_t construction_type = 0; ///< Way the industry was constructed (@see IndustryConstructionType)
-	uint8_t selected_layout = 0; ///< Which tile layout was used when creating the industry
-	Owner exclusive_supplier = INVALID_OWNER; ///< Which company has exclusive rights to deliver cargo (INVALID_OWNER = anyone)
-	Owner exclusive_consumer = INVALID_OWNER; ///< Which company has exclusive rights to take cargo (INVALID_OWNER = anyone)
-	EncodedString text{}; ///< General text with additional information.
+#ifdef WITH_RUST
+	Owner &founder = *reinterpret_cast<Owner *>(&this->Metadata().founder);
+#else
+	Owner founder = INVALID_OWNER;
+#endif ///< Founder of the industry
+#ifdef WITH_RUST
+	TimerGameCalendar::Date &construction_date = *reinterpret_cast<TimerGameCalendar::Date *>(&this->Metadata().construction_date);
+#else
+	TimerGameCalendar::Date construction_date{};
+#endif ///< Date of the construction of the industry
+#ifdef WITH_RUST
+	uint8_t &construction_type = this->Metadata().construction_type;
+#else
+	uint8_t construction_type = 0;
+#endif ///< Way the industry was constructed (@see IndustryConstructionType)
+#ifdef WITH_RUST
+	uint8_t &selected_layout = this->Metadata().selected_layout;
+#else
+	uint8_t selected_layout = 0;
+#endif ///< Which tile layout was used when creating the industry
+#ifdef WITH_RUST
+	Owner &exclusive_supplier = *reinterpret_cast<Owner *>(&this->Metadata().exclusive_supplier);
+#else
+	Owner exclusive_supplier = INVALID_OWNER;
+#endif ///< Which company has exclusive rights to deliver cargo (INVALID_OWNER = anyone)
+#ifdef WITH_RUST
+	Owner &exclusive_consumer = *reinterpret_cast<Owner *>(&this->Metadata().exclusive_consumer);
+#else
+	Owner exclusive_consumer = INVALID_OWNER;
+#endif ///< Which company has exclusive rights to take cargo (INVALID_OWNER = anyone)
+#ifdef WITH_RUST
+	bool HasText() const { return openttd_rust_industry_text(this->production_owner.get()).size != 0; }
+	EncodedString GetText() const
+	{
+		auto view = openttd_rust_industry_text(this->production_owner.get());
+		return EncodedString(std::string(reinterpret_cast<const char *>(view.data), view.size));
+	}
+	static OpenTTDByteSpan TextView(const EncodedString &value) { return {reinterpret_cast<const uint8_t *>(value.string.data()), value.string.size()}; }
+	void SetText(const EncodedString &value) { auto text = TextView(value); openttd_rust_industry_set_text(this->production_owner.get(), text.data, text.size); }
+#else
+	bool HasText() const { return !this->text.empty(); }
+	EncodedString GetText() const { return this->text; }
+	void SetText(const EncodedString &value) { this->text = value; }
+	EncodedString text{};
+#endif ///< General text with additional information.
 
-	uint16_t random = 0; ///< Random value used for randomisation of all kinds of things
+#ifdef WITH_RUST
+	uint16_t &random = this->Metadata().random;
+#else
+	uint16_t random = 0;
+#endif ///< Random value used for randomisation of all kinds of things
 
 	PersistentStorage *psa = nullptr; ///< Persistent storage for NewGRF industries.
 
+#ifdef WITH_RUST
+	Industry(TileIndex tile = INVALID_TILE) { std::construct_at(&this->location, tile, 0, 0); }
+	/** Synchronous resolver shell; its Rust stack owner outlives this shell. */
+	explicit Industry(OpenTTDIndustry *borrowed) : production_owner(borrowed, [](OpenTTDIndustry *) {}) { std::construct_at(&this->location, INVALID_TILE, 0, 0); }
+#else
 	Industry(TileIndex tile = INVALID_TILE) : location(tile, 0, 0) {}
+#endif
 	~Industry();
 
 	void RecomputeProductionMultipliers();
@@ -324,7 +390,11 @@ struct Industry : IndustryPool::PoolItem<&_industry_pool> {
 		return this->cached_name;
 	}
 
-	static std::array<FlatSet<IndustryID>, NUM_INDUSTRYTYPES> industries; ///< List of industries of each type.
+#ifdef WITH_RUST
+	static std::array<RustIndustryRegistry, NUM_INDUSTRYTYPES> industries;
+#else
+	static std::array<FlatSet<IndustryID>, NUM_INDUSTRYTYPES> industries;
+#endif ///< List of industries of each type.
 
 private:
 	void FillCachedName() const;
@@ -390,6 +460,11 @@ enum IndustryDirectoryInvalidateWindowData : uint8_t {
 void TrimIndustryAcceptedProduced(Industry *ind);
 #ifdef WITH_RUST
 const OpenTTDIndustryServices &GetIndustryRustServices();
+const OpenTTDIndustryLifecycleServices &GetIndustryLifecycleRustServices();
+OpenTTDIndustryRandomisationSpec IndustryRandomisationSpec(uint32_t tile) noexcept;
+OpenTTDIndustryReseed IndustryResolveReseed(uint32_t tile, uint16_t gfx, void *industry, uint8_t waiting) noexcept;
+OpenTTDIndustryAnimationSpec IndustryAnimationSpec(uint32_t tile) noexcept;
+void IndustryChangeAnimationFrame(const void *spec, uint32_t tile, uint32_t random, uint32_t parameter) noexcept;
 #endif
 
 #endif /* INDUSTRY_H */

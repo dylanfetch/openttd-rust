@@ -13,18 +13,19 @@ ROAD = "roadveh[0]/"
 COMMON = ROAD + "common[0]/"
 AI_FOLDER = "road-scenario-ai"
 
-# Best-known idle-host medians at a014255973: median of three --benchmark 3
-# invocation medians per scenario. All 54 pairs had equal semantic state/logs.
-# Baseline evidence: https://github.com/dylanfetch/openttd-rust/issues/155#issuecomment-6136739607
+# Idle-host medians at d162b66bfe: median of three --benchmark 3 invocations.
+# All 54 pairs had equal semantic state/logs; invocation spread was 0.31-1.89%.
+# https://github.com/dylanfetch/openttd-rust/issues/155#issuecomment-6141061273
 # Recalibration (#229) is not a code improvement or a port regression waiver.
-# Lower these only after coordinated measurements; never raise them for a port.
+# Lower a cap only when repeated improvement exceeds the invocation spread;
+# never raise one for a port.
 SPEED_BUDGETS = {
-    "generate-tgp-256-1": 1.1671469740634008,
-    "play-opus-55-167-002-manual": 1.265122265122265,
-    "play-grok-159-001-manual": 1.2617354196301565,
-    "play-padhattan-ridge-1996-manual": 1.2964509394572026,
-    "play-padhattan-ridge-2000-manual": 1.3243647234678624,
-    "play-padhattan-ridge-2016-manual": 1.444232602478551,
+    "generate-tgp-256-1": 1.1638418079096045,
+    "play-opus-55-167-002-manual": 1.2584556477345246,
+    "play-grok-159-001-manual": 1.2538677918424754,
+    "play-padhattan-ridge-1996-manual": 1.2747474747474747,
+    "play-padhattan-ridge-2000-manual": 1.3492537313432835,
+    "play-padhattan-ridge-2016-manual": 1.427007299270073,
 }
 
 
