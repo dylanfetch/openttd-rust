@@ -6,10 +6,10 @@ blank lines included):
 
   rust     lines added under rust/
   tooling  lines added under tools/
-  glue     lines added under src/ that are compiled when WITH_RUST is defined
+  glue     fork-added src/ lines newly compiled when WITH_RUST is defined
   retired  change in retired lines of the pinned original, excluding fork glue
   net_glue change in compiled fork-added src/ lines against the pinned original
-  glue_removed  glue added minus net glue (removed or made portable-only)
+  glue_removed  fork-added lines removed or made portable-only
 
 --whole-fork measures totals against the pinned original and the line share of
 simulation sources retired. Comments, blank lines and data tables count; this is
@@ -180,7 +180,8 @@ def simulation_source(path):
     )
 
 
-def source_metrics(base, head="HEAD"):
+def source_metrics(base, head="HEAD", glue_lines=None):
+    """Raw diff counts; optionally collect compiled added-line identities."""
     result = {"rust": 0, "tooling": 0, "glue": 0, "retired": 0, "simulation": 0}
     sources = (".cpp", ".h", ".hpp", ".c", ".cc", ".mm")
     for status, old, new in changes(base, head):
@@ -210,19 +211,39 @@ def source_metrics(base, head="HEAD"):
             result["simulation"] += retired
         if status == "D":
             continue
-        result["glue"] += sum(
-            1 for n in numbers if n <= len(head_tags) and head_tags[n - 1] != "cpp"
-        )
+        added_glue = {
+            n for n in numbers if n <= len(head_tags) and head_tags[n - 1] != "cpp"
+        }
+        result["glue"] += len(added_glue)
+        if glue_lines is not None:
+            glue_lines[new] = added_glue
     return result
 
 
 def metrics(base, head="HEAD", whole_fork=False):
     result = source_metrics(base, head)
-    before = source_metrics(BASELINE, base)
-    after = result.copy() if base == BASELINE else source_metrics(BASELINE, head)
+    before_glue, after_glue = {}, {}
+    before = source_metrics(BASELINE, base, before_glue)
+    after = source_metrics(BASELINE, head, after_glue)
     result["retired"] = after["retired"] - before["retired"]
     result["net_glue"] = after["glue"] - before["glue"]
-    result["glue_removed"] = result["glue"] - result["net_glue"]
+    result["glue"], result["glue_removed"] = 0, 0
+    # Compare fork line identities, excluding restored original lines and
+    # including unchanged fork lines whose WITH_RUST compilation state changes.
+    for status, old, new in changes(base, head):
+        old_lines, new_lines = before_glue.get(old, set()), after_glue.get(new, set())
+        if not old_lines and not new_lines:
+            continue
+        kept = (
+            {}
+            if status in ("A", "D")
+            else surviving(
+                list(hunks(base, head, old, new)), len(classify(show(base, old)))
+            )
+        )
+        retained = {kept[n] for n in old_lines if n in kept and kept[n] in new_lines}
+        result["glue"] += len(new_lines - retained)
+        result["glue_removed"] += len(old_lines) - len(retained)
     result.pop("simulation")
     if whole_fork:
         paths = git("ls-tree", "-r", "--name-only", BASELINE, "src/").splitlines()
