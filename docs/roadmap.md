@@ -4,14 +4,13 @@ Root owns selection here; `AGENTS.md` and `docs/rust-migration.md` define proces
 If an issue conflicts, follow this roadmap and report it to root. Keep this
 forward-looking, about 200 lines; completed work is one row, with evidence in PRs.
 
-## Where the fork stands (2026-10-13, `21e2c9ea60`)
+## Where the fork stands (2026-10-13, `648d44e940`)
 
-- Twenty-two ownership ports. Whole fork against the pinned original: Rust
-  52,104 / tooling 25,940 / C++ glue 23,176 / original C++ retired 34,426 (7.3%
-  of `src/`); simulation-source share 26,502 / 102,615 (25.83%, #226).
-- #228/#232 integrated; five PRs remain. Original retirement is unchanged
-  across these fidelity/setup changes. #218 ownership is next, ahead of
-  further conversion; platform CI now reuses versioned OpenGFX archives.
+- Twenty-three ownership ports. Whole fork against the pinned original: Rust
+  55,079 / tooling 26,610 / C++ glue 24,570 / original C++ retired 36,162 (7.68%
+  of all `src/` sources); simulation-source share 28,215 / 102,615 (27.50%, #226).
+- #218 industry construction/lifecycle is integrated; four reviewed PRs remain
+  paused. #228/#232 are integrated; platform CI reuses versioned OpenGFX archives.
 - Repeated idle baseline at `a014255973` (#155): Opus 1.265, Grok 1.262,
   Padhattan-1996 1.296, Padhattan-2000 1.324, TGP 1.167, Padhattan-2016 1.444.
   #218 fits all six caps and lowers observed medians in its PR; #230's separate
@@ -108,6 +107,7 @@ Metrics are `tools/port-metrics.py`: Rust / tooling / C++ glue / C++ retired.
 | #138 | Orders lifecycle and commands | #176 via #184 | `2a76d5f287` | 4554 / 519 / 1752 / 2518 |
 | #146 | Ship controller and private state | #152 via #184 | `2a76d5f287` | 1101 / 270 / 893 / 721 |
 | #147 | Fleet groups and autoreplace | #197 | `a7a6e6650a` | 2686 / 577 / 1199 / 1454 |
+| #150 | Industry construction and lifecycle | #218 | `648d44e940` | 3066 / 701 / 1433 / 1736 |
 
 Harness and process: #72 harness (#85), #84 play saves (#87), #97 provenance
 freeze (#100), #88 Ruff (#92), #75 partial-pixel fidelity (#91), #90 world-state
@@ -159,9 +159,7 @@ go in `KNOWN_FAILURES` with an issue, never in masks (`docs/rust-migration.md`).
 Integrate reviewed work first, in order of readiness; at most six unintegrated
 branches (#157). Independent items (#156, #223, caps) may run in parallel.
 
-1. **Integrate #218.** Shared map/company/cost/height services are consolidated;
-   root verified fixing diffs and cap-data review; timing fits all six caps.
-   Update from base and obtain exact-head full CI. #209 is integrated.
+1. **#218 integrated**; see the completed ownership row. #209 is integrated.
 2. **#217 station/loading**, with the changes in its PR comment.
 3. **#216 town, narrowed**, then town founding/generation, the house tile loop,
    and town commands, authority actions and deletion as their own ports.
@@ -176,18 +174,17 @@ The #108 decision keeps C++ map arrays and direct bundled `noexcept` services.
 
 ## Resume checkpoint
 
-Resumed with the eighth/ninth steering corrections; #209/#225/#228/#232
-integrated, with worktrees removed and CI_ON_DEMAND restored after #232.
-#218 is the second original draft required before new ownership starts.
-Five branches remain; evidence stays on PRs.
+Paused at the user's request. #218 integrated at `648d44e940`; post-merge CI
+is green, and its worktree and local branch are removed. Four PRs remain open
+at their reviewed heads, with state comments on each and no base updates or
+CI requests during wind-down. The Phase 2 work order is unchanged.
 
 | Issue / PR | Branch (worktree suffix), head | State and next step |
 | --- | --- | --- |
-| #150 / #218 | `industry-construction-150`, `9c2083e328` | Ownership/boundary/cap fixes reviewed and verified; timing passes. Adopt #232 base; full CI next. |
-| #214 / #217 | `station-loading-direct-214`, `f53ea99f6d` | #228 source conflict reviewed/verified; 17 paired scenarios pass. Adopt base; full CI after #218. |
-| #148 / #216 | `town-lifecycle-148`, `079350b3a7` | Narrowed/state/guard and company-base fixes reviewed/verified. Adopt #218 native cost helpers on base update; full CI. |
-| #223 / #226 | `metric-original-223`, `e20519eb78` | Reviewed identity/inventory fixes verified; update base/full CI. |
-| #229 / #230 | `speed-caps-229`, `d7949a970a` | Recalibration reviewed; retain #218's lower caps when adopting base; full CI. |
+| #214 / #217 | `station-loading-direct-214`, `f53ea99f6d` | Reviewed, including #228 context conflict; waiting on base update and exact-head full CI. Preserve the per-vehicle loading context; review source conflicts. |
+| #148 / #216 | `town-lifecycle-148`, `079350b3a7` | Narrowed/state/guard and company-base fixes reviewed; waiting on base update adopting #218's native cost helpers, narrow review and exact-head full CI. |
+| #223 / #226 | `metric-original-223`, `e20519eb78` | Identity/inventory fixes reviewed; waiting on base update, roadmap/template reconciliation and exact-head full CI. |
+| #229 / #230 | `speed-caps-229`, `d7949a970a` | Recalibration reviewed; waiting on base update retaining #218's lower caps, cap-data review and exact-head full CI. |
 
 Selected but unstarted: #212/#213, then #219/#220. ABI blocks: train through 385,
 tree additions 386-389, fleet 390-399, company 400-429, town 430-459, road 460-499,
