@@ -245,20 +245,31 @@ def check(scenario, run, mode, role, result):
             role,
             "aircraft",
             (
-                "ticks",
+                *(
+                    ("ticks", "station_resolutions")
+                    if scenario.get("aircraft_control")
+                    or scenario.get("aircraft_fixture")
+                    or "padhattan-ridge-2000" in scenario.get("name", "")
+                    or "padhattan-ridge-2016" in scenario.get("name", "")
+                    else ()
+                ),
                 "services",
                 "entries",
-                "station_resolutions",
                 "observation_bytes",
             ),
         )
         if counts is not None:
             result[f"{mode}_{role}_aircraft_boundary"] = dict(
                 counts,
-                services_per_tick=counts["services"] / counts["ticks"],
-                entries_per_tick=counts["entries"] / counts["ticks"],
-                observation_bytes_per_tick=counts["observation_bytes"]
-                / counts["ticks"],
+                services_per_tick=counts["services"] / counts["ticks"]
+                if counts["ticks"]
+                else None,
+                entries_per_tick=counts["entries"] / counts["ticks"]
+                if counts["ticks"]
+                else None,
+                observation_bytes_per_tick=counts["observation_bytes"] / counts["ticks"]
+                if counts["ticks"]
+                else None,
             )
 
     if scenario.get("aircraft_control"):
