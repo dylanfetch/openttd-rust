@@ -31,7 +31,8 @@ extern "C" {
  * 110 station cargo metadata, 111 station scalars, 112 station services,
  * 113 station edge observations, 114 station links, 115 station loading.
  * 130-138 industry storage, observation, world services and production result.
- * 210 company history entry, 211 finances, 212 economy, 213 action, 214 leaves.
+ * 210 company history entry, 211 finances, 212 economy, 213 finance services,
+ * 214 company services, 400-417 company records and stack continuations.
  * 215-244 narrow road reads, 245 position, 246 track choice, 247 depot result.
  * 260 order fields, 261 consist, 262 vehicle orders, 263 order list,
  * 264 order backup, 265 typed order services, 266 closest-depot result.
