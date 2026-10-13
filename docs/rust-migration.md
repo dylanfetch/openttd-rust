@@ -401,7 +401,12 @@ head status.
 Protected pushes have per-SHA concurrency, so a later docs push cannot cancel
 the code merge run. A merged push whose tree matches the tree marker from the same successful full
 request refreshes native compiler caches without repeating tests or scenarios.
-Platform caches refresh on uncovered code pushes; a combined tree no full request
+Covered protected pushes also rebuild the cached Linux GCC, macOS and Windows
+targets to refresh their compiler caches. This path skips Cargo checks, CTest,
+comparison/configuration probes, annotation checks and platform evidence; Clang
+and Emscripten have no compiler cache to refresh. The path is derived only from
+the protected push's matching tree, and requested PR validation always runs the
+complete selected suite. A combined tree no full request
 covered receives all native and platform checks. Markdown-only pushes skip heavy
 builds after complete file classification. A post-merge failure is fixed forward first. Force pushes and branch deletion are disallowed,
 including for administrators. The approving-review count is zero because agents
@@ -414,9 +419,12 @@ then runs component comparisons and six simulation shards concurrently. Recorded
 scenario seconds assign work while keeping effects/disasters/aircraft fixture
 families whole. The gate requires every job and exactly the current default
 `simulate.py --list` inventory, with matching executable and manifest hashes.
-Exports strip debug sections only on copies, proving identical loadable/allocated
-code and data and retaining parent/derived hashes. Original verification binaries
-stay intact; frozen simulation reports identify their derived executables. Probe
+Export requires canonical binary/configuration identity matching clean current
+source. Exports strip debug sections only on copies, proving identical
+loadable/allocated code and data and retaining parent/derived hashes; widget
+objects also preserve resolved symbols, relocations and COMDAT groups.
+Original verification binaries stay intact; `tools/evidence.py` joins explicit
+derived simulation identities to their verified parent hashes. Probe
 workers receive prebuilt generators/archives and the widget probe's real link
 objects; build metadata relocation has its own receipt. Reports/logs and retained
 failing saves are artifacts; build inputs expire after one day. Tests and their results are never cached. Cache writers trim native roles

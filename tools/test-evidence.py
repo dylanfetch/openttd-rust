@@ -153,6 +153,55 @@ class EvidenceTests(unittest.TestCase):
         ):
             self.render(report)
 
+    def test_frozen_export_joins_exact_parents_without_relabelling_executed_hashes(
+        self,
+    ):
+        sim = simulation()
+        for role, parent in (("candidate", BINARY), ("reference", REFERENCE)):
+            binary = sim["binaries"][role]
+            binary["sha256"] = ("1" if role == "candidate" else "2") * 64
+            binary["frozen_export"] = {
+                "ordinary_derivation": {
+                    "sha256": binary["sha256"],
+                    "source_sha256": parent,
+                    "command": ["objcopy", "--strip-debug", "exported-copy"],
+                    "content_proof": {
+                        "PT_LOAD_without_section_table_header_metadata": [{}],
+                        "SHF_ALLOC": [{}],
+                    },
+                }
+            }
+        candidate = sim["binaries"]["candidate"]
+        candidate["source_build_identity"] = candidate.pop("build_identity")
+        self.assertIn("clean source", self.render(sims=[sim]))
+        for mutate in (
+            lambda s: s["binaries"]["candidate"]["frozen_export"][
+                "ordinary_derivation"
+            ].update(source_sha256="3" * 64),
+            lambda s: s["binaries"]["reference"]["frozen_export"][
+                "ordinary_derivation"
+            ].update(source_sha256="3" * 64),
+            lambda s: s["binaries"]["candidate"]["frozen_export"][
+                "ordinary_derivation"
+            ].update(sha256="3" * 64),
+            lambda s: s["binaries"]["candidate"]["frozen_export"][
+                "ordinary_derivation"
+            ].update(command=["objcopy", "--strip-all", "exported-copy"]),
+            lambda s: s["binaries"]["candidate"]["source_build_identity"].update(
+                source_digest="3" * 64
+            ),
+            lambda s: s["binaries"]["candidate"].update(
+                build_identity=build_identity()
+            ),
+            lambda s: s["binaries"]["candidate"]["frozen_export"][
+                "ordinary_derivation"
+            ]["content_proof"].update(SHF_ALLOC=[]),
+        ):
+            invalid = copy.deepcopy(sim)
+            mutate(invalid)
+            with self.assertRaises(evidence.EvidenceError):
+                self.render(sims=[invalid])
+
     def test_required_fields_and_empty_receipts(self):
         for field in (
             "passed",
