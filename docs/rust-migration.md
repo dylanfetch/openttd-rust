@@ -416,7 +416,8 @@ against net glue plus tooling; conversions report their net glue. `--whole-fork`
 prints totals against the pinned original and the retired share of simulation
 source lines. Its one inventory in the tool covers world-state owners, commands,
 accessors, link graph and pathfinding, excluding GUI, platform and vendored code.
-Blank lines, comments and data tables count; this is not behavioral completion.
+Mixed owner files, blank lines, comments and data tables count; this is not
+behavioral completion.
 
 After a task's PR merges, remove its worktree with `git worktree remove PATH`
 and its branch with `git branch -d BRANCH`. Nothing under the worktree is

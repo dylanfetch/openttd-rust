@@ -37,7 +37,7 @@ SIMULATION_FAMILIES = frozenset(
     newgrf_airporttiles newgrf_canal newgrf_cargo newgrf_engine newgrf_generic
     newgrf_house newgrf_industries newgrf_industrytiles newgrf_object newgrf_railtype
     newgrf_roadstop newgrf_roadtype newgrf_station newgrf_storage newgrf_town
-    newgrf_townname object order pbs rail road roadstop roadveh ship signal slope
+    newgrf_townname object openttd order pbs rail road roadstop roadveh ship signal slope
     station subsidy terraform tgp tile tilearea timetable town townname train tree
     tunnel tunnelbridge vehicle void water waypoint bridge""".split()
 )
@@ -167,13 +167,15 @@ def changes(base, head):
 def simulation_source(path):
     """The single source inventory for the whole-fork simulation denominator."""
     name = Path(path).stem
-    return path.startswith(("src/linkgraph/", "src/pathfinder/")) or (
-        path.startswith("src/")
-        and path.count("/") == 1
-        and "gui" not in name.split("_")
-        and any(
-            name == family or name.startswith(family + "_")
-            for family in SIMULATION_FAMILIES
+    return "gui" not in name.split("_") and (
+        path.startswith(("src/linkgraph/", "src/pathfinder/"))
+        or (
+            path.startswith("src/")
+            and path.count("/") == 1
+            and any(
+                name == family or name.startswith(family + "_")
+                for family in SIMULATION_FAMILIES
+            )
         )
     )
 

@@ -59,11 +59,14 @@ class PortMetricsTests(unittest.TestCase):
         for path in (
             "src/town_cmd.cpp",
             "src/map_func.h",
+            "src/openttd.cpp",
             "src/pathfinder/yapf/yapf.hpp",
         ):
             self.assertTrue(METRICS.simulation_source(path), path)
         for path in (
             "src/town_gui.cpp",
+            "src/linkgraph/linkgraph_gui.cpp",
+            "src/linkgraph/linkgraph_gui.h",
             "src/3rdparty/foo.cpp",
             "src/os/unix/unix.cpp",
             "src/core/pool_type.hpp",
