@@ -41,12 +41,15 @@ TEST_CASE("Station service - scalar ABI layouts")
 	layout(509, {sizeof(OpenTTDOrderDestination), alignof(OpenTTDOrderDestination), offsetof(OpenTTDOrderDestination, destination), offsetof(OpenTTDOrderDestination, is_station)});
 	layout(510, {sizeof(OpenTTDTruncatedSource), alignof(OpenTTDTruncatedSource), offsetof(OpenTTDTruncatedSource, amount), offsetof(OpenTTDTruncatedSource, source), offsetof(OpenTTDTruncatedSource, present)});
 	layout(511, {sizeof(OpenTTDCargoSource), alignof(OpenTTDCargoSource), offsetof(OpenTTDCargoSource, id), offsetof(OpenTTDCargoSource, type)});
+	layout(512, {sizeof(OpenTTDLoadingControl), alignof(OpenTTDLoadingControl), offsetof(OpenTTDLoadingControl, ticks), offsetof(OpenTTDLoadingControl, vehicle_type), offsetof(OpenTTDLoadingControl, unload_type), offsetof(OpenTTDLoadingControl, load_type), offsetof(OpenTTDLoadingControl, refit_cargo), offsetof(OpenTTDLoadingControl, refit), offsetof(OpenTTDLoadingControl, full_load), offsetof(OpenTTDLoadingControl, stop), offsetof(OpenTTDLoadingControl, gradual), offsetof(OpenTTDLoadingControl, improved)});
+	layout(513, {sizeof(OpenTTDLoadingPart), alignof(OpenTTDLoadingPart), offsetof(OpenTTDLoadingPart, capacity), offsetof(OpenTTDLoadingPart, cargo), offsetof(OpenTTDLoadingPart, vehicle_type), offsetof(OpenTTDLoadingPart, unloading)});
+	layout(514, {sizeof(OpenTTDLoadingStats), alignof(OpenTTDLoadingStats), offsetof(OpenTTDLoadingStats, stored), offsetof(OpenTTDLoadingStats, load_count), offsetof(OpenTTDLoadingStats, speed), offsetof(OpenTTDLoadingStats, age), offsetof(OpenTTDLoadingStats, capacity), offsetof(OpenTTDLoadingStats, cargo)});
 	layout(110, {sizeof(OpenTTDStationCargo), alignof(OpenTTDStationCargo), offsetof(OpenTTDStationCargo, max_waiting_cargo), offsetof(OpenTTDStationCargo, status), offsetof(OpenTTDStationCargo, time_since_pickup), offsetof(OpenTTDStationCargo, rating), offsetof(OpenTTDStationCargo, last_speed), offsetof(OpenTTDStationCargo, last_age), offsetof(OpenTTDStationCargo, amount_fract)});
 	layout(111, {sizeof(OpenTTDStationFields), alignof(OpenTTDStationFields), offsetof(OpenTTDStationFields, always_accepted), offsetof(OpenTTDStationFields, delete_ctr), offsetof(OpenTTDStationFields, time_since_load), offsetof(OpenTTDStationFields, time_since_unload), offsetof(OpenTTDStationFields, last_vehicle_type)});
 	layout(112, {sizeof(OpenTTDStationServices), alignof(OpenTTDStationServices), offsetof(OpenTTDStationServices, base_station), offsetof(OpenTTDStationServices, station), offsetof(OpenTTDStationServices, station_owner), offsetof(OpenTTDStationServices, station_exclusivity), offsetof(OpenTTDStationServices, station_next), offsetof(OpenTTDStationServices, rating_counts), offsetof(OpenTTDStationServices, get), offsetof(OpenTTDStationServices, owner), offsetof(OpenTTDStationServices, pool_size), offsetof(OpenTTDStationServices, tick_counter), offsetof(OpenTTDStationServices, editor), offsetof(OpenTTDStationServices, facilities), offsetof(OpenTTDStationServices, in_use), offsetof(OpenTTDStationServices, is_station), offsetof(OpenTTDStationServices, local_owner), offsetof(OpenTTDStationServices, rectangle_empty), offsetof(OpenTTDStationServices, town_statue), offsetof(OpenTTDStationServices, select_goods), offsetof(OpenTTDStationServices, rating_cheat), offsetof(OpenTTDStationServices, available), offsetof(OpenTTDStationServices, cargo_valid), offsetof(OpenTTDStationServices, rating_callback_enabled), offsetof(OpenTTDStationServices, passenger_cargo), offsetof(OpenTTDStationServices, packet_available), offsetof(OpenTTDStationServices, rating_redraw), offsetof(OpenTTDStationServices, set_demand), offsetof(OpenTTDStationServices, acceptance_news), offsetof(OpenTTDStationServices, acceptance_redraw), offsetof(OpenTTDStationServices, delete_station), offsetof(OpenTTDStationServices, acceptance_animation), offsetof(OpenTTDStationServices, watched_animation), offsetof(OpenTTDStationServices, append_packet), offsetof(OpenTTDStationServices, update_supply), offsetof(OpenTTDStationServices, station_list_invalidation), offsetof(OpenTTDStationServices, new_cargo_animation), offsetof(OpenTTDStationServices, waiting_redraw), offsetof(OpenTTDStationServices, rating_callback), offsetof(OpenTTDStationServices, with_tiles), offsetof(OpenTTDStationServices, tile_next), offsetof(OpenTTDStationServices, accept_tile), offsetof(OpenTTDStationServices, acceptance_amounts), offsetof(OpenTTDStationServices, with_truncation), offsetof(OpenTTDStationServices, truncate_next), offsetof(OpenTTDStationServices, shared)});
 	layout(113, {sizeof(OpenTTDStationEdge), alignof(OpenTTDStationEdge), offsetof(OpenTTDStationEdge, destination), offsetof(OpenTTDStationEdge, last_update), offsetof(OpenTTDStationEdge, distance)});
 	layout(114, {sizeof(OpenTTDStationLinks), alignof(OpenTTDStationLinks), offsetof(OpenTTDStationLinks, graph), offsetof(OpenTTDStationLinks, automatic_distribution), offsetof(OpenTTDStationLinks, node), offsetof(OpenTTDStationLinks, edge_count), offsetof(OpenTTDStationLinks, date), offsetof(OpenTTDStationLinks, station_id), offsetof(OpenTTDStationLinks, edge_last_update), offsetof(OpenTTDStationLinks, last_compression), offsetof(OpenTTDStationLinks, edge), offsetof(OpenTTDStationLinks, edge_unrestricted), offsetof(OpenTTDStationLinks, edge_restricted), offsetof(OpenTTDStationLinks, delete_flows), offsetof(OpenTTDStationLinks, restrict_edge), offsetof(OpenTTDStationLinks, restrict_flows), offsetof(OpenTTDStationLinks, release_edge), offsetof(OpenTTDStationLinks, remove_edge), offsetof(OpenTTDStationLinks, compress), offsetof(OpenTTDStationLinks, order_list), offsetof(OpenTTDStationLinks, order_pool_size), offsetof(OpenTTDStationLinks, order_count), offsetof(OpenTTDStationLinks, order_destination), offsetof(OpenTTDStationLinks, order_vehicle), offsetof(OpenTTDStationLinks, next_vehicle), offsetof(OpenTTDStationLinks, next_shared), offsetof(OpenTTDStationLinks, stopped_in_depot), offsetof(OpenTTDStationLinks, last_service), offsetof(OpenTTDStationLinks, cargo_type), offsetof(OpenTTDStationLinks, refresh), offsetof(OpenTTDStationLinks, reroute)});
-	layout(115, {sizeof(OpenTTDStationLoading), alignof(OpenTTDStationLoading), offsetof(OpenTTDStationLoading, wait_observation), offsetof(OpenTTDStationLoading, load_engine), offsetof(OpenTTDStationLoading, engine_grf), offsetof(OpenTTDStationLoading, grf_version), offsetof(OpenTTDStationLoading, engine_load_callback), offsetof(OpenTTDStationLoading, engine_no_multiplier), offsetof(OpenTTDStationLoading, delivery_remaining), offsetof(OpenTTDStationLoading, cargo_stored), offsetof(OpenTTDStationLoading, cargo_reservation), offsetof(OpenTTDStationLoading, cargo_remaining), offsetof(OpenTTDStationLoading, capacity_remaining), offsetof(OpenTTDStationLoading, vehicle_type), offsetof(OpenTTDStationLoading, cargo_type), offsetof(OpenTTDStationLoading, cargo_cap), offsetof(OpenTTDStationLoading, stored_count), offsetof(OpenTTDStationLoading, unload_count), offsetof(OpenTTDStationLoading, deliver_count), offsetof(OpenTTDStationLoading, transfer_count), offsetof(OpenTTDStationLoading, load_count), offsetof(OpenTTDStationLoading, cargo_unloading), offsetof(OpenTTDStationLoading, unload_type), offsetof(OpenTTDStationLoading, load_type), offsetof(OpenTTDStationLoading, is_refit), offsetof(OpenTTDStationLoading, refit_cargo), offsetof(OpenTTDStationLoading, has_orders), offsetof(OpenTTDStationLoading, load_unload_ticks), offsetof(OpenTTDStationLoading, stopped_or_crashed), offsetof(OpenTTDStationLoading, has_articulated_part), offsetof(OpenTTDStationLoading, is_articulated_part), offsetof(OpenTTDStationLoading, is_rear_dualheaded), offsetof(OpenTTDStationLoading, is_normal_aircraft), offsetof(OpenTTDStationLoading, is_multiheaded), offsetof(OpenTTDStationLoading, cached_max_speed), offsetof(OpenTTDStationLoading, cargo_multiplier), offsetof(OpenTTDStationLoading, cached_total_length), offsetof(OpenTTDStationLoading, full_load_order), offsetof(OpenTTDStationLoading, vehicle_owner), offsetof(OpenTTDStationLoading, aircraft_old_speed), offsetof(OpenTTDStationLoading, passenger_cargo), offsetof(OpenTTDStationLoading, gradual), offsetof(OpenTTDStationLoading, improved_load), offsetof(OpenTTDStationLoading, station_length_penalty), offsetof(OpenTTDStationLoading, stop), offsetof(OpenTTDStationLoading, current_company), offsetof(OpenTTDStationLoading, last_station_visited), offsetof(OpenTTDStationLoading, total_count), offsetof(OpenTTDStationLoading, build_year), offsetof(OpenTTDStationLoading, calendar_year), offsetof(OpenTTDStationLoading, order_time), offsetof(OpenTTDStationLoading, refit_mask), offsetof(OpenTTDStationLoading, set_cargo_unloading), offsetof(OpenTTDStationLoading, set_loading_finished), offsetof(OpenTTDStationLoading, set_stop), offsetof(OpenTTDStationLoading, set_load_ticks), offsetof(OpenTTDStationLoading, set_speed), offsetof(OpenTTDStationLoading, set_refit_capacity), offsetof(OpenTTDStationLoading, subtract_profit), offsetof(OpenTTDStationLoading, unknown_load_result), offsetof(OpenTTDStationLoading, refresh_capacity), offsetof(OpenTTDStationLoading, vehicle_dirty), offsetof(OpenTTDStationLoading, update_indicator), offsetof(OpenTTDStationLoading, set_current_company), offsetof(OpenTTDStationLoading, next_vehicle), offsetof(OpenTTDStationLoading, next_articulated), offsetof(OpenTTDStationLoading, other_multiheaded), offsetof(OpenTTDStationLoading, first_engine_part), offsetof(OpenTTDStationLoading, first_vehicle), offsetof(OpenTTDStationLoading, previous_vehicle), offsetof(OpenTTDStationLoading, with_next_stations), offsetof(OpenTTDStationLoading, stage), offsetof(OpenTTDStationLoading, return_cargo), offsetof(OpenTTDStationLoading, unload_cargo), offsetof(OpenTTDStationLoading, load_cargo), offsetof(OpenTTDStationLoading, reserve_cargo), offsetof(OpenTTDStationLoading, deliver_to_transfer), offsetof(OpenTTDStationLoading, deliver_to_keep), offsetof(OpenTTDStationLoading, has_cargo_for), offsetof(OpenTTDStationLoading, platform_length), offsetof(OpenTTDStationLoading, train_at_station), offsetof(OpenTTDStationLoading, station_cargo_total), offsetof(OpenTTDStationLoading, load_property), offsetof(OpenTTDStationLoading, load_callback), offsetof(OpenTTDStationLoading, get_payment), offsetof(OpenTTDStationLoading, create_payment), offsetof(OpenTTDStationLoading, delete_payment), offsetof(OpenTTDStationLoading, flush_delivery), offsetof(OpenTTDStationLoading, vehicle_new_cargo), offsetof(OpenTTDStationLoading, cargo_taken), offsetof(OpenTTDStationLoading, train_loads), offsetof(OpenTTDStationLoading, road_loads), offsetof(OpenTTDStationLoading, vehicle_empty), offsetof(OpenTTDStationLoading, station_dirty), offsetof(OpenTTDStationLoading, test_refit), offsetof(OpenTTDStationLoading, execute_refit)});
+	layout(115, {sizeof(OpenTTDStationLoading), alignof(OpenTTDStationLoading), offsetof(OpenTTDStationLoading, control), offsetof(OpenTTDStationLoading, part), offsetof(OpenTTDStationLoading, set_refit_capacity_and_stats), offsetof(OpenTTDStationLoading, wait_observation), offsetof(OpenTTDStationLoading, load_engine), offsetof(OpenTTDStationLoading, grf_version), offsetof(OpenTTDStationLoading, engine_load_callback), offsetof(OpenTTDStationLoading, engine_no_multiplier), offsetof(OpenTTDStationLoading, delivery_remaining), offsetof(OpenTTDStationLoading, cargo_stored), offsetof(OpenTTDStationLoading, cargo_reservation), offsetof(OpenTTDStationLoading, cargo_remaining), offsetof(OpenTTDStationLoading, capacity_remaining), offsetof(OpenTTDStationLoading, vehicle_type), offsetof(OpenTTDStationLoading, cargo_type), offsetof(OpenTTDStationLoading, cargo_cap), offsetof(OpenTTDStationLoading, stored_count), offsetof(OpenTTDStationLoading, unload_count), offsetof(OpenTTDStationLoading, deliver_count), offsetof(OpenTTDStationLoading, transfer_count), offsetof(OpenTTDStationLoading, load_count), offsetof(OpenTTDStationLoading, unload_type), offsetof(OpenTTDStationLoading, has_orders), offsetof(OpenTTDStationLoading, load_unload_ticks), offsetof(OpenTTDStationLoading, status), offsetof(OpenTTDStationLoading, has_articulated_part), offsetof(OpenTTDStationLoading, is_articulated_part), offsetof(OpenTTDStationLoading, is_rear_dualheaded), offsetof(OpenTTDStationLoading, is_normal_aircraft), offsetof(OpenTTDStationLoading, is_multiheaded), offsetof(OpenTTDStationLoading, cargo_multiplier), offsetof(OpenTTDStationLoading, cached_total_length), offsetof(OpenTTDStationLoading, full_load_order), offsetof(OpenTTDStationLoading, vehicle_owner), offsetof(OpenTTDStationLoading, passenger_cargo), offsetof(OpenTTDStationLoading, station_length_penalty), offsetof(OpenTTDStationLoading, current_company), offsetof(OpenTTDStationLoading, last_station_visited), offsetof(OpenTTDStationLoading, total_count), offsetof(OpenTTDStationLoading, order_time), offsetof(OpenTTDStationLoading, refit_mask), offsetof(OpenTTDStationLoading, set_cargo_unloading), offsetof(OpenTTDStationLoading, set_loading_finished), offsetof(OpenTTDStationLoading, set_stop), offsetof(OpenTTDStationLoading, set_load_ticks), offsetof(OpenTTDStationLoading, set_speed), offsetof(OpenTTDStationLoading, subtract_profit), offsetof(OpenTTDStationLoading, unknown_load_result), offsetof(OpenTTDStationLoading, refresh_capacity), offsetof(OpenTTDStationLoading, vehicle_dirty), offsetof(OpenTTDStationLoading, update_indicator), offsetof(OpenTTDStationLoading, set_current_company), offsetof(OpenTTDStationLoading, next_vehicle), offsetof(OpenTTDStationLoading, next_articulated), offsetof(OpenTTDStationLoading, other_multiheaded), offsetof(OpenTTDStationLoading, first_engine_part), offsetof(OpenTTDStationLoading, first_vehicle), offsetof(OpenTTDStationLoading, previous_vehicle), offsetof(OpenTTDStationLoading, with_next_stations), offsetof(OpenTTDStationLoading, stage), offsetof(OpenTTDStationLoading, return_cargo), offsetof(OpenTTDStationLoading, unload_cargo), offsetof(OpenTTDStationLoading, load_cargo), offsetof(OpenTTDStationLoading, reserve_cargo), offsetof(OpenTTDStationLoading, deliver_to_transfer), offsetof(OpenTTDStationLoading, deliver_to_keep), offsetof(OpenTTDStationLoading, has_cargo_for), offsetof(OpenTTDStationLoading, platform_length), offsetof(OpenTTDStationLoading, vehicle_tile), offsetof(OpenTTDStationLoading, station_index), offsetof(OpenTTDStationLoading, station_cargo_total), offsetof(OpenTTDStationLoading, load_property), offsetof(OpenTTDStationLoading, load_callback), offsetof(OpenTTDStationLoading, get_payment), offsetof(OpenTTDStationLoading, create_payment), offsetof(OpenTTDStationLoading, delete_payment), offsetof(OpenTTDStationLoading, flush_delivery), offsetof(OpenTTDStationLoading, vehicle_new_cargo), offsetof(OpenTTDStationLoading, cargo_taken), offsetof(OpenTTDStationLoading, train_loads), offsetof(OpenTTDStationLoading, road_loads), offsetof(OpenTTDStationLoading, vehicle_empty), offsetof(OpenTTDStationLoading, station_dirty), offsetof(OpenTTDStationLoading, test_refit), offsetof(OpenTTDStationLoading, execute_refit)});
 }
 struct StationLoadingProbe {
 	OpenTTDStationService *owner;
@@ -111,9 +114,11 @@ TEST_CASE("Station service - direct prepare preserves native frames and same-own
 		.shared = nullptr,
 	};
 	const OpenTTDStationLoading loading = {
+		.control = nullptr,
+		.part = nullptr,
+		.set_refit_capacity_and_stats = nullptr,
 		.wait_observation = nullptr,
 		.load_engine = nullptr,
-		.engine_grf = nullptr,
 		.grf_version = nullptr,
 		.engine_load_callback = nullptr,
 		.engine_no_multiplier = nullptr,
@@ -124,62 +129,50 @@ TEST_CASE("Station service - direct prepare preserves native frames and same-own
 		.capacity_remaining = nullptr,
 		.vehicle_type = nullptr,
 		.cargo_type = nullptr,
-		.cargo_cap = [](void *) noexcept -> uint16_t { CHECK(_station_loading_probe->phase++ == 5); return 1; },
+		.cargo_cap = [](OpenTTDVehicle *) noexcept -> uint16_t { CHECK(_station_loading_probe->phase++ == 5); return 1; },
 		.stored_count = nullptr,
-		.unload_count = [](void *) noexcept -> uint32_t { CHECK(_station_loading_probe->phase++ == 9); return 1; },
+		.unload_count = [](OpenTTDVehicle *) noexcept -> uint32_t { CHECK(_station_loading_probe->phase++ == 9); return 1; },
 		.deliver_count = nullptr,
 		.transfer_count = nullptr,
 		.load_count = nullptr,
-		.cargo_unloading = nullptr,
-		.unload_type = [](void *) noexcept -> uint8_t { CHECK(_station_loading_probe->phase++ == 7); return 0; },
-		.load_type = nullptr,
-		.is_refit = nullptr,
-		.refit_cargo = nullptr,
-		.has_orders = [](void *) noexcept { CHECK(_station_loading_probe->phase++ == 4); return false; },
+		.unload_type = [](OpenTTDVehicle *) noexcept -> uint8_t { CHECK(_station_loading_probe->phase++ == 7); return 0; },
+		.has_orders = [](OpenTTDVehicle *) noexcept { CHECK(_station_loading_probe->phase++ == 4); return false; },
 		.load_unload_ticks = nullptr,
-		.stopped_or_crashed = nullptr,
+		.status = nullptr,
 		.has_articulated_part = nullptr,
 		.is_articulated_part = nullptr,
 		.is_rear_dualheaded = nullptr,
 		.is_normal_aircraft = nullptr,
 		.is_multiheaded = nullptr,
-		.cached_max_speed = nullptr,
 		.cargo_multiplier = nullptr,
 		.cached_total_length = nullptr,
 		.full_load_order = nullptr,
 		.vehicle_owner = nullptr,
-		.aircraft_old_speed = nullptr,
 		.passenger_cargo = nullptr,
-		.gradual = nullptr,
-		.improved_load = nullptr,
 		.station_length_penalty = nullptr,
-		.stop = nullptr,
 		.current_company = nullptr,
-		.last_station_visited = [](void *) noexcept -> uint16_t { return 0; },
-		.total_count = [](void *) noexcept -> uint32_t { CHECK(_station_loading_probe->phase++ == 6); return 1; },
-		.build_year = nullptr,
-		.calendar_year = nullptr,
+		.last_station_visited = [](OpenTTDVehicle *) noexcept -> uint16_t { return 0; },
+		.total_count = [](OpenTTDVehicle *) noexcept -> uint32_t { CHECK(_station_loading_probe->phase++ == 6); return 1; },
 		.order_time = nullptr,
 		.refit_mask = nullptr,
-		.set_cargo_unloading = [](void *, bool value) noexcept { CHECK(_station_loading_probe->phase++ == 10); CHECK(value); },
-		.set_loading_finished = [](void *, bool value) noexcept { CHECK(_station_loading_probe->phase++ == 0); CHECK_FALSE(value); },
+		.set_cargo_unloading = [](OpenTTDVehicle *, bool value) noexcept { CHECK(_station_loading_probe->phase++ == 10); CHECK(value); },
+		.set_loading_finished = [](OpenTTDVehicle *, bool value) noexcept { CHECK(_station_loading_probe->phase++ == 0); CHECK_FALSE(value); },
 		.set_stop = nullptr,
-		.set_load_ticks = [](void *, uint16_t value) noexcept { CHECK(_station_loading_probe->phase++ == 1); CHECK(value == 1); },
+		.set_load_ticks = [](OpenTTDVehicle *, uint16_t value) noexcept { CHECK(_station_loading_probe->phase++ == 1); CHECK(value == 1); },
 		.set_speed = nullptr,
-		.set_refit_capacity = nullptr,
 		.subtract_profit = nullptr,
 		.unknown_load_result = nullptr,
 		.refresh_capacity = nullptr,
 		.vehicle_dirty = nullptr,
 		.update_indicator = nullptr,
 		.set_current_company = nullptr,
-		.next_vehicle = [](void *) noexcept -> void * { CHECK(_station_loading_probe->phase++ == 11); return nullptr; },
+		.next_vehicle = [](OpenTTDVehicle *) noexcept -> OpenTTDVehicle * { CHECK(_station_loading_probe->phase++ == 11); return nullptr; },
 		.next_articulated = nullptr,
 		.other_multiheaded = nullptr,
 		.first_engine_part = nullptr,
 		.first_vehicle = nullptr,
 		.previous_vehicle = nullptr,
-		.with_next_stations = [](void *, void *context, OpenTTDStationScope body) noexcept {
+		.with_next_stations = [](OpenTTDVehicle *, void *context, OpenTTDStationScope body) noexcept {
 			CHECK(_station_loading_probe->phase++ == 3);
 			int destination = 42;
 			_station_loading_probe->frame_live = true;
@@ -188,7 +181,7 @@ TEST_CASE("Station service - direct prepare preserves native frames and same-own
 			CHECK(destination == 42);
 			_station_loading_probe->frame_live = false;
 		},
-		.stage = [](OpenTTDStation *st, void *, uint8_t unload, void *next, OpenTTDNativeCargoPayment *payment) noexcept {
+		.stage = [](OpenTTDStation *st, OpenTTDVehicle *, uint8_t unload, void *next, OpenTTDNativeCargoPayment *payment) noexcept {
 			CHECK(_station_loading_probe->phase++ == 8);
 			CHECK(static_cast<void *>(st) == _station_loading_probe);
 			CHECK(_station_loading_probe->frame_live);
@@ -207,12 +200,13 @@ TEST_CASE("Station service - direct prepare preserves native frames and same-own
 		.deliver_to_keep = nullptr,
 		.has_cargo_for = nullptr,
 		.platform_length = nullptr,
-		.train_at_station = nullptr,
+		.vehicle_tile = nullptr,
+		.station_index = nullptr,
 		.station_cargo_total = nullptr,
 		.load_property = nullptr,
 		.load_callback = nullptr,
 		.get_payment = nullptr,
-		.create_payment = [](void *) noexcept -> OpenTTDNativeCargoPayment * { CHECK(_station_loading_probe->phase++ == 2); return reinterpret_cast<OpenTTDNativeCargoPayment *>(&_station_loading_probe->payment); },
+		.create_payment = [](OpenTTDVehicle *) noexcept -> OpenTTDNativeCargoPayment * { CHECK(_station_loading_probe->phase++ == 2); return reinterpret_cast<OpenTTDNativeCargoPayment *>(&_station_loading_probe->payment); },
 		.delete_payment = nullptr,
 		.flush_delivery = nullptr,
 		.vehicle_new_cargo = nullptr,
@@ -224,7 +218,7 @@ TEST_CASE("Station service - direct prepare preserves native frames and same-own
 		.test_refit = nullptr,
 		.execute_refit = nullptr,
 	};
-	openttd_rust_station_prepare(&probe.vehicle, &services, &loading);
+	openttd_rust_station_prepare(reinterpret_cast<OpenTTDVehicle *>(&probe.vehicle), &services, &loading);
 	CHECK(probe.phase == 13);
 	CHECK_FALSE(probe.frame_live);
 	CHECK(cargo->rating == 6);

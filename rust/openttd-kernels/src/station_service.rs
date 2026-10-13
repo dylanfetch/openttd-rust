@@ -20,7 +20,9 @@ use crate::cargo_payment::NativePayment;
 use crate::linkgraph::NativeGraph;
 use crate::orders::NativeOrderList;
 use crate::station::{BaseStation, Station};
+use crate::vehicle::{EngineRef, VS_CRASHED, VS_STOPPED, VehicleRef};
 use std::ffi::c_void;
+use std::ptr::NonNull;
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct CargoFields {
@@ -62,7 +64,8 @@ pub struct Service {
 }
 
 /// Activity fields consumed together after a station-radius filter.
-pub(crate) struct StationActivity {
+#[repr(C)]
+pub struct StationActivity {
     pub time_since_load: u8,
     pub time_since_unload: u8,
 }
@@ -284,12 +287,39 @@ pub struct DeliveryRemaining {
     pub(crate) deliver: u32,
     pub(crate) capacity: u16,
 }
-pub(crate) enum Engine {}
-pub(crate) enum Grf {}
 #[repr(C)]
 pub struct LoadEngine {
-    pub(crate) engine: *const Engine,
+    pub(crate) engine: EngineRef,
     pub(crate) amount: u8,
+}
+#[repr(C)]
+pub struct LoadingControl {
+    pub(crate) ticks: u16,
+    pub(crate) vehicle_type: u8,
+    pub(crate) unload_type: u8,
+    pub(crate) load_type: u8,
+    pub(crate) refit_cargo: u8,
+    pub(crate) refit: bool,
+    pub(crate) full_load: bool,
+    pub(crate) stop: bool,
+    pub(crate) gradual: bool,
+    pub(crate) improved: bool,
+}
+#[repr(C)]
+pub struct LoadingPart {
+    pub(crate) capacity: u16,
+    pub(crate) cargo: u8,
+    pub(crate) vehicle_type: u8,
+    pub(crate) unloading: bool,
+}
+#[repr(C)]
+pub struct LoadingStats {
+    pub(crate) stored: u32,
+    pub(crate) load_count: u32,
+    pub(crate) speed: i32,
+    pub(crate) age: i32,
+    pub(crate) capacity: u16,
+    pub(crate) cargo: u8,
 }
 #[repr(C)]
 pub struct LoadingWait {
@@ -485,6 +515,7 @@ pub unsafe extern "C" fn openttd_rust_station_acceptance(
             (w.acceptance_news)(st, rejects, true);
         }
     }
+    crate::witness::hit(crate::witness::STATION_ACCEPTANCE_CHANGED);
     (w.acceptance_redraw)(st);
 }
 #[unsafe(no_mangle)]
@@ -857,26 +888,27 @@ pub struct Links {
     pub(crate) order_pool_size: extern "C" fn() -> usize,
     pub(crate) order_count: extern "C" fn(*mut NativeOrderList) -> usize,
     pub(crate) order_destination: extern "C" fn(*mut NativeOrderList, usize) -> OrderDestination,
-    pub(crate) order_vehicle: extern "C" fn(*mut NativeOrderList) -> *mut c_void,
-    pub(crate) next_vehicle: extern "C" fn(*mut c_void) -> *mut c_void,
-    pub(crate) next_shared: extern "C" fn(*mut c_void) -> *mut c_void,
-    pub(crate) stopped_in_depot: extern "C" fn(*mut c_void) -> bool,
-    pub(crate) last_service: extern "C" fn(*mut c_void) -> i32,
-    pub(crate) cargo_type: extern "C" fn(*mut c_void) -> u8,
-    pub(crate) refresh: extern "C" fn(*mut c_void),
-    pub(crate) reroute: extern "C" fn(*mut BaseStation, *mut c_void, u8, u16, u16),
+    pub(crate) order_vehicle: extern "C" fn(*mut NativeOrderList) -> Option<VehicleRef>,
+    pub(crate) next_vehicle: extern "C" fn(VehicleRef) -> Option<VehicleRef>,
+    pub(crate) next_shared: extern "C" fn(VehicleRef) -> Option<VehicleRef>,
+    pub(crate) stopped_in_depot: extern "C" fn(VehicleRef) -> bool,
+    pub(crate) last_service: extern "C" fn(VehicleRef) -> i32,
+    pub(crate) cargo_type: extern "C" fn(VehicleRef) -> u8,
+    pub(crate) refresh: extern "C" fn(VehicleRef),
+    pub(crate) reroute: extern "C" fn(*mut BaseStation, Option<VehicleRef>, u8, u16, u16),
 }
 unsafe fn reroute(st: *mut BaseStation, cargo: u8, avoid: u16, avoid2: u16, w: &World, l: &Links) {
-    (l.reroute)(st, std::ptr::null_mut(), cargo, avoid, avoid2);
+    (l.reroute)(st, None, cargo, avoid, avoid2);
     let state = (w.owner)(st);
     let mut node = unsafe { openttd_rust_station_queue_first(state) };
     while !node.is_null() {
-        let mut vehicle = unsafe { openttd_rust_station_queue_value(node) };
-        while !vehicle.is_null() {
+        let mut current =
+            NonNull::new(unsafe { openttd_rust_station_queue_value(node) }.cast()).map(VehicleRef);
+        while let Some(vehicle) = current {
             if u32::from((l.cargo_type)(vehicle)) == u32::from(cargo) {
-                (l.reroute)(st, vehicle, cargo, avoid, avoid2);
+                (l.reroute)(st, Some(vehicle), cargo, avoid, avoid2);
             }
-            vehicle = (l.next_vehicle)(vehicle);
+            current = (l.next_vehicle)(vehicle);
         }
         node = unsafe { openttd_rust_station_queue_next(state, node) };
     }
@@ -900,7 +932,7 @@ pub unsafe extern "C" fn openttd_rust_station_reroute(
 #[allow(clippy::too_many_lines)]
 unsafe fn stale(from: *mut BaseStation, w: &World, l: &Links) {
     for cargo in 0..64 {
-        let auto = u32::from((l.automatic_distribution)(cargo)) != 0;
+        let auto = (l.automatic_distribution)(cargo);
         let graph = (l.graph)(from, cargo);
         if graph.is_null() {
             continue;
@@ -946,27 +978,28 @@ unsafe fn stale(from: *mut BaseStation, w: &World, l: &Links) {
                             }
                         }
                         if found_from && found_to {
-                            vehicles.push((l.order_vehicle)(list));
+                            vehicles.push(unsafe { (l.order_vehicle)(list).unwrap_unchecked() });
                         }
                     }
                     let mut iterator = 0;
                     while iterator < vehicles.len() {
                         let vehicle = vehicles[iterator];
-                        if u32::from((l.stopped_in_depot)(vehicle)) == 0
+                        if !(l.stopped_in_depot)(vehicle)
                             || date.wrapping_sub((l.last_service)(vehicle)) <= 1024
                         {
                             (l.refresh)(vehicle);
                         }
                         if (l.edge_last_update)(graph, node, index) == date {
+                            crate::witness::hit(crate::witness::STATION_STALE_REFRESH);
                             updated = true;
                             break;
                         }
                         let next_shared = (l.next_shared)(vehicle);
-                        if next_shared.is_null() {
-                            vehicles.remove(iterator);
-                        } else {
+                        if let Some(next_shared) = next_shared {
                             vehicles[iterator] = next_shared;
                             iterator += 1;
+                        } else {
+                            vehicles.remove(iterator);
                         }
                         if iterator == vehicles.len() {
                             iterator = 0;
@@ -974,6 +1007,7 @@ unsafe fn stale(from: *mut BaseStation, w: &World, l: &Links) {
                     }
                 }
                 if !updated {
+                    crate::witness::hit(crate::witness::STATION_STALE_REMOVE);
                     remove.push((l.node)(edge.destination, cargo));
                     let to_id = (l.station_id)(edge.destination);
                     (l.delete_flows)(from, cargo, to_id);
@@ -1090,231 +1124,115 @@ pub unsafe extern "C" fn openttd_rust_station_tick(world: *const World, links: *
 
 #[repr(C)]
 pub struct Loading {
-    pub(crate) wait_observation: extern "C" fn(*mut c_void) -> LoadingWait,
-    pub(crate) load_engine: extern "C" fn(*mut c_void) -> LoadEngine,
-    pub(crate) engine_grf: extern "C" fn(*const Engine) -> *const Grf,
-    pub(crate) grf_version: extern "C" fn(*const Grf) -> u8,
-    pub(crate) engine_load_callback: extern "C" fn(*const Engine) -> bool,
-    pub(crate) engine_no_multiplier: extern "C" fn(*const Engine) -> bool,
-    pub(crate) delivery_remaining: extern "C" fn(*mut c_void) -> DeliveryRemaining,
-    pub(crate) cargo_stored: extern "C" fn(*mut c_void) -> CargoStored,
-    pub(crate) cargo_reservation: extern "C" fn(*mut c_void) -> CargoReservation,
-    pub(crate) cargo_remaining: extern "C" fn(*mut c_void) -> CargoRemaining,
-    pub(crate) capacity_remaining: extern "C" fn(*mut c_void) -> CapacityRemaining,
-    pub(crate) vehicle_type: extern "C" fn(*mut c_void) -> u8,
-    pub(crate) cargo_type: extern "C" fn(*mut c_void) -> u8,
-    pub(crate) cargo_cap: extern "C" fn(*mut c_void) -> u16,
-    pub(crate) stored_count: extern "C" fn(*mut c_void) -> u32,
-    pub(crate) unload_count: extern "C" fn(*mut c_void) -> u32,
-    pub(crate) deliver_count: extern "C" fn(*mut c_void) -> u32,
-    pub(crate) transfer_count: extern "C" fn(*mut c_void) -> u32,
-    pub(crate) load_count: extern "C" fn(*mut c_void) -> u32,
-    pub(crate) cargo_unloading: extern "C" fn(*mut c_void) -> bool,
-    pub(crate) unload_type: extern "C" fn(*mut c_void) -> u8,
-    pub(crate) load_type: extern "C" fn(*mut c_void) -> u8,
-    pub(crate) is_refit: extern "C" fn(*mut c_void) -> bool,
-    pub(crate) refit_cargo: extern "C" fn(*mut c_void) -> u8,
-    pub(crate) has_orders: extern "C" fn(*mut c_void) -> bool,
-    pub(crate) load_unload_ticks: extern "C" fn(*mut c_void) -> u16,
-    pub(crate) stopped_or_crashed: extern "C" fn(*mut c_void) -> bool,
-    pub(crate) has_articulated_part: extern "C" fn(*mut c_void) -> bool,
-    pub(crate) is_articulated_part: extern "C" fn(*mut c_void) -> bool,
-    pub(crate) is_rear_dualheaded: extern "C" fn(*mut c_void) -> bool,
-    pub(crate) is_normal_aircraft: extern "C" fn(*mut c_void) -> bool,
-    pub(crate) is_multiheaded: extern "C" fn(*mut c_void) -> bool,
-    pub(crate) cached_max_speed: extern "C" fn(*mut c_void) -> u16,
-    pub(crate) cargo_multiplier: extern "C" fn(*mut c_void) -> u16,
-    pub(crate) cached_total_length: extern "C" fn(*mut c_void) -> u16,
-    pub(crate) full_load_order: extern "C" fn(*mut c_void) -> bool,
-    pub(crate) vehicle_owner: extern "C" fn(*mut c_void) -> u8,
-    pub(crate) aircraft_old_speed: extern "C" fn(*mut c_void) -> i32,
-    pub(crate) passenger_cargo: extern "C" fn(*mut c_void) -> bool,
-    pub(crate) gradual: extern "C" fn() -> bool,
-    pub(crate) improved_load: extern "C" fn() -> bool,
+    pub(crate) control: extern "C" fn(VehicleRef) -> LoadingControl,
+    pub(crate) part: extern "C" fn(VehicleRef) -> LoadingPart,
+    pub(crate) set_refit_capacity_and_stats:
+        extern "C" fn(VehicleRef, VehicleRef, u8, u16, bool) -> LoadingStats,
+    pub(crate) wait_observation: extern "C" fn(VehicleRef) -> LoadingWait,
+    pub(crate) load_engine: extern "C" fn(VehicleRef) -> LoadEngine,
+    pub(crate) grf_version: extern "C" fn(EngineRef) -> u8,
+    pub(crate) engine_load_callback: extern "C" fn(EngineRef) -> bool,
+    pub(crate) engine_no_multiplier: extern "C" fn(EngineRef) -> bool,
+    pub(crate) delivery_remaining: extern "C" fn(VehicleRef) -> DeliveryRemaining,
+    pub(crate) cargo_stored: extern "C" fn(VehicleRef) -> CargoStored,
+    pub(crate) cargo_reservation: extern "C" fn(VehicleRef) -> CargoReservation,
+    pub(crate) cargo_remaining: extern "C" fn(VehicleRef) -> CargoRemaining,
+    pub(crate) capacity_remaining: extern "C" fn(VehicleRef) -> CapacityRemaining,
+    pub(crate) vehicle_type: extern "C" fn(VehicleRef) -> u8,
+    pub(crate) cargo_type: extern "C" fn(VehicleRef) -> u8,
+    pub(crate) cargo_cap: extern "C" fn(VehicleRef) -> u16,
+    pub(crate) stored_count: extern "C" fn(VehicleRef) -> u32,
+    pub(crate) unload_count: extern "C" fn(VehicleRef) -> u32,
+    pub(crate) deliver_count: extern "C" fn(VehicleRef) -> u32,
+    pub(crate) transfer_count: extern "C" fn(VehicleRef) -> u32,
+    pub(crate) load_count: extern "C" fn(VehicleRef) -> u32,
+    pub(crate) unload_type: extern "C" fn(VehicleRef) -> u8,
+    pub(crate) has_orders: extern "C" fn(VehicleRef) -> bool,
+    pub(crate) load_unload_ticks: extern "C" fn(VehicleRef) -> u16,
+    pub(crate) status: extern "C" fn(VehicleRef) -> u8,
+    pub(crate) has_articulated_part: extern "C" fn(VehicleRef) -> bool,
+    pub(crate) is_articulated_part: extern "C" fn(VehicleRef) -> bool,
+    pub(crate) is_rear_dualheaded: extern "C" fn(VehicleRef) -> bool,
+    pub(crate) is_normal_aircraft: extern "C" fn(VehicleRef) -> bool,
+    pub(crate) is_multiheaded: extern "C" fn(VehicleRef) -> bool,
+    pub(crate) cargo_multiplier: extern "C" fn(VehicleRef) -> u16,
+    pub(crate) cached_total_length: extern "C" fn(VehicleRef) -> u16,
+    pub(crate) full_load_order: extern "C" fn(VehicleRef) -> bool,
+    pub(crate) vehicle_owner: extern "C" fn(VehicleRef) -> u8,
+    pub(crate) passenger_cargo: extern "C" fn(VehicleRef) -> bool,
     pub(crate) station_length_penalty: extern "C" fn() -> bool,
-    pub(crate) stop: extern "C" fn(*mut c_void) -> bool,
     pub(crate) current_company: extern "C" fn() -> u8,
-    pub(crate) last_station_visited: extern "C" fn(*mut c_void) -> u16,
-    pub(crate) total_count: extern "C" fn(*mut c_void) -> u32,
-    pub(crate) build_year: extern "C" fn(*mut c_void) -> i32,
-    pub(crate) calendar_year: extern "C" fn() -> i32,
-    pub(crate) order_time: extern "C" fn(*mut c_void) -> i32,
-    pub(crate) refit_mask: extern "C" fn(*mut c_void) -> u64,
-    pub(crate) set_cargo_unloading: extern "C" fn(*mut c_void, bool),
-    pub(crate) set_loading_finished: extern "C" fn(*mut c_void, bool),
-    pub(crate) set_stop: extern "C" fn(*mut c_void, bool),
-    pub(crate) set_load_ticks: extern "C" fn(*mut c_void, u16),
-    pub(crate) set_speed: extern "C" fn(*mut c_void, u16),
-    pub(crate) set_refit_capacity: extern "C" fn(*mut c_void, u16),
-    pub(crate) subtract_profit: extern "C" fn(*mut c_void, i64),
-    pub(crate) unknown_load_result: extern "C" fn(*mut c_void, u16),
-    pub(crate) refresh_capacity: extern "C" fn(*mut c_void),
-    pub(crate) vehicle_dirty: extern "C" fn(*mut c_void),
-    pub(crate) update_indicator: extern "C" fn(*mut c_void),
+    pub(crate) last_station_visited: extern "C" fn(VehicleRef) -> u16,
+    pub(crate) total_count: extern "C" fn(VehicleRef) -> u32,
+    pub(crate) order_time: extern "C" fn(VehicleRef) -> i32,
+    pub(crate) refit_mask: extern "C" fn(VehicleRef) -> u64,
+    pub(crate) set_cargo_unloading: extern "C" fn(VehicleRef, bool),
+    pub(crate) set_loading_finished: extern "C" fn(VehicleRef, bool),
+    pub(crate) set_stop: extern "C" fn(VehicleRef, bool),
+    pub(crate) set_load_ticks: extern "C" fn(VehicleRef, u16),
+    pub(crate) set_speed: extern "C" fn(VehicleRef, u16),
+    pub(crate) subtract_profit: extern "C" fn(VehicleRef, i64),
+    pub(crate) unknown_load_result: extern "C" fn(VehicleRef, u16),
+    pub(crate) refresh_capacity: extern "C" fn(VehicleRef),
+    pub(crate) vehicle_dirty: extern "C" fn(VehicleRef),
+    pub(crate) update_indicator: extern "C" fn(VehicleRef),
     pub(crate) set_current_company: extern "C" fn(u8),
-    pub(crate) next_vehicle: extern "C" fn(*mut c_void) -> *mut c_void,
-    pub(crate) next_articulated: extern "C" fn(*mut c_void) -> *mut c_void,
-    pub(crate) other_multiheaded: extern "C" fn(*mut c_void) -> *mut c_void,
-    pub(crate) first_engine_part: extern "C" fn(*mut c_void) -> *mut c_void,
-    pub(crate) first_vehicle: extern "C" fn(*mut c_void) -> *mut c_void,
-    pub(crate) previous_vehicle: extern "C" fn(*mut c_void) -> *mut c_void,
-    pub(crate) with_next_stations: extern "C" fn(*mut c_void, *mut c_void, Scope),
-    pub(crate) stage: extern "C" fn(*mut Station, *mut c_void, u8, *mut c_void, *mut NativePayment),
-    pub(crate) return_cargo: extern "C" fn(*mut Station, *mut c_void, u32),
+    pub(crate) next_vehicle: extern "C" fn(VehicleRef) -> Option<VehicleRef>,
+    pub(crate) next_articulated: extern "C" fn(VehicleRef) -> Option<VehicleRef>,
+    pub(crate) other_multiheaded: extern "C" fn(VehicleRef) -> VehicleRef,
+    pub(crate) first_engine_part: extern "C" fn(VehicleRef) -> VehicleRef,
+    pub(crate) first_vehicle: extern "C" fn(VehicleRef) -> VehicleRef,
+    pub(crate) previous_vehicle: extern "C" fn(VehicleRef) -> VehicleRef,
+    pub(crate) with_next_stations: extern "C" fn(VehicleRef, *mut c_void, Scope),
+    pub(crate) stage: extern "C" fn(*mut Station, VehicleRef, u8, *mut c_void, *mut NativePayment),
+    pub(crate) return_cargo: extern "C" fn(*mut Station, VehicleRef, u32),
     pub(crate) unload_cargo:
-        extern "C" fn(*mut Station, *mut c_void, u32, *mut NativePayment) -> u32,
-    pub(crate) load_cargo: extern "C" fn(*mut Station, *mut c_void, u32, *mut c_void) -> u32,
-    pub(crate) reserve_cargo: extern "C" fn(*mut Station, *mut c_void, u32, *mut c_void),
-    pub(crate) deliver_to_transfer: extern "C" fn(*mut c_void, u32),
-    pub(crate) deliver_to_keep: extern "C" fn(*mut c_void, u32),
+        extern "C" fn(*mut Station, VehicleRef, u32, *mut NativePayment) -> u32,
+    pub(crate) load_cargo: extern "C" fn(*mut Station, VehicleRef, u32, *mut c_void) -> u32,
+    pub(crate) reserve_cargo: extern "C" fn(*mut Station, VehicleRef, u32, *mut c_void),
+    pub(crate) deliver_to_transfer: extern "C" fn(VehicleRef, u32),
+    pub(crate) deliver_to_keep: extern "C" fn(VehicleRef, u32),
     pub(crate) has_cargo_for: extern "C" fn(*mut Station, u8, *mut c_void) -> bool,
-    pub(crate) platform_length: extern "C" fn(*mut Station, *mut c_void) -> u32,
-    pub(crate) train_at_station: extern "C" fn(*mut Station, *mut c_void) -> bool,
+    pub(crate) platform_length: extern "C" fn(*mut Station, VehicleRef) -> u32,
+    pub(crate) vehicle_tile: extern "C" fn(VehicleRef) -> u32,
+    pub(crate) station_index: extern "C" fn(*mut Station) -> u16,
     pub(crate) station_cargo_total: extern "C" fn(*mut Station, u8) -> u32,
-    pub(crate) load_property: extern "C" fn(*mut c_void) -> u16,
-    pub(crate) load_callback: extern "C" fn(*mut c_void) -> u16,
-    pub(crate) get_payment: extern "C" fn(*mut c_void) -> *mut NativePayment,
-    pub(crate) create_payment: extern "C" fn(*mut c_void) -> *mut NativePayment,
+    pub(crate) load_property: extern "C" fn(VehicleRef) -> u16,
+    pub(crate) load_callback: extern "C" fn(VehicleRef) -> u16,
+    pub(crate) get_payment: extern "C" fn(VehicleRef) -> *mut NativePayment,
+    pub(crate) create_payment: extern "C" fn(VehicleRef) -> *mut NativePayment,
     pub(crate) delete_payment: extern "C" fn(*mut NativePayment),
     pub(crate) flush_delivery: extern "C" fn(),
-    pub(crate) vehicle_new_cargo: extern "C" fn(*mut c_void),
+    pub(crate) vehicle_new_cargo: extern "C" fn(VehicleRef),
     pub(crate) cargo_taken: extern "C" fn(*mut Station, u8),
-    pub(crate) train_loads: extern "C" fn(*mut Station, *mut c_void),
-    pub(crate) road_loads: extern "C" fn(*mut Station, *mut c_void),
-    pub(crate) vehicle_empty: extern "C" fn(*mut c_void),
+    pub(crate) train_loads: extern "C" fn(*mut Station, VehicleRef),
+    pub(crate) road_loads: extern "C" fn(*mut Station, VehicleRef),
+    pub(crate) vehicle_empty: extern "C" fn(VehicleRef),
     pub(crate) station_dirty: extern "C" fn(*mut Station),
-    pub(crate) test_refit: extern "C" fn(*mut c_void, u8) -> u32,
-    pub(crate) execute_refit: extern "C" fn(*mut c_void, u8, *mut i64) -> bool,
-}
-impl Loading {
-    fn vehicle_type(&self, vehicle: *mut c_void) -> u32 {
-        u32::from((self.vehicle_type)(vehicle))
-    }
-    fn cargo_type(&self, vehicle: *mut c_void) -> u32 {
-        u32::from((self.cargo_type)(vehicle))
-    }
-    fn cargo_cap(&self, vehicle: *mut c_void) -> u32 {
-        u32::from((self.cargo_cap)(vehicle))
-    }
-    fn stored_count(&self, vehicle: *mut c_void) -> u32 {
-        (self.stored_count)(vehicle)
-    }
-    fn unload_count(&self, vehicle: *mut c_void) -> u32 {
-        (self.unload_count)(vehicle)
-    }
-    fn deliver_count(&self, vehicle: *mut c_void) -> u32 {
-        (self.deliver_count)(vehicle)
-    }
-    fn transfer_count(&self, vehicle: *mut c_void) -> u32 {
-        (self.transfer_count)(vehicle)
-    }
-    fn load_count(&self, vehicle: *mut c_void) -> u32 {
-        (self.load_count)(vehicle)
-    }
-    fn cargo_unloading(&self, vehicle: *mut c_void) -> u32 {
-        u32::from((self.cargo_unloading)(vehicle))
-    }
-    fn unload_type(&self, vehicle: *mut c_void) -> u32 {
-        u32::from((self.unload_type)(vehicle))
-    }
-    fn load_type(&self, vehicle: *mut c_void) -> u32 {
-        u32::from((self.load_type)(vehicle))
-    }
-    fn is_refit(&self, vehicle: *mut c_void) -> u32 {
-        u32::from((self.is_refit)(vehicle))
-    }
-    fn refit_cargo(&self, vehicle: *mut c_void) -> u32 {
-        u32::from((self.refit_cargo)(vehicle))
-    }
-    fn has_orders(&self, vehicle: *mut c_void) -> u32 {
-        u32::from((self.has_orders)(vehicle))
-    }
-    fn load_unload_ticks(&self, vehicle: *mut c_void) -> u32 {
-        u32::from((self.load_unload_ticks)(vehicle))
-    }
-    fn stopped_or_crashed(&self, vehicle: *mut c_void) -> u32 {
-        u32::from((self.stopped_or_crashed)(vehicle))
-    }
-    fn has_articulated_part(&self, vehicle: *mut c_void) -> u32 {
-        u32::from((self.has_articulated_part)(vehicle))
-    }
-    fn is_articulated_part(&self, vehicle: *mut c_void) -> u32 {
-        u32::from((self.is_articulated_part)(vehicle))
-    }
-    fn is_rear_dualheaded(&self, vehicle: *mut c_void) -> u32 {
-        u32::from((self.is_rear_dualheaded)(vehicle))
-    }
-    fn is_normal_aircraft(&self, vehicle: *mut c_void) -> u32 {
-        u32::from((self.is_normal_aircraft)(vehicle))
-    }
-    fn is_multiheaded(&self, vehicle: *mut c_void) -> u32 {
-        u32::from((self.is_multiheaded)(vehicle))
-    }
-    fn cached_max_speed(&self, vehicle: *mut c_void) -> u32 {
-        u32::from((self.cached_max_speed)(vehicle))
-    }
-    fn cargo_multiplier(&self, vehicle: *mut c_void) -> u32 {
-        u32::from((self.cargo_multiplier)(vehicle))
-    }
-    fn cached_total_length(&self, vehicle: *mut c_void) -> u32 {
-        u32::from((self.cached_total_length)(vehicle))
-    }
-    fn full_load_order(&self, vehicle: *mut c_void) -> u32 {
-        u32::from((self.full_load_order)(vehicle))
-    }
-    fn vehicle_owner(&self, vehicle: *mut c_void) -> u32 {
-        u32::from((self.vehicle_owner)(vehicle))
-    }
-    fn aircraft_old_speed(&self, vehicle: *mut c_void) -> u32 {
-        (self.aircraft_old_speed)(vehicle) as u32
-    }
-    fn passenger_cargo(&self, vehicle: *mut c_void) -> u32 {
-        u32::from((self.passenger_cargo)(vehicle))
-    }
-    fn gradual(&self, vehicle: *mut c_void) -> u32 {
-        let _ = vehicle;
-        u32::from((self.gradual)())
-    }
-    fn improved_load(&self, vehicle: *mut c_void) -> u32 {
-        let _ = vehicle;
-        u32::from((self.improved_load)())
-    }
-    fn station_length_penalty(&self, vehicle: *mut c_void) -> u32 {
-        let _ = vehicle;
-        u32::from((self.station_length_penalty)())
-    }
-    fn stop(&self, vehicle: *mut c_void) -> u32 {
-        u32::from((self.stop)(vehicle))
-    }
-    fn current_company(&self, vehicle: *mut c_void) -> u32 {
-        let _ = vehicle;
-        u32::from((self.current_company)())
-    }
-    fn total_count(&self, vehicle: *mut c_void) -> u32 {
-        (self.total_count)(vehicle)
-    }
+    pub(crate) test_refit: extern "C" fn(VehicleRef, u8) -> u32,
+    pub(crate) execute_refit: extern "C" fn(VehicleRef, u8, *mut i64) -> bool,
 }
 
-fn parts(l: &Loading, v: *mut c_void, mut action: impl FnMut(*mut c_void) -> bool) -> bool {
-    let mut part = v;
-    while !part.is_null() {
+fn parts(l: &Loading, v: VehicleRef, mut action: impl FnMut(VehicleRef) -> bool) -> bool {
+    let mut current = Some(v);
+    while let Some(part) = current {
         if !action(part) {
             return false;
         }
-        if l.vehicle_type(part) == 0
-            && l.is_multiheaded(part) != 0
+        if (l.vehicle_type)(part) == 0
+            && (l.is_multiheaded)(part)
             && !action((l.other_multiheaded)(part))
         {
             return false;
         }
-        part = if l.has_articulated_part(part) != 0 {
+        current = if (l.has_articulated_part)(part) {
             (l.next_articulated)(part)
         } else {
-            std::ptr::null_mut()
+            None
         };
     }
-    if l.vehicle_type(v) == 3 && l.is_normal_aircraft(v) != 0 {
-        return action((l.next_vehicle)(v));
+    if (l.vehicle_type)(v) == 3 && (l.is_normal_aircraft)(v) {
+        return action(unsafe { (l.next_vehicle)(v).unwrap_unchecked() });
     }
     true
 }
@@ -1325,29 +1243,34 @@ struct LoadingStation {
     base: *mut BaseStation,
     state: *mut Service,
 }
-fn may_load(st: LoadingStation, v: *mut c_void, w: &World, l: &Loading) -> bool {
+fn may_load(st: LoadingStation, v: VehicleRef, w: &World, l: &Loading) -> bool {
     if (w.station_owner)(st.base) != 16 {
         return true;
     }
     let observed = (w.station_exclusivity)(st.base);
-    observed.counter == 0 || u32::from(observed.exclusive) == l.vehicle_owner(v)
+    observed.counter == 0 || observed.exclusive == (l.vehicle_owner)(v)
 }
 fn reserve_consist(
     st: LoadingStation,
-    front: *mut c_void,
+    front: VehicleRef,
+    control: &LoadingControl,
     mut capleft: Option<&mut [u32; 64]>,
     next: *mut c_void,
     w: &World,
     l: &Loading,
 ) {
-    let must_reserve = l.is_refit(front) == 0 || (l.get_payment)(front).is_null();
-    let mut v = front;
-    while !v.is_null() {
-        if l.is_articulated_part(v) == 0
-            && (l.vehicle_type(v) != 0 || l.is_rear_dualheaded(v) == 0)
-            && (l.vehicle_type(v) != 3 || l.is_normal_aircraft(v) != 0)
-            && (must_reserve || l.refit_cargo(front) == l.cargo_type(v))
-        {
+    let must_reserve = !control.refit || (l.get_payment)(front).is_null();
+    let mut current = Some(front);
+    while let Some(v) = current {
+        let reserve_part = if (l.is_articulated_part)(v) {
+            false
+        } else {
+            let kind = (l.vehicle_type)(v);
+            (kind != 0 || !(l.is_rear_dualheaded)(v))
+                && (kind != 3 || (l.is_normal_aircraft)(v))
+                && (must_reserve || control.refit_cargo == (l.cargo_type)(v))
+        };
+        if reserve_part {
             parts(l, v, |part| {
                 let observed = (l.capacity_remaining)(part);
                 let cap = u32::from(observed.capacity);
@@ -1359,34 +1282,34 @@ fn reserve_consist(
             });
         }
         if let Some(ref mut capleft) = capleft
-            && l.cargo_cap(v) != 0
+            && (l.cargo_cap)(v) != 0
         {
             let observed = (l.cargo_remaining)(v);
             let cargo = usize::from(observed.cargo);
             capleft[cargo] = capleft[cargo]
                 .wrapping_add(u32::from(observed.capacity).wrapping_sub(observed.remaining));
         }
-        v = (l.next_vehicle)(v);
+        current = (l.next_vehicle)(v);
     }
 }
-fn load_amount(v: *mut c_void, l: &Loading) -> u32 {
+fn load_amount(v: VehicleRef, gradual: bool, l: &Loading) -> u32 {
     let observed = (l.load_engine)(v);
     let engine = observed.engine;
     let mut amount = u32::from(observed.amount);
-    let mail = l.vehicle_type(v) == 3 && l.is_normal_aircraft(v) == 0;
+    let mail = (l.vehicle_type)(v) == 3 && !(l.is_normal_aircraft)(v);
     if mail {
         amount = amount.wrapping_add(3) / 4;
     }
-    if l.gradual(v) != 0 {
-        let grf = (l.engine_grf)(engine);
+    if gradual {
+        let version = (l.grf_version)(engine);
         let mut cb = 0xffff;
-        if !grf.is_null() && (l.grf_version)(grf) >= 8 {
+        if version >= 8 {
             cb = (l.load_property)(v);
         } else if (l.engine_load_callback)(engine) {
             cb = (l.load_callback)(v);
         }
         if cb != 0xffff {
-            if (l.grf_version)((l.engine_grf)(engine)) < 8 {
+            if (l.grf_version)(engine) < 8 {
                 cb &= 255;
             }
             if cb >= 256 {
@@ -1397,12 +1320,15 @@ fn load_amount(v: *mut c_void, l: &Loading) -> u32 {
         }
     }
     if (l.engine_no_multiplier)(engine) && !mail {
-        amount = amount.wrapping_mul(l.cargo_multiplier(v)).wrapping_add(255) / 256;
+        amount = amount
+            .wrapping_mul(u32::from((l.cargo_multiplier)(v)))
+            .wrapping_add(255)
+            / 256;
     }
     amount.max(1)
 }
 fn refit_vehicle(
-    v: *mut c_void,
+    v: VehicleRef,
     capleft: &mut [u32; 64],
     st: LoadingStation,
     next: *mut c_void,
@@ -1411,11 +1337,11 @@ fn refit_vehicle(
     l: &Loading,
 ) {
     let start = (l.first_engine_part)(v);
-    if !parts(l, start, |part| l.stored_count(part) == 0) {
+    if !parts(l, start, |part| (l.stored_count)(part) == 0) {
         return;
     }
-    let old_company = l.current_company(std::ptr::null_mut());
-    (l.set_current_company)(l.vehicle_owner(v) as u8);
+    let old_company = (l.current_company)();
+    (l.set_current_company)((l.vehicle_owner)(v));
     let mut mask = (l.refit_mask)(v);
     parts(l, start, |part| {
         let observed = (l.cargo_reservation)(part);
@@ -1427,11 +1353,9 @@ fn refit_vehicle(
     });
     let auto = new_cargo == 253;
     if auto {
-        new_cargo = l.cargo_type(start) as u8;
+        new_cargo = (l.cargo_type)(start);
         for cargo in 0..64_u8 {
-            if mask & (1_u64 << cargo) == 0
-                || u32::from((l.has_cargo_for)(st.native, cargo, next)) == 0
-            {
+            if mask & (1_u64 << cargo) == 0 || !(l.has_cargo_for)(st.native, cargo, next) {
                 continue;
             }
             let capacity = (l.test_refit)(start, cargo);
@@ -1444,7 +1368,7 @@ fn refit_vehicle(
             }
         }
     }
-    if new_cargo < 64 && u32::from(new_cargo) != l.cargo_type(start) {
+    if new_cargo < 64 && u32::from(new_cargo) != u32::from((l.cargo_type)(start)) {
         parts(l, start, |part| {
             (l.return_cargo)(st.native, part, u32::MAX);
             true
@@ -1455,7 +1379,7 @@ fn refit_vehicle(
             (l.subtract_profit)((l.first_vehicle)(v), cost.wrapping_shl(8));
         }
     }
-    let do_reserve = auto || l.full_load_order((l.first_vehicle)(v)) != 0;
+    let do_reserve = auto || (l.full_load_order)((l.first_vehicle)(v));
     parts(l, start, |part| {
         let observed = (l.cargo_remaining)(part);
         let remaining = u32::from(observed.capacity).wrapping_sub(observed.remaining);
@@ -1469,11 +1393,11 @@ fn refit_vehicle(
             .wrapping_add(u32::from(observed.capacity).wrapping_sub(observed.remaining));
         true
     });
-    (l.set_current_company)(old_company as u8);
+    (l.set_current_company)(old_company);
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_station_prepare(
-    front: *mut c_void,
+    front: VehicleRef,
     world: *const World,
     loading: *const Loading,
 ) {
@@ -1487,33 +1411,32 @@ pub unsafe extern "C" fn openttd_rust_station_prepare(
         state: (w.owner)(base),
     };
     unsafe {
-        openttd_rust_station_queue_push(st.state, front);
+        openttd_rust_station_queue_push(st.state, front.0.as_ptr().cast());
     }
     (l.set_loading_finished)(front, false);
     (l.set_load_ticks)(front, 1);
     let payment = (l.create_payment)(front);
     let mut body = |next| {
-        if l.has_orders(front) == 0 || l.unload_type(front) != 4 {
-            let mut v = front;
-            while !v.is_null() {
-                if l.cargo_cap(v) > 0 && l.total_count(v) > 0 {
-                    (l.stage)(st.native, v, l.unload_type(front) as u8, next, payment);
-                    if l.unload_count(v) > 0 {
+        if !(l.has_orders)(front) || (l.unload_type)(front) != 4 {
+            let mut current = Some(front);
+            while let Some(v) = current {
+                if u32::from((l.cargo_cap)(v)) > 0 && (l.total_count)(v) > 0 {
+                    (l.stage)(st.native, v, (l.unload_type)(front), next, payment);
+                    if (l.unload_count)(v) > 0 {
                         (l.set_cargo_unloading)(v, true);
                     }
                 }
-                v = (l.next_vehicle)(v);
+                current = (l.next_vehicle)(v);
             }
         }
     };
     let (context, callback) = scope_context(&mut body);
     (l.with_next_stations)(front, context, callback);
 }
-fn update_ticks(front: *mut c_void, st: LoadingStation, mut ticks: i32, l: &Loading) {
-    if l.vehicle_type(front) == 0 && l.station_length_penalty(front) != 0 {
+fn update_ticks(front: VehicleRef, st: LoadingStation, kind: u8, mut ticks: i32, l: &Loading) {
+    if kind == 0 && (l.station_length_penalty)() {
         // Platform length is a world-geometry query on the native station shell.
-        let overhang = l
-            .cached_total_length(front)
+        let overhang = u32::from((l.cached_total_length)(front))
             .wrapping_sub((l.platform_length)(st.native, front).wrapping_mul(16))
             as i32;
         if overhang > 0 {
@@ -1525,20 +1448,22 @@ fn update_ticks(front: *mut c_void, st: LoadingStation, mut ticks: i32, l: &Load
 }
 // Preserve complete loading control at the source observation points.
 #[allow(clippy::too_many_lines)]
-unsafe fn load_vehicle(front: *mut c_void, st: LoadingStation, w: &World, l: &Loading) {
+unsafe fn load_vehicle(front: VehicleRef, st: LoadingStation, w: &World, l: &Loading) {
     let mut body = |next| {
-        let auto = l.is_refit(front) != 0 && l.refit_cargo(front) == 253;
+        let control = (l.control)(front);
+        let auto = control.refit && control.refit_cargo == 253;
         let mut capleft = [0_u32; 64];
-        let reserve = if l.improved_load(front) != 0 && auto {
+        let reserve = if control.improved && auto {
             (l.get_payment)(front).is_null()
         } else {
-            l.full_load_order(front) != 0
+            control.full_load
         };
         if reserve {
             reserve_consist(
                 st,
                 front,
-                if auto && l.load_unload_ticks(front) != 0 {
+                &control,
+                if auto && control.ticks != 0 {
                     Some(&mut capleft)
                 } else {
                     None
@@ -1548,10 +1473,15 @@ unsafe fn load_vehicle(front: *mut c_void, st: LoadingStation, w: &World, l: &Lo
                 l,
             );
         }
-        if l.load_unload_ticks(front) != 0 {
+        if control.ticks != 0 {
             return;
         }
-        if l.vehicle_type(front) == 0 && u32::from((l.train_at_station)(st.native, front)) == 0 {
+        if control.vehicle_type == 0 && {
+            let tile = (l.vehicle_tile)(front);
+            let shared = unsafe { &*w.shared };
+            (shared.tile_type)(tile) != crate::vehicle::MP_STATION
+                || (shared.station_index)(tile) != (l.station_index)(st.native)
+        } {
             (l.set_loading_finished)(front, true);
             (l.set_load_ticks)(front, 1);
             return;
@@ -1570,29 +1500,30 @@ unsafe fn load_vehicle(front: *mut c_void, st: LoadingStation, w: &World, l: &Lo
         (l.set_speed)(front, 0);
         let payment = (l.get_payment)(front);
         let mut artic_part = 0_u32;
-        let mut v = front;
-        while !v.is_null() {
-            if v == front || l.has_articulated_part((l.previous_vehicle)(v)) == 0 {
+        let mut current = Some(front);
+        while let Some(v) = current {
+            if v == front || !(l.has_articulated_part)((l.previous_vehicle)(v)) {
                 artic_part = 0;
             }
-            if l.cargo_cap(v) == 0 {
-                v = (l.next_vehicle)(v);
+            let part = (l.part)(v);
+            if part.capacity == 0 {
+                current = (l.next_vehicle)(v);
                 continue;
             }
             artic_part = artic_part.wrapping_add(1);
-            let mut cargo = l.cargo_type(v) as u8;
+            let mut cargo = part.cargo;
             let mut ge = unsafe { cp(state, cargo) };
-            if l.cargo_unloading(v) != 0 && l.unload_type(front) != 4 {
-                let count = l.unload_count(v);
-                let mut amount = if l.gradual(v) != 0 {
-                    count.min(load_amount(v, l))
+            if part.unloading && control.unload_type != 4 {
+                let count = (l.unload_count)(v);
+                let mut amount = if control.gradual {
+                    count.min(load_amount(v, control.gradual, l))
                 } else {
                     count
                 };
-                if unsafe { (*ge).status } & 1 == 0 && l.deliver_count(v) > 0 {
-                    let unload_type = l.unload_type(front);
+                if unsafe { (*ge).status } & 1 == 0 && (l.deliver_count)(v) > 0 {
+                    let unload_type = control.unload_type;
                     if unload_type == 2 || unload_type == 1 {
-                        (l.deliver_to_transfer)(v, l.deliver_count(v));
+                        (l.deliver_to_transfer)(v, (l.deliver_count)(v));
                     } else {
                         let observed = (l.delivery_remaining)(v);
                         let remaining = observed.remaining.wrapping_add(observed.deliver);
@@ -1603,11 +1534,11 @@ unsafe fn load_vehicle(front: *mut c_void, st: LoadingStation, w: &World, l: &Lo
                                 remaining - u32::from(observed.capacity),
                             );
                         }
-                        (l.deliver_to_keep)(v, l.deliver_count(v));
+                        (l.deliver_to_keep)(v, (l.deliver_count)(v));
                         unloaded = true;
                     }
                 }
-                if l.transfer_count(v) > 0 {
+                if (l.transfer_count)(v) > 0 {
                     dirty_station = true;
                     if unsafe { (*ge).status } & 2 == 0 {
                         unsafe {
@@ -1616,8 +1547,9 @@ unsafe fn load_vehicle(front: *mut c_void, st: LoadingStation, w: &World, l: &Lo
                         }
                     }
                 }
+                crate::witness::hit(crate::witness::STATION_UNLOAD_CARGO);
                 amount = (l.unload_cargo)(st.native, v, amount, payment);
-                let remaining = l.unload_count(v) > 0;
+                let remaining = (l.unload_count)(v) > 0;
                 if amount > 0 {
                     dirty_vehicle = true;
                     unloaded = true;
@@ -1626,56 +1558,56 @@ unsafe fn load_vehicle(front: *mut c_void, st: LoadingStation, w: &World, l: &Lo
                         (&raw mut (*state).fields.time_since_unload).write(0);
                     }
                 }
-                if l.gradual(v) != 0 && remaining {
+                if control.gradual && remaining {
                     emptied = false;
                 } else {
                     (l.set_cargo_unloading)(v, false);
                 }
-                v = (l.next_vehicle)(v);
+                current = (l.next_vehicle)(v);
                 continue;
             }
-            if l.load_type(front) == 4 || l.stop(front) != 0 {
-                v = (l.next_vehicle)(v);
+            if control.load_type == 4 || control.stop {
+                current = (l.next_vehicle)(v);
                 continue;
             }
-            if l.is_refit(front) != 0 && artic_part == 1 {
-                refit_vehicle(v, &mut capleft, st, next, l.refit_cargo(front) as u8, w, l);
-                cargo = l.cargo_type(v) as u8;
+            let refitted = control.refit && artic_part == 1;
+            if refitted {
+                refit_vehicle(v, &mut capleft, st, next, control.refit_cargo, w, l);
+            }
+            let observed = (l.set_refit_capacity_and_stats)(
+                v,
+                front,
+                control.vehicle_type,
+                part.capacity,
+                refitted,
+            );
+            if refitted {
+                cargo = observed.cargo;
                 ge = unsafe { cp(state, cargo) };
             }
-            (l.set_refit_capacity)(v, l.cargo_cap(v) as u16);
-            let kind = l.vehicle_type(front);
-            let speed = match kind {
-                0 | 2 => l.cached_max_speed(front),
-                1 => l.cached_max_speed(front) / 2,
-                3 => l.aircraft_old_speed(front),
-                _ => unreachable!(),
-            };
             unsafe {
-                (&raw mut (*ge).last_speed).write(speed.min(255) as u8);
-                (&raw mut (*ge).last_age).write(
-                    (l.calendar_year)()
-                        .wrapping_sub((l.build_year)(front))
-                        .clamp(0, 255) as u8,
-                );
+                (&raw mut (*ge).last_speed).write(observed.speed.clamp(0, 255) as u8);
+                (&raw mut (*ge).last_age).write(observed.age.clamp(0, 255) as u8);
             }
-            let stored = (l.cargo_stored)(v);
-            let mut cap = u32::from(stored.capacity).wrapping_sub(stored.stored);
+            let mut cap = u32::from(observed.capacity).wrapping_sub(observed.stored);
             if cap > 0 {
                 unsafe {
                     (&raw mut (*ge).time_since_pickup).write(0);
                 }
-                if (l.load_count(v) > 0 || (w.available)(st.base, cargo) > 0)
+                if (observed.load_count > 0 || (w.available)(st.base, cargo) > 0)
                     && may_load(st, v, w, l)
                 {
-                    if l.stored_count(v) == 0 {
+                    if observed.stored == 0 {
                         (l.vehicle_new_cargo)(v);
                     }
-                    if l.gradual(v) != 0 {
-                        cap = cap.min(load_amount(v, l));
+                    if control.gradual {
+                        cap = cap.min(load_amount(v, control.gradual, l));
                     }
                     let loaded = (l.load_cargo)(st.native, v, cap, next);
-                    if l.load_count(v) > 0 {
+                    if control.gradual && loaded > 0 {
+                        crate::witness::hit(crate::witness::STATION_GRADUAL_LOADED);
+                    }
+                    if (l.load_count)(v) > 0 {
                         reservation_left |= 1 << cargo;
                     }
                     if loaded == cap {
@@ -1688,8 +1620,7 @@ unsafe fn load_vehicle(front: *mut c_void, st: LoadingStation, w: &World, l: &Lo
                         loaded_any = true;
                         unsafe {
                             (&raw mut (*state).fields.time_since_load).write(0);
-                            (&raw mut (*state).fields.last_vehicle_type)
-                                .write(l.vehicle_type(v) as u8);
+                            (&raw mut (*state).fields.last_vehicle_type).write(part.vehicle_type);
                         }
                         if (l.station_cargo_total)(st.native, cargo) == 0 {
                             (l.cargo_taken)(st.native, cargo);
@@ -1706,12 +1637,12 @@ unsafe fn load_vehicle(front: *mut c_void, st: LoadingStation, w: &World, l: &Lo
             } else {
                 cargo_not_full |= 1 << cargo;
             }
-            v = (l.next_vehicle)(v);
+            current = (l.next_vehicle)(v);
         }
         if loaded_any || unloaded {
-            if l.vehicle_type(front) == 0 {
+            if control.vehicle_type == 0 {
                 (l.train_loads)(st.native, front);
-            } else if l.vehicle_type(front) == 1 {
+            } else if control.vehicle_type == 1 {
                 (l.road_loads)(st.native, front);
             }
         }
@@ -1721,32 +1652,27 @@ unsafe fn load_vehicle(front: *mut c_void, st: LoadingStation, w: &World, l: &Lo
         }
         (l.set_stop)(front, false);
         if loaded_any || unloaded {
-            if l.gradual(front) != 0 {
-                ticks = [40, 20, 10, 20][l.vehicle_type(front) as usize];
+            if control.gradual {
+                ticks = [40, 20, 10, 20][control.vehicle_type as usize];
             }
-            if !unloaded
-                && full_load == 0
-                && reservation_left == 0
-                && l.full_load_order(front) == 0
-                && {
-                    let observed = (l.wait_observation)(front);
-                    let wait = i32::from(observed.wait)
-                        .wrapping_sub(observed.lateness)
-                        .max(0);
-                    (l.order_time)(front) >= wait
-                }
-            {
+            if !unloaded && full_load == 0 && reservation_left == 0 && !control.full_load && {
+                let observed = (l.wait_observation)(front);
+                let wait = i32::from(observed.wait)
+                    .wrapping_sub(observed.lateness)
+                    .max(0);
+                (l.order_time)(front) >= wait
+            } {
                 (l.set_stop)(front, true);
             }
-            update_ticks(front, st, ticks, l);
+            update_ticks(front, st, control.vehicle_type, ticks, l);
         } else {
-            update_ticks(front, st, 20, l);
+            update_ticks(front, st, control.vehicle_type, 20, l);
             let mut finished = true;
-            if l.full_load_order(front) != 0 {
-                if l.load_type(front) == 3 {
-                    if (l.vehicle_type(front) == 3
-                        && l.passenger_cargo(front) != 0
-                        && l.cargo_cap(front) > l.stored_count(front))
+            if control.full_load {
+                if control.load_type == 3 {
+                    if (control.vehicle_type == 3
+                        && (l.passenger_cargo)(front)
+                        && u32::from((l.cargo_cap)(front)) > (l.stored_count)(front))
                         || (cargo_not_full != 0 && (cargo_full & !cargo_not_full) == 0)
                     {
                         finished = false;
@@ -1794,30 +1720,34 @@ pub unsafe extern "C" fn openttd_rust_station_load(
     if node.is_null() {
         return;
     }
-    let mut last = std::ptr::null_mut();
+    let mut last = None;
     while !node.is_null() {
-        let v = unsafe { openttd_rust_station_queue_value(node) };
-        if l.stopped_or_crashed(v) == 0 {
-            let ticks = l.load_unload_ticks(v).wrapping_sub(1);
-            (l.set_load_ticks)(v, ticks as u16);
+        let v = VehicleRef(unsafe {
+            NonNull::new_unchecked(openttd_rust_station_queue_value(node).cast())
+        });
+        if (l.status)(v) & (VS_STOPPED | VS_CRASHED) == 0 {
+            let ticks = (l.load_unload_ticks)(v).wrapping_sub(1);
+            (l.set_load_ticks)(v, ticks);
             if ticks == 0 {
-                last = v;
+                last = Some(v);
             }
         }
         node = unsafe { openttd_rust_station_queue_next(state, node) };
     }
-    if last.is_null() {
+    if last.is_none() {
         return;
     }
     node = unsafe { openttd_rust_station_queue_first(state) };
     while !node.is_null() {
-        let v = unsafe { openttd_rust_station_queue_value(node) };
-        if l.stopped_or_crashed(v) == 0 {
+        let v = VehicleRef(unsafe {
+            NonNull::new_unchecked(openttd_rust_station_queue_value(node).cast())
+        });
+        if (l.status)(v) & (VS_STOPPED | VS_CRASHED) == 0 {
             unsafe {
                 load_vehicle(v, st, w, l);
             }
         }
-        if v == last {
+        if Some(v) == last {
             break;
         }
         node = unsafe { openttd_rust_station_queue_next(state, node) };

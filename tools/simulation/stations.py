@@ -15,7 +15,7 @@ VEHICLE = "roadveh[0]/common[0]/"
 
 def game_environment(scenario):
     witnessed = scenario.get("station_service") and scenario.get("witnesses")
-    return {"OPENTTD_STATION_PROFILE": "1"} if witnessed else {}
+    return core.WITNESS_ENVIRONMENT if witnessed else {}
 
 
 def scenarios(soak):
@@ -179,15 +179,17 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
 def check(scenario, run, mode, role, result):
     if "station_service" not in scenario:
         return
-    required = ["station_calls", "grouped_reads", "scoped_bodies"]
-    if scenario["station_service"] in ("manual", "cargodist", "full-gradual"):
-        required.append("loading_calls")
-    if scenario["station_service"].startswith("stale-"):
-        required.append("links_calls")
-    if counts := core.branch_witnesses(
-        scenario, run, role, "station-boundary-profile.json", required
-    ):
-        result[f"{mode}_{role}_station_boundary"] = counts
+    kind = scenario["station_service"]
+    required = {
+        "acceptance-loss": ["acceptance_changed"],
+        "full-gradual": ["gradual_loaded"],
+        "manual": ["unload_cargo"],
+        "cargodist": ["unload_cargo"],
+        "stale-remove": ["stale_remove"],
+        "stale-refresh": ["stale_refresh"],
+    }.get(kind, [])
+    if counts := core.branch_witnesses(scenario, run, role, "station", required):
+        result[f"{mode}_{role}_station_branches"] = counts
     if not run["snapshots"]:
         return
     saved = [read_save(path) for path in run["snapshots"]]
