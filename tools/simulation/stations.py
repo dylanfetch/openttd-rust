@@ -25,19 +25,24 @@ def scenarios(soak):
             "economy": "cargodist"
             if mode in ("cargodist", "stale-refresh")
             else "stockpile"
-            if mode in ("acceptance-loss", "full-gradual")
+            if mode in ("acceptance-loss", "full-gradual", "loading-context")
             else "manual",
             "station_service": mode,
-            "ticks": 32
+            "ticks": 1
+            if mode == "loading-context"
+            else 32
             if mode == "acceptance-loss"
             else (8 if soak else 4) * SNAPSHOT_TICKS,
-            "snapshot_minimum": 0 if mode == "acceptance-loss" else 2,
+            "snapshot_minimum": 0
+            if mode in ("acceptance-loss", "loading-context")
+            else 2,
         }
         for mode in (
             "manual",
             "cargodist",
             "acceptance-loss",
             "full-gradual",
+            "loading-context",
             "rating-expire",
             "rating-cap",
             "stale-refresh",
@@ -71,7 +76,7 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
     stations = economy.rows(original, "STNN")
     if not any(row.get(PREFIX + "loading_vehicles") for row in stations.values()):
         raise RuntimeError("station input lacks a real active loading queue")
-    if mode in ("acceptance-loss", "full-gradual"):
+    if mode in ("acceptance-loss", "full-gradual", "loading-context"):
         front = economy.pending(original)
         if front is None:
             raise RuntimeError("station input lacks staged coal unloading")
@@ -93,6 +98,24 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
             patch(
                 "VEHS", front, VEHICLE + "current_order.flags", (flags & ~0x70) | 0x20
             )
+            if mode == "loading-context":
+                # Modern save fixup accepts this independent last-visited field;
+                # the queue stays at the real unloading station. The original
+                # resolves the vehicle's station before reservation/unloading.
+                alternate = 3
+                row = stations[alternate]
+                if (
+                    alternate == station
+                    or row[PREFIX + "base[0]/owner"] != vehicle[VEHICLE + "owner"]
+                    or row[PREFIX + f"goods[{cargo}]/status"] & 1
+                    or row[PREFIX + "loading_vehicles"]
+                    or stations[station][PREFIX + "loading_vehicles"] != (front + 1,)
+                    or vehicle[VEHICLE + "load_unload_ticks"] != 1
+                ):
+                    raise RuntimeError(
+                        "loading-context input lacks distinct station witness"
+                    )
+                patch("VEHS", front, VEHICLE + "last_station_visited", alternate)
         result["station_front"] = front
         result["station_target"] = (station, cargo)
     if mode.startswith(("rating-", "stale-")):
@@ -232,6 +255,26 @@ def check(scenario, run, mode, role, result):
                 result["problems"].append(
                     f"{mode}/{role}: full load finished while cargo unavailable"
                 )
+        elif kind == "loading-context":
+            initial = economy.rows(before, "VEHS")[front]
+            actions = vehicle[VEHICLE + "cargo.action_counts"]
+            queued = rows[-1][PREFIX + "loading_vehicles"]
+            if (
+                actions != (0, 0, sum(initial[VEHICLE + "cargo.action_counts"]), 0)
+                or vehicle[VEHICLE + "cargo.packets"]
+                != initial[VEHICLE + "cargo.packets"]
+                or vehicle[VEHICLE + "vehicle_flags"] & 1
+                or queued != (front + 1,)
+            ):
+                result["problems"].append(
+                    f"{mode}/{role}: vehicle station did not retain staged cargo/queue"
+                )
+            result[f"{mode}_{role}_loading_context"] = {
+                "last_station": vehicle[VEHICLE + "last_station_visited"],
+                "queue_station": station,
+                "action_counts": actions,
+                "loading_queue": queued,
+            }
         elif not vehicle[VEHICLE + "cargo.action_counts"][2]:
             result["problems"].append(
                 f"{mode}/{role}: acceptance loss did not retain staged delivery"

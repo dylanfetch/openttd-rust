@@ -1188,7 +1188,8 @@ fn update_ticks(front: *mut c_void, st: *mut c_void, mut ticks: i32, l: &Loading
 }
 // Preserve complete loading control at the source observation points.
 #[allow(clippy::too_many_lines)]
-unsafe fn load_vehicle(front: *mut c_void, st: *mut c_void, w: &World, l: &Loading) {
+unsafe fn load_vehicle(front: *mut c_void, w: &World, l: &Loading) {
+    let st = (w.get)(l.last_station_visited(front));
     let next = (l.next_stations)(front);
     let auto = l.is_refit(front) != 0 && l.refit_cargo(front) == 253;
     let mut capleft = [0_u32; 64];
@@ -1472,7 +1473,7 @@ pub unsafe extern "C" fn openttd_rust_station_load(
         let v = unsafe { openttd_rust_station_queue_value(node) };
         if l.stopped_or_crashed(v) == 0 {
             unsafe {
-                load_vehicle(v, st, &w, &l);
+                load_vehicle(v, &w, &l);
             }
         }
         if v == last {
