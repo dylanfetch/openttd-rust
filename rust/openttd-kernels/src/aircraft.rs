@@ -326,7 +326,9 @@ macro_rules! scalar_services {
     ($($name:ident($receiver:ident; $($arg:ident : $ty:ty),*) => $call:expr;)*) => {$(
         fn $name(&$receiver, $($arg:$ty),*) -> i64 {
             // SAFETY: No canonical owner borrow survives this noexcept callback.
-            i64::from(unsafe { $call })
+            let result = unsafe { $call };
+            service_witness(stringify!($name), std::mem::size_of_val(&result));
+            i64::from(result)
         }
     )*};
 }
@@ -334,9 +336,34 @@ macro_rules! direct_services {
     ($($name:ident($receiver:ident; $($arg:ident : $ty:ty),*) -> $ret:ty => $call:expr;)*) => {$(
         fn $name(&$receiver, $($arg:$ty),*) -> $ret {
             // SAFETY: No canonical owner borrow survives this noexcept callback.
-            unsafe { $call }
+            let result = unsafe { $call };
+            service_witness(stringify!($name), std::mem::size_of_val(&result));
+            result
         }
     )*};
+}
+/// Count the actual boundary return type before integer promotion. Writes return
+/// unit (zero observation bytes). Names affect instrumentation only; the native
+/// services remain distinct typed calls.
+fn service_witness(name: &str, bytes: usize) {
+    use crate::witness;
+    if !witness::enabled() {
+        return;
+    }
+    witness::hit(witness::AIRCRAFT_SERVICES);
+    witness::add(witness::AIRCRAFT_BYTES, bytes as u64);
+    if matches!(
+        name,
+        "station"
+            | "hangar_height"
+            | "can_use_station"
+            | "hangar_exit"
+            | "landing_rating"
+            | "first_arrival"
+            | "touchdown_animation"
+    ) {
+        witness::hit(witness::AIRCRAFT_STATIONS);
+    }
 }
 impl World<'_> {
     scalar_services! {
@@ -502,15 +529,24 @@ impl World<'_> {
     }
 
     fn next(&self, v: Vehicle) -> Vehicle {
-        unsafe { (self.leaves.next)(v) }
+        {
+            let result = unsafe { (self.leaves.next)(v) };
+            service_witness("next", std::mem::size_of_val(&result));
+            result
+        }
     }
     fn station(&self, id: u32) -> *const c_void {
-        unsafe { (self.leaves.station)(id as u16) }
+        {
+            let result = unsafe { (self.leaves.station)(id as u16) };
+            service_witness("station", std::mem::size_of_val(&result));
+            result
+        }
     }
     fn moving(&self, airport: *const c_void, pos: i64) -> Movement {
         // SAFETY: Synchronous noexcept service; no owner borrow spans this call.
         {
             let m = unsafe { (self.leaves.moving)(airport, pos as u8) };
+            service_witness("moving", std::mem::size_of_val(&m));
             Movement {
                 x: i64::from(m.x),
                 y: i64::from(m.y),
@@ -523,6 +559,7 @@ impl World<'_> {
         // SAFETY: Synchronous noexcept service; no owner borrow spans this call.
         {
             let p = unsafe { (self.leaves.new_position)(v) };
+            service_witness("new_position", std::mem::size_of_val(&p));
             NewPosition {
                 x: i64::from(p.x),
                 y: i64::from(p.y),
@@ -531,9 +568,14 @@ impl World<'_> {
         }
     }
     fn next_aircraft(&self, last: u32) -> Vehicle {
-        unsafe { (self.leaves.next_aircraft)(last) }
+        {
+            let result = unsafe { (self.leaves.next_aircraft)(last) };
+            service_witness("next_aircraft", std::mem::size_of_val(&result));
+            result
+        }
     }
     fn station_rating(&self, tile: i64, owner: i64, amount: i64, radius: i64) {
+        service_witness("station_rating", 0);
         // SAFETY: Synchronous noexcept service; no owner borrow spans this call.
         unsafe {
             (self.leaves.station_rating)(tile as u32, owner as u8, amount as i32, radius as u32);
@@ -1696,6 +1738,7 @@ impl World<'_> {
         if self.subtype(id) > 2 {
             return true;
         }
+        crate::witness::hit(crate::witness::AIRCRAFT_TICKS);
         self.set_tick_counter(id, i64::from((self.tick_counter(id) as u8).wrapping_add(1)));
         if self.vehicle_status(id) & STOPPED == 0 {
             self.set_running_ticks(
@@ -1919,6 +1962,7 @@ pub unsafe extern "C" fn openttd_rust_airport_blocks_destroy(blocks: *mut u64) {
 /// Raw scalar accesses end before noexcept callbacks; no borrow survives reentry.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_aircraft_tick(leaves: *const Leaves, id: Vehicle) -> bool {
+    crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
     let w = World {
         leaves: unsafe { &*leaves },
     };
@@ -1930,6 +1974,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_tick(leaves: *const Leaves, id: V
 /// Raw scalar accesses end before noexcept callbacks; no borrow survives reentry.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_aircraft_calendar_day(leaves: *const Leaves, id: Vehicle) {
+    crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
     let w = World {
         leaves: unsafe { &*leaves },
     };
@@ -1941,6 +1986,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_calendar_day(leaves: *const Leave
 /// Raw scalar accesses end before noexcept callbacks; no borrow survives reentry.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_aircraft_economy_day(leaves: *const Leaves, id: Vehicle) {
+    crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
     let w = World {
         leaves: unsafe { &*leaves },
     };
@@ -1958,6 +2004,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_position(
     y: i32,
     z: i32,
 ) {
+    crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
     let w = World {
         leaves: unsafe { &*leaves },
     };
@@ -1969,6 +2016,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_position(
 /// Raw scalar accesses end before noexcept callbacks; no borrow survives reentry.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_aircraft_enter_hangar(leaves: *const Leaves, id: Vehicle) {
+    crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
     let w = World {
         leaves: unsafe { &*leaves },
     };
@@ -1984,6 +2032,8 @@ pub unsafe extern "C" fn openttd_rust_aircraft_cache(
     id: Vehicle,
     range: bool,
 ) {
+    crate::witness::hit(crate::witness::AIRCRAFT_CACHE_ENTRIES);
+    crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
     let w = World {
         leaves: unsafe { &*leaves },
     };
@@ -2000,6 +2050,10 @@ pub unsafe extern "C" fn openttd_rust_aircraft_flight_bounds(
     min: *mut i32,
     max: *mut i32,
 ) {
+    if id.state.is_null() {
+        crate::witness::hit(crate::witness::AIRCRAFT_DISASTER_ENTRIES);
+    }
+    crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
     let w = World {
         leaves: unsafe { &*leaves },
     };
@@ -2028,6 +2082,10 @@ pub unsafe extern "C" fn openttd_rust_aircraft_flight_level(
     flags: *mut u8,
     takeoff: bool,
 ) -> i32 {
+    if id.state.is_null() {
+        crate::witness::hit(crate::witness::AIRCRAFT_DISASTER_ENTRIES);
+    }
+    crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
     let w = World {
         leaves: unsafe { &*leaves },
     };
@@ -2039,6 +2097,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_flight_level(
 /// Raw scalar accesses end before noexcept callbacks; no borrow survives reentry.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_aircraft_height(leaves: *const Leaves, id: Vehicle) -> i32 {
+    crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
     let w = World {
         leaves: unsafe { &*leaves },
     };
@@ -2053,6 +2112,10 @@ pub unsafe extern "C" fn openttd_rust_aircraft_hold_altitude(
     leaves: *const Leaves,
     id: Vehicle,
 ) -> i32 {
+    if id.state.is_null() {
+        crate::witness::hit(crate::witness::AIRCRAFT_DISASTER_ENTRIES);
+    }
+    crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
     let w = World {
         leaves: unsafe { &*leaves },
     };
@@ -2064,6 +2127,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_hold_altitude(
 /// Raw scalar accesses end before noexcept callbacks; no borrow survives reentry.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_aircraft_missing_orders(leaves: *const Leaves, id: Vehicle) {
+    crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
     let w = World {
         leaves: unsafe { &*leaves },
     };
@@ -2079,6 +2143,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_crash(
     id: Vehicle,
     flooded: bool,
 ) -> u32 {
+    crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
     let w = World {
         leaves: unsafe { &*leaves },
     };
@@ -2090,6 +2155,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_crash(
 /// Raw scalar accesses end before noexcept callbacks; no borrow survives reentry.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_aircraft_next_airport(leaves: *const Leaves, id: Vehicle) {
+    crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
     let w = World {
         leaves: unsafe { &*leaves },
     };
@@ -2105,6 +2171,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_leave_hangar(
     id: Vehicle,
     direction: u8,
 ) {
+    crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
     let w = World {
         leaves: unsafe { &*leaves },
     };
@@ -2116,6 +2183,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_leave_hangar(
 /// Raw scalar accesses end before noexcept callbacks; no borrow survives reentry.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_aircraft_order_location(leaves: *const Leaves, id: Vehicle) {
+    crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
     let w = World {
         leaves: unsafe { &*leaves },
     };
@@ -2129,6 +2197,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_order_location(leaves: *const Lea
 /// Raw scalar accesses end before noexcept callbacks; no borrow survives reentry.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_aircraft_replacement(leaves: *const Leaves, station: u16) {
+    crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
     let w = World {
         leaves: unsafe { &*leaves },
     };
@@ -2143,6 +2212,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_nearest_hangar(
     leaves: *const Leaves,
     id: Vehicle,
 ) -> u16 {
+    crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
     let w = World {
         leaves: unsafe { &*leaves },
     };
@@ -2157,6 +2227,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_closest_depot(
     leaves: *const Leaves,
     id: Vehicle,
 ) -> u16 {
+    crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
     let w = World {
         leaves: unsafe { &*leaves },
     };
@@ -2183,6 +2254,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_event(
     id: Vehicle,
     pass: bool,
 ) -> bool {
+    crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
     let w = World {
         leaves: unsafe { &*leaves },
     };
@@ -2194,6 +2266,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_event(
 /// Raw scalar accesses end before noexcept callbacks; no borrow survives reentry.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_aircraft_release_blocks(leaves: *const Leaves, id: Vehicle) {
+    crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
     let w = World {
         leaves: unsafe { &*leaves },
     };
@@ -2212,6 +2285,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_invalidate_target(
     leaves: *const Leaves,
     station: u16,
 ) {
+    crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
     let w = World {
         leaves: unsafe { &*leaves },
     };

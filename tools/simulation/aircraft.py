@@ -221,7 +221,46 @@ def prepare_aircraft_save(migration, out, timeout):
     print(f"Prepared {destination}; raw input and logs: {out}")
 
 
+def counted_scenario(scenario):
+    return (
+        scenario.get("aircraft_control")
+        or scenario.get("aircraft_fixture")
+        or scenario.get("name", "").startswith("play-")
+    )
+
+
+def game_environment(scenario):
+    return (
+        {"OPENTTD_WITNESS": "1"}
+        if counted_scenario(scenario) and scenario.get("witnesses")
+        else {}
+    )
+
+
 def check(scenario, run, mode, role, result):
+    if counted_scenario(scenario):
+        counts = core.branch_witnesses(
+            scenario,
+            run,
+            role,
+            "aircraft",
+            (
+                "ticks",
+                "services",
+                "entries",
+                "station_resolutions",
+                "observation_bytes",
+            ),
+        )
+        if counts is not None:
+            result[f"{mode}_{role}_aircraft_boundary"] = dict(
+                counts,
+                services_per_tick=counts["services"] / counts["ticks"],
+                entries_per_tick=counts["entries"] / counts["ticks"],
+                observation_bytes_per_tick=counts["observation_bytes"]
+                / counts["ticks"],
+            )
+
     if scenario.get("aircraft_control"):
         check_control(scenario, run, mode, role, result)
         return

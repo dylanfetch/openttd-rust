@@ -222,7 +222,22 @@ pub const ROAD_VISITORS: usize = 93;
 pub const ROAD_ENTRIES: usize = 94;
 
 /// Counter names, grouped by the prefix the harness selects.
-pub const NAMES: [&str; 95] = [
+/// Primary aircraft ticks, including both event passes.
+pub const AIRCRAFT_TICKS: usize = 95;
+/// Aircraft calls into native services, including shared services.
+pub const AIRCRAFT_SERVICES: usize = 96;
+/// Native calls into aircraft controllers/helpers (excluding owner allocation).
+pub const AIRCRAFT_ENTRIES: usize = 97;
+/// Aircraft service station-pool resolutions.
+pub const AIRCRAFT_STATIONS: usize = 98;
+/// Bytes returned by aircraft observations (including record padding).
+pub const AIRCRAFT_BYTES: usize = 99;
+/// Cache helper ingress, also included in total entries.
+pub const AIRCRAFT_CACHE_ENTRIES: usize = 100;
+/// Ownerless flight helper ingress, also included in total entries.
+pub const AIRCRAFT_DISASTER_ENTRIES: usize = 101;
+
+pub const NAMES: [&str; 102] = [
     "train.tick_first",
     "train.tick_second",
     "train.reversal",
@@ -318,6 +333,13 @@ pub const NAMES: [&str; 95] = [
     "road.services",
     "road.visitors",
     "road.entries",
+    "aircraft.ticks",
+    "aircraft.services",
+    "aircraft.entries",
+    "aircraft.station_resolutions",
+    "aircraft.observation_bytes",
+    "aircraft.cache_entries",
+    "aircraft.disaster_entries",
 ];
 
 static ENABLED: AtomicBool = AtomicBool::new(false);
