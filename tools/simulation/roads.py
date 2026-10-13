@@ -13,17 +13,18 @@ ROAD = "roadveh[0]/"
 COMMON = ROAD + "common[0]/"
 AI_FOLDER = "road-scenario-ai"
 
-# Best-known idle-host medians from three semantic-equal pairs (#155).
-# Pad caps: coordinated idle run at 193591dd10 (2026-10-11), PR #208.
-# TGP/Opus/Grok caps: coordinated idle run at 842d8a4e0a, PR #215.
-# https://github.com/dylanfetch/openttd-rust/pull/215
+# Coordinated idle-host caps (#155). TGP/Opus/Padhattan-1996/2016 use the
+# median of three --benchmark 3 invocation medians at 52e5becb1b (#218).
+# https://github.com/dylanfetch/openttd-rust/pull/218#issuecomment-6137474401
+# Grok/2000 retain earlier caps; #229 records the repeated calibration.
 # Lower these only after coordinated measurements; never raise them for a port.
 SPEED_BUDGETS = {
-    "play-opus-55-167-002-manual": 1.2792207792207793,
+    "play-opus-55-167-002-manual": 1.265625,
     "play-grok-159-001-manual": 1.2427385892116183,
-    "play-padhattan-ridge-1996-manual": 1.284351145038168,
+    "play-padhattan-ridge-1996-manual": 1.270440251572327,
     "play-padhattan-ridge-2000-manual": 1.3475177304964538,
-    "generate-tgp-256-1": 1.173913043478261,
+    "play-padhattan-ridge-2016-manual": 1.4327375352775165,
+    "generate-tgp-256-1": 1.154970760233918,
 }
 
 

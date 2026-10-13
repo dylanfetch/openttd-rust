@@ -1646,6 +1646,29 @@ tools.simulation.industries` checks absent NewGRF versions/repeat/arithmetic aga
 the unchanged pinned callback body. The corpus does not exhaust legacy saves,
 NewGRF resolver programs or every industry layout; native tests check ABI/lifetimes.
 
+### Industry construction and tile lifecycle (#150, in progress)
+
+Rust owns industry metadata/text, ordered type registries, builder scratch,
+destruction, initial generation, full validation/funding/prospecting transactions,
+initialization, construction-stage completion, tile loops, builtin animation,
+acceptance, clear/terraform policy and NewGRF tile/parent trigger traversal.
+Native aliases and scoped load adapters preserve saved names/reference fixups,
+partial initialization and ID reuse. Water destruction retains the tile-type recheck.
+Packed map/pool shells, rendering, specs, resolvers and persistent storage stay C++.
+Only progress cancellation (`AbortGenerateWorldSignal`) returns to the native
+exception frame after source-order restoration. Direct synchronous services use
+native stack costs; temporary resolver shells borrow a Rust stack owner through
+the original constructor/destructor scope. No state borrow survives reentry.
+`python3 tools/migration.py simulate industry-command-fund industry-command-prospect
+industry-command-clear industry-command-terraform --jobs 2` compares command tests,
+execution, ID reuse and autoslope; default industry scenarios also cover four
+climates, lumber, generation and builder/farm cleanup. Default industry comparisons
+check absent NewGRF acceptance/triggers and rare animation against unchanged bodies;
+native tests check cancellation/restoration, callback policy and borrowed lifetimes.
+Shared map/RNG leaves use the canonical typed services; stable dimensions are
+captured once per consuming entry. Independent review and exact-head full CI remain required. Legacy saves, resolver
+programs and exhaustive industry layouts remain corpus limits tracked by #156.
+
 ### Aircraft controllers and airport movement
 
 Issue #136 moves both tick passes, movement/speed/flight levels, shadow/rotor,

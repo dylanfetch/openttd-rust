@@ -102,8 +102,9 @@ checks that run; do not restate them in paragraphs.
   is code to maintain; keep it proportionate to the C++ the port retires.
 - Review report: reviewed commit, findings with their fixing commits (or why one
   went to root), plus one line naming the functions or files compared against
-  the original body. Do not
-  narrate further when there are no findings. Branches the harness does not
+  the original body and one line naming any new callback that duplicates a
+  shared accessor (each one is a finding). Do not narrate further when there
+  are no findings. Branches the harness does not
   reach go in the coverage tracker (#156), not only in the disposition.
 - One PR per component, targeting `rust-migration` directly. Use an integration
   branch only when CI capacity forces batching. Updating a PR branch from its
@@ -228,6 +229,14 @@ run at that exact head publishes the required `Full validation` status, and any
 later push needs a new one. When capacity forces batching, validate one concrete
 integration PR. `docs/rust-migration.md` (team process section) has the flags
 and limits.
+
+CI wall time is development time (#233). Keep warm-cache full validation within
+about 15 minutes by adding parallel jobs or shards, never by adding steps to one
+job's critical path, and keep caches under the repository limit. Validate
+reviewed PRs concurrently: a merge or docs push to `rust-migration` does not
+invalidate another PR's run at an unchanged head. Post-merge CI fully
+re-validates only a merged tree no full run covered; a red `rust-migration` is
+still fixed before more integrations.
 
 Before pushing, run `python3 tools/preflight.py --base origin/rust-migration` for
 the inherited commit checker. Check receipts with `tools/evidence.py` rather than
