@@ -293,7 +293,11 @@ void openttd_rust_industry_daily(OpenTTDIndustryBuilder *builder, const OpenTTDI
 void openttd_rust_industry_monthly(OpenTTDIndustryBuilder *builder, const OpenTTDIndustryServices *services);
 void openttd_rust_industry_build_type_reset(OpenTTDIndustryBuildFields *fields);
 /** Native stack cost operations consumed by industry policy. */
+#ifdef __cplusplus
+typedef class CommandCost OpenTTDIndustryCost;
+#else
 typedef struct CommandCost OpenTTDIndustryCost;
+#endif
 typedef struct OpenTTDIndustryCostServices {
 	void (*zero)(OpenTTDIndustryCost *) OPENTTD_INDUSTRY_NOEXCEPT;
 	void (*error)(OpenTTDIndustryCost *, uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
