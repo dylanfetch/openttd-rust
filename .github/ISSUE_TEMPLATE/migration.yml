@@ -39,7 +39,7 @@ body:
     id: boundary
     attributes:
       label: Ownership boundary
-      description: The state and control flow Rust will own, the C++ facade and callbacks that remain, and a budget for new C++ glue lines.
+      description: The state and control flow Rust will own, the C++ facade and callbacks that remain, and budgets for original C++ retirement, net fork glue and tooling. Removed fork glue does not count as original retirement.
     validations:
       required: true
   - type: textarea
@@ -60,6 +60,6 @@ body:
     id: acceptance
     attributes:
       label: Acceptance criteria
-      description: State the behavior evidence, integration, and checks required before accepting the replacement.
+      description: State the behavior evidence, integration, and checks required before accepting the replacement. Report tools/port-metrics.py; retire more original C++ than net glue plus tooling added, or explain why.
     validations:
       required: true
