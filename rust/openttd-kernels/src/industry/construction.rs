@@ -45,6 +45,7 @@ pub struct ConstructionRequest {
     pub layout_index: usize,
     pub tile: u32,
     pub size_x: u32,
+    pub size_y: u32,
     pub id: u16,
     pub random_bits: u16,
     pub kind: u8,
@@ -71,9 +72,7 @@ pub struct ConstructionServices {
     pub translated_gfx: unsafe extern "C" fn(u16) -> u16,
     pub animation_enabled: unsafe extern "C" fn(u16) -> bool,
     pub add_animated: unsafe extern "C" fn(u32, bool),
-    pub map: unsafe extern "C" fn() -> Map,
     pub build_window_dirty: unsafe extern "C" fn(),
-    pub neutral_station: unsafe extern "C" fn(*mut c_void) -> *mut StationHandle,
     pub serve_neutral: unsafe extern "C" fn() -> bool,
     pub insert_near_station: unsafe extern "C" fn(*mut c_void, *mut StationHandle),
     pub clear_near_industries: unsafe extern "C" fn(*mut StationHandle),
@@ -134,7 +133,7 @@ unsafe extern "C" fn visit_station(
     false
 }
 fn populate(industry: *mut c_void, id: u16, l: &LifecycleServices, c: &ConstructionServices) {
-    let neutral = unsafe { (c.neutral_station)(industry) };
+    let neutral = unsafe { (l.neutral_station)(industry) };
     if !neutral.is_null() && !unsafe { (c.serve_neutral)() } {
         unsafe {
             (c.insert_near_station)(industry, neutral);
@@ -308,7 +307,7 @@ pub unsafe extern "C" fn openttd_rust_industry_initialize(
     let callbacks = unsafe { (c.callback_mask)(spec) };
     if unsafe { (s.economy_type)() } != 0 && callbacks & ORIGINAL_CALLBACKS == 0 {
         for n in 0..produced_count(owner) {
-            let random = unsafe { (s.random_range)(256) };
+            let random = s.shared().random_range(256);
             let p = produced(owner, n);
             let rate = unsafe { u32::from((*p).rate) };
             unsafe {
@@ -320,7 +319,7 @@ pub unsafe extern "C" fn openttd_rust_industry_initialize(
         (c.set_town)(industry, r.town);
         (*owner).metadata.owner = 16;
     }
-    let random = unsafe { (s.random)() } as u16;
+    let random = s.shared().random() as u16;
     let f = fields(owner);
     unsafe {
         (*owner).metadata.random_colour = (random & 15) as u8;
@@ -353,7 +352,7 @@ pub unsafe extern "C" fn openttd_rust_industry_initialize(
         (*f).prod_level = 16;
     }
     if callbacks & (1 << 14) != 0 {
-        let random = unsafe { (s.random)() };
+        let random = s.shared().random();
         let res = unsafe { (c.callback)(industry, PROD_CHANGE_BUILD, 0, random) };
         if res != CALLBACK_FAILED {
             if !(4..=128).contains(&res) {
@@ -434,7 +433,7 @@ pub unsafe extern "C" fn openttd_rust_industry_initialize(
             unsafe {
                 (c.clear_tile)(tile, (1 << 0) | (1 << 4) | (1 << 9));
             }
-            let random = unsafe { (s.random)() };
+            let random = s.shared().random();
             unsafe {
                 (c.make_industry)(tile, r.id, layout.gfx, random, water);
             }
@@ -464,7 +463,11 @@ pub unsafe extern "C" fn openttd_rust_industry_initialize(
     let kind = unsafe { (*owner).metadata.kind };
     let behaviour = unsafe { (g.spec_behaviour)((g.spec)(kind)) };
     if behaviour & (1 << 6) != 0 {
-        let map = unsafe { (c.map)() };
+        let map = Map {
+            size_x: r.size_x,
+            size_y: r.size_y,
+            landscape: 0,
+        };
         for _ in 0..50 {
             // Only the shared service table is borrowed across map/RNG calls.
             // Initialization observes landscape at the original plant branches.

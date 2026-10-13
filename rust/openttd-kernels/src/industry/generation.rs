@@ -169,7 +169,7 @@ pub unsafe extern "C" fn openttd_rust_industry_generate(
             }
         }
         for _ in 0..amount {
-            let mut r = unsafe { (s.random_range)(p.total as u32) };
+            let mut r = s.shared().random_range(p.total as u32);
             let mut kind = 0;
             while r >= p.probs[kind] {
                 r = r.wrapping_sub(p.probs[kind]);

@@ -395,6 +395,7 @@ pub struct TypeInfo {
 /// construction and commands return values at the original call site.
 #[repr(C)]
 pub struct Services {
+    pub shared: *const crate::services::Services,
     pub next_tick: unsafe extern "C" fn(u32) -> Entry,
     pub sound_count: unsafe extern "C" fn(*mut c_void) -> u16,
     pub behaviour: unsafe extern "C" fn(*mut c_void) -> u32,
@@ -405,12 +406,9 @@ pub struct Services {
     pub tick_trigger: unsafe extern "C" fn(*mut c_void),
     pub production_callback: unsafe extern "C" fn(*mut c_void, u8),
     pub scale_cargo: unsafe extern "C" fn(u32) -> u32,
-    pub random: unsafe extern "C" fn() -> u32,
-    pub random_range: unsafe extern "C" fn(u32) -> u32,
     pub move_goods: unsafe extern "C" fn(*mut c_void, u32, u32) -> u32,
     pub tile_add_wrap: unsafe extern "C" fn(u32, i32, i32) -> u32,
     pub farm_tile: unsafe extern "C" fn(u32) -> FarmTile,
-    pub tile_z: unsafe extern "C" fn(u32) -> i32,
     pub snow_line: unsafe extern "C" fn() -> u8,
     pub make_field: unsafe extern "C" fn(u32, u8, u8, u16),
     pub fence_wanted: unsafe extern "C" fn(u32, u8) -> bool,
@@ -449,6 +447,19 @@ pub struct Services {
     pub calendar_year: unsafe extern "C" fn() -> i32,
     pub deity: unsafe extern "C" fn() -> bool,
 }
+impl Services {
+    /// The immutable shared table outlives every synchronous industry entry.
+    fn shared(&self) -> &crate::services::Services {
+        unsafe { &*self.shared }
+    }
+}
+impl Map {
+    fn coordinates(self) -> crate::services::Map {
+        crate::services::Map {
+            log_x: self.size_x.trailing_zeros() as u8,
+        }
+    }
+}
 const SND_36_LUMBER_MILL_3: u16 = 0x36;
 const SND_37_LUMBER_MILL_2: u16 = 0x37;
 const LANDSCAPE_ARCTIC: u8 = 1;
@@ -464,10 +475,10 @@ fn observe(s: &Services, i: *mut c_void) -> Observation {
     o
 }
 fn rand(s: &Services) -> u32 {
-    unsafe { (s.random)() }
+    s.shared().random()
 }
 fn range(s: &Services, n: u32) -> u32 {
-    unsafe { (s.random_range)(n) }
+    s.shared().random_range(n)
 }
 fn chance_value(a: u32, b: u32, value: u32) -> bool {
     (((value & 0xffff).wrapping_mul(b).wrapping_add(b / 2)) >> 16) < a
@@ -1087,18 +1098,6 @@ fn place(kind: u8, creation: u8, hard: bool, s: &Services) -> *mut c_void {
     }
     ptr::null_mut()
 }
-/// # Safety
-/// Construction service retains the original complete transaction, may reenter
-/// production, and returns its live shell. Rust retains no owner references.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_industry_place(
-    kind: u8,
-    creation: u8,
-    hard: u8,
-    s: *const Services,
-) -> *mut c_void {
-    place(kind, creation, hard != 0, unsafe { &*s })
-}
 fn build_try(builder: *mut Builder, s: &Services) {
     targets(builder, s);
     let b = build_fields(builder);
@@ -1319,7 +1318,7 @@ fn fence(mut tile: u32, mut size: u32, kind: u8, side: u8, map: Map, s: &Service
 }
 fn plant(tile: u32, industry: u16, map: Map, s: &Services, landscape: &impl Fn() -> u8) {
     if landscape() == LANDSCAPE_ARCTIC
-        && unsafe { (s.tile_z)(tile) + 2 >= i32::from((s.snow_line)()) }
+        && (s.shared().tile_z)(tile) + 2 >= i32::from(unsafe { (s.snow_line)() })
     {
         return;
     }

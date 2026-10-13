@@ -63,7 +63,6 @@ pub struct TileServices {
     pub toffee_offset: unsafe extern "C" fn(u8) -> u8,
     pub on_water: unsafe extern "C" fn(u32) -> bool,
     pub water_loop: unsafe extern "C" fn(u32),
-    pub is_industry: unsafe extern "C" fn(u32) -> bool,
     pub transport: unsafe extern "C" fn(u32) -> bool,
     pub anim_production: unsafe extern "C" fn(u16) -> u16,
     pub anim_next: unsafe extern "C" fn(u16) -> u16,
@@ -78,20 +77,19 @@ pub struct TileServices {
     pub cargo_translation: unsafe extern "C" fn(*const TileSpec, u8) -> u8,
 }
 fn chance(s: &Services, a: u32, b: u32) -> bool {
-    crate::services::chance16_i(a, b, unsafe { (s.random)() })
+    crate::services::chance16_i(a, b, s.shared().random())
 }
 fn sound(tile: u32, sound: u16, s: &Services, t: &TileServices) {
     if unsafe { (t.ambient)() } {
         unsafe { (s.play_sound)(sound, tile) };
     }
 }
-fn dirty(tile: u32, l: &LifecycleServices) {
-    unsafe { (l.mark_dirty)(tile) };
+fn dirty(tile: u32, s: &Services) {
+    (s.shared().mark_dirty)(tile);
 }
-fn chimney(tile: u32, c: &ConstructionServices, t: &TileServices) {
-    let map = unsafe { (c.map)() };
-    let x = (tile % map.size_x).wrapping_mul(16);
-    let y = (tile / map.size_x).wrapping_mul(16);
+fn chimney(tile: u32, map: crate::services::Map, t: &TileServices) {
+    let x = map.tile_x(tile).wrapping_mul(16);
+    let y = map.tile_y(tile).wrapping_mul(16);
     let z = unsafe { (t.pixel_max_z)(tile) };
     unsafe {
         (t.create_effect)(
@@ -104,6 +102,7 @@ fn chimney(tile: u32, c: &ConstructionServices, t: &TileServices) {
 }
 fn bigger(
     tile: u32,
+    map: crate::services::Map,
     s: &Services,
     c: &ConstructionServices,
     l: &LifecycleServices,
@@ -123,7 +122,7 @@ fn bigger(
             (t.set_completed)(tile);
         }
     }
-    dirty(tile, l);
+    dirty(tile, s);
     if !unsafe { (t.completed)(tile) } {
         return;
     }
@@ -132,10 +131,10 @@ fn bigger(
         return;
     }
     match gfx {
-        8 => chimney(tile, c, t),
+        8 => chimney(tile, map, t),
         24 => {
-            let other = tile.wrapping_add(unsafe { (c.map)() }.size_x);
-            if unsafe { (t.is_industry)(other) } && unsafe { (t.gfx)(other) } == 24 {
+            let other = tile.wrapping_add(map.size_x());
+            if (s.shared().tile_type)(other) == 8 && unsafe { (t.gfx)(other) } == 24 {
                 let own = unsafe { (t.industry_index)(tile) };
                 let other = unsafe { (t.industry_index)(other) };
                 if own == other {
@@ -151,7 +150,7 @@ fn bigger(
         _ => {}
     }
 }
-fn mine(tile: u32, s: &Services, l: &LifecycleServices, t: &TileServices) {
+fn mine(tile: u32, s: &Services, t: &TileServices) {
     let state = (unsafe { (t.tick_counter)() } & 0x7ff) as i32 - 0x400;
     if state < 0 {
         return;
@@ -174,7 +173,7 @@ fn mine(tile: u32, s: &Services, l: &LifecycleServices, t: &TileServices) {
             frame = 0xc0;
         }
         unsafe { (t.set_frame)(tile, frame) };
-        dirty(tile, l);
+        dirty(tile, s);
     } else if (0x200..0x3a0).contains(&state) {
         let mask = if !(0x220..0x380).contains(&state) {
             7
@@ -189,7 +188,7 @@ fn mine(tile: u32, s: &Services, l: &LifecycleServices, t: &TileServices) {
             frame = 0x82;
         }
         unsafe { (t.set_frame)(tile, frame) };
-        dirty(tile, l);
+        dirty(tile, s);
     }
 }
 /// # Safety
@@ -199,10 +198,9 @@ pub unsafe extern "C" fn openttd_rust_industry_tile_animate(
     tile: u32,
     s: *const Services,
     c: *const ConstructionServices,
-    l: *const LifecycleServices,
     t: *const TileServices,
 ) {
-    let (s, c, l, t) = unsafe { (&*s, &*c, &*l, &*t) };
+    let (s, c, t) = unsafe { (&*s, &*c, &*t) };
     let gfx = unsafe { (t.gfx)(tile) };
     if unsafe { (c.animation_enabled)(gfx) } {
         unsafe { (t.animate_new)(tile) };
@@ -223,7 +221,7 @@ pub unsafe extern "C" fn openttd_rust_industry_tile_animate(
                 unsafe { (t.delete_animated)(tile) };
             }
             unsafe { (t.set_frame)(tile, frame) };
-            dirty(tile, l);
+            dirty(tile, s);
         }
         165 if unsafe { (t.tick_counter)() } & 3 == 0 => {
             let mut frame = unsafe { (t.frame)(tile) };
@@ -236,7 +234,7 @@ pub unsafe extern "C" fn openttd_rust_industry_tile_animate(
                 unsafe { (t.delete_animated)(tile) };
             }
             unsafe { (t.set_frame)(tile, frame) };
-            dirty(tile, l);
+            dirty(tile, s);
         }
         162 if unsafe { (t.tick_counter)() } & 1 == 0 => {
             let mut frame = unsafe { (t.frame)(tile) }.wrapping_add(1);
@@ -245,7 +243,7 @@ pub unsafe extern "C" fn openttd_rust_industry_tile_animate(
                 unsafe { (t.delete_animated)(tile) };
             }
             unsafe { (t.set_frame)(tile, frame) };
-            dirty(tile, l);
+            dirty(tile, s);
         }
         10 if unsafe { (t.tick_counter)() } & 3 == 0 => {
             let frame = unsafe { (t.frame)(tile) };
@@ -257,7 +255,7 @@ pub unsafe extern "C" fn openttd_rust_industry_tile_animate(
             } else {
                 unsafe { (t.set_frame)(tile, frame.wrapping_add(1)) };
             }
-            dirty(tile, l);
+            dirty(tile, s);
         }
         143 if unsafe { (t.tick_counter)() } & 1 == 0 => {
             let mut frame = unsafe { (t.frame)(tile) }.wrapping_add(1);
@@ -279,11 +277,11 @@ pub unsafe extern "C" fn openttd_rust_industry_tile_animate(
                 }
             }
             unsafe { (t.set_frame)(tile, frame) };
-            dirty(tile, l);
+            dirty(tile, s);
         }
         148..=155 if unsafe { (t.tick_counter)() } & 3 == 0 => {
             unsafe { (t.set_gfx)(tile, if gfx < 155 { gfx.wrapping_add(1) } else { 148 }) };
-            dirty(tile, l);
+            dirty(tile, s);
         }
         30..=32 if unsafe { (t.tick_counter)() } & 7 == 0 => {
             let stop = chance(s, 1, 7);
@@ -313,20 +311,21 @@ pub unsafe extern "C" fn openttd_rust_industry_tile_animate(
                     (t.set_gfx)(tile, gfx);
                 }
             }
-            dirty(tile, l);
+            dirty(tile, s);
         }
-        1 | 48 | 88 => mine(tile, s, l, t),
+        1 | 48 | 88 => mine(tile, s, t),
         _ => {}
     }
 }
-fn bubble(tile: u32, s: &Services, c: &ConstructionServices, t: &TileServices) {
+fn bubble(tile: u32, s: &Services, map: crate::services::Map, t: &TileServices) {
     sound(tile, 46, s, t);
-    let dir = (unsafe { (s.random)() } & 3) as usize;
-    let map = unsafe { (c.map)() };
-    let x = (tile % map.size_x)
+    let dir = (s.shared().random() & 3) as usize;
+    let x = map
+        .tile_x(tile)
         .wrapping_mul(16)
         .wrapping_add([11_i32, 0, -4, -14][dir] as u32) as i32;
-    let y = (tile / map.size_x)
+    let y = map
+        .tile_y(tile)
         .wrapping_mul(16)
         .wrapping_add([-4_i32, -10, -4, 1][dir] as u32) as i32;
     let vehicle = unsafe { (t.create_effect_above)(x, y, [49, 59, 60, 65][dir], 9) };
@@ -340,6 +339,7 @@ fn bubble(tile: u32, s: &Services, c: &ConstructionServices, t: &TileServices) {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_industry_tile_loop(
     tile: u32,
+    log_x: u8,
     s: *const Services,
     c: *const ConstructionServices,
     l: *const LifecycleServices,
@@ -347,10 +347,11 @@ pub unsafe extern "C" fn openttd_rust_industry_tile_loop(
     g: *const GenerationServices,
 ) {
     let (s, c, l, t) = unsafe { (&*s, &*c, &*l, &*t) };
+    let map = crate::services::Map { log_x };
     if unsafe { (t.on_water)(tile) } {
         unsafe { (t.water_loop)(tile) };
     }
-    if !unsafe { (t.is_industry)(tile) } {
+    if (s.shared().tile_type)(tile) != 8 {
         return;
     }
     let industry = unsafe { (t.industry)(tile) };
@@ -365,7 +366,7 @@ pub unsafe extern "C" fn openttd_rust_industry_tile_loop(
         );
     };
     if !unsafe { (t.completed)(tile) } {
-        bigger(tile, s, c, l, t);
+        bigger(tile, map, s, c, l, t);
         return;
     }
     if unsafe { ((*g).editor)() } {
@@ -378,7 +379,7 @@ pub unsafe extern "C" fn openttd_rust_industry_tile_loop(
                 industry.owner,
                 (t.industry_index)(tile),
                 4,
-                (c.map)().size_x,
+                map.size_x(),
                 s,
                 l,
             )
@@ -391,7 +392,7 @@ pub unsafe extern "C" fn openttd_rust_industry_tile_loop(
                     (t.set_completed)(tile);
                     (t.set_gfx)(tile, next);
                 }
-                dirty(tile, l);
+                dirty(tile, s);
                 return;
             }
         }
@@ -406,7 +407,7 @@ pub unsafe extern "C" fn openttd_rust_industry_tile_loop(
             (t.reset_construction)(tile);
             (t.set_gfx)(tile, next);
         };
-        dirty(tile, l);
+        dirty(tile, s);
         return;
     }
     let mut gfx = unsafe { (t.gfx)(tile) };
@@ -447,7 +448,7 @@ pub unsafe extern "C" fn openttd_rust_industry_tile_loop(
                     (c.set_construction_stage)(tile, 3);
                     (t.delete_animated)(tile);
                 }
-                dirty(tile, l);
+                dirty(tile, s);
             }
         }
         10 => {
@@ -457,11 +458,10 @@ pub unsafe extern "C" fn openttd_rust_industry_tile_loop(
             }
         }
         49 => {
-            let map = unsafe { (c.map)() };
             unsafe {
                 (t.create_effect_above)(
-                    (tile % map.size_x).wrapping_mul(16).wrapping_add(6) as i32,
-                    (tile / map.size_x).wrapping_mul(16).wrapping_add(6) as i32,
+                    map.tile_x(tile).wrapping_mul(16).wrapping_add(6) as i32,
+                    map.tile_y(tile).wrapping_mul(16).wrapping_add(6) as i32,
                     43,
                     11,
                 )
@@ -479,7 +479,7 @@ pub unsafe extern "C" fn openttd_rust_industry_tile_loop(
                 }
             }
         }
-        161 => bubble(tile, s, c, t),
+        161 => bubble(tile, s, map, t),
         165 => unsafe { (c.add_animated)(tile, true) },
         174 if chance(s, 1, 3) => {
             unsafe { (c.add_animated)(tile, true) };
@@ -572,7 +572,6 @@ pub struct TilePolicyServices {
     pub destroy: unsafe extern "C" fn(*mut ShellHandle),
     pub removal_cost: unsafe extern "C" fn(*const SpecHandle) -> i64,
     pub autoslope_enabled: unsafe extern "C" fn() -> bool,
-    pub tile_slope: unsafe extern "C" fn(u32) -> u8,
     pub tile_max_z: unsafe extern "C" fn(u32) -> i32,
     pub autoslope_callback: unsafe extern "C" fn(*const TileSpec) -> bool,
     pub callback_boolean: unsafe extern "C" fn(*const TileSpec, u16, u16) -> bool,
@@ -632,13 +631,14 @@ pub unsafe extern "C" fn openttd_rust_industry_tile_terraform(
     flags: u16,
     z_new: i32,
     slope_new: u8,
+    shared: *const crate::services::Services,
     tiles: *const TileServices,
     policy: *const TilePolicyServices,
     costs: *const IndustryCostServices,
 ) {
     let (t, p, c) = unsafe { (&*tiles, &*policy, &*costs) };
     if unsafe { (p.autoslope_enabled)() } {
-        let old_slope = unsafe { (p.tile_slope)(tile) };
+        let old_slope = unsafe { ((*shared).tile_slope)(tile) };
         let max_z = if slope_new == 0 {
             0
         } else if slope_new & 16 != 0 {

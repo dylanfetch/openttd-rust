@@ -75,11 +75,7 @@ pub struct TransactionServices {
     pub edge_distance: unsafe extern "C" fn(u32, u8) -> u32,
     pub refinery_limit: unsafe extern "C" fn() -> u8,
     pub tile_height: unsafe extern "C" fn(u32) -> u32,
-    pub tropic_zone: unsafe extern "C" fn(u32) -> u8,
-    pub water_tile: unsafe extern "C" fn(u32) -> bool,
-    pub bridge_above: unsafe extern "C" fn(u32) -> bool,
     pub has_water_class: unsafe extern "C" fn(u32) -> bool,
-    pub tile_type: unsafe extern "C" fn(u32) -> u8,
     pub ensure_no_vehicle: unsafe extern "C" fn(*mut IndustryCost, u32),
     pub set_company: unsafe extern "C" fn(u8),
     pub temporary_shell: unsafe extern "C" fn(
@@ -110,6 +106,7 @@ pub struct TransactionServices {
 }
 #[repr(C)]
 pub struct TransactionContext {
+    pub map: super::Map,
     pub builder: *mut Builder,
     pub production: *const Services,
     pub generation: *const GenerationServices,
@@ -158,17 +155,18 @@ impl Engine<'_> {
         original
     }
     fn map(&self) -> super::Map {
-        unsafe { (self.c.map)() }
+        self.context.map
     }
     fn distance(&self, a: u32, b: u32) -> u32 {
         let map = self.map();
-        (a % map.size_x)
-            .abs_diff(b % map.size_x)
-            .max((a / map.size_x).abs_diff(b / map.size_x))
+        let coordinates = map.coordinates();
+        coordinates
+            .tile_x(a)
+            .abs_diff(coordinates.tile_x(b))
+            .max(coordinates.tile_y(a).abs_diff(coordinates.tile_y(b)))
     }
     fn offset(&self, tile: u32, x: i32, y: i32) -> u32 {
-        tile.wrapping_add((y as u32).wrapping_mul(self.map().size_x))
-            .wrapping_add(x as u32)
+        tile.wrapping_add(self.map().coordinates().diff(x, y))
     }
     fn edge(&self, tile: u32, limit: u32) -> bool {
         let map = self.map();
@@ -193,7 +191,7 @@ impl Engine<'_> {
         match unsafe { (self.x.check_proc)(spec) } {
             1 => {
                 if self.map().landscape == 1
-                    && unsafe { (self.s.tile_z)(tile) }
+                    && (self.s.shared().tile_z)(tile)
                         < i32::from(unsafe { (self.x.highest_snow_line)() }) + 2
                 {
                     return self.fail(self.e.forest);
@@ -211,16 +209,16 @@ impl Engine<'_> {
             }
             3 => {
                 if self.map().landscape == 1
-                    && unsafe { (self.s.tile_z)(tile) }.wrapping_add(2)
+                    && (self.s.shared().tile_z)(tile).wrapping_add(2)
                         >= i32::from(unsafe { (self.x.highest_snow_line)() })
                 {
                     return self.fail(self.e.site);
                 }
             }
-            4 if unsafe { (self.x.tropic_zone)(tile) } == 1 => return self.fail(self.e.site),
-            5 if unsafe { (self.x.tropic_zone)(tile) } != 1 => return self.fail(self.e.desert),
-            6 if unsafe { (self.x.tropic_zone)(tile) } != 2 => return self.fail(self.e.rainforest),
-            7 if unsafe { (self.s.tile_z)(tile) } > 4 => return self.fail(self.e.lowland),
+            4 if (self.s.shared().tropic_zone)(tile) == 1 => return self.fail(self.e.site),
+            5 if (self.s.shared().tropic_zone)(tile) != 1 => return self.fail(self.e.desert),
+            6 if (self.s.shared().tropic_zone)(tile) != 2 => return self.fail(self.e.rainforest),
+            7 if (self.s.shared().tile_z)(tile) > 4 => return self.fail(self.e.lowland),
             8 => {
                 if unsafe { (self.g.editor)() } && unsafe { (self.x.ignore_restrictions)() } {
                     return self.success();
@@ -309,8 +307,8 @@ impl Engine<'_> {
                 return self.fail(self.e.site);
             }
             if gfx == 255 {
-                if !unsafe { (self.x.water_tile)(current) }
-                    || unsafe { (self.p.tile_slope)(current) } != 0
+                if (self.s.shared().tile_type)(current) != 6
+                    || (self.s.shared().tile_slope)(current) != 0
                 {
                     return self.fail(self.e.site);
                 }
@@ -319,7 +317,7 @@ impl Engine<'_> {
                 if !self.succeeded() {
                     return false;
                 }
-                if unsafe { (self.x.bridge_above)(current) } {
+                if (self.s.shared().bridge_above)(current) {
                     return self.fail(self.e.site);
                 }
                 let spec = unsafe { (self.t.spec)(gfx) };
@@ -331,9 +329,9 @@ impl Engine<'_> {
                     return self.fail(self.e.site);
                 }
                 if behaviour & 0x18 != 0
-                    || (behaviour & 32 != 0 && unsafe { (self.x.tile_type)(current) } == 3)
+                    || (behaviour & 32 != 0 && (self.s.shared().tile_type)(current) == 3)
                 {
-                    if unsafe { (self.x.tile_type)(current) } != 3 {
+                    if (self.s.shared().tile_type)(current) != 3 {
                         return self.fail(self.e.town);
                     }
                     let company = self.swap_company(15);
@@ -392,7 +390,7 @@ impl Engine<'_> {
                         return false;
                     }
                 } else {
-                    refused |= slope_refused(unsafe { (self.p.tile_slope)(current) }, unsafe {
+                    refused |= slope_refused((self.s.shared().tile_slope)(current), unsafe {
                         (self.p.slopes_refused)(spec)
                     });
                 }
@@ -413,7 +411,7 @@ impl Engine<'_> {
         let map = self.map();
         if tile.is_multiple_of(map.size_x)
             || tile / map.size_x == 0
-            || unsafe { (self.x.tile_type)(tile) } == 7
+            || (self.s.shared().tile_type)(tile) == 7
         {
             return false;
         }
@@ -421,8 +419,7 @@ impl Engine<'_> {
             for x in 0..2 {
                 let walk = self.offset(tile, x - 1, y - 1);
                 let current = unsafe { (self.x.tile_height)(walk) };
-                if unsafe { (self.x.tile_type)(walk) } != 0
-                    && unsafe { (self.x.tile_type)(walk) } != 4
+                if (self.s.shared().tile_type)(walk) != 0 && (self.s.shared().tile_type)(walk) != 4
                 {
                     return false;
                 }
@@ -644,6 +641,7 @@ impl Engine<'_> {
                 layout_index,
                 tile,
                 size_x: self.map().size_x,
+                size_y: self.map().size_y,
                 id: allocation.id,
                 random_bits: bits,
                 kind,
@@ -726,7 +724,7 @@ unsafe extern "C" fn shape_visit(context: *mut c_void, shell: *mut ShellHandle) 
     let parameter = (u32::from(call.creation) << 8) | call.layout_index as u32;
     let result = unsafe { (e.x.resolve_shape)(shell, call.current, call.gfx, parameter) };
     if result.callback == 0xffff {
-        if !slope_refused(unsafe { (e.p.tile_slope)(call.current) }, unsafe {
+        if !slope_refused((e.s.shared().tile_slope)(call.current), unsafe {
             (e.p.slopes_refused)(call.spec)
         }) {
             e.success();
@@ -841,15 +839,15 @@ pub unsafe extern "C" fn openttd_rust_industry_build(
     {
         if flags & 1 != 0 {
             let succeeded = deity_prospect
-                || unsafe { (e.s.random)() } <= unsafe { (e.x.prospecting_chance)(spec) };
+                || e.s.shared().random() <= unsafe { (e.x.prospecting_chance)(spec) };
             if succeeded {
                 let creation = if e.company() == 18 { 1 } else { 3 };
                 let company = e.swap_company(15);
                 for _ in 0..5000 {
                     let map = e.map();
-                    let candidate = unsafe { (e.s.random)() }
-                        & map.size_x.wrapping_mul(map.size_y).wrapping_sub(1);
-                    let mut layout = unsafe { (e.s.random_range)(count as u32) } as usize;
+                    let candidate =
+                        e.s.shared().random() & map.size_x.wrapping_mul(map.size_y).wrapping_sub(1);
+                    let mut layout = e.s.shared().random_range(count as u32) as usize;
                     for _ in 0..count {
                         layout = layout.wrapping_add(1) % count;
                         if e.create(
@@ -927,10 +925,10 @@ pub unsafe extern "C" fn openttd_rust_industry_create(
 ) {
     let e = unsafe { engine(context, out) };
     let spec = unsafe { (e.g.spec)(kind) };
-    let random = unsafe { (e.s.random)() };
-    let second = unsafe { (e.s.random)() };
+    let random = e.s.shared().random();
+    let second = e.s.shared().random();
     let count = unsafe { (e.x.layout_count)(spec) };
-    let layout = unsafe { (e.s.random_range)(count as u32) } as usize;
+    let layout = e.s.shared().random_range(count as u32) as usize;
     e.create(
         tile,
         kind,

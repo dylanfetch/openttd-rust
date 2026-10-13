@@ -37,7 +37,7 @@ pub struct AnimationSpec {
 }
 #[repr(C)]
 pub struct LifecycleServices {
-    pub neutral_station: unsafe extern "C" fn(*mut c_void) -> bool,
+    pub neutral_station: unsafe extern "C" fn(*mut c_void) -> *mut super::StationHandle,
     pub cleanup_tile: unsafe extern "C" fn(u32) -> CleanupTile,
     pub delete_tile_inspect: unsafe extern "C" fn(u32),
     pub make_water: unsafe extern "C" fn(u32),
@@ -62,7 +62,6 @@ pub struct LifecycleServices {
     pub resolve_reseed: unsafe extern "C" fn(u32, u16, *mut c_void, u8) -> Reseed,
     pub random_bits: unsafe extern "C" fn(u32) -> u8,
     pub set_random_bits: unsafe extern "C" fn(u32, u8),
-    pub mark_dirty: unsafe extern "C" fn(u32),
     pub animation_spec: unsafe extern "C" fn(u32) -> AnimationSpec,
     pub change_frame: unsafe extern "C" fn(*const c_void, u32, u32, u32),
 }
@@ -109,7 +108,7 @@ pub unsafe extern "C" fn openttd_rust_industry_cleanup(
     if width == 0 {
         return;
     }
-    let has_neutral_station = unsafe { (w.neutral_station)(industry) };
+    let has_neutral_station = !unsafe { (w.neutral_station)(industry) }.is_null();
     let area = unsafe {
         Location {
             tile: ptr::read(ptr::addr_of!((*owner).metadata.tile)),
@@ -190,12 +189,12 @@ unsafe fn randomise_tile(
     unsafe { (w.set_random_triggers)(tile, waiting) };
     let masks = unsafe { (w.resolve_reseed)(tile, spec.gfx, industry, waiting) };
     unsafe { (w.set_random_triggers)(tile, waiting & !masks.used) };
-    let new_random_bits = unsafe { (s.random)() } as u8;
+    let new_random_bits = s.shared().random() as u8;
     let random_bits = unsafe { (w.random_bits)(tile) };
     let random_bits = (random_bits & !(masks.own as u8)) | (new_random_bits & masks.own as u8);
     unsafe {
         (w.set_random_bits)(tile, random_bits);
-        (w.mark_dirty)(tile);
+        (s.shared().mark_dirty)(tile);
     }
     masks.parent
 }
@@ -203,7 +202,7 @@ unsafe fn reseed_industry(owner: *mut Industry, reseed: u32, s: &Services) {
     if reseed == 0 || owner.is_null() {
         return;
     }
-    let random_bits = unsafe { (s.random)() } as u16;
+    let random_bits = s.shared().random() as u16;
     unsafe {
         let field = ptr::addr_of_mut!((*owner).metadata.random);
         let old = ptr::read(field);
@@ -275,7 +274,7 @@ pub unsafe extern "C" fn openttd_rust_industry_animate_tile(
 ) -> bool {
     let s = unsafe { &*services };
     let w = unsafe { &*lifecycle };
-    let random = unsafe { (s.random)() };
+    let random = s.shared().random();
     unsafe { trigger_animation(tile, trigger, random, extra, w) }
 }
 /// # Safety
@@ -292,12 +291,12 @@ pub unsafe extern "C" fn openttd_rust_industry_animate(
     let s = unsafe { &*services };
     let w = unsafe { &*lifecycle };
     let mut result = true;
-    let mut random = unsafe { (s.random)() };
+    let mut random = s.shared().random();
     tiles(unsafe { location(owner) }, size_x, |tile| unsafe {
         if (w.belongs)(tile, id) {
             if trigger_animation(tile, trigger, random, 0, w) {
                 // SB does not mask its input, so the draw can set high bits too.
-                random = (random & 0xffff_0000) | (s.random)();
+                random = (random & 0xffff_0000) | s.shared().random();
             } else {
                 result = false;
             }

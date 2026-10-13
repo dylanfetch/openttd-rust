@@ -159,17 +159,11 @@ pub unsafe extern "C" fn openttd_rust_industry_change_owner(
 pub struct IndustryCost {
     _private: [u8; 0],
 }
-/// Temporary mirror of the canonical #216 stack boundary until it integrates.
+/// Native stack cost operations consumed by industry policy.
 #[repr(C)]
 pub struct IndustryCostServices {
     pub zero: unsafe extern "C" fn(*mut IndustryCost),
     pub error: unsafe extern "C" fn(*mut IndustryCost, u32),
     pub expense_money: unsafe extern "C" fn(*mut IndustryCost, u8, i64),
-    pub error_param: unsafe extern "C" fn(*mut IndustryCost, u32, u64),
-    pub add: unsafe extern "C" fn(*mut IndustryCost, *mut IndustryCost),
-    pub move_cost: unsafe extern "C" fn(*mut IndustryCost, *mut IndustryCost),
-    pub amount: unsafe extern "C" fn(*mut IndustryCost, i64),
     pub success: unsafe extern "C" fn(*const IndustryCost) -> bool,
-    pub error_message: unsafe extern "C" fn(*const IndustryCost) -> u32,
-    pub money: unsafe extern "C" fn(*const IndustryCost) -> i64,
 }

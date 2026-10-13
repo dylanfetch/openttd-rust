@@ -278,16 +278,16 @@ pub fn layout(type_id: u16, item: u8) -> usize {
             layout!(crate::industry::ConstructionErrors, item; site, forest, positioned, desert, rainforest, lowland, one_per_town, town, population, near_town, conflict, too_many)
         }
         584 => {
-            layout!(crate::industry::TransactionServices, item; enabled, layout_count, layout, raw, raw_setting, check_proc, conflicting, multiple_per_town, closest_town, town, population, town_position, industry, highest_snow_line, edge_distance, refinery_limit, tile_height, tropic_zone, water_tile, bridge_above, has_water_class, tile_type, ensure_no_vehicle, set_company, temporary_shell, resolve_location, resolve_shape, location_error, shape_error, tile_grf_version, shape_callback, terragenesis, ignore_restrictions, platform, terraform, can_allocate, allocate, prospecting_chance, local_company, prospect_no_place, prospect_unlucky, construction_cost)
+            layout!(crate::industry::TransactionServices, item; enabled, layout_count, layout, raw, raw_setting, check_proc, conflicting, multiple_per_town, closest_town, town, population, town_position, industry, highest_snow_line, edge_distance, refinery_limit, tile_height, has_water_class, ensure_no_vehicle, set_company, temporary_shell, resolve_location, resolve_shape, location_error, shape_error, tile_grf_version, shape_callback, terragenesis, ignore_restrictions, platform, terraform, can_allocate, allocate, prospecting_chance, local_company, prospect_no_place, prospect_unlucky, construction_cost)
         }
         585 => {
-            layout!(crate::industry::TransactionContext, item; builder, production, generation, construction, lifecycle, tiles, tile_policy, commands, costs, transaction, errors, clear_areas, restore_clear_areas)
+            layout!(crate::industry::TransactionContext, item; map, builder, production, generation, construction, lifecycle, tiles, tile_policy, commands, costs, transaction, errors, clear_areas, restore_clear_areas)
         }
         578 => {
-            layout!(crate::industry::TilePolicyServices, item; current_company, magic_bulldozer, object_in_way, slopes_refused, close_ai, close_game, destroy, removal_cost, autoslope_enabled, tile_slope, tile_max_z, autoslope_callback, callback_boolean, foundation_cost, landscape_clear)
+            layout!(crate::industry::TilePolicyServices, item; current_company, magic_bulldozer, object_in_way, slopes_refused, close_ai, close_game, destroy, removal_cost, autoslope_enabled, tile_max_z, autoslope_callback, callback_boolean, foundation_cost, landscape_clear)
         }
         577 => {
-            layout!(crate::industry::IndustryCostServices, item; zero, error, expense_money, error_param, add, move_cost, amount, success, error_message, money)
+            layout!(crate::industry::IndustryCostServices, item; zero, error, expense_money, success)
         }
         576 => {
             layout!(crate::industry::IndustryCommandServices, item; deity, get, owner, valid_company, invalidate_view)
@@ -297,7 +297,7 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         }
         573 => layout!(crate::industry::TileIndustry, item; shell, owner),
         574 => {
-            layout!(crate::industry::TileServices, item; gfx, set_gfx, frame, set_frame, animation_loop, set_animation_loop, delete_animated, tick_counter, ambient, animate_new, construction_counter, construction_stage, completed, set_completed, reset_construction, industry, industry_index, toffee_offset, on_water, water_loop, is_industry, transport, anim_production, anim_next, build_oilrig, pixel_max_z, create_effect, create_effect_above, set_effect_substate, spec, acceptance, callback, cargo_translation)
+            layout!(crate::industry::TileServices, item; gfx, set_gfx, frame, set_frame, animation_loop, set_animation_loop, delete_animated, tick_counter, ambient, animate_new, construction_counter, construction_stage, completed, set_completed, reset_construction, industry, industry_index, toffee_offset, on_water, water_loop, transport, anim_production, anim_next, build_oilrig, pixel_max_z, create_effect, create_effect_above, set_effect_substate, spec, acceptance, callback, cargo_translation)
         }
         572 => layout!(crate::services::ByteSpan, item; data, size),
         568 => {
@@ -307,10 +307,10 @@ pub fn layout(type_id: u16, item: u8) -> usize {
             layout!(crate::industry::LayoutTile, item; x, y, gfx)
         }
         570 => {
-            layout!(crate::industry::ConstructionRequest, item; layout, town, layout_index, tile, size_x, id, random_bits, kind, founder)
+            layout!(crate::industry::ConstructionRequest, item; layout, town, layout_index, tile, size_x, size_y, id, random_bits, kind, founder)
         }
         571 => {
-            layout!(crate::industry::ConstructionServices, item; cargo_lists, callback_mask, set_town, calendar_date, generating, callback, callback_error, grf_version, cargo_translation, layout_size, layout_tile, water_class, clear_tile, make_industry, set_construction_counter, set_construction_stage, translated_gfx, animation_enabled, add_animated, map, build_window_dirty, neutral_station, serve_neutral, insert_near_station, clear_near_industries, insert_neutral_industry, stations_around, add_delivery)
+            layout!(crate::industry::ConstructionServices, item; cargo_lists, callback_mask, set_town, calendar_date, generating, callback, callback_error, grf_version, cargo_translation, layout_size, layout_tile, water_class, clear_tile, make_industry, set_construction_counter, set_construction_stage, translated_gfx, animation_enabled, add_animated, build_window_dirty, serve_neutral, insert_near_station, clear_near_industries, insert_neutral_industry, stations_around, add_delivery)
         }
         566 => layout!(crate::industry::GenerationInfo, item; appear, enabled, layouts),
         567 => {
@@ -324,7 +324,7 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         563 => layout!(crate::industry::RandomisationSpec, item; gfx, enabled),
         564 => layout!(crate::industry::AnimationSpec, item; spec, triggers),
         565 => {
-            layout!(crate::industry::LifecycleServices, item; neutral_station, cleanup_tile, delete_tile_inspect, make_water, delete_oilrig, clear_docking, industry_field, disassociate_field, release_disasters, delete_storage, delete_news, close_view, close_production, delete_inspect, delete_subsidies, invalidate_cargo, next_near_station, remove_delivery, belongs, randomisation_spec, random_triggers, set_random_triggers, resolve_reseed, random_bits, set_random_bits, mark_dirty, animation_spec, change_frame)
+            layout!(crate::industry::LifecycleServices, item; neutral_station, cleanup_tile, delete_tile_inspect, make_water, delete_oilrig, clear_docking, industry_field, disassociate_field, release_disasters, delete_storage, delete_news, close_view, close_production, delete_inspect, delete_subsidies, invalidate_cargo, next_near_station, remove_delivery, belongs, randomisation_spec, random_triggers, set_random_triggers, resolve_reseed, random_bits, set_random_bits, animation_spec, change_frame)
         }
         130 => {
             layout!(crate::industry::Fields, item; valid_history, last_prod_year, counter, prod_level, was_cargo_delivered, ctlflags)
@@ -344,7 +344,7 @@ pub fn layout(type_id: u16, item: u8) -> usize {
             layout!(crate::industry::Observation, item; owner, behaviour, callbacks, life, original, kind, up_text, down_text, closure_text)
         }
         137 => {
-            layout!(crate::industry::Services, item; next_tick, sound_count, behaviour, location, industry_sound, play_sound, special_effect, tick_trigger, production_callback, scale_cargo, random, random_range, move_goods, tile_add_wrap, farm_tile, tile_z, snow_line, make_field, fence_wanted, set_fence, tile_completed, harvest, observe, production_rate, change_callback, custom_text, news, rate_news, callback_error, set_dirty, destroy, advertise, create, random_industry, get, type_count, total, type_info, probability_callback, scale_by_map_size, company_none, restore_company, directory_dirty, recession, economy_month, economy_year, days_since_last_month, landscape, economy_type, passengers, fund_only, calendar_year, deity)
+            layout!(crate::industry::Services, item; shared, next_tick, sound_count, behaviour, location, industry_sound, play_sound, special_effect, tick_trigger, production_callback, scale_cargo, move_goods, tile_add_wrap, farm_tile, snow_line, make_field, fence_wanted, set_fence, tile_completed, harvest, observe, production_rate, change_callback, custom_text, news, rate_news, callback_error, set_dirty, destroy, advertise, create, random_industry, get, type_count, total, type_info, probability_callback, scale_by_map_size, company_none, restore_company, directory_dirty, recession, economy_month, economy_year, days_since_last_month, landscape, economy_type, passengers, fund_only, calendar_year, deity)
         }
         138 => {
             layout!(crate::industry::ProductionResult, item; subtract, add, again, cargo_input, cargo_output, version, num_input, num_output, present)
