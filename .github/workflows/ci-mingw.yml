@@ -60,20 +60,7 @@ jobs:
         pacman --noconfirm -U "$package"
 
     - name: Install OpenGFX
-      shell: bash
-      run: |
-        mkdir -p "C:/Users/Public/Documents/OpenTTD/baseset"
-        cd "C:/Users/Public/Documents/OpenTTD/baseset"
-
-        echo "::group::Download OpenGFX"
-        curl -L https://cdn.openttd.org/opengfx-releases/0.6.0/opengfx-0.6.0-all.zip -o opengfx-all.zip
-        echo "::endgroup::"
-
-        echo "::group::Unpack OpenGFX"
-        unzip opengfx-all.zip
-        echo "::endgroup::"
-
-        rm -f opengfx-all.zip
+      uses: ./.github/actions/install-opengfx
 
     - name: Install GCC problem matcher
       uses: ammaraskar/gcc-problem-matcher@master
