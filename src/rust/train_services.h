@@ -8,6 +8,8 @@
 #include "services_ffi.h"
 
 /** @file train_services.h Direct shared-world operations; no train policy. */
+#include "sound_services.h"
+
 #include "vehicle_services.h"
 #include "settings_services.h"
 
@@ -104,7 +106,7 @@ static uint64_t TrainAllPowered(OpenTTDTrainHandle, uint64_t a) noexcept
 }
 static uint64_t TrainAmbientSound(OpenTTDTrainHandle) noexcept
 {
-	return _settings_client.sound.ambient;
+	return OpenTTDAmbientSound();
 }
 static void TrainArrivalNews(OpenTTDTrainHandle id, uint16_t a) noexcept
 {

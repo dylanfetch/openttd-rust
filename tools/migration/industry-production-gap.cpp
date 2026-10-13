@@ -85,7 +85,8 @@ int main()
 	std::remove_pointer_t<decltype(spec.grf_prop.grffile)> file{};
 	spec.grf_prop.grffile = &file;
 	OpenTTDIndustryServices services{};
-	services.random = []() noexcept { return Random(); };
+	auto shared = OpenTTDFixtureSharedServices(nullptr, [](void *) noexcept -> uint32_t { return Random(); }, nullptr);
+	services.shared = &shared;
 	services.set_dirty = [](void *) noexcept { dirty++; };
 	services.callback_error = [](void *, bool) noexcept { errors++; };
 	uint cases = 0;

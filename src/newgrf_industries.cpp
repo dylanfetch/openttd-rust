@@ -542,6 +542,7 @@ uint16_t GetIndustryCallback(CallbackID callback, uint32_t param1, uint32_t para
  * @param creation_type The circumstances the industry is created under.
  * @return Succeeded or failed command.
  */
+#ifndef WITH_RUST
 CommandCost CheckIfCallBackAllowsCreation(TileIndex tile, IndustryType type, size_t layout, uint32_t seed, uint16_t initial_random_bits, Owner founder, IndustryAvailabilityCallType creation_type)
 {
 	const IndustrySpec *indspec = GetIndustrySpec(type);
@@ -567,6 +568,20 @@ CommandCost CheckIfCallBackAllowsCreation(TileIndex tile, IndustryType type, siz
 
 	return GetErrorMessageFromLocationCallbackResult(result, regs100, indspec->grf_prop.grffile, STR_ERROR_SITE_UNSUITABLE);
 }
+#else
+extern "C" OpenTTDIndustryLocationResult openttd_industry_resolve_location(Industry *industry, uint32_t tile, uint8_t type, uint32_t seed, uint8_t creation) noexcept
+{
+	industry->psa = nullptr;
+	IndustriesResolverObject object(TileIndex(tile), industry, type, seed, CBID_INDUSTRY_LOCATION, 0, creation);
+	OpenTTDIndustryLocationResult result{};
+	result.callback = object.ResolveCallback(result.registers);
+	return result;
+}
+extern "C" void openttd_industry_location_error(OpenTTDIndustryCost *out, const OpenTTDIndustryLocationResult *result, const OpenTTDIndustrySpecHandle *spec) noexcept
+{
+	*out = GetErrorMessageFromLocationCallbackResult(result->callback, result->registers, reinterpret_cast<const IndustrySpec *>(spec)->grf_prop.grffile, STR_ERROR_SITE_UNSUITABLE);
+}
+#endif
 
 /**
  * Check with callback #CBID_INDUSTRY_PROBABILITY whether the industry can be built.

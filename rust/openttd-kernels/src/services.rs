@@ -59,6 +59,16 @@ pub struct TownHandle {
     _private: [u8; 0],
 }
 
+/// Synchronous borrowed bytes, including embedded NULs. The producing entry
+/// specifies lifetime; no native callback may retain this view after mutation.
+#[repr(C)]
+pub struct ByteSpan {
+    /// Readable bytes for the producing entry's specified lifetime.
+    pub data: *const u8,
+    /// Full byte count; embedded NULs do not terminate the span.
+    pub size: usize,
+}
+
 /// Immutable call table supplied by the game (or isolated test world). No global
 /// registration or game symbol imports are needed by standalone Cargo binaries.
 /// The context and function addresses outlive the component invocation; callbacks

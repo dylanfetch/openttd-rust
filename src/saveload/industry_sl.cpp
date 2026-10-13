@@ -151,23 +151,45 @@ public:
 #ifdef WITH_RUST
 struct IndustryProductionSaveScope {
 	static inline OpenTTDIndustryFields current{};
+	static inline OpenTTDIndustryMetadata metadata{};
+	static inline EncodedString text{};
 	Industry *industry;
 	bool loading;
 	OpenTTDIndustryFields previous;
-	IndustryProductionSaveScope(Industry *industry, bool loading) : industry(industry), loading(loading), previous(current) { current = industry->ProductionFields(); }
+	OpenTTDIndustryMetadata previous_metadata;
+	EncodedString previous_text;
+	IndustryProductionSaveScope(Industry *industry, bool loading) : industry(industry), loading(loading), previous(current), previous_metadata(metadata), previous_text(text) { current = industry->ProductionFields(); metadata = industry->Metadata(); text = industry->GetText(); }
 	~IndustryProductionSaveScope()
 	{
-		if (this->loading) this->industry->ProductionFields() = current;
+		if (this->loading) { this->industry->ProductionFields() = current; this->industry->Metadata() = metadata; this->industry->SetText(text); }
 		current = this->previous;
+		metadata = this->previous_metadata;
+		text = std::move(this->previous_text);
 	}
 };
 #endif
 
 static const SaveLoad _industry_desc[] = {
+#ifdef WITH_RUST
+	SLEG_CONDVAR("location.tile", IndustryProductionSaveScope::metadata.tile,              SLE_FILE_U16 | SLE_VAR_U32,  SL_MIN_VERSION, SLV_6),
+#else
 	SLE_CONDVAR(Industry, location.tile,              SLE_FILE_U16 | SLE_VAR_U32,  SL_MIN_VERSION, SLV_6),
+#endif
+#ifdef WITH_RUST
+	SLEG_CONDVAR("location.tile", IndustryProductionSaveScope::metadata.tile,              SLE_UINT32,                  SLV_6, SL_MAX_VERSION),
+#else
 	SLE_CONDVAR(Industry, location.tile,              SLE_UINT32,                  SLV_6, SL_MAX_VERSION),
+#endif
+#ifdef WITH_RUST
+	    SLEG_VAR("location.w", IndustryProductionSaveScope::metadata.width,                 SLE_FILE_U8 | SLE_VAR_U16),
+#else
 	    SLE_VAR(Industry, location.w,                 SLE_FILE_U8 | SLE_VAR_U16),
+#endif
+#ifdef WITH_RUST
+	    SLEG_VAR("location.h", IndustryProductionSaveScope::metadata.height,                 SLE_FILE_U8 | SLE_VAR_U16),
+#else
 	    SLE_VAR(Industry, location.h,                 SLE_FILE_U8 | SLE_VAR_U16),
+#endif
 	    SLE_REF(Industry, town,                       REF_TOWN),
 	SLE_CONDREF(Industry, neutral_station,            REF_STATION,                SLV_SERVE_NEUTRAL_INDUSTRIES, SL_MAX_VERSION),
 	SLEG_CONDARR("produced_cargo",             SlIndustryProduced::old_cargo,                  SLE_UINT8,  INDUSTRY_ORIGINAL_NUM_OUTPUTS, SLV_78, SLV_EXTEND_INDUSTRY_CARGO_SLOTS),
@@ -200,9 +222,21 @@ static const SaveLoad _industry_desc[] = {
 	    SLE_VAR(Industry, counter,                    SLE_UINT16),
 #endif
 
+#ifdef WITH_RUST
+	    SLEG_VAR("type", IndustryProductionSaveScope::metadata.type,                       SLE_UINT8),
+#else
 	    SLE_VAR(Industry, type,                       SLE_UINT8),
+#endif
+#ifdef WITH_RUST
+	    SLEG_VAR("owner", IndustryProductionSaveScope::metadata.owner,                      SLE_UINT8),
+#else
 	    SLE_VAR(Industry, owner,                      SLE_UINT8),
+#endif
+#ifdef WITH_RUST
+	    SLEG_VAR("random_colour", IndustryProductionSaveScope::metadata.random_colour,              SLE_UINT8),
+#else
 	    SLE_VAR(Industry, random_colour,              SLE_UINT8),
+#endif
 #ifdef WITH_RUST
 	SLEG_CONDVAR("last_prod_year", IndustryProductionSaveScope::current.last_prod_year,             SLE_FILE_U8 | SLE_VAR_I32,  SL_MIN_VERSION, SLV_31),
 #else
@@ -224,20 +258,52 @@ static const SaveLoad _industry_desc[] = {
 	SLE_CONDVAR(Industry, ctlflags,                   SLE_UINT8,                 SLV_GS_INDUSTRY_CONTROL, SL_MAX_VERSION),
 #endif
 
+#ifdef WITH_RUST
+	SLEG_CONDVAR("founder", IndustryProductionSaveScope::metadata.founder,                    SLE_UINT8,                 SLV_70, SL_MAX_VERSION),
+#else
 	SLE_CONDVAR(Industry, founder,                    SLE_UINT8,                 SLV_70, SL_MAX_VERSION),
+#endif
+#ifdef WITH_RUST
+	SLEG_CONDVAR("construction_date", IndustryProductionSaveScope::metadata.construction_date,          SLE_INT32,                 SLV_70, SL_MAX_VERSION),
+#else
 	SLE_CONDVAR(Industry, construction_date,          SLE_INT32,                 SLV_70, SL_MAX_VERSION),
+#endif
+#ifdef WITH_RUST
+	SLEG_CONDVAR("construction_type", IndustryProductionSaveScope::metadata.construction_type,          SLE_UINT8,                 SLV_70, SL_MAX_VERSION),
+#else
 	SLE_CONDVAR(Industry, construction_type,          SLE_UINT8,                 SLV_70, SL_MAX_VERSION),
+#endif
 	SLEG_CONDVAR("last_cargo_accepted_at[0]",  SlIndustryAccepted::old_last_accepted[0], SLE_INT32,     SLV_70, SLV_EXTEND_INDUSTRY_CARGO_SLOTS),
 	SLEG_CONDARR("last_cargo_accepted_at",     SlIndustryAccepted::old_last_accepted,    SLE_INT32, 16, SLV_EXTEND_INDUSTRY_CARGO_SLOTS, SLV_INDUSTRY_CARGO_REORGANISE),
+#ifdef WITH_RUST
+	SLEG_CONDVAR("selected_layout", IndustryProductionSaveScope::metadata.selected_layout,            SLE_UINT8,                 SLV_73, SL_MAX_VERSION),
+#else
 	SLE_CONDVAR(Industry, selected_layout,            SLE_UINT8,                 SLV_73, SL_MAX_VERSION),
+#endif
+#ifdef WITH_RUST
+	SLEG_CONDVAR("exclusive_supplier", IndustryProductionSaveScope::metadata.exclusive_supplier,         SLE_UINT8,                 SLV_GS_INDUSTRY_CONTROL, SL_MAX_VERSION),
+#else
 	SLE_CONDVAR(Industry, exclusive_supplier,         SLE_UINT8,                 SLV_GS_INDUSTRY_CONTROL, SL_MAX_VERSION),
+#endif
+#ifdef WITH_RUST
+	SLEG_CONDVAR("exclusive_consumer", IndustryProductionSaveScope::metadata.exclusive_consumer,         SLE_UINT8,                 SLV_GS_INDUSTRY_CONTROL, SL_MAX_VERSION),
+#else
 	SLE_CONDVAR(Industry, exclusive_consumer,         SLE_UINT8,                 SLV_GS_INDUSTRY_CONTROL, SL_MAX_VERSION),
+#endif
 
 	SLEG_CONDARR("storage", _old_ind_persistent_storage.storage, SLE_UINT32, 16, SLV_76, SLV_161),
 	SLE_CONDREF(Industry, psa,                        REF_STORAGE,              SLV_161, SL_MAX_VERSION),
 
+#ifdef WITH_RUST
+	SLEG_CONDVAR("random", IndustryProductionSaveScope::metadata.random,                     SLE_UINT16,                SLV_82, SL_MAX_VERSION),
+#else
 	SLE_CONDVAR(Industry, random,                     SLE_UINT16,                SLV_82, SL_MAX_VERSION),
+#endif
+#ifdef WITH_RUST
+	SLEG_CONDSSTR("text", IndustryProductionSaveScope::text,     SLE_STR | SLF_ALLOW_CONTROL,     SLV_INDUSTRY_TEXT, SL_MAX_VERSION),
+#else
 	SLE_CONDSSTR(Industry, text,     SLE_STR | SLF_ALLOW_CONTROL,     SLV_INDUSTRY_TEXT, SL_MAX_VERSION),
+#endif
 
 #ifdef WITH_RUST
 	SLEG_CONDVAR("valid_history", IndustryProductionSaveScope::current.valid_history, SLE_UINT64, SLV_INDUSTRY_NUM_VALID_HISTORY, SL_MAX_VERSION),
