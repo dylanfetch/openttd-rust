@@ -30,6 +30,7 @@ permissions:
   contents: read
   actions: read
   checks: read
+  statuses: read
   pull-requests: read
 
 concurrency:
@@ -57,6 +58,7 @@ jobs:
       head: ${{ steps.plan.outputs.head }}
       base: ${{ steps.plan.outputs.base }}
       merge: ${{ steps.plan.outputs.merge }}
+      tree: ${{ steps.plan.outputs.tree }}
       profile: ${{ steps.plan.outputs.profile }}
       pr: ${{ steps.plan.outputs.pr }}
     steps:
@@ -89,7 +91,11 @@ jobs:
           if (pull.mergeable !== true || !/^[0-9a-f]{40}$/.test(pull.merge_commit_sha || '')) {
             throw new Error('Pull request is unmergeable or mergeability is pending; retry after resolving it');
           }
-          for (const [key, value] of Object.entries({head, base: pull.base.sha, merge: pull.merge_commit_sha, profile, pr})) {
+          const {data: tested} = await github.rest.repos.getCommit({
+            ...context.repo, ref: pull.merge_commit_sha
+          });
+          for (const [key, value] of Object.entries({head, base: pull.base.sha, merge: pull.merge_commit_sha,
+              tree: tested.commit.tree.sha, profile, pr})) {
             core.setOutput(key, String(value));
           }
           if (profile === 'full') {
@@ -169,9 +175,9 @@ jobs:
             return;
           }
           const {data: pull} = await github.rest.pulls.get({...context.repo, pull_number: pr});
-          const current = pull.state === 'open' && pull.base.ref === 'rust-migration' && pull.head.sha === head &&
-            pull.mergeable === true && pull.base.sha === needs.plan.outputs.base &&
-            pull.merge_commit_sha === needs.plan.outputs.merge;
+          // Head identity remains valid when another PR or docs advance the base.
+          // Post-merge policy checks the resulting tree to catch combined changes.
+          const current = pull.state === 'open' && pull.base.ref === 'rust-migration' && pull.head.sha === head;
           const complete = ['plan', 'quick', 'native', 'platform'].every(
             name => needs[name]?.result === 'success') &&
             needs.native?.outputs?.validated === 'true' && needs.platform?.outputs?.validated === 'true';
@@ -182,4 +188,10 @@ jobs:
             description: passed ? 'All required validation passed for this PR head' :
               current ? 'Required validation failed, skipped, or was cancelled' : 'PR head changed; request validation again'
           });
+          if (passed) {
+            await github.rest.repos.createCommitStatus({
+              ...context.repo, sha: head, context: 'Validated tree', state: 'success',
+              target_url: runUrl, description: needs.plan.outputs.tree
+            });
+          }
           if (!passed) core.setFailed('Full validation did not pass for the current PR head');

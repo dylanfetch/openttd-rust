@@ -631,6 +631,7 @@ def run_scenario(
     fallback for link graph computation. No wall-time-dependent join pauses
     consume null-driver iterations, so every save and complete log is compared."""
     name = scenario["name"]
+    started = time.monotonic()
     result = {
         "scenario": name,
         "plain_speed": {"samples": [], "median_candidate_reference_ratio": None},
@@ -859,6 +860,7 @@ def run_scenario(
                 shutil.rmtree(out / name / mode, ignore_errors=True)
         else:
             shutil.rmtree(out / name, ignore_errors=True)  # Keep only failing runs.
+    result["seconds"] = round(time.monotonic() - started, 3)
     return result
 
 
@@ -945,6 +947,9 @@ def main():
         "--timeout", type=int, default=1200, help="seconds per game run"
     )
     parser.add_argument("--list", action="store_true")
+    parser.add_argument(
+        "--frozen-runtimes", type=Path, help="verified CI runtime bundle"
+    )
     parser.add_argument(
         "--benchmark",
         type=int,
@@ -1035,27 +1040,49 @@ def run_simulation(args, scenarios, migration, out, parser, stamp):
     candidate_commit = migration.git("rev-parse", "HEAD")
     candidate_status = migration.git("status", "--short")
     builds = {role: out / f"{role}-runtime" for role in ("reference", "candidate")}
-    # The game finds its data next to the executable, so copy the shared
-    # reference's runtime while no other worktree can rebuild it,
-    # then run without holding the lock.
-    with migration.reference_lock(shared=True):
-        shared = migration.REFERENCE_BUILD.resolve()
-        reference = copy_runtime(shared, shared / "openttd", builds["reference"])
-    sources = {"reference": shared / "openttd"}
-    binaries = {"reference": reference}
-    if args.self:
-        builds["candidate"], binaries["candidate"] = builds["reference"], reference
-        sources["candidate"] = sources["reference"]
-    else:
-        candidate = (args.candidate or ROOT / "build-rust/openttd-rust").resolve()
-        if not candidate.is_file():
-            parser.error(
-                f"candidate binary {candidate} is missing; run python3 tools/migration.py build"
+    if args.frozen_runtimes:
+        from .runtime import verify
+
+        if args.self or args.candidate:
+            parser.error("--frozen-runtimes conflicts with --self/--candidate")
+        bundle = args.frozen_runtimes.resolve()
+        manifest = verify(bundle, migration)
+        sources, binaries = {}, {}
+        for role in ("reference", "candidate"):
+            source = bundle / manifest["roles"][role]["binary"]
+            sources[role] = source
+            binaries[role] = copy_runtime(source.parent, source, builds[role])
+            for name in ("fleet", "orders"):
+                shutil.copytree(source.parent / name, builds[role] / name)
+            shutil.copy2(
+                source.parent / "adapters.json", builds[role] / "adapters.json"
             )
-        sources["candidate"] = candidate
-        binaries["candidate"] = copy_runtime(
-            candidate.parent, candidate, builds["candidate"], candidate=True
-        )
+            if role == "candidate":
+                shutil.copy2(
+                    source.parent / IDENTITY_NAME, builds[role] / IDENTITY_NAME
+                )
+    else:
+        # The game finds its data next to the executable, so copy the shared
+        # reference's runtime while no other worktree can rebuild it,
+        # then run without holding the lock.
+        with migration.reference_lock(shared=True):
+            shared = migration.REFERENCE_BUILD.resolve()
+            reference = copy_runtime(shared, shared / "openttd", builds["reference"])
+        sources = {"reference": shared / "openttd"}
+        binaries = {"reference": reference}
+        if args.self:
+            builds["candidate"], binaries["candidate"] = builds["reference"], reference
+            sources["candidate"] = sources["reference"]
+        else:
+            candidate = (args.candidate or ROOT / "build-rust/openttd-rust").resolve()
+            if not candidate.is_file():
+                parser.error(
+                    f"candidate binary {candidate} is missing; run python3 tools/migration.py build"
+                )
+            sources["candidate"] = candidate
+            binaries["candidate"] = copy_runtime(
+                candidate.parent, candidate, builds["candidate"], candidate=True
+            )
     binary_evidence = {
         role: {
             "path": str(path),
@@ -1064,6 +1091,13 @@ def run_simulation(args, scenarios, migration, out, parser, stamp):
         }
         for role, path in binaries.items()
     }
+
+    if args.frozen_runtimes:
+        for role in binaries:
+            binary_evidence[role]["frozen_export"] = manifest["roles"][role]
+        binary_evidence["candidate"]["source_build_identity"] = manifest[
+            "candidate_build_identity"
+        ]
 
     if not args.self and (builds["candidate"] / IDENTITY_NAME).is_file():
         identity = json.loads((builds["candidate"] / IDENTITY_NAME).read_text())
