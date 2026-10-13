@@ -169,21 +169,22 @@ The #108 decision keeps C++ map arrays and direct bundled `noexcept` services.
 
 ## Resume checkpoint
 
-Paused on 2026-10-11 at the user's wind-down; resume with the work order above.
-#211, #208 and #215 are integrated. Four drafts are clean and pushed. Evidence
-and exact validation status stay on the linked PRs and issues; the eighth-review
-PR comments list what each draft must change.
+Resumed on 2026-10-12 with the eighth/ninth steering corrections. Four component
+drafts and two maintenance PRs are active; no new ownership starts before two
+component drafts integrate. Evidence and exact validation stay on the linked PRs.
 
 | Issue / PR | Branch (worktree suffix), head | State and next step |
 | --- | --- | --- |
-| #150 / #218 | `industry-construction-150`, `8bf3a71c90` | Draft; real ownership, audited clean. Update from base, adopt shared map services, drop dead slots, then fresh review and full CI. |
-| #192 / #209 | `company-direct-192`, `aaeafc9b69` | Draft; reviewed, plus startup scenarios. No new steps: update from base, fresh review of new commits, full CI. |
-| #214 / #217 | `station-loading-direct-214`, `d456668553` | Draft; fidelity clean. Remove its profile facility, revert portable-body edits, adopt #215 accessors, group reads. |
-| #148 / #216 | `town-lifecycle-148`, `0e98404f21` | Draft; last native-verified `e0a1132aba`. Fix the `thread_local!` crash, narrow scope, adopt #215 accessors. |
+| #150 / #218 | `industry-construction-150`, `a16981bc35` | Shared map/dimension reads and dead-slot corrections pushed; finishing clean-head evidence, then fresh review and full CI. |
+| #192 / #209 | `company-direct-192`, `2d907389d0` | Conflict-free base update pushed; fresh review/evidence underway. Pending scope moved to #156; full CI next. |
+| #214 / #217 | `station-loading-direct-214`, `d456668553` | Required profile/portable/shared/grouped-read fixes underway; no draft service dependency. |
+| #148 / #216 | `town-lifecycle-148`, `0e98404f21` | Narrowing and process-wide state fix underway, with default thread-scope regression; no draft dependency. |
+| #224 / #225 | `issue-224-disk-hygiene`, `718d5c38a2` | Fresh reviewer fixed fixture-preparation cleanup; finishing clean-head evidence and disposition. |
+| #223 / #226 | `metric-original-223`, `32d7d3006d` | Original retirement/net glue and simulation share pushed; local default checks pass; fresh review next. |
 
 Selected but unstarted: #212/#213, then #219/#220. ABI blocks: train through 385,
 tree additions 386-389, fleet 390-399, company 400-429, town 430-459, road 460-499,
-station/loading 500-559, industry 560-619 (572 shared ByteSpan lands with town), CommandCost 620-629,
+station/loading 500-559, industry 560-619 (572 consumed shared ByteSpan in #218), CommandCost 620-629,
 and additional town lifecycle 630-669. Allocate only consumed layouts.
 
 Preserve the pinned reference, paused curve worktrees and evidence branches
