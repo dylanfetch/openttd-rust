@@ -515,7 +515,6 @@ pub unsafe extern "C" fn openttd_rust_station_acceptance(
             (w.acceptance_news)(st, rejects, true);
         }
     }
-    crate::witness::hit(crate::witness::STATION_ACCEPTANCE_CHANGED);
     (w.acceptance_redraw)(st);
 }
 #[unsafe(no_mangle)]
@@ -1459,6 +1458,9 @@ unsafe fn load_vehicle(front: VehicleRef, st: LoadingStation, w: &World, l: &Loa
             control.full_load
         };
         if reserve {
+            if control.full_load {
+                crate::witness::hit(crate::witness::STATION_FULL_LOAD_RESERVE);
+            }
             reserve_consist(
                 st,
                 front,
@@ -1516,11 +1518,15 @@ unsafe fn load_vehicle(front: VehicleRef, st: LoadingStation, w: &World, l: &Loa
             if part.unloading && control.unload_type != 4 {
                 let count = (l.unload_count)(v);
                 let mut amount = if control.gradual {
+                    if count > 0 {
+                        crate::witness::hit(crate::witness::STATION_GRADUAL_UNLOAD);
+                    }
                     count.min(load_amount(v, control.gradual, l))
                 } else {
                     count
                 };
                 if unsafe { (*ge).status } & 1 == 0 && (l.deliver_count)(v) > 0 {
+                    crate::witness::hit(crate::witness::STATION_REJECTED_DELIVERY);
                     let unload_type = control.unload_type;
                     if unload_type == 2 || unload_type == 1 {
                         (l.deliver_to_transfer)(v, (l.deliver_count)(v));
@@ -1604,9 +1610,6 @@ unsafe fn load_vehicle(front: VehicleRef, st: LoadingStation, w: &World, l: &Loa
                         cap = cap.min(load_amount(v, control.gradual, l));
                     }
                     let loaded = (l.load_cargo)(st.native, v, cap, next);
-                    if control.gradual && loaded > 0 {
-                        crate::witness::hit(crate::witness::STATION_GRADUAL_LOADED);
-                    }
                     if (l.load_count)(v) > 0 {
                         reservation_left |= 1 << cargo;
                     }

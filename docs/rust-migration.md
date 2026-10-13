@@ -1542,8 +1542,8 @@ loading, rating expiry/decay/capping, stale-link refresh/removal and active relo
 `--self` and `--soak` reuse these cases. Required named station branches use the
 shared witness facility, disabled during timing. Native tests cover
 ABI, aliases, queue/reentry order, save failure and retirement/indexed reuse.
-The corpus is not exhaustive for legacy versions, NewGRF cargo callbacks,
-articulated/multiheaded refits or every transport combination.
+Acceptance-loss precedes acceptance polling; full-gradual proves reservation and
+unloading, not a positive load. Legacy, NewGRF and refit gaps remain in #156.
 
 ### Ship controller and private state (#146)
 

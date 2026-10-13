@@ -181,8 +181,8 @@ def check(scenario, run, mode, role, result):
         return
     kind = scenario["station_service"]
     required = {
-        "acceptance-loss": ["acceptance_changed"],
-        "full-gradual": ["gradual_loaded"],
+        "acceptance-loss": ["rejected_delivery"],
+        "full-gradual": ["full_load_reserve", "gradual_unload"],
         "manual": ["unload_cargo"],
         "cargodist": ["unload_cargo"],
         "stale-remove": ["stale_remove"],

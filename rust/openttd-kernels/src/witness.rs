@@ -221,19 +221,22 @@ pub const ROAD_VISITORS: usize = 93;
 /// Selected road controller entries, including reentrant helpers.
 pub const ROAD_ENTRIES: usize = 94;
 
-/// `station.acceptance_changed` branch.
-pub const STATION_ACCEPTANCE_CHANGED: usize = 95;
+/// `station.rejected_delivery` branch.
+pub const STATION_REJECTED_DELIVERY: usize = 95;
 /// `station.stale_remove` branch.
 pub const STATION_STALE_REMOVE: usize = 96;
 /// `station.stale_refresh` branch.
 pub const STATION_STALE_REFRESH: usize = 97;
 /// `station.unload_cargo` branch.
 pub const STATION_UNLOAD_CARGO: usize = 98;
-/// `station.gradual_loaded` branch.
-pub const STATION_GRADUAL_LOADED: usize = 99;
+/// `station.gradual_unload` branch.
+pub const STATION_GRADUAL_UNLOAD: usize = 99;
+
+/// `station.full_load_reserve` branch.
+pub const STATION_FULL_LOAD_RESERVE: usize = 100;
 
 /// Counter names, grouped by the prefix the harness selects.
-pub const NAMES: [&str; 100] = [
+pub const NAMES: [&str; 101] = [
     "train.tick_first",
     "train.tick_second",
     "train.reversal",
@@ -329,11 +332,12 @@ pub const NAMES: [&str; 100] = [
     "road.services",
     "road.visitors",
     "road.entries",
-    "station.acceptance_changed",
+    "station.rejected_delivery",
     "station.stale_remove",
     "station.stale_refresh",
     "station.unload_cargo",
-    "station.gradual_loaded",
+    "station.gradual_unload",
+    "station.full_load_reserve",
 ];
 
 static ENABLED: AtomicBool = AtomicBool::new(false);
