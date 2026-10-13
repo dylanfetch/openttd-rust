@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 HEAD = "a" * 40
 BASE = "b" * 40
 MERGE = "d" * 40
+TREE = "f" * 40
 PULL = {
     "state": "open",
     "head": {"sha": HEAD},
@@ -57,6 +58,7 @@ def good_needs():
         "base": BASE,
         "merge": MERGE,
         "pr": "170",
+        "tree": TREE,
     }
     for name in ("native", "platform"):
         needs[name]["outputs"]["validated"] = "true"
@@ -71,6 +73,7 @@ const context = {{repo: {{owner: 'example', repo: 'fork'}}, actor: 'root',
   serverUrl: 'https://github.com', runId: 123, payload: {{pull_request: {json.dumps(event)}}}}};
 const core = {{setFailed: value => failures.push(value), setOutput: (k,v) => outputs[k] = v}};
 const github = {{rest: {{pulls: {{get: async () => ({{data: {json.dumps(pull)}}})}}, repos: {{
+  getCommit: async () => ({{data: {{commit: {{tree: {{sha: {json.dumps(TREE)}}}}}}}}}),
   getCollaboratorPermissionLevel: async () => ({{data: {{permission: 'write'}}}}),
   getCombinedStatusForRef: async () => ({{data: {{statuses: {json.dumps([latest] if latest else [])}}}}}),
   createCommitStatus: async value => statuses.push(value)
@@ -221,9 +224,6 @@ class GateTests(unittest.TestCase):
             {"head": {"sha": "c" * 40}},
             {"state": "closed"},
             {"base": {"ref": "master", "sha": BASE}},
-            {"base": {"ref": "rust-migration", "sha": "e" * 40}},
-            {"merge_commit_sha": "e" * 40},
-            {"mergeable": False},
         ):
             self.assertEqual(
                 execute_publisher(good_needs(), dict(PULL, **change))["statuses"][0][
@@ -231,6 +231,22 @@ class GateTests(unittest.TestCase):
                 ],
                 "failure",
             )
+
+    def test_base_advances_and_mergeability_pending_preserve_exact_head_validation(
+        self,
+    ):
+        for change in (
+            {"base": {"ref": "rust-migration", "sha": "e" * 40}},
+            {"merge_commit_sha": "e" * 40},
+            {"mergeable": None},
+            {"mergeable": False},
+        ):
+            result = execute_publisher(good_needs(), dict(PULL, **change))
+            self.assertEqual(result["statuses"][0]["state"], "success")
+            marker = result["statuses"][1]
+            self.assertEqual(marker["context"], "Validated tree")
+            self.assertEqual(marker["description"], TREE)
+            self.assertEqual(marker["target_url"], result["statuses"][0]["target_url"])
 
     def test_no_candidate_execution_in_privileged_jobs(self):
         workflow = (ROOT / ".github/workflows/ci-request.yml").read_text()
@@ -337,11 +353,52 @@ class PolicyTests(unittest.TestCase):
                 const context = {{eventName: {json.dumps(event)}, repo: {{}}, sha: 'head',
                   payload: {{before: 'base', pull_request: {{base: {{ref: 'rust-migration'}}}}}}}};
                 const core = {{setOutput: (key, value) => outputs[key] = value, info: () => {{}}}};
-                const github = {{rest: {{repos: {{compareCommitsWithBasehead: async () => ({{data: {{files: {json.dumps(files)}}}}})}}}}}};
+                const github = {{paginate: async () => [], rest: {{repos: {{
+                  getCommit: async () => ({{data: {{commit: {{tree: {{sha: "tree"}}}}}}}}),
+                  compareCommitsWithBasehead: async () => ({{data: {{files: {json.dumps(files)}}}}})
+                }}}}}};
                 (async () => {{{script}}})().then(() => console.log(JSON.stringify(outputs)));
                 """
                 result = node(harness)
                 self.assertEqual(result["heavy"], expected)
+
+    def test_only_matching_successful_merged_tree_skips_validation(self):
+        script = script_for("ci-policy.yml", "policy")
+        for full, marker, same_run, tree, merged, expected in (
+            ("success", "success", True, TREE, True, "false"),
+            ("success", "success", True, "other", True, "true"),
+            ("pending", "success", True, TREE, True, "true"),
+            ("failure", "success", True, TREE, True, "true"),
+            ("success", "failure", True, TREE, True, "true"),
+            ("success", "success", False, TREE, True, "true"),
+            ("success", "success", True, TREE, False, "true"),
+        ):
+            statuses = [
+                {"context": "Full validation", "state": full, "target_url": "run"},
+                {
+                    "context": "Validated tree",
+                    "state": marker,
+                    "target_url": "run" if same_run else "old",
+                    "description": tree,
+                },
+            ]
+            pull = dict(PULL, merged_at="date" if merged else None)
+            harness = f"""
+            process.env.CI_ON_DEMAND = 'true';
+            const outputs = {{}};
+            const context = {{eventName: 'push', repo: {{}}, sha: 'head', payload: {{before: 'base'}}}};
+            const core = {{setOutput: (k, v) => outputs[k] = v, info: () => {{}}}};
+            const github = {{paginate: async () => [{json.dumps(pull)}], rest: {{repos: {{
+              getCommit: async () => ({{data: {{commit: {{tree: {{sha: {json.dumps(TREE)}}}}}}}}}),
+              getCombinedStatusForRef: async () => ({{data: {{statuses: {json.dumps(statuses)}}}}}),
+              compareCommitsWithBasehead: async () => ({{data: {{files: [{{filename: 'src/code.cpp'}}]}}}})
+            }}}}}};
+            (async () => {{{script}}})().then(() => console.log(JSON.stringify(outputs)));
+            """
+            with self.subTest(
+                full=full, marker=marker, same_run=same_run, tree=tree, merged=merged
+            ):
+                self.assertEqual(node(harness)["heavy"], expected)
 
 
 class RequestTests(unittest.TestCase):
