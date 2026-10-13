@@ -6,6 +6,8 @@ from .core import (
     ROOT,
     SNAPSHOT_TICKS,
     TICKS_PER_DAY,
+    WITNESS_ENVIRONMENT,
+    branch_witnesses,
     decode_element,
     read_save,
     run_game,
@@ -175,3 +177,46 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
 
 
 PREPARE_ORDER = 3
+
+
+def counted_road_save(scenario):
+    return any(
+        scenario.get("name", "").startswith(f"play-{save}-")
+        for save in (*PLAY_SAVES, "padhattan-ridge-2000")
+    )
+
+
+def game_environment(scenario):
+    return (
+        WITNESS_ENVIRONMENT
+        if counted_road_save(scenario) and scenario.get("witnesses")
+        else {}
+    )
+
+
+def check(scenario, run, mode, role, result):
+    if not counted_road_save(scenario):
+        return
+    counts = branch_witnesses(
+        scenario, run, role, "road", ("ticks", "services", "entries")
+    )
+    if counts is None:
+        return
+    crossings = counts["services"] + counts["visitors"]
+    density = crossings / counts["ticks"]
+    result[f"{mode}_{role}_road_crossings"] = dict(
+        counts,
+        services_and_visitors_per_tick=density,
+        controller_entries_per_tick=counts["entries"] / counts["ticks"],
+        observed_controller_crossings_per_tick=(crossings + counts["entries"])
+        / counts["ticks"],
+    )
+    # Plain mode budgets 13 outgoing services plus visitor callbacks per tick.
+    # Snapshot desync checks additionally rebuild/check caches; their calls and
+    # selected controller ingress are reported separately.
+    if (
+        mode == "plain"
+        and scenario["name"] == "play-padhattan-ridge-2000-manual"
+        and density > 13
+    ):
+        raise RuntimeError(f"road boundary exceeds 13 crossings/tick: {density:.3f}")
