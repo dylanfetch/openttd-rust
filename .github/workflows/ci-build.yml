@@ -49,7 +49,7 @@ jobs:
 
   linux:
     needs: policy
-    if: ${{ !cancelled() && (inputs.checkout-ref != '' || needs.policy.outputs.heavy == 'true') }}
+    if: ${{ !cancelled() && (inputs.checkout-ref != '' || needs.policy.outputs.heavy == 'true' || needs.policy.outputs.covered == 'true') }}
     strategy:
       fail-fast: false
       matrix:
@@ -79,10 +79,11 @@ jobs:
       cxxcompiler: ${{ matrix.cxxcompiler }}
       libraries: ${{ matrix.libraries }}
       extra-cmake-parameters: ${{ matrix.extra-cmake-parameters }}
+      cache-only: ${{ inputs.checkout-ref == '' && github.event_name == 'push' && github.ref == 'refs/heads/rust-migration' && needs.policy.outputs.covered == 'true' }}
 
   macos:
     needs: policy
-    if: ${{ !cancelled() && (inputs.checkout-ref != '' || needs.policy.outputs.heavy == 'true') && inputs.profile != 'native' }}
+    if: ${{ !cancelled() && (inputs.checkout-ref != '' || needs.policy.outputs.heavy == 'true' || needs.policy.outputs.covered == 'true') && inputs.profile != 'native' }}
     strategy:
       fail-fast: false
       matrix:
@@ -106,10 +107,11 @@ jobs:
       arch: ${{ matrix.arch }}
       full_arch: ${{ matrix.full_arch }}
       extra-cmake-parameters: ${{ matrix.extra-cmake-parameters }}
+      cache-only: ${{ inputs.checkout-ref == '' && github.event_name == 'push' && github.ref == 'refs/heads/rust-migration' && needs.policy.outputs.covered == 'true' }}
 
   windows:
     needs: policy
-    if: ${{ !cancelled() && (inputs.checkout-ref != '' || needs.policy.outputs.heavy == 'true') && inputs.profile != 'native' }}
+    if: ${{ !cancelled() && (inputs.checkout-ref != '' || needs.policy.outputs.heavy == 'true' || needs.policy.outputs.covered == 'true') && inputs.profile != 'native' }}
     strategy:
       fail-fast: false
       matrix:
@@ -125,6 +127,7 @@ jobs:
       checkout-ref: ${{ inputs.checkout-ref }}
       rust: true
       arch: ${{ matrix.arch }}
+      cache-only: ${{ inputs.checkout-ref == '' && github.event_name == 'push' && github.ref == 'refs/heads/rust-migration' && needs.policy.outputs.covered == 'true' }}
 
   check_annotations:
     name: Check Annotations

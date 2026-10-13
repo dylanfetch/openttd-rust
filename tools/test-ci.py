@@ -271,7 +271,121 @@ class GateTests(unittest.TestCase):
         self.assertNotIn("state: 'success'", workflow)
 
 
+class CacheTests(unittest.TestCase):
+    def prune(self, caches):
+        script = script_for("ci-cache.yml", "prune")
+        return node(f"""
+const deleted = [], failures = [], context = {{repo: {{}}}};
+const core = {{info: () => {{}}, setFailed: value => failures.push(value)}};
+const github = {{paginate: async () => {json.dumps(caches)}, rest: {{actions: {{
+  getActionsCacheList: () => {{}}, deleteActionsCacheById: async value => deleted.push(value.cache_id)
+}}}}}};
+(async () => {{{script}}})().then(() => console.log(JSON.stringify({{deleted, failures}})));
+""")
+
+    def test_actual_cache_controller_keeps_one_entry_per_prefix_and_eight_gib(self):
+        gib = 1024**3
+        caches = [
+            {
+                "id": i,
+                "key": prefix + "-" + str(i) * 40,
+                "created_at": f"2026-10-{i:02}",
+                "size_in_bytes": gib,
+            }
+            for i, prefix in enumerate(
+                (
+                    "compiler-v1-linux",
+                    "compiler-v1-linux",
+                    "ccache-linux-v2-gcc",
+                    "ccache-macos-v2-arm64",
+                    "ccache-msvc-v1-x64",
+                ),
+                start=1,
+            )
+        ]
+        result = self.prune(caches)
+        self.assertEqual(result["deleted"], [1])
+        self.assertEqual(result["failures"], [])
+        caches[-1]["size_in_bytes"] = 7 * gib
+        result = self.prune(caches)
+        self.assertEqual(result["deleted"], [1, 2, 3])
+        self.assertEqual(result["failures"], [])
+        result = self.prune(
+            [
+                {
+                    "id": 99,
+                    "key": "unmanaged",
+                    "created_at": "date",
+                    "size_in_bytes": 9 * gib,
+                }
+            ]
+        )
+        self.assertTrue(result["failures"])
+        workflow = (ROOT / ".github/workflows/ci-cache.yml").read_text()
+        self.assertIn("actions: write", workflow)
+        self.assertNotIn("actions/checkout", workflow)
+        self.assertNotIn("download-artifact", workflow)
+        self.assertNotRegex(workflow, r"(?m)^\s+(?:- )?run:")
+
+
 class PolicyTests(unittest.TestCase):
+    def test_platform_cache_refresh_is_only_a_covered_protected_push(self):
+        workflow = (ROOT / ".github/workflows/ci-build.yml").read_text()
+        for job in ("linux", "macos", "windows"):
+            section = workflow.split(f"  {job}:\n", 1)[1]
+            section = re.split(r"\n  [a-z_]+:\n", section, maxsplit=1)[0]
+            expression = re.search(r"      cache-only: \${{ (.+) }}", section)[1]
+            expression = expression.replace(
+                "inputs.checkout-ref", 'inputs["checkout-ref"]'
+            )
+            for checkout, event, ref, covered, expected in (
+                ("", "push", "refs/heads/rust-migration", "true", True),
+                ("merge", "push", "refs/heads/rust-migration", "true", False),
+                ("", "pull_request", "refs/heads/rust-migration", "true", False),
+                ("", "push", "refs/heads/master", "true", False),
+                ("", "push", "refs/heads/rust-migration", "false", False),
+            ):
+                self.assertEqual(
+                    evaluate(
+                        expression,
+                        inputs={"checkout-ref": checkout},
+                        github={"event_name": event, "ref": ref},
+                        needs={"policy": {"outputs": {"covered": covered}}},
+                    ),
+                    expected,
+                )
+        excluded = {
+            "ci-linux.yml": ["Test"],
+            "ci-macos.yml": [
+                "Rust checks",
+                "Test",
+                "Compare accepted wide math templates with pinned C++",
+                "Reject unsupported Rust configurations",
+                "Fresh Rust native generators",
+                "Verify native archive configuration freshness",
+                "Retain native Rust evidence",
+            ],
+            "ci-windows.yml": [
+                "Rust checks for actual selected target",
+                "Test",
+                "Fresh Rust native generators",
+                "Validate refusals and actual archive freshness",
+                "Record native CRT ABI linkage and fresh outputs",
+                "Retain native Windows Rust and test evidence",
+            ],
+        }
+        for filename, labels in excluded.items():
+            child = (ROOT / ".github/workflows" / filename).read_text()
+            for label in labels:
+                step = child.split(f"    - name: {label}\n", 1)[1].split(
+                    "    - name:", 1
+                )[0]
+                self.assertRegex(step, r"      if: .* !inputs.cache-only")
+        self.assertIn(
+            "!inputs.cache-only || inputs.compiler != 'clang'",
+            (ROOT / ".github/workflows/ci-linux.yml").read_text(),
+        )
+
     def test_heavy_predicates_bypass_skipped_policy_but_respect_cancellation(self):
         for filename, jobs in (
             ("ci-build.yml", ("emscripten", "linux", "macos", "windows")),
