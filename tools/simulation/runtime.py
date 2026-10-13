@@ -109,9 +109,10 @@ def elf_content(path):
             if section[1] == 2:  # SHT_SYMTAB; strip-debug renumbers retained symbols.
                 for entry in range(section[5] // section[9]):
                     record, target = symbol(index, entry)
-                    if record["info"] & 15 != 4 and not (
+                    if record["info"] >> 4 != 0 and not (
                         0 < target < len(sections) and debug_section(target)
-                    ):  # STT_FILE and debug-section symbols have no link semantics.
+                    ):  # Local symbols are resolved in relocation/group records;
+                        # unused section symbols may have served debug references only.
                         symbols.append(record)
             elif section[1] in (4, 9):  # RELA/REL, resolved through their symbol table.
                 if debug_section(section[7]):
