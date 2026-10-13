@@ -583,7 +583,7 @@ pub unsafe extern "C" fn openttd_rust_town_authority_station(
     no_test: bool,
 ) {
     // SAFETY: Native immutable tables live for this synchronous invocation.
-    let (a, s, c) = unsafe { (*authority, *services, *costs) };
+    let (a, s, c) = unsafe { (&*authority, &*services, &*costs) };
     if (a.council_tolerance)() == 3 {
         (c.zero)(result);
         return;
@@ -620,7 +620,7 @@ pub unsafe extern "C" fn openttd_rust_town_authority_remove(
     kind: u8,
 ) {
     // SAFETY: Native immutable tables and stack-owned result outlive this call.
-    let (a, s, c) = unsafe { (*authority, *services, *costs) };
+    let (a, s, c) = unsafe { (&*authority, &*services, &*costs) };
     if town.is_null() {
         (c.zero)(result);
         return;
