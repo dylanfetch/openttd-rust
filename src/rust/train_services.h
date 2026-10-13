@@ -10,24 +10,6 @@
 /** @file train_services.h Direct shared-world operations; no train policy. */
 #include "sound_services.h"
 
-struct TrainProfile {
-	bool enabled = std::getenv("OPENTTD_TRAIN_PROFILE") != nullptr;
-	uint64_t counts[31]{};
-	~TrainProfile()
-	{
-		if (!this->enabled) return;
-		const char *personal = std::getenv("HOME");
-		if (personal == nullptr) return;
-		if (FILE *file = std::fopen(fmt::format("{}/train-profile.json", personal).c_str(), "w")) {
-			constexpr const char *names[] = {"tick_first", "tick_second", "reversal", "wormhole_swap", "unequal_before", "unequal_after", "depot_start", "depot_service", "red_oneway", "red_twoway", "force_signal", "stuck_retry", "stuck_reverse", "cross_bar", "cross_unbar", "collision", "crash_delete", "free_wagon_delete", "articulated_move", "first_tile_rail", "wormhole_exit", "depot_reentry", "controller_extension", "extension_fail", "extension_rollback", "extension_opposing_red", "extension_restore", "free_path", "choose_track", "order_lookahead", "order_restore"};
-			fmt::print(file, "{{");
-			for (size_t i = 0; i < std::size(names); ++i) fmt::print(file, "{}\"{}\":{}", i == 0 ? "" : ",", names[i], this->counts[i]);
-			fmt::print(file, "}}\n");
-			std::fclose(file);
-		}
-	}
-};
-static TrainProfile _train_profile;
 #include "vehicle_services.h"
 #include "settings_services.h"
 
