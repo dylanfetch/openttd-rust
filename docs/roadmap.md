@@ -4,14 +4,14 @@ Root owns selection here; `AGENTS.md` and `docs/rust-migration.md` define proces
 If an issue conflicts, follow this roadmap and report it to root. Keep this
 forward-looking, about 200 lines; completed work is one row, with evidence in PRs.
 
-## Where the fork stands (2026-10-12, `898eb33c17`)
+## Where the fork stands (2026-10-13, `9ee89f69ad`)
 
 - Twenty-two ownership ports. Whole fork against the pinned original: Rust
-  52,103 / tooling 25,897 / C++ glue 23,176 / original C++ retired 34,426 (7.3%
+  52,104 / tooling 25,940 / C++ glue 23,176 / original C++ retired 34,426 (7.3%
   of `src/`); simulation-source share 26,502 / 102,615 (25.83%, #226).
-- #209 and #225 integrated; six PRs remain, all count toward WIP. Original
-  retirement fell by three lines across these integrations; #218 comes before
-  further conversion, following the Phase 1 loading fix #228.
+- #209/#225/#228 integrated; five PRs remain. User-requested #231 caches
+  OpenGFX before further platform runs and takes the sixth WIP slot. #218
+  remains the next ownership integration, ahead of further conversion.
 - Repeated idle baseline at `a014255973` (#155): Opus 1.265, Grok 1.262,
   Padhattan-1996 1.296, Padhattan-2000 1.324, TGP 1.167, Padhattan-2016 1.444.
   #218 fits all six caps and lowers observed medians in its PR; #230's separate
@@ -130,6 +130,7 @@ retirement, with net glue in the PR (#223).
 | #199 (shared road services) | #215 | direct | `4b130309a5` | 2288 / 565 / 1331 / 1354 |
 | #192 (company direct services) | #209 | direct | `8fe6f5ed56` | 1495 / 159 / 954 / -3; net glue +424 |
 | #224 (disk hygiene) | #225 | direct | `898eb33c17` | 0 / 149 / 0 / 0; net tooling -546 |
+| #227 (loading context fidelity) | #228 | direct | `9ee89f69ad` | 3 / 47 / 0 / 0 |
 
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -148,8 +149,11 @@ go in `KNOWN_FAILURES` with an issue, never in masks (`docs/rust-migration.md`).
    eighth review added the threaded game loop, multi-part road vehicles,
    station refit and loading callbacks, industry NewGRF construction callbacks
    and candidate-side town generation.
-3. **#223 metric.** Original C++ retired apart from removed glue; small.
-4. **#229 caps.** Integrate the repeated calibration in #230, retaining any
+3. **#231 OpenGFX cache, user request.** Reuse the fixed platform-CI archive,
+   install it in every job, and test candidate workflows through bootstrap CI.
+   Integrate before the next full platform run; local builds already reuse it.
+4. **#223 metric.** Original C++ retired apart from removed glue; small.
+5. **#229 caps.** Integrate the repeated calibration in #230, retaining any
    lower caps introduced by ownership PRs.
 
 ## Phase 2: current work, in order
@@ -158,8 +162,8 @@ Integrate reviewed work first, in order of readiness; at most six unintegrated
 branches (#157). Independent items (#156, #223, caps) may run in parallel.
 
 1. **Integrate #218.** Shared map/company/cost/height services are consolidated;
-   root verified fixing diffs and timing fits all six caps. Finish the cap-data
-   review, update from base and obtain exact-head full CI. #209 is integrated.
+   root verified fixing diffs and cap-data review; timing fits all six caps.
+   After #231, update from base and obtain exact-head full CI. #209 integrated.
 2. **#217 station/loading**, with the changes in its PR comment.
 3. **#216 town, narrowed**, then town founding/generation, the house tile loop,
    and town commands, authority actions and deletion as their own ports.
@@ -174,18 +178,18 @@ The #108 decision keeps C++ map arrays and direct bundled `noexcept` services.
 
 ## Resume checkpoint
 
-Resumed with the eighth/ninth steering corrections; #209/#225 are integrated,
+Resumed with the eighth/ninth steering corrections; #209/#225/#228 integrated,
 with worktrees removed. #218 is the second original draft required before new
-ownership starts. Six branches remain; evidence stays on PRs and issues.
+ownership starts. Five branches plus selected #231; evidence stays on PRs.
 
 | Issue / PR | Branch (worktree suffix), head | State and next step |
 | --- | --- | --- |
-| #150 / #218 | `industry-construction-150`, `cc67c63a27` | Ownership/boundary fixes reviewed and verified; timing passes. Cap-data review, base update/full CI next. |
+| #150 / #218 | `industry-construction-150`, `4aa5a76ab7` | Ownership/boundary/cap fixes reviewed and verified; timing passes. After #231, base update/full CI. |
 | #214 / #217 | `station-loading-direct-214`, `a1b892e280` | Company adoption reviewed/verified. Adopt #228 from base; review source conflicts; full CI. |
 | #148 / #216 | `town-lifecycle-148`, `6061f279d2` | Narrowed/state/guard and company-base fixes reviewed/verified. Adopt #218 native cost helpers on base update; full CI. |
-| #223 / #226 | `metric-original-223`, `f66293c260` | Reviewed identity/inventory fixes verified; update base/full CI. |
-| #227 / #228 | `loading-context-fix-227`, `c081bbb239` | Accepted-load regression reviewed. Update base; Phase 1 full CI next. |
+| #223 / #226 | `metric-original-223`, `bcee2b71b1` | Reviewed identity/inventory fixes verified; update base/full CI. |
 | #229 / #230 | `speed-caps-229`, `d7949a970a` | Recalibration reviewed; retain #218's lower caps when adopting base; full CI. |
+| #231 | Selected, no branch yet | Fresh implementation agent prepares version/OS archive cache; review, candidate-workflow full CI and integration next. |
 
 Selected but unstarted: #212/#213, then #219/#220. ABI blocks: train through 385,
 tree additions 386-389, fleet 390-399, company 400-429, town 430-459, road 460-499,
