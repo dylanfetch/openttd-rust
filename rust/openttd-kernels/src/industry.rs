@@ -26,6 +26,18 @@
 )]
 use std::ffi::c_void;
 use std::ptr;
+mod transaction;
+pub use transaction::*;
+mod commands;
+pub use commands::*;
+mod tile;
+pub use tile::*;
+mod construction;
+pub use construction::*;
+mod generation;
+pub use generation::*;
+mod lifecycle;
+pub use lifecycle::*;
 const RECORDS: usize = 61;
 const TYPES: usize = 240;
 #[repr(C)]
@@ -90,9 +102,47 @@ pub struct Fields {
     pub was_cargo_delivered: u8,
     pub ctlflags: u8,
 }
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct Metadata {
+    pub tile: u32,
+    pub width: u16,
+    pub height: u16,
+    pub construction_date: i32,
+    pub random: u16,
+    pub kind: u8,
+    pub owner: u8,
+    pub random_colour: u8,
+    pub founder: u8,
+    pub construction_type: u8,
+    pub selected_layout: u8,
+    pub exclusive_supplier: u8,
+    pub exclusive_consumer: u8,
+}
+impl Default for Metadata {
+    fn default() -> Self {
+        Self {
+            tile: u32::MAX,
+            width: 0,
+            height: 0,
+            construction_date: 0,
+            random: 0,
+            kind: 0,
+            owner: 255,
+            random_colour: 0,
+            founder: 255,
+            construction_type: 0,
+            selected_layout: 0,
+            exclusive_supplier: 255,
+            exclusive_consumer: 255,
+        }
+    }
+}
 #[derive(Default)]
 pub struct Industry {
     fields: Fields,
+    metadata: Metadata,
+    text: Vec<u8>,
     produced: Vec<Produced>,
     accepted: Vec<Accepted>,
 }
@@ -116,6 +166,7 @@ pub struct BuilderFields {
 }
 pub struct Builder {
     fields: BuilderFields,
+    registry: [Vec<u16>; TYPES],
 }
 #[repr(C)]
 pub struct Slots {
@@ -244,6 +295,7 @@ pub unsafe extern "C" fn openttd_rust_industry_history(accepted: *mut Accepted) 
 #[unsafe(no_mangle)]
 pub extern "C" fn openttd_rust_industry_builder_new() -> *mut Builder {
     Box::into_raw(Box::new(Builder {
+        registry: std::array::from_fn(|_| Vec::new()),
         fields: BuilderFields {
             builddata: [BuildFields::default(); TYPES],
             wanted_inds: 0,
@@ -275,16 +327,10 @@ pub unsafe extern "C" fn openttd_rust_industry_builder_fields(
 #[derive(Default, Clone, Copy)]
 pub struct Observation {
     pub owner: *mut Industry,
-    pub tile: u32,
     pub behaviour: u32,
-    pub id: u16,
-    pub width: u16,
-    pub height: u16,
     pub callbacks: u16,
-    pub sound_count: u16,
     pub life: u8,
     pub original: u8,
-    pub minimal_cargo: u8,
     pub kind: u8,
     pub up_text: u32,
     pub down_text: u32,
@@ -349,6 +395,7 @@ pub struct TypeInfo {
 /// construction and commands return values at the original call site.
 #[repr(C)]
 pub struct Services {
+    pub shared: *const crate::services::Services,
     pub next_tick: unsafe extern "C" fn(u32) -> Entry,
     pub sound_count: unsafe extern "C" fn(*mut c_void) -> u16,
     pub behaviour: unsafe extern "C" fn(*mut c_void) -> u32,
@@ -359,12 +406,9 @@ pub struct Services {
     pub tick_trigger: unsafe extern "C" fn(*mut c_void),
     pub production_callback: unsafe extern "C" fn(*mut c_void, u8),
     pub scale_cargo: unsafe extern "C" fn(u32) -> u32,
-    pub random: unsafe extern "C" fn() -> u32,
-    pub random_range: unsafe extern "C" fn(u32) -> u32,
     pub move_goods: unsafe extern "C" fn(*mut c_void, u32, u32) -> u32,
     pub tile_add_wrap: unsafe extern "C" fn(u32, i32, i32) -> u32,
     pub farm_tile: unsafe extern "C" fn(u32) -> FarmTile,
-    pub tile_z: unsafe extern "C" fn(u32) -> i32,
     pub snow_line: unsafe extern "C" fn() -> u8,
     pub make_field: unsafe extern "C" fn(u32, u8, u8, u16),
     pub fence_wanted: unsafe extern "C" fn(u32, u8) -> bool,
@@ -387,11 +431,11 @@ pub struct Services {
     pub type_count: unsafe extern "C" fn(u8) -> u16,
     pub total: unsafe extern "C" fn() -> u32,
     pub type_info: unsafe extern "C" fn(u8) -> TypeInfo,
-    pub probability_callback: unsafe extern "C" fn(u8, u32) -> u32,
+    pub probability_callback: unsafe extern "C" fn(u8, u8, u32) -> u32,
     pub scale_by_map_size: unsafe extern "C" fn(u32) -> u32,
     pub company_none: unsafe extern "C" fn() -> u8,
     pub restore_company: unsafe extern "C" fn(u8),
-    pub directory_dirty: unsafe extern "C" fn(),
+    pub directory_dirty: unsafe extern "C" fn(u8),
     pub recession: unsafe extern "C" fn() -> bool,
     pub economy_month: unsafe extern "C" fn() -> u8,
     pub economy_year: unsafe extern "C" fn() -> i32,
@@ -402,6 +446,19 @@ pub struct Services {
     pub fund_only: unsafe extern "C" fn() -> bool,
     pub calendar_year: unsafe extern "C" fn() -> i32,
     pub deity: unsafe extern "C" fn() -> bool,
+}
+impl Services {
+    /// The immutable shared table outlives every synchronous industry entry.
+    fn shared(&self) -> &crate::services::Services {
+        unsafe { &*self.shared }
+    }
+}
+impl Map {
+    fn coordinates(self) -> crate::services::Map {
+        crate::services::Map {
+            log_x: self.size_x.trailing_zeros() as u8,
+        }
+    }
 }
 const SND_36_LUMBER_MILL_3: u16 = 0x36;
 const SND_37_LUMBER_MILL_2: u16 = 0x37;
@@ -418,10 +475,10 @@ fn observe(s: &Services, i: *mut c_void) -> Observation {
     o
 }
 fn rand(s: &Services) -> u32 {
-    unsafe { (s.random)() }
+    s.shared().random()
 }
 fn range(s: &Services, n: u32) -> u32 {
-    unsafe { (s.random_range)(n) }
+    s.shared().random_range(n)
 }
 fn chance_value(a: u32, b: u32, value: u32) -> bool {
     (((value & 0xffff).wrapping_mul(b).wrapping_add(b / 2)) >> 16) < a
@@ -923,7 +980,7 @@ fn game_probability(kind: u8, s: &Services) -> u64 {
     {
         return 0;
     }
-    let probability = unsafe { (s.probability_callback)(kind, u32::from(info.appear)) } as u8;
+    let probability = unsafe { (s.probability_callback)(kind, 1, u32::from(info.appear)) } as u8;
     if probability == 0 {
         return 0;
     }
@@ -1040,18 +1097,6 @@ fn place(kind: u8, creation: u8, hard: bool, s: &Services) -> *mut c_void {
         }
     }
     ptr::null_mut()
-}
-/// # Safety
-/// Construction service retains the original complete transaction, may reenter
-/// production, and returns its live shell. Rust retains no owner references.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_industry_place(
-    kind: u8,
-    creation: u8,
-    hard: u8,
-    s: *const Services,
-) -> *mut c_void {
-    place(kind, creation, hard != 0, unsafe { &*s })
 }
 fn build_try(builder: *mut Builder, s: &Services) {
     targets(builder, s);
@@ -1177,7 +1222,7 @@ pub unsafe extern "C" fn openttd_rust_industry_daily(
     }
     unsafe {
         (s.restore_company)(company);
-        (s.directory_dirty)();
+        (s.directory_dirty)(1);
     }
 }
 /// # Safety
@@ -1208,7 +1253,7 @@ pub unsafe extern "C" fn openttd_rust_industry_monthly(
     }
     unsafe {
         (s.restore_company)(company);
-        (s.directory_dirty)();
+        (s.directory_dirty)(1);
     }
 }
 /// # Safety
@@ -1225,23 +1270,6 @@ pub unsafe extern "C" fn openttd_rust_industry_trim(i: *mut Industry) {
         p.truncate(n);
         p.shrink_to_fit();
     }
-}
-/// # Safety
-/// Live industry and validated original-economy command arguments. The original
-/// compares the requested level after assigning it, so its news branch is unreachable.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_industry_set_production(
-    i: *mut c_void,
-    level: u8,
-    s: *const Services,
-) {
-    let s = unsafe { &*s };
-    let o = observe(s, i);
-    unsafe {
-        (*fields(o.owner)).ctlflags |= 8;
-        (*fields(o.owner)).prod_level = level;
-    }
-    recompute(i, o.owner, s);
 }
 
 fn tile_xy(x: u32, y: u32, map: Map) -> u32 {
@@ -1288,14 +1316,14 @@ fn fence(mut tile: u32, mut size: u32, kind: u8, side: u8, map: Map, s: &Service
         }
     }
 }
-fn plant(tile: u32, industry: u16, map: Map, s: &Services) {
-    if map.landscape == LANDSCAPE_ARCTIC
-        && unsafe { (s.tile_z)(tile) + 2 >= i32::from((s.snow_line)()) }
+fn plant(tile: u32, industry: u16, map: Map, s: &Services, landscape: &impl Fn() -> u8) {
+    if landscape() == LANDSCAPE_ARCTIC
+        && (s.shared().tile_z)(tile) + 2 >= i32::from(unsafe { (s.snow_line)() })
     {
         return;
     }
     let mut r = (rand(s) & 0x303) + 0x404;
-    if map.landscape == LANDSCAPE_ARCTIC {
+    if landscape() == LANDSCAPE_ARCTIC {
         r += 0x404;
     }
     let (width, height) = (map.size_x, map.size_y);
@@ -1331,7 +1359,7 @@ fn plant(tile: u32, industry: u16, map: Map, s: &Services) {
         }
     }
     let mut kind = 3;
-    if map.landscape != LANDSCAPE_ARCTIC && map.landscape != LANDSCAPE_TROPIC {
+    if landscape() != LANDSCAPE_ARCTIC && landscape() != LANDSCAPE_TROPIC {
         kind = [1, 1, 1, 1, 1, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6][(rand(s) & 15) as usize];
     }
     fence(tile_xy(x, y, map), sy, kind, 0, map, s);
@@ -1339,7 +1367,13 @@ fn plant(tile: u32, industry: u16, map: Map, s: &Services) {
     fence(tile_xy(x + sx - 1, y, map), sy, kind, 2, map, s);
     fence(tile_xy(x, y + sy - 1, map), sx, kind, 1, map, s);
 }
-fn farm(i: *mut c_void, id: u16, map: Map, s: &Services) {
+fn farm_with_landscape(
+    i: *mut c_void,
+    id: u16,
+    map: Map,
+    s: &Services,
+    landscape: &impl Fn() -> u8,
+) {
     let l = unsafe { (s.location)(i) };
     let x = (u32::from(l.width) / 2)
         .wrapping_add(rand(s) % 31)
@@ -1349,8 +1383,12 @@ fn farm(i: *mut c_void, id: u16, map: Map, s: &Services) {
         .wrapping_sub(16) as i32;
     let tile = unsafe { (s.tile_add_wrap)(l.tile, x, y) };
     if tile != INVALID_TILE {
-        plant(tile, id, map, s);
+        plant(tile, id, map, s, landscape);
     }
+}
+fn farm(i: *mut c_void, id: u16, map: Map, s: &Services) {
+    // Preserve the earlier production tick's captured landscape until #168.
+    farm_with_landscape(i, id, map, s, &|| map.landscape);
 }
 /// # Safety
 /// Live industry, synchronous map/RNG services. No owner references cross calls.
@@ -1537,43 +1575,6 @@ pub unsafe extern "C" fn openttd_rust_industry_build_type_reset(fields: *mut Bui
     }
 }
 /// # Safety
-/// Synchronous command services with the same live lookup and current-company
-/// contract as the native command facade. Returns failure before any mutation.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_industry_command(
-    id: u16,
-    production: u8,
-    execute: u8,
-    value: u8,
-    services: *const Services,
-) -> u8 {
-    let s = unsafe { &*services };
-    if unsafe { !(s.deity)() } {
-        return 0;
-    }
-    if production != 0 && !(4..=128).contains(&value) {
-        return 0;
-    }
-    let i = unsafe { (s.get)(id) };
-    if i.is_null() || (production == 0 && value & !15 != 0) {
-        return 0;
-    }
-    if execute != 0 {
-        if production != 0 {
-            unsafe {
-                openttd_rust_industry_set_production(i, value, services);
-            }
-        } else {
-            let o = observe(s, i);
-            unsafe {
-                (*fields(o.owner)).ctlflags = value;
-            }
-        }
-    }
-    1
-}
-
-/// # Safety
 /// Live builder; native map-size preconditions constrain the original shift.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_industry_daily_start(
@@ -1588,4 +1589,80 @@ pub unsafe extern "C" fn openttd_rust_industry_daily_start(
             (*fields).daily_counter = 0;
         }
     }
+}
+
+/// # Safety
+/// Live owner with serial field-sized accesses. The facade placement-constructs
+/// its native `TileArea` prefix once with pinned scalar layout; no reference spans a callback.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_industry_metadata(owner: *mut Industry) -> *mut Metadata {
+    unsafe { ptr::addr_of_mut!((*owner).metadata) }
+}
+/// # Safety
+/// Live owner. The returned full byte span stays valid until text mutation or
+/// owner destruction. Copy or inspect it before any callback that can mutate it.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_industry_text(
+    owner: *const Industry,
+) -> crate::services::ByteSpan {
+    let text = unsafe { &(*owner).text };
+    crate::services::ByteSpan {
+        data: text.as_ptr(),
+        size: text.len(),
+    }
+}
+/// # Safety
+/// Live owner; text points to length initialized bytes, disjoint from this owner.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_industry_set_text(
+    owner: *mut Industry,
+    text: *const u8,
+    length: usize,
+) {
+    let target = unsafe { &mut (*owner).text };
+    target.clear();
+    if length != 0 {
+        target.extend_from_slice(unsafe { std::slice::from_raw_parts(text, length) });
+    }
+}
+/// # Safety
+/// Live builder and valid original type. View ends before registry mutation.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_industry_registry_view(
+    owner: *mut Builder,
+    kind: u8,
+) -> Slots {
+    unsafe { view(&mut (*owner).registry[usize::from(kind)]) }
+}
+/// # Safety
+/// Live builder and valid original type. No registry view survives this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_industry_registry_insert(
+    owner: *mut Builder,
+    kind: u8,
+    id: u16,
+) {
+    let registry = unsafe { &mut (*owner).registry[usize::from(kind)] };
+    if let Err(index) = registry.binary_search(&id) {
+        registry.insert(index, id);
+    }
+}
+/// # Safety
+/// Live builder and valid original type. No registry view survives this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_industry_registry_erase(
+    owner: *mut Builder,
+    kind: u8,
+    id: u16,
+) {
+    let registry = unsafe { &mut (*owner).registry[usize::from(kind)] };
+    if let Ok(index) = registry.binary_search(&id) {
+        registry.remove(index);
+    }
+}
+/// # Safety
+/// Live builder and valid original type. No registry view survives this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_industry_registry_clear(owner: *mut Builder, kind: u8) {
+    unsafe { (*owner).registry[usize::from(kind)].clear() };
 }

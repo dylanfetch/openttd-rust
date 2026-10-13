@@ -119,6 +119,7 @@ private:
 	friend class EndianBufferWriter;
 	friend class EndianBufferReader;
 	friend class ScriptText;
+	friend struct Industry;
 };
 
 #endif /* STRINGS_TYPE_H */

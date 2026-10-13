@@ -12,6 +12,15 @@ use std::ffi::c_void;
 
 /// Source `TileType::MP_HOUSE`.
 pub const MP_HOUSE: u8 = 3;
+/// Synchronous borrowed bytes, including embedded NULs. The producing entry
+/// specifies lifetime; no native callback may retain this view after mutation.
+#[repr(C)]
+pub struct ByteSpan {
+    /// Readable bytes for the producing entry's specified lifetime.
+    pub data: *const u8,
+    /// Full byte count; embedded NULs do not terminate the span.
+    pub size: usize,
+}
 
 /// Immutable call table supplied by the game (or isolated test world). No global
 /// registration or game symbol imports are needed by standalone Cargo binaries.

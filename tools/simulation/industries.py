@@ -3,19 +3,30 @@
 import shutil
 from pathlib import Path
 
-from . import disasters, economy
+from . import companies, disasters, economy
 from .core import SNAPSHOT_TICKS, TICKS_PER_DAY, read_save, run_game
 
 AI_FOLDER = "industry-scenario-ai"
 
 
 def uses_ai(scenario):
-    return scenario.get("industry") == "lumber"
+    return scenario.get("industry") in (
+        "lumber",
+        "fund",
+        "prospect",
+        "clear",
+        "terraform",
+    )
 
 
 def install(scenario, run_dir):
     if uses_ai(scenario):
-        shutil.copytree(scenario["scenario_ai"], run_dir / "ai/industry-scenarios")
+        folder = run_dir / "ai/industry-scenarios"
+        shutil.copytree(scenario["scenario_ai"], folder)
+        (folder / "parameters.nut").write_text(
+            f'INDUSTRY_MODE <- "{scenario["industry"]}";\n'
+            f"INDUSTRY_TARGET <- {scenario.get('industry_target', 0)};\n"
+        )
 
 
 def game_args(scenario):
@@ -57,7 +68,7 @@ def scenarios(soak):
                 },
             }
         )
-    for mode in ("original", "frozen", "control", "closure", "builder"):
+    for mode in ("original", "frozen", "control", "closure", "farm-cleanup", "builder"):
         result.append(
             {
                 "name": "industry-" + mode,
@@ -72,11 +83,120 @@ def scenarios(soak):
                 "console": ["setting difficulty.disasters 0"],
             }
         )
+    for name, density in (("fund-only", 0), ("custom-forced", 6)):
+        result.append(
+            {
+                "name": "industry-generation-" + name,
+                "kind": "generate",
+                "seed": 12345,
+                "map_log2": 7,
+                "land_generator": 1,
+                "industry": "generation",
+                "ticks": 2 * SNAPSHOT_TICKS,
+                "settings": {
+                    "difficulty": {"industry_density": density},
+                    "game_creation": {"custom_industry_number": 0},
+                },
+                "console": ["setting difficulty.disasters 0"],
+                "industry_generation_empty": density == 0,
+            }
+        )
+    for mode in ("fund", "prospect", "clear", "terraform"):
+        result.append(
+            {
+                "name": "industry-command-" + mode,
+                "kind": "generate",
+                "seed": 12345,
+                "map_log2": 7,
+                "land_generator": 1,
+                "industry": mode,
+                "ticks": (12 if soak else 6) * SNAPSHOT_TICKS,
+                "settings": {
+                    "difficulty": {
+                        "industry_density": 0 if mode in ("fund", "prospect") else 4,
+                        "max_loan": 5000000,
+                    },
+                    "construction": {
+                        "raw_industry_construction": 2 if mode == "prospect" else 1,
+                        "autoslope": True,
+                    },
+                },
+                "console": [
+                    "setting difficulty.disasters 0",
+                    "start_ai MigrationIndustries",
+                ],
+            }
+        )
+    result.extend(
+        dict(
+            scenario,
+            name="industry-company-" + scenario["companies"],
+            industry="transfer",
+        )
+        for scenario in companies.scenarios(soak)
+        if scenario["companies"] in ("acquire", "delete", "reuse")
+    )
     return result
 
 
 def prepare(scenario, binaries, builds, out, timeout, env, result):
     mode = scenario.get("industry")
+    if mode == "transfer":
+        # Company preparation runs first and builds real AI assets with the
+        # unchanged reference. Both roles receive these same reachable settings.
+        source = Path(scenario["save"])
+        industries = economy.rows(read_save(source), "INDY")
+        chosen = next(i for i, row in industries.items() if row["prod_level"] >= 4)
+        target = source.parent / "industry-transfer.sav"
+        result["industry_input"] = disasters.patch(
+            source,
+            target,
+            {
+                "INDY": {
+                    chosen: {
+                        "founder": 1,
+                        "exclusive_supplier": 1,
+                        "exclusive_consumer": 1,
+                        "ctlflags": industries[chosen]["ctlflags"] | 4,
+                    }
+                }
+            },
+        )
+        result["industry_chosen"] = chosen
+        return dict(scenario, save=str(target))
+    if mode in ("clear", "terraform"):
+        folder = out / scenario["name"] / "input"
+        setup = dict(
+            scenario,
+            industry="input",
+            ticks=2 * SNAPSHOT_TICKS,
+            console=[
+                line for line in scenario["console"] if not line.startswith("start_ai")
+            ],
+        )
+        run = run_game(
+            setup,
+            binaries["reference"],
+            builds["reference"],
+            folder / "reference",
+            timeout,
+            env,
+        )
+        if run["exit"] or not run["snapshots"]:
+            raise RuntimeError("industry command reference input failed")
+        source = run["snapshots"][-1]
+        industries = economy.rows(read_save(source), "INDY")
+        chosen = next(index for index, row in industries.items() if row["type"] == 0)
+        edits = {"CHTS": {0: {"magic_bulldozer.value": int(mode == "clear")}}}
+        target = folder / "input.sav"
+        result["industry_input"] = disasters.patch(source, target, edits)
+        result["industry_chosen"] = chosen
+        return dict(
+            scenario,
+            kind="save",
+            save=str(target),
+            industry_target=industries[chosen]["location.tile"],
+        )
     if mode == "lumber":
         setup = dict(
             scenario,
@@ -99,7 +219,14 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
         target = out / scenario["name"] / "input" / "lumber.sav"
         result["industry_input"] = disasters.patch(source, target, {})
         return dict(scenario, kind="save", save=str(target))
-    if mode not in ("original", "frozen", "control", "closure", "builder"):
+    if mode not in (
+        "original",
+        "frozen",
+        "control",
+        "closure",
+        "farm-cleanup",
+        "builder",
+    ):
         return scenario
     folder = out / scenario["name"] / "input"
     setup = dict(scenario, ticks=2 * SNAPSHOT_TICKS)
@@ -127,7 +254,14 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
         console.append("setting economy.type " + ("0" if mode == "original" else "2"))
     if mode == "control":
         changes["INDY"] = {index: {"ctlflags": 15} for index in industries}
-    if mode == "closure":
+    if mode in ("closure", "farm-cleanup"):
+        if mode == "farm-cleanup":
+            chosen = next(
+                index for index, row in industries.items() if row["type"] == 9
+            )
+            result["industry_field_input"] = len(industry_fields(before, chosen))
+            if not result["industry_field_input"]:
+                raise RuntimeError("reference farm has no associated fields to remove")
         changes["INDY"] = {chosen: {"prod_level": 0}}
         console.append("setting difficulty.industry_density 0")
     if mode == "builder":
@@ -148,6 +282,8 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
 
 def check(scenario, run, mode, role, result):
     kind = scenario.get("industry")
+    if kind == "transfer" and not run["snapshots"]:
+        raise RuntimeError("industry ownership transfer witness has no output save")
     if kind is None or not run["snapshots"]:
         return
     saved = [read_save(path) for path in run["snapshots"]]
@@ -195,6 +331,18 @@ def check(scenario, run, mode, role, result):
         ),
     }
     facts["year_history"] = bool(facts["valid_history"] & (1 << 42))
+    if kind == "transfer":
+        chosen = result["industry_chosen"]
+        expected = (2, 2, 2) if scenario["companies"] == "acquire" else (16, 255, 255)
+        final = rows[-1].get(chosen, {})
+        facts["ownership"] = tuple(
+            final.get(field)
+            for field in ("founder", "exclusive_supplier", "exclusive_consumer")
+        )
+        if facts["ownership"] != expected:
+            result["problems"].append(
+                f"{mode}/{role}: industry ownership transfer missing: {facts['ownership']} != {expected}"
+            )
     if kind in ("temperate", "arctic"):
 
         def fields(chunks):
@@ -227,18 +375,66 @@ def check(scenario, run, mode, role, result):
         )
         if not facts["lumber_harvest"]:
             result["problems"].append(f"{mode}/{role}: no actual lumber harvest")
+    if kind in ("fund", "prospect", "clear", "terraform"):
+        marker = f"INDUSTRY-COMMAND {kind} ready true"
+        facts["command_completed"] = any(marker in line for line in run["log"])
+        if not facts["command_completed"]:
+            result["problems"].append(f"{mode}/{role}: {kind} command branch missing")
+        if kind in ("fund", "prospect") and not any(
+            row["type"] == 0 and row["founder"] < 15
+            for sample in rows
+            for row in sample.values()
+        ):
+            result["problems"].append(f"{mode}/{role}: no player-funded raw industry")
+        if kind == "clear":
+            before = economy.rows(read_save(Path(scenario["save"])), "INDY")
+            chosen = result["industry_chosen"]
+            facts["reused_id"] = (
+                chosen in rows[-1]
+                and rows[-1][chosen]["founder"] < 15
+                and before[chosen]["founder"] == 16
+            )
+            if not facts["reused_id"]:
+                result["problems"].append(
+                    f"{mode}/{role}: industry ID not reused after clear"
+                )
     result[f"{mode}_{role}_industry"] = facts
-    if kind != "cargo" and facts["produced_history"] == 0:
+    if kind == "generation":
+        if bool(facts["industries"] == 0) != scenario["industry_generation_empty"]:
+            result["problems"].append(
+                f"{mode}/{role}: generation density branch missing"
+            )
+    if (
+        kind
+        not in (
+            "cargo",
+            "generation",
+            "fund",
+            "prospect",
+            "clear",
+            "terraform",
+            "transfer",
+        )
+        and facts["produced_history"] == 0
+    ):
         result["problems"].append(f"{mode}/{role}: no industry production history")
     if scenario.get("industry_soak") and not facts["year_history"]:
         result["problems"].append(f"{mode}/{role}: no yearly industry history")
     if kind == "cargo" and scenario["economy"] != "stockpile":
         if facts["transported_history"] == 0 or facts["accepted_history"] == 0:
             result["problems"].append(f"{mode}/{role}: no transported/accepted history")
-    if kind == "closure":
+    if kind in ("closure", "farm-cleanup"):
         chosen = result["industry_chosen"]
         if chosen in rows[-1]:
             result["problems"].append(f"{mode}/{role}: selected industry did not close")
+        if kind == "farm-cleanup":
+            facts["remaining_associated_fields"] = len(
+                industry_fields(saved[-1], chosen)
+            )
+            if facts["remaining_associated_fields"]:
+                result["problems"].append(
+                    f"{mode}/{role}: farm fields remained associated"
+                )
     if kind == "control":
         before = economy.rows(read_save(Path(scenario["save"])), "INDY")
         for index, row in rows[-1].items():
@@ -251,6 +447,19 @@ def check(scenario, run, mode, role, result):
         facts["new_industries"] = len(set(rows[-1]) - set(before))
         if facts["new_industries"] == 0 or facts["builder_backoff"] <= 1:
             result["problems"].append(f"{mode}/{role}: no builder success/backoff")
+
+
+def industry_fields(chunks, industry):
+    """Canonical packed field association, exposed by the existing save decoder."""
+    import struct
+
+    return {
+        tile
+        for tile, value in enumerate(chunks["MAPT"]["raw"])
+        if value >> 4 == 0
+        and (chunks["MAP5"]["raw"][tile] >> 2) & 7 == 3
+        and struct.unpack_from(">H", chunks["MAP2"]["raw"], tile * 2)[0] == industry
+    }
 
 
 def production_gap():
@@ -299,5 +508,127 @@ def production_gap():
     subprocess.run([str(binary)], cwd=ROOT, check=True)
 
 
+def lifecycle_gap():
+    """Absent custom industry GRFs: unchanged tile/parent RNG and animation."""
+    import importlib.util
+    import subprocess
+
+    from .core import ROOT
+
+    spec = importlib.util.spec_from_file_location(
+        "migration", ROOT / "tools/migration.py"
+    )
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    out = ROOT / ".local/industry-lifecycle-gap"
+    out.mkdir(parents=True, exist_ok=True)
+    source = subprocess.check_output(
+        ["git", "show", migration.BASELINE["commit"] + ":src/newgrf_industrytiles.cpp"],
+        cwd=ROOT,
+        text=True,
+    )
+    signatures = (
+        "static bool DoTriggerIndustryTileAnimation(",
+        "bool TriggerIndustryTileAnimation_ConstructionStageChanged(",
+        "bool TriggerIndustryTileAnimation(",
+        "bool TriggerIndustryAnimation(",
+        "static void DoTriggerIndustryTileRandomisation(",
+        "static void DoReseedIndustry(",
+        "void TriggerIndustryTileRandomisation(",
+        "void TriggerIndustryRandomisation(",
+    )
+    bodies = []
+    for signature in signatures:
+        start = source.index(signature)
+        end = source.index("{", start) + 1
+        depth = 1
+        while depth:
+            if source[end] == "{":
+                depth += 1
+            elif source[end] == "}":
+                depth -= 1
+            end += 1
+        bodies.append(source[start:end])
+    (out / "industry-lifecycle-reference.inc").write_text("\n\n".join(bodies))
+    tile_source = subprocess.check_output(
+        ["git", "show", migration.BASELINE["commit"] + ":src/industry_cmd.cpp"],
+        cwd=ROOT,
+        text=True,
+    )
+    start = tile_source.index("static void AddAcceptedCargo_Industry(")
+    end = tile_source.index("{", start) + 1
+    depth = 1
+    while depth:
+        if tile_source[end] == "{":
+            depth += 1
+        elif tile_source[end] == "}":
+            depth -= 1
+        end += 1
+    (out / "industry-acceptance-reference.inc").write_text(tile_source[start:end])
+    animation = []
+    for name in (
+        "AnimateSugarSieve",
+        "AnimateToffeeQuarry",
+        "AnimateBubbleCatcher",
+        "AnimatePowerPlantSparks",
+        "AnimateToyFactory",
+        "AnimatePlasticFountain",
+        "AnimateOilWell",
+        "AnimateMineTower",
+        "AnimateTile_Industry",
+    ):
+        start = tile_source.index("static void " + name + "(")
+        end = tile_source.index("{", start) + 1
+        depth = 1
+        while depth:
+            if tile_source[end] == "{":
+                depth += 1
+            elif tile_source[end] == "}":
+                depth -= 1
+            end += 1
+        animation.append(tile_source[start:end])
+    drawing = subprocess.check_output(
+        ["git", "show", migration.BASELINE["commit"] + ":src/table/industry_land.h"],
+        cwd=ROOT,
+        text=True,
+    )
+    start = drawing.index("static const uint8_t _industry_anim_offs_toffee[]")
+    end = drawing.index("};", start) + 2
+    animation.insert(0, drawing[start:end])
+    (out / "industry-animation-reference.inc").write_text("\n\n".join(animation))
+    graphics = subprocess.check_output(
+        ["git", "show", migration.BASELINE["commit"] + ":src/industry_map.h"],
+        cwd=ROOT,
+        text=True,
+    )
+    start = graphics.index("enum IndustryGraphics :")
+    end = graphics.index("};", start) + 2
+    (out / "industry-graphics-reference.inc").write_text(graphics[start:end])
+    binary = out / "probe"
+    subprocess.run(
+        [
+            "c++",
+            "-std=c++20",
+            "-O2",
+            "-fno-strict-overflow",
+            "-DPOINTER_IS_64BIT",
+            "-I" + str(ROOT / "src"),
+            "-I" + str(out),
+            str(ROOT / "tools/migration/industry-lifecycle-gap.cpp"),
+            str(migration.rust_archive(ROOT / "build-rust")),
+            "-ldl",
+            "-lpthread",
+            "-lm",
+            "-o",
+            str(binary),
+        ],
+        cwd=ROOT,
+        env=migration.environment(),
+        check=True,
+    )
+    subprocess.run([str(binary)], cwd=ROOT, check=True)
+
+
 if __name__ == "__main__":
     production_gap()
+    lifecycle_gap()

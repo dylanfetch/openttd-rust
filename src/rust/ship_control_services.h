@@ -9,6 +9,7 @@
 
 /** @file ship_control_services.h Typed synchronous shared-world services. */
 #include "settings_services.h"
+#include "tile_animation_services.h"
 #include "vehicle_services.h"
 static_assert(MP_INDUSTRY == 8 && MP_TUNNELBRIDGE == 9 && TILE_HEIGHT == 8 && TILE_SIZE == 16);
 static_assert(TRACK_BIT_DEPOT == 128 && TRACK_BIT_WORMHOLE == 64 && HVOT_SHIP == 32);
@@ -48,7 +49,7 @@ static uint32_t Ship_lock_dir(uint32_t tile) noexcept { return GetInclinedSlopeD
 
 static uint32_t Ship_tile_min_z(uint32_t tile) noexcept { return GetRustSharedServices().tile_z(tile); }
 
-static uint32_t Ship_tile_max_z(uint32_t tile) noexcept { return GetTileMaxZ(TileIndex(tile)); }
+static uint32_t Ship_tile_max_z(uint32_t tile) noexcept { return OpenTTDTileMaxZ(TileIndex(tile)); }
 
 static uint32_t Ship_track_status(uint32_t tile, uint32_t entry_dir) noexcept
 {

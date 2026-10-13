@@ -850,12 +850,25 @@ static std::array<Industry::ProducedCargo, INDUSTRY_ORIGINAL_NUM_OUTPUTS> _old_p
 
 #ifdef WITH_RUST
 static OpenTTDIndustryFields _old_industry_fields;
+static OpenTTDIndustryMetadata _old_industry_metadata;
 #endif
 static const OldChunks industry_chunk[] = {
+#ifdef WITH_RUST
+	OCL_VAR( OC_TILE, 1, &_old_industry_metadata.tile ),
+#else
 	OCL_SVAR(   OC_TILE, Industry, location.tile ),
+#endif
 	OCL_VAR ( OC_UINT32,   1, &_old_town_index ),
+#ifdef WITH_RUST
+	OCL_VAR( OC_FILE_U8 | OC_VAR_U16, 1, &_old_industry_metadata.width ),
+#else
 	OCL_SVAR( OC_FILE_U8 | OC_VAR_U16, Industry, location.w ),
+#endif
+#ifdef WITH_RUST
+	OCL_VAR( OC_FILE_U8 | OC_VAR_U16, 1, &_old_industry_metadata.height ),
+#else
 	OCL_SVAR( OC_FILE_U8 | OC_VAR_U16, Industry, location.h ),
+#endif
 	OCL_NULL( 2 ),  ///< used to be industry's produced_cargo
 
 	OCL_VAR( OC_TTD | OC_UINT16, 1, &_old_produced[0].waiting ),
@@ -886,14 +899,26 @@ static const OldChunks industry_chunk[] = {
 	OCL_VAR( OC_UINT16, 1, &_old_produced[0].history[LAST_MONTH].transported ),
 	OCL_VAR( OC_UINT16, 1, &_old_produced[1].history[LAST_MONTH].transported ),
 
+#ifdef WITH_RUST
+	OCL_VAR( OC_UINT8, 1, &_old_industry_metadata.type ),
+#else
 	OCL_SVAR(  OC_UINT8, Industry, type ),
+#endif
 #ifdef WITH_RUST
 	OCL_VAR( OC_TTO | OC_FILE_U8 | OC_VAR_U16, 1, &_old_industry_fields.counter ),
 #else
 	OCL_SVAR( OC_TTO | OC_FILE_U8 | OC_VAR_U16, Industry, counter ),
 #endif
+#ifdef WITH_RUST
+	OCL_VAR( OC_UINT8, 1, &_old_industry_metadata.owner ),
+#else
 	OCL_SVAR(  OC_UINT8, Industry, owner ),
+#endif
+#ifdef WITH_RUST
+	OCL_VAR( OC_UINT8, 1, &_old_industry_metadata.random_colour ),
+#else
 	OCL_SVAR(  OC_UINT8, Industry, random_colour ),
+#endif
 #ifdef WITH_RUST
 	OCL_VAR( OC_TTD | OC_FILE_U8 | OC_VAR_I32, 1, &_old_industry_fields.last_prod_year ),
 #else
@@ -920,8 +945,10 @@ static bool LoadOldIndustry(LoadgameState &ls, int num)
 	Industry *i = new (IndustryID(num)) Industry();
 #ifdef WITH_RUST
 	_old_industry_fields = i->ProductionFields();
+	_old_industry_metadata = i->Metadata();
 	bool loaded = LoadChunk(ls, i, industry_chunk);
 	i->ProductionFields() = _old_industry_fields;
+	i->Metadata() = _old_industry_metadata;
 	if (!loaded) return false;
 #else
 	if (!LoadChunk(ls, i, industry_chunk)) return false;
