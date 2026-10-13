@@ -200,8 +200,8 @@ layout. Platform or toolchain expansion. Deferred behavior improvements stay in
 ## Progress metric
 
 Every port PR pastes `python3 tools/port-metrics.py`: Rust / tooling / C++ glue
-added and original C++ retired (deleted or portable-only). Until #223 lands,
-deleted glue also counts as retired; quote the whole-fork delta against the
-pinned original for conversions. Retire more original C++ than glue plus
-tooling, or explain why. Data tables inflate retirement; judge progress
+added, original C++ retired, fork glue removed and net glue. Conversions report
+net glue; `--whole-fork` gives totals and the share of simulation sources retired.
+Retire more original C++ than net glue plus tooling, or explain why.
+Data tables inflate retirement; judge progress
 by game logic owned and avoid utility-kernel extraction.

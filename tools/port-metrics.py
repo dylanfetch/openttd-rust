@@ -7,8 +7,13 @@ blank lines included):
   rust     lines added under rust/
   tooling  lines added under tools/
   glue     lines added under src/ that are compiled when WITH_RUST is defined
-  retired  src/ lines the candidate compiled at the base and no longer
-           compiles: removed, or now only in the portable (no WITH_RUST) build
+  retired  change in retired lines of the pinned original, excluding fork glue
+  net_glue change in compiled fork-added src/ lines against the pinned original
+  glue_removed  glue added minus net glue (removed or made portable-only)
+
+--whole-fork measures totals against the pinned original and the line share of
+simulation sources retired. Comments, blank lines and data tables count; this is
+a source-line measure, not a claim of complete behavior or subsystem coverage.
 
 Both guard forms are understood: `#ifdef WITH_RUST ... #else <original>
 #endif` and `#ifndef WITH_RUST <original> #endif` (and the `defined()` forms).
@@ -21,6 +26,21 @@ import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+BASELINE = json.loads((ROOT / "migration/baseline.json").read_text())["commit"]
+# World-state owners and their commands/accessors; excludes GUI, platform, vendor
+# and generic support. Match complete family names, not arbitrary substrings.
+SIMULATION_FAMILIES = frozenset(
+    """aircraft airport animated_tile articulated_vehicles autoreplace base_consist
+    base_station cargoaction cargomonitor cargopacket cargotype clear company depot
+    disaster_vehicle economy effectvehicle engine genworld ground_vehicle group
+    heightmap house industry industrytype landscape map newgrf_airport
+    newgrf_airporttiles newgrf_canal newgrf_cargo newgrf_engine newgrf_generic
+    newgrf_house newgrf_industries newgrf_industrytiles newgrf_object newgrf_railtype
+    newgrf_roadstop newgrf_roadtype newgrf_station newgrf_storage newgrf_town
+    newgrf_townname object order pbs rail road roadstop roadveh ship signal slope
+    station subsidy terraform tgp tile tilearea timetable town townname train tree
+    tunnel tunnelbridge vehicle void water waypoint bridge""".split()
+)
 DIRECTIVE = re.compile(r"^\s*#\s*(if|ifdef|ifndef|elif|else|endif)\b(.*)")
 POSITIVE = re.compile(r"^\s*(?:defined\s*\(?\s*WITH_RUST\s*\)?|WITH_RUST)\s*$")
 NEGATIVE = re.compile(r"^\s*!\s*defined\s*\(?\s*WITH_RUST\s*\)?\s*$")
@@ -144,8 +164,22 @@ def changes(base, head):
             i += 2
 
 
-def metrics(base, head="HEAD"):
-    result = {"rust": 0, "tooling": 0, "glue": 0, "retired": 0}
+def simulation_source(path):
+    """The single source inventory for the whole-fork simulation denominator."""
+    name = Path(path).stem
+    return path.startswith(("src/linkgraph/", "src/pathfinder/")) or (
+        path.startswith("src/")
+        and path.count("/") == 1
+        and "gui" not in name.split("_")
+        and any(
+            name == family or name.startswith(family + "_")
+            for family in SIMULATION_FAMILIES
+        )
+    )
+
+
+def source_metrics(base, head="HEAD"):
+    result = {"rust": 0, "tooling": 0, "glue": 0, "retired": 0, "simulation": 0}
     sources = (".cpp", ".h", ".hpp", ".c", ".cc", ".mm")
     for status, old, new in changes(base, head):
         before, after = (
@@ -164,15 +198,41 @@ def metrics(base, head="HEAD"):
         head_tags, base_tags = classify(after), classify(before)
         kept = {} if status == "D" else surviving(diff, len(base_tags))
         # Original lines compiled with WITH_RUST that are now removed or C++-only.
-        result["retired"] += sum(
+        retired = sum(
             1
             for n, tag in enumerate(base_tags, 1)
             if tag == "common" and (n not in kept or head_tags[kept[n] - 1] == "cpp")
         )
+        result["retired"] += retired
+        if simulation_source(old):
+            result["simulation"] += retired
         if status == "D":
             continue
         result["glue"] += sum(
             1 for n in numbers if n <= len(head_tags) and head_tags[n - 1] != "cpp"
+        )
+    return result
+
+
+def metrics(base, head="HEAD", whole_fork=False):
+    result = source_metrics(base, head)
+    before = source_metrics(BASELINE, base)
+    after = result.copy() if base == BASELINE else source_metrics(BASELINE, head)
+    result["retired"] = after["retired"] - before["retired"]
+    result["net_glue"] = after["glue"] - before["glue"]
+    result["glue_removed"] = result["glue"] - result["net_glue"]
+    result.pop("simulation")
+    if whole_fork:
+        paths = git("ls-tree", "-r", "--name-only", BASELINE, "src/").splitlines()
+        total = sum(
+            len(classify(show(BASELINE, path)))
+            for path in paths
+            if simulation_source(path) and path.endswith((".cpp", ".h", ".hpp"))
+        )
+        result.update(
+            simulation_retired=after["simulation"],
+            simulation_total=total,
+            simulation_percent=100 * after["simulation"] / total,
         )
     return result
 
@@ -188,16 +248,27 @@ def main():
         "--head", default="HEAD", help="revision to measure (default: HEAD)"
     )
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--whole-fork", action="store_true")
     args = parser.parse_args()
-    base = git("merge-base", args.target, args.head).strip()
-    result = metrics(base, args.head)
+    base = (
+        BASELINE
+        if args.whole_fork
+        else git("merge-base", args.target, args.head).strip()
+    )
+    result = metrics(base, args.head, args.whole_fork)
     if args.json:
         print(json.dumps(dict(result, base=base)))
     else:
         print(
             f"Rust added: {result['rust']} | tooling added: {result['tooling']} | "
-            f"C++ glue added: {result['glue']} | C++ retired: {result['retired']}"
+            f"C++ glue added: {result['glue']} | original C++ retired: {result['retired']} | "
+            f"fork glue removed: {result['glue_removed']} | net glue: {result['net_glue']}"
         )
+        if args.whole_fork:
+            print(
+                f"Simulation original C++ retired: {result['simulation_retired']} / "
+                f"{result['simulation_total']} ({result['simulation_percent']:.2f}%)"
+            )
 
 
 if __name__ == "__main__":

@@ -22,7 +22,7 @@ Agent: <agent path> | Model: <exact model> | Reasoning effort: <effort>
 
 ## Metrics
 
-<!-- Paste the output of: python3 tools/port-metrics.py. If C++ retired is less than glue plus tooling, give the reason. -->
+<!-- Paste python3 tools/port-metrics.py. Judge ownership by original C++ retired; conversions report net glue. If original retirement is less than net glue plus tooling, explain why. -->
 
 ## Known limits
 
