@@ -36,10 +36,12 @@ def production_thread_locals(source):
             end += 1
         masked = masked[: match.start()] + " " * (end - match.start()) + masked[end:]
     names = []
-    for match in re.finditer(r"thread_local\s*!\s*\{", masked):
+    for match in re.finditer(r"thread_local\s*!\s*([\{\(\[])", masked):
+        opener = match[1]
+        closer = {"{": "}", "(": ")", "[": "]"}[opener]
         end, depth = match.end(), 1
         while depth:
-            depth += (masked[end] == "{") - (masked[end] == "}")
+            depth += (masked[end] == opener) - (masked[end] == closer)
             end += 1
         names.extend(re.findall(r"\bstatic\s+(\w+)", masked[match.end() : end]))
     return names
@@ -63,8 +65,10 @@ class KernelStateTests(unittest.TestCase):
                 "#[cfg(test)] mod tests { thread_local! { static TEST: X = X; } }\n"
                 "#[cfg(test)] static TEST_SCALAR: u8 = 0;\n"
                 "thread_local! { static GLOBAL: X = X; static SECOND: X = X; }"
+                "thread_local!(static PAREN: X = X::new());"
+                "thread_local![static BRACKET: [u8; 2] = [0; 2];];"
             ),
-            ["GLOBAL", "SECOND"],
+            ["GLOBAL", "SECOND", "PAREN", "BRACKET"],
         )
 
 
