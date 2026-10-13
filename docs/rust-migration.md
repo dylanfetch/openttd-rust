@@ -415,6 +415,18 @@ verification and optional repeated simulation receipts with committed port metri
 and agent attribution; unsupported, failed or mismatched receipts fail. Narrow
 checks, legacy receipts, dirty source and unknown provenance remain labelled.
 
+`python3 tools/port-metrics.py` reports the change in retired pinned-original
+C++ lines separately from fork glue added/removed and signed net glue. Original
+retirement can be negative when original lines are restored; removing fork glue
+does not retire original C++. Ownership ports retire more original C++ than
+net glue plus tooling added, or explain why; conversions report their net glue.
+`--whole-fork` prints totals against the pinned original and the retired share of
+simulation source lines. Its one inventory covers world-state owners, commands,
+accessors, link graph and pathfinding, excluding GUI, platform, vendored code and
+generic support. Mixed owner files, blank lines, comments and data tables count.
+The diff/guard classification measures source lines, not C++ preprocessing or
+behavioral completion. Historical roadmap rows keep their labelled legacy counts.
+
 After a task's PR merges, remove its worktree with `git worktree remove PATH`
 and its branch with `git branch -d BRANCH`. Nothing under the worktree is
 preserved: evidence lives in the PR or issue, and ignored output is rebuildable.

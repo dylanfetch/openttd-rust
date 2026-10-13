@@ -300,18 +300,21 @@ def render(
         lines.append(f"- Simulation: {summary}. Receipt: {code(path)}.")
     if not simulations:
         lines.append("- Simulation: no simulation or benchmark receipts selected.")
-    for key in ("rust", "tooling", "glue", "retired"):
+    for key in ("rust", "tooling", "glue", "glue_removed"):
         require(
             type(metrics.get(key)) is int and metrics[key] >= 0,
             f"invalid port metrics: {key}",
         )
+    for key in ("retired", "net_glue"):
+        require(type(metrics.get(key)) is int, f"invalid port metrics: {key}")
     require(
         isinstance(metrics.get("base"), str) and metrics["base"],
         "missing port metrics base",
     )
     lines.append(
         f"- Port metrics ({code(metrics['base'])} to {code(head)}, committed sources): "
-        f"Rust {metrics['rust']} / tooling {metrics['tooling']} / C++ glue {metrics['glue']} / C++ retired {metrics['retired']}."
+        f"Rust {metrics['rust']} / tooling {metrics['tooling']} / C++ glue added {metrics['glue']} / "
+        f"original C++ retired {metrics['retired']} / fork glue removed {metrics['glue_removed']} / net glue {metrics['net_glue']}."
     )
     lines += ["", "Exact validation commands recorded in the receipt:"]
     for command in verification_record["commands"]:
