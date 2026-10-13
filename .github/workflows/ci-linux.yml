@@ -7,6 +7,10 @@ on:
         required: false
         type: string
         default: ""
+      cache-only:
+        required: false
+        type: boolean
+        default: false
       compiler:
         required: true
         type: string
@@ -26,8 +30,9 @@ env:
 jobs:
   linux:
     name: CI
+    if: ${{ !inputs.cache-only || inputs.compiler != 'clang' }}
 
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.CI_LINUX_PLATFORM || 'ubuntu-24.04' }}
     env:
       CC: ${{ inputs.compiler }}
       CXX: ${{ inputs.cxxcompiler }}
@@ -38,6 +43,26 @@ jobs:
       with:
         ref: ${{ inputs.checkout-ref }}
         persist-credentials: false
+        fetch-depth: 1
+
+    # Keep the Clang build's upstream PCH coverage; cache both GCC flavours.
+    - name: Identify compiler cache
+      if: inputs.compiler != 'clang'
+      id: compiler-image
+      env:
+        EXTRA_CMAKE_PARAMETERS: ${{ inputs.extra-cmake-parameters }}
+      run: |
+        echo "version=${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
+        echo "flavour=$(printf '%s' "$EXTRA_CMAKE_PARAMETERS" | sha256sum | cut -c1-12)" >> "$GITHUB_OUTPUT"
+
+    - name: Restore compiler cache
+      if: inputs.compiler != 'clang'
+      id: compiler-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ runner.temp }}/ccache
+        key: ccache-linux-v2-${{ inputs.compiler }}-${{ steps.compiler-image.outputs.flavour }}-${{ steps.compiler-image.outputs.version }}-${{ hashFiles('migration/ccache.conf') }}-${{ inputs.checkout-ref || github.sha }}
+        restore-keys: ccache-linux-v2-${{ inputs.compiler }}-${{ steps.compiler-image.outputs.flavour }}-${{ steps.compiler-image.outputs.version }}-${{ hashFiles('migration/ccache.conf') }}-
 
     - name: Setup vcpkg
       id: vcpkg
@@ -51,6 +76,7 @@ jobs:
 
         echo "::group::Install dependencies"
         sudo apt-get install -y --no-install-recommends \
+          ccache \
           liballegro4-dev \
           libcurl4-openssl-dev \
           libfontconfig-dev \
@@ -85,28 +111,59 @@ jobs:
       uses: ammaraskar/gcc-problem-matcher@master
 
     - name: Build
+      env:
+        CCACHE_CONFIGPATH: ${{ github.workspace }}/migration/ccache.conf
+        CCACHE_DIR: ${{ runner.temp }}/ccache
+        CCACHE_MAXSIZE: 600M
+        CCACHE_BASEDIR: ${{ github.workspace }}
       run: |
         mkdir build
         cd build
 
         echo "::group::CMake"
-        cmake .. -DCMAKE_TOOLCHAIN_FILE=${{ runner.temp }}/vcpkg/scripts/buildsystems/vcpkg.cmake ${{ inputs.extra-cmake-parameters }}
+        cache_parameters=()
+        if [ "${{ inputs.compiler }}" != clang ]; then
+          cache_parameters=(-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+            -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON)
+          ccache -z
+        fi
+        cmake .. -DCMAKE_TOOLCHAIN_FILE=${{ runner.temp }}/vcpkg/scripts/buildsystems/vcpkg.cmake \
+          ${{ inputs.extra-cmake-parameters }} "${cache_parameters[@]}"
         echo "::endgroup::"
 
         echo "::group::Build"
         echo "Running on $(nproc) cores"
         cmake --build . -j $(nproc)
         echo "::endgroup::"
+        if [ "${{ inputs.compiler }}" != clang ]; then
+          ccache -sv
+        fi
+
+    - name: Restore the dependency manifest
+      run: mv vcpkg-disabled.json vcpkg.json
 
     - name: Test
+      if: ${{ !inputs.cache-only }}
       run: |
         (
           cd build
           ctest -j $(nproc) --timeout 120
         )
 
-        # Re-enable vcpkg.
-        mv vcpkg-disabled.json vcpkg.json
-
         # Check no tracked files have been modified.
         git diff --exit-code
+
+    - name: Trim compiler cache
+      if: inputs.compiler != 'clang' && github.event_name == 'push' && github.ref == 'refs/heads/rust-migration'
+      env:
+        CCACHE_CONFIGPATH: ${{ github.workspace }}/migration/ccache.conf
+        CCACHE_DIR: ${{ runner.temp }}/ccache
+        CCACHE_MAXSIZE: 600M
+      run: ccache --cleanup
+
+    - name: Save compiler cache
+      if: inputs.compiler != 'clang' && github.event_name == 'push' && github.ref == 'refs/heads/rust-migration' && steps.compiler-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ runner.temp }}/ccache
+        key: ${{ steps.compiler-cache.outputs.cache-primary-key }}

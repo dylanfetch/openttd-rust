@@ -4,52 +4,44 @@ Root owns selection here; `AGENTS.md` and `docs/rust-migration.md` define proces
 If an issue conflicts, follow this roadmap and report it to root. Keep this
 forward-looking, about 200 lines; completed work is one row, with evidence in PRs.
 
-## Where the fork stands (2026-10-13, `648d44e940`)
+## Where the fork stands (2026-10-13, `21eeb445be`)
 
 - Twenty-three ownership ports. Whole fork against the pinned original: Rust
-  55,079 / tooling 26,610 / C++ glue 24,570 / original C++ retired 36,162 (7.68%
+  55,079 / tooling 28,391 / C++ glue 24,570 / original C++ retired 36,162 (7.68%
   of all `src/` sources); simulation-source share 28,215 / 102,615 (27.50%, #226).
-- #218 industry construction/lifecycle is integrated; four reviewed PRs wait
-  for CI. #228/#232 are integrated; platform CI reuses versioned OpenGFX archives.
-- Tenth-review benchmark at `46f725b426`, median of three `--benchmark 3`
-  invocations: Opus 1.265, Grok 1.262, Padhattan-1996 1.275, Padhattan-2000
-  1.355, Padhattan-2016 1.436, TGP 1.158; all within 3% of their caps, TGP above
+- #226 metric and #235 CI implementation are integrated. Four reviewed PRs wait
+  for full CI; aircraft #238 is active. Five component branches are unintegrated.
+- New-base benchmark, median of three `--benchmark 3` invocations:
+  Opus 1.258, Grok 1.254, Padhattan-1996 1.275, Padhattan-2000 1.349,
+  Padhattan-2016 1.427, TGP 1.164; these recalibrated #230 caps have been
+  independently reviewed. Town/station checks pass; TGP remains above
   its 1.15 target. Per-field, opcode and task boundaries in aircraft, station,
   loading, town and orders cost about 0.31 of Padhattan-2016's ratio.
-- Full validation takes about 43 minutes and serializes PRs (#233).
+- This integration pair retires no game code; next ownership remains #212/#213
+  after a second paused draft integrates.
+- #235 splits full validation into a build, component comparisons and six
+  simulation shards. #233 remains open for live timing, concurrency and cache
+  acceptance. Bootstrap passed in 18.6 minutes with cold platform caches;
+  warm small/port timing and concurrent protected runs remain to be measured.
 - Open #156 gaps include threaded execution, NewGRF/refit callbacks, positive
   gradual loading and station acceptance polling. No whole-game fidelity claim.
 
 ## Tenth steering review (2026-10-13, CI)
 
-One root session since the eighth review integrated #209, #225, #228, #232 and
-#218 with the process followed and CI green, then paused with #216, #217, #226
-and #230 reviewed and waiting. CI now limits throughput more than agents do: a
-full run takes about 43 minutes, and any push to `rust-migration` fails the
-in-flight runs of other PRs. Audits found a reachable divergence in #218
-(#234), none in #216 or #217, per-port accessor copies in all three, and caps
-in #230 combined below the noise.
-
-Corrections, in order:
-1. **CI throughput first (#233, AGENTS.md).** Assign #233 to an implementation
-   agent at session start. Integrate the four paused PRs by readiness around
-   it, holding roadmap commits while a full run is in flight until #233 lands.
-   Runner size and account plan are the user's decision; #233 keeps them a
-   repository setting.
-2. **Fix #234** (industry water-check tiles accept ship depots and locks) in its
-   own small PR.
-3. **Fix before integration, per the PR comments.** #217: one crossing before
-   the per-station empty-queue check, shared accessors, no `capacity_remaining`.
-   #216: road table straight to the shared functions, Rust-owned building
-   counts read directly, shared accessors. #230: recalibrate at its new base
-   rather than taking the lower of two calibrations. #218's departures are on
-   #168.
-4. **Shared accessors in review (AGENTS.md).** #216, #217 and #218 each added
-   copies of company, vehicle or map accessors despite the rule. Review reports
-   now name any new callback that duplicates a shared accessor.
-5. **Aircraft conversion next (#199).** Aircraft costs 0.13 of Padhattan-2016's
-   ratio (per-field calls, `src/rust/aircraft_adapter.hpp:31-60`), the largest
-   recoverable item. It is unblocked and starts when a branch slot frees.
+Corrections and work order:
+1. **CI throughput first (#233).** #235's implementation is integrated. Complete
+   live timing, concurrent-status and three-merge cache acceptance before closing
+   #233. Runner size and account plan remain the user's decision; runner classes
+   stay repository settings. Integrate reviewed work by readiness.
+2. **Fix #234 (#236)**: industry water-check tiles must reject ship depots/locks.
+3. **Reviewed corrections await integration.** #217 enters once before the empty
+   queue check, uses shared accessors and removes capacity_remaining. #216 uses
+   direct shared road functions/building counts. #230 uses all six new-base
+   calibrations rather than minima. Their evidence remains in the PRs.
+4. **Shared accessors in review (AGENTS.md).** Review reports name each new
+   callback that duplicates a shared accessor; there are no boundary exceptions.
+5. **Aircraft conversion (#199/#237/#238)** is active: the largest measured
+   recoverable boundary cost (0.13 of Padhattan-2016's ratio).
 6. **Budgets for #212 and #213.** TGP has about 11 ms of slack. #212's scope is
    about 177 of TGP's 352 reference ms over 14.4M tile visits: at most about
    0.8 ns extra per visit, and no Rust-to-C++-to-Rust crossing for tile types
@@ -59,26 +51,17 @@ Corrections, in order:
 
 ## Earlier steering, still in force
 
-First review (10-04): call shared services directly (#107); measure before map
-decisions (#108); keep tooling proportionate (#109); prioritize core simulation.
-Second (10-04): harness end moments (#154); speed report (#155); coverage gaps
-(#156); a WIP cap of six branches (#157). Third (10-07): convert per-call
-task/future/`Rc` boundaries, opcode dispatch and whole-record reads to direct
-typed calls (#168); the speed budget is a ratchet; each review round gets a
-fresh reviewer, who fixes its own findings; close finished agents. Fourth
-(10-07): on-demand CI stays (#171); exact-head full validation; never merge with
-`--admin`. Fifth (10-08): root is `gpt-6.1-sol` xhigh in Codex; exact timing
-(#186); no boundary exceptions at integration. Sixth (10-09): cited witnesses
-run by default (#198, #204); one shared typed vehicle and map layer (#199);
-trees and the industry tick before company; a fixed hasher for the lookup-only
-YAPF maps. Seventh (10-09): cited reference probes run in default CI (#210,
-#211); milestone pushes and recorded task state, and an unfinished review counts
-as none; improvements lower the caps; one ABI block per component; start town
-#148 and select the tile loops and vehicle base tick. Eighth (10-12): integrate
-by readiness, no draft waiting on another's services; Rust state at the
-original's scope; the original-retirement metric (#223); caps from the median of
-three invocations; ownership before more conversion. Ninth (10-12): remove
-merged worktrees with plain git and archive nothing.
+Standing steering: direct shared services (#107/#168/#199); measure before map
+changes (#108); proportionate tooling (#109); prioritize simulation ownership.
+The harness checks end moments (#154), default branch witnesses/reference probes
+(#198/#204/#210/#211), speed ratchets (#155) and documented coverage gaps (#156).
+The WIP cap is six (#157); full CI is exact-head/on-demand (#171), with no admin
+bypass. Fresh reviewers fix their findings; integrated worktrees are removed,
+never archived. State keeps the original process scope. Original retirement
+excludes removed fork glue (#223); caps use three invocation medians and lower
+only beyond measured spread. Ownership comes before the remaining conversions.
+The #108 map decision retains C++ arrays with direct bundled services.
+Use a fixed hasher for lookup-only YAPF maps; ABI blocks stay per component.
 
 ## Completed ownership ports
 
@@ -129,6 +112,8 @@ retirement, with net glue in the PR (#223).
 | #224 (disk hygiene) | #225 | direct | `898eb33c17` | 0 / 149 / 0 / 0; net tooling -546 |
 | #227 (loading context fidelity) | #228 | direct | `9ee89f69ad` | 3 / 47 / 0 / 0 |
 | #231 (OpenGFX cache) | #232 | direct | `21e2c9ea60` | 0 / 0 / 0 / 0; workflow net -6 |
+| #223 (original-retirement metric) | #226 | direct | `86322c8422` | 0 / 274 / 0 / 0; net glue 0 |
+| #233 (CI implementation; acceptance pending) | #235 | direct | `21eeb445be` | 0 / 1567 / 0 / 0; net glue 0 |
 
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -150,8 +135,8 @@ go in `KNOWN_FAILURES` with an issue, never in masks (`docs/rust-migration.md`).
 3. **#156 coverage, standing capacity.** Random and crash branches first. The
    tenth review added station stale-link restriction, town station ratings,
    exclusivity and unwanted months, and #218's NewGRF and game-script paths.
-4. **#234 fidelity fix**, then **#223 metric (#226)** and **#229 caps (#230,
-   recalibrated at its new base)**.
+4. **#234 fidelity fix (#236)** and **#229 caps (#230, recalibrated at its new
+   base)** await full CI. The #223 metric correction is integrated.
 
 ## Phase 2: current work, in order
 
@@ -162,7 +147,7 @@ branches (#157). Independent items (#156, #223, caps) may run in parallel.
 2. **#216 town, narrowed**, with the changes in its PR comment; then town
    founding/generation, the house tile loop, and town commands, authority
    actions and deletion as their own ports.
-3. **#199 aircraft conversion** when a branch slot frees (tenth review item 5).
+3. **#199/#237 aircraft conversion (#238)** is active (tenth review item 5).
 4. **New ownership** after two drafts integrate: #212 landscape tile loops and
    #213 base vehicle tick within the tenth review's budgets; then #219 signal
    blocks and #220 engine lifecycle (#220 after #213 and #148).
@@ -174,22 +159,25 @@ The #108 decision keeps C++ map arrays and direct bundled `noexcept` services.
 
 ## Resume checkpoint
 
-Resume after the user's pause. #218 is integrated at `648d44e940` with green
-post-merge CI. Four PRs wait at their reviewed heads for a base update, the
-tenth review's PR-comment changes and exact-head full CI. #233 and #234 are
-new and unstarted.
+Active continuous development. #226 and #235 are integrated; #233 operational
+acceptance remains open. Station/town corrections and cap recalibration have
+fresh reviews and quiet speed evidence; water fidelity has paired/self and
+unfixed-base negative evidence. Request exact-head full CI using the protected
+controller and integrate by readiness. Aircraft #237/#238 is implementing the
+shared boundary; new ownership waits for a second of #216/#217/#226/#230.
 
-| Issue / PR | Branch (worktree suffix), head | State and next step |
+| Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #214 / #217 | `station-loading-direct-214`, `f53ea99f6d` | Reviewed, including #228 context conflict; waiting on base update and exact-head full CI. Preserve the per-vehicle loading context; apply the tenth-review comment. |
-| #148 / #216 | `town-lifecycle-148`, `079350b3a7` | Narrowed/state/guard and company-base fixes reviewed; waiting on base update adopting #218's native cost helpers, the tenth-review comment, narrow review and exact-head full CI. |
-| #223 / #226 | `metric-original-223`, `e20519eb78` | Identity/inventory fixes reviewed; waiting on base update, roadmap/template reconciliation and exact-head full CI. |
-| #229 / #230 | `speed-caps-229`, `d7949a970a` | Recalibration reviewed; waiting on base update, recalibration at the new base (tenth-review comment), cap-data review and exact-head full CI. |
+| #214 / #217 | `station-loading-direct-214`, `ae7b65cf74` | Corrections reviewed; all six speed cases pass. Full CI, integrate. |
+| #148 / #216 | `town-lifecycle-148`, `a23a6437a8` | Corrections reviewed; seven town and six speed cases pass. Full CI, integrate. |
+| #229 / #230 | `speed-caps-229`, `e7e33b318a` | All six new-base caps reviewed, exact median rounding fixed. Full CI, integrate. |
+| #234 / #236 | `industry-water-fidelity-234`, `27e8f0782c` | Reviewed; default depot/lower-lock command regressions pass. Full CI, integrate. |
+| #237 / #238 | `aircraft-shared-boundary-237`, `fd7c19d5ff` | Corrected default crossing witnesses/baseline pushed; conversion active. |
 
 Selected but unstarted: #212/#213, then #219/#220. ABI blocks: train through 385,
 tree additions 386-389, fleet 390-399, company 400-429, town 430-459, road 460-499,
 station/loading 500-559, industry 560-619 (572 consumed shared ByteSpan in #218), CommandCost 620-629,
-and additional town lifecycle 630-669. Allocate only consumed layouts.
+additional town lifecycle 630-669, aircraft observations 670-739. Allocate only consumed layouts.
 
 Preserve the pinned reference, paused curve worktrees and evidence branches
 `evidence-disaster-vehicles` (`a775543162`) and `evidence-water-regions`

@@ -1,0 +1,31 @@
+name: Native migration environment
+description: Install the pinned native toolchain and fetch only the pinned reference
+runs:
+  using: composite
+  steps:
+  - shell: bash
+    run: |
+      sudo apt-get update
+      sudo apt-get install -y ccache ninja-build libsdl2-dev liblzma-dev libpng-dev \
+        libcurl4-openssl-dev libfreetype-dev libfontconfig-dev libharfbuzz-dev \
+        libicu-dev liblzo2-dev openttd-opengfx
+      baseline=$(python3 -c 'import json; print(json.load(open("migration/baseline.json"))["commit"])')
+      git fetch --no-tags --depth=1 origin "$baseline"
+      python3 - <<'PY'
+      import sys
+      sys.path.insert(0, "tools")
+      import migration
+      with migration.reference_lock():
+          migration.ensure_reference()
+      PY
+      python3 - <<'PY'
+      from pathlib import Path
+      import subprocess
+      import tomllib
+      toolchain = tomllib.loads(Path("rust-toolchain.toml").read_text())["toolchain"]
+      subprocess.run([
+          "rustup", "toolchain", "install", toolchain["channel"],
+          "--profile", toolchain["profile"],
+          "--component", ",".join(toolchain["components"]),
+      ], check=True)
+      PY
