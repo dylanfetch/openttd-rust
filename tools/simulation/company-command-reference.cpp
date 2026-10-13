@@ -70,20 +70,18 @@ static void NetworkTextMessage(int, int, bool, const std::string &, const std::s
  * touched by these unchanged command bodies, through their audited ABI offsets. */
 static std::array<void *, 3> owners;
 static int64_t &Field(void *p, uint8_t item) { return *reinterpret_cast<int64_t *>(static_cast<char *>(p) + openttd_rust_abi_layout(211, item)); }
-static uint32_t OPENTTD_COMPANY_CALL Next(uint32_t, uint32_t) { return UINT32_MAX; }
-static void *OPENTTD_COMPANY_CALL Owner(uint32_t id) { return id < owners.size() ? owners[id] : nullptr; }
-static void OPENTTD_COMPANY_CALL Read(uint32_t kind, uint32_t, int64_t, int64_t *v)
-{
-	std::fill_n(v, 32, 0);
-	if (kind == 0) { v[2] = _networking; v[5] = _current_company; v[6] = _settings_game.difficulty.infinite_money; v[11] = _settings_game.economy.give_money; }
-}
-static int64_t OPENTTD_COMPANY_CALL Service(const OpenTTDCompanyAction *a)
-{
-	if (a->kind == 2) _current_company = a->id;
-	else trace.emplace_back(a->kind, a->id, a->a);
-	return 0;
-}
-static OpenTTDCompanyLeaves leaves{Next, Read, Owner, Service};
+static uint8_t CurrentCompany() noexcept { return _current_company; }
+static void SetCurrentCompany(uint8_t id) noexcept { _current_company = id; }
+static bool Networking() noexcept { return _networking; }
+static CompanyFinances *Finances(uint8_t id) noexcept { return id < owners.size() ? static_cast<CompanyFinances *>(owners[id]) : nullptr; }
+static void Invalidate(uint8_t id) noexcept { trace.emplace_back(3, id, 0); }
+static void GiveMoneyMessage(uint8_t dest, int64_t amount) noexcept { trace.emplace_back(52, dest, amount); }
+static void MoneyAnimation(uint32_t tile, int64_t amount) noexcept { trace.emplace_back(53, tile, amount); }
+static const OpenTTDCompanyFinanceServices services{
+	.current_company = CurrentCompany, .set_current_company = SetCurrentCompany, .networking = Networking,
+	.company_finances = Finances, .invalidate_company_windows = Invalidate,
+	.give_money_message = GiveMoneyMessage, .money_animation = MoneyAnimation,
+};
 static void Reset(int64_t money, int64_t loan, int64_t max, bool infinite, bool networking, bool give, CompanyID current)
 {
 	_current_company = current; _networking = networking; _settings_game = {{infinite}, {give}}; trace.clear();
@@ -93,9 +91,9 @@ static void Reset(int64_t money, int64_t loan, int64_t max, bool infinite, bool 
 	}
 	*static_cast<int64_t *>(openttd_rust_economy_state()) = 300000;
 }
-static bool Equal(const CommandCost &expected, const OpenTTDCompanyAction &actual)
+static bool Equal(const CommandCost &expected, const OpenTTDCompanyCost &actual)
 {
-	if (actual.kind != 0 || expected.error != actual.a || expected.cost.base() != actual.b || expected.expense != actual.c || expected.param.base() != actual.d) return false;
+	if (expected.error != actual.error || expected.cost.base() != actual.cost || expected.expense != actual.expense || expected.param.base() != actual.param) return false;
 	for (uint32_t i = 0; i < owners.size(); i++) {
 		const auto &c = companies[i]; void *p = owners[i];
 		if (c.money.base() != Field(p, 2) || c.current_loan.base() != Field(p, 4) || c.max_loan.base() != Field(p, 5)) return false;
@@ -109,6 +107,7 @@ static bool Equal(const CommandCost &expected, const OpenTTDCompanyAction &actua
 int main()
 {
 	for (auto &p : owners) p = openttd_rust_company_state_create();
+	OpenTTDCompanyCost actual{};
 	uint64_t cases = 0;
 	for (uint32_t op : {21, 22, 23, 24, 25}) for (bool execute : {false, true}) {
 		for (int64_t money : {INT64_MIN, int64_t(-1), int64_t(0), int64_t(9999), int64_t(10000), int64_t(30000000), INT64_MAX}) {
@@ -127,16 +126,19 @@ int main()
 					if (op == 24) expected = CmdSetCompanyMaxLoan({execute}, id, amount);
 					if (op == 25) { b = variant == 14 ? 0 : variant; c = execute; d = variant % 2; expected = CmdChangeBankBalance({execute}, d, amount, id, ExpensesType(b)); }
 					auto expected_trace = trace; auto expected_current = _current_company; trace.clear(); _current_company = current;
-					auto *run = openttd_rust_company_create(op, id, a, b, c, d, &leaves);
-					auto actual = openttd_rust_company_advance(run, 0); openttd_rust_company_destroy(run);
+					if (op == 21) actual = openttd_rust_company_give_money(&services, give, a, static_cast<uint8_t>(id), b != 0);
+					if (op == 22) actual = openttd_rust_company_increase_loan(&services, static_cast<uint8_t>(a), b, infinite, c != 0);
+					if (op == 23) actual = openttd_rust_company_decrease_loan(&services, static_cast<uint8_t>(a), b, infinite, c != 0);
+					if (op == 24) actual = openttd_rust_company_set_max_loan(&services, static_cast<uint8_t>(id), a, b != 0);
+					if (op == 25) actual = openttd_rust_company_change_bank_balance(&services, static_cast<uint32_t>(d), a, static_cast<uint8_t>(id), static_cast<uint8_t>(b), c != 0);
 					if (!Equal(expected, actual) || expected_trace != trace || expected_current != _current_company) {
-						std::fprintf(stderr, "financial command gap failed: op=%u execute=%d money=%lld loan=%lld amount=%lld variant=%u result=%lld/%lld/%lld/%lld expected=%d/%lld/%u/%lld\n", op, execute, static_cast<long long>(money), static_cast<long long>(loan), static_cast<long long>(amount), variant, static_cast<long long>(actual.a), static_cast<long long>(actual.b), static_cast<long long>(actual.c), static_cast<long long>(actual.d), expected.error, static_cast<long long>(expected.cost.base()), expected.expense, static_cast<long long>(expected.param.base())); return 1;
+						std::fprintf(stderr, "financial command gap failed: op=%u execute=%d money=%lld loan=%lld amount=%lld variant=%u result=%lld/%lld/%lld/%lld expected=%d/%lld/%u/%lld\n", op, execute, static_cast<long long>(money), static_cast<long long>(loan), static_cast<long long>(amount), variant, static_cast<long long>(actual.error), static_cast<long long>(actual.cost), static_cast<long long>(actual.expense), static_cast<long long>(actual.param), expected.error, static_cast<long long>(expected.cost.base()), expected.expense, static_cast<long long>(expected.param.base())); return 1;
 					}
 					cases++;
 				}
 			}
 		}
 	}
-	for (auto p : owners) openttd_rust_company_state_destroy(p);
+	for (auto p : owners) openttd_rust_company_state_destroy(static_cast<CompanyFinances *>(p));
 	std::printf("company financial command gap: %llu unchanged-reference cases passed\n", static_cast<unsigned long long>(cases));
 }

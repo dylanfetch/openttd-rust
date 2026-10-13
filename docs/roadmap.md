@@ -4,17 +4,17 @@ Root owns selection here; `AGENTS.md` and `docs/rust-migration.md` define proces
 If an issue conflicts, follow this roadmap and report it to root. Keep this
 forward-looking, about 200 lines; completed work is one row, with evidence in PRs.
 
-## Where the fork stands (2026-10-12, `04b32068f6`)
+## Where the fork stands (2026-10-12, `8fe6f5ed56`)
 
 - Twenty-two ownership ports. Whole fork against the pinned original: Rust
-  51,602 / tooling 26,308 / C++ glue 22,752 / original C++ retired 34,429 (7.3%
-  of 470,612 `src/` lines), up 11 since the seventh review (#223).
-- Four drafts: #218 industry construction (real ownership, nearest), #209
-  company (reviewed conversion), #217 station/loading (conversion), #216 town
-  (mostly conversion, with a reachable crash).
-- Idle-host timing, nine pairs each: Opus 1.273, Grok 1.300 (cap 1.243),
-  Padhattan-1996 1.305, Padhattan-2000 1.386, TGP 1.185 (target 1.15),
-  Padhattan-2016 1.518 (no cap). Game loop alone: Padhattan-2000 1.55x.
+  52,103 / tooling 26,443 / C++ glue 23,176 / original C++ retired 34,426 (7.3%
+  of `src/`); simulation-source share 26,502 / 102,615 (25.83%, #226).
+- #209 integrated. Three component PRs are freshly reviewed: #218 ownership,
+  #217 conversion and narrowed #216 with process-wide state. Maintenance #225,
+  #226 and fidelity #228 are reviewed; six active PRs, five count toward WIP.
+- Repeated idle baseline at `a014255973` (#155): Opus 1.265, Grok 1.262,
+  Padhattan-1996 1.296, Padhattan-2000 1.324, TGP 1.167, Padhattan-2016 1.444.
+  Cap update is next; these process ratios do not show a code improvement.
 
 ## Eighth steering review (2026-10-12)
 
@@ -113,9 +113,9 @@ design (`docs/design/world-state.md`).
 Earlier maintenance: #109/#112, #107/#113/#115, #86/#110/#132, #108/#116,
 #154/#160, #158/#159, #155/#163, #156/#161/#162/#164/#167, #170/#171,
 #173/#174, #178/#185/#187 in #184, #169/#175/#177/#180 in #181, #200/#201,
-#188/#196, #191/#193 and #198/#204; evidence remains in those PRs. Conversion
-rows below count removed glue as retired; their original retirement is near
-zero (#223).
+#188/#196, #191/#193 and #198/#204; evidence remains in those PRs. Rows through
+#215 use legacy retirement including deleted glue; new rows use original
+retirement, with net glue in the PR (#223).
 | Issues | Maintenance PRs | Integration | Commit | Metrics |
 | --- | --- | --- | --- | --- |
 | #190 (#168 aircraft) | #194 | direct | `d8aed8754f` | 1279 / 352 / 1300 / 247 |
@@ -125,6 +125,7 @@ zero (#223).
 | #210 (default probes) | #211 | direct | `cbebf6e5fe` | 0 / 25 / 0 / 0 |
 | #202 (#168 trees) | #208 | direct | `0e459aa81f` | 1604 / 91 / 347 / 53 |
 | #199 (shared road services) | #215 | direct | `4b130309a5` | 2288 / 565 / 1331 / 1354 |
+| #192 (company direct services) | #209 | direct | `8fe6f5ed56` | 1495 / 159 / 954 / -3; net glue +424 |
 
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -169,18 +170,18 @@ The #108 decision keeps C++ map arrays and direct bundled `noexcept` services.
 
 ## Resume checkpoint
 
-Resumed on 2026-10-12 with the eighth/ninth steering corrections. Four component
-drafts and two maintenance PRs are active; no new ownership starts before two
-component drafts integrate. Evidence and exact validation stay on the linked PRs.
+Resumed with the eighth/ninth steering corrections; #209 is integrated and its
+worktree removed. All six active PRs are reviewed. #218 is the second original
+draft required before new ownership starts. Evidence stays on PRs and issues.
 
 | Issue / PR | Branch (worktree suffix), head | State and next step |
 | --- | --- | --- |
-| #150 / #218 | `industry-construction-150`, `a16981bc35` | Shared map/dimension reads and dead-slot corrections pushed; finishing clean-head evidence, then fresh review and full CI. |
-| #192 / #209 | `company-direct-192`, `2d907389d0` | Conflict-free base update pushed; fresh review/evidence underway. Pending scope moved to #156; full CI next. |
-| #214 / #217 | `station-loading-direct-214`, `d456668553` | Required profile/portable/shared/grouped-read fixes underway; no draft service dependency. |
-| #148 / #216 | `town-lifecycle-148`, `0e98404f21` | Narrowing and process-wide state fix underway, with default thread-scope regression; no draft dependency. |
-| #224 / #225 | `issue-224-disk-hygiene`, `718d5c38a2` | Fresh reviewer fixed fixture-preparation cleanup; finishing clean-head evidence and disposition. |
-| #223 / #226 | `metric-original-223`, `32d7d3006d` | Original retirement/net glue and simulation share pushed; local default checks pass; fresh review next. |
+| #150 / #218 | `industry-construction-150`, `4e3be008ca` | Reviewed; root verified fixture fix. Update from base; full CI. |
+| #214 / #217 | `station-loading-direct-214`, `6961ebef2d` | Reviewed; root verified fixes. Adopt integrated company helpers and #227 fix on base update; review source conflicts; full CI. |
+| #148 / #216 | `town-lifecycle-148`, `f9965c8862` | Narrowed/state/guard fixes reviewed and verified. Update from base; review source conflicts; full CI. |
+| #224 / #225 | `issue-224-disk-hygiene`, `718d5c38a2` | Reviewed/fixes verified; update base and full CI next. Small WIP exemption. |
+| #223 / #226 | `metric-original-223`, `f48322fbbd` | Reviewed identity/inventory fixes verified; update base/full CI. |
+| #227 / #228 | `loading-context-fix-227`, `4a25023f58` | Accepted-load gap fixed; default mutation-sensitive witness reviewed. Phase 1 full CI priority. |
 
 Selected but unstarted: #212/#213, then #219/#220. ABI blocks: train through 385,
 tree additions 386-389, fleet 390-399, company 400-429, town 430-459, road 460-499,
