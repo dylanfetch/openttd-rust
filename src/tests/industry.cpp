@@ -311,6 +311,7 @@ TEST_CASE("Industry - borrowed stack resolver shell and callback policy")
 	costs.zero = [](CommandCost *out) noexcept { *out = CommandCost(); };
 	costs.error = [](CommandCost *out, uint32_t message) noexcept { *out = CommandCost(message); };
 	OpenTTDIndustryTransactionContext context{
+		.map = {},
 		.builder = nullptr, .production = &production, .generation = &generation,
 		.construction = &construction, .lifecycle = &lifecycle, .tiles = &tiles,
 		.tile_policy = &policy, .commands = &commands, .costs = &costs,
