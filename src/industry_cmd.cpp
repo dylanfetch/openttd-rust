@@ -57,6 +57,7 @@
 
 #ifdef WITH_RUST
 #include "rust/industry_generation_adapter.hpp"
+#include "rust/company_services.h"
 #include "rust/sound_services.h"
 #include "rust/tile_animation_services.h"
 #include "rust/orders_ffi.h"
@@ -69,7 +70,7 @@ static const OpenTTDIndustryTilePolicyServices &GetIndustryTilePolicyServices();
 static OpenTTDIndustryTransactionContext GetIndustryTransactionContext();
 static Industry *IndustryIfValid(uint16_t id) noexcept { return Industry::GetIfValid(IndustryID(id)); }
 static OpenTTDIndustry *IndustryOwner(Industry *shell) noexcept { return shell->production_owner.get(); }
-static bool IndustryCommandDeity() noexcept { return _current_company == OWNER_DEITY; }
+static bool IndustryCommandDeity() noexcept { return OpenTTDCurrentCompany() == OWNER_DEITY; }
 #endif
 
 #include "safeguards.h"
@@ -3676,11 +3677,11 @@ static const OpenTTDIndustryServices _industry_services = {
 	.probability_callback = [](uint8_t type, uint8_t creation, uint32_t chance) noexcept -> uint32_t { return GetIndustryProbabilityCallback(type, static_cast<IndustryAvailabilityCallType>(creation), chance); },
 	.scale_by_map_size = [](uint32_t n) noexcept -> uint32_t { return Map::ScaleBySize(n); },
 	.company_none = []() noexcept -> uint8_t {
-		CompanyID old = _current_company;
-		_current_company = OWNER_NONE;
+		CompanyID old = OpenTTDCurrentCompany();
+		OpenTTDSetCurrentCompany(OWNER_NONE);
 		return old.base();
 	},
-	.restore_company = [](uint8_t company) noexcept { _current_company = CompanyID(company); },
+	.restore_company = [](uint8_t company) noexcept { OpenTTDSetCurrentCompany(CompanyID(company)); },
 	.directory_dirty = [](uint8_t reason) noexcept { InvalidateWindowData(WC_INDUSTRY_DIRECTORY, 0, reason); },
 	.recession = []() noexcept -> bool { return EconomyIsInRecession(); },
 	.economy_month = []() noexcept -> uint8_t { return TimerGameEconomy::month; },
@@ -3901,7 +3902,7 @@ static const OpenTTDIndustryCostServices &GetIndustryCostServices()
 static const OpenTTDIndustryTilePolicyServices &GetIndustryTilePolicyServices()
 {
 	static const OpenTTDIndustryTilePolicyServices services = {
-		.current_company = []() noexcept -> uint8_t { return _current_company.base(); },
+		.current_company = []() noexcept -> uint8_t { return OpenTTDCurrentCompany().base(); },
 		.magic_bulldozer = []() noexcept -> bool { return _cheats.magic_bulldozer.value; },
 		.object_in_way = [](OpenTTDIndustryCost *out, const OpenTTDIndustrySpecHandle *spec) noexcept { *out = CommandCostWithParam(STR_ERROR_GENERIC_OBJECT_IN_THE_WAY, reinterpret_cast<const IndustrySpec *>(spec)->name); },
 		.slopes_refused = [](const OpenTTDIndustryTileSpec *spec) noexcept -> uint8_t { return spec->slopes_refused; },
@@ -3943,7 +3944,7 @@ static const OpenTTDIndustryTransactionServices &GetIndustryTransactionServices(
 		.tile_height = [](uint32_t tile) noexcept -> uint32_t { return TileHeight(TileIndex(tile)); },
 		.has_water_class = [](uint32_t tile) noexcept -> bool { return HasTileWaterClass(TileIndex(tile)); },
 		.ensure_no_vehicle = [](OpenTTDIndustryCost *out, uint32_t tile) noexcept { *out = EnsureNoVehicleOnGround(TileIndex(tile)); },
-		.set_company = [](uint8_t company) noexcept { _current_company = CompanyID(company); },
+		.set_company = [](uint8_t company) noexcept { OpenTTDSetCurrentCompany(CompanyID(company)); },
 		.temporary_shell = [](OpenTTDIndustry *owner, void *context, OpenTTDIndustryTemporaryVisit visit) noexcept { Industry industry(owner); industry.index = IndustryID::Invalid(); visit(context, &industry); },
 		.resolve_location = openttd_industry_resolve_location,
 		.resolve_shape = openttd_industry_resolve_shape,
