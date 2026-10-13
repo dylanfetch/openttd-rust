@@ -1,0 +1,54 @@
+name: Native compiler cache
+description: Restore or trim and save compatible native compilation artifacts
+inputs:
+  save:
+    description: Save instead of restore
+    default: 'false'
+  prefix:
+    description: Previously computed compatibility prefix when saving
+    default: ''
+outputs:
+  prefix:
+    description: Compatibility prefix
+    value: ${{ steps.identity.outputs.prefix }}
+runs:
+  using: composite
+  steps:
+  - id: identity
+    if: inputs.save != 'true'
+    shell: bash
+    run: |
+      python3 - <<'PY'
+      import json
+      import os
+      from pathlib import Path
+      import sys
+      sys.path.insert(0, "tools")
+      import migration
+      identity = migration.compiler_cache_compatibility()
+      Path(".local").mkdir(exist_ok=True)
+      Path(".local/compiler-cache-identity.json").write_text(json.dumps(identity, indent=2) + "\n")
+      with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+          output.write(f"prefix={identity['prefix']}\n")
+      PY
+  - if: inputs.save != 'true'
+    uses: actions/cache/restore@v4
+    with:
+      path: |
+        .local/compiler-cache/reference
+        .local/compiler-cache/candidate
+      key: ${{ steps.identity.outputs.prefix }}-${{ github.sha }}
+      restore-keys: ${{ steps.identity.outputs.prefix }}-
+  - if: inputs.save == 'true'
+    shell: bash
+    run: |
+      for role in reference candidate; do
+        CCACHE_DIR="$GITHUB_WORKSPACE/.local/compiler-cache/$role" CCACHE_MAXSIZE=750M ccache --cleanup
+      done
+  - if: inputs.save == 'true'
+    uses: actions/cache/save@v4
+    with:
+      path: |
+        .local/compiler-cache/reference
+        .local/compiler-cache/candidate
+      key: ${{ inputs.prefix }}-${{ github.sha }}

@@ -378,7 +378,8 @@ python3 tools/ci.py wait .local/ci-requests/REQUEST.json
 `rust` runs four Cargo checks; `native` adds the Linux matrix and full migration
 comparison; `platform` runs the platform matrix. All include quick checks.
 Only `full` satisfies the merge gate. Unmergeable or pending-mergeability PRs
-are refused; a changed PR head or base needs a new full request.
+are refused; a changed PR head needs a new full request. A later base advance
+does not invalidate an unchanged head; independent reviewed PRs can validate concurrently.
 The CLI records the SHA and request/run identity and refuses a changed PR head.
 `CI_ON_DEMAND=true` enables this scheduling after root installs and verifies the
 required status. With the variable absent, automatic full CI remains as a safe
@@ -390,15 +391,47 @@ For capacity batching, test a concrete integration PR and merge it once. A stack
 organizes dependent PRs but does not itself combine validation runs.
 
 Required checks must pass on the PR head; branches need not be up to date with the
-base; the captured merge commit must still match when validation publishes.
+base. The publisher records the immutable tested merge tree separately from the
+head status.
 Protected pushes have per-SHA concurrency, so a later docs push cannot cancel
-the code merge run. Platform CI also runs after code merges into `rust-migration`; markdown-only
-pushes skip heavy builds after complete file classification. A post-merge
-failure is fixed forward first. Force pushes and branch deletion are disallowed,
+the code merge run. A merged push whose tree matches the tree marker from the same successful full
+request refreshes native compiler caches without repeating tests or scenarios.
+Covered protected pushes also rebuild the cached Linux GCC, macOS and Windows
+targets to refresh their compiler caches. This path skips Cargo checks, CTest,
+comparison/configuration probes, annotation checks and platform evidence; Clang
+and Emscripten have no compiler cache to refresh. The path is derived only from
+the protected push's matching tree, and requested PR validation always runs the
+complete selected suite. A combined tree no full request
+covered receives all native and platform checks. Markdown-only pushes skip heavy
+builds after complete file classification. A post-merge failure is fixed forward first. Force pushes and branch deletion are disallowed,
 including for administrators. The approving-review count is zero because agents
 share credentials; the attributed independent review report is the process gate
 before root integrates. Repository controls are enforced separately from these
 documents.
+
+Native validation exports both frozen runtimes and once-built fleet/orders adapters,
+then runs component comparisons and six simulation shards concurrently. Recorded
+scenario seconds assign work while keeping effects/disasters/aircraft fixture
+families whole. The gate requires every job and exactly the current default
+`simulate.py --list` inventory, with matching executable and manifest hashes.
+Export requires canonical binary/configuration identity matching clean current
+source. Exports strip debug sections only on copies, proving identical
+loadable/allocated code and data and retaining parent/derived hashes; widget
+objects also preserve resolved symbols, relocations and COMDAT groups.
+Original verification binaries stay intact; `tools/evidence.py` joins explicit
+derived simulation identities to their verified parent hashes. Probe
+workers receive prebuilt generators/archives and the widget probe's real link
+objects; build metadata relocation has its own receipt. Reports/logs and retained
+failing saves are artifacts; build inputs expire after one day. Tests and their results are never cached. Cache writers trim native roles
+to 750 MB, Linux flavours to 600 MB and macOS flavours to 650 MB. The trusted
+cache-retention workflow keeps the latest entry per prefix and bounds total usage
+to 8 GiB (below the 10 GiB repository limit).
+
+Runner settings are `CI_LINUX_HEAVY`, `CI_LINUX_COMPARISONS`,
+`CI_LINUX_SIMULATION`, `CI_LINUX_PLATFORM` (default `ubuntu-24.04`), and
+`CI_MACOS_HEAVY` (default `macos-latest`). Heavy native jobs use `nproc` slots.
+One full request peaks around 16 jobs; overlapping requests may queue against
+account/runner capacity. Runner size and account plan remain repository settings.
 
 `python3 tools/preflight.py --base origin/rust-migration --verification REPORT`
 runs the pinned inherited commit checker and checks explicit candidate compiler
@@ -409,6 +442,18 @@ logs it explicitly leaves warnings unchecked. `tools/evidence.py` exports explic
 verification and optional repeated simulation receipts with committed port metrics
 and agent attribution; unsupported, failed or mismatched receipts fail. Narrow
 checks, legacy receipts, dirty source and unknown provenance remain labelled.
+
+`python3 tools/port-metrics.py` reports the change in retired pinned-original
+C++ lines separately from fork glue added/removed and signed net glue. Original
+retirement can be negative when original lines are restored; removing fork glue
+does not retire original C++. Ownership ports retire more original C++ than
+net glue plus tooling added, or explain why; conversions report their net glue.
+`--whole-fork` prints totals against the pinned original and the retired share of
+simulation source lines. Its one inventory covers world-state owners, commands,
+accessors, link graph and pathfinding, excluding GUI, platform, vendored code and
+generic support. Mixed owner files, blank lines, comments and data tables count.
+The diff/guard classification measures source lines, not C++ preprocessing or
+behavioral completion. Historical roadmap rows keep their labelled legacy counts.
 
 After a task's PR merges, remove its worktree with `git worktree remove PATH`
 and its branch with `git branch -d BRANCH`. Nothing under the worktree is
