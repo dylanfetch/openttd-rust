@@ -29,7 +29,7 @@ jobs:
   macos:
     name: CI
 
-    runs-on: macos-latest
+    runs-on: ${{ vars.CI_MACOS_HEAVY || 'macos-latest' }}
     env:
       MACOSX_DEPLOYMENT_TARGET: ${{ inputs.rust && '11.0' || '10.13' }}
 
@@ -44,6 +44,7 @@ jobs:
       with:
         ref: ${{ inputs.checkout-ref }}
         persist-credentials: false
+        fetch-depth: 1
 
     - name: Install pinned Rust and select native SDK
       if: inputs.rust
@@ -106,8 +107,8 @@ jobs:
       with:
         path: ${{ runner.temp }}/ccache
         # The runner image pins the Xcode toolchain, so it is part of the key.
-        key: ccache-macos-v1-${{ inputs.arch }}-${{ steps.runner-image.outputs.version }}-${{ steps.runner-image.outputs.flavour }}-${{ hashFiles('migration/ccache.conf') }}-${{ inputs.checkout-ref || github.sha }}
-        restore-keys: ccache-macos-v1-${{ inputs.arch }}-${{ steps.runner-image.outputs.version }}-${{ steps.runner-image.outputs.flavour }}-${{ hashFiles('migration/ccache.conf') }}-
+        key: ccache-macos-v2-${{ inputs.arch }}-${{ steps.runner-image.outputs.version }}-${{ steps.runner-image.outputs.flavour }}-${{ hashFiles('migration/ccache.conf') }}-${{ inputs.checkout-ref || github.sha }}
+        restore-keys: ccache-macos-v2-${{ inputs.arch }}-${{ steps.runner-image.outputs.version }}-${{ steps.runner-image.outputs.flavour }}-${{ hashFiles('migration/ccache.conf') }}-
 
     - name: Install OpenGFX
       uses: ./.github/actions/install-opengfx
@@ -120,7 +121,7 @@ jobs:
         VCPKG_BINARY_SOURCES: clear;files,${{ runner.temp }}/vcpkg-binary-cache,readwrite
         CCACHE_CONFIGPATH: ${{ github.workspace }}/migration/ccache.conf
         CCACHE_DIR: ${{ runner.temp }}/ccache
-        CCACHE_MAXSIZE: 1G
+        CCACHE_MAXSIZE: 650M
       run: |
         mkdir build
         cd build
@@ -157,6 +158,14 @@ jobs:
       with:
         path: ${{ runner.temp }}/vcpkg-binary-cache
         key: ${{ steps.vcpkg-binary-cache.outputs.cache-primary-key }}
+
+    - name: Trim compiler cache
+      if: inputs.rust && github.event_name == 'push' && github.ref == 'refs/heads/rust-migration'
+      env:
+        CCACHE_CONFIGPATH: ${{ github.workspace }}/migration/ccache.conf
+        CCACHE_DIR: ${{ runner.temp }}/ccache
+        CCACHE_MAXSIZE: 650M
+      run: '"$CCACHE_EXE" --cleanup'
 
     - name: Save compiler cache
       if: inputs.rust && github.event_name == 'push' && github.ref == 'refs/heads/rust-migration' && steps.compiler-cache.outputs.cache-hit != 'true'
@@ -203,6 +212,7 @@ jobs:
           -DCMAKE_OSX_DEPLOYMENT_TARGET="$MACOSX_DEPLOYMENT_TARGET" \
           -DVCPKG_TARGET_TRIPLET=${{ inputs.arch }}-osx \
           -DCMAKE_TOOLCHAIN_FILE=${{ steps.vcpkg.outputs.vcpkg-cmake }} \
+          -DVCPKG_INSTALLED_DIR="$PWD/build/vcpkg_installed" \
           ${{ inputs.extra-cmake-parameters }}
         cmake --build .local/build-tools-macos -j $(sysctl -n hw.logicalcpu)
 
