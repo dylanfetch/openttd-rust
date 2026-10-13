@@ -1552,6 +1552,8 @@ original end of LoadUnloadStation. Original bodies remain in portable builds.
 `python3 tools/migration.py simulate stations economy` uses the existing road/CAPY
 inputs for loading queues, fractional admission, acceptance loss, full/gradual
 loading, rating expiry/decay/capping, stale-link refresh/removal and active reload.
+`stations-loading-context` checks an accepted modern save with a distinct valid
+last-visited station, preserving the outer queue and staged cargo (#227/#75).
 `--self` and `--soak` reuse these cases. Native tests cover ABI, stable aliases,
 queue mutation, partial/nested save failure and actual retirement/indexed reuse.
 The corpus is not exhaustive for legacy versions, NewGRF cargo callbacks,
