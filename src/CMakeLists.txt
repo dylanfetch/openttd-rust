@@ -251,11 +251,6 @@ add_files(
     rust/command_cost_services.h
     rust/command_services_ffi.h
     rust/command_services.h
-    rust/town_house_ffi.h
-    rust/town_lifecycle_ffi.h
-    rust/byte_span_ffi.h
-    rust/town_bytes.hpp
-    rust/town_placement_ffi.h
     rust/ffi.h
     landscape.h
     landscape_cmd.h

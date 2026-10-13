@@ -227,9 +227,6 @@ def tunnel_reference_gap(out, archive=None):
     signatures = {
         "CanRoadContinueIntoNextTile": "static bool CanRoadContinueIntoNextTile(",
         "GrowTownWithTunnel": "static bool GrowTownWithTunnel(",
-        "GetHouseNorthPart": "TileIndexDiff GetHouseNorthPart(",
-        "AdvanceSingleHouseConstruction": "static void AdvanceSingleHouseConstruction(",
-        "AdvanceHouseConstruction": "static void AdvanceHouseConstruction(",
         "SumHistory": "template <>\nTown::SuppliedHistory SumHistory(",
         "SetTownRatingTestMode": "void SetTownRatingTestMode(",
         "GetRating": "static int GetRating(",
@@ -247,143 +244,6 @@ def tunnel_reference_gap(out, archive=None):
             depth += (source[end] == "{") - (source[end] == "}")
             end += 1
         bodies[name] = source[start:end]
-
-    def unchanged_body(text, signature):
-        start = text.index(signature)
-        end = text.index("{", start) + 1
-        depth = 1
-        while depth:
-            depth += (text[end] == "{") - (text[end] == "}")
-            end += 1
-        return text[start:end]
-
-    name_source = (migration.REFERENCE / "src/townname.cpp").read_text()
-    utf_header = (migration.REFERENCE / "src/core/utf8.hpp").read_text()
-    name_bodies = {
-        "IsUtf8Part": unchanged_body(utf_header, "inline bool IsUtf8Part("),
-        "Utf8View": unchanged_body(utf_header, "class Utf8View {") + ";",
-        "Utf8StringLength": unchanged_body(
-            (migration.REFERENCE / "src/string.cpp").read_text(),
-            "size_t Utf8StringLength(",
-        ),
-        "TownNameParams": unchanged_body(
-            name_source, "TownNameParams::TownNameParams(const Town *t)"
-        ),
-        "GetTownName": unchanged_body(
-            name_source, "std::string GetTownName(const Town *t)"
-        ),
-        "VerifyTownName": unchanged_body(name_source, "bool VerifyTownName("),
-        "GenerateTownName": unchanged_body(name_source, "bool GenerateTownName("),
-        "IsUniqueTownName": unchanged_body(source, "static bool IsUniqueTownName("),
-    }
-    (out / "town-names-original.hpp").write_text(
-        "\n\n".join(name_bodies.values()) + "\n"
-    )
-    bodies.update(name_bodies)
-    map_source = (migration.REFERENCE / "src/town_map.h").read_text()
-    map_bodies = {}
-    for name in (
-        "GetHouseConstructionTick",
-        "IncHouseConstructionTick",
-        "IncrementHouseAge",
-        "ResetHouseAge",
-    ):
-        result = "uint8_t" if name == "GetHouseConstructionTick" else "void"
-        map_bodies[name] = unchanged_body(map_source, f"inline {result} {name}(")
-    bits_source = (migration.REFERENCE / "src/core/bitmath_func.hpp").read_text()
-    for name, signature in (
-        (
-            "GB",
-            "template <typename T>\n[[debug_inline]] inline constexpr static uint GB(",
-        ),
-        ("AB", "template <typename T, typename U>\nconstexpr T AB("),
-    ):
-        map_bodies[name] = unchanged_body(bits_source, signature)
-    placement_names = {
-        "IsCloseToTown": "static bool IsCloseToTown(",
-        "TownCanBePlacedHere": "static CommandCost TownCanBePlacedHere(",
-        "AlignTileToGrid": "static TileIndex AlignTileToGrid(",
-        "IsTileAlignedToGrid": "static bool IsTileAlignedToGrid(",
-        "FindNearestGoodCoastalTownSpot": "static TileIndex FindNearestGoodCoastalTownSpot(",
-        "GetDefaultTownsForMapSize": "uint GetDefaultTownsForMapSize()",
-    }
-    placement_bodies = {
-        name: unchanged_body(source, signature)
-        for name, signature in placement_names.items()
-    }
-    area_header = (migration.REFERENCE / "src/tilearea_type.h").read_text()
-    area_source = (migration.REFERENCE / "src/tilearea.cpp").read_text()
-    spiral_bodies = {
-        name: unchanged_body(area_header, f"class {name} {{") + ";"
-        for name in ("SpiralTileIterator", "SpiralTileSequence")
-    }
-    for name, signature in (
-        ("SpiralSquare", "SpiralTileIterator::SpiralTileIterator(TileIndex center,"),
-        ("SpiralSkip", "void SpiralTileIterator::SkipOutsideMap()"),
-        ("SpiralPosition", "void SpiralTileIterator::InitPosition()"),
-        ("SpiralIncrement", "void SpiralTileIterator::Increment()"),
-    ):
-        spiral_bodies[name] = unchanged_body(area_source, signature)
-    math_source = (migration.REFERENCE / "src/core/math_func.hpp").read_text()
-    map_functions = (migration.REFERENCE / "src/map_func.h").read_text()
-    map_cpp = (migration.REFERENCE / "src/map.cpp").read_text()
-    placement_bodies["DistanceFromEdge"] = unchanged_body(
-        map_cpp, "uint DistanceFromEdge(TileIndex tile)"
-    )
-    scale_bodies = {
-        "CeilDiv": unchanged_body(
-            math_source, "constexpr uint CeilDiv(uint a, uint b)"
-        ),
-        "ScaleBySize": unchanged_body(
-            map_functions, "static inline uint ScaleBySize(uint n)"
-        ),
-    }
-    (out / "town-scale-original.hpp").write_text(scale_bodies["ScaleBySize"] + "\n")
-    (out / "town-ceil-original.hpp").write_text(scale_bodies["CeilDiv"] + "\n")
-    distance_body = placement_bodies["DistanceFromEdge"]
-    (out / "town-placement-original.hpp").write_text(
-        "\n\n".join(
-            [
-                *spiral_bodies.values(),
-                distance_body,
-                *(
-                    body
-                    for name, body in placement_bodies.items()
-                    if name != "DistanceFromEdge"
-                ),
-            ]
-        )
-        + "\n"
-    )
-    bodies.update(placement_bodies | spiral_bodies | scale_bodies)
-    # Template bit helpers precede the unchanged map bodies that call them.
-    map_bodies = {
-        name: map_bodies[name]
-        for name in (
-            "GB",
-            "AB",
-            "GetHouseConstructionTick",
-            "IncHouseConstructionTick",
-            "IncrementHouseAge",
-            "ResetHouseAge",
-        )
-    }
-    house_bodies = {
-        name: bodies.pop(name)
-        for name in (
-            "AdvanceSingleHouseConstruction",
-            "AdvanceHouseConstruction",
-            "GetHouseNorthPart",
-        )
-    }
-    yearly_start = source.index("_economy_towns_yearly")
-    yearly_start = source.index("{", source.index("[](auto)", yearly_start))
-    yearly_body = unchanged_body(source[yearly_start:], "{")
-    house_bodies["Yearly"] = "static void ReferenceYearly() " + yearly_body
-    (out / "town-house-original.hpp").write_text(
-        "\n\n".join([*map_bodies.values(), *house_bodies.values()]) + "\n"
-    )
-    bodies.update(map_bodies | house_bodies)
     header = (migration.REFERENCE / "src/town.h").read_text()
     start = header.index("uint8_t PctTransported() const")
     end = header.index("{", start) + 1
@@ -393,19 +253,7 @@ def tunnel_reference_gap(out, archive=None):
         end += 1
     percent_body = header[start:end]
     (out / "town-percent-original.hpp").write_text(percent_body + "\n")
-    (out / "town-tunnel-original.hpp").write_text(
-        "\n\n".join(
-            body
-            for name, body in bodies.items()
-            if name not in map_bodies
-            and name not in house_bodies
-            and name not in placement_bodies
-            and name not in spiral_bodies
-            and name not in scale_bodies
-            and name not in name_bodies
-        )
-        + "\n"
-    )
+    (out / "town-tunnel-original.hpp").write_text("\n\n".join(bodies.values()) + "\n")
     bodies["PctTransported"] = percent_body
     build = ROOT / "build-rust"
     configuration = migration.rust_configuration(build)
@@ -415,22 +263,12 @@ def tunnel_reference_gap(out, archive=None):
         for line in (build / "CMakeCache.txt").read_text().splitlines()
         if line.startswith("CMAKE_CXX_COMPILER:FILEPATH=")
     )
-    header = (migration.REFERENCE / "src/town.h").read_text()
-    start = header.index("inline const std::string &GetCachedName() const")
-    end = header.index("{", start) + 1
-    depth = 1
-    while depth:
-        depth += (header[end] == "{") - (header[end] == "}")
-        end += 1
-    bodies["GetCachedName"] = header[start:end]
-    (out / "town-cached-name-original.hpp").write_text(bodies["GetCachedName"])
     fixture = Path(__file__).with_name("town-tunnel-reference.cpp")
     binary = out / "town-tunnel-reference"
     command = [
         compiler,
         "-std=c++20",
         "-O2",
-        "-DWITH_RUST",
         "-I",
         str(out),
         str(fixture),
@@ -477,26 +315,6 @@ def tunnel_reference_gap(out, archive=None):
         raise RuntimeError(
             "town transported-percent gap omitted completion/count marker"
         )
-    house = re.search(rb"\nPASS (\d+) unchanged-reference house cases\n", run.stdout)
-    if not house or int(house[1]) == 0:
-        raise RuntimeError("town house reference gap omitted completion/count marker")
-    placement = re.search(
-        rb"\nPASS (\d+) unchanged-reference placement cases\n", run.stdout
-    )
-    if not placement or int(placement[1]) == 0:
-        raise RuntimeError(
-            "town placement reference gap omitted completion/count marker"
-        )
-    town_bytes = re.search(
-        rb"\nPASS (\d+) unchanged-reference town-byte cases\n", run.stdout
-    )
-    if not town_bytes or int(town_bytes[1]) == 0:
-        raise RuntimeError("town byte ownership gap omitted completion/count marker")
-    names = re.search(
-        rb"\nPASS (\d+) unchanged-reference name-policy cases\n", run.stdout
-    )
-    if not names or int(names[1]) == 0:
-        raise RuntimeError("town name policy gap omitted completion/count marker")
     migration.ensure_reference()
     report = {
         "passed": True,
@@ -505,10 +323,6 @@ def tunnel_reference_gap(out, archive=None):
         "radius_cases": int(radius[1]),
         "authority_cases": int(authority[1]),
         "percent_cases": int(percent[1]),
-        "house_cases": int(house[1]),
-        "placement_cases": int(placement[1]),
-        "town_byte_cases": int(town_bytes[1]),
-        "name_policy_cases": int(names[1]),
         "cases": int(match[1]),
         "successful_tunnel_cases": len(re.findall(rb" result=1 ", run.stdout)),
         "execute_effect_cases": len(re.findall(rb" effects=1 ", run.stdout)),
@@ -528,11 +342,7 @@ def tunnel_reference_gap(out, archive=None):
             "Nested rating scratch, company changes, shell reuse and early-return service ordering are absent from ordinary console saves.",
             "Radius table/linear boundary and full house-count widths supplement the ordinary generated-town populations.",
             "Ordered road-mask/info services, command arguments, result, RNG and partial execute effects compare exactly.",
-            "Pure C++ map getter calls and typed Rust predicates have different granularity; their call counts/order are not compared.",
-            "Packed-byte construction/age boundaries, multi-tile order and animation reentry supplement the ordinary house-growth snapshots.",
-            "Name collisions, malformed UTF-8 length, missing GRF fallback, retry exhaustion and untouched failure output are not forced by generated worlds.",
-            "Raw NUL/non-UTF8 ownership and stable cached-name reference invalidation are not reachable through validated name commands.",
-            "Exact site goals/near-town thresholds, clipped coastal order/ties and default-count widths are not forced by generated-save scenarios.",
+            "Pure C++ map getter calls and Rust bundled records have different granularity; their call counts/order are not compared.",
             "One active town-buildable road type; shared command internals and road-type selection are outside this gap check.",
         ],
         "agent": "/root/town_lifecycle_148",

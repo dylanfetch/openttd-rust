@@ -27,30 +27,6 @@ struct TownSimulationSaveScope {
 	TownSimulationSaveScope &operator=(const TownSimulationSaveScope &) = delete;
 };
 
-/** Match original std::string/EncodedString save fields, including writes made
- * before a partial-load exception. Staging is scoped and never authoritative. */
-struct TownBytesSaveScope {
-	struct Values { std::string name; EncodedString text; };
-	static inline Values current{};
-	Values previous;
-	Town *town;
-	bool loading;
-	TownBytesSaveScope(Town *town, bool loading) : previous(std::move(current)), town(town), loading(loading)
-	{
-		current = {std::string(town->name.view()), town->text.encoded()};
-	}
-	~TownBytesSaveScope()
-	{
-		if (this->loading) {
-			this->town->name = current.name;
-			this->town->text = current.text;
-		}
-		current = std::move(this->previous);
-	}
-	TownBytesSaveScope(const TownBytesSaveScope &) = delete;
-	TownBytesSaveScope &operator=(const TownBytesSaveScope &) = delete;
-};
-
 struct TownGrowthSaveScope {
 	struct Values { uint16_t counter, rate; uint8_t funding, road, flags; };
 	static inline Values current{};

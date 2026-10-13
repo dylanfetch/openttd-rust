@@ -67,7 +67,6 @@ struct OpenTTDSharedServices {
 	uint16_t (*town_index)(uint32_t) noexcept;
 	uint8_t (*road_bits)(uint32_t, uint8_t, bool) noexcept;
 };
-const OpenTTDTownHandle *OpenTTDNextTown(uint32_t from) noexcept;
 const OpenTTDSharedServices &GetRustSharedServices() noexcept;
 
 /* Standalone fixtures without a game map: map predicates return zero and writes do nothing. */

@@ -283,11 +283,7 @@ static const SaveLoad _town_desc[] = {
 	    SLE_VAR(Town, townnametype,          SLE_UINT16),
 	    SLE_VAR(Town, townnameparts,         SLE_UINT32),
 #endif
-#ifdef WITH_RUST
-	SLEG_CONDSSTR("name", TownBytesSaveScope::current.name, SLE_STR | SLF_ALLOW_CONTROL, SLV_84, SL_MAX_VERSION),
-#else
 	SLE_CONDSSTR(Town, name,                 SLE_STR | SLF_ALLOW_CONTROL, SLV_84, SL_MAX_VERSION),
-#endif
 
 #ifdef WITH_RUST
 	    SLEG_VAR("flags", TownGrowthSaveScope::current.flags,                 SLE_UINT8),
@@ -381,11 +377,7 @@ static const SaveLoad _town_desc[] = {
 	SLE_CONDARR(Town, goal, SLE_UINT32, NUM_TAE, SLV_165, SL_MAX_VERSION),
 #endif
 
-#ifdef WITH_RUST
-	SLEG_CONDSSTR("text", TownBytesSaveScope::current.text, SLE_STR | SLF_ALLOW_CONTROL, SLV_168, SL_MAX_VERSION),
-#else
 	SLE_CONDSSTR(Town, text,                 SLE_STR | SLF_ALLOW_CONTROL, SLV_168, SL_MAX_VERSION),
-#endif
 
 #ifdef WITH_RUST
 	SLEG_CONDVAR("time_until_rebuild", TownSimulationSaveScope::current.time_until_rebuild, SLE_FILE_U8 | SLE_VAR_U16, SL_MIN_VERSION, SLV_54),
@@ -485,7 +477,6 @@ struct CITYChunkHandler : ChunkHandler {
 #ifdef WITH_RUST
 			TownSimulationSaveScope simulation_scope(t, false);
 			TownGrowthSaveScope growth_scope(t, false);
-			TownBytesSaveScope bytes_scope(t, false);
 #endif
 			SlObject(t, _town_desc);
 		}
@@ -503,7 +494,6 @@ struct CITYChunkHandler : ChunkHandler {
 #ifdef WITH_RUST
 				TownSimulationSaveScope simulation_scope(t, true);
 				TownGrowthSaveScope growth_scope(t, true);
-				TownBytesSaveScope bytes_scope(t, true);
 #endif
 				SlObject(t, slt);
 			}
@@ -536,7 +526,6 @@ struct CITYChunkHandler : ChunkHandler {
 #ifdef WITH_RUST
 			TownSimulationSaveScope simulation_scope(t, false);
 			TownGrowthSaveScope growth_scope(t, false);
-			TownBytesSaveScope bytes_scope(t, false);
 #endif
 			SlObject(t, _town_desc);
 		}

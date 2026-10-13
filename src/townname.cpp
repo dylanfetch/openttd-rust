@@ -19,7 +19,6 @@
 
 #ifdef WITH_RUST
 #include "rust/townname_ffi.h"
-#include "rust/town_names_ffi.h"
 #else
 #include "table/townname.h"
 #endif
@@ -98,33 +97,6 @@ std::string GetTownName(const Town *t)
 }
 
 
-#ifdef WITH_RUST
-OpenTTDTownNameParams GetRustTownNameParams() noexcept
-{
-	TownNameParams params(_settings_game.game_creation.town_name);
-	return {.grfid = params.grfid, .kind = params.type};
-}
-const OpenTTDTownNameServices &GetRustTownNameServices() noexcept
-{
-	static const OpenTTDTownNameServices services{
-		.params = GetRustTownNameParams,
-		.next_random = [](OpenTTDTownRandomizer *randomizer) noexcept { return randomizer->Next(); },
-		.next_town = [](uint32_t from) noexcept {
-			const auto *town = OpenTTDNextTown(from);
-			return OpenTTDTownNameCursor{.town = town, .index = town == nullptr ? uint16_t{0} : reinterpret_cast<const Town *>(town)->index.base()};
-		},
-		.grf_valid = [](uint32_t grfid) noexcept { return GetGRFTownName(grfid) != nullptr; },
-		.render = [](OpenTTDTownNameParams params, uint32_t parts, void *context, bool (*consume)(void *, OpenTTDByteSpan)) noexcept {
-			static_assert(sizeof(TownNameParams) == sizeof(OpenTTDTownNameParams));
-			auto native_params = std::bit_cast<TownNameParams>(params);
-			std::string name = GetTownName(&native_params, parts);
-			return consume(context, {reinterpret_cast<const uint8_t *>(name.data()), name.size()});
-		},
-	};
-	return services;
-}
-#endif
-
 /**
  * Verifies the town name is valid and unique.
  * @param r random bits
@@ -134,9 +106,6 @@ const OpenTTDTownNameServices &GetRustTownNameServices() noexcept
  */
 bool VerifyTownName(uint32_t r, const TownNameParams *par, TownNames *town_names)
 {
-#ifdef WITH_RUST
-	return openttd_rust_town_verify_name(&GetRustTownNameServices(), &GetRustSharedServices(), r, {.grfid = par->grfid, .kind = par->type}, town_names == nullptr ? nullptr : town_names->get());
-#else
 	std::string name = GetTownName(par, r);
 
 	/* Check size and width */
@@ -158,7 +127,6 @@ bool VerifyTownName(uint32_t r, const TownNameParams *par, TownNames *town_names
 	}
 
 	return true;
-#endif
 }
 
 
@@ -171,9 +139,6 @@ bool VerifyTownName(uint32_t r, const TownNameParams *par, TownNames *town_names
  */
 bool GenerateTownName(Randomizer &randomizer, uint32_t *townnameparts, TownNames *town_names)
 {
-#ifdef WITH_RUST
-	return openttd_rust_town_generate_name(&GetRustTownNameServices(), &GetRustSharedServices(), &randomizer, townnameparts, town_names == nullptr ? nullptr : town_names->get());
-#else
 	TownNameParams par(_settings_game.game_creation.town_name);
 
 	/* Do not set i too low, since when we run out of names, we loop
@@ -190,7 +155,6 @@ bool GenerateTownName(Randomizer &randomizer, uint32_t *townnameparts, TownNames
 	}
 
 	return false;
-#endif
 }
 
 
@@ -1020,14 +984,10 @@ void GenerateTownNameString(StringBuilder &builder, size_t lang, uint32_t seed)
 #ifdef WITH_RUST
 	static_assert(BUILTIN_TOWNNAME_GENERATOR_COUNT == 21);
 	assert(lang < BUILTIN_TOWNNAME_GENERATOR_COUNT);
-	/* Append outside Rust; stack RAII frees source output bytes if allocation throws. */
-	struct Output {
-		OpenTTDTownNameStackOutput storage;
-		Output(size_t lang, uint32_t seed) { openttd_rust_townname_stack_init(&this->storage, lang, seed); }
-		~Output() { openttd_rust_townname_stack_destroy(&this->storage); }
-	} result(lang, seed);
+	/* Append outside Rust; RAII also frees the result if the C++ allocation throws. */
+	auto result = std::unique_ptr<OpenTTDTownNameResult, decltype(&openttd_rust_townname_destroy)>(openttd_rust_townname_generate(lang, seed), openttd_rust_townname_destroy);
 	size_t length;
-	const char *data = openttd_rust_townname_stack_data(&result.storage, &length);
+	const char *data = openttd_rust_townname_data(result.get(), &length);
 	builder.Put(std::string_view(data, length));
 #else
 	assert(lang < std::size(_town_name_generators));

@@ -19,7 +19,6 @@
 #include "cargotype.h"
 #ifdef WITH_RUST
 #include "rust/town_owner.hpp"
-#include "rust/town_bytes.hpp"
 #endif
 
 template <typename T>
@@ -155,11 +154,7 @@ struct Town : TownPool::PoolItem<&_town_pool> {
 	uint16_t townnametype = 0;
 	uint32_t townnameparts = 0;
 #endif
-#ifdef WITH_RUST
-	RustTownName name{growth_owner.get()};
-#else
 	std::string name{}; ///< Custom town name. If empty, the town was not renamed and uses the generated name.
-#endif
 	mutable std::string cached_name{}; ///< NOSAVE: Cache of the resolved name of the town, if not using a custom town name
 
 #ifdef WITH_RUST
@@ -265,11 +260,7 @@ struct Town : TownPool::PoolItem<&_town_pool> {
 	ValidHistoryMask valid_history = 0; ///< Mask of valid history records.
 #endif
 
-#ifdef WITH_RUST
-	RustTownText text{growth_owner.get()};
-#else
 	EncodedString text{}; ///< General text with additional information.
-#endif
 
 	inline SuppliedCargo &GetOrCreateCargoSupplied(CargoType cargo)
 	{

@@ -6,14 +6,9 @@
  */
 
 /** @file windows-abi.cpp Bounded first-32-bit layout and real C ABI call checks. */
-#include "rust/town_names_ffi.h"
 #include "rust/abi_ffi.h"
-#include "rust/byte_span_ffi.h"
 #include "rust/command_cost_ffi.h"
 #include "rust/command_services_ffi.h"
-#include "rust/town_house_ffi.h"
-#include "rust/town_lifecycle_ffi.h"
-#include "rust/town_placement_ffi.h"
 #include "rust/water_regions_ffi.h"
 #include "rust/cargo_payment_ffi.h"
 #include "rust/cargo_storage_ffi.h"
@@ -87,18 +82,7 @@ static void Layout(uint16_t type, const char *name, std::initializer_list<size_t
 
 static void Layouts()
 {
-	Layout(572, "OpenTTDByteSpan", {sizeof(OpenTTDByteSpan), alignof(OpenTTDByteSpan), offsetof(OpenTTDByteSpan, data), offsetof(OpenTTDByteSpan, size)});
-	Layout(454, "OpenTTDTownNameServices", {sizeof(OpenTTDTownNameServices), alignof(OpenTTDTownNameServices), offsetof(OpenTTDTownNameServices, params), offsetof(OpenTTDTownNameServices, next_random), offsetof(OpenTTDTownNameServices, next_town), offsetof(OpenTTDTownNameServices, grf_valid), offsetof(OpenTTDTownNameServices, render)});
-	Layout(453, "OpenTTDTownNameCursor", {sizeof(OpenTTDTownNameCursor), alignof(OpenTTDTownNameCursor), offsetof(OpenTTDTownNameCursor, town), offsetof(OpenTTDTownNameCursor, index)});
-	Layout(452, "OpenTTDTownNamesScratch", {sizeof(OpenTTDTownNamesScratch), alignof(OpenTTDTownNamesScratch), offsetof(OpenTTDTownNamesScratch, words)});
-	Layout(451, "OpenTTDTownNameStackOutput", {sizeof(OpenTTDTownNameStackOutput), alignof(OpenTTDTownNameStackOutput), offsetof(OpenTTDTownNameStackOutput, words)});
-	Layout(450, "OpenTTDTownPlacementServices", {sizeof(OpenTTDTownPlacementServices), alignof(OpenTTDTownPlacementServices), offsetof(OpenTTDTownPlacementServices, spatial_empty), offsetof(OpenTTDTownPlacementServices, nearest_town), offsetof(OpenTTDTownPlacementServices, clear_ground), offsetof(OpenTTDTownPlacementServices, tree_ground), offsetof(OpenTTDTownPlacementServices, water_distance), offsetof(OpenTTDTownPlacementServices, number_towns), offsetof(OpenTTDTownPlacementServices, custom_towns), offsetof(OpenTTDTownPlacementServices, edge_error), offsetof(OpenTTDTownPlacementServices, town_error), offsetof(OpenTTDTownPlacementServices, site_error)});
 	Layout(444, "OpenTTDTownSuppliedEntry", {sizeof(OpenTTDTownSuppliedEntry), alignof(OpenTTDTownSuppliedEntry), offsetof(OpenTTDTownSuppliedEntry, entry), offsetof(OpenTTDTownSuppliedEntry, created)});
-	Layout(449, "OpenTTDTownCountSizes", {sizeof(OpenTTDTownCountSizes), alignof(OpenTTDTownCountSizes), offsetof(OpenTTDTownCountSizes, houses), offsetof(OpenTTDTownCountSizes, classes)});
-	Layout(448, "OpenTTDTownNameParams", {sizeof(OpenTTDTownNameParams), alignof(OpenTTDTownNameParams), offsetof(OpenTTDTownNameParams, grfid), offsetof(OpenTTDTownNameParams, kind)});
-	Layout(447, "OpenTTDTownCreateServices", {sizeof(OpenTTDTownCreateServices), alignof(OpenTTDTownCreateServices), offsetof(OpenTTDTownCreateServices, count_sizes), offsetof(OpenTTDTownCreateServices, insert_spatial), offsetof(OpenTTDTownCreateServices, acceptance_cargo), offsetof(OpenTTDTownCreateServices, name_params), offsetof(OpenTTDTownCreateServices, initial_city_size), offsetof(OpenTTDTownCreateServices, show_zone), offsetof(OpenTTDTownCreateServices, virt_coord), offsetof(OpenTTDTownCreateServices, dirty_directory), offsetof(OpenTTDTownCreateServices, update_noise)});
-	Layout(446, "OpenTTDTownHouseNorth", {sizeof(OpenTTDTownHouseNorth), alignof(OpenTTDTownHouseNorth), offsetof(OpenTTDTownHouseNorth, house), offsetof(OpenTTDTownHouseNorth, diff)});
-	Layout(445, "OpenTTDTownHouseServices", {sizeof(OpenTTDTownHouseServices), alignof(OpenTTDTownHouseServices), offsetof(OpenTTDTownHouseServices, byte), offsetof(OpenTTDTownHouseServices, completed), offsetof(OpenTTDTownHouseServices, set_byte), offsetof(OpenTTDTownHouseServices, set_completed), offsetof(OpenTTDTownHouseServices, house), offsetof(OpenTTDTownHouseServices, population), offsetof(OpenTTDTownHouseServices, construction_animation)});
 	Layout(443, "OpenTTDTownAuthorityServices", {sizeof(OpenTTDTownAuthorityServices), alignof(OpenTTDTownAuthorityServices), offsetof(OpenTTDTownAuthorityServices, council_tolerance), offsetof(OpenTTDTownAuthorityServices, bulldozer), offsetof(OpenTTDTownAuthorityServices, authority_distance), offsetof(OpenTTDTownAuthorityServices, town_index), offsetof(OpenTTDTownAuthorityServices, refusal)});
 	Layout(621, "OpenTTDCommandServices", {sizeof(OpenTTDCommandServices), alignof(OpenTTDCommandServices), offsetof(OpenTTDCommandServices, landscape_clear)});
 	Layout(620, "OpenTTDCommandCostServices", {sizeof(OpenTTDCommandCostServices), alignof(OpenTTDCommandCostServices), offsetof(OpenTTDCommandCostServices, zero), offsetof(OpenTTDCommandCostServices, error), offsetof(OpenTTDCommandCostServices, expense_money), offsetof(OpenTTDCommandCostServices, error_param), offsetof(OpenTTDCommandCostServices, add), offsetof(OpenTTDCommandCostServices, move), offsetof(OpenTTDCommandCostServices, amount), offsetof(OpenTTDCommandCostServices, success), offsetof(OpenTTDCommandCostServices, error_message), offsetof(OpenTTDCommandCostServices, money)});
@@ -1581,13 +1565,6 @@ int main()
 	size_t name_length;
 	const char *name = openttd_rust_townname_data(townname, &name_length);
 	CHECK(name_length == 8 && std::memcmp(name, "Alen\xc3\xa7on", name_length) == 0);
-	OpenTTDTownNameStackOutput stack_name;
-	openttd_rust_townname_stack_init(&stack_name, 1, UINT32_MAX);
-	size_t stack_length;
-	const char *stack_data = openttd_rust_townname_stack_data(&stack_name, &stack_length);
-	CHECK(stack_length == name_length);
-	CHECK(std::memcmp(stack_data, name, name_length) == 0);
-	openttd_rust_townname_stack_destroy(&stack_name);
 	openttd_rust_townname_destroy(townname);
 	Calls();
 	Encoded();

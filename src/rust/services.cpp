@@ -91,12 +91,6 @@ static uint8_t SharedNextCompany(uint8_t from) noexcept
 	return it == range.end() ? CompanyID::Invalid().base() : (*it)->index.base();
 }
 
-const OpenTTDTownHandle *OpenTTDNextTown(uint32_t from) noexcept
-{
-	auto range = Town::Iterate(from);
-	auto it = range.begin();
-	return it == range.end() ? nullptr : reinterpret_cast<const OpenTTDTownHandle *>(*it);
-}
 static const OpenTTDTownHandle *SharedClosestTown(uint32_t tile, uint32_t threshold) noexcept
 {
 	return reinterpret_cast<const OpenTTDTownHandle *>(ClosestTownFromTile(TileIndex{tile}, threshold));

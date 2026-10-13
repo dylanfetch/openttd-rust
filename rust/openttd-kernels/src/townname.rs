@@ -624,70 +624,13 @@ const GENERATORS: [fn(&mut String, u32); 21] = [
     catalan,
 ];
 
-/// Stack-placed immutable output owner. The opaque words preserve alignment on
-/// native 32/64-bit targets; Rust alone knows the contained `String` layout.
-#[repr(C)]
-pub struct StackOutput {
-    pub words: [std::mem::MaybeUninit<usize>; 3],
-}
-const _: () = {
-    assert!(std::mem::size_of::<String>() <= std::mem::size_of::<StackOutput>());
-    assert!(std::mem::align_of::<String>() <= std::mem::align_of::<StackOutput>());
-};
-fn generate_owned(lang: usize, seed: u32) -> String {
-    let mut output = String::new();
-    GENERATORS[lang](&mut output, seed);
-    output
-}
-/// # Safety
-/// Output addresses uninitialized, aligned stack storage that stays live until
-/// stack destroy. No output view exists before initialization or after destroy.
-#[allow(unsafe_code)]
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_townname_stack_init(
-    output: *mut StackOutput,
-    lang: usize,
-    seed: u32,
-) {
-    // SAFETY: The facade provides fresh storage, sized/aligned as checked above.
-    unsafe {
-        output.cast::<String>().write(generate_owned(lang, seed));
-    }
-}
-/// # Safety
-/// Output was initialized once; bytes stay live/immutable until stack destroy.
-/// Length addresses writable native `size_t`; no caller retains a destroyed view.
-#[allow(unsafe_code)]
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_townname_stack_data(
-    output: *const StackOutput,
-    length: *mut usize,
-) -> *const u8 {
-    // SAFETY: This live initialized storage contains the single output owner.
-    let value = unsafe { &*output.cast::<String>() };
-    // SAFETY: Native facade supplies its writable stack length sink.
-    unsafe {
-        *length = value.len();
-    }
-    value.as_ptr()
-}
-/// # Safety
-/// Destroy exactly once initialized stack storage, after the final byte borrow.
-/// Native RAII invokes this even if appending to the source builder throws.
-#[allow(unsafe_code)]
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_townname_stack_destroy(output: *mut StackOutput) {
-    // SAFETY: Caller guarantees a live initialized String and unique destruction.
-    unsafe {
-        std::ptr::drop_in_place(output.cast::<String>());
-    }
-}
-
 /// Owns the complete immutable output; the C++ builder is accessed only after return.
 #[allow(unsafe_code)]
 #[unsafe(no_mangle)]
 pub extern "C" fn openttd_rust_townname_generate(lang: usize, seed: u32) -> *mut String {
-    Box::into_raw(Box::new(generate_owned(lang, seed)))
+    let mut output = Box::new(String::new());
+    GENERATORS[lang](&mut output, seed);
+    Box::into_raw(output)
 }
 
 /// # Safety

@@ -8,9 +8,6 @@
 /** @file newgrf_house.cpp Implementation of NewGRF houses. */
 
 #include "stdafx.h"
-#ifdef WITH_RUST
-#include "rust/town_lifecycle_ffi.h"
-#endif
 #include "debug.h"
 #include "landscape.h"
 #include "newgrf_badge.h"
@@ -153,28 +150,16 @@ HouseClassID AllocateHouseClassID(uint8_t grf_class_id, uint32_t grfid)
 	return static_cast<HouseClassID>(std::distance(std::begin(_class_mapping), it));
 }
 
-#ifdef WITH_RUST
-OpenTTDTownCountSizes GetRustTownCountSizes() noexcept
-{
-	return {.houses = HouseSpec::Specs().size(), .classes = _class_mapping.size()};
-}
-#endif
-
 /**
  * Initialise building counts for a town.
  * @param t Town cache to initialise.
  */
 void InitializeBuildingCounts(Town *t)
 {
-#ifdef WITH_RUST
-	openttd_rust_town_initialize_counts(t->growth_owner.get(), GetRustTownCountSizes());
-#else
-
 	t->cache.building_counts.id_count.clear();
 	t->cache.building_counts.class_count.clear();
 	t->cache.building_counts.id_count.resize(HouseSpec::Specs().size());
 	t->cache.building_counts.class_count.resize(_class_mapping.size());
-#endif
 }
 
 /**
