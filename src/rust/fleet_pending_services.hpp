@@ -5,10 +5,12 @@
  * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
  */
 
+#include "company_services.h"
+
 /* Typed tick-end services. Rust owns ordering and policy; native CommandCost
  * and presentation encoding stay on the native caller stack. Vehicle, owner,
  * locality and CommandCost reads reuse the group and transaction tables. */
-static void FleetPending_set_current(uint8_t company) noexcept { _current_company = CompanyID(company); }
+static void FleetPending_set_current(uint8_t company) noexcept { OpenTTDSetCurrentCompany(CompanyID(company)); }
 static void FleetPending_restart(void *shell) noexcept { static_cast<Vehicle *>(shell)->vehstatus.Reset(VehState::Stopped); }
 static int32_t FleetPending_x(void *shell) noexcept { return static_cast<Vehicle *>(shell)->x_pos; }
 static int32_t FleetPending_y(void *shell) noexcept { return static_cast<Vehicle *>(shell)->y_pos; }

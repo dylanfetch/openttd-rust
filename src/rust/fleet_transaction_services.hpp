@@ -5,6 +5,8 @@
  * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
  */
 
+#include "company_services.h"
+
 /* Named shared services and full native CommandCost storage. All callbacks are
  * noexcept, retain original move/AddCost behavior, and permit ordinary reentry.
  * No Rust state access spans them; environmental failures terminate. */
@@ -44,7 +46,7 @@ static constexpr bool FLEET_ASSERTIONS = true;
 #else
 static constexpr bool FLEET_ASSERTIONS = false;
 #endif
-static bool FleetTransaction_needs_renew(void *shell, bool settings) noexcept { return static_cast<Vehicle *>(shell)->NeedsAutorenewing(Company::Get(_current_company), settings); }
+static bool FleetTransaction_needs_renew(void *shell, bool settings) noexcept { return static_cast<Vehicle *>(shell)->NeedsAutorenewing(Company::Get(OpenTTDCurrentCompany()), settings); }
 static bool FleetTransaction_engine_valid(uint16_t id) noexcept { return Engine::IsValidID(EngineID(id)); }
 static bool FleetTransaction_company_valid(uint8_t id) noexcept { return Company::IsValidID(CompanyID(id)); }
 static bool FleetTransaction_engine_buildable(uint16_t id, uint8_t type, uint8_t company) noexcept { return IsEngineBuildable(EngineID(id), static_cast<VehicleType>(type), CompanyID(company)); }
