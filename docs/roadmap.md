@@ -9,8 +9,8 @@ forward-looking, about 200 lines; completed work is one row, with evidence in PR
 - Twenty-three ownership ports. Whole fork against the pinned original: Rust
   55,079 / tooling 28,391 / C++ glue 24,570 / original C++ retired 36,162 (7.68%
   of all `src/` sources); simulation-source share 28,215 / 102,615 (27.50%, #226).
-- #226 metric and #235 CI implementation are integrated. #230/#236 full CI runs
-  concurrently; #216/#217 await it. Aircraft #238 and coverage #239 are active;
+- #226 metric and #235 CI implementation are integrated. #230/#236 passed
+  concurrent full CI; #216/#217 await it. Aircraft #238 and coverage #239 are active;
   six component branches are unintegrated.
 - New-base benchmark, median of three `--benchmark 3` invocations:
   Opus 1.258, Grok 1.254, Padhattan-1996 1.275, Padhattan-2000 1.349,
@@ -161,21 +161,21 @@ The #108 decision keeps C++ map arrays and direct bundled `noexcept` services.
 
 ## Resume checkpoint
 
-Active continuous development. #233 operational acceptance remains open.
-All four reviewed branches adopt integrated CI without source conflicts;
-#230/#236 validate concurrently. Station/town await full CI. Aircraft conversion
-passes its initial default crossing budgets; coverage #239 is implementing.
-Integrate by readiness. New ownership waits for a second of #216/#217/#226/#230;
-#212's read-only plan prepares its required hot-path feasibility prototype.
+Active continuous development. The host aborted root's session at 09:35Z on
+2026-10-13. Every worktree was left clean and pushed. #230/#236 have passed full
+CI at their current heads and can integrate first. #233 has two concurrent warm
+samples (13.8 and 16.9 min, recorded on the issue); three-merge cache acceptance
+is still open. #212's read-only plan is done; #213's plan was interrupted and
+needs a fresh planner.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
 | #214 / #217 | `station-loading-direct-214`, `debe725826` | Reviewed; all six speed cases pass. Full CI, integrate. |
 | #148 / #216 | `town-lifecycle-148`, `78477f22bc` | Reviewed; seven town and six speed cases pass. Full CI, integrate. |
-| #229 / #230 | `speed-caps-229`, `c14dd31681` | All six caps reviewed; exact-head full CI running. |
-| #234 / #236 | `industry-water-fidelity-234`, `2270aa2edd` | Reviewed; refreshed-base full CI running. |
-| #237 / #238 | `aircraft-shared-boundary-237`, `0f3a9cf066` | Shared conversion pushed; complete validation, quiet speed and review. |
-| #239 | `industry-prospect-coverage-239`, base `bc02f41b41` | Reference prospect-failure inputs calibrated; implement default assertions. |
+| #229 / #230 | `speed-caps-229`, `c14dd31681` | Reviewed; full CI passed at this head. Integrate. |
+| #234 / #236 | `industry-water-fidelity-234`, `2270aa2edd` | Reviewed; full CI passed at this head. Integrate. |
+| #237 / #238 | `aircraft-shared-boundary-237`, `0f3a9cf066` | Affected scenarios pass; quiet timing was interrupted, so rerun it, then review. |
+| #239 / #240 | `industry-prospect-coverage-239`, `2081e85ce5` | Implemented and verified; the review was interrupted, so it needs a fresh reviewer. |
 
 Selected but unstarted: #212/#213, then #219/#220. ABI blocks: train through 385,
 tree additions 386-389, fleet 390-399, company 400-429, town 430-459, road 460-499,
