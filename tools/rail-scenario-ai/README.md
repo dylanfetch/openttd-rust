@@ -23,9 +23,10 @@ reverses after waiting. The candidate's `extension_fail` and `extension_rollback
 must be positive. These are controller extension branches, distinct from YAPF's
 search rollback.
 
-Every rail scenario enables `train-profile.json` for a distinct candidate and
-fails when it is missing or a branch in `rails.TRAIN_BRANCHES` is zero; the
-reference, `--self` and `--benchmark` runs do not count branches.
+Every rail scenario sets `OPENTTD_WITNESS` for a distinct candidate and fails
+when its `branch-witnesses.json` is missing or a `train.*` branch in
+`rails.TRAIN_BRANCHES` is zero; the reference, `--self` and `--benchmark` runs
+do not count branches.
 
 ```sh
 python3 tools/migration.py simulate rail-controller --self --jobs 2

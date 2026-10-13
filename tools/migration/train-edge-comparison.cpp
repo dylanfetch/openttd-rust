@@ -65,9 +65,6 @@ static bool IsBridgeTile(TileIndex) { return false; }
 static OpenTTDTrainHandle Handle(Train *v) noexcept { return {v, v == nullptr ? nullptr : v->state}; }
 static Train &Part(OpenTTDTrainHandle part) noexcept { return *static_cast<Train *>(part.shell); }
 static uint32_t UnexpectedRandom(void *) noexcept { std::abort(); }
-static void UnexpectedObserve(void *, uint32_t, uint32_t *) noexcept { std::abort(); }
-static void UnexpectedWrite(void *, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) noexcept { std::abort(); }
-static float UnexpectedTrig(uint32_t, float) noexcept { std::abort(); }
 static uint32_t UnexpectedIndustry(int32_t, int32_t, uint32_t *) noexcept { std::abort(); }
 static OpenTTDTrainServices Leaves()
 {
@@ -94,20 +91,19 @@ static OpenTTDTrainServices Leaves()
 	leaves.viewport = [](OpenTTDTrainHandle h, uint8_t a, uint8_t b) noexcept { Part(h).UpdateViewport(a != 0, b != 0); };
 	leaves.tile_virt = [](OpenTTDTrainHandle, int32_t x, int32_t y) noexcept { return uint64_t(TileVirtXY(x, y)); };
 	leaves.is_tunnelbridge = [](OpenTTDTrainHandle, uint32_t) noexcept { return uint64_t(0); };
-	leaves.profile = [](OpenTTDTrainHandle, uint64_t) noexcept {};
 	leaves.enter_tile = [](OpenTTDTrainHandle h, uint32_t tile, int32_t x, int32_t y) noexcept { VehicleEnterTile(&Part(h), tile, x, y); return uint64_t(0); };
 	return leaves;
 }
 static uint16_t RustCurve()
 {
 	const auto leaves = Leaves();
-	const OpenTTDSharedServices shared{nullptr, UnexpectedRandom, UnexpectedObserve, UnexpectedWrite, UnexpectedTrig, UnexpectedIndustry};
+	const OpenTTDSharedServices shared = OpenTTDFixtureSharedServices(nullptr, UnexpectedRandom, UnexpectedIndustry);
 	return openttd_rust_train_curve_limit(Handle(trains), &leaves, &shared);
 }
 static void RustReverse(int left, int right)
 {
 	const auto leaves = Leaves();
-	const OpenTTDSharedServices shared{nullptr, UnexpectedRandom, UnexpectedObserve, UnexpectedWrite, UnexpectedTrig, UnexpectedIndustry};
+	const OpenTTDSharedServices shared = OpenTTDFixtureSharedServices(nullptr, UnexpectedRandom, UnexpectedIndustry);
 	openttd_rust_train_reverse_swap(Handle(trains), left, right, &leaves, &shared);
 }
 static uint32_t random_state = 130;

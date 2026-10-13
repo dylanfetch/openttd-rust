@@ -48,7 +48,6 @@
 
 #ifdef WITH_RUST
 #include "rust/ffi.h"
-#include "rust/trees_ffi.h"
 #endif
 
 #include "safeguards.h"
@@ -818,9 +817,6 @@ TileIndex _cur_tileloop_tile;
  */
 void RunTileLoop()
 {
-#ifdef WITH_RUST
-	ProfileRustTreeTileLoop();
-#endif
 	PerformanceAccumulator framerate(PFE_GL_LANDSCAPE);
 
 	/* The pseudorandom sequence of tiles is generated using a Galois linear feedback

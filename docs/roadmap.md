@@ -4,60 +4,59 @@ Root owns selection here; `AGENTS.md` and `docs/rust-migration.md` define proces
 If an issue conflicts, follow this roadmap and report it to root. Keep this
 forward-looking, about 200 lines; completed work is one row, with evidence in PRs.
 
-## Where the fork stands (2026-10-09, `271fdfea2e`)
+## Where the fork stands (2026-10-12, `04b32068f6`)
 
-- Twenty-two ownership ports retire about 32.5k original C++ lines, about 8.5%
-  of roughly 384k non-vendored `src/` lines. Over the last day, the #168
-  conversions added about 5.7k C++ glue lines and retired 2.6k. Untouched
-  simulation remains large: `rail_cmd`, `road_cmd`, `water_cmd`,
-  `tunnelbridge_cmd`, `clear_cmd`, most of `vehicle.cpp`/`vehicle_cmd.cpp`, and
-  the tile loops they drive.
-- Speed (independent idle-host run, `271fdfea2e`): Opus 1.39x, Grok 1.39x,
-  Padhattan-1996 1.44x, Padhattan-2000 1.49x (was 2.02x), TGP 1.38x. The
-  play-save target of 1.5x or less is met. Glue is about 27% of reference time,
-  down from 52%. Trees #208 brings TGP to 1.20x, and #199 road takes road
-  crossings from 44 to 11 per vehicle tick.
-- Current unintegrated branches and owners are in the resume checkpoint.
+- Twenty-two ownership ports. Whole fork against the pinned original: Rust
+  51,602 / tooling 26,308 / C++ glue 22,752 / original C++ retired 34,429 (7.3%
+  of 470,612 `src/` lines), up 11 since the seventh review (#223).
+- Four drafts: #218 industry construction (real ownership, nearest), #209
+  company (reviewed conversion), #217 station/loading (conversion), #216 town
+  (mostly conversion, with a reachable crash).
+- Idle-host timing, nine pairs each: Opus 1.273, Grok 1.300 (cap 1.243),
+  Padhattan-1996 1.305, Padhattan-2000 1.386, TGP 1.185 (target 1.15),
+  Padhattan-2016 1.518 (no cap). Game loop alone: Padhattan-2000 1.55x.
 
-## Seventh steering review (2026-10-09)
+## Eighth steering review (2026-10-12)
 
-The two root sessions since the sixth review ran in Claude Code
-(`claude-opus-5-5`) rather than Codex, and both ended at a usage limit. Root
-followed the process: train #195, aircraft #194, UTF-8 #193, industry #205,
-fleet #197 and hasher #207 each integrated with an attributed review, an
-exact-head full CI run and paired timing. Five independent audits (trees #208,
-company #209, the #199 WIP, the integrated deltas, and a perf/callgrind
-profile) found no reachable divergence.
-
-The findings are systemic:
-- three cited probes never run in CI;
-- hand-allocated ABI IDs collide between branches;
-- an interrupted review was left as the only review of #208;
-- the speed caps lag far behind the measured ratios;
-- conversion work is crowding out new ownership.
+One root session since the seventh review integrated #211, #208 and #215,
+started #216-#218 and selected #212, #213, #219 and #220, with CI green and the
+process followed. Audits of #215-#218 found a reachable crash in #216, drafts
+waiting on each other for shared accessors, a metric that counts deleted glue,
+and speed caps inside the noise.
 
 Corrections, in order:
-1. **Cited checks run in CI (#210, AGENTS.md).** The rule now covers reference
-   probes as well as witnesses. Resolve the `companies`, `industries` and
-   `cargo_storage` probes; the company probe gates #209.
-2. **Interrupted work (AGENTS.md).** Agents push at every passing milestone,
-   each task records its state on its issue or PR when it starts or stops, and a
-   review with no findings or disposition counts as no review. #208 needs a
-   fresh reviewer; the audit on #208 can serve as its comparison.
-3. **Integrate #208, then #199 road PR1, then #209** (PR comments on #208 and
-   #209, and the #199 issue comment). Before PR1, #199 fixes the 390-398 ABI-ID
-   collision with fleet, reserves one ID block per component, and keeps one
-   shared accessor table rather than a second `OpenTTDMapServices`.
-4. **Ratchet the caps now.** Lower `SPEED_BUDGETS` to an idle-host
-   re-measurement, for example in #208's PR: about Opus 1.39, Grok 1.40,
-   Padhattan-1996 1.44, Padhattan-2000 1.49 and TGP 1.38, or 1.20 with #208.
-   Every later PR holds them.
-5. **Return to ownership.** Speed no longer gates new ports. Start #148 town
-   lifecycle now: it delivers town in the direct typed form and replaces the
-   `RustTownRun` operation dispatch rather than converting it twice. After the
-   #199 road and aircraft PRs and station/loading, the remaining #168 tail
-   (disaster, cold cargo/orders) does not block new ownership work. The next
-   planner selects the tile loops and the vehicle base tick (see #168 comment).
+1. **Integrate by readiness (AGENTS.md).** No draft waits for another draft's
+   services, and a reviewed PR gains no scope before it integrates. The first
+   PR to integrate adds a missing shared accessor in final typed form; others
+   adopt it at their next base update. #218 first with #209 alongside, then
+   #217, then a narrowed #216; each PR comment lists what must change.
+2. **State keeps the original's scope (AGENTS.md).** #216's global house counts
+   are `thread_local!`; GUI builds run commands on the main thread and the game
+   loop on `ottd:game`, so a NewGRF house set crashes. Fix it in #216 with a
+   default check against `thread_local!` in non-test kernel code.
+3. **Narrow #216** to direct calls replacing `RustTownRun`, Rust storage with
+   save staging, monthly/yearly loops, ratings, authority checks, population and
+   radius. Placement, names and house stages, now fragments under C++ loops,
+   move with the founding/generation and house tile-loop ports.
+4. **Honest metric (#223):** original C++ retired apart from removed glue, plus
+   a simulation share for "percent complete".
+5. **Caps from the median of three `--benchmark 3` invocations**, plus a
+   Padhattan-2016 cap (about 1.52); one measurement plus 3% is inside the noise.
+6. **Ownership before more conversion.** No speed item gates ownership. #199
+   aircraft (0.05-0.09, Padhattan only) may follow once #218 and #209
+   integrate; train and ship wait for #213, which moves the shared base-vehicle
+   slots. Orders (hot, positional) and effect (opcode) join the #168 tail.
+7. **Design #212 and #213 for the caps.** `TileLoop_Clear` and `TileLoop_Water`
+   are 126 of TGP's 364 reference ms; ported trees-style (2.6x the original's
+   per-tile instructions) they would take TGP to about 1.5x. Prototype and
+   measure the per-tile and per-vehicle-tick path against the original first.
+8. **Start a new component only after two of the four drafts integrate.**
+
+## Ninth steering review (2026-10-12, disk)
+
+Deleted 231 GB of merged-work cruft (`tools/worktrees.py` archives, `simulate`
+runtime copies, CI artifacts). Merged worktrees are now removed with plain git
+and nothing archived (AGENTS.md); land #224 (Phase 1 item 4).
 
 ## Earlier steering, still in force
 
@@ -71,9 +70,12 @@ fresh reviewer, who fixes its own findings; close finished agents. Fourth
 (10-07): on-demand CI stays (#171); exact-head full validation; never merge with
 `--admin`. Fifth (10-08): root is `gpt-6.1-sol` xhigh in Codex; exact timing
 (#186); no boundary exceptions at integration. Sixth (10-09): cited witnesses
-run by default (#198, #204); one shared typed vehicle and map layer with a
-crossing budget (#199); trees and the industry tick before company; a fixed
-hasher for the lookup-only YAPF maps.
+run by default (#198, #204); one shared typed vehicle and map layer (#199);
+trees and the industry tick before company; a fixed hasher for the lookup-only
+YAPF maps. Seventh (10-09): cited reference probes run in default CI (#210,
+#211); milestone pushes and recorded task state, and an unfinished review counts
+as none; improvements lower the caps; one ABI block per component; start town
+#148 and select the tile loops and vehicle base tick.
 
 ## Completed ownership ports
 
@@ -110,19 +112,19 @@ design (`docs/design/world-state.md`).
 
 Earlier maintenance: #109/#112, #107/#113/#115, #86/#110/#132, #108/#116,
 #154/#160, #158/#159, #155/#163, #156/#161/#162/#164/#167, #170/#171,
-#173/#174, and #178/#185/#187 in #184; evidence remains in those PRs.
+#173/#174, #178/#185/#187 in #184, #169/#175/#177/#180 in #181, #200/#201,
+#188/#196, #191/#193 and #198/#204; evidence remains in those PRs. Conversion
+rows below count removed glue as retired; their original retirement is near
+zero (#223).
 | Issues | Maintenance PRs | Integration | Commit | Metrics |
 | --- | --- | --- | --- | --- |
-| #169, #156, #179 | #175, #177, #180 | #181 | `f604e30d50` | 4 / 193 / 0 / 0 |
-| #200 | #201 | direct | `bb302706c1` | 0 / 10 / 0 / 0 |
-| #188 | #196 | direct | `05f94f56d5` | 0 / 182 / 0 / 0 |
-| #191 | #193 | direct | `b127ffaa88` | 0 / 44 / 73 / 14 |
-| #198 (enforcement) | #204 | direct | `c0c67a3dd4` | 0 / 147 / 0 / 0 |
 | #190 (#168 aircraft) | #194 | direct | `d8aed8754f` | 1279 / 352 / 1300 / 247 |
 | #189 (#168 train) | #195 | direct | `3a2e8f6a10` | 4263 / 91 / 2812 / 853 |
 | #203 (#168 industry) | #205 | direct | `9025f623e0` | 450 / 8 / 278 / 16 |
 | #206 (YAPF hasher) | #207 | direct | `65ff465080` | 95 / 0 / 0 / 0 |
 | #210 (default probes) | #211 | direct | `cbebf6e5fe` | 0 / 25 / 0 / 0 |
+| #202 (#168 trees) | #208 | direct | `0e459aa81f` | 1604 / 91 / 347 / 53 |
+| #199 (shared road services) | #215 | direct | `4b130309a5` | 2288 / 565 / 1331 / 1354 |
 
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -131,62 +133,58 @@ Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas
 The default semantic harness runs in CI; regressions come first. Port differences
 go in `KNOWN_FAILURES` with an issue, never in masks (`docs/rust-migration.md`).
 
-1. **Speed ratchet (#155).** `SPEED_BUDGETS` in `tools/simulation/roads.py` is
-   the authority for the five caps, run with `simulate <name> --benchmark 3
-   --jobs 2` on an idle host. A PR may exceed a cap by at most 3%, unless root
-   accepts a stated reason that is not a boundary-rule exception. Improvements
-   lower the caps in the same PR (seventh review, item 4). Targets: play saves
-   1.5x or less (met), generation 1.15x or less. The null driver redraws
-   whenever 1 ms has elapsed, so a slower candidate also draws more frames.
+1. **Speed ratchet (#155).** `SPEED_BUDGETS` in `tools/simulation/roads.py`
+   holds the caps: the median of three `simulate <name> --benchmark 3 --jobs 2`
+   invocations on an idle host. A PR may exceed a cap by 3% unless root accepts
+   a stated reason that is not a boundary exception; improvements lower it in
+   the same PR. Targets: play saves 1.5x, generation 1.15x. The null driver
+   redraws whenever 1 ms has elapsed, so a slower candidate draws more frames.
 2. **#156 coverage, standing capacity.** Random and crash branches first. The
-   seventh review added fleet, industry, trees and company gaps. A company
-   scenario with `max_no_competitors >= 1` reaches the AI-start Post loop.
+   eighth review added the threaded game loop, multi-part road vehicles,
+   station refit and loading callbacks, industry NewGRF construction callbacks
+   and candidate-side town generation.
+3. **#223 metric.** Original C++ retired apart from removed glue; small.
+4. **#224 disk hygiene.** Delete `tools/worktrees.py`; `simulate` drops its
+   runtime copies and keeps the newest 10 runs. Small; does not wait on ports.
 
 ## Phase 2: current work, in order
 
-Integrate reviewed work first; at most six unintegrated branches (#157).
-Independent items (#156, #210) may run in parallel.
+Integrate reviewed work first, in order of readiness; at most six unintegrated
+branches (#157). Independent items (#156, #223, caps) may run in parallel.
 
-1. **Integrate:** reviewed trees #208 with lowered caps, then shared road #215,
-   then company #209. Default probes #211 and the company reset doc fix are done.
-2. **#199 shared vehicle and map layer**, one PR per vehicle type: road PR1 from
-   `shared-layer-road-199` (fixes listed on #199), then aircraft (about 150
-   crossings per tick), train, ship. Each PR deletes that port's accessor copies
-   and reports crossings per vehicle tick.
-3. **#148 town lifecycle (#216)** owns state and control in the direct typed
-   form. Its shared station activity reads reuse integrated #217 before final review.
-4. **#168 station tick and loading (#214 / #217)**: field-number reads (`RustStationRead`,
-   `RustLoadingRead`) become typed narrow reads. Then disaster and the cold
-   cargo/orders conversions, which never block new ownership work.
-5. **New ownership:** #150 industry construction is active, then #212 landscape tile
-   scheduling and clear/water/rail/road/tunnel-bridge loops, then #213 base
-   vehicle tick and maintenance. #212/#213 start after integrated #208 and
-   #199 road; retain canonical map/shared Vehicle fields behind the typed layer.
-   A fresh high-effort planner replenishes selection when fewer than two
-   unstarted components remain. Whole simulation owners take priority.
+1. **Integrate #218 and #209.** #218 updates from base, adopts #215's shared map
+   services and drops dead slots; #209 moves its three pending steps to a #156
+   follow-up. Each gets a fresh review and exact-head full CI.
+2. **#217 station/loading**, with the changes in its PR comment.
+3. **#216 town, narrowed**, then town founding/generation, the house tile loop,
+   and town commands, authority actions and deletion as their own ports.
+4. **New ownership** after two drafts integrate: #212 landscape tile loops and
+   #213 base vehicle tick, designed for the caps first; then #219 signal blocks
+   and #220 engine lifecycle (#220 after #213, #209 and #148).
+5. **Conversions:** #199 aircraft after item 1; train and ship after #213; the
+   #168 tail (orders, effect, disaster) never blocks ownership.
 
 The #108 decision keeps C++ map arrays and direct bundled `noexcept` services.
-#199 decides vehicle state access: a typed shared layer with per-operation reads,
-not a pinned-offset field view.
+#199 selects a typed shared vehicle layer with per-operation reads.
 
 ## Resume checkpoint
 
-Root resumed 2026-10-11; #211 is integrated. Four implementation agents are active
-with six unintegrated branches. Owners record passing heads and evidence on linked
-issues/PRs. Integration order remains #208, #215, #209; #217 precedes #216.
+Paused on 2026-10-11 at the user's wind-down; resume with the work order above.
+#211, #208 and #215 are integrated. Four drafts are clean and pushed. Evidence
+and exact validation status stay on the linked PRs and issues; the eighth-review
+PR comments list what each draft must change.
 
 | Issue / PR | Branch (worktree suffix), head | State and next step |
 | --- | --- | --- |
-| #202 / #208 | `trees-direct-202`, `e7c29cc708` | Review fixes verified, five idle-host caps lowered; root updates base and requests full CI. |
-| #192 / #209 | `company-direct-192`, `9b6ce4cdf1` | Reviewed fix/reset docs verified; root updates and validates after preceding integrations. Coverage is on #156. |
-| #199 / #215 | `shared-layer-road-199`, `006e743c99` | `/root/shared_road_199_resume`: focused/self/soak pass, preliminary default running; after #208, canonical helpers, final checks, profile and fresh review. |
-| #148 / #216 | `town-lifecycle-148`, `f2b56a82a6` | `/root/town_lifecycle_148`: canonical storage/direct growth pass; monthly control, remaining lifecycle and integrated #217 reuse next. |
-| #214 / #217 | `station-loading-direct-214`, `2bd95c5c6c` | `/root/station_loading_direct_214`: typed tables/scoped frames/shared activity pass; narrow engine reads, integrated #199 reuse and final simulation next. |
-| #150 | `industry-construction-150`, `cbebf6e5fe` | `/root/industry_construction_150`: complete construction/tile owner started; first metadata/registry/destruction milestone and draft PR next. |
+| #150 / #218 | `industry-construction-150`, `8bf3a71c90` | Draft; real ownership, audited clean. Update from base, adopt shared map services, drop dead slots, then fresh review and full CI. |
+| #192 / #209 | `company-direct-192`, `aaeafc9b69` | Draft; reviewed, plus startup scenarios. No new steps: update from base, fresh review of new commits, full CI. |
+| #214 / #217 | `station-loading-direct-214`, `d456668553` | Draft; fidelity clean. Remove its profile facility, revert portable-body edits, adopt #215 accessors, group reads. |
+| #148 / #216 | `town-lifecycle-148`, `0e98404f21` | Draft; last native-verified `e0a1132aba`. Fix the `thread_local!` crash, narrow scope, adopt #215 accessors. |
 
-Planning complete: #212/#213 selected after #150. ABI blocks: train through 385,
+Selected but unstarted: #212/#213, then #219/#220. ABI blocks: train through 385,
 tree additions 386-389, fleet 390-399, company 400-429, town 430-459, road 460-499,
-station/loading 500-559 and industry construction 560-619.
+station/loading 500-559, industry 560-619 (572 shared ByteSpan lands with town), CommandCost 620-629,
+and additional town lifecycle 630-669. Allocate only consumed layouts.
 
 Preserve the pinned reference, paused curve worktrees and evidence branches
 `evidence-disaster-vehicles` (`a775543162`) and `evidence-water-regions`
@@ -202,6 +200,8 @@ layout. Platform or toolchain expansion. Deferred behavior improvements stay in
 ## Progress metric
 
 Every port PR pastes `python3 tools/port-metrics.py`: Rust / tooling / C++ glue
-added and original C++ retired (deleted or portable-only). Retire more C++ than
-glue plus tooling, or explain why. Data tables inflate retirement; judge progress
+added and original C++ retired (deleted or portable-only). Until #223 lands,
+deleted glue also counts as retired; quote the whole-fork delta against the
+pinned original for conversions. Retire more original C++ than glue plus
+tooling, or explain why. Data tables inflate retirement; judge progress
 by game logic owned and avoid utility-kernel extraction.
