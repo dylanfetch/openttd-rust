@@ -98,15 +98,21 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
     }
     executables, provenance = {}, {}
     for role in ("reference", "candidate"):
-        lock = (
-            migration.reference_lock(shared=True)
-            if native_builds[role] == migration.REFERENCE_BUILD
-            else migration.candidate_lock(native_builds[role], shared=True)
-        )
-        with lock:
-            executables[role], provenance[role] = adapter(
-                native_builds[role], folder / role, env
+        from .runtime import prepared_adapter
+
+        prepared = prepared_adapter("orders", role, binaries, builds, folder / role)
+        if prepared is not None:
+            executables[role], provenance[role] = prepared
+        else:
+            lock = (
+                migration.reference_lock(shared=True)
+                if native_builds[role] == migration.REFERENCE_BUILD
+                else migration.candidate_lock(native_builds[role], shared=True)
             )
+            with lock:
+                executables[role], provenance[role] = adapter(
+                    native_builds[role], folder / role, env
+                )
         if (
             provenance[role]["ordinary_binary_sha256"]
             != hashlib.sha256(binaries[role].read_bytes()).hexdigest()

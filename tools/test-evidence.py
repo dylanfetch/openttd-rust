@@ -14,7 +14,15 @@ import evidence
 HEAD = "a" * 40
 BINARY = "b" * 64
 REFERENCE = "c" * 64
-METRICS = {"base": "d" * 40, "rust": 1, "tooling": 2, "glue": 3, "retired": 4}
+METRICS = {
+    "base": "d" * 40,
+    "rust": 1,
+    "tooling": 2,
+    "glue": 3,
+    "retired": 4,
+    "glue_removed": 5,
+    "net_glue": -2,
+}
 
 
 def build_identity():
@@ -117,7 +125,10 @@ class EvidenceTests(unittest.TestCase):
         self.assertIn("Rust checks, native builds and both CTest suites", text)
         self.assertIn("selected semantic scenarios", text)
         self.assertIn("Reasoning effort: `high`", text)
-        self.assertIn("Rust 1 / tooling 2 / C++ glue 3 / C++ retired 4", text)
+        self.assertIn(
+            "Rust 1 / tooling 2 / C++ glue added 3 / original C++ retired 4", text
+        )
+        self.assertIn("fork glue removed 5 / net glue -2", text)
         self.assertLessEqual(len(text.splitlines()), 55)
 
     def test_candidate_and_reference_hash_mismatches(self):
@@ -141,6 +152,55 @@ class EvidenceTests(unittest.TestCase):
             evidence.EvidenceError, "identity binary hash mismatch"
         ):
             self.render(report)
+
+    def test_frozen_export_joins_exact_parents_without_relabelling_executed_hashes(
+        self,
+    ):
+        sim = simulation()
+        for role, parent in (("candidate", BINARY), ("reference", REFERENCE)):
+            binary = sim["binaries"][role]
+            binary["sha256"] = ("1" if role == "candidate" else "2") * 64
+            binary["frozen_export"] = {
+                "ordinary_derivation": {
+                    "sha256": binary["sha256"],
+                    "source_sha256": parent,
+                    "command": ["objcopy", "--strip-debug", "exported-copy"],
+                    "content_proof": {
+                        "PT_LOAD_without_section_table_header_metadata": [{}],
+                        "SHF_ALLOC": [{}],
+                    },
+                }
+            }
+        candidate = sim["binaries"]["candidate"]
+        candidate["source_build_identity"] = candidate.pop("build_identity")
+        self.assertIn("clean source", self.render(sims=[sim]))
+        for mutate in (
+            lambda s: s["binaries"]["candidate"]["frozen_export"][
+                "ordinary_derivation"
+            ].update(source_sha256="3" * 64),
+            lambda s: s["binaries"]["reference"]["frozen_export"][
+                "ordinary_derivation"
+            ].update(source_sha256="3" * 64),
+            lambda s: s["binaries"]["candidate"]["frozen_export"][
+                "ordinary_derivation"
+            ].update(sha256="3" * 64),
+            lambda s: s["binaries"]["candidate"]["frozen_export"][
+                "ordinary_derivation"
+            ].update(command=["objcopy", "--strip-all", "exported-copy"]),
+            lambda s: s["binaries"]["candidate"]["source_build_identity"].update(
+                source_digest="3" * 64
+            ),
+            lambda s: s["binaries"]["candidate"].update(
+                build_identity=build_identity()
+            ),
+            lambda s: s["binaries"]["candidate"]["frozen_export"][
+                "ordinary_derivation"
+            ]["content_proof"].update(SHF_ALLOC=[]),
+        ):
+            invalid = copy.deepcopy(sim)
+            mutate(invalid)
+            with self.assertRaises(evidence.EvidenceError):
+                self.render(sims=[invalid])
 
     def test_required_fields_and_empty_receipts(self):
         for field in (
@@ -292,7 +352,10 @@ class EvidenceTests(unittest.TestCase):
             self.assertEqual(list(Path(directory).iterdir()), [path])
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Port metrics", result.stdout)
-        self.assertIn("Rust 0 / tooling 0 / C++ glue 0 / C++ retired 0", result.stdout)
+        self.assertIn(
+            "Rust 0 / tooling 0 / C++ glue added 0 / original C++ retired 0",
+            result.stdout,
+        )
         self.assertIn("/root/test", result.stdout)
 
     def test_cli_requires_explicit_selection_and_diagnoses_bad_receipt(self):
