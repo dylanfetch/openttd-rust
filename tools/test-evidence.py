@@ -14,7 +14,15 @@ import evidence
 HEAD = "a" * 40
 BINARY = "b" * 64
 REFERENCE = "c" * 64
-METRICS = {"base": "d" * 40, "rust": 1, "tooling": 2, "glue": 3, "retired": 4}
+METRICS = {
+    "base": "d" * 40,
+    "rust": 1,
+    "tooling": 2,
+    "glue": 3,
+    "retired": 4,
+    "glue_removed": 5,
+    "net_glue": -2,
+}
 
 
 def build_identity():
@@ -117,7 +125,10 @@ class EvidenceTests(unittest.TestCase):
         self.assertIn("Rust checks, native builds and both CTest suites", text)
         self.assertIn("selected semantic scenarios", text)
         self.assertIn("Reasoning effort: `high`", text)
-        self.assertIn("Rust 1 / tooling 2 / C++ glue 3 / C++ retired 4", text)
+        self.assertIn(
+            "Rust 1 / tooling 2 / C++ glue added 3 / original C++ retired 4", text
+        )
+        self.assertIn("fork glue removed 5 / net glue -2", text)
         self.assertLessEqual(len(text.splitlines()), 55)
 
     def test_candidate_and_reference_hash_mismatches(self):
@@ -292,7 +303,10 @@ class EvidenceTests(unittest.TestCase):
             self.assertEqual(list(Path(directory).iterdir()), [path])
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Port metrics", result.stdout)
-        self.assertIn("Rust 0 / tooling 0 / C++ glue 0 / C++ retired 0", result.stdout)
+        self.assertIn(
+            "Rust 0 / tooling 0 / C++ glue added 0 / original C++ retired 0",
+            result.stdout,
+        )
         self.assertIn("/root/test", result.stdout)
 
     def test_cli_requires_explicit_selection_and_diagnoses_bad_receipt(self):

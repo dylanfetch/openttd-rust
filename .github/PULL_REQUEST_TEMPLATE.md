@@ -22,7 +22,7 @@ Agent: <agent path> | Model: <exact model> | Reasoning effort: <effort>
 
 ## Metrics
 
-<!-- Paste the output of: python3 tools/port-metrics.py. If C++ retired is less than glue plus tooling, give the reason. -->
+<!-- Paste python3 tools/port-metrics.py: original C++ retired, fork glue added/removed and signed net glue remain separate. Conversions report net glue. If original retirement is no greater than net glue plus tooling added, explain why. Use --whole-fork for total retirement and simulation-source share; this is a source-line measure, not behavioral completion. -->
 
 ## Known limits
 
