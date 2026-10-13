@@ -189,6 +189,7 @@ def unpack(archive_path):
 
 
 def pack(bundle, count):
+    bundle = bundle.resolve()
     runtime.export(bundle, migration)
     origin = ROOT / ".local/native-export-root.json"
     origin.write_text(
