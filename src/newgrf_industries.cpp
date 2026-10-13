@@ -94,7 +94,7 @@ static uint32_t GetClosestIndustry(TileIndex tile, IndustryType type, const Indu
 {
 	uint32_t best_dist = UINT32_MAX;
 
-	for (const IndustryID industry : Industry::industries[type]) {
+	for (const IndustryID &industry : Industry::industries[type]) {
 		if (industry == current->index) continue;
 
 		best_dist = std::min(best_dist, DistanceManhattan(tile, Industry::Get(industry)->location.tile));
@@ -148,7 +148,7 @@ static uint32_t GetCountAndDistanceOfClosestInstance(const ResolverObject &objec
 	} else {
 		/* Count only those who match the same industry type and layout filter
 		 * Unfortunately, we have to do it manually */
-		for (const IndustryID industry : Industry::industries[industry_type]) {
+		for (const IndustryID &industry : Industry::industries[industry_type]) {
 			if (industry == current->index) continue;
 
 			const Industry *i = Industry::Get(industry);

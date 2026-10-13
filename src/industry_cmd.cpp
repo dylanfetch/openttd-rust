@@ -1526,7 +1526,7 @@ static CommandCost FindTownForIndustry(TileIndex tile, IndustryType type, Town *
 
 	if (_settings_game.economy.multiple_industry_per_town) return CommandCost();
 
-	for (const IndustryID industry : Industry::industries[type]) {
+	for (const IndustryID &industry : Industry::industries[type]) {
 		if (Industry::Get(industry)->town == *t) {
 			*t = nullptr;
 			return CommandCost(STR_ERROR_ONLY_ONE_ALLOWED_PER_TOWN);
@@ -1795,7 +1795,7 @@ static CommandCost CheckIfFarEnoughFromConflictingIndustry(TileIndex tile, Indus
 	for (IndustryType conflicting_type : indspec->conflicting) {
 		if (conflicting_type == IT_INVALID) continue;
 
-		for (const IndustryID industry : Industry::industries[conflicting_type]) {
+		for (const IndustryID &industry : Industry::industries[conflicting_type]) {
 			/* Within 14 tiles from another industry is considered close */
 			if (DistanceMax(tile, Industry::Get(industry)->location.tile) > 14) continue;
 
