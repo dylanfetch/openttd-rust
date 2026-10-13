@@ -25,7 +25,7 @@ SPEED_BUDGETS = {
     "play-grok-159-001-manual": 1.2538677918424754,
     "play-padhattan-ridge-1996-manual": 1.2747474747474747,
     "play-padhattan-ridge-2000-manual": 1.3492537313432835,
-    "play-padhattan-ridge-2016-manual": 1.427007299270073,
+    "play-padhattan-ridge-2016-manual": 1.4270072992700729,
 }
 
 
