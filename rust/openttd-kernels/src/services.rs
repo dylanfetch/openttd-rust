@@ -87,6 +87,18 @@ pub struct Services {
     pub mark_dirty: extern "C" fn(u32),
     /// `SetTropicZone`.
     pub set_tropic_zone: extern "C" fn(u32, u8),
+    /// `GetTileOwner`.
+    pub tile_owner: extern "C" fn(u32) -> u8,
+    /// `GetStationIndex`.
+    pub station_index: extern "C" fn(u32) -> u16,
+    /// `GetDepotIndex`.
+    pub depot_index: extern "C" fn(u32) -> u16,
+    /// `IsLevelCrossingTile`.
+    pub is_level_crossing: extern "C" fn(u32) -> bool,
+    /// `GetTunnelBridgeDirection`.
+    pub tunnel_bridge_direction: extern "C" fn(u32) -> u8,
+    /// Bridge specification speed at this bridge tile.
+    pub bridge_speed: extern "C" fn(u32) -> u16,
     /// Whether this company pool ID is live.
     pub company_valid: extern "C" fn(u8) -> bool,
     /// Next live company at or after this ID; 255 denotes end.
@@ -121,8 +133,6 @@ pub struct Services {
     pub tunnel_transport: extern "C" fn(u32) -> u8,
     /// Original native `other_tunnel_end` map observation.
     pub other_tunnel_end: extern "C" fn(u32) -> u32,
-    /// Original native `tunnel_bridge_direction` map observation.
-    pub tunnel_bridge_direction: extern "C" fn(u32) -> u8,
     /// Original native `is_road_depot` map observation.
     pub is_road_depot: extern "C" fn(u32) -> bool,
     /// Original native `road_depot_direction` map observation.
@@ -151,6 +161,10 @@ pub struct Services {
     pub town_index: extern "C" fn(u32) -> u16,
     /// Original `GetAnyRoadBits`, parameterized by `RoadTramType`.
     pub road_bits: extern "C" fn(u32, u8, bool) -> u8,
+    /// Current snow line used by town, industry and trees.
+    pub snow_line: extern "C" fn() -> u8,
+    /// Current calendar year used by town and industry.
+    pub calendar_year: extern "C" fn() -> i32,
 }
 impl Services {
     /// Draw one shared random word.
@@ -172,11 +186,16 @@ pub fn fixture(
     random: extern "C" fn(*mut c_void) -> u32,
     industry: extern "C" fn(i32, i32, *mut u32) -> u32,
 ) -> Services {
+    extern "C" fn zero_byte() -> u8 { 0 }
+    extern "C" fn zero_year() -> i32 { 0 }
     extern "C" fn byte(_: u32) -> u8 {
         0
     }
     extern "C" fn flag(_: u32) -> bool {
         false
+    }
+    extern "C" fn short(_: u32) -> u16 {
+        0
     }
     extern "C" fn height(_: u32) -> i32 {
         0
@@ -203,6 +222,12 @@ pub fn fixture(
         tile_slope: byte,
         mark_dirty: tile,
         set_tropic_zone: zone,
+        tile_owner: byte,
+        station_index: short,
+        depot_index: short,
+        is_level_crossing: flag,
+        tunnel_bridge_direction: byte,
+        bridge_speed: short,
         company_valid: unused_company_valid,
         next_company: unused_next_company,
         current_company: unused_current_company,
@@ -220,7 +245,6 @@ pub fn fixture(
         is_bridge: flag,
         tunnel_transport: byte,
         other_tunnel_end: word,
-        tunnel_bridge_direction: byte,
         is_road_depot: flag,
         road_depot_direction: byte,
         is_normal_road: flag,
@@ -235,8 +259,64 @@ pub fn fixture(
         road_owner: byte,
         town_index: index,
         road_bits: bits,
+        snow_line: zero_byte,
+        calendar_year: zero_year,
     }
 }
+/// Map dimensions read once per entry.
+#[derive(Clone, Copy)]
+pub struct Map {
+    /// `Map::LogX()` captured for this synchronous entry.
+    pub log_x: u8,
+}
+impl Map {
+    /// `Map::SizeX()`, from the dimension captured at entry.
+    #[must_use]
+    pub fn size_x(self) -> u32 {
+        1_u32 << self.log_x
+    }
+    /// `TileX`.
+    #[must_use]
+    pub fn tile_x(self, tile: u32) -> u32 {
+        tile & (self.size_x() - 1)
+    }
+    /// `TileY`.
+    #[must_use]
+    pub fn tile_y(self, tile: u32) -> u32 {
+        tile >> self.log_x
+    }
+    /// `TileDiffXY`: `y * Map::SizeX() + x` in unsigned arithmetic.
+    #[must_use]
+    pub fn diff(self, x: i32, y: i32) -> u32 {
+        y.cast_unsigned()
+            .wrapping_mul(self.size_x())
+            .wrapping_add(x.cast_unsigned())
+    }
+    /// `tile + TileOffsByDiagDir(dir)`.
+    #[must_use]
+    pub fn add_diag(self, tile: u32, dir: u8) -> u32 {
+        const OFFSETS: [(i32, i32); 4] = [(-1, 0), (0, 1), (1, 0), (0, -1)];
+        let (x, y) = OFFSETS[usize::from(dir)];
+        tile.wrapping_add(self.diff(x, y))
+    }
+    /// `TileAddByDir(tile, dir)`.
+    #[must_use]
+    pub fn add_dir(self, tile: u32, dir: u8) -> u32 {
+        const OFFSETS: [(i32, i32); 8] = [
+            (-1, -1),
+            (-1, 0),
+            (-1, 1),
+            (0, 1),
+            (1, 1),
+            (1, 0),
+            (1, -1),
+            (0, -1),
+        ];
+        let (x, y) = OFFSETS[usize::from(dir)];
+        tile.wrapping_add(self.diff(x, y))
+    }
+}
+
 /// Source `Chance16I` uses uint32 multiplication/addition after uint16 truncation.
 #[must_use]
 pub fn chance16_i(a: u32, b: u32, r: u32) -> bool {

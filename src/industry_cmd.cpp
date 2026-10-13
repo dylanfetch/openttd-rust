@@ -3488,7 +3488,7 @@ static const OpenTTDIndustryServices _industry_services = {
 		}
 	},
 	.tile_z = [](uint32_t tile) noexcept -> int32_t { return GetTileZ(TileIndex(tile)); },
-	.snow_line = []() noexcept -> uint8_t { return GetSnowLine(); },
+	.snow_line = GetRustSharedServices().snow_line,
 	.make_field = [](uint32_t index, uint8_t field_type, uint8_t counter, uint16_t industry) noexcept {
 		TileIndex tile(index);
 		MakeField(tile, field_type, IndustryID(industry));
@@ -3562,7 +3562,7 @@ static const OpenTTDIndustryServices _industry_services = {
 	.economy_type = []() noexcept -> uint8_t { return _settings_game.economy.type; },
 	.passengers = []() noexcept -> uint8_t { return GetCargoTypeByLabel(CT_PASSENGERS); },
 	.fund_only = []() noexcept -> bool { return _settings_game.difficulty.industry_density == ID_FUND_ONLY; },
-	.calendar_year = []() noexcept -> int32_t { return TimerGameCalendar::year.base(); },
+	.calendar_year = GetRustSharedServices().calendar_year,
 	.deity = []() noexcept -> bool { return _current_company == OWNER_DEITY; },
 };
 const OpenTTDIndustryServices &GetIndustryRustServices() { return _industry_services; }

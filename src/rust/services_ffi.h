@@ -34,6 +34,12 @@ struct OpenTTDSharedServices {
 	uint8_t (*tile_slope)(uint32_t) noexcept;
 	void (*mark_dirty)(uint32_t) noexcept;
 	void (*set_tropic_zone)(uint32_t, uint8_t) noexcept;
+	uint8_t (*tile_owner)(uint32_t) noexcept;
+	uint16_t (*station_index)(uint32_t) noexcept;
+	uint16_t (*depot_index)(uint32_t) noexcept;
+	bool (*is_level_crossing)(uint32_t) noexcept;
+	uint8_t (*tunnel_bridge_direction)(uint32_t) noexcept;
+	uint16_t (*bridge_speed)(uint32_t) noexcept;
 	bool (*company_valid)(uint8_t) noexcept;
 	uint8_t (*next_company)(uint8_t) noexcept;
 	uint8_t (*current_company)() noexcept;
@@ -51,7 +57,6 @@ struct OpenTTDSharedServices {
 	bool (*is_bridge)(uint32_t) noexcept;
 	uint8_t (*tunnel_transport)(uint32_t) noexcept;
 	uint32_t (*other_tunnel_end)(uint32_t) noexcept;
-	uint8_t (*tunnel_bridge_direction)(uint32_t) noexcept;
 	bool (*is_road_depot)(uint32_t) noexcept;
 	uint8_t (*road_depot_direction)(uint32_t) noexcept;
 	bool (*is_normal_road)(uint32_t) noexcept;
@@ -66,6 +71,8 @@ struct OpenTTDSharedServices {
 	uint8_t (*road_owner)(uint32_t) noexcept;
 	uint16_t (*town_index)(uint32_t) noexcept;
 	uint8_t (*road_bits)(uint32_t, uint8_t, bool) noexcept;
+	uint8_t (*snow_line)() noexcept;
+	int32_t (*calendar_year)() noexcept;
 };
 const OpenTTDSharedServices &GetRustSharedServices() noexcept;
 
@@ -88,6 +95,12 @@ inline OpenTTDSharedServices OpenTTDFixtureSharedServices(void *context, uint32_
 		.tile_slope = OpenTTDFixtureMapService<uint8_t, uint32_t>,
 		.mark_dirty = OpenTTDFixtureMapService<void, uint32_t>,
 		.set_tropic_zone = OpenTTDFixtureMapService<void, uint32_t, uint8_t>,
+		.tile_owner = OpenTTDFixtureMapService<uint8_t, uint32_t>,
+		.station_index = OpenTTDFixtureMapService<uint16_t, uint32_t>,
+		.depot_index = OpenTTDFixtureMapService<uint16_t, uint32_t>,
+		.is_level_crossing = OpenTTDFixtureMapService<bool, uint32_t>,
+		.tunnel_bridge_direction = OpenTTDFixtureMapService<uint8_t, uint32_t>,
+		.bridge_speed = OpenTTDFixtureMapService<uint16_t, uint32_t>,
 		.company_valid = OpenTTDFixtureMapService<bool, uint8_t>,
 		.next_company = [](uint8_t) noexcept -> uint8_t { return UINT8_MAX; },
 		.current_company = []() noexcept -> uint8_t { return UINT8_MAX; },
@@ -105,7 +118,6 @@ inline OpenTTDSharedServices OpenTTDFixtureSharedServices(void *context, uint32_
 		.is_bridge = OpenTTDFixtureMapService<bool, uint32_t>,
 		.tunnel_transport = OpenTTDFixtureMapService<uint8_t, uint32_t>,
 		.other_tunnel_end = OpenTTDFixtureMapService<uint32_t, uint32_t>,
-		.tunnel_bridge_direction = OpenTTDFixtureMapService<uint8_t, uint32_t>,
 		.is_road_depot = OpenTTDFixtureMapService<bool, uint32_t>,
 		.road_depot_direction = OpenTTDFixtureMapService<uint8_t, uint32_t>,
 		.is_normal_road = OpenTTDFixtureMapService<bool, uint32_t>,
@@ -120,6 +132,8 @@ inline OpenTTDSharedServices OpenTTDFixtureSharedServices(void *context, uint32_
 		.road_owner = OpenTTDFixtureMapService<uint8_t, uint32_t>,
 		.town_index = OpenTTDFixtureMapService<uint16_t, uint32_t>,
 		.road_bits = OpenTTDFixtureMapService<uint8_t, uint32_t, uint8_t, bool>,
+		.snow_line = OpenTTDFixtureMapService<uint8_t>,
+		.calendar_year = OpenTTDFixtureMapService<int32_t>,
 	};
 }
 #endif /* RUST_SERVICES_FFI_H */

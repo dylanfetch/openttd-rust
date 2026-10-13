@@ -1,7 +1,6 @@
-"""Owner-built multimodal fixtures and rail controller evidence (#86/#179/#183)."""
+"""Owner-built multimodal fixtures and rail controller evidence (#86/#179/#183/#221)."""
 
 import hashlib
-import json
 import lzma
 import re
 import shutil
@@ -33,6 +32,19 @@ def install(scenario, run_dir):
         (ai / "parameters.nut").write_text(
             f'RAIL_ACTION <- "{scenario["rail_control"]}";\n'
         )
+
+
+# Trains, road vehicles, ships and aircraft of the 2016 save. Aircraft 26, 48
+# and 57 crash in the reference (48 in both distributions) and are left out.
+HEADS_2016 = tuple(
+    map(
+        int,
+        """5 37 43
+        6 11 12 18 22 41 45 46 47 52 53 54 55 56 59 60 69 71 72 83 85 87 88 90
+        2 25 42 65 70
+        3 7 10 28 30 44 62 73 75 76""".split(),
+    )
+)
 
 
 def scenarios(soak):
@@ -149,6 +161,19 @@ def scenarios(soak):
                 short_checkpoint=True,
             )
         )
+    for distribution, commands in DISTRIBUTIONS.items():
+        cases.append(
+            {
+                "name": f"play-padhattan-ridge-2016-{distribution}",
+                "kind": "save",
+                "rail_fixture": True,
+                "owner_structures": True,
+                "vehicle_heads": HEADS_2016,
+                "console": commands,
+                "save": str(ROOT / "migration/saves/padhattan-ridge-2016.sav"),
+                "ticks": (6 if soak else 2) * 365 * TICKS_PER_DAY + SNAPSHOT_TICKS,
+            }
+        )
     return cases
 
 
@@ -158,10 +183,10 @@ def game_args(scenario):
 
 def game_environment(scenario):
     witnessed = scenario.get("rail_fixture") and scenario.get("witnesses")
-    return {"OPENTTD_TRAIN_PROFILE": "1"} if witnessed else {}
+    return core.WITNESS_ENVIRONMENT if witnessed else {}
 
 
-# TrainProfile branches each candidate run must reach, by longest name prefix.
+# train.* witness branches each candidate run must reach, by longest name prefix.
 # Unreached (#156): wormhole_swap, unequal_before/after, red_twoway,
 # force_signal, free_wagon_delete, articulated_move, depot_reentry and
 # extension_opposing_red/extension_restore.
@@ -181,6 +206,9 @@ TRAIN_BRANCHES = {
     "play-padhattan-ridge-2006": (*PATHS, "reversal", "depot_start", *CROSSINGS)
     + ("depot_service", "wormhole_exit"),
     "rail-owner-2006": (*PATHS, "wormhole_exit"),
+    "play-padhattan-ridge-2016": (*TICKS, "first_tile_rail", "free_path")
+    + ("choose_track", "order_restore", "reversal", "depot_start", *CROSSINGS)
+    + ("wormhole_exit",),
     "rail-controller-reverse": ROUTES,
     "rail-controller-service": ROUTES,
     "rail-controller-crossing": (*ROUTES, *CROSSINGS),
@@ -665,7 +693,7 @@ def check(scenario, run, mode, role, result):
     if not scenario.get("rail_fixture"):
         return
     counts = core.branch_witnesses(
-        scenario, run, role, "train-profile.json", train_required(scenario)
+        scenario, run, role, "train", train_required(scenario)
     )
     if counts is not None:
         result[f"{mode}_{role}_train_profile"] = counts
@@ -691,9 +719,8 @@ def check(scenario, run, mode, role, result):
         )
         return
     result[f"{mode}_{role}_rail_search"] = search_witnesses(scenario, run, mode)
-    profile = run["snapshots"][-1].parents[2] / "rail-profile.json"
-    if profile.is_file():
-        result[f"{mode}_{role}_rail_profile"] = json.loads(profile.read_text())
+    if (profile := core.witness_counts(run, "rail")) is not None:
+        result[f"{mode}_{role}_rail_profile"] = profile
     paths = [Path(scenario["save"]), *run["snapshots"]]
     observations = [vehicle_rows(path) for path in paths]
     witnesses = {}

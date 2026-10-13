@@ -20,12 +20,19 @@
 #include "../landscape.h"
 #include "../viewport_func.h"
 #include "../core/random_func.hpp"
+#include "../station_map.h"
+#include "../depot_map.h"
+#include "../rail_map.h"
+#include "../tunnelbridge_map.h"
+#include "../bridge.h"
 #include "../company_base.h"
 #include "../company_func.h"
 #include "../command_type.h"
 #include "../command_func.h"
 #include "../landscape_cmd.h"
 #include "../town.h"
+#include "../snowline.h"
+#include "../timer/timer_game_calendar.h"
 #include "../safeguards.h"
 
 static CommandCost *NativeCost(OpenTTDCommandCost *cost) noexcept { return reinterpret_cast<CommandCost *>(cost); }
@@ -64,6 +71,9 @@ const OpenTTDCommandServices &GetRustCommandServices() noexcept
 	return services;
 }
 
+static uint8_t SharedSnowLine() noexcept { return GetSnowLine(); }
+static int32_t SharedCalendarYear() noexcept { return TimerGameCalendar::year.base(); }
+
 static uint32_t SharedRandom(void *) noexcept { return Random(); }
 static uint8_t SharedTileType(uint32_t tile) noexcept { return GetTileType(TileIndex{tile}); }
 static bool SharedBridgeAbove(uint32_t tile) noexcept { return IsBridgeAbove(TileIndex{tile}); }
@@ -81,6 +91,13 @@ static uint32_t SharedIndustry(int32_t x, int32_t y, uint32_t *index) noexcept
 	if (!IsTileType(tile, MP_INDUSTRY)) return 0;
 	return GetIndustryGfx(tile) == GFX_BUBBLE_CATCHER ? 2 : 1;
 }
+
+static uint8_t MapSvcTileOwner(uint32_t tile) noexcept { return GetTileOwner(TileIndex(tile)).base(); }
+static uint16_t MapSvcStationIndex(uint32_t tile) noexcept { return GetStationIndex(TileIndex(tile)).base(); }
+static uint16_t MapSvcDepotIndex(uint32_t tile) noexcept { return GetDepotIndex(TileIndex(tile)).base(); }
+static bool MapSvcIsLevelCrossing(uint32_t tile) noexcept { return IsLevelCrossingTile(TileIndex(tile)); }
+static uint8_t MapSvcTunnelBridgeDirection(uint32_t tile) noexcept { return GetTunnelBridgeDirection(TileIndex(tile)); }
+static uint16_t MapSvcBridgeSpeed(uint32_t tile) noexcept { return GetBridgeSpec(GetBridgeType(TileIndex(tile)))->speed; }
 
 static bool SharedCompanyValid(uint8_t company) noexcept { return Company::IsValidID(CompanyID(company)); }
 static uint8_t SharedCurrentCompany() noexcept { return _current_company.base(); }
@@ -112,7 +129,6 @@ static bool Shared_is_plain_rail(uint32_t tile) noexcept { return IsPlainRailTil
 static bool Shared_is_bridge(uint32_t tile) noexcept { return IsBridgeTile(TileIndex{tile}); }
 static uint8_t Shared_tunnel_transport(uint32_t tile) noexcept { return GetTunnelBridgeTransportType(TileIndex{tile}); }
 static uint32_t Shared_other_tunnel_end(uint32_t tile) noexcept { return GetOtherTunnelBridgeEnd(TileIndex{tile}).base(); }
-static uint8_t Shared_tunnel_bridge_direction(uint32_t tile) noexcept { return GetTunnelBridgeDirection(TileIndex{tile}); }
 static bool Shared_is_road_depot(uint32_t tile) noexcept { return IsRoadDepotTile(TileIndex{tile}); }
 static uint8_t Shared_road_depot_direction(uint32_t tile) noexcept { return GetRoadDepotDirection(TileIndex{tile}); }
 static bool Shared_is_normal_road(uint32_t tile) noexcept { return IsNormalRoadTile(TileIndex{tile}); }
@@ -140,6 +156,12 @@ const OpenTTDSharedServices &GetRustSharedServices() noexcept
 		.tile_slope = SharedTileSlope,
 		.mark_dirty = SharedMarkDirty,
 		.set_tropic_zone = SharedSetTropicZone,
+		.tile_owner = MapSvcTileOwner,
+		.station_index = MapSvcStationIndex,
+		.depot_index = MapSvcDepotIndex,
+		.is_level_crossing = MapSvcIsLevelCrossing,
+		.tunnel_bridge_direction = MapSvcTunnelBridgeDirection,
+		.bridge_speed = MapSvcBridgeSpeed,
 		.company_valid = SharedCompanyValid, .next_company = SharedNextCompany, .current_company = SharedCurrentCompany,
 		.closest_town = SharedClosestTown, .town_owner = SharedTownOwner,
 		.tile_valid = Shared_tile_valid,
@@ -154,7 +176,6 @@ const OpenTTDSharedServices &GetRustSharedServices() noexcept
 		.is_bridge = Shared_is_bridge,
 		.tunnel_transport = Shared_tunnel_transport,
 		.other_tunnel_end = Shared_other_tunnel_end,
-		.tunnel_bridge_direction = Shared_tunnel_bridge_direction,
 		.is_road_depot = Shared_is_road_depot,
 		.road_depot_direction = Shared_road_depot_direction,
 		.is_normal_road = Shared_is_normal_road,
@@ -169,6 +190,8 @@ const OpenTTDSharedServices &GetRustSharedServices() noexcept
 		.road_owner = Shared_road_owner,
 		.town_index = Shared_town_index,
 		.road_bits = Shared_road_bits,
+		.snow_line = SharedSnowLine,
+		.calendar_year = SharedCalendarYear,
 	};
 	return services;
 }

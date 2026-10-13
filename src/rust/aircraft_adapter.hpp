@@ -6,12 +6,20 @@
  */
 /** @file aircraft_adapter.hpp Canonical pool observations and direct shared leaves. */
 #include "aircraft_ffi.h"
+#include "vehicle_services.h"
 static_assert(AIR_FAST == 2 && AIR_CTOL == 1 && ROTOR_Z_OFFSET == 5);
 static_assert(HRS_ROTOR_STOPPED == 0 && HRS_ROTOR_MOVING_3 == 3);
 static_assert(VehicleID::Invalid().base() == 1048575 && StationID::Invalid().base() == 65535);
 static_assert(EV_BREAKDOWN_SMOKE_AIRCRAFT == 10 && EV_EXPLOSION_LARGE == 5 && EV_EXPLOSION_SMALL == 7);
 static_assert(HVOT_AIRCRAFT == 16);
 static_assert(OWNER_NONE.base() == 16);
+
+/* Preserve the aircraft ABI while using the canonical vehicle field definitions. */
+template <typename Result, auto Read>
+static Result OPENTTD_AIRCRAFT_CALL AircraftVehicleRead(OpenTTDAircraftVehicle vehicle) noexcept
+{
+	return Read(static_cast<const Vehicle *>(vehicle.handle));
+}
 
 /* Resolve each live shell/private owner once. Disaster helpers retain null State.
  * The record contains opaque pointers only; Rust never views C++ object layout. */
@@ -62,22 +70,10 @@ static void OPENTTD_AIRCRAFT_CALL Aircraft_set_z(OpenTTDAircraftVehicle vehicle,
 	v->z_pos = value;
 }
 
-static uint32_t OPENTTD_AIRCRAFT_CALL Aircraft_tile(OpenTTDAircraftVehicle vehicle) noexcept
-{
-	const Vehicle *v = static_cast<const Vehicle *>(vehicle.handle);
-	return v->tile.base();
-}
-
 static void OPENTTD_AIRCRAFT_CALL Aircraft_set_tile(OpenTTDAircraftVehicle vehicle, uint32_t value) noexcept
 {
 	Vehicle *v = static_cast<Vehicle *>(vehicle.handle);
 	v->tile = TileIndex{value};
-}
-
-static uint8_t OPENTTD_AIRCRAFT_CALL Aircraft_direction(OpenTTDAircraftVehicle vehicle) noexcept
-{
-	const Vehicle *v = static_cast<const Vehicle *>(vehicle.handle);
-	return v->direction;
 }
 
 static void OPENTTD_AIRCRAFT_CALL Aircraft_set_direction(OpenTTDAircraftVehicle vehicle, uint8_t value) noexcept
@@ -86,29 +82,12 @@ static void OPENTTD_AIRCRAFT_CALL Aircraft_set_direction(OpenTTDAircraftVehicle 
 	v->direction = static_cast<Direction>(value);
 }
 
-static uint8_t OPENTTD_AIRCRAFT_CALL Aircraft_tick_counter(OpenTTDAircraftVehicle vehicle) noexcept
-{
-	const Vehicle *v = static_cast<const Vehicle *>(vehicle.handle);
-	return v->tick_counter;
-}
-
 static void OPENTTD_AIRCRAFT_CALL Aircraft_set_tick_counter(OpenTTDAircraftVehicle vehicle, uint8_t value) noexcept
 {
 	Vehicle *v = static_cast<Vehicle *>(vehicle.handle);
-	v->tick_counter = value;
+	RustWriteVehicleTick(v, value);
 }
 
-static uint8_t OPENTTD_AIRCRAFT_CALL Aircraft_owner(OpenTTDAircraftVehicle vehicle) noexcept
-{
-	const Vehicle *v = static_cast<const Vehicle *>(vehicle.handle);
-	return v->owner.base();
-}
-
-static uint8_t OPENTTD_AIRCRAFT_CALL Aircraft_vehicle_status(OpenTTDAircraftVehicle vehicle) noexcept
-{
-	const Vehicle *v = static_cast<const Vehicle *>(vehicle.handle);
-	return v->vehstatus.base();
-}
 
 static void OPENTTD_AIRCRAFT_CALL Aircraft_set_vehicle_status(OpenTTDAircraftVehicle vehicle, uint8_t value) noexcept
 {
@@ -140,16 +119,10 @@ static void OPENTTD_AIRCRAFT_CALL Aircraft_set_subspeed(OpenTTDAircraftVehicle v
 	v->subspeed = value;
 }
 
-static uint8_t OPENTTD_AIRCRAFT_CALL Aircraft_progress(OpenTTDAircraftVehicle vehicle) noexcept
-{
-	const Vehicle *v = static_cast<const Vehicle *>(vehicle.handle);
-	return v->progress;
-}
-
 static void OPENTTD_AIRCRAFT_CALL Aircraft_set_progress(OpenTTDAircraftVehicle vehicle, uint8_t value) noexcept
 {
 	Vehicle *v = static_cast<Vehicle *>(vehicle.handle);
-	v->progress = value;
+	RustWriteVehicleProgress(v, value);
 }
 
 static uint8_t OPENTTD_AIRCRAFT_CALL Aircraft_acceleration(OpenTTDAircraftVehicle vehicle) noexcept
@@ -176,17 +149,6 @@ static void OPENTTD_AIRCRAFT_CALL Aircraft_set_breakdown_counter(OpenTTDAircraft
 	v->breakdown_ctr = value;
 }
 
-static uint8_t OPENTTD_AIRCRAFT_CALL Aircraft_order_type(OpenTTDAircraftVehicle vehicle) noexcept
-{
-	const Vehicle *v = static_cast<const Vehicle *>(vehicle.handle);
-	return v->current_order.GetType();
-}
-
-static uint16_t OPENTTD_AIRCRAFT_CALL Aircraft_order_destination(OpenTTDAircraftVehicle vehicle) noexcept
-{
-	const Vehicle *v = static_cast<const Vehicle *>(vehicle.handle);
-	return v->current_order.GetDestination().base();
-}
 
 static uint8_t OPENTTD_AIRCRAFT_CALL Aircraft_running_ticks(OpenTTDAircraftVehicle vehicle) noexcept
 {
@@ -280,7 +242,7 @@ static void OPENTTD_AIRCRAFT_CALL Aircraft_set_cargo_age(OpenTTDAircraftVehicle 
 
 static OpenTTDAircraftVehicle OPENTTD_AIRCRAFT_CALL Aircraft_next(OpenTTDAircraftVehicle vehicle) noexcept
 {
-	return AircraftVehicle(static_cast<Vehicle *>(vehicle.handle)->Next());
+	return AircraftVehicle(RustVehicleNext(static_cast<Vehicle *>(vehicle.handle)));
 }
 
 static uint32_t OPENTTD_AIRCRAFT_CALL Aircraft_map_size_x() noexcept
@@ -940,27 +902,27 @@ static const OpenTTDAircraftLeaves _aircraft_leaves{
 	.set_y = Aircraft_set_y,
 	.z = Aircraft_z,
 	.set_z = Aircraft_set_z,
-	.tile = Aircraft_tile,
+	.tile = AircraftVehicleRead<uint32_t, RustVehicleTile>,
 	.set_tile = Aircraft_set_tile,
-	.direction = Aircraft_direction,
+	.direction = AircraftVehicleRead<uint8_t, RustVehicleDirection>,
 	.set_direction = Aircraft_set_direction,
-	.tick_counter = Aircraft_tick_counter,
+	.tick_counter = AircraftVehicleRead<uint8_t, RustVehicleTick>,
 	.set_tick_counter = Aircraft_set_tick_counter,
-	.owner = Aircraft_owner,
-	.vehicle_status = Aircraft_vehicle_status,
+	.owner = AircraftVehicleRead<uint8_t, RustVehicleOwner>,
+	.vehicle_status = AircraftVehicleRead<uint8_t, RustVehicleStatus>,
 	.set_vehicle_status = Aircraft_set_vehicle_status,
 	.current_speed = Aircraft_current_speed,
 	.set_current_speed = Aircraft_set_current_speed,
 	.subspeed = Aircraft_subspeed,
 	.set_subspeed = Aircraft_set_subspeed,
-	.progress = Aircraft_progress,
+	.progress = AircraftVehicleRead<uint8_t, RustVehicleProgress>,
 	.set_progress = Aircraft_set_progress,
 	.acceleration = Aircraft_acceleration,
 	.maximum_speed = Aircraft_maximum_speed,
 	.set_maximum_speed = Aircraft_set_maximum_speed,
 	.set_breakdown_counter = Aircraft_set_breakdown_counter,
-	.order_type = Aircraft_order_type,
-	.order_destination = Aircraft_order_destination,
+	.order_type = AircraftVehicleRead<uint8_t, RustVehicleOrderType>,
+	.order_destination = AircraftVehicleRead<uint16_t, RustVehicleOrderDestination>,
 	.running_ticks = Aircraft_running_ticks,
 	.set_running_ticks = Aircraft_set_running_ticks,
 	.order_time = Aircraft_order_time,

@@ -24,9 +24,22 @@
 )]
 use crate::services::{Services, chance16_i};
 use std::{
-    cell::{Cell, OnceCell, UnsafeCell},
+    cell::{OnceCell, UnsafeCell},
     ffi::c_void,
 };
+
+// Original C++ globals are shared by GUI commands on the main thread and the
+// simulation on ottd:game. The native game-state mutex serializes both; startup
+// accesses occur before the game thread starts. No borrow crosses a callback.
+struct GameState<T>(UnsafeCell<T>);
+// SAFETY: Every access is serialized by the native game-state mutex (or startup).
+unsafe impl<T> Sync for GameState<T> {}
+impl<T> GameState<T> {
+    const fn new(value: T) -> Self { Self(UnsafeCell::new(value)) }
+    fn with<R>(&self, access: impl FnOnce(&UnsafeCell<T>) -> R) -> R {
+        access(&self.0)
+    }
+}
 
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
@@ -140,10 +153,13 @@ pub(crate) unsafe fn population(state: *const State) -> u32 {
     // SAFETY: Caller establishes owner lifetime and serialized access.
     unsafe { (*state).simulation.population }
 }
-thread_local! { static GENERATING_TOWN: Cell<bool> = const { Cell::new(false) }; }
+static GENERATING_TOWN: GameState<bool> = GameState::new(false);
 #[unsafe(no_mangle)]
 pub extern "C" fn openttd_rust_town_generating_exchange(generating: bool) -> bool {
-    GENERATING_TOWN.with(|flag| flag.replace(generating))
+    GENERATING_TOWN.with(|flag| {
+        // SAFETY: Serialized native entry; the flag is process-wide.
+        unsafe { std::ptr::replace(flag.get(), generating) }
+    })
 }
 unsafe fn update_radius(state: *mut State) {
     const RADII: [[u32; 5]; 23] = [
@@ -202,7 +218,10 @@ unsafe fn change_population(leaves: &Leaves, state: *mut State, town: u32, amoun
     unsafe {
         (*state).simulation.population = population(state).wrapping_add(amount as u32);
     }
-    if GENERATING_TOWN.with(Cell::get) {
+    if GENERATING_TOWN.with(|flag| {
+        // SAFETY: Immediate serialized read ends before presentation callbacks.
+        unsafe { *flag.get() }
+    }) {
         return;
     }
     (leaves.population_changed)(town);
@@ -351,7 +370,7 @@ struct GlobalCounts {
     ids: Vec<u32>,
     classes: Vec<u32>,
 }
-thread_local! { static BUILDING_COUNTS: UnsafeCell<GlobalCounts> = UnsafeCell::default(); }
+static BUILDING_COUNTS: GameState<GlobalCounts> = GameState::new(GlobalCounts { ids: Vec::new(), classes: Vec::new() });
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_town_id_counts(state: *mut State) -> Slots {
     // SAFETY: Canonical serialized vector. Native views end before resize.
@@ -387,7 +406,7 @@ pub unsafe extern "C" fn openttd_rust_town_class_counts_resize(state: *mut State
 #[unsafe(no_mangle)]
 pub extern "C" fn openttd_rust_town_global_id_counts() -> Slots {
     BUILDING_COUNTS.with(|cell| {
-        // SAFETY: Game-thread serialized access; no service call or reentry.
+        // SAFETY: Game-state-mutex serialized access; no service call or reentry.
         let counts = unsafe { &mut (*cell.get()).ids };
         Slots {
             data: counts.as_mut_ptr().cast(),
@@ -397,7 +416,7 @@ pub extern "C" fn openttd_rust_town_global_id_counts() -> Slots {
 }
 #[unsafe(no_mangle)]
 pub extern "C" fn openttd_rust_town_global_id_counts_resize(count: usize) {
-    // SAFETY: Game-thread serialized access; no native view survives resizing.
+    // SAFETY: Game-state-mutex serialized access; no native view survives resizing.
     BUILDING_COUNTS.with(|cell| unsafe {
         (*cell.get()).ids.resize(count, 0);
     });
@@ -405,7 +424,7 @@ pub extern "C" fn openttd_rust_town_global_id_counts_resize(count: usize) {
 #[unsafe(no_mangle)]
 pub extern "C" fn openttd_rust_town_global_class_counts() -> Slots {
     BUILDING_COUNTS.with(|cell| {
-        // SAFETY: Game-thread serialized access; no service call or reentry.
+        // SAFETY: Game-state-mutex serialized access; no service call or reentry.
         let counts = unsafe { &mut (*cell.get()).classes };
         Slots {
             data: counts.as_mut_ptr().cast(),
@@ -415,7 +434,7 @@ pub extern "C" fn openttd_rust_town_global_class_counts() -> Slots {
 }
 #[unsafe(no_mangle)]
 pub extern "C" fn openttd_rust_town_global_class_counts_resize(count: usize) {
-    // SAFETY: Game-thread serialized access; no native view survives resizing.
+    // SAFETY: Game-state-mutex serialized access; no native view survives resizing.
     BUILDING_COUNTS.with(|cell| unsafe {
         (*cell.get()).classes.resize(count, 0);
     });
@@ -429,7 +448,7 @@ pub unsafe extern "C" fn openttd_rust_town_increase_building(
     // SAFETY: Original valid spec/count indices; no callback while borrowed.
     let state = unsafe { &mut *state };
     BUILDING_COUNTS.with(|cell| {
-        // SAFETY: All counters are serialized on the game thread.
+        // SAFETY: All counters are serialized by the game-state mutex.
         let global = unsafe { &mut *cell.get() };
         state.id_counts[usize::from(house)] = state.id_counts[usize::from(house)].wrapping_add(1);
         global.ids[usize::from(house)] = global.ids[usize::from(house)].wrapping_add(1);
@@ -449,7 +468,7 @@ pub unsafe extern "C" fn openttd_rust_town_decrease_building(
     // SAFETY: Source valid indices and serialized original lifetime preconditions.
     let state = unsafe { &mut *state };
     BUILDING_COUNTS.with(|cell| {
-        // SAFETY: No callback spans the game-thread global count access.
+        // SAFETY: No callback spans the process-wide global count access.
         let global = unsafe { &mut *cell.get() };
         state.id_counts[usize::from(house)] = state.id_counts[usize::from(house)].saturating_sub(1);
         global.ids[usize::from(house)] = global.ids[usize::from(house)].saturating_sub(1);
@@ -465,11 +484,9 @@ struct HouseCandidates {
     slots: [std::mem::MaybeUninit<(u32, u32)>; 4096],
     len: usize,
 }
-thread_local! {
-    static HOUSE_CANDIDATES: UnsafeCell<HouseCandidates> = const { UnsafeCell::new(HouseCandidates {
-        slots: [std::mem::MaybeUninit::uninit(); 4096], len: 0,
-    }) };
-}
+static HOUSE_CANDIDATES: GameState<HouseCandidates> = GameState::new(HouseCandidates {
+    slots: [std::mem::MaybeUninit::uninit(); 4096], len: 0,
+});
 fn clear_house_candidates() {
     HOUSE_CANDIDATES.with(|cell| unsafe {
         (*cell.get()).len = 0;
@@ -687,13 +704,13 @@ pub struct CommandResult {
     pub success: bool,
 }
 #[derive(Clone)]
-struct Engine {
-    leaves: Leaves,
-    services: Services,
+struct Engine<'a> {
+    leaves: &'a Leaves,
+    services: &'a Services,
     map_log_x: OnceCell<u8>,
     owner: *mut State,
 }
-impl Engine {
+impl Engine<'_> {
     fn size_x(&self) -> u32 {
         1 << *self
             .map_log_x
@@ -829,8 +846,8 @@ impl Engine {
         (self.leaves.clear_land)(tile, u32::from(execute))
     }
     fn count_stations(&self, _town: u32) -> u32 {
-        struct StationCount {
-            engine: Engine,
+        struct StationCount<'a> {
+            engine: Engine<'a>,
             center: u32,
             radius: u32,
             count: u32,
@@ -950,10 +967,10 @@ fn incline(dir: u32) -> u32 {
     [12, 6, 3, 9][dir as usize]
 }
 
-fn engine(leaves: *const Leaves, services: *const Services) -> Engine {
+fn engine<'a>(leaves: *const Leaves, services: *const Services) -> Engine<'a> {
     // SAFETY: Immutable game-thread service tables remain live for each synchronous entry.
-    let leaves = unsafe { *leaves };
-    let services = unsafe { *services };
+    let leaves = unsafe { &*leaves };
+    let services = unsafe { &*services };
     Engine {
         leaves,
         services,
@@ -969,7 +986,7 @@ fn round_div(a: i32, b: u32) -> i32 {
     }
 }
 
-impl Engine {
+impl Engine<'_> {
     fn road_type(&self) -> u32 {
         let mut mask = (self.leaves.road_mask)();
         let mut best = 0;
@@ -1316,7 +1333,7 @@ impl Engine {
     }
 }
 
-impl Engine {
+impl Engine<'_> {
     fn in_tile(&self, town: u32, tile: &mut u32, cur: u32, mut dir: u32, modes: u32) -> u32 {
         let at = *tile;
         let layout = self.layout();
@@ -2082,7 +2099,7 @@ fn history_ranges() -> [crate::history::Descriptor; 3] {
         descriptor(42, 61, 4, 12),
     ]
 }
-impl Engine {
+impl Engine<'_> {
     fn monthly_statistics(&self, month: u8) {
         // SAFETY: No callback or service spans this borrow of canonical histories.
         let state = unsafe { &mut *self.owner };
@@ -2143,8 +2160,8 @@ impl Engine {
         }
     }
     fn update_rating(&self, town: u32) {
-        struct RatingContext {
-            engine: Engine,
+        struct RatingContext<'a> {
+            engine: Engine<'a>,
             center: u32,
             radius: u32,
         }
@@ -2223,11 +2240,11 @@ struct RatingTest {
     depth: i32,
     ratings: std::collections::BTreeMap<usize, i32>,
 }
-thread_local! { static RATING_TEST: UnsafeCell<RatingTest> = UnsafeCell::default(); }
+static RATING_TEST: GameState<RatingTest> = GameState::new(RatingTest { depth: 0, ratings: std::collections::BTreeMap::new() });
 #[unsafe(no_mangle)]
 pub extern "C" fn openttd_rust_town_rating_test(mode: bool) {
     RATING_TEST.with(|cell| {
-        // SAFETY: Game-thread serialized scratch; no callback.
+        // SAFETY: Game-state-mutex serialized scratch; no callback.
         let test = unsafe { &mut *cell.get() };
         if mode {
             if test.depth == 0 {

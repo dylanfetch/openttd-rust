@@ -39,7 +39,9 @@ mod town;
 mod townname;
 mod townname_data;
 mod trees;
+mod vehicle;
 mod widget_parser;
+mod witness;
 
 pub use admin_conversion::Action as AdminAction;
 pub use alternating::{AlternatingState, AlternatingStep};

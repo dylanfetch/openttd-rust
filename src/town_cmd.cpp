@@ -938,13 +938,11 @@ static uint32_t RustTown_map_log_x() noexcept { return Map::LogX(); }
 static uint32_t RustTown_map_size_y() noexcept { return Map::SizeY(); }
 static bool RustTown_build_on_slopes() noexcept { return _settings_game.construction.build_on_slopes; }
 static uint8_t RustTown_growth_rate() noexcept { return _settings_game.economy.town_growth_rate; }
-static uint8_t RustTown_snow_line() noexcept { return GetSnowLine(); }
 static bool RustTown_editor() noexcept { return _game_mode == GM_EDITOR; }
 static bool RustTown_generating_world() noexcept { return _generating_world; }
 static bool RustTown_allow_crossings() noexcept { return _settings_game.economy.allow_town_level_crossings; }
 static uint8_t RustTown_climate() noexcept { return to_underlying(_settings_game.game_creation.landscape); }
 static uint8_t RustTown_highest_snow_line() noexcept { return HighestSnowLine(); }
-static int32_t RustTown_calendar_year() noexcept { return TimerGameCalendar::year.base(); }
 static bool RustTown_allow_roads() noexcept { return _settings_game.economy.allow_town_roads; }
 static int32_t RustTown_calendar_date() noexcept { return TimerGameCalendar::date.base(); }
 static uint8_t RustTownRoadFlags(uint8_t id) noexcept { return GetRoadTypeInfo(static_cast<RoadType>(id))->flags.base(); }
@@ -1114,13 +1112,13 @@ static const OpenTTDTownLeaves &GetRustTownServices() noexcept
 		.map_size_y = RustTown_map_size_y,
 		.build_on_slopes = RustTown_build_on_slopes,
 		.growth_rate = RustTown_growth_rate,
-		.snow_line = RustTown_snow_line,
+		.snow_line = GetRustSharedServices().snow_line,
 		.editor = RustTown_editor,
 		.generating_world = RustTown_generating_world,
 		.allow_crossings = RustTown_allow_crossings,
 		.climate = RustTown_climate,
 		.highest_snow_line = RustTown_highest_snow_line,
-		.calendar_year = RustTown_calendar_year,
+		.calendar_year = GetRustSharedServices().calendar_year,
 		.allow_roads = RustTown_allow_roads,
 		.calendar_date = RustTown_calendar_date,
 		.road_flags = RustTownRoadFlags,

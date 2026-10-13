@@ -246,6 +246,10 @@ add_files(
     landscape.cpp
     rust/company_adapter.cpp
     rust/services.cpp
+    rust/witness.cpp
+    rust/vehicle_services.cpp
+    rust/vehicle_services.h
+    rust/vehicle_ffi.h
     rust/services_ffi.h
     rust/command_cost_ffi.h
     rust/command_cost_services.h
