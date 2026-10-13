@@ -56,6 +56,37 @@ pub struct Service {
     // temporary Box/&mut reborrow on a surviving entry would invalidate them.
     queue: Vec<*mut QueueEntry>,
 }
+/// Activity fields consumed together after a station-radius filter.
+#[repr(C)]
+pub struct StationActivity {
+    /// Canonical number of days since loading.
+    pub time_since_load: u8,
+    /// Canonical number of days since unloading.
+    pub time_since_unload: u8,
+}
+
+/// Read the canonical fields without retaining a borrow across native callbacks.
+///
+/// # Safety
+/// `state` is a live station owner whose fields are not being accessed concurrently.
+pub(crate) unsafe fn activity(state: *const Service) -> StationActivity {
+    // SAFETY: Immediate field-sized reads from the caller's live serialized owner.
+    unsafe {
+        StationActivity {
+            time_since_load: (&raw const (*state).fields.time_since_load).read(),
+            time_since_unload: (&raw const (*state).fields.time_since_unload).read(),
+        }
+    }
+}
+/// Shared native town observation of the canonical station owner.
+///
+/// # Safety
+/// `state` is live and game-state-mutex serialized; no borrow survives this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_station_activity(state: *const Service) -> StationActivity {
+    // SAFETY: Native shared helper supplies the station's live canonical owner.
+    unsafe { activity(state) }
+}
 #[unsafe(no_mangle)]
 pub extern "C" fn openttd_rust_station_service_new() -> *mut Service {
     Box::into_raw(Box::new(Service {

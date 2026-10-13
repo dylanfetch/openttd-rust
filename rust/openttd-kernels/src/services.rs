@@ -186,8 +186,12 @@ pub fn fixture(
     random: extern "C" fn(*mut c_void) -> u32,
     industry: extern "C" fn(i32, i32, *mut u32) -> u32,
 ) -> Services {
-    extern "C" fn zero_byte() -> u8 { 0 }
-    extern "C" fn zero_year() -> i32 { 0 }
+    extern "C" fn zero_byte() -> u8 {
+        0
+    }
+    extern "C" fn zero_year() -> i32 {
+        0
+    }
     extern "C" fn byte(_: u32) -> u8 {
         0
     }
@@ -284,6 +288,13 @@ impl Map {
     #[must_use]
     pub fn tile_y(self, tile: u32) -> u32 {
         tile >> self.log_x
+    }
+    /// Original `DistanceSquare` over captured map dimensions.
+    #[must_use]
+    pub fn distance_square(self, a: u32, b: u32) -> u32 {
+        let x = self.tile_x(a).cast_signed() - self.tile_x(b).cast_signed();
+        let y = self.tile_y(a).cast_signed() - self.tile_y(b).cast_signed();
+        (x * x + y * y).cast_unsigned()
     }
     /// `TileDiffXY`: `y * Map::SizeX() + x` in unsigned arithmetic.
     #[must_use]

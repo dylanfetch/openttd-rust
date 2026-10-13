@@ -9,6 +9,7 @@
 #ifndef RUST_TOWN_FFI_H
 #define RUST_TOWN_FFI_H
 #include "services_ffi.h"
+#include "station_activity_ffi.h"
 #include <cstdint>
 #include "command_cost_ffi.h"
 #include <cstddef>
@@ -32,12 +33,17 @@ struct OpenTTDTownSuppliedHistory { uint32_t production, transported; };
 struct OpenTTDTownSupplied { uint8_t cargo; OpenTTDTownSuppliedHistory history[61]; };
 struct OpenTTDTownSuppliedEntry { OpenTTDTownSupplied *entry; bool created; };
 struct OpenTTDTownSlots { void *data; size_t size; };
-struct OpenTTDTownStationActivity { uint8_t time_since_load, time_since_unload; };
+using OpenTTDTownStationActivity = OpenTTDStationActivity;
 struct OpenTTDTownCommandResult { int64_t cost; bool success; };
 struct OpenTTDTownRoadChoice { int32_t introduction_date; uint16_t max_speed; bool town_build; };
 struct OpenTTDTownHouseAvailability { uint16_t zones; uint16_t override_id; uint16_t class_id; uint8_t probability; bool enabled; };
 struct OpenTTDTownHousePlacement { int32_t min_year; int32_t max_year; uint8_t flags; uint8_t extra_flags; };
 struct OpenTTDTownHouseConstruction { uint8_t extra_flags; uint8_t population; };
+struct OpenTTDTownYearlyServices {
+	bool (*completed)(uint32_t) noexcept;
+	uint8_t (*age)(uint32_t) noexcept;
+	void (*set_age)(uint32_t, uint8_t) noexcept;
+};
 struct OpenTTDTownAuthorityServices {
 	uint8_t (*council_tolerance)() noexcept;
 	bool (*bulldozer)() noexcept;
@@ -101,6 +107,7 @@ struct OpenTTDTownLeaves {
  * and bounded NewGRF resolution may reenter; ordinary gameplay does not throw.
  * Environmental failures and Rust panics abort. Save/load staging stays native. */
 extern "C" {
+void openttd_rust_town_yearly(const OpenTTDSharedServices *, const OpenTTDTownYearlyServices *, uint32_t);
 void openttd_rust_town_authority_station(const OpenTTDTownAuthorityServices *, const OpenTTDSharedServices *, const OpenTTDCommandCostServices *, OpenTTDCommandCost *, uint32_t, bool);
 void openttd_rust_town_authority_remove(const OpenTTDTownAuthorityServices *, const OpenTTDSharedServices *, const OpenTTDCommandCostServices *, OpenTTDCommandCost *, const OpenTTDTownHandle *, bool, uint8_t);
 bool openttd_rust_town_generating_exchange(bool);

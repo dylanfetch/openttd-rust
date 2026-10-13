@@ -43,6 +43,8 @@
 #include "town.h"
 #ifdef WITH_RUST
 #include "rust/command_services.h"
+#include "rust/company_services.h"
+#include "rust/station_services.h"
 #endif
 #include "town_kdtree.h"
 #include "townname_func.h"
@@ -991,7 +993,9 @@ static void RustTown_set_road_town(uint32_t tile, uint32_t town) noexcept
 }
 static uint32_t RustTown_exchange_company(uint32_t company) noexcept
 {
-	{ auto old = _current_company; _current_company = CompanyID(company); return old.base(); }
+	auto old = OpenTTDCurrentCompany();
+	OpenTTDSetCurrentCompany(CompanyID(company));
+	return old.base();
 }
 static void RustTown_increase_building_count(uint32_t town, uint32_t house) noexcept
 {
@@ -1096,13 +1100,13 @@ static void RustTownStations(uint32_t tile, uint32_t radius, void *context, void
 {
 	ForAllStationsRadius(TileIndex{tile}, radius, [context, visit](const Station *st) { visit(context, st, st->xy.base()); });
 }
-/* Temporary activity/owner adapters; #214 supplies their shared canonical helpers. */
+/* Thin FFI conversion facades over the shared station observations. */
 static OpenTTDTownStationActivity RustTownStationActivity(const void *station) noexcept
 {
 	const auto *st = static_cast<const Station *>(station);
-	return {st->time_since_load, st->time_since_unload};
+	return OpenTTDStationActivityOf(st);
 }
-static uint8_t RustTownStationOwner(const void *station) noexcept { return static_cast<const Station *>(station)->owner.base(); }
+static uint8_t RustTownStationOwner(const void *station) noexcept { return OpenTTDStationOwner(static_cast<const Station *>(station)).base(); }
 static void RustTownDirtyAuthority(uint32_t town) noexcept { SetWindowDirty(WC_TOWN_AUTHORITY, TownID(town)); }
 
 static const OpenTTDTownLeaves &GetRustTownServices() noexcept
@@ -2858,7 +2862,7 @@ static void MakeTownHouse(TileIndex tile, Town *t, uint8_t counter, uint8_t stag
 	if (size.Any(BUILDING_2_TILES_X))   ClearMakeHouseTile(tile + TileDiffXY(1, 0), t, counter, stage, ++type, random_bits, is_protected);
 	if (size.Any(BUILDING_HAS_4_TILES)) ClearMakeHouseTile(tile + TileDiffXY(1, 1), t, counter, stage, ++type, random_bits, is_protected);
 
-	ForAllStationsAroundTiles(TileArea(tile, size.Any(BUILDING_2_TILES_X) ? 2 : 1, flags.Any(BUILDING_2_TILES_Y) ? 2 : 1), [t](Station *st, TileIndex) {
+	ForAllStationsAroundTiles(TileArea(tile, size.Any(BUILDING_2_TILES_X) ? 2 : 1, size.Any(BUILDING_2_TILES_Y) ? 2 : 1), [t](Station *st, TileIndex) {
 		t->stations_near.insert(st);
 		return true;
 	});
@@ -4505,11 +4509,20 @@ static const IntervalTimer<TimerGameEconomy> _economy_towns_monthly({TimerGameEc
 
 static const IntervalTimer<TimerGameEconomy> _economy_towns_yearly({TimerGameEconomy::YEAR, TimerGameEconomy::Priority::TOWN}, [](auto)
 {
+#ifdef WITH_RUST
+	static const OpenTTDTownYearlyServices houses{
+		.completed = [](uint32_t tile) noexcept { return IsHouseCompleted(TileIndex{tile}); },
+		.age = [](uint32_t tile) noexcept { return Tile(TileIndex{tile}).m5(); },
+		.set_age = [](uint32_t tile, uint8_t age) noexcept { Tile(TileIndex{tile}).m5() = age; },
+	};
+	openttd_rust_town_yearly(&GetRustSharedServices(), &houses, Map::Size());
+#else
 	/* Increment house ages */
 	for (const auto t : Map::Iterate()) {
 		if (!IsTileType(t, MP_HOUSE)) continue;
 		IncrementHouseAge(t);
 	}
+#endif
 });
 
 static CommandCost TerraformTile_Town(TileIndex tile, DoCommandFlags flags, int z_new, Slope tileh_new)

@@ -26,6 +26,7 @@ macro_rules! layout {
 #[allow(clippy::too_many_lines)]
 pub fn layout(type_id: u16, item: u8) -> usize {
     match type_id {
+        445 => layout!(crate::town::YearlyServices, item; completed, age, set_age),
         444 => layout!(crate::town::SuppliedEntry, item; entry, created),
         443 => {
             layout!(crate::town::AuthorityServices, item; council_tolerance, bulldozer, authority_distance, town_index, refusal)

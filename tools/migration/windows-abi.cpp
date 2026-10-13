@@ -82,6 +82,7 @@ static void Layout(uint16_t type, const char *name, std::initializer_list<size_t
 
 static void Layouts()
 {
+	Layout(445, "OpenTTDTownYearlyServices", {sizeof(OpenTTDTownYearlyServices), alignof(OpenTTDTownYearlyServices), offsetof(OpenTTDTownYearlyServices, completed), offsetof(OpenTTDTownYearlyServices, age), offsetof(OpenTTDTownYearlyServices, set_age)});
 	Layout(444, "OpenTTDTownSuppliedEntry", {sizeof(OpenTTDTownSuppliedEntry), alignof(OpenTTDTownSuppliedEntry), offsetof(OpenTTDTownSuppliedEntry, entry), offsetof(OpenTTDTownSuppliedEntry, created)});
 	Layout(443, "OpenTTDTownAuthorityServices", {sizeof(OpenTTDTownAuthorityServices), alignof(OpenTTDTownAuthorityServices), offsetof(OpenTTDTownAuthorityServices, council_tolerance), offsetof(OpenTTDTownAuthorityServices, bulldozer), offsetof(OpenTTDTownAuthorityServices, authority_distance), offsetof(OpenTTDTownAuthorityServices, town_index), offsetof(OpenTTDTownAuthorityServices, refusal)});
 	Layout(621, "OpenTTDCommandServices", {sizeof(OpenTTDCommandServices), alignof(OpenTTDCommandServices), offsetof(OpenTTDCommandServices, landscape_clear)});

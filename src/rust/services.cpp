@@ -9,6 +9,7 @@
 #include "../stdafx.h"
 #include "services_ffi.h"
 #include "command_services.h"
+#include "company_services.h"
 #ifdef WITH_RUST
 #include "../industry_map.h"
 #include "../bridge_map.h"
@@ -20,10 +21,7 @@
 #include "../landscape.h"
 #include "../viewport_func.h"
 #include "../core/random_func.hpp"
-#include "../station_map.h"
 #include "../depot_map.h"
-#include "../rail_map.h"
-#include "../tunnelbridge_map.h"
 #include "../bridge.h"
 #include "../company_base.h"
 #include "../company_func.h"
@@ -31,7 +29,6 @@
 #include "../command_func.h"
 #include "../landscape_cmd.h"
 #include "../town.h"
-#include "../snowline.h"
 #include "../timer/timer_game_calendar.h"
 #include "../safeguards.h"
 
@@ -99,8 +96,8 @@ static bool MapSvcIsLevelCrossing(uint32_t tile) noexcept { return IsLevelCrossi
 static uint8_t MapSvcTunnelBridgeDirection(uint32_t tile) noexcept { return GetTunnelBridgeDirection(TileIndex(tile)); }
 static uint16_t MapSvcBridgeSpeed(uint32_t tile) noexcept { return GetBridgeSpec(GetBridgeType(TileIndex(tile)))->speed; }
 
+static uint8_t SharedCurrentCompany() noexcept { return OpenTTDCurrentCompany().base(); }
 static bool SharedCompanyValid(uint8_t company) noexcept { return Company::IsValidID(CompanyID(company)); }
-static uint8_t SharedCurrentCompany() noexcept { return _current_company.base(); }
 static uint8_t SharedNextCompany(uint8_t from) noexcept
 {
 	auto range = Company::Iterate(from);

@@ -22,7 +22,7 @@
     clippy::collapsible_match,
     clippy::decimal_bitwise_operands
 )]
-use crate::services::{Services, chance16_i};
+use crate::services::{Map, Services, chance16_i};
 use std::{
     cell::{OnceCell, UnsafeCell},
     ffi::c_void,
@@ -33,9 +33,11 @@ use std::{
 // accesses occur before the game thread starts. No borrow crosses a callback.
 struct GameState<T>(UnsafeCell<T>);
 // SAFETY: Every access is serialized by the native game-state mutex (or startup).
-unsafe impl<T> Sync for GameState<T> {}
+unsafe impl<T: Send> Sync for GameState<T> {}
 impl<T> GameState<T> {
-    const fn new(value: T) -> Self { Self(UnsafeCell::new(value)) }
+    const fn new(value: T) -> Self {
+        Self(UnsafeCell::new(value))
+    }
     fn with<R>(&self, access: impl FnOnce(&UnsafeCell<T>) -> R) -> R {
         access(&self.0)
     }
@@ -370,7 +372,10 @@ struct GlobalCounts {
     ids: Vec<u32>,
     classes: Vec<u32>,
 }
-static BUILDING_COUNTS: GameState<GlobalCounts> = GameState::new(GlobalCounts { ids: Vec::new(), classes: Vec::new() });
+static BUILDING_COUNTS: GameState<GlobalCounts> = GameState::new(GlobalCounts {
+    ids: Vec::new(),
+    classes: Vec::new(),
+});
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_town_id_counts(state: *mut State) -> Slots {
     // SAFETY: Canonical serialized vector. Native views end before resize.
@@ -485,7 +490,8 @@ struct HouseCandidates {
     len: usize,
 }
 static HOUSE_CANDIDATES: GameState<HouseCandidates> = GameState::new(HouseCandidates {
-    slots: [std::mem::MaybeUninit::uninit(); 4096], len: 0,
+    slots: [std::mem::MaybeUninit::uninit(); 4096],
+    len: 0,
 });
 fn clear_house_candidates() {
     HOUSE_CANDIDATES.with(|cell| unsafe {
@@ -691,12 +697,7 @@ pub struct Leaves {
     pub allow_construction: extern "C" fn(u32, u32, u32, u32) -> bool,
     pub construction_animation: extern "C" fn(u32),
 }
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct StationActivity {
-    pub time_since_load: u8,
-    pub time_since_unload: u8,
-}
+pub type StationActivity = crate::station_service::StationActivity;
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct CommandResult {
@@ -707,14 +708,17 @@ pub struct CommandResult {
 struct Engine<'a> {
     leaves: &'a Leaves,
     services: &'a Services,
-    map_log_x: OnceCell<u8>,
+    map: OnceCell<Map>,
     owner: *mut State,
 }
 impl Engine<'_> {
+    fn map(&self) -> Map {
+        *self.map.get_or_init(|| Map {
+            log_x: (self.leaves.map_log_x)() as u8,
+        })
+    }
     fn size_x(&self) -> u32 {
-        1 << *self
-            .map_log_x
-            .get_or_init(|| (self.leaves.map_log_x)() as u8)
+        self.map().size_x()
     }
     fn position(&self) -> u32 {
         // SAFETY: Stable live owner; each immediate field read ends before services.
@@ -808,11 +812,10 @@ impl Engine<'_> {
         self.services.random_range(4)
     }
     fn offset(&self, tile: u32, x: i32, y: i32) -> u32 {
-        tile.wrapping_add(y.wrapping_mul(self.size_x() as i32).wrapping_add(x) as u32)
+        tile.wrapping_add(self.map().diff(x, y))
     }
     fn step(&self, tile: u32, dir: u32) -> u32 {
-        let (x, y) = [(-1, 0), (0, 1), (1, 0), (0, -1)][dir as usize];
-        self.offset(tile, x, y)
+        self.map().add_diag(tile, dir as u8)
     }
     fn valid(&self, tile: u32) -> bool {
         (self.services.tile_valid)(tile)
@@ -833,10 +836,7 @@ impl Engine<'_> {
         )
     }
     fn distance(&self, a: u32, b: u32) -> u32 {
-        let sx = self.size_x();
-        let x = (a % sx) as i32 - (b % sx) as i32;
-        let y = (a / sx) as i32 - (b / sx) as i32;
-        (x * x + y * y) as u32
+        self.map().distance_square(a, b)
     }
     fn road(&self, town: u32, tile: u32, bits: u32, flags: u32) -> bool {
         let rt = self.road_type();
@@ -968,13 +968,13 @@ fn incline(dir: u32) -> u32 {
 }
 
 fn engine<'a>(leaves: *const Leaves, services: *const Services) -> Engine<'a> {
-    // SAFETY: Immutable game-thread service tables remain live for each synchronous entry.
+    // SAFETY: Immutable native service tables remain live for each synchronous entry.
     let leaves = unsafe { &*leaves };
     let services = unsafe { &*services };
     Engine {
         leaves,
         services,
-        map_log_x: OnceCell::new(),
+        map: OnceCell::new(),
         owner: std::ptr::null_mut(),
     }
 }
@@ -1716,7 +1716,7 @@ impl Engine<'_> {
             if stage == 3 {
                 // SAFETY: Owner mutation ends before possible presentation reentry.
                 unsafe {
-                    change_population(&self.leaves, self.owner, town, i32::from(h.population));
+                    change_population(self.leaves, self.owner, town, i32::from(h.population));
                 }
             } else {
                 counter = (construction >> 2) & 3;
@@ -2240,7 +2240,10 @@ struct RatingTest {
     depth: i32,
     ratings: std::collections::BTreeMap<usize, i32>,
 }
-static RATING_TEST: GameState<RatingTest> = GameState::new(RatingTest { depth: 0, ratings: std::collections::BTreeMap::new() });
+static RATING_TEST: GameState<RatingTest> = GameState::new(RatingTest {
+    depth: 0,
+    ratings: std::collections::BTreeMap::new(),
+});
 #[unsafe(no_mangle)]
 pub extern "C" fn openttd_rust_town_rating_test(mode: bool) {
     RATING_TEST.with(|cell| {
@@ -2323,5 +2326,110 @@ pub unsafe extern "C" fn openttd_rust_town_change_rating(
         }
         // SAFETY: Live immutable typed service table.
         (unsafe { (*leaves).dirty_authority })(town);
+    }
+}
+
+/// House fields consumed only by the yearly traversal, with immediate map access.
+#[repr(C)]
+pub struct YearlyServices {
+    pub completed: extern "C" fn(u32) -> bool,
+    pub age: extern "C" fn(u32) -> u8,
+    pub set_age: extern "C" fn(u32, u8),
+}
+/// Original `Map::Iterate` order and completed-house age saturation.
+/// SAFETY: Immutable tables live through this serialized native timer entry.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_town_yearly(
+    services: *const Services,
+    houses: *const YearlyServices,
+    size: u32,
+) {
+    // SAFETY: Borrowed tables outlive traversal; map access ends before mutations.
+    let (services, houses) = unsafe { (&*services, &*houses) };
+    for tile in 0..size {
+        if (services.tile_type)(tile) != 3 {
+            continue;
+        }
+        if (houses.completed)(tile) {
+            let age = (houses.age)(tile);
+            if age < u8::MAX {
+                (houses.set_age)(tile, age + 1);
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn gui_and_game_threads_share_original_globals() {
+        // Spawn/join serializes each access like the native game-state mutex.
+        // Size a NewGRF-range house ID on the command thread before ottd:game.
+        openttd_rust_town_global_id_counts_resize(4096);
+        openttd_rust_town_global_class_counts_resize(16);
+        let ids = openttd_rust_town_global_id_counts();
+        let classes = openttd_rust_town_global_class_counts();
+        let mut owner = State {
+            id_counts: vec![0; 4096],
+            class_counts: vec![0; 16],
+            ..State::default()
+        };
+        owner.simulation.ratings[0] = 77;
+        let address = (&raw mut owner) as usize;
+        assert!(!openttd_rust_town_generating_exchange(true));
+        clear_house_candidates();
+        add_house_candidate(110, 1);
+        openttd_rust_town_rating_test(true);
+        let (id_pointer, class_pointer, rating) = std::thread::spawn(move || {
+            let owner = address as *mut State;
+            assert!(openttd_rust_town_generating_exchange(false));
+            assert_eq!(take_house_candidate(0), (110, 1));
+            add_house_candidate(4095, 1);
+            // SAFETY: Owner lives on the suspended parent stack; spawn/join prevents
+            // concurrent reads and every index is valid in both sized owners.
+            unsafe {
+                openttd_rust_town_increase_building(owner, 110, 15);
+            }
+            RATING_TEST.with(|cell| {
+                // SAFETY: Serialized access; same process-wide test scratch.
+                let test = unsafe { &mut *cell.get() };
+                assert_eq!(test.depth, 1);
+                test.ratings.insert(42, -99);
+            });
+            // SAFETY: The parent does not touch its live owner until this join.
+            let rating = unsafe { openttd_rust_town_rating(owner, 42, 0) };
+            (
+                openttd_rust_town_global_id_counts().data as usize,
+                openttd_rust_town_global_class_counts().data as usize,
+                rating,
+            )
+        })
+        .join()
+        .unwrap();
+        assert_eq!(ids.data as usize, id_pointer);
+        assert_eq!(classes.data as usize, class_pointer);
+        assert_eq!(rating, -99);
+        assert_eq!(take_house_candidate(0), (4095, 1));
+        assert!(!openttd_rust_town_generating_exchange(false));
+        // SAFETY: Child has joined; original pointers remain valid without resize.
+        unsafe {
+            assert_eq!(*ids.data.cast::<u32>().add(110), 1);
+            assert_eq!(*classes.data.cast::<u32>().add(15), 1);
+            assert_eq!(openttd_rust_town_rating(&raw const owner, 42, 0), -99);
+            openttd_rust_town_decrease_building(&raw mut owner, 110, 15);
+            assert_eq!(*ids.data.cast::<u32>().add(110), 0);
+            assert_eq!(*classes.data.cast::<u32>().add(15), 0);
+        }
+        assert_eq!(owner.id_counts[110], 0);
+        openttd_rust_town_rating_test(false);
+        // SAFETY: Test scratch is disabled; the live owner's rating is restored.
+        assert_eq!(
+            unsafe { openttd_rust_town_rating(&raw const owner, 42, 0) },
+            77
+        );
+        openttd_rust_town_global_id_counts_resize(0);
+        openttd_rust_town_global_class_counts_resize(0);
     }
 }

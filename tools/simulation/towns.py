@@ -263,8 +263,8 @@ def tunnel_reference_gap(out, archive=None):
         for line in (build / "CMakeCache.txt").read_text().splitlines()
         if line.startswith("CMAKE_CXX_COMPILER:FILEPATH=")
     )
-    fixture = Path(__file__).with_name("town-tunnel-reference.cpp")
-    binary = out / "town-tunnel-reference"
+    fixture = Path(__file__).with_name("town-reference-gaps.cpp")
+    binary = out / "town-reference-gaps"
     command = [
         compiler,
         "-std=c++20",
@@ -500,6 +500,33 @@ def check_growth(scenario, run):
         raise RuntimeError("town built roads while road expansion was disabled")
     if not houses or (scenario["town_growth"] == "roads" and not roads + changed_roads):
         raise RuntimeError("town-growth scenario did not build houses/roads")
+    aged_houses = 0
+    if scenario.get("yearly_age_witness"):
+        if core.save_moment(paths[-1])[0] - core.save_moment(paths[0])[0] < 366:
+            raise RuntimeError("yearly house-age scenario did not cross a year")
+        # Completion lives in M3LO bit 7; MAP5 is age only for completed houses.
+        # Count surviving unchanged house IDs/town owners with the expected age.
+        # Full semantic comparison still checks every saved tile, including the
+        # construction, replacement and saturation paths outside this witness.
+        for i, (before, after) in enumerate(
+            zip(tile_types[0], tile_types[-1], strict=True)
+        ):
+            if before >> 4 != 3 or after >> 4 != 3:
+                continue
+            if not initial["M3LO"]["raw"][i] & final["M3LO"]["raw"][i] & 128:
+                continue
+            if any(
+                initial[key]["raw"][2 * i : 2 * i + 2]
+                != final[key]["raw"][2 * i : 2 * i + 2]
+                for key in ("MAP2", "MAP8")
+            ):
+                continue
+            old_age, new_age = initial["MAP5"]["raw"][i], final["MAP5"]["raw"][i]
+            aged_houses += old_age < 255 and new_age == old_age + 1
+        if not aged_houses:
+            raise RuntimeError(
+                "yearly traversal did not age any surviving completed house"
+            )
     moments = [core.save_moment(path)[2] for path in paths]
     failed_intervals = 0
     for index, case in scenario["growth_assignments"].items():
@@ -587,6 +614,7 @@ def check_growth(scenario, run):
             for index, history in zip(ids, rows, strict=True)
         }
     return {
+        "yearly_aged_houses": aged_houses,
         "new_house_tiles": houses,
         "new_road_tiles": roads,
         "changed_road_bits": changed_roads,
@@ -623,7 +651,9 @@ def growth_scenarios(soak):
             "map_log2": 7,
             "land_generator": 1,
             "town_growth": mode,
-            "ticks": (365 if soak else 210) * TICKS_PER_DAY + SNAPSHOT_TICKS,
+            "ticks": (370 if soak or mode == "buildings" else 210) * TICKS_PER_DAY
+            + SNAPSHOT_TICKS,
+            "yearly_age_witness": mode == "buildings",
             "console": [
                 f"setting economy.allow_town_roads {int(mode != 'buildings')}",
                 f"setting economy.town_growth_rate {0 if mode == 'disabled' else 4}",
@@ -676,7 +706,7 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
             with _TUNNEL_LOCK:
                 if out not in _TUNNEL_REPORTS:
                     _TUNNEL_REPORTS[out] = tunnel_reference_gap(
-                        out / "town-tunnel-reference"
+                        out / "town-reference-gaps"
                     )
                 result["tunnel_reference_gap"] = _TUNNEL_REPORTS[out]
         scenario, result["reload_input"] = prepare_growth(
@@ -719,9 +749,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description=tunnel_reference_gap.__doc__)
-    parser.add_argument(
-        "--out", type=Path, default=ROOT / ".local/town-tunnel-reference"
-    )
+    parser.add_argument("--out", type=Path, default=ROOT / ".local/town-reference-gaps")
     parser.add_argument("--archive", type=Path)
     args = parser.parse_args()
     report = tunnel_reference_gap(args.out.resolve(), args.archive)
