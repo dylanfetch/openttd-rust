@@ -44,6 +44,7 @@
 #ifdef WITH_RUST
 #include "rust/command_services.h"
 #include "rust/company_services.h"
+#include "rust/environment_services.h"
 #include "rust/station_services.h"
 #endif
 #include "town_kdtree.h"
@@ -936,14 +937,10 @@ static void ChangeTileOwner_Town(TileIndex, Owner, Owner)
 static_assert(Ticks::TOWN_GROWTH_TICKS == 70 && MAX_BRIDGES == 13);
 static_assert(OWNER_TOWN.base() == 15 && OWNER_NONE.base() == 16);
 static_assert(CalendarTime::MAX_DATE.base() == 1826212865);
-static uint32_t RustTown_map_log_x() noexcept { return Map::LogX(); }
 static uint32_t RustTown_map_size_y() noexcept { return Map::SizeY(); }
 static bool RustTown_build_on_slopes() noexcept { return _settings_game.construction.build_on_slopes; }
 static uint8_t RustTown_growth_rate() noexcept { return _settings_game.economy.town_growth_rate; }
-static bool RustTown_editor() noexcept { return _game_mode == GM_EDITOR; }
-static bool RustTown_generating_world() noexcept { return _generating_world; }
 static bool RustTown_allow_crossings() noexcept { return _settings_game.economy.allow_town_level_crossings; }
-static uint8_t RustTown_climate() noexcept { return to_underlying(_settings_game.game_creation.landscape); }
 static uint8_t RustTown_highest_snow_line() noexcept { return HighestSnowLine(); }
 static bool RustTown_allow_roads() noexcept { return _settings_game.economy.allow_town_roads; }
 static int32_t RustTown_calendar_date() noexcept { return TimerGameCalendar::date.base(); }
@@ -997,10 +994,7 @@ static uint32_t RustTown_exchange_company(uint32_t company) noexcept
 	OpenTTDSetCurrentCompany(CompanyID(company));
 	return old.base();
 }
-static void RustTown_increase_building_count(uint32_t town, uint32_t house) noexcept
-{
-	IncreaseBuildingCount(Town::Get(TownID(town)), house);
-}
+static uint16_t RustTownHouseClass(uint16_t house) noexcept { return HouseSpec::Get(house)->class_id; }
 static void RustTown_make_house(uint32_t tile, uint32_t town, uint32_t house, uint32_t construction) noexcept
 {
 	MakeHouseTile(TileIndex{tile}, TownID(town), construction & 0xFF, (construction >> 8) & 0xFF, house, (construction >> 16) & 0xFF, construction >> 24);
@@ -1028,13 +1022,6 @@ static void RustTown_nearby_stations(uint32_t town, uint32_t tile, uint32_t size
 static uint32_t RustTown_house_count() noexcept
 {
 	return HouseSpec::Specs().size();
-}
-static uint16_t RustTown_building_count(uint32_t town, uint32_t house, uint32_t house_class) noexcept
-{
-	{
-			const auto &counts = Town::Get(TownID(town))->cache.building_counts;
-			return house_class != HOUSE_NO_CLASS ? counts.class_count[house_class] : counts.id_count[house];
-		}
 }
 static void RustTown_update_max_pass(uint32_t town) noexcept
 {
@@ -1112,15 +1099,15 @@ static void RustTownDirtyAuthority(uint32_t town) noexcept { SetWindowDirty(WC_T
 static const OpenTTDTownLeaves &GetRustTownServices() noexcept
 {
 	static const OpenTTDTownLeaves services{
-		.map_log_x = RustTown_map_log_x,
+		.map_log_x = OpenTTDMapLogX,
 		.map_size_y = RustTown_map_size_y,
 		.build_on_slopes = RustTown_build_on_slopes,
 		.growth_rate = RustTown_growth_rate,
 		.snow_line = GetRustSharedServices().snow_line,
-		.editor = RustTown_editor,
-		.generating_world = RustTown_generating_world,
+		.editor = OpenTTDEditor,
+		.generating_world = OpenTTDGeneratingWorld,
 		.allow_crossings = RustTown_allow_crossings,
-		.climate = RustTown_climate,
+		.climate = OpenTTDLandscapeValue,
 		.highest_snow_line = RustTown_highest_snow_line,
 		.calendar_year = GetRustSharedServices().calendar_year,
 		.allow_roads = RustTown_allow_roads,
@@ -1144,13 +1131,12 @@ static const OpenTTDTownLeaves &GetRustTownServices() noexcept
 		.clean_road_bits = RustTown_clean_road_bits,
 		.set_road_town = RustTown_set_road_town,
 		.exchange_company = RustTown_exchange_company,
-		.increase_building_count = RustTown_increase_building_count,
+		.house_class = RustTownHouseClass,
 		.make_house = RustTown_make_house,
 		.add_animation = RustTown_add_animation,
 		.population_changed = RustTown_population_changed,
 		.nearby_stations = RustTown_nearby_stations,
 		.house_count = RustTown_house_count,
-		.building_count = RustTown_building_count,
 		.update_max_pass = RustTown_update_max_pass,
 		.next_town = RustTown_next_town,
 		.road_mask = RustTown_road_mask,

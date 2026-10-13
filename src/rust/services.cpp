@@ -9,6 +9,7 @@
 #include "../stdafx.h"
 #include "services_ffi.h"
 #include "command_services.h"
+#include "command_cost_native_services.h"
 #include "company_services.h"
 #ifdef WITH_RUST
 #include "../industry_map.h"
@@ -34,14 +35,14 @@
 
 static CommandCost *NativeCost(OpenTTDCommandCost *cost) noexcept { return reinterpret_cast<CommandCost *>(cost); }
 static const CommandCost *NativeCost(const OpenTTDCommandCost *cost) noexcept { return reinterpret_cast<const CommandCost *>(cost); }
-static void CostZero(OpenTTDCommandCost *out) noexcept { *NativeCost(out) = CommandCost(); }
-static void CostError(OpenTTDCommandCost *out, uint32_t message) noexcept { *NativeCost(out) = CommandCost(message); }
-static void CostExpenseMoney(OpenTTDCommandCost *out, uint8_t expense, int64_t amount) noexcept { *NativeCost(out) = CommandCost(static_cast<ExpensesType>(expense), Money(amount)); }
+static void CostZero(OpenTTDCommandCost *out) noexcept { OpenTTDCommandCostZero(NativeCost(out)); }
+static void CostError(OpenTTDCommandCost *out, uint32_t message) noexcept { OpenTTDCommandCostError(NativeCost(out), message); }
+static void CostExpenseMoney(OpenTTDCommandCost *out, uint8_t expense, int64_t amount) noexcept { OpenTTDCommandCostExpenseMoney(NativeCost(out), static_cast<ExpensesType>(expense), Money(amount)); }
 static void CostErrorParam(OpenTTDCommandCost *out, uint32_t message, uint64_t parameter) noexcept { *NativeCost(out) = CommandCostWithParam(message, parameter); }
 static void CostAdd(OpenTTDCommandCost *out, OpenTTDCommandCost *item) noexcept { NativeCost(out)->AddCost(std::move(*NativeCost(item))); }
 static void CostMove(OpenTTDCommandCost *out, OpenTTDCommandCost *item) noexcept { *NativeCost(out) = std::move(*NativeCost(item)); }
 static void CostAmount(OpenTTDCommandCost *out, int64_t amount) noexcept { NativeCost(out)->AddCost(Money(amount)); }
-static bool CostSuccess(const OpenTTDCommandCost *cost) noexcept { return NativeCost(cost)->Succeeded(); }
+static bool CostSuccess(const OpenTTDCommandCost *cost) noexcept { return OpenTTDCommandCostSuccess(NativeCost(cost)); }
 static uint32_t CostErrorMessage(const OpenTTDCommandCost *cost) noexcept { return NativeCost(cost)->GetErrorMessage(); }
 static int64_t CostMoney(const OpenTTDCommandCost *cost) noexcept { return NativeCost(cost)->GetCost(); }
 const OpenTTDCommandCostServices &GetRustCommandCostServices() noexcept

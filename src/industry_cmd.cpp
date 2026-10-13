@@ -58,6 +58,7 @@
 #ifdef WITH_RUST
 #include "rust/industry_generation_adapter.hpp"
 #include "rust/company_services.h"
+#include "rust/environment_services.h"
 #include "rust/command_cost_native_services.h"
 #include "rust/sound_services.h"
 #include "rust/tile_animation_services.h"
@@ -3688,7 +3689,7 @@ static const OpenTTDIndustryServices _industry_services = {
 	.economy_month = []() noexcept -> uint8_t { return TimerGameEconomy::month; },
 	.economy_year = []() noexcept -> int32_t { return TimerGameEconomy::year.base(); },
 	.days_since_last_month = []() noexcept -> uint32_t { return TimerGameEconomy::days_since_last_month; },
-	.landscape = []() noexcept -> uint8_t { return to_underlying(_settings_game.game_creation.landscape); },
+	.landscape = OpenTTDLandscapeValue,
 	.economy_type = []() noexcept -> uint8_t { return _settings_game.economy.type; },
 	.passengers = []() noexcept -> uint8_t { return GetCargoTypeByLabel(CT_PASSENGERS); },
 	.fund_only = []() noexcept -> bool { return _settings_game.difficulty.industry_density == ID_FUND_ONLY; },
@@ -3755,7 +3756,7 @@ static const OpenTTDIndustryGenerationServices &GetIndustryGenerationServices()
 			auto proc = reinterpret_cast<const IndustrySpec *>(handle)->check_proc;
 			return proc == CHECK_REFINERY || proc == CHECK_OIL_RIG;
 		},
-		.editor = []() noexcept -> bool { return _game_mode == GM_EDITOR; },
+		.editor = OpenTTDEditor,
 		.density = []() noexcept -> uint8_t { return _settings_game.difficulty.industry_density; },
 		.custom_number = []() noexcept -> uint32_t { return _settings_game.game_creation.custom_industry_number; },
 		.scale_by_size_1d = [](uint32_t n) noexcept -> uint32_t { return Map::ScaleBySize1D(n); },
@@ -3792,7 +3793,7 @@ static const OpenTTDIndustryConstructionServices &GetIndustryConstructionService
 		.callback_mask = [](const OpenTTDIndustrySpecHandle *handle) noexcept -> uint16_t { return reinterpret_cast<const IndustrySpec *>(handle)->callback_mask.base(); },
 		.set_town = [](void *shell, const OpenTTDTownHandle *town) noexcept { RustIndustry(shell)->town = const_cast<Town *>(reinterpret_cast<const Town *>(town)); },
 		.calendar_date = []() noexcept -> int32_t { return TimerGameCalendar::date.base(); },
-		.generating = []() noexcept -> bool { return _generating_world; },
+		.generating = OpenTTDGeneratingWorld,
 		.callback = [](void *shell, uint16_t callback, uint32_t parameter, uint32_t random) noexcept -> uint16_t {
 			Industry *i = RustIndustry(shell);
 			return GetIndustryCallback(static_cast<CallbackID>(callback), parameter, random, i, i->type, INVALID_TILE);

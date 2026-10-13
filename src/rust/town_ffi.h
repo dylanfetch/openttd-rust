@@ -84,13 +84,12 @@ struct OpenTTDTownLeaves {
 	uint32_t (*clean_road_bits)(uint32_t tile, uint32_t bits) noexcept;
 	void (*set_road_town)(uint32_t tile, uint32_t town) noexcept;
 	uint32_t (*exchange_company)(uint32_t company) noexcept;
-	void (*increase_building_count)(uint32_t town, uint32_t house) noexcept;
+	uint16_t (*house_class)(uint16_t house) noexcept;
 	void (*make_house)(uint32_t tile, uint32_t town, uint32_t house, uint32_t construction) noexcept;
 	void (*add_animation)(uint32_t tile) noexcept;
 	void (*population_changed)(uint32_t town) noexcept;
 	void (*nearby_stations)(uint32_t town, uint32_t tile, uint32_t size) noexcept;
 	uint32_t (*house_count)() noexcept;
-	uint16_t (*building_count)(uint32_t town, uint32_t house, uint32_t house_class) noexcept;
 	void (*update_max_pass)(uint32_t town) noexcept;
 	uint32_t (*next_town)(uint32_t from) noexcept;
 	uint64_t (*road_mask)() noexcept;

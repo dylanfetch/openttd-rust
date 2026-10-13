@@ -678,13 +678,12 @@ pub struct Leaves {
     pub clean_road_bits: extern "C" fn(u32, u32) -> u32,
     pub set_road_town: extern "C" fn(u32, u32),
     pub exchange_company: extern "C" fn(u32) -> u32,
-    pub increase_building_count: extern "C" fn(u32, u32),
+    pub house_class: extern "C" fn(u16) -> u16,
     pub make_house: extern "C" fn(u32, u32, u32, u32),
     pub add_animation: extern "C" fn(u32),
     pub population_changed: extern "C" fn(u32),
     pub nearby_stations: extern "C" fn(u32, u32, u32),
     pub house_count: extern "C" fn() -> u32,
-    pub building_count: extern "C" fn(u32, u32, u32) -> u16,
     pub update_max_pass: extern "C" fn(u32),
     pub next_town: extern "C" fn(u32) -> u32,
     pub road_mask: extern "C" fn() -> u64,
@@ -1679,7 +1678,10 @@ impl Engine<'_> {
         protected: bool,
     ) {
         (self.leaves.clear_house_land)(tile);
-        (self.leaves.increase_building_count)(town, house);
+        let class = (self.leaves.house_class)(house as u16);
+        // SAFETY: Entry resolved the live town once. Count borrows end here,
+        // before map writes or callbacks can reenter and mutate the owner.
+        unsafe { openttd_rust_town_increase_building(self.owner, house as u16, class) };
         (self.leaves.make_house)(
             tile,
             town,
@@ -1817,7 +1819,16 @@ impl Engine<'_> {
             if u32::from(h.zones) & zones != zones || !h.enabled || h.override_id != u16::MAX {
                 continue;
             }
-            if (self.leaves.building_count)(town, house, u32::from(h.class_id)) == u16::MAX {
+            // SAFETY: Original valid spec/count indices; immediate read ends
+            // before the next spec query or any construction callback.
+            let count = unsafe {
+                if h.class_id != 0 {
+                    (&(*self.owner).class_counts)[usize::from(h.class_id)]
+                } else {
+                    (&(*self.owner).id_counts)[house as usize]
+                }
+            };
+            if count == u16::MAX {
                 continue;
             }
             max = max.wrapping_add(u32::from(h.probability));
