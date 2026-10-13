@@ -5,6 +5,7 @@ import json
 import shutil
 import struct
 import subprocess
+from functools import cache
 from pathlib import Path
 
 from build_identity import IDENTITY_NAME, read_identity, source_identity
@@ -71,11 +72,15 @@ def elf_content(path):
     ]
     names = sections[names_index]
     strings = data[names[4] : names[4] + names[5]]
-    section_names = [strings[s[0] :].split(b"\0", 1)[0].decode() for s in sections]
+    section_names = [
+        strings[s[0] : strings.index(b"\0", s[0])].decode() for s in sections
+    ]
+    symbol_strings = {}
 
     def debug_section(index):
         return section_names[index].startswith((".debug", ".zdebug"))
 
+    @cache
     def symbol(table, index):
         entry = sections[table]
         values = struct.unpack_from(
@@ -88,10 +93,12 @@ def elf_content(path):
             if wide
             else (values[0], values[3], values[4], values[5], values[1], values[2])
         )
-        names = sections[entry[6]]
-        strings = data[names[4] : names[4] + names[5]]
+        if table not in symbol_strings:
+            names = sections[entry[6]]
+            symbol_strings[table] = data[names[4] : names[4] + names[5]]
+        strings = symbol_strings[table]
         return {
-            "name": strings[name:].split(b"\0", 1)[0].decode(),
+            "name": strings[name : strings.index(b"\0", name)].decode(),
             "info": info,
             "other": other,
             "value": value,
@@ -191,10 +198,10 @@ def elf_content(path):
             "sections": len(other_sections),
         }
     allocated = []
-    for section in sections:
+    for index, section in enumerate(sections):
         if not section[2] & 2:  # SHF_ALLOC, also checks relocatable widget objects.
             continue
-        name = strings[section[0] :].split(b"\0", 1)[0].decode()
+        name = section_names[index]
         body = b"" if section[1] == 8 else data[section[4] : section[4] + section[5]]
         allocated.append(
             {
