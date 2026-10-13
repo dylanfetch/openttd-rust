@@ -1000,17 +1000,17 @@ def main():
     global GAME_LOCK
     migration.COMMON_LOCAL.mkdir(parents=True, exist_ok=True)
     GAME_LOCK = migration.COMMON_LOCAL / "simulation-game.lock"
-    if args.prepare_water_save:
-        from .ships import prepare_water_save
-
-        prepare_water_save(args.prepare_water_save, migration, out, args.timeout)
-        return 0
-    if args.prepare_aircraft_save:
-        from .aircraft import prepare_aircraft_save
-
-        prepare_aircraft_save(migration, out, args.timeout)
-        return 0
     try:
+        if args.prepare_water_save:
+            from .ships import prepare_water_save
+
+            prepare_water_save(args.prepare_water_save, migration, out, args.timeout)
+            return 0
+        if args.prepare_aircraft_save:
+            from .aircraft import prepare_aircraft_save
+
+            prepare_aircraft_save(migration, out, args.timeout)
+            return 0
         report = run_simulation(args, scenarios, migration, out, parser, stamp)
     finally:
         for role in ("reference", "candidate"):

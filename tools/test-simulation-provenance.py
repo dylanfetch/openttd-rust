@@ -303,6 +303,51 @@ class SimulationProvenanceTests(unittest.TestCase):
     def test_unexpected_worker_failure_removes_runtimes(self):
         self.exercise(crash=True)
 
+    def test_fixture_preparation_removes_runtimes_on_pass_and_fail(self):
+        from simulation import aircraft, ships
+
+        for module, name, arguments in (
+            (aircraft, "prepare_aircraft_save", ["--prepare-aircraft-save"]),
+            (ships, "prepare_water_save", ["--prepare-water-save", "ferry"]),
+        ):
+            for crash in (False, True):
+                with self.subTest(preparation=name, crash=crash):
+                    with tempfile.TemporaryDirectory() as directory:
+                        root = Path(directory)
+                        (root / "tools").mkdir()
+                        (root / "tools/migration.py").write_text(
+                            "from pathlib import Path\n"
+                            "LOCAL = COMMON_LOCAL = Path(__file__).resolve().parents[1] / '.local'\n"
+                        )
+
+                        def prepare(*args, crash=crash):
+                            out = args[-2]
+                            (out / "reference-runtime").mkdir()
+                            (out / "fixture.log").write_text("retained output")
+                            if crash:
+                                raise RuntimeError("fixture preparation failed")
+
+                        with (
+                            patch.object(simulate, "ROOT", root),
+                            patch.object(
+                                simulate, "scenario_list", return_value=[{"name": "a"}]
+                            ),
+                            patch.object(module, name, side_effect=prepare),
+                            patch.object(sys, "argv", ["simulate.py", *arguments]),
+                        ):
+                            if crash:
+                                with self.assertRaisesRegex(
+                                    RuntimeError, "preparation failed"
+                                ):
+                                    simulate.main()
+                            else:
+                                self.assertEqual(simulate.main(), 0)
+                        run = next((root / ".local/simulation").iterdir())
+                        self.assertFalse((run / "reference-runtime").exists())
+                        self.assertEqual(
+                            (run / "fixture.log").read_text(), "retained output"
+                        )
+
     def test_pruning_keeps_newest_ten_completed_runs_and_active_outputs(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
