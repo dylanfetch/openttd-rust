@@ -67,6 +67,8 @@ pub const INVALID_TRACKDIR: u8 = 0xFF;
 pub const INVALID_ENGINE: u16 = 0xFFFF;
 /// `INVALID_PRICE`.
 pub const INVALID_PRICE: u8 = 0xFF;
+/// `PROP_AIRCRAFT_SPEED`.
+pub const PROP_AIRCRAFT_SPEED: u8 = 0x0C;
 /// `CALLBACK_FAILED`.
 pub const CALLBACK_FAILED: u16 = 0xFFFF;
 /// `VEHICLE_LENGTH`.
@@ -103,6 +105,54 @@ pub struct Breakdown {
 pub struct PreviousTile {
     pub tile: u32,
     pub exists: bool,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct Coordinates {
+    pub x: i32,
+    pub y: i32,
+    pub z: i32,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct XY {
+    pub x: i32,
+    pub y: i32,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct SpeedInputs {
+    pub speed: u16,
+    pub max_speed: u16,
+    pub acceleration: u8,
+    pub status: u8,
+    pub subspeed: u8,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct DirectionProgress {
+    pub direction: u8,
+    pub progress: u8,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct TickStatus {
+    pub tick: u8,
+    pub status: u8,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct DayCost {
+    pub profit: i64,
+    pub running: u8,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct AltitudeInputs {
+    pub max_speed: u16,
+    pub direction: u8,
 }
 
 /// Base `Vehicle` operations and writes shared by every vehicle type.
@@ -170,6 +220,45 @@ pub struct VehicleServices {
     pub order_type: extern "C" fn(VehicleRef) -> u8,
     pub order_destination: extern "C" fn(VehicleRef) -> u16,
     pub order_nonstop: extern "C" fn(VehicleRef) -> u8,
+    pub subtype: extern "C" fn(VehicleRef) -> u8,
+    pub x: extern "C" fn(VehicleRef) -> i32,
+    pub y: extern "C" fn(VehicleRef) -> i32,
+    pub z: extern "C" fn(VehicleRef) -> i32,
+    pub tick: extern "C" fn(VehicleRef) -> u8,
+    pub owner: extern "C" fn(VehicleRef) -> u8,
+    pub speed: extern "C" fn(VehicleRef) -> u16,
+    pub subspeed: extern "C" fn(VehicleRef) -> u8,
+    pub running: extern "C" fn(VehicleRef) -> u8,
+    pub order_time: extern "C" fn(VehicleRef) -> i32,
+    pub last_station: extern "C" fn(VehicleRef) -> u16,
+    pub vehicle_type: extern "C" fn(VehicleRef) -> u8,
+    pub write_x: extern "C" fn(VehicleRef, i32),
+    pub write_y: extern "C" fn(VehicleRef, i32),
+    pub write_z: extern "C" fn(VehicleRef, i32),
+    pub write_tile: extern "C" fn(VehicleRef, u32),
+    pub write_status: extern "C" fn(VehicleRef, u8),
+    pub write_subspeed: extern "C" fn(VehicleRef, u8),
+    pub write_breakdown_counter: extern "C" fn(VehicleRef, u8),
+    pub write_running: extern "C" fn(VehicleRef, u8),
+    pub write_order_time: extern "C" fn(VehicleRef, i32),
+    pub write_profit: extern "C" fn(VehicleRef, i64),
+    pub write_economy_service: extern "C" fn(VehicleRef, i32),
+    pub write_calendar_service: extern "C" fn(VehicleRef, i32),
+    pub write_breakdowns: extern "C" fn(VehicleRef, u8),
+    pub write_reliability: extern "C" fn(VehicleRef, u16),
+    pub write_cargo_age: extern "C" fn(VehicleRef, u16),
+    pub coordinates: extern "C" fn(VehicleRef) -> Coordinates,
+    pub xy: extern "C" fn(VehicleRef) -> XY,
+    pub speed_inputs: extern "C" fn(VehicleRef) -> SpeedInputs,
+    pub direction_progress: extern "C" fn(VehicleRef) -> DirectionProgress,
+    pub tick_status: extern "C" fn(VehicleRef) -> TickStatus,
+    pub day_cost: extern "C" fn(VehicleRef) -> DayCost,
+    pub make_dummy: extern "C" fn(VehicleRef),
+    pub loading: extern "C" fn(VehicleRef, bool),
+    pub breakdown: extern "C" fn(VehicleRef) -> u8,
+    pub check_orders_only: extern "C" fn(VehicleRef),
+    pub write_coordinates: extern "C" fn(VehicleRef, i32, i32, i32),
+    pub altitude_inputs: extern "C" fn(VehicleRef) -> AltitudeInputs,
 }
 
 /// Position step result: `UpdateInclination`'s old height, then the new height,

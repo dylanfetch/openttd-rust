@@ -20,6 +20,12 @@ pub struct ByteSpan {
     pub size: usize,
 }
 
+/// Opaque live C++ station; Rust never views its native layout.
+#[repr(C)]
+pub struct Station {
+    _private: [u8; 0],
+}
+
 /// Immutable call table supplied by the game (or isolated test world). No global
 /// registration or game symbol imports are needed by standalone Cargo binaries.
 /// The context and function addresses outlive the component invocation; callbacks
@@ -60,6 +66,30 @@ pub struct Services {
     pub tunnel_bridge_direction: extern "C" fn(u32) -> u8,
     /// Bridge specification speed at this bridge tile.
     pub bridge_speed: extern "C" fn(u32) -> u16,
+    /// Shared live map log x observation.
+    pub map_log_x: extern "C" fn() -> u8,
+    /// Shared live map max x observation.
+    pub map_max_x: extern "C" fn() -> u32,
+    /// Shared live map max y observation.
+    pub map_max_y: extern "C" fn() -> u32,
+    /// Shared live plane speed observation.
+    pub plane_speed: extern "C" fn() -> u8,
+    /// Shared live no jetcrash observation.
+    pub no_jetcrash: extern "C" fn() -> bool,
+    /// Shared live plane crashes observation.
+    pub plane_crashes: extern "C" fn() -> u8,
+    /// Shared live service at helipad observation.
+    pub service_at_helipad: extern "C" fn() -> bool,
+    /// Shared live disaster sound observation.
+    pub disaster_sound: extern "C" fn() -> bool,
+    /// Shared live economy date observation.
+    pub economy_date: extern "C" fn() -> i32,
+    /// Shared live calendar date observation.
+    pub calendar_date: extern "C" fn() -> i32,
+    /// Shared live slope observation.
+    pub slope: extern "C" fn(i32, i32) -> i32,
+    /// Shared live tile height observation.
+    pub tile_height: extern "C" fn(u32) -> i32,
 }
 impl Services {
     /// Draw one shared random word.
@@ -95,6 +125,21 @@ pub fn fixture(
     }
     extern "C" fn tile(_: u32) {}
     extern "C" fn zone(_: u32, _: u8) {}
+    extern "C" fn flag0() -> bool {
+        false
+    }
+    extern "C" fn byte0() -> u8 {
+        0
+    }
+    extern "C" fn word0() -> u32 {
+        0
+    }
+    extern "C" fn int0() -> i32 {
+        0
+    }
+    extern "C" fn slope(_: i32, _: i32) -> i32 {
+        0
+    }
     Services {
         context,
         random,
@@ -112,6 +157,18 @@ pub fn fixture(
         is_level_crossing: flag,
         tunnel_bridge_direction: byte,
         bridge_speed: word,
+        map_log_x: byte0,
+        map_max_x: word0,
+        map_max_y: word0,
+        plane_speed: byte0,
+        no_jetcrash: flag0,
+        plane_crashes: byte0,
+        service_at_helipad: flag0,
+        disaster_sound: flag0,
+        economy_date: int0,
+        calendar_date: int0,
+        slope,
+        tile_height: height,
     }
 }
 /// Map dimensions read once per entry.

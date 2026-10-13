@@ -14,4 +14,8 @@ inline uint8_t RustRoadAccelerationModel() noexcept { return _settings_game.vehi
 inline uint8_t RustRoadSide() noexcept { return _settings_game.vehicle.road_side; }
 inline bool RustRoadQueue() noexcept { return _settings_game.pf.roadveh_queue; }
 inline uint32_t RustMaximumDepotPenalty() noexcept { return _settings_game.pf.yapf.maximum_go_to_depot_penalty; }
+inline uint8_t RustPlaneSpeed() noexcept { return _settings_game.vehicle.plane_speed; }
+inline uint8_t RustPlaneCrashes() noexcept { return _settings_game.vehicle.plane_crashes; }
+inline bool RustServiceAtHelipad() noexcept { return _settings_game.order.serviceathelipad; }
+inline bool RustDisasterSound() noexcept { return _settings_client.sound.disaster; }
 #endif /* RUST_SETTINGS_SERVICES_H */

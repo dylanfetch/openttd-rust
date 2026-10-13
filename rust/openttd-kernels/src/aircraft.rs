@@ -33,16 +33,27 @@ pub struct State {
     pub turn_counter: u8,
     pub flags: u8,
 }
-use crate::services::chance16_i;
+use crate::services::{Map, Services, Station, chance16_i};
+use crate::vehicle::PROP_AIRCRAFT_SPEED;
+use crate::vehicle::{
+    AltitudeInputs, Coordinates, DayCost, DirectionProgress, OpenTTDVehicle, SpeedInputs,
+    TickStatus, VehicleRef, VehicleServices, XY, YEAR_TICKS,
+};
+use std::cell::Cell;
 use std::ffi::c_void;
+use std::ptr::NonNull;
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct Vehicle {
-    pub handle: *mut c_void,
+    pub handle: *mut OpenTTDVehicle,
     pub state: *mut State,
     pub id: u32,
 }
 impl Vehicle {
+    fn base(self) -> VehicleRef {
+        // SAFETY: Original live-handle precondition holds for every native service.
+        VehicleRef(unsafe { NonNull::new_unchecked(self.handle) })
+    }
     fn invalid() -> Self {
         Self {
             handle: std::ptr::null_mut(),
@@ -67,13 +78,6 @@ pub struct Moving {
     pub y: i16,
     pub flags: u16,
     pub direction: u8,
-}
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct Position {
-    pub x: i32,
-    pub y: i32,
-    pub tile: u32,
 }
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -108,74 +112,51 @@ struct NewPosition {
     tile: u32,
 }
 #[repr(C)]
+#[derive(Clone, Copy)]
+pub struct Geometry {
+    pub tile: u32,
+    pub rotation: u8,
+    pub width: u16,
+    pub height: u16,
+    pub airport: bool,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct LayoutRoute {
+    pub node: *const c_void,
+    pub next: *const c_void,
+    pub next_position: u8,
+    pub heading: u8,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct HangarCandidate {
+    pub owner: u8,
+    pub airport: bool,
+    pub hangar: bool,
+}
+#[repr(C)]
 pub struct Leaves {
-    pub subtype: unsafe extern "C" fn(Vehicle) -> u8,
-    pub x: unsafe extern "C" fn(Vehicle) -> i32,
-    pub set_x: unsafe extern "C" fn(Vehicle, i32),
-    pub y: unsafe extern "C" fn(Vehicle) -> i32,
-    pub set_y: unsafe extern "C" fn(Vehicle, i32),
-    pub z: unsafe extern "C" fn(Vehicle) -> i32,
-    pub set_z: unsafe extern "C" fn(Vehicle, i32),
-    pub tile: unsafe extern "C" fn(Vehicle) -> u32,
-    pub set_tile: unsafe extern "C" fn(Vehicle, u32),
-    pub direction: unsafe extern "C" fn(Vehicle) -> u8,
-    pub set_direction: unsafe extern "C" fn(Vehicle, u8),
-    pub tick_counter: unsafe extern "C" fn(Vehicle) -> u8,
-    pub set_tick_counter: unsafe extern "C" fn(Vehicle, u8),
-    pub owner: unsafe extern "C" fn(Vehicle) -> u8,
-    pub vehicle_status: unsafe extern "C" fn(Vehicle) -> u8,
-    pub set_vehicle_status: unsafe extern "C" fn(Vehicle, u8),
-    pub current_speed: unsafe extern "C" fn(Vehicle) -> u16,
-    pub set_current_speed: unsafe extern "C" fn(Vehicle, u16),
-    pub subspeed: unsafe extern "C" fn(Vehicle) -> u8,
-    pub set_subspeed: unsafe extern "C" fn(Vehicle, u8),
-    pub progress: unsafe extern "C" fn(Vehicle) -> u8,
-    pub set_progress: unsafe extern "C" fn(Vehicle, u8),
-    pub acceleration: unsafe extern "C" fn(Vehicle) -> u8,
-    pub maximum_speed: unsafe extern "C" fn(Vehicle) -> u16,
-    pub set_maximum_speed: unsafe extern "C" fn(Vehicle, u16),
-    pub set_breakdown_counter: unsafe extern "C" fn(Vehicle, u8),
-    pub order_type: unsafe extern "C" fn(Vehicle) -> u8,
-    pub order_destination: unsafe extern "C" fn(Vehicle) -> u16,
-    pub running_ticks: unsafe extern "C" fn(Vehicle) -> u8,
-    pub set_running_ticks: unsafe extern "C" fn(Vehicle, u8),
-    pub order_time: unsafe extern "C" fn(Vehicle) -> i32,
-    pub set_order_time: unsafe extern "C" fn(Vehicle, i32),
-    pub day_counter: unsafe extern "C" fn(Vehicle) -> u8,
-    pub set_day_counter: unsafe extern "C" fn(Vehicle, u8),
-    pub profit: unsafe extern "C" fn(Vehicle) -> i64,
-    pub set_profit: unsafe extern "C" fn(Vehicle, i64),
-    pub last_station: unsafe extern "C" fn(Vehicle) -> u16,
-    pub set_last_station: unsafe extern "C" fn(Vehicle, u16),
-    pub set_economy_service: unsafe extern "C" fn(Vehicle, i32),
-    pub set_calendar_service: unsafe extern "C" fn(Vehicle, i32),
-    pub set_breakdowns: unsafe extern "C" fn(Vehicle, u8),
-    pub set_reliability: unsafe extern "C" fn(Vehicle, u16),
-    pub set_cargo_age: unsafe extern "C" fn(Vehicle, u16),
+    pub hangar_candidate: unsafe extern "C" fn(*const Station, u8) -> HangarCandidate,
+    pub geometry: unsafe extern "C" fn(*const Station) -> Geometry,
+    pub layout_blocks: unsafe extern "C" fn(*const c_void, u8) -> u64,
+    pub layout_heading: unsafe extern "C" fn(*const c_void, u8) -> u8,
+    pub layout_next_position: unsafe extern "C" fn(*const c_void, u8) -> u8,
+    pub layout_next: unsafe extern "C" fn(*const c_void, u8) -> *const c_void,
+    pub layout_route: unsafe extern "C" fn(*const c_void, u8) -> LayoutRoute,
+    pub vehicle: *const VehicleServices,
+    pub shared: *const Services,
     pub next: unsafe extern "C" fn(Vehicle) -> Vehicle,
-    pub map_size_x: unsafe extern "C" fn() -> u32,
-    pub map_max_x: unsafe extern "C" fn() -> u32,
-    pub map_max_y: unsafe extern "C" fn() -> u32,
-    pub plane_speed: unsafe extern "C" fn() -> u8,
-    pub no_jetcrash: unsafe extern "C" fn() -> bool,
-    pub plane_crashes: unsafe extern "C" fn() -> u8,
-    pub service_at_helipad: unsafe extern "C" fn() -> bool,
-    pub disaster_sound: unsafe extern "C" fn() -> bool,
-    pub economy_date: unsafe extern "C" fn() -> i32,
-    pub calendar_date: unsafe extern "C" fn() -> i32,
-    pub station: unsafe extern "C" fn(u16) -> *const c_void,
-    pub airport_tile: unsafe extern "C" fn(*const c_void) -> u32,
-    pub station_tile: unsafe extern "C" fn(*const c_void) -> u32,
-    pub rotation: unsafe extern "C" fn(*const c_void) -> u8,
-    pub airport_width: unsafe extern "C" fn(*const c_void) -> u16,
-    pub airport_height: unsafe extern "C" fn(*const c_void) -> u16,
-    pub airport_type: unsafe extern "C" fn(*const c_void) -> u8,
-    pub station_owner: unsafe extern "C" fn(*const c_void) -> u8,
-    pub has_hangar: unsafe extern "C" fn(*const c_void) -> bool,
-    pub has_airport: unsafe extern "C" fn(*const c_void) -> bool,
-    pub airport_fta: unsafe extern "C" fn(*const c_void) -> *const c_void,
-    pub airport_blocks: unsafe extern "C" fn(*const c_void) -> *mut u64,
-    pub had_vehicle: unsafe extern "C" fn(*const c_void) -> u8,
+    pub station: unsafe extern "C" fn(u16) -> *const Station,
+    pub airport_tile: unsafe extern "C" fn(*const Station) -> u32,
+    pub station_tile: unsafe extern "C" fn(*const Station) -> u32,
+    pub rotation: unsafe extern "C" fn(*const Station) -> u8,
+    pub airport_type: unsafe extern "C" fn(*const Station) -> u8,
+    pub station_owner: unsafe extern "C" fn(*const Station) -> u8,
+    pub has_hangar: unsafe extern "C" fn(*const Station) -> bool,
+    pub airport_fta: unsafe extern "C" fn(*const Station) -> *const c_void,
+    pub airport_blocks: unsafe extern "C" fn(*const Station) -> *mut u64,
+    pub had_vehicle: unsafe extern "C" fn(*const Station) -> u8,
     pub dummy_airport: unsafe extern "C" fn() -> *const c_void,
     pub airport_elements: unsafe extern "C" fn(*const c_void) -> u8,
     pub helipads: unsafe extern "C" fn(*const c_void) -> u8,
@@ -188,39 +169,27 @@ pub struct Leaves {
     pub engine_subtype: unsafe extern "C" fn(Vehicle) -> u8,
     pub engine_sound: unsafe extern "C" fn(Vehicle) -> u16,
     pub engine_reliability: unsafe extern "C" fn(Vehicle) -> u16,
-    pub vehicle_type: unsafe extern "C" fn(Vehicle) -> u8,
-    pub slope: unsafe extern "C" fn(i32, i32) -> i32,
-    pub tile_height: unsafe extern "C" fn(u32) -> i32,
     pub airport_entry: unsafe extern "C" fn(*const c_void, u8) -> u8,
     pub direction_towards: unsafe extern "C" fn(Vehicle, i32, i32) -> u8,
-    pub new_position: unsafe extern "C" fn(Vehicle) -> Position,
     pub hangar_height: unsafe extern "C" fn(u16) -> i32,
     pub terminal_count: unsafe extern "C" fn(*const c_void, u32) -> u8,
     pub hangar_exit: unsafe extern "C" fn(Vehicle) -> u8,
-    pub can_use_station: unsafe extern "C" fn(Vehicle, u16) -> bool,
+    pub can_use_station: unsafe extern "C" fn(Vehicle, *const Station) -> bool,
     pub service_interval: unsafe extern "C" fn(Vehicle) -> u16,
-    pub needs_service: unsafe extern "C" fn(Vehicle) -> bool,
     pub chain_in_depot: unsafe extern "C" fn(Vehicle) -> bool,
-    pub waiting_unbunching: unsafe extern "C" fn(Vehicle) -> bool,
     pub nearest_depot_order: unsafe extern "C" fn(Vehicle) -> bool,
     pub part_of_orders: unsafe extern "C" fn(Vehicle) -> bool,
     pub next_station: unsafe extern "C" fn(u16) -> u16,
     pub next_aircraft: unsafe extern "C" fn(u32) -> Vehicle,
-    pub random: unsafe extern "C" fn() -> u32,
     pub update_position: unsafe extern "C" fn(Vehicle),
     pub rotor_image: unsafe extern "C" fn(Vehicle),
     pub copy_sprite: unsafe extern "C" fn(Vehicle, Vehicle),
     pub position_viewport: unsafe extern "C" fn(Vehicle),
     pub create_effect: unsafe extern "C" fn(Vehicle, u8, i32, i32, i32),
-    pub dirty_start_stop: unsafe extern "C" fn(Vehicle),
-    pub play_sound: unsafe extern "C" fn(Vehicle, u16),
     pub truncate_cargo: unsafe extern "C" fn(Vehicle),
     pub crash_news: unsafe extern "C" fn(Vehicle, u16, u32),
     pub station_rating: unsafe extern "C" fn(u32, u8, i32, u32),
     pub landing_rating: unsafe extern "C" fn(u16, u8),
-    pub free_order: unsafe extern "C" fn(Vehicle),
-    pub service_in_depot: unsafe extern "C" fn(Vehicle),
-    pub leave_unbunching: unsafe extern "C" fn(Vehicle),
     pub dirty_depot: unsafe extern "C" fn(Vehicle),
     pub first_arrival: unsafe extern "C" fn(Vehicle, u16),
     pub begin_loading: unsafe extern "C" fn(Vehicle),
@@ -229,15 +198,7 @@ pub struct Leaves {
     pub touchdown_animation: unsafe extern "C" fn(Vehicle, u16),
     pub destination_too_far: unsafe extern "C" fn(Vehicle),
     pub delete_range_news: unsafe extern "C" fn(Vehicle),
-    pub handle_breakdown: unsafe extern "C" fn(Vehicle),
-    pub handle_loading: unsafe extern "C" fn(Vehicle, bool),
     pub service_order: unsafe extern "C" fn(Vehicle, u16),
-    pub dummy_order: unsafe extern "C" fn(Vehicle),
-    pub age_vehicle: unsafe extern "C" fn(Vehicle),
-    pub economy_age: unsafe extern "C" fn(Vehicle),
-    pub decrease_value: unsafe extern "C" fn(Vehicle),
-    pub check_orders: unsafe extern "C" fn(Vehicle),
-    pub check_breakdown: unsafe extern "C" fn(Vehicle),
     pub running_cost: unsafe extern "C" fn(Vehicle) -> i64,
     pub subtract_cost: unsafe extern "C" fn(Vehicle, i64),
     pub dirty_lists: unsafe extern "C" fn(Vehicle),
@@ -248,34 +209,71 @@ pub struct Leaves {
     pub invalid_position: unsafe extern "C" fn(Vehicle, *const c_void),
     pub invalid_scheme: unsafe extern "C" fn(Vehicle),
     pub unreachable: unsafe extern "C" fn(Vehicle),
-    pub speed_property: unsafe extern "C" fn(Vehicle) -> u32,
     pub cargo_age_property: unsafe extern "C" fn(Vehicle) -> u32,
     pub range_property: unsafe extern "C" fn(Vehicle) -> u32,
-    pub start_sound: unsafe extern "C" fn(Vehicle) -> bool,
     pub touchdown_sound: unsafe extern "C" fn(Vehicle) -> bool,
     pub rotor_image_if_changed: unsafe extern "C" fn(Vehicle) -> bool,
     pub update_rotor_image: unsafe extern "C" fn(Vehicle),
     pub process_orders: unsafe extern "C" fn(Vehicle),
-    pub enter_depot: unsafe extern "C" fn(Vehicle),
     pub vehicle_crash: unsafe extern "C" fn(Vehicle, bool) -> u32,
-    pub delete_aircraft: unsafe extern "C" fn(Vehicle),
     pub send_to_depot: unsafe extern "C" fn(Vehicle, bool) -> bool,
-    pub sample_count: unsafe extern "C" fn() -> u32,
-    pub helicopter_sound: unsafe extern "C" fn() -> u32,
-    pub explosion_sound: unsafe extern "C" fn() -> u32,
-    pub skid_sound: unsafe extern "C" fn() -> u32,
-    pub ticks_per_year: unsafe extern "C" fn() -> u32,
-    pub fta_blocks: unsafe extern "C" fn(*const c_void) -> u64,
-    pub fta_heading: unsafe extern "C" fn(*const c_void) -> u8,
     pub fta_next_position: unsafe extern "C" fn(*const c_void) -> u8,
-    pub fta_next: unsafe extern "C" fn(*const c_void) -> *const c_void,
     pub block_node: unsafe extern "C" fn(*const c_void) -> BlockNode,
     pub route_node: unsafe extern "C" fn(*const c_void) -> RouteNode,
     pub block_choice: unsafe extern "C" fn(*const c_void) -> BlockChoice,
 }
+struct AirportAccess {
+    station: *const Station,
+    blocks: Cell<Option<*mut u64>>,
+}
+impl AirportAccess {
+    fn new(station: *const Station) -> Self {
+        Self {
+            station,
+            blocks: Cell::new(None),
+        }
+    }
+    fn pointer(&self, world: &World<'_>) -> *mut u64 {
+        self.blocks.get().unwrap_or_else(|| {
+            let pointer = world.airport_blocks(self.station);
+            self.blocks.set(Some(pointer));
+            pointer
+        })
+    }
+    fn read(&self, world: &World<'_>) -> u64 {
+        // SAFETY: One field-sized access to the live canonical mask, ending
+        // before any native callback. Reentry observes/mutates the same scalar.
+        unsafe { self.pointer(world).read() }
+    }
+    fn reserve(&self, world: &World<'_>, bits: u64) {
+        let pointer = self.pointer(world);
+        // SAFETY: Serial game-state interval; no Rust world reference is formed.
+        unsafe {
+            pointer.write(pointer.read() | bits);
+        }
+    }
+    fn release(&self, world: &World<'_>, bits: u64) {
+        let pointer = self.pointer(world);
+        // SAFETY: Same short canonical scalar access as reserve.
+        unsafe {
+            pointer.write(pointer.read() & !bits);
+        }
+    }
+}
 struct World<'a> {
     leaves: &'a Leaves,
+    vs: &'a VehicleServices,
+    ss: &'a Services,
+    map: Cell<Option<Map>>,
+    map_bounds: Cell<Option<(u32, u32)>>,
 }
+const SAMPLE_COUNT: i64 = 73;
+const HELICOPTER_SOUND: i64 = 22;
+const EXPLOSION_SOUND: i64 = 16;
+const SKID_SOUND: i64 = 21;
+const TICKS_PER_YEAR: i64 = YEAR_TICKS;
+const OILRIG: i64 = 9;
+const NUM_CARGO: i64 = 64;
 const INVALID_STATION: u32 = 65535;
 const OWNER_NONE: i64 = 16;
 const INVALID_TILE: u32 = u32::MAX;
@@ -326,7 +324,7 @@ macro_rules! scalar_services {
     ($($name:ident($receiver:ident; $($arg:ident : $ty:ty),*) => $call:expr;)*) => {$(
         fn $name(&$receiver, $($arg:$ty),*) -> i64 {
             // SAFETY: No canonical owner borrow survives this noexcept callback.
-            let result = unsafe { $call };
+            let result = $call;
             service_witness(stringify!($name), std::mem::size_of_val(&result));
             i64::from(result)
         }
@@ -336,7 +334,7 @@ macro_rules! direct_services {
     ($($name:ident($receiver:ident; $($arg:ident : $ty:ty),*) -> $ret:ty => $call:expr;)*) => {$(
         fn $name(&$receiver, $($arg:$ty),*) -> $ret {
             // SAFETY: No canonical owner borrow survives this noexcept callback.
-            let result = unsafe { $call };
+            let result = $call;
             service_witness(stringify!($name), std::mem::size_of_val(&result));
             result
         }
@@ -356,7 +354,6 @@ fn service_witness(name: &str, bytes: usize) {
         name,
         "station"
             | "hangar_height"
-            | "can_use_station"
             | "hangar_exit"
             | "landing_rating"
             | "first_arrival"
@@ -366,166 +363,207 @@ fn service_witness(name: &str, bytes: usize) {
     }
 }
 impl World<'_> {
+    unsafe fn new(leaves: *const Leaves) -> Self {
+        // SAFETY: Immutable tables outlive this synchronous entry. No copied
+        // vehicle/station observations or owner borrows survive callbacks.
+        let leaves = unsafe { &*leaves };
+        Self {
+            leaves,
+            vs: unsafe { &*leaves.vehicle },
+            ss: unsafe { &*leaves.shared },
+            map: Cell::new(None),
+            map_bounds: Cell::new(None),
+        }
+    }
+    // Dimensions are runtime observations captured once when this entry first
+    // consumes them. Game-state serialization and these callbacks exclude map
+    // reset; nested entries obtain their own dimensions. No world state is cached.
+    fn map(&self) -> Map {
+        self.map.get().unwrap_or_else(|| {
+            let log_x = (self.ss.map_log_x)();
+            service_witness("map_log_x", 1);
+            let map = Map { log_x };
+            self.map.set(Some(map));
+            map
+        })
+    }
+    fn map_bounds(&self) -> (u32, u32) {
+        self.map_bounds.get().unwrap_or_else(|| {
+            let bounds = (self.ss.map_max_x)();
+            service_witness("map_max_x", 4);
+            let y = (self.ss.map_max_y)();
+            service_witness("map_max_y", 4);
+            self.map_bounds.set(Some((bounds, y)));
+            (bounds, y)
+        })
+    }
+    fn map_max_x(&self) -> i64 {
+        i64::from(self.map_bounds().0)
+    }
+    fn map_max_y(&self) -> i64 {
+        i64::from(self.map_bounds().1)
+    }
+    fn random(&self) -> u32 {
+        let word = self.ss.random();
+        service_witness("random", 4);
+        word
+    }
+
     scalar_services! {
-        subtype(self; v: Vehicle) => (self.leaves.subtype)(v);
-        x(self; v: Vehicle) => (self.leaves.x)(v);
-        y(self; v: Vehicle) => (self.leaves.y)(v);
-        z(self; v: Vehicle) => (self.leaves.z)(v);
-        tile(self; v: Vehicle) => (self.leaves.tile)(v);
-        direction(self; v: Vehicle) => (self.leaves.direction)(v);
-        tick_counter(self; v: Vehicle) => (self.leaves.tick_counter)(v);
-        owner(self; v: Vehicle) => (self.leaves.owner)(v);
-        vehicle_status(self; v: Vehicle) => (self.leaves.vehicle_status)(v);
-        current_speed(self; v: Vehicle) => (self.leaves.current_speed)(v);
-        subspeed(self; v: Vehicle) => (self.leaves.subspeed)(v);
-        progress(self; v: Vehicle) => (self.leaves.progress)(v);
-        acceleration(self; v: Vehicle) => (self.leaves.acceleration)(v);
-        maximum_speed(self; v: Vehicle) => (self.leaves.maximum_speed)(v);
-        order_type(self; v: Vehicle) => (self.leaves.order_type)(v);
-        order_destination(self; v: Vehicle) => (self.leaves.order_destination)(v);
-        running_ticks(self; v: Vehicle) => (self.leaves.running_ticks)(v);
-        order_time(self; v: Vehicle) => (self.leaves.order_time)(v);
-        day_counter(self; v: Vehicle) => (self.leaves.day_counter)(v);
-        last_station(self; v: Vehicle) => (self.leaves.last_station)(v);
-        map_size_x(self; ) => (self.leaves.map_size_x)();
-        map_max_x(self; ) => (self.leaves.map_max_x)();
-        map_max_y(self; ) => (self.leaves.map_max_y)();
-        plane_speed(self; ) => (self.leaves.plane_speed)();
-        no_jetcrash(self; ) => (self.leaves.no_jetcrash)();
-        plane_crashes(self; ) => (self.leaves.plane_crashes)();
-        service_at_helipad(self; ) => (self.leaves.service_at_helipad)();
-        disaster_sound(self; ) => (self.leaves.disaster_sound)();
-        economy_date(self; ) => (self.leaves.economy_date)();
-        calendar_date(self; ) => (self.leaves.calendar_date)();
-        airport_tile(self; s: *const c_void) => (self.leaves.airport_tile)(s);
-        station_tile(self; s: *const c_void) => (self.leaves.station_tile)(s);
-        rotation(self; s: *const c_void) => (self.leaves.rotation)(s);
-        airport_width(self; s: *const c_void) => (self.leaves.airport_width)(s);
-        airport_height(self; s: *const c_void) => (self.leaves.airport_height)(s);
-        airport_type(self; s: *const c_void) => (self.leaves.airport_type)(s);
-        station_owner(self; s: *const c_void) => (self.leaves.station_owner)(s);
-        has_hangar(self; s: *const c_void) => (self.leaves.has_hangar)(s);
-        has_airport(self; s: *const c_void) => (self.leaves.has_airport)(s);
-        had_vehicle(self; s: *const c_void) => (self.leaves.had_vehicle)(s);
-        airport_elements(self; airport: *const c_void) => (self.leaves.airport_elements)(airport);
-        helipads(self; airport: *const c_void) => (self.leaves.helipads)(airport);
-        airport_flags(self; airport: *const c_void) => (self.leaves.airport_flags)(airport);
-        airport_delta_z(self; airport: *const c_void) => (self.leaves.airport_delta_z)(airport);
-        engine_speed(self; v: Vehicle) => (self.leaves.engine_speed)(v);
-        engine_subtype(self; v: Vehicle) => (self.leaves.engine_subtype)(v);
-        engine_sound(self; v: Vehicle) => (self.leaves.engine_sound)(v);
-        engine_reliability(self; v: Vehicle) => (self.leaves.engine_reliability)(v);
-        vehicle_type(self; v: Vehicle) => (self.leaves.vehicle_type)(v);
-        slope(self; x: i64, y: i64) => (self.leaves.slope)(x as i32, y as i32);
-        tile_height(self; tile: i64) => (self.leaves.tile_height)(tile as u32);
-        airport_entry(self; ap: *const c_void, direction: i64) => (self.leaves.airport_entry)(ap, direction as u8);
-        direction_towards(self; v: Vehicle, x: i64, y: i64) => (self.leaves.direction_towards)(v, x as i32, y as i32);
-        hangar_height(self; station: i64) => (self.leaves.hangar_height)(station as u16);
-        terminal_count(self; ap: *const c_void, index: i64) => (self.leaves.terminal_count)(ap, index as u32);
-        hangar_exit(self; v: Vehicle) => (self.leaves.hangar_exit)(v);
-        can_use_station(self; v: Vehicle, station: i64) => (self.leaves.can_use_station)(v, station as u16);
-        service_interval(self; v: Vehicle) => (self.leaves.service_interval)(v);
-        needs_service(self; v: Vehicle) => (self.leaves.needs_service)(v);
-        chain_in_depot(self; v: Vehicle) => (self.leaves.chain_in_depot)(v);
-        waiting_unbunching(self; v: Vehicle) => (self.leaves.waiting_unbunching)(v);
-        nearest_depot_order(self; v: Vehicle) => (self.leaves.nearest_depot_order)(v);
-        part_of_orders(self; v: Vehicle) => (self.leaves.part_of_orders)(v);
-        next_station(self; last: i64) => (self.leaves.next_station)(last as u16);
-        next_stopping_station(self; vehicle: Vehicle) => (self.leaves.next_stopping_station)(vehicle);
-        speed_property(self; v: Vehicle) => (self.leaves.speed_property)(v);
-        cargo_age_property(self; v: Vehicle) => (self.leaves.cargo_age_property)(v);
-        range_property(self; v: Vehicle) => (self.leaves.range_property)(v);
-        start_sound(self; v: Vehicle) => (self.leaves.start_sound)(v);
-        touchdown_sound(self; v: Vehicle) => (self.leaves.touchdown_sound)(v);
-        rotor_image_if_changed(self; v: Vehicle) => (self.leaves.rotor_image_if_changed)(v);
-        vehicle_crash(self; v: Vehicle, flooded: i64) => (self.leaves.vehicle_crash)(v, flooded != 0);
-        send_to_depot(self; v: Vehicle, service: i64) => (self.leaves.send_to_depot)(v, service != 0);
-        sample_count(self; ) => (self.leaves.sample_count)();
-        helicopter_sound(self; ) => (self.leaves.helicopter_sound)();
-        explosion_sound(self; ) => (self.leaves.explosion_sound)();
-        skid_sound(self; ) => (self.leaves.skid_sound)();
-        ticks_per_year(self; ) => (self.leaves.ticks_per_year)();
+        handle_breakdown(self; vehicle: Vehicle) => (self.vs.breakdown)(vehicle.base());
+        subtype(self; v: Vehicle) => (self.vs.subtype)(v.base());
+        x(self; v: Vehicle) => (self.vs.x)(v.base());
+        y(self; v: Vehicle) => (self.vs.y)(v.base());
+        z(self; v: Vehicle) => (self.vs.z)(v.base());
+        tile(self; v: Vehicle) => (self.vs.tile)(v.base());
+        direction(self; v: Vehicle) => (self.vs.direction)(v.base());
+        tick_counter(self; v: Vehicle) => (self.vs.tick)(v.base());
+        owner(self; v: Vehicle) => (self.vs.owner)(v.base());
+        vehicle_status(self; v: Vehicle) => (self.vs.status)(v.base());
+        current_speed(self; v: Vehicle) => (self.vs.speed)(v.base());
+        subspeed(self; v: Vehicle) => (self.vs.subspeed)(v.base());
+        order_type(self; v: Vehicle) => (self.vs.order_type)(v.base());
+        order_destination(self; v: Vehicle) => (self.vs.order_destination)(v.base());
+        running_ticks(self; v: Vehicle) => (self.vs.running)(v.base());
+        order_time(self; v: Vehicle) => (self.vs.order_time)(v.base());
+        last_station(self; v: Vehicle) => (self.vs.last_station)(v.base());
+        plane_speed(self; ) => (self.ss.plane_speed)();
+        no_jetcrash(self; ) => (self.ss.no_jetcrash)();
+        plane_crashes(self; ) => (self.ss.plane_crashes)();
+        service_at_helipad(self; ) => (self.ss.service_at_helipad)();
+        disaster_sound(self; ) => (self.ss.disaster_sound)();
+        economy_date(self; ) => (self.ss.economy_date)();
+        calendar_date(self; ) => (self.ss.calendar_date)();
+        airport_tile(self; s: *const Station) => unsafe { (self.leaves.airport_tile)(s) };
+        station_tile(self; s: *const Station) => unsafe { (self.leaves.station_tile)(s) };
+        rotation(self; s: *const Station) => unsafe { (self.leaves.rotation)(s) };
+        airport_type(self; s: *const Station) => unsafe { (self.leaves.airport_type)(s) };
+        station_owner(self; s: *const Station) => unsafe { (self.leaves.station_owner)(s) };
+        has_hangar(self; s: *const Station) => unsafe { (self.leaves.has_hangar)(s) };
+        had_vehicle(self; s: *const Station) => unsafe { (self.leaves.had_vehicle)(s) };
+        airport_elements(self; airport: *const c_void) => unsafe { (self.leaves.airport_elements)(airport) };
+        helipads(self; airport: *const c_void) => unsafe { (self.leaves.helipads)(airport) };
+        airport_flags(self; airport: *const c_void) => unsafe { (self.leaves.airport_flags)(airport) };
+        airport_delta_z(self; airport: *const c_void) => unsafe { (self.leaves.airport_delta_z)(airport) };
+        engine_speed(self; v: Vehicle) => unsafe { (self.leaves.engine_speed)(v) };
+        engine_subtype(self; v: Vehicle) => unsafe { (self.leaves.engine_subtype)(v) };
+        engine_sound(self; v: Vehicle) => unsafe { (self.leaves.engine_sound)(v) };
+        engine_reliability(self; v: Vehicle) => unsafe { (self.leaves.engine_reliability)(v) };
+        vehicle_type(self; v: Vehicle) => (self.vs.vehicle_type)(v.base());
+        slope(self; x: i64, y: i64) => (self.ss.slope)(x as i32, y as i32);
+        tile_height(self; tile: i64) => (self.ss.tile_height)(tile as u32);
+        airport_entry(self; ap: *const c_void, direction: i64) => unsafe { (self.leaves.airport_entry)(ap, direction as u8) };
+        direction_towards(self; v: Vehicle, x: i64, y: i64) => unsafe { (self.leaves.direction_towards)(v, x as i32, y as i32) };
+        hangar_height(self; station: i64) => unsafe { (self.leaves.hangar_height)(station as u16) };
+        terminal_count(self; ap: *const c_void, index: i64) => unsafe { (self.leaves.terminal_count)(ap, index as u32) };
+        hangar_exit(self; v: Vehicle) => unsafe { (self.leaves.hangar_exit)(v) };
+        can_use_station(self; v: Vehicle, station: *const Station) => unsafe { (self.leaves.can_use_station)(v, station) };
+        service_interval(self; v: Vehicle) => unsafe { (self.leaves.service_interval)(v) };
+        needs_service(self; v: Vehicle) => (self.vs.needs_automatic_servicing)(v.base());
+        chain_in_depot(self; v: Vehicle) => unsafe { (self.leaves.chain_in_depot)(v) };
+        waiting_unbunching(self; v: Vehicle) => (self.vs.waiting_for_unbunching)(v.base());
+        nearest_depot_order(self; v: Vehicle) => unsafe { (self.leaves.nearest_depot_order)(v) };
+        part_of_orders(self; v: Vehicle) => unsafe { (self.leaves.part_of_orders)(v) };
+        next_station(self; last: i64) => unsafe { (self.leaves.next_station)(last as u16) };
+        next_stopping_station(self; vehicle: Vehicle) => unsafe { (self.leaves.next_stopping_station)(vehicle) };
+        speed_property(self; v: Vehicle) => (self.vs.property)(v.base(), PROP_AIRCRAFT_SPEED, 0) as u32;
+        cargo_age_property(self; v: Vehicle) => unsafe { (self.leaves.cargo_age_property)(v) };
+        range_property(self; v: Vehicle) => unsafe { (self.leaves.range_property)(v) };
+        start_sound(self; v: Vehicle) => (self.vs.play_start_sound)(v.base());
+        touchdown_sound(self; v: Vehicle) => unsafe { (self.leaves.touchdown_sound)(v) };
+        rotor_image_if_changed(self; v: Vehicle) => unsafe { (self.leaves.rotor_image_if_changed)(v) };
+        vehicle_crash(self; v: Vehicle, flooded: i64) => unsafe { (self.leaves.vehicle_crash)(v, flooded != 0) };
+        send_to_depot(self; v: Vehicle, service: i64) => unsafe { (self.leaves.send_to_depot)(v, service != 0) };
     }
     direct_services! {
-        set_x(self; v: Vehicle, value: i64) -> () => (self.leaves.set_x)(v, value as i32);
-        set_y(self; v: Vehicle, value: i64) -> () => (self.leaves.set_y)(v, value as i32);
-        set_z(self; v: Vehicle, value: i64) -> () => (self.leaves.set_z)(v, value as i32);
-        set_tile(self; v: Vehicle, value: i64) -> () => (self.leaves.set_tile)(v, value as u32);
-        set_direction(self; v: Vehicle, value: i64) -> () => (self.leaves.set_direction)(v, value as u8);
-        set_tick_counter(self; v: Vehicle, value: i64) -> () => (self.leaves.set_tick_counter)(v, value as u8);
-        set_vehicle_status(self; v: Vehicle, value: i64) -> () => (self.leaves.set_vehicle_status)(v, value as u8);
-        set_current_speed(self; v: Vehicle, value: i64) -> () => (self.leaves.set_current_speed)(v, value as u16);
-        set_subspeed(self; v: Vehicle, value: i64) -> () => (self.leaves.set_subspeed)(v, value as u8);
-        set_progress(self; v: Vehicle, value: i64) -> () => (self.leaves.set_progress)(v, value as u8);
-        set_maximum_speed(self; v: Vehicle, value: i64) -> () => (self.leaves.set_maximum_speed)(v, value as u16);
-        set_breakdown_counter(self; v: Vehicle, value: i64) -> () => (self.leaves.set_breakdown_counter)(v, value as u8);
-        set_running_ticks(self; v: Vehicle, value: i64) -> () => (self.leaves.set_running_ticks)(v, value as u8);
-        set_order_time(self; v: Vehicle, value: i64) -> () => (self.leaves.set_order_time)(v, value as i32);
-        set_day_counter(self; v: Vehicle, value: i64) -> () => (self.leaves.set_day_counter)(v, value as u8);
-        profit(self; v: Vehicle) -> i64 => (self.leaves.profit)(v);
-        set_profit(self; v: Vehicle, value: i64) -> () => (self.leaves.set_profit)(v, value as i64);
-        set_last_station(self; v: Vehicle, value: i64) -> () => (self.leaves.set_last_station)(v, value as u16);
-        set_economy_service(self; v: Vehicle, value: i64) -> () => (self.leaves.set_economy_service)(v, value as i32);
-        set_calendar_service(self; v: Vehicle, value: i64) -> () => (self.leaves.set_calendar_service)(v, value as i32);
-        set_breakdowns(self; v: Vehicle, value: i64) -> () => (self.leaves.set_breakdowns)(v, value as u8);
-        set_reliability(self; v: Vehicle, value: i64) -> () => (self.leaves.set_reliability)(v, value as u16);
-        set_cargo_age(self; v: Vehicle, value: i64) -> () => (self.leaves.set_cargo_age)(v, value as u16);
-        airport_fta(self; s: *const c_void) -> *const c_void => (self.leaves.airport_fta)(s);
-        airport_blocks(self; s: *const c_void) -> *mut u64 => (self.leaves.airport_blocks)(s);
-        dummy_airport(self; ) -> *const c_void => (self.leaves.dummy_airport)();
-        node(self; airport: *const c_void, pos: u8) -> *const c_void => (self.leaves.node)(airport, pos);
-        fta(self; node: *const c_void) -> Node => (self.leaves.fta)(node);
-        block_choice(self; node: *const c_void) -> BlockChoice => (self.leaves.block_choice)(node);
-        route_node(self; node: *const c_void) -> RouteNode => (self.leaves.route_node)(node);
-        block_node(self; node: *const c_void) -> BlockNode => (self.leaves.block_node)(node);
-        fta_blocks(self; node: *const c_void) -> u64 => (self.leaves.fta_blocks)(node);
-        fta_heading(self; node: *const c_void) -> u8 => (self.leaves.fta_heading)(node);
-        fta_next_position(self; node: *const c_void) -> u8 => (self.leaves.fta_next_position)(node);
-        fta_next(self; node: *const c_void) -> *const c_void => (self.leaves.fta_next)(node);
-        random(self; ) -> u32 => (self.leaves.random)();
-        update_position(self; vehicle: Vehicle) -> () => (self.leaves.update_position)(vehicle);
-        rotor_image(self; vehicle: Vehicle) -> () => (self.leaves.rotor_image)(vehicle);
-        copy_sprite(self; vehicle: Vehicle, source: Vehicle) -> () => (self.leaves.copy_sprite)(vehicle, source);
-        position_viewport(self; vehicle: Vehicle) -> () => (self.leaves.position_viewport)(vehicle);
-        create_effect(self; vehicle: Vehicle, kind: i64, x: i64, y: i64, z: i64) -> () => (self.leaves.create_effect)(vehicle, kind as u8, x as i32, y as i32, z as i32);
-        dirty_start_stop(self; vehicle: Vehicle) -> () => (self.leaves.dirty_start_stop)(vehicle);
-        play_sound(self; vehicle: Vehicle, sound: i64) -> () => (self.leaves.play_sound)(vehicle, sound as u16);
-        truncate_cargo(self; vehicle: Vehicle) -> () => (self.leaves.truncate_cargo)(vehicle);
-        crash_news(self; vehicle: Vehicle, station: i64, victims: i64) -> () => (self.leaves.crash_news)(vehicle, station as u16, victims as u32);
-        landing_rating(self; station_id: i64, cargo: i64) -> () => (self.leaves.landing_rating)(station_id as u16, cargo as u8);
-        free_order(self; vehicle: Vehicle) -> () => (self.leaves.free_order)(vehicle);
-        service_in_depot(self; vehicle: Vehicle) -> () => (self.leaves.service_in_depot)(vehicle);
-        leave_unbunching(self; vehicle: Vehicle) -> () => (self.leaves.leave_unbunching)(vehicle);
-        dirty_depot(self; vehicle: Vehicle) -> () => (self.leaves.dirty_depot)(vehicle);
-        first_arrival(self; vehicle: Vehicle, station: i64) -> () => (self.leaves.first_arrival)(vehicle, station as u16);
-        begin_loading(self; vehicle: Vehicle) -> () => (self.leaves.begin_loading)(vehicle);
-        dirty_details(self; vehicle: Vehicle) -> () => (self.leaves.dirty_details)(vehicle);
-        update_delta(self; vehicle: Vehicle) -> () => (self.leaves.update_delta)(vehicle);
-        touchdown_animation(self; vehicle: Vehicle, station: i64) -> () => (self.leaves.touchdown_animation)(vehicle, station as u16);
-        destination_too_far(self; vehicle: Vehicle) -> () => (self.leaves.destination_too_far)(vehicle);
-        delete_range_news(self; vehicle: Vehicle) -> () => (self.leaves.delete_range_news)(vehicle);
-        handle_breakdown(self; vehicle: Vehicle) -> () => (self.leaves.handle_breakdown)(vehicle);
-        handle_loading(self; vehicle: Vehicle, second: i64) -> () => (self.leaves.handle_loading)(vehicle, second != 0);
-        service_order(self; vehicle: Vehicle, station: i64) -> () => (self.leaves.service_order)(vehicle, station as u16);
-        dummy_order(self; vehicle: Vehicle) -> () => (self.leaves.dummy_order)(vehicle);
-        age_vehicle(self; vehicle: Vehicle) -> () => (self.leaves.age_vehicle)(vehicle);
-        economy_age(self; vehicle: Vehicle) -> () => (self.leaves.economy_age)(vehicle);
-        decrease_value(self; vehicle: Vehicle) -> () => (self.leaves.decrease_value)(vehicle);
-        check_orders(self; vehicle: Vehicle) -> () => (self.leaves.check_orders)(vehicle);
-        check_breakdown(self; vehicle: Vehicle) -> () => (self.leaves.check_breakdown)(vehicle);
-        running_cost(self; vehicle: Vehicle) -> i64 => (self.leaves.running_cost)(vehicle);
-        subtract_cost(self; vehicle: Vehicle, cost: i64) -> () => (self.leaves.subtract_cost)(vehicle, cost);
-        dirty_lists(self; vehicle: Vehicle) -> () => (self.leaves.dirty_lists)(vehicle);
-        remove_depot_orders(self; station_id: i64) -> () => (self.leaves.remove_depot_orders)(station_id as u16);
-        assert_flying(self; vehicle: Vehicle) -> () => (self.leaves.assert_flying)(vehicle);
-        invalid_movement(self; vehicle: Vehicle) -> () => (self.leaves.invalid_movement)(vehicle);
-        invalid_position(self; vehicle: Vehicle, ap: *const c_void) -> () => (self.leaves.invalid_position)(vehicle, ap);
-        invalid_scheme(self; vehicle: Vehicle) -> () => (self.leaves.invalid_scheme)(vehicle);
-        unreachable(self; vehicle: Vehicle) -> () => (self.leaves.unreachable)(vehicle);
-        update_rotor_image(self; v: Vehicle) -> () => (self.leaves.update_rotor_image)(v);
-        process_orders(self; v: Vehicle) -> () => (self.leaves.process_orders)(v);
-        enter_depot(self; v: Vehicle) -> () => (self.leaves.enter_depot)(v);
-        delete_aircraft(self; v: Vehicle) -> () => (self.leaves.delete_aircraft)(v);
+        hangar_candidate(self; s: *const Station, owner: u8) -> HangarCandidate => unsafe { (self.leaves.hangar_candidate)(s, owner) };
+        altitude_inputs(self; v: Vehicle) -> AltitudeInputs => (self.vs.altitude_inputs)(v.base());
+        geometry(self; s: *const Station) -> Geometry => unsafe { (self.leaves.geometry)(s) };
+        layout_blocks(self; ap: *const c_void, pos: u8) -> u64 => unsafe { (self.leaves.layout_blocks)(ap, pos) };
+        layout_heading(self; ap: *const c_void, pos: u8) -> u8 => unsafe { (self.leaves.layout_heading)(ap, pos) };
+        layout_next_position(self; ap: *const c_void, pos: u8) -> u8 => unsafe { (self.leaves.layout_next_position)(ap, pos) };
+        layout_next(self; ap: *const c_void, pos: u8) -> *const c_void => unsafe { (self.leaves.layout_next)(ap, pos) };
+        layout_route(self; ap: *const c_void, pos: u8) -> LayoutRoute => unsafe { (self.leaves.layout_route)(ap, pos) };
+        write_coordinates(self; v: Vehicle, x: i64, y: i64, z: i64) -> () => (self.vs.write_coordinates)(v.base(), x as i32, y as i32, z as i32);
+        coordinates(self; v: Vehicle) -> Coordinates => (self.vs.coordinates)(v.base());
+        xy(self; v: Vehicle) -> XY => (self.vs.xy)(v.base());
+        speed_inputs(self; v: Vehicle) -> SpeedInputs => (self.vs.speed_inputs)(v.base());
+        direction_progress(self; v: Vehicle) -> DirectionProgress => (self.vs.direction_progress)(v.base());
+        tick_status(self; v: Vehicle) -> TickStatus => (self.vs.tick_status)(v.base());
+        day_cost(self; v: Vehicle) -> DayCost => (self.vs.day_cost)(v.base());
+
+        set_x(self; v: Vehicle, value: i64) -> () => (self.vs.write_x)(v.base(), value as i32);
+        set_y(self; v: Vehicle, value: i64) -> () => (self.vs.write_y)(v.base(), value as i32);
+        set_z(self; v: Vehicle, value: i64) -> () => (self.vs.write_z)(v.base(), value as i32);
+        set_tile(self; v: Vehicle, value: i64) -> () => (self.vs.write_tile)(v.base(), value as u32);
+        set_direction(self; v: Vehicle, value: i64) -> () => (self.vs.write_direction)(v.base(), value as u8);
+        set_tick_counter(self; v: Vehicle, value: i64) -> () => (self.vs.write_tick)(v.base(), value as u8);
+        set_vehicle_status(self; v: Vehicle, value: i64) -> () => (self.vs.write_status)(v.base(), value as u8);
+        set_current_speed(self; v: Vehicle, value: i64) -> () => (self.vs.write_speed)(v.base(), value as u16);
+        set_subspeed(self; v: Vehicle, value: i64) -> () => (self.vs.write_subspeed)(v.base(), value as u8);
+        set_progress(self; v: Vehicle, value: i64) -> () => (self.vs.write_progress)(v.base(), value as u8);
+        set_maximum_speed(self; v: Vehicle, value: i64) -> () => (self.vs.write_max_speed)(v.base(), value as u16);
+        set_breakdown_counter(self; v: Vehicle, value: i64) -> () => (self.vs.write_breakdown_counter)(v.base(), value as u8);
+        set_running_ticks(self; v: Vehicle, value: i64) -> () => (self.vs.write_running)(v.base(), value as u8);
+        set_order_time(self; v: Vehicle, value: i64) -> () => (self.vs.write_order_time)(v.base(), value as i32);
+        set_day_counter(self; v: Vehicle, value: i64) -> () => (self.vs.write_day)(v.base(), value as u8);
+        set_profit(self; v: Vehicle, value: i64) -> () => (self.vs.write_profit)(v.base(), value as i64);
+        set_last_station(self; v: Vehicle, value: i64) -> () => (self.vs.write_last_station)(v.base(), value as u16);
+        set_economy_service(self; v: Vehicle, value: i64) -> () => (self.vs.write_economy_service)(v.base(), value as i32);
+        set_calendar_service(self; v: Vehicle, value: i64) -> () => (self.vs.write_calendar_service)(v.base(), value as i32);
+        set_breakdowns(self; v: Vehicle, value: i64) -> () => (self.vs.write_breakdowns)(v.base(), value as u8);
+        set_reliability(self; v: Vehicle, value: i64) -> () => (self.vs.write_reliability)(v.base(), value as u16);
+        set_cargo_age(self; v: Vehicle, value: i64) -> () => (self.vs.write_cargo_age)(v.base(), value as u16);
+        airport_fta(self; s: *const Station) -> *const c_void => unsafe { (self.leaves.airport_fta)(s) };
+        airport_blocks(self; s: *const Station) -> *mut u64 => unsafe { (self.leaves.airport_blocks)(s) };
+        dummy_airport(self; ) -> *const c_void => unsafe { (self.leaves.dummy_airport)() };
+        node(self; airport: *const c_void, pos: u8) -> *const c_void => unsafe { (self.leaves.node)(airport, pos) };
+        fta(self; node: *const c_void) -> Node => unsafe { (self.leaves.fta)(node) };
+        block_choice(self; node: *const c_void) -> BlockChoice => unsafe { (self.leaves.block_choice)(node) };
+        route_node(self; node: *const c_void) -> RouteNode => unsafe { (self.leaves.route_node)(node) };
+        block_node(self; node: *const c_void) -> BlockNode => unsafe { (self.leaves.block_node)(node) };
+        fta_next_position(self; node: *const c_void) -> u8 => unsafe { (self.leaves.fta_next_position)(node) };
+        update_position(self; vehicle: Vehicle) -> () => unsafe { (self.leaves.update_position)(vehicle) };
+        rotor_image(self; vehicle: Vehicle) -> () => unsafe { (self.leaves.rotor_image)(vehicle) };
+        copy_sprite(self; vehicle: Vehicle, source: Vehicle) -> () => unsafe { (self.leaves.copy_sprite)(vehicle, source) };
+        position_viewport(self; vehicle: Vehicle) -> () => unsafe { (self.leaves.position_viewport)(vehicle) };
+        create_effect(self; vehicle: Vehicle, kind: i64, x: i64, y: i64, z: i64) -> () => unsafe { (self.leaves.create_effect)(vehicle, kind as u8, x as i32, y as i32, z as i32) };
+        dirty_start_stop(self; vehicle: Vehicle) -> () => (self.vs.start_stop_dirty)(vehicle.base());
+        play_sound(self; vehicle: Vehicle, sound: i64) -> () => (self.vs.play_sound)(vehicle.base(), sound as u16);
+        truncate_cargo(self; vehicle: Vehicle) -> () => unsafe { (self.leaves.truncate_cargo)(vehicle) };
+        crash_news(self; vehicle: Vehicle, station: i64, victims: i64) -> () => unsafe { (self.leaves.crash_news)(vehicle, station as u16, victims as u32) };
+        landing_rating(self; station_id: i64, cargo: i64) -> () => unsafe { (self.leaves.landing_rating)(station_id as u16, cargo as u8) };
+        free_order(self; vehicle: Vehicle) -> () => (self.vs.order_free)(vehicle.base());
+        service_in_depot(self; vehicle: Vehicle) -> () => (self.vs.service_in_depot)(vehicle.base());
+        leave_unbunching(self; vehicle: Vehicle) -> () => (self.vs.leave_unbunching_depot)(vehicle.base());
+        dirty_depot(self; vehicle: Vehicle) -> () => unsafe { (self.leaves.dirty_depot)(vehicle) };
+        first_arrival(self; vehicle: Vehicle, station: i64) -> () => unsafe { (self.leaves.first_arrival)(vehicle, station as u16) };
+        begin_loading(self; vehicle: Vehicle) -> () => unsafe { (self.leaves.begin_loading)(vehicle) };
+        dirty_details(self; vehicle: Vehicle) -> () => unsafe { (self.leaves.dirty_details)(vehicle) };
+        update_delta(self; vehicle: Vehicle) -> () => unsafe { (self.leaves.update_delta)(vehicle) };
+        touchdown_animation(self; vehicle: Vehicle, station: i64) -> () => unsafe { (self.leaves.touchdown_animation)(vehicle, station as u16) };
+        destination_too_far(self; vehicle: Vehicle) -> () => unsafe { (self.leaves.destination_too_far)(vehicle) };
+        delete_range_news(self; vehicle: Vehicle) -> () => unsafe { (self.leaves.delete_range_news)(vehicle) };
+        handle_loading(self; vehicle: Vehicle, second: i64) -> () => (self.vs.loading)(vehicle.base(), second != 0);
+        service_order(self; vehicle: Vehicle, station: i64) -> () => unsafe { (self.leaves.service_order)(vehicle, station as u16) };
+        dummy_order(self; vehicle: Vehicle) -> () => (self.vs.make_dummy)(vehicle.base());
+        age_vehicle(self; vehicle: Vehicle) -> () => (self.vs.age)(vehicle.base());
+        decrease_value(self; vehicle: Vehicle) -> () => (self.vs.decrease_value)(vehicle.base());
+        check_orders(self; vehicle: Vehicle) -> () => (self.vs.check_orders_only)(vehicle.base());
+        check_breakdown(self; vehicle: Vehicle) -> () => (self.vs.check_breakdown)(vehicle.base());
+        running_cost(self; vehicle: Vehicle) -> i64 => unsafe { (self.leaves.running_cost)(vehicle) };
+        subtract_cost(self; vehicle: Vehicle, cost: i64) -> () => unsafe { (self.leaves.subtract_cost)(vehicle, cost) };
+        dirty_lists(self; vehicle: Vehicle) -> () => unsafe { (self.leaves.dirty_lists)(vehicle) };
+        remove_depot_orders(self; station_id: i64) -> () => unsafe { (self.leaves.remove_depot_orders)(station_id as u16) };
+        assert_flying(self; vehicle: Vehicle) -> () => unsafe { (self.leaves.assert_flying)(vehicle) };
+        invalid_movement(self; vehicle: Vehicle) -> () => unsafe { (self.leaves.invalid_movement)(vehicle) };
+        invalid_position(self; vehicle: Vehicle, ap: *const c_void) -> () => unsafe { (self.leaves.invalid_position)(vehicle, ap) };
+        invalid_scheme(self; vehicle: Vehicle) -> () => unsafe { (self.leaves.invalid_scheme)(vehicle) };
+        unreachable(self; vehicle: Vehicle) -> () => unsafe { (self.leaves.unreachable)(vehicle) };
+        update_rotor_image(self; v: Vehicle) -> () => unsafe { (self.leaves.update_rotor_image)(v) };
+        process_orders(self; v: Vehicle) -> () => unsafe { (self.leaves.process_orders)(v) };
+        enter_depot(self; v: Vehicle) -> () => (self.vs.enter_depot)(v.base());
+        delete_aircraft(self; v: Vehicle) -> () => (self.vs.destroy)(v.base());
     }
 
     fn next(&self, v: Vehicle) -> Vehicle {
@@ -535,7 +573,7 @@ impl World<'_> {
             result
         }
     }
-    fn station(&self, id: u32) -> *const c_void {
+    fn station(&self, id: u32) -> *const Station {
         {
             let result = unsafe { (self.leaves.station)(id as u16) };
             service_witness("station", std::mem::size_of_val(&result));
@@ -558,7 +596,7 @@ impl World<'_> {
     fn new_position(&self, v: Vehicle) -> NewPosition {
         // SAFETY: Synchronous noexcept service; no owner borrow spans this call.
         {
-            let p = unsafe { (self.leaves.new_position)(v) };
+            let p = (self.vs.new_position)(v.base());
             service_witness("new_position", std::mem::size_of_val(&p));
             NewPosition {
                 x: i64::from(p.x),
@@ -603,7 +641,7 @@ impl World<'_> {
         let f = self.flags(id);
         self.set_flags(id, if on { f | (1 << bit) } else { f & !(1 << bit) });
     }
-    fn target_station(&self, id: Vehicle) -> *const c_void {
+    fn target_station(&self, id: Vehicle) -> *const Station {
         self.station(u32::from(self.target(id)))
     }
     fn valid_airport(&self, id: Vehicle) -> bool {
@@ -618,36 +656,27 @@ impl World<'_> {
             self.airport_fta(s)
         }
     }
+    fn block_owner(&self, station: u32) -> AirportAccess {
+        AirportAccess::new(self.station(station))
+    }
     fn blocks(&self, station: u32) -> u64 {
-        let ptr = self.airport_blocks(self.station(station));
-        unsafe { ptr.read() }
-    }
-    fn set_blocks(&self, station: u32, value: u64) {
-        let ptr = self.airport_blocks(self.station(station));
-        unsafe {
-            ptr.write(value);
-        }
-    }
-    fn reserve(&self, station: u32, bits: u64) {
-        self.set_blocks(station, self.blocks(station) | bits);
-    }
-    fn release(&self, station: u32, bits: u64) {
-        self.set_blocks(station, self.blocks(station) & !bits);
+        self.block_owner(station).read(self)
     }
     fn tile_x(&self, t: u32) -> i64 {
-        i64::from(t & (self.map_size_x() as u32 - 1))
+        i64::from(self.map().tile_x(t))
     }
     fn tile_y(&self, t: u32) -> i64 {
-        i64::from(t >> (self.map_size_x() as u32).trailing_zeros())
+        i64::from(self.map().tile_y(t))
     }
     fn tile_virt(&self, x: i64, y: i64) -> u32 {
         ((y as i32 as u32) >> 4)
-            .wrapping_mul(self.map_size_x() as u32)
+            .wrapping_mul(self.map().size_x())
             .wrapping_add((x as i32 as u32) >> 4)
     }
     fn height(&self, id: Vehicle) -> i64 {
-        let x = self.x(id).clamp(0, self.map_max_x() * 16);
-        let y = self.y(id).clamp(0, self.map_max_y() * 16);
+        let point = self.xy(id);
+        let x = i64::from(point.x).clamp(0, self.map_max_x() * 16);
+        let y = i64::from(point.y).clamp(0, self.map_max_y() * 16);
         self.tile_height(i64::from(self.tile_virt(x, y)))
     }
     fn bounds(&self, id: Vehicle) -> (i64, i64) {
@@ -655,11 +684,12 @@ impl World<'_> {
         if self.subtype(id) == 0 && self.vehicle_type(id) == 3 {
             base += 34;
         }
-        if self.direction(id) <= 3 {
+        let inputs = self.altitude_inputs(id);
+        if inputs.direction <= 3 {
             base += 10;
         }
         // C++ cached_max_speed is uint16; arithmetic promotes to signed int.
-        base += (20 * (self.maximum_speed(id) / 200) - 90).min(0);
+        base += (20 * (i64::from(inputs.max_speed) / 200) - 90).min(0);
         (base + 120, base + 360)
     }
     fn flight_flags(&self, id: Vehicle, ptr: *mut u8, takeoff: bool) -> i64 {
@@ -694,9 +724,7 @@ impl World<'_> {
         self.create_effect(id, i64::from(kind), x, y, z);
     }
     fn position(&self, id: Vehicle, x: i64, y: i64, z: i64) {
-        self.set_x(id, x);
-        self.set_y(id, y);
-        self.set_z(id, z);
+        self.write_coordinates(id, x, y, z);
         self.update_position(id);
         if self.subtype(id) == 0 {
             self.rotor_image(id);
@@ -712,14 +740,13 @@ impl World<'_> {
         self.position_viewport(shadow);
         let rotor = self.next(shadow);
         if !rotor.handle.is_null() {
-            self.set_x(rotor, x);
-            self.set_y(rotor, y);
-            self.set_z(rotor, z + 5);
+            self.write_coordinates(rotor, x, y, z + 5);
             self.position_viewport(rotor);
         }
     }
     fn position_current(&self, id: Vehicle) {
-        self.position(id, self.x(id), self.y(id), self.z(id));
+        let p = self.coordinates(id);
+        self.position(id, i64::from(p.x), i64::from(p.y), i64::from(p.z));
     }
     fn enter_hangar(&self, id: Vehicle) {
         self.set_subspeed(id, 0);
@@ -760,27 +787,29 @@ impl World<'_> {
         if self.vehicle_status(rotor) & HIDDEN != 0 {
             return;
         }
+        let mut speed = self.current_speed(rotor);
         if self.order_type(id) == 3 || self.vehicle_status(id) & STOPPED != 0 {
-            if self.current_speed(rotor) != 0 {
-                self.set_current_speed(
-                    rotor,
-                    i64::from((self.current_speed(rotor) as u16).wrapping_add(1)),
-                );
-                if self.current_speed(rotor) >= 128 && self.state(rotor) == 3 {
-                    self.set_current_speed(rotor, 0);
+            if speed != 0 {
+                speed = i64::from((speed as u16).wrapping_add(1));
+                self.set_current_speed(rotor, speed);
+                if speed >= 128 && self.state(rotor) == 3 {
+                    speed = 0;
+                    self.set_current_speed(rotor, speed);
                 }
             }
         } else {
-            if self.current_speed(rotor) == 0 {
-                self.set_current_speed(rotor, 112);
+            if speed == 0 {
+                speed = 112;
+                self.set_current_speed(rotor, speed);
             }
-            if self.current_speed(rotor) >= 80 {
-                self.set_current_speed(rotor, self.current_speed(rotor) - 1);
+            if speed >= 80 {
+                speed -= 1;
+                self.set_current_speed(rotor, speed);
             }
         }
         let tick = (self.tick_counter(rotor) as u8).wrapping_add(1);
         self.set_tick_counter(rotor, i64::from(tick));
-        let speed = self.current_speed(rotor) >> 4;
+        let speed = speed >> 4;
         if speed == 0 {
             self.set_state(rotor, 0);
             if self.rotor_image_if_changed(id) != 0 {
@@ -797,25 +826,26 @@ impl World<'_> {
         self.position_viewport(rotor);
     }
     fn speed(&self, id: Vehicle, mut limit: u32, mut hard: bool) -> u32 {
-        let mut spd = (self.acceleration(id) as u32).wrapping_mul(77);
+        let input = self.speed_inputs(id);
+        let mut spd = u32::from(input.acceleration).wrapping_mul(77);
         let factor = self.plane_speed() as u32;
         limit = limit.wrapping_mul(factor);
-        if self.vehicle_status(id) & BROKEN != 0 {
+        if i64::from(input.status) & BROKEN != 0 {
             if 320 < limit {
                 hard = false;
             }
             limit = limit.min(320);
         }
-        if (self.maximum_speed(id) as u32) < limit {
-            if (self.current_speed(id) as u32) < limit {
+        if (i64::from(input.max_speed) as u32) < limit {
+            if (i64::from(input.speed) as u32) < limit {
                 hard = false;
             }
-            limit = self.maximum_speed(id) as u32;
+            limit = i64::from(input.max_speed) as u32;
         }
-        let old_sub = self.subspeed(id) as u8;
+        let old_sub = i64::from(input.subspeed) as u8;
         let sub = old_sub.wrapping_add(spd as u8);
         self.set_subspeed(id, i64::from(sub));
-        let cur = self.current_speed(id) as u32;
+        let cur = i64::from(input.speed) as u32;
         if !hard && cur > limit {
             let reduction = ((cur as i32).wrapping_mul(cur as i32) / 16384) / factor as i32;
             limit = cur.wrapping_sub(reduction.max(1) as u32);
@@ -828,24 +858,29 @@ impl World<'_> {
         if factor > 1 {
             spd /= factor;
         }
-        if self.direction(id) & 1 == 0 {
+        let motion = self.direction_progress(id);
+        if motion.direction & 1 == 0 {
             spd = spd.wrapping_mul(3) / 4;
         }
-        spd = spd.wrapping_add(self.progress(id) as u32);
+        spd = spd.wrapping_add(u32::from(motion.progress));
         self.set_progress(id, i64::from(spd as u8));
         spd >> 8
     }
-    fn entry_point(&self, id: Vehicle, ap: *const c_void, rotation: i64) -> u8 {
-        let s = self.target_station(id);
-        let tile = if s.is_null() {
-            0
-        } else if self.airport_tile(s) as u32 != INVALID_TILE {
-            self.airport_tile(s) as u32
+    fn entry_tile(&self, station: *const Station) -> u32 {
+        if station.is_null() {
+            return 0;
+        }
+        let tile = self.airport_tile(station) as u32;
+        if tile == INVALID_TILE {
+            self.station_tile(station) as u32
         } else {
-            self.station_tile(s) as u32
-        };
-        let dx = self.x(id) - self.tile_x(tile) * 16;
-        let dy = self.y(id) - self.tile_y(tile) * 16;
+            tile
+        }
+    }
+    fn entry_point(&self, id: Vehicle, ap: *const c_void, rotation: i64, tile: u32) -> u8 {
+        let point = self.xy(id);
+        let dx = i64::from(point.x) - self.tile_x(tile) * 16;
+        let dy = i64::from(point.y) - self.tile_y(tile) * 16;
         let dir = if dy.abs() < dx.abs() {
             if dx < 0 { 0 } else { 2 }
         } else if dy < 0 {
@@ -861,14 +896,26 @@ impl World<'_> {
             self.set_target(id, self.order_destination(id) as u16);
         }
         let s = self.target_station(id);
-        let valid = !s.is_null() && self.airport_tile(s) as u32 != INVALID_TILE;
+        let airport_tile = if s.is_null() {
+            INVALID_TILE
+        } else {
+            self.airport_tile(s) as u32
+        };
+        let valid = airport_tile != INVALID_TILE;
+        let tile = if s.is_null() {
+            0
+        } else if valid {
+            airport_tile
+        } else {
+            self.station_tile(s) as u32
+        };
         let ap = if valid {
             self.airport_fta(s)
         } else {
             self.dummy_airport()
         };
         let rotation = if valid { self.rotation(s) } else { 0 };
-        let pos = self.entry_point(id, ap, rotation);
+        let pos = self.entry_point(id, ap, rotation, tile);
         self.set_pos(id, pos);
         self.set_previous(id, pos);
     }
@@ -879,24 +926,23 @@ impl World<'_> {
         let mut rotation = 0;
         let mut sx = 1;
         let mut sy = 1;
+        let mut has_airport = false;
         if valid {
-            if self.airport_tile(s) as u32 != INVALID_TILE {
-                tile = self.airport_tile(s) as u32;
-                rotation = self.rotation(s);
-                sx = self.airport_width(s);
-                sy = self.airport_height(s);
-            } else {
-                tile = self.station_tile(s) as u32;
-            }
+            let geometry = self.geometry(s);
+            tile = geometry.tile;
+            rotation = i64::from(geometry.rotation);
+            sx = i64::from(geometry.width);
+            sy = i64::from(geometry.height);
+            has_airport = geometry.airport;
         }
         let ap = if tile == INVALID_TILE {
             self.dummy_airport()
         } else {
             self.airport_fta(s)
         };
-        if !valid || self.airport_tile(s) as u32 == INVALID_TILE {
+        if !has_airport {
             if i64::from(self.pos(id)) >= self.airport_elements(ap) {
-                let pos = self.entry_point(id, ap, 0);
+                let pos = self.entry_point(id, ap, 0, if valid { tile } else { 0 });
                 self.set_pos(id, pos);
                 self.set_previous(id, pos);
             } else if i64::from(self.target(id)) != self.order_destination(id) {
@@ -941,8 +987,8 @@ impl World<'_> {
                     let sound = self.engine_sound(id);
                     self.play_sound(
                         id,
-                        if sound < self.sample_count() {
-                            self.helicopter_sound()
+                        if sound < SAMPLE_COUNT {
+                            HELICOPTER_SOUND
                         } else {
                             sound
                         },
@@ -976,7 +1022,7 @@ impl World<'_> {
                 self.next_airport(id);
                 return false;
             }
-            if self.airport_type(s) != 9 {
+            if self.airport_type(s) != OILRIG {
                 x = self.x(id);
                 y = self.y(id);
                 tile = self.tile_virt(x, y);
@@ -1004,7 +1050,9 @@ impl World<'_> {
             }
             return false;
         }
-        let dist = ((x + amd.x - self.x(id)).abs() + (y + amd.y - self.y(id)).abs()) as u32;
+        let point = self.xy(id);
+        let dist = ((x + amd.x - i64::from(point.x)).abs() + (y + amd.y - i64::from(point.y)).abs())
+            as u32;
         if flags & EXACT == 0 && dist <= if flags & SLOW_TURN != 0 { 8 } else { 4 } {
             return true;
         }
@@ -1061,11 +1109,12 @@ impl World<'_> {
             let py;
             let next_tile;
             if nudge || flags & LAND != 0 {
-                let vx = self.x(id);
-                let vy = self.y(id);
+                let point = self.xy(id);
+                let vx = i64::from(point.x);
+                let vy = i64::from(point.y);
                 px = vx + (x + amd.x - vx).signum();
                 py = vy + (y + amd.y - vy).signum();
-                next_tile = if self.airport_type(s) == 9 {
+                next_tile = if self.airport_type(s) == OILRIG {
                     self.airport_tile(s) as u32
                 } else {
                     self.tile_virt(px, py)
@@ -1166,7 +1215,8 @@ impl World<'_> {
     }
     fn crashed_tick(&self, id: Vehicle) -> bool {
         self.set_crashed(id, self.crashed(id).wrapping_add(3));
-        let valid = self.valid_airport(id);
+        let station = self.target_station(id);
+        let valid = !station.is_null() && self.airport_tile(station) as u32 != INVALID_TILE;
         if self.crashed(id) < 500 && !valid && self.crashed(id).is_multiple_of(3) {
             let z = self.slope(
                 self.x(id).clamp(0, self.map_max_x() * 16),
@@ -1198,15 +1248,15 @@ impl World<'_> {
             }
         } else if self.crashed(id) >= 10000 {
             if valid {
-                self.release(u32::from(self.target(id)), (1 << 8) | (1 << 29));
+                AirportAccess::new(station).release(self, (1 << 8) | (1 << 29));
             }
             self.delete_aircraft(id);
             return false;
         }
         true
     }
-    fn smoke(&self, id: Vehicle, mode: bool) {
-        if self.vehicle_status(id) & BROKEN == 0 {
+    fn smoke(&self, id: Vehicle, mode: bool, status: i64) {
+        if status & BROKEN == 0 {
             return;
         }
         if self.current_speed(id) < 10 {
@@ -1250,7 +1300,7 @@ impl World<'_> {
         );
         self.station_rating(i64::from(tile), self.owner(id), -160, 30);
         if self.disaster_sound() != 0 {
-            self.play_sound(id, self.explosion_sound());
+            self.play_sound(id, EXPLOSION_SOUND);
         }
     }
     fn maybe_crash(&self, id: Vehicle) {
@@ -1270,7 +1320,7 @@ impl World<'_> {
         if self.random() & ((1 << 22) - 1) > prob {
             return;
         }
-        for cargo in 0..64 {
+        for cargo in 0..NUM_CARGO {
             self.landing_rating(i64::from(self.target(id)), cargo);
         }
         self.crash_airplane(id);
@@ -1314,16 +1364,22 @@ impl World<'_> {
         }
         self.begin_loading(id);
     }
-    fn has_block(&self, id: Vehicle, current: *const c_void, ap: *const c_void) -> bool {
+    fn has_block(
+        &self,
+        id: Vehicle,
+        current: *const c_void,
+        ap: *const c_void,
+        airport: &AirportAccess,
+    ) -> bool {
         let reference = self.node(ap, self.pos(id));
         let c = self.block_node(current);
-        let next = self.fta_blocks(self.node(ap, c.next_position));
-        if self.fta_blocks(self.node(ap, c.position)) != next {
+        let next = self.layout_blocks(ap, c.next_position);
+        if self.layout_blocks(ap, c.position) != next {
             let mut blocks = next;
             if current != reference && c.blocks != NOTHING {
                 blocks |= c.blocks;
             }
-            if self.blocks(u32::from(self.target(id))) & blocks != 0 {
+            if airport.read(self) & blocks != 0 {
                 self.set_current_speed(id, 0);
                 self.set_subspeed(id, 0);
                 return true;
@@ -1331,11 +1387,17 @@ impl World<'_> {
         }
         false
     }
-    fn set_block(&self, id: Vehicle, current: *const c_void, ap: *const c_void) -> bool {
+    fn set_block(
+        &self,
+        id: Vehicle,
+        current: *const c_void,
+        ap: *const c_void,
+        airport: &AirportAccess,
+    ) -> bool {
         let c = self.fta(current);
-        let next = self.fta_blocks(self.node(ap, c.next_position));
+        let next = self.layout_blocks(ap, c.next_position);
         let reference = self.node(ap, self.pos(id));
-        if (self.fta_blocks(self.node(ap, c.position)) & next) != next {
+        if (self.layout_blocks(ap, c.position) & next) != next {
             let mut blocks = next;
             let mut cursor = if current == reference {
                 c.next
@@ -1353,50 +1415,47 @@ impl World<'_> {
             if c.blocks == next {
                 blocks ^= next;
             }
-            let station = u32::from(self.target(id));
-            if self.blocks(station) & blocks != 0 {
+            if airport.read(self) & blocks != 0 {
                 self.set_current_speed(id, 0);
                 self.set_subspeed(id, 0);
                 return false;
             }
             if next != NOTHING {
-                self.reserve(station, blocks);
+                airport.reserve(self, blocks);
             }
         }
         true
     }
-    fn free_terminal(&self, id: Vehicle, start: u8, end: u8) -> bool {
+    fn free_terminal(&self, id: Vehicle, start: u8, end: u8, airport: &AirportAccess) -> bool {
         let states = [2, 3, 4, 5, 6, 7, 19, 20, 8, 9, 21];
         let bits = [0, 1, 2, 3, 4, 5, 22, 23, 6, 7, 24];
-        let station = u32::from(self.target(id));
         for i in start..end {
             let block = 1 << bits[usize::from(i)];
-            if self.blocks(station) & block == 0 {
+            if airport.read(self) & block == 0 {
                 self.set_state(id, states[usize::from(i)]);
-                self.reserve(station, block);
+                airport.reserve(self, block);
                 return true;
             }
         }
         false
     }
-    fn find_terminal(&self, id: Vehicle, ap: *const c_void) -> bool {
+    fn find_terminal(&self, id: Vehicle, ap: *const c_void, airport: &AirportAccess) -> bool {
         let groups = self.terminal_count(ap, 0);
         if groups > 1 {
-            let station = u32::from(self.target(id));
-            let mut cursor = self.fta_next(self.node(ap, self.pos(id)));
+            let mut cursor = self.layout_next(ap, self.pos(id));
             while !cursor.is_null() {
                 let node = self.block_choice(cursor);
                 if node.heading != 255 {
                     return false;
                 }
-                if self.blocks(station) & node.blocks == 0 {
+                if airport.read(self) & node.blocks == 0 {
                     let group = u32::from(self.fta_next_position(cursor)) + 1;
                     let mut start = 0;
                     for i in 1..group {
                         start += self.terminal_count(ap, i64::from(i));
                     }
                     let end = start + self.terminal_count(ap, i64::from(group));
-                    if self.free_terminal(id, start as u8, end as u8) {
+                    if self.free_terminal(id, start as u8, end as u8, airport) {
                         return true;
                     }
                 }
@@ -1407,22 +1466,22 @@ impl World<'_> {
         for i in (1..=groups).rev() {
             total += self.terminal_count(ap, i);
         }
-        self.free_terminal(id, 0, total as u8)
+        self.free_terminal(id, 0, total as u8, airport)
     }
-    fn find_helipad(&self, id: Vehicle, ap: *const c_void) -> bool {
+    fn find_helipad(&self, id: Vehicle, ap: *const c_void, airport: &AirportAccess) -> bool {
         let pads = self.helipads(ap) as u8;
         if pads == 0 {
-            self.find_terminal(id, ap)
+            self.find_terminal(id, ap, airport)
         } else {
-            self.free_terminal(id, 8, pads.wrapping_add(8))
+            self.free_terminal(id, 8, pads.wrapping_add(8), airport)
         }
     }
-    fn state_handler(&self, id: Vehicle, ap: *const c_void) {
+    fn state_handler(&self, id: Vehicle, ap: *const c_void, airport: &AirportAccess) {
         match self.state(id) {
             HANGAR => {
                 if self.previous(id) != self.pos(id) {
                     self.enter_depot(id);
-                    self.set_state(id, self.fta_heading(self.node(ap, self.pos(id))));
+                    self.set_state(id, self.layout_heading(ap, self.pos(id)));
                     return;
                 }
                 if self.order_type(id) == 2 && self.vehicle_status(id) & STOPPED != 0 {
@@ -1441,15 +1500,15 @@ impl World<'_> {
                     self.enter_depot(id);
                     return;
                 }
-                if self.has_block(id, self.node(ap, self.pos(id)), ap) {
+                if self.has_block(id, self.node(ap, self.pos(id)), ap, airport) {
                     return;
                 }
                 if self.order_destination(id) == i64::from(self.target(id)) {
                     if self.subtype(id) == 0 {
-                        if !self.find_helipad(id, ap) {
+                        if !self.find_helipad(id, ap, airport) {
                             return;
                         }
-                    } else if !self.find_terminal(id, ap) {
+                    } else if !self.find_terminal(id, ap, airport) {
                         return;
                     }
                 } else {
@@ -1464,12 +1523,12 @@ impl World<'_> {
                 }
                 let dir = self.hangar_exit(id);
                 self.leave_hangar(id, dir);
-                self.airport_move(id, ap);
+                self.airport_move(id, ap, &self.block_owner(u32::from(self.target(id))));
             }
             2..=9 | 19..=21 => {
                 if self.previous(id) != self.pos(id) {
                     self.terminal(id);
-                    self.set_state(id, self.fta_heading(self.node(ap, self.pos(id))));
+                    self.set_state(id, self.layout_heading(ap, self.pos(id)));
                     if self.service_at_helipad() != 0
                         && self.subtype(id) == 0
                         && self.helipads(ap) > 0
@@ -1485,7 +1544,7 @@ impl World<'_> {
                 if self.order_type(id) == 0 {
                     return;
                 }
-                if self.has_block(id, self.node(ap, self.pos(id)), ap) {
+                if self.has_block(id, self.node(ap, self.pos(id)), ap, airport) {
                     return;
                 }
                 let hangar = match self.order_type(id) {
@@ -1507,7 +1566,7 @@ impl World<'_> {
                         TAKEOFF
                     },
                 );
-                self.airport_move(id, ap);
+                self.airport_move(id, ap, &self.block_owner(u32::from(self.target(id))));
             }
             TAKEOFF => {
                 if self.start_sound(id) == 0 {
@@ -1532,31 +1591,30 @@ impl World<'_> {
                 }
             }
             FLYING => {
-                let station = u32::from(self.target(id));
-                let s = self.station(station);
-                if self.can_use_station(id, i64::from(station)) != 0
+                let s = airport.station;
+                if self.can_use_station(id, s) != 0
                     && (self.station_owner(s) == OWNER_NONE
                         || self.station_owner(s) == self.owner(id))
-                    && self.blocks(station) & CLOSED == 0
+                    && airport.read(self) & CLOSED == 0
                 {
                     let landing = if self.subtype(id) == 0 {
                         HELILANDING
                     } else {
                         LANDING
                     };
-                    let mut cursor = self.fta_next(self.node(ap, self.pos(id)));
+                    let mut cursor = self.layout_next(ap, self.pos(id));
                     while !cursor.is_null() {
                         let node = self.route_node(cursor);
                         if node.heading == landing {
                             let speed = self.current_speed(id);
                             let sub = self.subspeed(id);
-                            if !self.has_block(id, cursor, ap) {
+                            if !self.has_block(id, cursor, ap, airport) {
                                 self.set_state(id, landing);
                                 if landing == HELILANDING {
                                     self.flag(id, 3, true);
                                 }
                                 self.set_pos(id, node.next_position);
-                                self.reserve(station, self.fta_blocks(self.node(ap, self.pos(id))));
+                                airport.reserve(self, self.layout_blocks(ap, self.pos(id)));
                                 return;
                             }
                             self.set_current_speed(id, speed);
@@ -1566,14 +1624,14 @@ impl World<'_> {
                     }
                 }
                 self.set_state(id, FLYING);
-                self.set_pos(id, self.fta_next_position(self.node(ap, self.pos(id))));
+                self.set_pos(id, self.layout_next_position(ap, self.pos(id)));
             }
             LANDING => {
                 self.set_state(id, ENDLANDING);
                 self.update_delta(id);
                 self.touchdown_animation(id, i64::from(self.target(id)));
                 if self.touchdown_sound(id) == 0 {
-                    self.play_sound(id, self.skid_sound());
+                    self.play_sound(id, SKID_SOUND);
                 }
                 if self.needs_service(id) != 0 {
                     self.send_to_depot(id, 1);
@@ -1584,19 +1642,19 @@ impl World<'_> {
                 self.update_delta(id);
             }
             ENDLANDING => {
-                if self.has_block(id, self.node(ap, self.pos(id)), ap) {
+                if self.has_block(id, self.node(ap, self.pos(id)), ap, airport) {
                     return;
                 }
-                if self.order_type(id) == 1 && self.find_terminal(id, ap) {
+                if self.order_type(id) == 1 && self.find_terminal(id, ap, airport) {
                     return;
                 }
                 self.set_state(id, HANGAR);
             }
             HELIENDLANDING => {
-                if self.has_block(id, self.node(ap, self.pos(id)), ap) {
+                if self.has_block(id, self.node(ap, self.pos(id)), ap, airport) {
                     return;
                 }
-                if self.order_type(id) == 1 && self.find_helipad(id, ap) {
+                if self.order_type(id) == 1 && self.find_helipad(id, ap, airport) {
                     return;
                 }
                 self.set_state(
@@ -1613,16 +1671,16 @@ impl World<'_> {
             }
         }
     }
-    fn airport_move(&self, id: Vehicle, ap: *const c_void) -> bool {
+    fn airport_move(&self, id: Vehicle, ap: *const c_void, airport: &AirportAccess) -> bool {
         if i64::from(self.pos(id)) >= self.airport_elements(ap) {
             self.invalid_position(id, ap);
         }
-        let mut cursor = self.node(ap, self.pos(id));
-        let current = self.route_node(cursor);
+        let current = self.layout_route(ap, self.pos(id));
+        let mut cursor = current.node;
         if current.heading == self.state(id) {
             let previous = self.pos(id);
             let state = self.state(id);
-            self.state_handler(id, ap);
+            self.state_handler(id, ap, airport);
             if self.state(id) != FLYING {
                 self.set_previous(id, previous);
             }
@@ -1633,7 +1691,7 @@ impl World<'_> {
         }
         self.set_previous(id, self.pos(id));
         if current.next.is_null() {
-            if self.set_block(id, cursor, ap) {
+            if self.set_block(id, cursor, ap, airport) {
                 self.set_pos(id, current.next_position);
                 self.cache(id, false);
             }
@@ -1642,7 +1700,7 @@ impl World<'_> {
         loop {
             let node = self.route_node(cursor);
             if node.heading == self.state(id) || node.heading == 0 {
-                if self.set_block(id, cursor, ap) {
+                if self.set_block(id, cursor, ap, airport) {
                     self.set_pos(id, node.next_position);
                     self.cache(id, false);
                 }
@@ -1660,16 +1718,19 @@ impl World<'_> {
         if !self.controller(id) {
             return;
         }
-        let ap = self.airport(id);
-        let previous = self.fta_blocks(self.node(ap, self.previous(id)));
-        let current = self.fta_blocks(self.node(ap, self.pos(id)));
-        if previous != current {
-            let station = u32::from(self.target(id));
-            if !(self.blocks(station) & ZEPPELIN != 0 && previous == 1 << 8) {
-                self.release(station, previous);
-            }
+        let station = self.target_station(id);
+        let ap = if station.is_null() {
+            self.dummy_airport()
+        } else {
+            self.airport_fta(station)
+        };
+        let airport = AirportAccess::new(station);
+        let previous = self.layout_blocks(ap, self.previous(id));
+        let current = self.layout_blocks(ap, self.pos(id));
+        if previous != current && !(airport.read(self) & ZEPPELIN != 0 && previous == 1 << 8) {
+            airport.release(self, previous);
         }
-        self.airport_move(id, ap);
+        self.airport_move(id, ap, &airport);
     }
     fn too_far(&self, id: Vehicle, too_far: bool) {
         let has = self.flags(id) & 1 != 0;
@@ -1693,24 +1754,26 @@ impl World<'_> {
         dx.wrapping_mul(dx).wrapping_add(dy.wrapping_mul(dy)) as u32
     }
     fn event(&self, id: Vehicle, pass: u32) -> bool {
-        if self.vehicle_status(id) & CRASHED != 0 {
+        let status = self.vehicle_status(id);
+        if status & CRASHED != 0 {
             return self.crashed_tick(id);
         }
-        if self.vehicle_status(id) & STOPPED != 0 {
+        if status & STOPPED != 0 {
             return true;
         }
-        self.handle_breakdown(id);
-        self.smoke(id, pass != 0);
+        let status = self.handle_breakdown(id);
+        self.smoke(id, pass != 0, status);
         self.process_orders(id);
         self.handle_loading(id, i64::from(pass));
-        if matches!(self.order_type(id), 3 | 4) {
+        let order_type = self.order_type(id);
+        if matches!(order_type, 3 | 4) {
             return true;
         }
         if (ENDTAKEOFF..=HELIENDLANDING).contains(&self.state(id)) {
             self.too_far(id, false);
         } else if self.range_sqr(id) != 0 {
             let current = self.target_station(id);
-            let next = if matches!(self.order_type(id), 1 | 2) {
+            let next = if matches!(order_type, 1 | 2) {
                 self.station(self.order_destination(id) as u32)
             } else {
                 std::ptr::null()
@@ -1735,18 +1798,20 @@ impl World<'_> {
         true
     }
     fn tick(&self, id: Vehicle) -> bool {
-        if self.subtype(id) > 2 {
+        let subtype = self.subtype(id);
+        if subtype > 2 {
             return true;
         }
         crate::witness::hit(crate::witness::AIRCRAFT_TICKS);
-        self.set_tick_counter(id, i64::from((self.tick_counter(id) as u8).wrapping_add(1)));
-        if self.vehicle_status(id) & STOPPED == 0 {
+        let gate = self.tick_status(id);
+        self.set_tick_counter(id, i64::from(gate.tick.wrapping_add(1)));
+        if i64::from(gate.status) & STOPPED == 0 {
             self.set_running_ticks(
                 id,
                 i64::from((self.running_ticks(id) as u8).wrapping_add(1)),
             );
         }
-        if self.subtype(id) == 0 {
+        if subtype == 0 {
             self.helicopter_tick(id);
         }
         self.set_order_time(id, i64::from((self.order_time(id) as i32).wrapping_add(1)));
@@ -1770,7 +1835,7 @@ impl World<'_> {
         }
         let station = self.order_destination(id) as u32;
         let st = self.station(station);
-        if self.has_hangar(st) != 0 && self.can_use_station(id, i64::from(station)) != 0 {
+        if self.has_hangar(st) != 0 && self.can_use_station(id, st) != 0 {
             self.service_order(id, i64::from(station));
             self.dirty_start_stop(id);
         } else if self.order_type(id) == 2 {
@@ -1786,8 +1851,9 @@ impl World<'_> {
             self.age_vehicle(id);
             return;
         }
-        self.economy_age(id);
-        let day = (self.day_counter(id) as u8).wrapping_add(1);
+        let day = (self.vs.economy_age)(id.base());
+        service_witness("economy_age", 1);
+        let day = day.wrapping_add(1);
         self.set_day_counter(id, i64::from(day));
         if day & 7 == 0 {
             self.decrease_value(id);
@@ -1799,11 +1865,12 @@ impl World<'_> {
             return;
         }
         let cost = self.running_cost(id);
-        let ticks = self.running_ticks(id);
-        let divisor = self.ticks_per_year();
+        let inputs = self.day_cost(id);
+        let ticks = i64::from(inputs.running);
+        let divisor = TICKS_PER_YEAR;
         // Money's saturating multiplication is provided by the shared Money service.
         let cost = cost.saturating_mul(ticks) / divisor;
-        self.set_profit(id, self.profit(id).saturating_sub(cost));
+        self.set_profit(id, inputs.profit.saturating_sub(cost));
         self.set_running_ticks(id, 0);
         self.subtract_cost(id, cost);
         self.dirty_lists(id);
@@ -1834,6 +1901,7 @@ impl World<'_> {
         let last = self.station(last);
         let next = self.station(next);
         let engine_subtype = self.engine_subtype(id);
+        let owner = self.owner(id) as u8;
         let mut cursor = INVALID_STATION;
         loop {
             cursor = self.next_station(i64::from(cursor)) as u32;
@@ -1841,10 +1909,8 @@ impl World<'_> {
                 break;
             }
             let st = self.station(cursor);
-            if self.station_owner(st) != self.owner(id)
-                || self.has_airport(st) == 0
-                || self.has_hangar(st) == 0
-            {
+            let candidate = self.hangar_candidate(st, owner);
+            if candidate.owner != owner || !candidate.airport || !candidate.hangar {
                 continue;
             }
             let ap = self.airport_fta(st);
@@ -1899,13 +1965,17 @@ impl World<'_> {
             if self.order_type(cursor) == 2
                 && self.part_of_orders(cursor) == 0
                 && self.order_destination(cursor) == i64::from(station)
-                && (self.has_hangar(st) == 0
-                    || self.can_use_station(cursor, i64::from(station)) == 0)
+                && (self.has_hangar(st) == 0 || self.can_use_station(cursor, st) == 0)
             {
                 self.dummy_order(cursor);
                 self.dirty_start_stop(cursor);
             }
-            let pos = self.entry_point(cursor, ap, rotation);
+            let pos = self.entry_point(
+                cursor,
+                ap,
+                rotation,
+                self.entry_tile(self.target_station(cursor)),
+            );
             self.set_pos(cursor, pos);
             self.set_previous(cursor, pos);
             self.cache(cursor, false);
@@ -1963,9 +2033,7 @@ pub unsafe extern "C" fn openttd_rust_airport_blocks_destroy(blocks: *mut u64) {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_aircraft_tick(leaves: *const Leaves, id: Vehicle) -> bool {
     crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
-    let w = World {
-        leaves: unsafe { &*leaves },
-    };
+    let w = unsafe { World::new(leaves) };
     w.tick(id)
 }
 /// Run the original controller synchronously over live handles.
@@ -1975,9 +2043,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_tick(leaves: *const Leaves, id: V
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_aircraft_calendar_day(leaves: *const Leaves, id: Vehicle) {
     crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
-    let w = World {
-        leaves: unsafe { &*leaves },
-    };
+    let w = unsafe { World::new(leaves) };
     w.day(id, true);
 }
 /// Run the original controller synchronously over live handles.
@@ -1987,9 +2053,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_calendar_day(leaves: *const Leave
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_aircraft_economy_day(leaves: *const Leaves, id: Vehicle) {
     crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
-    let w = World {
-        leaves: unsafe { &*leaves },
-    };
+    let w = unsafe { World::new(leaves) };
     w.day(id, false);
 }
 /// Run the original controller synchronously over live handles.
@@ -2005,9 +2069,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_position(
     z: i32,
 ) {
     crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
-    let w = World {
-        leaves: unsafe { &*leaves },
-    };
+    let w = unsafe { World::new(leaves) };
     w.position(id, i64::from(x), i64::from(y), i64::from(z));
 }
 /// Run the original controller synchronously over live handles.
@@ -2017,9 +2079,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_position(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_aircraft_enter_hangar(leaves: *const Leaves, id: Vehicle) {
     crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
-    let w = World {
-        leaves: unsafe { &*leaves },
-    };
+    let w = unsafe { World::new(leaves) };
     w.enter_hangar(id);
 }
 /// Run the original controller synchronously over live handles.
@@ -2034,9 +2094,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_cache(
 ) {
     crate::witness::hit(crate::witness::AIRCRAFT_CACHE_ENTRIES);
     crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
-    let w = World {
-        leaves: unsafe { &*leaves },
-    };
+    let w = unsafe { World::new(leaves) };
     w.cache(id, range);
 }
 /// Run the original controller synchronously over live handles.
@@ -2054,9 +2112,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_flight_bounds(
         crate::witness::hit(crate::witness::AIRCRAFT_DISASTER_ENTRIES);
     }
     crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
-    let w = World {
-        leaves: unsafe { &*leaves },
-    };
+    let w = unsafe { World::new(leaves) };
     {
         let (lo, hi) = w.bounds(id);
         if !min.is_null() {
@@ -2086,9 +2142,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_flight_level(
         crate::witness::hit(crate::witness::AIRCRAFT_DISASTER_ENTRIES);
     }
     crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
-    let w = World {
-        leaves: unsafe { &*leaves },
-    };
+    let w = unsafe { World::new(leaves) };
     w.flight_flags(id, flags, takeoff) as i32
 }
 /// Run the original controller synchronously over live handles.
@@ -2098,9 +2152,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_flight_level(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_aircraft_height(leaves: *const Leaves, id: Vehicle) -> i32 {
     crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
-    let w = World {
-        leaves: unsafe { &*leaves },
-    };
+    let w = unsafe { World::new(leaves) };
     w.height(id) as i32
 }
 /// Run the original controller synchronously over live handles.
@@ -2116,9 +2168,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_hold_altitude(
         crate::witness::hit(crate::witness::AIRCRAFT_DISASTER_ENTRIES);
     }
     crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
-    let w = World {
-        leaves: unsafe { &*leaves },
-    };
+    let w = unsafe { World::new(leaves) };
     (w.height(id) + if w.subtype(id) == 0 { 184 } else { 150 }) as i32
 }
 /// Run the original controller synchronously over live handles.
@@ -2128,9 +2178,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_hold_altitude(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_aircraft_missing_orders(leaves: *const Leaves, id: Vehicle) {
     crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
-    let w = World {
-        leaves: unsafe { &*leaves },
-    };
+    let w = unsafe { World::new(leaves) };
     w.missing_orders(id);
 }
 /// Run the original controller synchronously over live handles.
@@ -2144,9 +2192,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_crash(
     flooded: bool,
 ) -> u32 {
     crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
-    let w = World {
-        leaves: unsafe { &*leaves },
-    };
+    let w = unsafe { World::new(leaves) };
     w.crash(id, flooded)
 }
 /// Run the original controller synchronously over live handles.
@@ -2156,9 +2202,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_crash(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_aircraft_next_airport(leaves: *const Leaves, id: Vehicle) {
     crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
-    let w = World {
-        leaves: unsafe { &*leaves },
-    };
+    let w = unsafe { World::new(leaves) };
     w.next_airport(id);
 }
 /// Run the original controller synchronously over live handles.
@@ -2172,9 +2216,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_leave_hangar(
     direction: u8,
 ) {
     crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
-    let w = World {
-        leaves: unsafe { &*leaves },
-    };
+    let w = unsafe { World::new(leaves) };
     w.leave_hangar(id, i64::from(direction));
 }
 /// Run the original controller synchronously over live handles.
@@ -2184,9 +2226,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_leave_hangar(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_aircraft_order_location(leaves: *const Leaves, id: Vehicle) {
     crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
-    let w = World {
-        leaves: unsafe { &*leaves },
-    };
+    let w = unsafe { World::new(leaves) };
     if w.state(id) == FLYING {
         w.next_airport(id);
     }
@@ -2198,9 +2238,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_order_location(leaves: *const Lea
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_aircraft_replacement(leaves: *const Leaves, station: u16) {
     crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
-    let w = World {
-        leaves: unsafe { &*leaves },
-    };
+    let w = unsafe { World::new(leaves) };
     w.replacement(u32::from(station));
 }
 /// Run the original controller synchronously over live handles.
@@ -2213,9 +2251,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_nearest_hangar(
     id: Vehicle,
 ) -> u16 {
     crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
-    let w = World {
-        leaves: unsafe { &*leaves },
-    };
+    let w = unsafe { World::new(leaves) };
     w.nearest_hangar(id) as u16
 }
 /// Run the original controller synchronously over live handles.
@@ -2228,14 +2264,12 @@ pub unsafe extern "C" fn openttd_rust_aircraft_closest_depot(
     id: Vehicle,
 ) -> u16 {
     crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
-    let w = World {
-        leaves: unsafe { &*leaves },
-    };
+    let w = unsafe { World::new(leaves) };
     {
         let st = w.target_station(id);
         if !st.is_null()
             && w.airport_tile(st) as u32 != INVALID_TILE
-            && w.can_use_station(id, i64::from(w.target(id))) != 0
+            && w.can_use_station(id, st) != 0
             && w.has_hangar(st) != 0
         {
             w.target(id)
@@ -2255,9 +2289,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_event(
     pass: bool,
 ) -> bool {
     crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
-    let w = World {
-        leaves: unsafe { &*leaves },
-    };
+    let w = unsafe { World::new(leaves) };
     w.event(id, u32::from(pass))
 }
 /// Run the original controller synchronously over live handles.
@@ -2267,13 +2299,12 @@ pub unsafe extern "C" fn openttd_rust_aircraft_event(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_aircraft_release_blocks(leaves: *const Leaves, id: Vehicle) {
     crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
-    let w = World {
-        leaves: unsafe { &*leaves },
-    };
-    if w.valid_airport(id) {
-        let ap = w.airport(id);
-        let bits = w.fta_blocks(w.node(ap, w.previous(id))) | w.fta_blocks(w.node(ap, w.pos(id)));
-        w.release(u32::from(w.target(id)), bits);
+    let w = unsafe { World::new(leaves) };
+    let station = w.target_station(id);
+    if !station.is_null() && w.airport_tile(station) as u32 != INVALID_TILE {
+        let ap = w.airport_fta(station);
+        let bits = w.layout_blocks(ap, w.previous(id)) | w.layout_blocks(ap, w.pos(id));
+        AirportAccess::new(station).release(&w, bits);
     }
 }
 /// Run the original controller synchronously over live handles.
@@ -2286,9 +2317,7 @@ pub unsafe extern "C" fn openttd_rust_aircraft_invalidate_target(
     station: u16,
 ) {
     crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
-    let w = World {
-        leaves: unsafe { &*leaves },
-    };
+    let w = unsafe { World::new(leaves) };
     {
         let mut cursor = Vehicle::invalid();
         loop {

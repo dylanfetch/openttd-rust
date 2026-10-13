@@ -20,6 +20,10 @@
 #include "../tunnelbridge_map.h"
 #include "../bridge.h"
 #include "../safeguards.h"
+#include "settings_services.h"
+#include "../cheat_type.h"
+#include "../timer/timer_game_calendar.h"
+#include "../timer/timer_game_economy.h"
 
 static uint32_t SharedRandom(void *) noexcept { return Random(); }
 static uint8_t SharedTileType(uint32_t tile) noexcept { return GetTileType(TileIndex{tile}); }
@@ -46,6 +50,19 @@ static bool MapSvcIsLevelCrossing(uint32_t tile) noexcept { return IsLevelCrossi
 static uint8_t MapSvcTunnelBridgeDirection(uint32_t tile) noexcept { return GetTunnelBridgeDirection(TileIndex(tile)); }
 static uint16_t MapSvcBridgeSpeed(uint32_t tile) noexcept { return GetBridgeSpec(GetBridgeType(TileIndex(tile)))->speed; }
 
+static uint8_t SharedMapLogX() noexcept { return Map::LogX(); }
+static uint32_t SharedMapMaxX() noexcept { return Map::MaxX(); }
+static uint32_t SharedMapMaxY() noexcept { return Map::MaxY(); }
+static uint8_t SharedPlaneSpeed() noexcept { return RustPlaneSpeed(); }
+static bool SharedNoJetcrash() noexcept { return _cheats.no_jetcrash.value; }
+static uint8_t SharedPlaneCrashes() noexcept { return RustPlaneCrashes(); }
+static bool SharedServiceAtHelipad() noexcept { return RustServiceAtHelipad(); }
+static bool SharedDisasterSound() noexcept { return RustDisasterSound(); }
+static int32_t SharedEconomyDate() noexcept { return TimerGameEconomy::date.base(); }
+static int32_t SharedCalendarDate() noexcept { return TimerGameCalendar::date.base(); }
+static int32_t SharedSlope(int32_t x, int32_t y) noexcept { return GetSlopePixelZ(x, y); }
+static int32_t SharedTileHeight(uint32_t tile) noexcept { return TileHeight(TileIndex{tile}) * TILE_HEIGHT; }
+
 const OpenTTDSharedServices &GetRustSharedServices() noexcept
 {
 	static const OpenTTDSharedServices services{
@@ -65,6 +82,18 @@ const OpenTTDSharedServices &GetRustSharedServices() noexcept
 		.is_level_crossing = MapSvcIsLevelCrossing,
 		.tunnel_bridge_direction = MapSvcTunnelBridgeDirection,
 		.bridge_speed = MapSvcBridgeSpeed,
+		.map_log_x = SharedMapLogX,
+		.map_max_x = SharedMapMaxX,
+		.map_max_y = SharedMapMaxY,
+		.plane_speed = SharedPlaneSpeed,
+		.no_jetcrash = SharedNoJetcrash,
+		.plane_crashes = SharedPlaneCrashes,
+		.service_at_helipad = SharedServiceAtHelipad,
+		.disaster_sound = SharedDisasterSound,
+		.economy_date = SharedEconomyDate,
+		.calendar_date = SharedCalendarDate,
+		.slope = SharedSlope,
+		.tile_height = SharedTileHeight,
 	};
 	return services;
 }

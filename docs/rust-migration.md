@@ -1674,38 +1674,31 @@ programs and exhaustive industry layouts remain corpus limits tracked by #156.
 
 ### Aircraft controllers and airport movement
 
-Issue #136 moves both tick passes, movement/speed/flight levels, shadow/rotor,
-all FTA traversal, terminal/group/helipad reservation, service/diversion/range,
-crash cleanup and airport replacement/destruction policies into Rust. Fixed Rust
-allocations own aircraft counters/cache and each station's airport block mask;
-placement-constructed trivial C++ facades retain save, legacy load and external-write
-addresses. Original bodies compile only in portable builds. Shared Vehicle/pools,
-orders/loading, airport geometry/FTA records and rendering remain C++.
+#136 owns both tick passes, movement/speed/flight, shadow/rotor, FTA traversal,
+terminal/helipad reservations, service/range, crash cleanup and airport lifecycle
+in Rust. Fixed allocations own private counters/cache and airport masks; trivial
+C++ save aliases preserve their addresses. Portable bodies remain unchanged.
 
-The #190 boundary uses named synchronous entries and typed noexcept services;
-entries resolve each live vehicle and canonical State once, with field-sized raw
-access and narrow map, vehicle, airport and FTA observations. An immutable service
-table is borrowed, with no continuation, selector dispatch or per-entry allocation.
-ProcessOrders/UpdateOrderDest, depot/refit, qualified Vehicle::Crash, depot commands
-and deletion call directly after all owner accesses end. Command failures return
-native results; event insertion queues without running a script VM. PreDestructor
-releases airport blocks while state is live; the deleting caller returns immediately.
-Disaster flight helpers use their actual Vehicle and independent flags address.
-Canonical save/legacy aliases and portable bodies remain unchanged. Panics and
-environmental failures abort; wrapping counters and shared RNG retain source order.
+#237 borrows shared vehicle/map/settings/RNG services directly. Entries resolve
+live shells/State once; consumed speed, motion, tick, cost, altitude, geometry,
+FTA and hangar projections retain source phases. Typed station access intervals
+share short live-mask accesses and refresh after reentrant movement. No owner
+borrow crosses ProcessOrders/loading, depot/refit, animation, crash or deletion.
+PreDestructor releases blocks while state is live; deletion returns immediately.
+Disaster flight helpers retain actual Vehicle identity and independent flags.
+Runtime dimensions are captured per entry; wrapping arithmetic/RNG order remain.
 
-`python3 tools/migration.py simulate aircraft-route aircraft-controller disasters`
-compares every saved chunk and debug log: planes/helicopters, terminal groups,
-dedicated pads, occupied-block waits, service, closure diversion, zeppelin landing
-abort, airborne airport removal, orderless service-to-hangar diversion,
-out-of-fuel crash/destruction and live reload. `--self` and
-`--soak` check reproducibility/longer runs. A scenario-local native probe compares
-800 finite-range branches against unchanged reference helpers because supplied
-engines have unlimited range. ABI checks cover owner defaults/layout/lifetime, typed table/record offsets,
-nested same-owner mutation, live block-release/deletion and disaster flight flags.
-Full legacy files, arbitrary NewGRFs/airport rotations and viewport/sound output
-remain evidence limits. A reference-built ownerless oilrig route checks public
-helicopter landing through the ordinary FTA path.
+`python3 tools/migration.py simulate aircraft disasters --jobs 2` (also `--self`
+and `--soak`) exercises traffic, cargo, service, closure, zeppelin abort, removal,
+ownerless oilrig landing, crash and reload. Default hooks require aircraft
+crossing/lookup/observation-byte counts and enforce measured plain caps; timing
+disables them. The unchanged-reference probe covers 800 finite-range cases.
+Native ABI checks cover every layout, nested mutation, rotor/order/loading phases,
+post-dirty motion reads, live block release/deletion and ownerless flight flags.
+Real NewGRF/refit/airport rotations, threaded GUI, legacy-save fixtures and
+presentation remain gaps tracked on #156; these checks do not establish full
+subsystem equivalence.
+
 ### Cargo storage and movement (#139)
 
 Rust owns packet fields, ordered station/vehicle lists, count/age/feeder/action/

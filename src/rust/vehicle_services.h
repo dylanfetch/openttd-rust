@@ -40,6 +40,20 @@ inline uint8_t RustGroundCachedLength(const T *v) noexcept { return v->gcache.ca
 template <class T>
 inline bool RustGroundHasArticulated(const T *v) noexcept { return v->HasArticulatedPart(); }
 
+inline uint8_t RustVehicleSubtype(const Vehicle *v) noexcept { return v->subtype; }
+inline int32_t RustVehicleX(const Vehicle *v) noexcept { return v->x_pos; }
+inline int32_t RustVehicleY(const Vehicle *v) noexcept { return v->y_pos; }
+inline int32_t RustVehicleZ(const Vehicle *v) noexcept { return v->z_pos; }
+inline uint16_t RustVehicleSpeed(const Vehicle *v) noexcept { return v->cur_speed; }
+inline uint8_t RustVehicleSubspeed(const Vehicle *v) noexcept { return v->subspeed; }
+inline uint8_t RustVehicleAcceleration(const Vehicle *v) noexcept { return v->acceleration; }
+inline uint16_t RustVehicleMaxSpeed(const Vehicle *v) noexcept { return v->vcache.cached_max_speed; }
+inline uint8_t RustVehicleRunning(const Vehicle *v) noexcept { return v->running_ticks; }
+inline int32_t RustVehicleOrderTime(const Vehicle *v) noexcept { return v->current_order_time; }
+inline int64_t RustVehicleProfit(const Vehicle *v) noexcept { return v->profit_this_year; }
+inline uint16_t RustVehicleLastStation(const Vehicle *v) noexcept { return v->last_station_visited.base(); }
+inline uint8_t RustVehicleVehicleType(const Vehicle *v) noexcept { return v->type; }
+
 /** GRF version of a live engine; the original default-engine value is zero. */
 inline uint8_t RustEngineGRFVersion(const Engine *engine) noexcept
 {
