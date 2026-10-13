@@ -2,7 +2,6 @@
 """Exercise complete shard coverage, build identity, and frozen adapter inputs."""
 
 import copy
-import hashlib
 import json
 import shutil
 import subprocess
@@ -129,6 +128,92 @@ class ShardTests(unittest.TestCase):
 
 
 class FrozenRuntimeTests(unittest.TestCase):
+    def test_canonical_export_identity_rejects_stale_binary_config_and_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            binary = root / "game"
+            binary.write_bytes(b"binary")
+            cache = root / "CMakeCache.txt"
+            cache.write_text("configuration")
+            checkout = {
+                "source_commit": "head",
+                "source_status": "",
+                "source_digest": "source",
+            }
+            identity = {
+                "schema_version": 1,
+                **checkout,
+                "source_stable": True,
+                "configuration_digest": "config",
+                "binary_sha256": runtime.digest(binary),
+                "configuration_cache_sha256": runtime.digest(cache),
+            }
+            (root / runtime.IDENTITY_NAME).write_text(json.dumps(identity))
+            self.assertEqual(
+                runtime.candidate_identity(root, binary, checkout), identity
+            )
+            for altered in (
+                dict(checkout, source_status="M source"),
+                dict(checkout, source_digest="changed"),
+                dict(checkout, source_commit="other"),
+            ):
+                with self.assertRaises(RuntimeError):
+                    runtime.candidate_identity(root, binary, altered)
+            binary.write_bytes(b"changed")
+            with self.assertRaises(RuntimeError):
+                runtime.candidate_identity(root, binary, checkout)
+            binary.write_bytes(b"binary")
+            cache.write_text("changed")
+            with self.assertRaises(RuntimeError):
+                runtime.candidate_identity(root, binary, checkout)
+
+    @unittest.skipUnless(
+        shutil.which("cc") and shutil.which("objcopy"), "native ELF compiler/objcopy"
+    )
+    def test_object_export_preserves_symbols_relocations_and_comdat(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "probe.cpp"
+            source.write_text(
+                "extern int other; int local = 7; template<typename T> T add(T x) { return x + other; } int run(void) { return add(local); }\n"
+            )
+            binary, derived = root / "probe.o", root / "derived.o"
+            subprocess.run(
+                ["cc", "-g", "-c", str(source), "-o", str(binary)], check=True
+            )
+            receipt = runtime.strip_debug(binary, derived)
+            proof = receipt["content_proof"]["relocatable_link_inputs"]
+            self.assertGreater(proof["symbols"], 0)
+            self.assertGreater(proof["relocations"], 0)
+            self.assertGreater(proof["groups"], 0)
+            self.assertEqual(runtime.elf_content(binary), runtime.elf_content(derived))
+            # A symbol rename alters relocation resolution while allocated bytes stay exact.
+            altered = root / "altered.o"
+            subprocess.run(
+                [
+                    "objcopy",
+                    "--redefine-sym",
+                    "other=different",
+                    str(derived),
+                    str(altered),
+                ],
+                check=True,
+            )
+            before, after = runtime.elf_content(derived), runtime.elf_content(altered)
+            self.assertEqual(before["SHF_ALLOC"], after["SHF_ALLOC"])
+            self.assertNotEqual(
+                before["relocatable_link_inputs"], after["relocatable_link_inputs"]
+            )
+            with (
+                patch.object(
+                    runtime.subprocess,
+                    "run",
+                    side_effect=lambda *a, **k: shutil.copy2(altered, derived),
+                ),
+                self.assertRaises(RuntimeError),
+            ):
+                runtime.strip_debug(binary, derived)
+
     def test_debug_export_preserves_mapped_content_and_original_output(self):
         self.assertIsNotNone(shutil.which("cc"), "ELF regression requires cc")
         self.assertIsNotNone(shutil.which("objcopy"), "ELF regression requires objcopy")
@@ -240,19 +325,44 @@ class FrozenRuntimeTests(unittest.TestCase):
     def test_manifest_rejects_missing_mutated_and_extra_runtime_files(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / "game").write_bytes(b"bytes")
+            candidate = root / "candidate-runtime"
+            candidate.mkdir()
+            (candidate / "game").write_bytes(b"bytes")
+            checkout = {
+                "source_commit": "head",
+                "source_status": "",
+                "source_digest": "source",
+            }
+            identity = {**checkout, "source_stable": True, "binary_sha256": "original"}
+            (candidate / runtime.IDENTITY_NAME).write_text(json.dumps(identity))
+            (candidate / "adapters.json").write_text("{}")
             manifest = {
                 "schema_version": 1,
                 "baseline": ci_native.migration.BASELINE,
                 "candidate_commit": "head",
-                "candidate_build_identity": {
-                    "source_commit": "head",
-                    "source_stable": True,
+                "candidate_build_identity": identity,
+                "roles": {
+                    "candidate": {
+                        "binary": "candidate-runtime/game",
+                        "ordinary_derivation": {
+                            "source_sha256": "original",
+                            "sha256": runtime.digest(candidate / "game"),
+                            "content_proof": "proof",
+                        },
+                        "adapter_derivations": {},
+                    }
                 },
-                "files": {"game": hashlib.sha256(b"bytes").hexdigest()},
+                "files": {
+                    str(p.relative_to(root)): runtime.digest(p)
+                    for p in candidate.iterdir()
+                },
             }
             (root / runtime.MANIFEST).write_text(json.dumps(manifest))
-            with patch.object(ci_native.migration, "git", return_value="head"):
+            with (
+                patch.object(ci_native.migration, "git", return_value="head"),
+                patch.object(runtime, "source_identity", return_value=checkout),
+                patch.object(runtime, "elf_content", return_value="proof"),
+            ):
                 self.assertEqual(runtime.verify(root, ci_native.migration), manifest)
                 (root / "shard-plan.json").write_text("{}")
                 runtime.verify(root, ci_native.migration)
@@ -260,10 +370,20 @@ class FrozenRuntimeTests(unittest.TestCase):
                 with self.assertRaises(RuntimeError):
                     runtime.verify(root, ci_native.migration)
                 (root / "extra").unlink()
-                (root / "game").write_text("changed")
+                manifest["roles"]["candidate"]["ordinary_derivation"][
+                    "source_sha256"
+                ] = "unrelated"
+                (root / runtime.MANIFEST).write_text(json.dumps(manifest))
                 with self.assertRaises(RuntimeError):
                     runtime.verify(root, ci_native.migration)
-                (root / "game").unlink()
+                manifest["roles"]["candidate"]["ordinary_derivation"][
+                    "source_sha256"
+                ] = "original"
+                (root / runtime.MANIFEST).write_text(json.dumps(manifest))
+                (candidate / "game").write_text("changed")
+                with self.assertRaises(RuntimeError):
+                    runtime.verify(root, ci_native.migration)
+                (candidate / "game").unlink()
                 with self.assertRaises(RuntimeError):
                     runtime.verify(root, ci_native.migration)
             with (

@@ -7,7 +7,7 @@ import struct
 import subprocess
 from pathlib import Path
 
-from build_identity import IDENTITY_NAME
+from build_identity import IDENTITY_NAME, read_identity, source_identity
 
 from . import core
 
@@ -71,6 +71,124 @@ def elf_content(path):
     ]
     names = sections[names_index]
     strings = data[names[4] : names[4] + names[5]]
+    section_names = [strings[s[0] :].split(b"\0", 1)[0].decode() for s in sections]
+
+    def debug_section(index):
+        return section_names[index].startswith((".debug", ".zdebug"))
+
+    def symbol(table, index):
+        entry = sections[table]
+        values = struct.unpack_from(
+            endian + ("IBBHQQ" if wide else "IIIBBH"),
+            data,
+            entry[4] + index * entry[9],
+        )
+        name, info, other, target, value, size = (
+            values
+            if wide
+            else (values[0], values[3], values[4], values[5], values[1], values[2])
+        )
+        names = sections[entry[6]]
+        strings = data[names[4] : names[4] + names[5]]
+        return {
+            "name": strings[name:].split(b"\0", 1)[0].decode(),
+            "info": info,
+            "other": other,
+            "value": value,
+            "size": size,
+            "section": section_names[target] if 0 < target < len(sections) else target,
+        }, target
+
+    link_inputs = None
+    if header[0] == 1:  # ET_REL: section bytes alone do not prove link semantics.
+        symbols, relocations, groups, other_sections = [], [], [], []
+        for index, section in enumerate(sections):
+            name = section_names[index]
+            if debug_section(index):
+                continue
+            if section[1] == 2:  # SHT_SYMTAB; strip-debug renumbers retained symbols.
+                for entry in range(section[5] // section[9]):
+                    record, target = symbol(index, entry)
+                    if record["info"] & 15 != 4 and not (
+                        0 < target < len(sections) and debug_section(target)
+                    ):  # STT_FILE and debug-section symbols have no link semantics.
+                        symbols.append(record)
+            elif section[1] in (4, 9):  # RELA/REL, resolved through their symbol table.
+                if debug_section(section[7]):
+                    continue
+                entries = []
+                for entry in range(section[5] // section[9]):
+                    fmt = (
+                        ("QQq" if wide else "IIi")
+                        if section[1] == 4
+                        else ("QQ" if wide else "II")
+                    )
+                    values = struct.unpack_from(
+                        endian + fmt, data, section[4] + entry * section[9]
+                    )
+                    offset, info = values[:2]
+                    entries.append(
+                        {
+                            "offset": offset,
+                            "type": info & (0xFFFFFFFF if wide else 0xFF),
+                            "symbol": symbol(section[6], info >> (32 if wide else 8))[
+                                0
+                            ],
+                            "addend": values[2] if len(values) == 3 else None,
+                        }
+                    )
+                relocations.append(
+                    {
+                        "name": name,
+                        "target": section_names[section[7]],
+                        "entries": entries,
+                    }
+                )
+            elif section[1] == 17:  # SHT_GROUP/COMDAT indices also change on stripping.
+                members = struct.unpack_from(
+                    endian + "I" * (section[5] // 4), data, section[4]
+                )
+                groups.append(
+                    {
+                        "name": name,
+                        "flags": members[0],
+                        "signature": symbol(section[6], section[7])[0],
+                        "members": [section_names[i] for i in members[1:]],
+                    }
+                )
+            elif section[1] not in (
+                0,
+                3,
+            ):  # Nondebug notes/flags can affect linking too.
+                other_sections.append(
+                    {
+                        "name": name,
+                        "type": section[1],
+                        "flags": section[2],
+                        "alignment": section[8],
+                        "size": section[5],
+                        "sha256": hashlib.sha256(
+                            data[section[4] : section[4] + section[5]]
+                            if section[1] != 8
+                            else b""
+                        ).hexdigest(),
+                    }
+                )
+        semantics = {
+            "symbols": symbols,
+            "relocations": relocations,
+            "groups": groups,
+            "sections": other_sections,
+        }
+        link_inputs = {
+            "sha256": hashlib.sha256(
+                json.dumps(semantics, sort_keys=True).encode()
+            ).hexdigest(),
+            "symbols": len(symbols),
+            "relocations": sum(len(r["entries"]) for r in relocations),
+            "groups": len(groups),
+            "sections": len(other_sections),
+        }
     allocated = []
     for section in sections:
         if not section[2] & 2:  # SHF_ALLOC, also checks relocatable widget objects.
@@ -91,6 +209,7 @@ def elf_content(path):
     return {
         "PT_LOAD_without_section_table_header_metadata": load,
         "SHF_ALLOC": allocated,
+        "relocatable_link_inputs": link_inputs,
     }
 
 
@@ -113,10 +232,26 @@ def strip_debug(source, destination=None):
     }
 
 
+def candidate_identity(build, binary, checkout):
+    """Bind the export to the canonical binary/configuration and current source."""
+    identity = read_identity(build, binary)
+    if (
+        identity is None
+        or not identity["source_stable"]
+        or checkout["source_status"]
+        or any(identity[key] != value for key, value in checkout.items())
+    ):
+        raise RuntimeError("Candidate binary/configuration/source identity is stale")
+    return identity
+
+
 def export(destination, migration):
     """Capture under build locks; adapters must come from these exact game objects."""
     from . import fleet, orders
 
+    checkout = source_identity(core.ROOT)
+    if checkout["source_status"]:
+        raise RuntimeError("Frozen export requires a clean candidate checkout")
     destination.mkdir(parents=True)
     records = {}
     builds = {
@@ -131,6 +266,8 @@ def export(destination, migration):
         )
         with lock:
             source = build / ("openttd" if role == "reference" else "openttd-rust")
+            if role == "candidate":
+                identity = candidate_identity(build, source, checkout)
             runtime = destination / f"{role}-runtime"
             binary = core._copy_runtime(build, source, runtime)
             if role == "candidate":
@@ -169,9 +306,8 @@ def export(destination, migration):
         for path in sorted(destination.rglob("*"))
         if path.is_file()
     }
-    identity = json.loads(
-        (destination / "candidate-runtime" / IDENTITY_NAME).read_text()
-    )
+    if source_identity(core.ROOT) != checkout:
+        raise RuntimeError("Candidate source changed during frozen export")
     manifest = {
         "schema_version": 1,
         "candidate_commit": migration.git("rev-parse", "HEAD"),
@@ -191,8 +327,11 @@ def verify(destination, migration):
     if manifest["candidate_commit"] != migration.git("rev-parse", "HEAD"):
         raise RuntimeError("Frozen runtime belongs to another candidate commit")
     identity = manifest["candidate_build_identity"]
+    checkout = source_identity(core.ROOT)
     if (
-        identity["source_commit"] != manifest["candidate_commit"]
+        checkout["source_status"]
+        or any(identity.get(key) != value for key, value in checkout.items())
+        or identity["source_commit"] != manifest["candidate_commit"]
         or not identity["source_stable"]
     ):
         raise RuntimeError(
@@ -207,6 +346,39 @@ def verify(destination, migration):
     }
     if actual != expected:
         raise RuntimeError("Frozen runtime files differ from the build manifest")
+    if (
+        manifest["roles"]["candidate"]["ordinary_derivation"]["source_sha256"]
+        != identity["binary_sha256"]
+        or json.loads((destination / "candidate-runtime" / IDENTITY_NAME).read_text())
+        != identity
+    ):
+        raise RuntimeError(
+            "Derived candidate differs from its canonical build identity"
+        )
+    for record in manifest["roles"].values():
+        binary = destination / record["binary"]
+        derivation = record["ordinary_derivation"]
+        if (
+            derivation["sha256"] != expected[record["binary"]]
+            or elf_content(binary) != derivation["content_proof"]
+        ):
+            raise RuntimeError("Derived runtime differs from its code/data proof")
+        adapters = json.loads((binary.parent / "adapters.json").read_text())
+        for kind, derived in record["adapter_derivations"].items():
+            executable = binary.parent / kind / f"openttd-{kind}"
+            receipt = adapters[kind]
+            if (
+                derived["sha256"] != digest(executable)
+                or derived["source_sha256"] != receipt["source_binary_sha256"]
+                or receipt["binary_sha256"] != derived["sha256"]
+                or receipt["ordinary_binary_sha256"] != derivation["sha256"]
+                or receipt["source_ordinary_binary_sha256"]
+                != derivation["source_sha256"]
+                or elf_content(executable) != derived["content_proof"]
+            ):
+                raise RuntimeError(
+                    "Derived adapter differs from its source/runtime/proof"
+                )
     return manifest
 
 
