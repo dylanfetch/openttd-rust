@@ -54,6 +54,7 @@ class MigrationCompanies extends AIController {
 		while (true) {
 			while (AIEventController.IsEventWaiting()) {
 				local event = AIEventController.GetNextEvent(), type = event.GetEventType();
+				if (type == AIEvent.ET_COMPANY_NEW) print("COMPANY-NEW " + self + " " + AIEventCompanyNew.Convert(event).GetCompanyID());
 				if (type == AIEvent.ET_COMPANY_IN_TROUBLE) print("COMPANY-TROUBLE " + self + " " + AIEventCompanyInTrouble.Convert(event).GetCompanyID());
 				if (type == AIEvent.ET_COMPANY_ASK_MERGER) {
 					local offer = AIEventCompanyAskMerger.Convert(event);

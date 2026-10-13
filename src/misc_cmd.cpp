@@ -43,7 +43,7 @@
 CommandCost CmdIncreaseLoan(DoCommandFlags flags, LoanCommand cmd, Money amount)
 {
 #ifdef WITH_RUST
-	return RustCompanyCost(RunRustCompany(22, 0, static_cast<uint8_t>(cmd), amount, flags.Test(DoCommandFlag::Execute)));
+	return RustCompanyCost(openttd_rust_company_increase_loan(&GetRustCompanyFinanceServices(), static_cast<uint8_t>(cmd), amount.base(), _settings_game.difficulty.infinite_money, flags.Test(DoCommandFlag::Execute)));
 #else
 	Company *c = Company::Get(_current_company);
 	Money max_loan = c->GetMaxLoan();
@@ -93,7 +93,7 @@ CommandCost CmdIncreaseLoan(DoCommandFlags flags, LoanCommand cmd, Money amount)
 CommandCost CmdDecreaseLoan(DoCommandFlags flags, LoanCommand cmd, Money amount)
 {
 #ifdef WITH_RUST
-	return RustCompanyCost(RunRustCompany(23, 0, static_cast<uint8_t>(cmd), amount, flags.Test(DoCommandFlag::Execute)));
+	return RustCompanyCost(openttd_rust_company_decrease_loan(&GetRustCompanyFinanceServices(), static_cast<uint8_t>(cmd), amount.base(), _settings_game.difficulty.infinite_money, flags.Test(DoCommandFlag::Execute)));
 #else
 	Company *c = Company::Get(_current_company);
 
@@ -137,7 +137,7 @@ CommandCost CmdDecreaseLoan(DoCommandFlags flags, LoanCommand cmd, Money amount)
 CommandCost CmdSetCompanyMaxLoan(DoCommandFlags flags, CompanyID company, Money amount)
 {
 #ifdef WITH_RUST
-	return RustCompanyCost(RunRustCompany(24, company.base(), amount, flags.Test(DoCommandFlag::Execute)));
+	return RustCompanyCost(openttd_rust_company_set_max_loan(&GetRustCompanyFinanceServices(), company.base(), amount.base(), flags.Test(DoCommandFlag::Execute)));
 #else
 	if (_current_company != OWNER_DEITY) return CMD_ERROR;
 	if (amount != COMPANY_MAX_LOAN_DEFAULT) {
@@ -250,7 +250,7 @@ CommandCost CmdMoneyCheat(DoCommandFlags, Money amount)
 CommandCost CmdChangeBankBalance(DoCommandFlags flags, TileIndex tile, Money delta, CompanyID company, ExpensesType expenses_type)
 {
 #ifdef WITH_RUST
-	return RustCompanyCost(RunRustCompany(25, company.base(), delta, expenses_type, flags.Test(DoCommandFlag::Execute), tile.base()));
+	return RustCompanyCost(openttd_rust_company_change_bank_balance(&GetRustCompanyFinanceServices(), tile.base(), delta.base(), company.base(), expenses_type, flags.Test(DoCommandFlag::Execute)));
 #else
 	if (!Company::IsValidID(company)) return CMD_ERROR;
 	if (expenses_type >= EXPENSES_END) return CMD_ERROR;
