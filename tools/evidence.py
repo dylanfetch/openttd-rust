@@ -150,6 +150,30 @@ def verification(record, head):
     return scope, origin, schema, binary_hash, build_identity
 
 
+def simulation_parent(record, binary_hash):
+    """Validate an explicit exported-copy identity; never relabel the executed hash."""
+    if "frozen_export" not in record:
+        return binary_hash
+    derivation = field(
+        field(record, "frozen_export", dict), "ordinary_derivation", dict
+    )
+    require(
+        digest(field(derivation, "sha256", str), "derived binary hash") == binary_hash,
+        "derived simulation binary hash mismatch",
+    )
+    command = field(derivation, "command", list)
+    require(
+        len(command) in (3, 4)
+        and command[:2] == ["objcopy", "--strip-debug"]
+        and all(isinstance(argument, str) for argument in command),
+        "unsupported simulation binary derivation",
+    )
+    proof = field(derivation, "content_proof", dict)
+    for name in ("PT_LOAD_without_section_table_header_metadata", "SHF_ALLOC"):
+        require(field(proof, name, list), "empty derived code/data proof")
+    return digest(field(derivation, "source_sha256", str), "derived parent hash")
+
+
 def simulation(record, verified_hash, verified_identity, head, verified_reference=None):
     schema = version(record)
     require(field(record, "passed", bool), "simulation failed or incomplete")
@@ -165,14 +189,16 @@ def simulation(record, verified_hash, verified_identity, head, verified_referenc
     reference_hash = digest(
         field(binaries.get("reference"), "sha256", str), "simulation reference hash"
     )
+    candidate_parent = simulation_parent(binaries["candidate"], candidate_hash)
+    reference_parent = simulation_parent(binaries["reference"], reference_hash)
     if verified_reference:
         require(
-            reference_hash == verified_reference,
+            reference_parent == verified_reference,
             "verification/simulation reference binary hash mismatch",
         )
     if mode == "reference-vs-candidate" and verified_hash:
         require(
-            candidate_hash == verified_hash,
+            candidate_parent == verified_hash,
             "verification/simulation candidate binary hash mismatch",
         )
     if mode == "reference-vs-reference":
@@ -180,8 +206,14 @@ def simulation(record, verified_hash, verified_identity, head, verified_referenc
             reference_hash == candidate_hash, "self comparison binary hash mismatch"
         )
     build_identity = binaries["candidate"].get("build_identity")
+    if "frozen_export" in binaries["candidate"]:
+        require(
+            build_identity is None,
+            "derived binary relabelled with an ordinary build identity",
+        )
+        build_identity = field(binaries["candidate"], "source_build_identity", dict)
     if build_identity is not None:
-        identity(build_identity, candidate_hash)
+        identity(build_identity, candidate_parent)
         if verified_identity and mode == "reference-vs-candidate":
             require(
                 build_identity == verified_identity,
@@ -300,18 +332,21 @@ def render(
         lines.append(f"- Simulation: {summary}. Receipt: {code(path)}.")
     if not simulations:
         lines.append("- Simulation: no simulation or benchmark receipts selected.")
-    for key in ("rust", "tooling", "glue", "retired"):
+    for key in ("rust", "tooling", "glue", "glue_removed"):
         require(
             type(metrics.get(key)) is int and metrics[key] >= 0,
             f"invalid port metrics: {key}",
         )
+    for key in ("retired", "net_glue"):
+        require(type(metrics.get(key)) is int, f"invalid port metrics: {key}")
     require(
         isinstance(metrics.get("base"), str) and metrics["base"],
         "missing port metrics base",
     )
     lines.append(
         f"- Port metrics ({code(metrics['base'])} to {code(head)}, committed sources): "
-        f"Rust {metrics['rust']} / tooling {metrics['tooling']} / C++ glue {metrics['glue']} / C++ retired {metrics['retired']}."
+        f"Rust {metrics['rust']} / tooling {metrics['tooling']} / C++ glue added {metrics['glue']} / "
+        f"original C++ retired {metrics['retired']} / fork glue removed {metrics['glue_removed']} / net glue {metrics['net_glue']}."
     )
     lines += ["", "Exact validation commands recorded in the receipt:"]
     for command in verification_record["commands"]:
