@@ -58,6 +58,7 @@
 #ifdef WITH_RUST
 #include "rust/industry_generation_adapter.hpp"
 #include "rust/company_services.h"
+#include "rust/command_cost_native_services.h"
 #include "rust/sound_services.h"
 #include "rust/tile_animation_services.h"
 #include "rust/orders_ffi.h"
@@ -3888,14 +3889,13 @@ static const OpenTTDIndustryCommandServices &GetIndustryCommandServices()
 #endif
 
 #ifdef WITH_RUST
-/* Temporary adapters delegate to canonical #216 once its branch integrates. */
 static const OpenTTDIndustryCostServices &GetIndustryCostServices()
 {
 	static const OpenTTDIndustryCostServices services = {
-		.zero = [](OpenTTDIndustryCost *out) noexcept { *out = CommandCost(); },
-		.error = [](OpenTTDIndustryCost *out, uint32_t message) noexcept { *out = CommandCost(message); },
-		.expense_money = [](OpenTTDIndustryCost *out, uint8_t expense, int64_t money) noexcept { *out = CommandCost(static_cast<ExpensesType>(expense), Money(money)); },
-		.success = [](const OpenTTDIndustryCost *cost) noexcept -> bool { return cost->Succeeded(); },
+		.zero = OpenTTDCommandCostZero,
+		.error = OpenTTDCommandCostError,
+		.expense_money = [](OpenTTDIndustryCost *out, uint8_t expense, int64_t money) noexcept { OpenTTDCommandCostExpenseMoney(out, static_cast<ExpensesType>(expense), Money(money)); },
+		.success = OpenTTDCommandCostSuccess,
 	};
 	return services;
 }
