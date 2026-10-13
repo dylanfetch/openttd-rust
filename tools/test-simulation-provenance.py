@@ -126,7 +126,15 @@ class SimulationDeterminismTests(unittest.TestCase):
 
 
 class SimulationProvenanceTests(unittest.TestCase):
-    def exercise(self, *, custom=False, self_compare=False):
+    def exercise(
+        self,
+        *,
+        custom=False,
+        self_compare=False,
+        passed=True,
+        benchmark=False,
+        crash=False,
+    ):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "tools").mkdir()
@@ -197,6 +205,8 @@ class SimulationProvenanceTests(unittest.TestCase):
                     (Path(scenario["scenario_ai"]) / "main.nut").read_text(),
                     f"{folder}-before",
                 )
+                if crash:
+                    raise RuntimeError("scenario failed unexpectedly")
                 invocations.append(scenario["name"])
                 if len(invocations) == 1:
                     for role, binary in originals.items():
@@ -213,7 +223,7 @@ class SimulationProvenanceTests(unittest.TestCase):
                 return {
                     "scenario": scenario["name"],
                     "plain_speed": {"median_candidate_reference_ratio": None},
-                    "passed": True,
+                    "passed": passed,
                     "snapshots": 1,
                     "stats": {"chunks": 1, "elements": 1, "masked": {}},
                     "differences": [],
@@ -222,6 +232,8 @@ class SimulationProvenanceTests(unittest.TestCase):
                 }
 
             argv = ["simulate.py", "--jobs", "1"]
+            if benchmark:
+                argv += ["--benchmark", "1"]
             if self_compare:
                 argv += ["--self", "--candidate", str(root / "missing")]
             elif custom:
@@ -240,10 +252,19 @@ class SimulationProvenanceTests(unittest.TestCase):
                 patch.object(sys, "argv", argv),
                 contextlib.redirect_stdout(io.StringIO()),
             ):
-                self.assertEqual(simulate.main(), 0)
+                if crash:
+                    with self.assertRaisesRegex(RuntimeError, "scenario failed"):
+                        simulate.main()
+                    run = next((root / ".local/simulation").iterdir())
+                    self.assertFalse((run / "reference-runtime").exists())
+                    self.assertFalse((run / "candidate-runtime").exists())
+                    self.assertFalse((run / "report.json").exists())
+                    return
+                self.assertEqual(simulate.main(), 0 if passed else 1)
             report = json.loads(
                 next((root / ".local/simulation").glob("*/report.json")).read_text()
             )
+            self.assertEqual(report["passed"], passed)
             self.assertEqual(invocations, ["a", "b"])
             self.assertEqual(report["candidate_commit"], "initial-checkout")
             self.assertEqual(report["candidate_status"], " M tracked-file")
@@ -270,6 +291,39 @@ class SimulationProvenanceTests(unittest.TestCase):
 
     def test_reference_self_needs_no_candidate(self):
         self.exercise(self_compare=True)
+
+    def test_failed_runs_remove_runtimes_and_preserve_results(self):
+        self.exercise(passed=False)
+
+    def test_benchmark_runs_remove_runtimes_on_pass_and_fail(self):
+        for passed in (False, True):
+            with self.subTest(passed=passed):
+                self.exercise(benchmark=True, passed=passed)
+
+    def test_unexpected_worker_failure_removes_runtimes(self):
+        self.exercise(crash=True)
+
+    def test_pruning_keeps_newest_ten_completed_runs_and_active_outputs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            completed = []
+            for day in range(1, 14):
+                run = root / f"202601{day:02}T000000Z-123"
+                (run / "failing-scenario").mkdir(parents=True)
+                (run / "report.json").write_text('{"passed": false}')
+                (run / "failing-scenario/output.log").write_text("failure evidence")
+                completed.append(run)
+            active = root / "20250101T000000Z-456"
+            (active / "candidate-runtime").mkdir(parents=True)
+            (active / "report.json.tmp").write_text("unpublished")
+            simulate.prune_simulation_runs(root)
+            self.assertEqual(set(root.iterdir()), set(completed[3:] + [active]))
+            self.assertTrue((active / "candidate-runtime").is_dir())
+            for run in completed[3:]:
+                self.assertEqual(
+                    (run / "failing-scenario/output.log").read_text(),
+                    "failure evidence",
+                )
 
 
 class SimulationSpeedTests(unittest.TestCase):

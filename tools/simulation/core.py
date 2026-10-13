@@ -900,6 +900,17 @@ def _copy_runtime(build, binary, destination):
     return executable
 
 
+def prune_simulation_runs(root):
+    """Keep the newest ten completed runs; unpublished reports are still active."""
+    completed = sorted(
+        (run for run in root.iterdir() if (run / "report.json").is_file()),
+        key=lambda run: run.name,
+        reverse=True,
+    )
+    for run in completed[10:]:
+        shutil.rmtree(run, ignore_errors=True)
+
+
 def main():
     import importlib.util
 
@@ -938,7 +949,7 @@ def main():
         "--benchmark",
         type=int,
         metavar="REPETITIONS",
-        help="repeat only plain pairs in isolation; retain final runs for profiling",
+        help="repeat only plain pairs in isolation; retain final scenario outputs",
     )
     parser.add_argument(
         "--prepare-water-save",
@@ -981,10 +992,11 @@ def main():
         print("\n".join(s["name"] for s in scenarios))
         return 0
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    out = (
-        migration.LOCAL / "simulation" / f"{stamp}-{os.getpid()}"
-    )  # concurrent runs never share
-    out.mkdir(parents=True)
+    simulation = migration.LOCAL / "simulation"
+    simulation.mkdir(parents=True, exist_ok=True)
+    prune_simulation_runs(simulation)
+    out = simulation / f"{stamp}-{os.getpid()}"  # concurrent runs never share
+    out.mkdir()
     global GAME_LOCK
     migration.COMMON_LOCAL.mkdir(parents=True, exist_ok=True)
     GAME_LOCK = migration.COMMON_LOCAL / "simulation-game.lock"
@@ -998,13 +1010,33 @@ def main():
 
         prepare_aircraft_save(migration, out, args.timeout)
         return 0
+    try:
+        report = run_simulation(args, scenarios, migration, out, parser, stamp)
+    finally:
+        for role in ("reference", "candidate"):
+            shutil.rmtree(out / f"{role}-runtime", ignore_errors=True)
+    # Publish completion only after workers and runtime cleanup finish. Atomic
+    # replacement keeps concurrent startup pruning away from active runs.
+    temporary = out / "report.json.tmp"
+    temporary.write_text(json.dumps(report, indent=2) + "\n")
+    temporary.replace(out / "report.json")
+    results = report["results"]
+    passed = sum(r["passed"] for r in results)
+    print(
+        f"Simulation: {passed}/{len(results)} scenarios equal, "
+        f"{sum(r['snapshots'] for r in results)} snapshots in {report['seconds']} s. Report: {out / 'report.json'}"
+    )
+    return 0 if report["passed"] else 1
+
+
+def run_simulation(args, scenarios, migration, out, parser, stamp):
     # This is the checkout at invocation, not proof that an arbitrary --candidate
     # was built from it. The frozen executable's hash identifies what we execute.
     candidate_commit = migration.git("rev-parse", "HEAD")
     candidate_status = migration.git("status", "--short")
     builds = {role: out / f"{role}-runtime" for role in ("reference", "candidate")}
     # The game finds its data next to the executable, so copy the shared
-    # reference's runtime (about 16 MB) while no other worktree can rebuild it,
+    # reference's runtime while no other worktree can rebuild it,
     # then run without holding the lock.
     with migration.reference_lock(shared=True):
         shared = migration.REFERENCE_BUILD.resolve()
@@ -1136,13 +1168,4 @@ def main():
         "results": results,
         "passed": all(r["passed"] for r in results),
     }
-    (out / "report.json").write_text(json.dumps(report, indent=2) + "\n")
-    if not args.benchmark:
-        for build in set(builds.values()):
-            shutil.rmtree(build, ignore_errors=True)
-    passed = sum(r["passed"] for r in results)
-    print(
-        f"Simulation: {passed}/{len(results)} scenarios equal, "
-        f"{sum(r['snapshots'] for r in results)} snapshots in {report['seconds']} s. Report: {out / 'report.json'}"
-    )
-    return 0 if report["passed"] else 1
+    return report
