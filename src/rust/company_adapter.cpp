@@ -8,6 +8,7 @@
 #include "../stdafx.h"
 #ifdef WITH_RUST
 #include "company_adapter.h"
+#include "company_services.h"
 #include "../company_base.h"
 #include "../company_func.h"
 #include "../company_cmd.h"
@@ -88,8 +89,8 @@ template <typename T, typename F> static uint32_t NextOwned(uint8_t owner, uint3
 }
 
 /* Finance services. */
-static uint8_t Fin_current_company() noexcept { return _current_company.base(); }
-static void Fin_set_current_company(uint8_t id) noexcept { _current_company = CompanyID(id); }
+static uint8_t Fin_current_company() noexcept { return OpenTTDCurrentCompany().base(); }
+static void Fin_set_current_company(uint8_t id) noexcept { OpenTTDSetCurrentCompany(CompanyID(id)); }
 static bool Fin_networking() noexcept { return _networking; }
 static CompanyFinances *Fin_company_finances(uint8_t id) noexcept
 {
