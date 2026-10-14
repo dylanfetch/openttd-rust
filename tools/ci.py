@@ -28,16 +28,23 @@ def api(repository: str, path: str) -> dict:
     return json.loads(gh("api", f"repos/{repository}/{path}"))
 
 
-def validate_pull(pull: dict, head: str | None = None) -> str:
+def current_head(pull: dict, head: str | None = None) -> str:
     if pull["state"] != "open" or pull["base"]["ref"] != PROTECTED_REF:
         raise ValueError("PR must be open and target rust-migration")
+    current = pull["head"]["sha"]
+    if head is not None and current != head:
+        raise ValueError(f"PR head changed: requested {head}, current {current}")
+    return current
+
+
+def validate_pull(pull: dict, head: str | None = None) -> str:
+    # Mergeability selects the tested merge, so only requests require it. A base
+    # push can leave it pending; the requested run and its result remain valid.
+    current = current_head(pull, head)
     if pull.get("mergeable") is not True or not pull.get("merge_commit_sha"):
         raise ValueError(
             "PR is unmergeable or mergeability is pending; retry after resolving it"
         )
-    current = pull["head"]["sha"]
-    if head is not None and current != head:
-        raise ValueError(f"PR head changed: requested {head}, current {current}")
     return current
 
 
@@ -147,7 +154,7 @@ def status(path: Path) -> tuple[dict, dict | None]:
     if receipt.get("schema_version") != 1:
         raise ValueError("Unsupported CI request receipt schema")
     repository = receipt["repository"]
-    validate_pull(api(repository, f"pulls/{receipt['pr']}"), receipt["head"])
+    current_head(api(repository, f"pulls/{receipt['pr']}"), receipt["head"])
     if receipt.get("run_id"):
         run = api(repository, f"actions/runs/{receipt['run_id']}")
     else:
@@ -170,7 +177,7 @@ def verify_completion(receipt: dict, run: dict) -> None:
     if receipt["profile"] != "full":
         return
     repository = receipt["repository"]
-    validate_pull(api(repository, f"pulls/{receipt['pr']}"), receipt["head"])
+    current_head(api(repository, f"pulls/{receipt['pr']}"), receipt["head"])
     combined = api(repository, f"commits/{receipt['head']}/status")
     matching = [
         item
