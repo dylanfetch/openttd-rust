@@ -12,6 +12,7 @@
 #include "settings_services.h"
 #include "engine_services.h"
 #include "presentation_services.h"
+#include "environment_services.h"
 static_assert(MAX_COMPANIES == 15 && OWNER_DEITY.base() == 18 && MAX_LENGTH_ENGINE_NAME_CHARS == 32);
 static OpenTTDEngineRef EngineRef(const Engine *e) noexcept
 {
@@ -45,8 +46,6 @@ static OpenTTDEnginePreviewVariant Engine_preview_variant(const OpenTTDEngine *e
 	const auto &info = EngineOf(e)->info;
 	return {.parent = info.variant_id.base(), .join = info.extra_flags.Test(ExtraEngineFlag::JoinPreview)};
 }
-static uint8_t Engine_extra_flags(const OpenTTDEngine *e) noexcept { return EngineOf(e)->info.extra_flags.base(); }
-static uint16_t Engine_engine_id(const OpenTTDEngine *e) noexcept { return EngineOf(e)->index.base(); }
 static OpenTTDEngineReliability Engine_reliability(const OpenTTDEngine *shell) noexcept
 {
 	const auto &info = EngineOf(shell)->info;
@@ -55,14 +54,13 @@ static OpenTTDEngineReliability Engine_reliability(const OpenTTDEngine *shell) n
 static OpenTTDEngineStartup Engine_startup(const OpenTTDEngine *shell) noexcept
 {
 	const Engine *e = EngineOf(shell); const auto &info = e->info;
-	return {.base_intro = info.base_intro.base(), .grfid = e->GetGRFID(), .decay_speed = info.decay_speed, .base_life = static_cast<uint8_t>(info.base_life.base()), .climate = info.climates.Test(_settings_game.game_creation.landscape)};
+	return {.base_intro = info.base_intro.base(), .grfid = e->GetGRFID(), .decay_speed = info.decay_speed, .base_life = static_cast<uint8_t>(info.base_life.base()), .climate = info.climates.Test(OpenTTDLandscape())};
 }
 static OpenTTDEngineSeed Engine_seed_config(const OpenTTDEngine *e) noexcept
 {
 	const auto &info = EngineOf(e)->info;
 	return {.base_intro = info.base_intro.base(), .lifelength = info.lifelength.base(), .decay_speed = info.decay_speed, .retire_early = info.retire_early};
 }
-static int32_t Engine_base_intro(const OpenTTDEngine *e) noexcept { return EngineOf(e)->info.base_intro.base(); }
 static OpenTTDEngineYear Engine_aging_year(const OpenTTDEngine *shell) noexcept
 {
 	const Engine *e = EngineOf(shell);
@@ -140,11 +138,8 @@ static void Engine_no_engines(int32_t date) noexcept
 	if (date < INT32_MAX) ShowErrorMessage(GetEncodedString(STR_ERROR_NO_VEHICLES_AVAILABLE_YET), GetEncodedString(STR_ERROR_NO_VEHICLES_AVAILABLE_YET_EXPLANATION, TimerGameCalendar::Date{date}), WL_WARNING);
 	else ShowErrorMessage(GetEncodedString(STR_ERROR_NO_VEHICLES_AVAILABLE_AT_ALL), GetEncodedString(STR_ERROR_NO_VEHICLES_AVAILABLE_AT_ALL_EXPLANATION), WL_WARNING);
 }
-static bool Engine_climate(const OpenTTDEngine *e) noexcept { return EngineOf(e)->info.climates.Test(_settings_game.game_creation.landscape); }
 static void Engine_update_railtypes(uint8_t id) noexcept { Company::Get(CompanyID{id})->avail_railtypes = GetCompanyRailTypes(CompanyID{id}); }
 static void Engine_update_roadtypes(uint8_t id) noexcept { Company::Get(CompanyID{id})->avail_roadtypes = GetCompanyRoadTypes(CompanyID{id}); }
-static uint64_t Engine_company_railtypes(uint8_t id) noexcept { return Company::Get(CompanyID{id})->avail_railtypes.base(); }
-static uint64_t Engine_company_roadtypes(uint8_t id) noexcept { return Company::Get(CompanyID{id})->avail_roadtypes.base(); }
 static uint64_t Engine_introduces_railtypes(const OpenTTDEngine *e) noexcept
 {
 	RailTypes types = EngineOf(e)->VehInfo<RailVehicleInfo>().railtypes;
@@ -169,12 +164,12 @@ static const OpenTTDEngineServices &EngineServices() noexcept
 		.sync_variant = Engine_sync_variant,
 		.display_variant = Engine_display_variant,
 		.preview_variant = Engine_preview_variant,
-		.extra_flags = Engine_extra_flags,
-		.engine_id = Engine_engine_id,
+		.extra_flags = RustEngineExtraFlags,
+		.engine_id = RustEngineID,
 		.reliability = Engine_reliability,
 		.startup = Engine_startup,
 		.seed_config = Engine_seed_config,
-		.base_intro = Engine_base_intro,
+		.base_intro = RustEngineBaseIntro,
 		.aging_year = Engine_aging_year,
 		.calendar_year = GetRustSharedServices().calendar_year,
 		.never_expire = RustNeverExpireVehicles,
@@ -190,7 +185,7 @@ static const OpenTTDEngineServices &EngineServices() noexcept
 		.date_to_ymd = Engine_date_to_ymd,
 		.ymd_to_date = Engine_ymd_to_date,
 		.enabled = Engine_enabled,
-		.climate = Engine_climate,
+		.climate = RustEngineClimate,
 		.rail_kind = Engine_rail_kind,
 		.clear_last_variant = Engine_clear_last_variant,
 		.refresh_type = Engine_refresh_type,
@@ -207,8 +202,8 @@ static const OpenTTDEngineServices &EngineServices() noexcept
 		.company_valid = GetRustSharedServices().company_valid,
 		.compatible_railtypes = Engine_compatible_railtypes,
 		.powered_roadtypes = Engine_powered_roadtypes,
-		.company_railtypes = Engine_company_railtypes,
-		.company_roadtypes = Engine_company_roadtypes,
+		.company_railtypes = RustCompanyRailTypes,
+		.company_roadtypes = RustCompanyRoadTypes,
 		.company_engine_count = Engine_company_engine_count,
 		.block_preview = Engine_block_preview,
 		.introduces_railtypes = Engine_introduces_railtypes,

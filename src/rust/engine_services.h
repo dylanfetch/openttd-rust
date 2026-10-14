@@ -11,9 +11,14 @@
 #include "engine_ffi.h"
 #include "vehicle_services.h"
 #include "company_services.h"
+#include "environment_services.h"
 #include "../articulated_vehicles.h"
 #include "../rail.h"
 #include "../road.h"
+inline uint8_t RustEngineExtraFlags(const OpenTTDEngine *e) noexcept { return EngineOf(e)->info.extra_flags.base(); }
+inline uint16_t RustEngineID(const OpenTTDEngine *e) noexcept { return EngineOf(e)->index.base(); }
+inline int32_t RustEngineBaseIntro(const OpenTTDEngine *e) noexcept { return EngineOf(e)->info.base_intro.base(); }
+inline bool RustEngineClimate(const OpenTTDEngine *e) noexcept { return EngineOf(e)->info.climates.Test(OpenTTDLandscape()); }
 inline bool RustEngineCanCarry(const Engine *e) noexcept { return e->CanCarryCargo(); }
 inline uint64_t RustEngineRefitMask(EngineID id, bool initial) noexcept { return GetUnionOfArticulatedRefitMasks(id, initial); }
 inline uint8_t RustEngineRailKind(const Engine *e) noexcept { return e->VehInfo<RailVehicleInfo>().railveh_type; }

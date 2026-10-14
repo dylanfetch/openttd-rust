@@ -34,5 +34,7 @@ inline uint32_t RustNextCompanyID(uint32_t from) noexcept
 	Company *c = RustCompanyNext(from);
 	return c == nullptr ? UINT32_MAX : c->index.base();
 }
+inline uint64_t RustCompanyRailTypes(uint8_t id) noexcept { return Company::Get(CompanyID{id})->avail_railtypes.base(); }
+inline uint64_t RustCompanyRoadTypes(uint8_t id) noexcept { return Company::Get(CompanyID{id})->avail_roadtypes.base(); }
 inline bool RustIsInteractiveCompany(uint8_t id) noexcept { return IsInteractiveCompany(CompanyID{id}); }
 #endif /* RUST_COMPANY_SERVICES_H */
