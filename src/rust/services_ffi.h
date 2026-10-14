@@ -40,6 +40,7 @@ struct OpenTTDSharedServices {
 	bool (*is_level_crossing)(uint32_t) noexcept;
 	uint8_t (*tunnel_bridge_direction)(uint32_t) noexcept;
 	uint16_t (*bridge_speed)(uint32_t) noexcept;
+	bool (*is_water_tile)(uint32_t) noexcept;
 	bool (*company_valid)(uint8_t) noexcept;
 	uint8_t (*next_company)(uint8_t) noexcept;
 	uint8_t (*current_company)() noexcept;
@@ -51,7 +52,6 @@ struct OpenTTDSharedServices {
 	uint32_t (*tile_height)(uint32_t) noexcept;
 	uint8_t (*bridge_axis)(uint32_t) noexcept;
 	bool (*has_water_ground)(uint32_t) noexcept;
-	bool (*is_water)(uint32_t) noexcept;
 	bool (*is_sea)(uint32_t) noexcept;
 	bool (*is_plain_rail)(uint32_t) noexcept;
 	bool (*is_bridge)(uint32_t) noexcept;
@@ -101,6 +101,7 @@ inline OpenTTDSharedServices OpenTTDFixtureSharedServices(void *context, uint32_
 		.is_level_crossing = OpenTTDFixtureMapService<bool, uint32_t>,
 		.tunnel_bridge_direction = OpenTTDFixtureMapService<uint8_t, uint32_t>,
 		.bridge_speed = OpenTTDFixtureMapService<uint16_t, uint32_t>,
+		.is_water_tile = OpenTTDFixtureMapService<bool, uint32_t>,
 		.company_valid = OpenTTDFixtureMapService<bool, uint8_t>,
 		.next_company = [](uint8_t) noexcept -> uint8_t { return UINT8_MAX; },
 		.current_company = []() noexcept -> uint8_t { return UINT8_MAX; },
@@ -112,7 +113,6 @@ inline OpenTTDSharedServices OpenTTDFixtureSharedServices(void *context, uint32_
 		.tile_height = OpenTTDFixtureMapService<uint32_t, uint32_t>,
 		.bridge_axis = OpenTTDFixtureMapService<uint8_t, uint32_t>,
 		.has_water_ground = OpenTTDFixtureMapService<bool, uint32_t>,
-		.is_water = OpenTTDFixtureMapService<bool, uint32_t>,
 		.is_sea = OpenTTDFixtureMapService<bool, uint32_t>,
 		.is_plain_rail = OpenTTDFixtureMapService<bool, uint32_t>,
 		.is_bridge = OpenTTDFixtureMapService<bool, uint32_t>,

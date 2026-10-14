@@ -96,6 +96,7 @@ static uint16_t MapSvcDepotIndex(uint32_t tile) noexcept { return GetDepotIndex(
 static bool MapSvcIsLevelCrossing(uint32_t tile) noexcept { return IsLevelCrossingTile(TileIndex(tile)); }
 static uint8_t MapSvcTunnelBridgeDirection(uint32_t tile) noexcept { return GetTunnelBridgeDirection(TileIndex(tile)); }
 static uint16_t MapSvcBridgeSpeed(uint32_t tile) noexcept { return GetBridgeSpec(GetBridgeType(TileIndex(tile)))->speed; }
+static bool MapSvcIsWaterTile(uint32_t tile) noexcept { return IsWaterTile(TileIndex(tile)); }
 
 static uint8_t SharedCurrentCompany() noexcept { return OpenTTDCurrentCompany().base(); }
 static bool SharedCompanyValid(uint8_t company) noexcept { return Company::IsValidID(CompanyID(company)); }
@@ -121,7 +122,6 @@ static int32_t Shared_tile_max_z(uint32_t tile) noexcept { return GetTileMaxZ(Ti
 static uint32_t Shared_tile_height(uint32_t tile) noexcept { return TileHeight(TileIndex{tile}); }
 static uint8_t Shared_bridge_axis(uint32_t tile) noexcept { return GetBridgeAxis(TileIndex{tile}); }
 static bool Shared_has_water_ground(uint32_t tile) noexcept { return HasTileWaterGround(TileIndex{tile}); }
-static bool Shared_is_water(uint32_t tile) noexcept { return IsWaterTile(TileIndex{tile}); }
 static bool Shared_is_sea(uint32_t tile) noexcept { return IsSea(TileIndex{tile}); }
 static bool Shared_is_plain_rail(uint32_t tile) noexcept { return IsPlainRailTile(TileIndex{tile}); }
 static bool Shared_is_bridge(uint32_t tile) noexcept { return IsBridgeTile(TileIndex{tile}); }
@@ -160,6 +160,7 @@ const OpenTTDSharedServices &GetRustSharedServices() noexcept
 		.is_level_crossing = MapSvcIsLevelCrossing,
 		.tunnel_bridge_direction = MapSvcTunnelBridgeDirection,
 		.bridge_speed = MapSvcBridgeSpeed,
+		.is_water_tile = MapSvcIsWaterTile,
 		.company_valid = SharedCompanyValid, .next_company = SharedNextCompany, .current_company = SharedCurrentCompany,
 		.closest_town = SharedClosestTown, .town_owner = SharedTownOwner,
 		.tile_valid = Shared_tile_valid,
@@ -168,7 +169,6 @@ const OpenTTDSharedServices &GetRustSharedServices() noexcept
 		.tile_height = Shared_tile_height,
 		.bridge_axis = Shared_bridge_axis,
 		.has_water_ground = Shared_has_water_ground,
-		.is_water = Shared_is_water,
 		.is_sea = Shared_is_sea,
 		.is_plain_rail = Shared_is_plain_rail,
 		.is_bridge = Shared_is_bridge,

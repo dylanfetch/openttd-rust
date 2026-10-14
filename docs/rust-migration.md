@@ -1703,6 +1703,8 @@ execution, ID reuse and autoslope; default industry scenarios also cover four
 climates, lumber, generation and builder/farm cleanup. Default industry comparisons
 check absent NewGRF acceptance/triggers and rare animation against unchanged bodies;
 native tests check cancellation/restoration, callback policy and borrowed lifetimes.
+Default `industry-water-check-*` scenarios require oil-rig funding refusal over
+real depots/lower lock parts and acceptance after removal (#234).
 Shared map/RNG leaves use the canonical typed services; stable dimensions are
 captured once per consuming entry. Independent review and exact-head full CI remain required. Legacy saves, resolver
 programs and exhaustive industry layouts remain corpus limits tracked by #156.

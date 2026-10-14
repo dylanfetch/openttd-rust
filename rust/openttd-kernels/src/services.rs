@@ -109,6 +109,8 @@ pub struct Services {
     pub tunnel_bridge_direction: extern "C" fn(u32) -> u8,
     /// Bridge specification speed at this bridge tile.
     pub bridge_speed: extern "C" fn(u32) -> u16,
+    /// `IsWaterTile`: water category and clear subtype (sea, canal or river).
+    pub is_water_tile: extern "C" fn(u32) -> bool,
     /// Whether this company pool ID is live.
     pub company_valid: extern "C" fn(u8) -> bool,
     /// Next live company at or after this ID; 255 denotes end.
@@ -131,8 +133,6 @@ pub struct Services {
     pub bridge_axis: extern "C" fn(u32) -> u8,
     /// Original native `has_water_ground` map observation.
     pub has_water_ground: extern "C" fn(u32) -> bool,
-    /// Original native `is_water` map observation.
-    pub is_water: extern "C" fn(u32) -> bool,
     /// Original native `is_sea` map observation.
     pub is_sea: extern "C" fn(u32) -> bool,
     /// Original native `is_plain_rail` map observation.
@@ -242,6 +242,7 @@ pub fn fixture(
         is_level_crossing: flag,
         tunnel_bridge_direction: byte,
         bridge_speed: short,
+        is_water_tile: flag,
         company_valid: unused_company_valid,
         next_company: unused_next_company,
         current_company: unused_current_company,
@@ -253,7 +254,6 @@ pub fn fixture(
         tile_height: word,
         bridge_axis: byte,
         has_water_ground: flag,
-        is_water: flag,
         is_sea: flag,
         is_plain_rail: flag,
         is_bridge: flag,

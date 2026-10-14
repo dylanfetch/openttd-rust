@@ -9,8 +9,9 @@ forward-looking, about 200 lines; completed work is one row, with evidence in PR
 - Twenty-three ownership ports. Whole fork against the pinned original: Rust
   55,079 / tooling 28,391 / C++ glue 24,570 / original C++ retired 36,162 (7.68%
   of all `src/` sources); simulation-source share 28,215 / 102,615 (27.50%, #226).
-- #226 metric and #235 CI implementation are integrated. Four reviewed PRs wait
-  for full CI; aircraft #238 is active. Five component branches are unintegrated.
+- #226 metric and #235 CI implementation are integrated. #230/#236 passed
+  concurrent full CI; #216/#217 await it. Aircraft #238 and coverage #239 are active;
+  six component branches are unintegrated.
 - New-base benchmark, median of three `--benchmark 3` invocations:
   Opus 1.258, Grok 1.254, Padhattan-1996 1.275, Padhattan-2000 1.349,
   Padhattan-2016 1.427, TGP 1.164; these recalibrated #230 caps have been
@@ -132,7 +133,8 @@ go in `KNOWN_FAILURES` with an issue, never in masks (`docs/rust-migration.md`).
    its median of three beats it by more than the invocation spread (about 2%).
    Targets: play saves 1.5x, generation 1.15x. The null driver redraws whenever
    1 ms has elapsed, so a slower candidate draws more frames.
-3. **#156 coverage, standing capacity.** Random and crash branches first. The
+3. **#156 coverage, standing capacity.** #239 covers failed industry prospecting
+   and automatic overlap rejection. Random and crash branches first. The
    tenth review added station stale-link restriction, town station ratings,
    exclusivity and unwanted months, and #218's NewGRF and game-script paths.
 4. **#234 fidelity fix (#236)** and **#229 caps (#230, recalibrated at its new
@@ -159,20 +161,21 @@ The #108 decision keeps C++ map arrays and direct bundled `noexcept` services.
 
 ## Resume checkpoint
 
-Active continuous development. #226 and #235 are integrated; #233 operational
-acceptance remains open. Station/town corrections and cap recalibration have
-fresh reviews and quiet speed evidence; water fidelity has paired/self and
-unfixed-base negative evidence. Request exact-head full CI using the protected
-controller and integrate by readiness. Aircraft #237/#238 is implementing the
-shared boundary; new ownership waits for a second of #216/#217/#226/#230.
+Active continuous development. The host aborted root's session at 09:35Z on
+2026-10-13. Every worktree was left clean and pushed. #230/#236 have passed full
+CI at their current heads and can integrate first. #233 has two concurrent warm
+samples (13.8 and 16.9 min, recorded on the issue); three-merge cache acceptance
+is still open. #212's read-only plan is done; #213's plan was interrupted and
+needs a fresh planner.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #214 / #217 | `station-loading-direct-214`, `ae7b65cf74` | Corrections reviewed; all six speed cases pass. Full CI, integrate. |
-| #148 / #216 | `town-lifecycle-148`, `a23a6437a8` | Corrections reviewed; seven town and six speed cases pass. Full CI, integrate. |
-| #229 / #230 | `speed-caps-229`, `e7e33b318a` | All six new-base caps reviewed, exact median rounding fixed. Full CI, integrate. |
-| #234 / #236 | `industry-water-fidelity-234`, `27e8f0782c` | Reviewed; default depot/lower-lock command regressions pass. Full CI, integrate. |
-| #237 / #238 | `aircraft-shared-boundary-237`, `fd7c19d5ff` | Corrected default crossing witnesses/baseline pushed; conversion active. |
+| #214 / #217 | `station-loading-direct-214`, `debe725826` | Reviewed; all six speed cases pass. Full CI, integrate. |
+| #148 / #216 | `town-lifecycle-148`, `78477f22bc` | Reviewed; seven town and six speed cases pass. Full CI, integrate. |
+| #229 / #230 | `speed-caps-229`, `c14dd31681` | Reviewed; full CI passed at this head. Integrate. |
+| #234 / #236 | `industry-water-fidelity-234`, `2270aa2edd` | Reviewed; full CI passed at this head. Integrate. |
+| #237 / #238 | `aircraft-shared-boundary-237`, `0f3a9cf066` | Affected scenarios pass; quiet timing was interrupted, so rerun it, then review. |
+| #239 / #240 | `industry-prospect-coverage-239`, `2081e85ce5` | Implemented and verified; the review was interrupted, so it needs a fresh reviewer. |
 
 Selected but unstarted: #212/#213, then #219/#220. ABI blocks: train through 385,
 tree additions 386-389, fleet 390-399, company 400-429, town 430-459, road 460-499,

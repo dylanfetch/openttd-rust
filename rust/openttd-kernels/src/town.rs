@@ -1190,7 +1190,7 @@ impl Engine<'_> {
             }
             end = self.step(end, dir);
             if !self.valid(end)
-                || !(((self.services.is_water)(end)
+                || !(((self.services.is_water_tile)(end)
                     && (slope != 0 || !(self.services.is_sea)(end)))
                     || (self.services.is_plain_rail)(end)
                     || ((self.services.is_normal_road)(end)
