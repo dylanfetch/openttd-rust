@@ -114,7 +114,9 @@ def install(limit, receipt):
     )
     for name, text in launchers.items():
         path = directory / name
-        path.write_text(text)
+        # Native Windows Python otherwise translates Bash LF to CRLF and the
+        # already-CRLF .cmd launcher to CRCRLF. Preserve each generated format.
+        path.write_text(text, newline="")
         path.chmod(0o755)
     with open(os.environ["GITHUB_PATH"], "a") as destination:
         destination.write(str(directory) + "\n")

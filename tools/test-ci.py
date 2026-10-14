@@ -280,6 +280,37 @@ class GateTests(unittest.TestCase):
 
 
 class CacheTests(unittest.TestCase):
+    def test_installed_compressor_launchers_preserve_shell_line_endings(self):
+        path_open = Path.open
+
+        def windows_text_open(path, mode="r", *args, **kwargs):
+            if mode == "w" and kwargs.get("newline") is None:
+                kwargs["newline"] = "\r\n"
+            return path_open(path, mode, *args, **kwargs)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            receipt = root / "outer.json"
+            env = dict(
+                os.environ,
+                RUNNER_TEMP=str(root),
+                GITHUB_PATH=str(root / "github-path"),
+            )
+            # Exercise Windows newline translation even on Linux default CI.
+            with (
+                patch.dict(os.environ, env),
+                patch.object(Path, "open", windows_text_open),
+            ):
+                cache_zstd.install(1024, receipt)
+            guard = root / "cache-archive-guard"
+            for name in ("zstd", "zstdmt"):
+                data = (guard / name).read_bytes()
+                self.assertTrue(data.startswith(b"#!/usr/bin/env bash\n"))
+                self.assertNotIn(b"\r", data)
+            windows = (guard / "zstd.cmd").read_bytes()
+            self.assertTrue(windows.endswith(b"\r\n"))
+            self.assertEqual(windows.count(b"\r"), 1)
+
     def test_actual_sdk_compressor_stream_and_file_outputs_are_capped_before_upload(
         self,
     ):
@@ -300,13 +331,13 @@ class CacheTests(unittest.TestCase):
                 str(receipt),
             ).items():
                 path = guard / name
-                path.write_text(text)
+                path.write_text(text, newline="")
                 path.chmod(0o755)
             env = dict(os.environ, PATH=f"{guard}{os.pathsep}{os.environ['PATH']}")
             # Exact pinned SDK GNU-tar flags and compressor invocation; the
             # real outer archive (not its inner payload) reaches the guard.
             command = [
-                "tar",
+                cache_zstd.sdk_tar(),
                 "--posix",
                 "-cf",
                 "cache.tzst",
@@ -341,7 +372,7 @@ class CacheTests(unittest.TestCase):
                 measured - 1,
                 str(receipt),
             ).items():
-                (guard / name).write_text(text)
+                (guard / name).write_text(text, newline="")
             rejected = subprocess.run(command, cwd=root, env=env, capture_output=True)
             self.assertNotEqual(rejected.returncode, 0)
             self.assertFalse(receipt.exists())
