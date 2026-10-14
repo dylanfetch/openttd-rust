@@ -56,11 +56,16 @@ fork; the remaining upstream documentation explains behavior and architecture.
   positional array. Each entry resolves its owner once and reads, once, only
   the fields it uses: neither a whole-record view nor a call per field. A
   shared accessor (vehicle field, map predicate, setting, constant) has one
-  typed definition used by every port, not a per-port copy; services return
-  their real types on both sides and tables use designated initializers.
-  Existing ports convert under #168 and #199. Root grants no
-  exceptions at integration: a port whose hot path allocates per call, dispatches
-  by opcode or copies whole records is fixed before it integrates.
+  typed definition used by every port, not a per-port copy. A default-CI check
+  (#249) rejects new copies, and a PR that adds a shared accessor deletes the
+  integrated copies. Services return their real types on both sides and tables
+  use designated initializers. Existing ports convert under #168 and #199. Root
+  grants no exceptions at integration: a port whose hot path allocates per call,
+  dispatches by opcode or copies whole records is fixed before it integrates.
+- A port that misses a speed budget gets a profile-guided fix round before it
+  is deferred. Attribute the cost per function (callgrind instruction counts
+  work on this host, where hardware counters do not) and fix the attributed
+  overhead. Deferral needs a profile showing the remaining cost is inherent.
 - Evidence for game-logic ports is the semantic simulation harness (`python3
   tools/migration.py simulate`, #72) plus the existing tests; a new game-logic
   port integrates only after the harness exists and its scenarios exercise the
@@ -100,6 +105,10 @@ checks that run; do not restate them in paragraphs.
   not cite `.local/` receipts, which nobody else can check.
 - Harness tooling for a port goes in that component's scenario module. Tooling
   is code to maintain; keep it proportionate to the C++ the port retires.
+- Infrastructure work (CI, caches, evidence plumbing) states a tooling budget in
+  its issue and prefers platform defaults and settings (LRU cache eviction,
+  concurrency groups) over custom controllers. A draft that outgrows its budget
+  returns to root for re-selection, not another review round.
 - Review report: reviewed commit, findings with their fixing commits (or why one
   went to root), plus one line naming the functions or files compared against
   the original body and one line naming any new callback that duplicates a
@@ -232,7 +241,8 @@ and limits.
 
 CI wall time is development time (#233). Keep warm-cache full validation within
 about 15 minutes by adding parallel jobs or shards, never by adding steps to one
-job's critical path, and keep caches under the repository limit. Validate
+job's critical path, and keep steady-state caches within the repository limit
+(GitHub's LRU eviction absorbs transient peaks). Validate
 reviewed PRs concurrently: a merge or docs push to `rust-migration` does not
 invalidate another PR's run at an unchanged head. Post-merge CI fully
 re-validates only a merged tree no full run covered; a red `rust-migration` is

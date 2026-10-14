@@ -87,8 +87,9 @@ and water-region traversal calls track/follower services rather than individual
 map fields. The measurements in [PR #116](https://github.com/dylanfetch/openttd-rust/pull/116)
 and [PR #114](https://github.com/dylanfetch/openttd-rust/pull/114) establish crossing density,
 not a map-access bottleneck. C++ storage ownership remains selected. #212's
-entry-resolved raw tile-type experiment also failed its budget and is deferred
-with that owner. New owners use integrated typed services; no transfer is selected.
+raw tile-type read did not cause its budget miss. The eleventh steering review
+traced that miss to an uninlined dispatch closure and to lambda trampolines.
+New owners use integrated typed services; no transfer is selected.
 
 For the 256x512 tree soak, generation uses 191,315 (temperate) / 321,489 (tropic)
 map-service calls. Tree updates average 204--245 map calls per 512-tile batch
