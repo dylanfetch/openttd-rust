@@ -63,11 +63,25 @@ TEST_CASE("Base vehicle scheduler - scalar member identity and lifetime")
 	CHECK(v->motion_counter == UINT32_MAX);
 	v->cur_speed = 37;
 	CHECK(*motion.speed == RustVehicleSpeed(v));
+	auto *part = new RoadVehicle();
+	v->SetNext(part);
+	part->cur_speed = 9;
+	const auto part_cargo = services.cargo_addresses(RustVehicle(part));
+	const auto part_motion = services.motion_addresses(RustVehicle(part), part_cargo.front);
+	CHECK(part_cargo.front == RustVehicle(v));
+	CHECK(part_cargo.counter == &part->cargo_age_counter);
+	CHECK(part_motion.motion == &part->motion_counter);
+	CHECK(part_motion.speed == &v->cur_speed);
+	CHECK(part_motion.front_type == &v->type);
+	CHECK(*part_motion.speed == 37);
 	/* Force growth of the pool's indexing array: separately allocated shells
 	 * and their named members retain their addresses. */
-	const auto grow_id = VehicleID(static_cast<uint32_t>(id.base()) + 2048);
+	const auto *old_indexing_array = _vehicle_pool.data.data();
+	REQUIRE(_vehicle_pool.data.capacity() < VehiclePool::MAX_SIZE);
+	const auto grow_id = VehicleID(static_cast<uint32_t>(_vehicle_pool.data.capacity()));
 	REQUIRE(Vehicle::CanAllocateItem(1));
 	new (grow_id) RoadVehicle();
+	CHECK(_vehicle_pool.data.data() != old_indexing_array);
 	CHECK(Vehicle::Get(id) == v);
 	CHECK(services.cargo_addresses(RustVehicle(v)).counter == cargo.counter);
 	CHECK(services.motion_addresses(RustVehicle(v), cargo.front).motion == motion.motion);
@@ -80,7 +94,7 @@ TEST_CASE("Base vehicle scheduler - scalar member identity and lifetime")
 	/* Descriptors above are dead now, regardless of allocator address reuse. */
 	_vehicle_pool.CleanPool();
 	auto *reused = new (id) RoadVehicle();
-	CHECK(reused->cargo_age_counter == 0);
+	CHECK(reused->cargo_age_counter == 1); // Vehicle::Vehicle initializes it to one.
 	CHECK(reused->motion_counter == 0);
 	const auto fresh = services.cargo_addresses(RustVehicle(reused));
 	CHECK(fresh.counter == &reused->cargo_age_counter);
