@@ -10,7 +10,7 @@ forward-looking, about 200 lines; completed work is one row, with evidence in PR
 - This restart integrated selected CI work #253/#254: zero original retirement, +431 tooling, unchanged glue. The next work is four simulation owners, not more CI tooling.
 - Latest accepted speed (eleventh-review audit): TGP 1.123, Opus 1.250, Grok 1.245, Ridge 1996 1.225, 2000 1.293, 2016 1.344. CI-only integrations change no game body; new owner timing is pending.
 - Six unintegrated branches: signals #245, engine #248, landscape #255, vehicle #213, idle #244 and paused #66. No new component starts until a slot frees.
-- #252 compatibility passed; warm acceptance remains. #249 is enforced in quick CI. #233 has observed two of three code merges, below 10 GiB so far; #244 stays idle.
+- #252 compatibility and warm acceptance passed; eight Windows vCPUs retained. #249 is enforced in quick CI. #233 has observed two of three code merges, below 10 GiB so far; #244 stays idle.
 - Largest original simulation files remaining: station_cmd 4.5k lines, rail_cmd 3.2k, vehicle 3.0k, road_cmd 2.7k, town_cmd 2.5k, tunnelbridge 2.2k, landscape 1.8k, water 1.5k, engine 1.3k.
 
 ## Eleventh steering review (2026-10-14, throughput and enforcement)
@@ -29,7 +29,7 @@ The ports are faithful. Retirement stalled for three reasons, each fixable:
   - On play saves, the null driver redraws per elapsed millisecond, which inflates game-logic cost about 1.33x in wall ratios.
 
 Actions, in order:
-0. **#252 Windows CI on Blacksmith (user-selected, first).** #253 integrated after compatibility/full CI passed. Finish warm-cache/CPU acceptance and choose 4 vs 8 vCPU; macOS stays on GitHub.
+0. **#252 Windows CI on Blacksmith (user-selected, first).** #253 integrated; compatibility, warm-cache/CPU acceptance passed and eight vCPUs retained (#252). macOS stays on GitHub.
 1. **Do not work on #244.** Blacksmith moved the Linux caches out of GitHub's 10 GiB, so its cache-peak problem is likely gone. Over the next three code merges, record GitHub's peak cache usage on #233. If it stays under 10 GiB, close #233 as met and #243/#244 unmerged (keep the branch, remove the worktree). If it goes over, resume #244: fix the platform gate failure and the quick-job ccache fixture, then bootstrap, full CI and #233 live acceptance.
 2. **#249 shared-accessor check:** integrated in #254. Keep its baseline shrinking; do not block ownership on tooling-only base adoption.
 3. **#245 signals:** apply the two fixes in its steering comment, record its gaps (posted on #156), then do final-head validation, timing, a fresh fixing review, full CI and integrate.
@@ -115,7 +115,7 @@ retirement, with net glue in the PR (#223).
 | #214/#168 (typed station/loading) | #217 | direct | `3b3b931099` | 1018 / 42 / 1147 / 0; net glue +705 |
 | #250 (CI waiter survives base pushes) | #251 | direct | `409cdb253e` | 0 / 53 / 0 / 0; net glue 0 |
 | #237/#199 (typed aircraft boundary) | #238 | direct | `141e4ce397` | 798 / 420 / 470 / 0; net glue -310 |
-| #252 (Windows runner; warm acceptance pending) | #253 | direct | `cfc98a16a7` | 0 / 0 / 0 / 0 |
+| #252 (Windows runner) | #253 | direct | `cfc98a16a7` | 0 / 0 / 0 / 0 |
 | #249 (shared-accessor enforcement) | #254 | direct | `8f9d4fc906` | 0 / 431 / 0 / 0 |
 
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
@@ -164,18 +164,18 @@ that a `SaveLoad` descriptor cannot address through the alias.
 ## Resume checkpoint
 
 Root resumed from `fe337e4e40` with `/start-development`. The last code revision
-is green. #253/#254 are integrated and their worktrees removed. Root owns #252
-warm acceptance, CI/integration and #233 observation. Four owner agents are active.
+is green. #253/#254 are integrated and their worktrees removed. Root owns CI/integration and #233 observation. #252 acceptance is complete; four
+owner agents and the fresh signal reviewer are active.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
 | #233 / #243 / #244 | `ci-cache-peak-233`, `1288db61b4` | Root sampling; two of three code merges observed. Leave #244 idle (action 1). |
-| #252 / #253 | integrated, worktree removed | Compatibility/full CI passed; root collecting warm/cache/CPU evidence. On-demand scheduling restored. |
+| #252 / #253 | integrated, worktree removed | Closed: compatibility/full CI and warm-cache/CPU acceptance passed; eight vCPUs retained, scheduling restored. |
 | #249 / #254 | integrated, worktree removed | Fixing review/full CI passed; 206 baseline fingerprints, no additions permitted. |
-| #219 / #245 | `signal-owner-219`, `6fdb1fd18f` | `signals_final_245`: focused pair/self/soak and portable source checks passed; frozen default, then tooling adoption/timing/review. |
+| #219 / #245 | `signal-owner-219`, `6fdb1fd18f` | `signals_final_245`: focused pair/self/soak and portable source checks passed; frozen default, then tooling adoption/affected reruns, fixing review and timing. |
 | #220 / #248 | `engine-lifecycle-220`, `3c4f63a512` | `engine_final_248`: native/focused pair/self/soak passed; finish default and narrow adapter-provenance reruns before timing/review. |
 | #212 / #255 | `landscape-owner-212`, `87cd4cb673` | `landscape_owner_212`: native/focused pass; recorded interrupted timing prefix, fresh quiet gate before full scope. |
-| #213 | `vehicle-owner-213`, from `8f9d4fc906` | `vehicle_owner_213`: implement selected cursor/post-tick boundary and native ABI/lifetime probes, then quiet Opus gate. |
+| #213 / #257 | `vehicle-owner-213`, `61f2f93370` | `vehicle_owner_213`: cursor/post-tick boundary pushed; fix native loading-timer scope, then verify/quiet Opus gate. |
 | #246 / #256 / #247 | unstarted | Founding/names, then complete house lifecycle, then town commands/deletion. |
 | #64 / #66 | `issue/64-curve-family`, `aab5211801` | Paused draft/worktree; leave untouched, not a fallback. |
 | Paused integration | `integration/curve-script`, `c19f09cf8b` | Locked worktree preserved; no work. |
