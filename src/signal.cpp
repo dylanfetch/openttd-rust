@@ -24,12 +24,13 @@
 
 #ifdef WITH_RUST
 #include "rust/signal_ffi.h"
+#include "rust/vehicle_services.h"
 
 /** Native spatial query; Rust retains traversal and occupancy branching. */
 static bool SignalTrainOnTile(uint32_t tile) noexcept
 {
 	return HasVehicleOnTile(TileIndex(tile), [](const Vehicle *v) {
-		return v->type == VEH_TRAIN && Train::From(v)->GetTrack() != TRACK_BIT_DEPOT;
+		return RustVehicleVehicleType(v) == VEH_TRAIN && Train::From(v)->GetTrack() != TRACK_BIT_DEPOT;
 	});
 }
 static bool SignalTrainOnTracks(uint32_t tile, uint8_t tracks) noexcept
@@ -259,7 +260,7 @@ static SmallSet<DiagDirection, SIG_GLOB_SIZE> _globset("_globset"); ///< set of 
 /** Check whether there is a train on rail, not in a depot */
 static bool IsTrainAndNotInDepot(const Vehicle *v)
 {
-	return v->type == VEH_TRAIN && Train::From(v)->GetTrack() != TRACK_BIT_DEPOT;
+	return RustVehicleVehicleType(v) == VEH_TRAIN && Train::From(v)->GetTrack() != TRACK_BIT_DEPOT;
 }
 
 
