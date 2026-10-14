@@ -4,14 +4,14 @@ Root owns selection here; `AGENTS.md` and `docs/rust-migration.md` define proces
 If an issue conflicts, follow this roadmap and report it to root. Keep this
 forward-looking, about 200 lines; completed work is one row, with evidence in PRs.
 
-## Where the fork stands (2026-10-13, `62ef446d1e`)
+## Where the fork stands (2026-10-13, `3b3b931099`)
 
 - Twenty-three ownership ports. Whole fork against the pinned original: Rust
-  55,082 / tooling 28,602 / C++ glue 24,602 / original C++ retired 36,162 (7.68%
+  55,453 / tooling 28,635 / C++ glue 25,307 / original C++ retired 36,162 (7.68%
   of all `src/` sources); simulation-source share 28,215 / 102,615 (27.50%, #226).
-- #230 caps, #236 water fidelity and #240 coverage are integrated and cleaned up.
-  No additional original code retired. Six branches include the two ownership
-  prototypes and selected #243 cache-peak repair; reviews precede more integration.
+- #230/#236/#240/#217 are integrated and cleaned up. The fourth integration
+  leaves original retirement unchanged; five branches remain. Finish the bounded
+  ownership experiments or defer them, then #219 before further conversions.
 - Current calibrated ratios: Opus 1.258, Grok 1.254, Padhattan-1996 1.275,
   Padhattan-2000 1.349, Padhattan-2016 1.427, TGP 1.164. TGP remains above
   1.15. Aircraft's final six-case medians pass; a matched Padhattan-2016
@@ -118,6 +118,7 @@ retirement, with net glue in the PR (#223).
 | #234 (industry water fidelity) | #236 | direct | `b7a1429d38` | 5 / 97 / 32 / 0; net glue +32 |
 | #229 (six calibrated caps) | #230 | direct | `e69df25522` | 0 / 12 / 0 / 0; net glue 0 |
 | #239/#156 (prospect/overlap coverage) | #240 | direct | `62ef446d1e` | 0 / 114 / 0 / 0; net glue 0 |
+| #214/#168 (typed station/loading) | #217 | direct | `3b3b931099` | 1018 / 42 / 1147 / 0; net glue +705 |
 
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -145,17 +146,16 @@ go in `KNOWN_FAILURES` with an issue, never in masks (`docs/rust-migration.md`).
 Integrate reviewed work first, in order of readiness; at most six unintegrated
 branches (#157). Independent items (#156, #223, caps) may run in parallel.
 
-1. **#217 station/loading** has its Windows fix reviewed; exact-head full CI runs.
-2. **#216 town, narrowed** needs shared-table conflict resolution against the
-   integrated base and then #217, fresh narrow review and full CI; then town
+1. **#216 town, narrowed** adopts integrated #217, with fresh conflict review
+   and full CI; then town
    founding/generation, the house tile loop, and town commands, authority
    actions and deletion as their own ports.
-3. **#199/#237 aircraft conversion (#238)** has passing timing/review; full CI runs.
-4. **New ownership:** only #212 R0 shared map-read experiment and #213 vehicle
+2. **#199/#237 aircraft (#238)** passed full CI; fresh #217 conflict review runs.
+3. **New ownership:** only #212 R0 shared map-read experiment and #213 vehicle
    prototype now; broad ports require the unchanged budgets. #212 R0 follows
    the linked plan on its issue, including layout/lifetime/default checks.
    Then #219 signal blocks and #220 engines (#220 after #213 and #148).
-5. **Conversions:** train and ship after #213; the #168 tail (orders, effect,
+4. **Conversions:** train and ship after #213; the #168 tail (orders, effect,
    disaster, #218's accessors) never blocks ownership.
 
 #108 retains C++ map arrays; measured #212 failure now selects one bounded raw
@@ -174,16 +174,15 @@ pass. Failure defers this owner; broad maintenance remains unstarted.
 
 ## Resume checkpoint
 
-Active continuous development. #240's tested tree is the merged tree; post-merge
-cache refresh passed. Earlier code post-merge runs pass. CI peak acceptance failed;
-#243 is first. Failed landscape/vehicle prototypes have one bounded revision each.
+Active continuous development. #217 passed full CI and is merged/cleaned; its
+post-merge native policy hit a GitHub API failure and root reran it. More merges
+wait for main recovery. #243 is first; each failed owner has one bounded revision.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #214 / #217 | `station-loading-direct-214`, `d7f19146c8` | Reviewed Windows fix/root verification; full CI active. |
-| #148 / #216 | `town-lifecycle-148`, `3504fc4706` | Clean/pushed; final #217 adoption and fresh conflict review wait. |
-| #237 / #238 | `aircraft-shared-boundary-237`, `d0b52fdfc9` | Six caps pass; fixing review/root verification; full CI active. |
-| #212 / #241 | `landscape-budget-prototype-212`, `679c879166` | P1 reverted; adopted base; R0 source checks start. |
+| #148 / #216 | `town-lifecycle-148`, `3d1164d918` | #217 adoption pushed; fresh conflict checks active. |
+| #237 / #238 | `aircraft-shared-boundary-237`, `ca601fd547` | Earlier full passed; #217 conflicts resolved; fresh checks active. |
+| #212 / #241 | `landscape-budget-prototype-212`, `650b55321a` | R0 native checks; fixture reentry fix pending before timing. |
 | #213 / #242 | `vehicle-budget-prototype-213`, `d1d2e4bad0` | Native/semantics pass; P0 budget fails; scalar-address revision selected. |
 | #233 / #244 | `ci-cache-peak-233`, `85dd778eb1` | #243 protected-only two-slot publisher in progress; bootstrap after review. |
 
