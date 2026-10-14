@@ -10,6 +10,7 @@
 #define RUST_SERVICES_FFI_H
 #include <cstdint>
 #include <type_traits>
+#include "station_ffi.h"
 
 /* Immutable function table. All functions are noexcept and cannot reenter Rust.
  * Context may be null in the game; test fixtures supply their own world.
@@ -39,6 +40,18 @@ struct OpenTTDSharedServices {
 	uint8_t (*tunnel_bridge_direction)(uint32_t) noexcept;
 	uint16_t (*bridge_speed)(uint32_t) noexcept;
 	bool (*is_water_tile)(uint32_t) noexcept;
+	uint8_t (*map_log_x)() noexcept;
+	uint32_t (*map_max_x)() noexcept;
+	uint32_t (*map_max_y)() noexcept;
+	uint8_t (*plane_speed)() noexcept;
+	bool (*no_jetcrash)() noexcept;
+	uint8_t (*plane_crashes)() noexcept;
+	bool (*service_at_helipad)() noexcept;
+	bool (*disaster_sound)() noexcept;
+	int32_t (*economy_date)() noexcept;
+	int32_t (*calendar_date)() noexcept;
+	int32_t (*slope)(int32_t, int32_t) noexcept;
+	int32_t (*tile_height)(uint32_t) noexcept;
 };
 const OpenTTDSharedServices &GetRustSharedServices() noexcept;
 
@@ -68,6 +81,18 @@ inline OpenTTDSharedServices OpenTTDFixtureSharedServices(void *context, uint32_
 		.tunnel_bridge_direction = OpenTTDFixtureMapService<uint8_t, uint32_t>,
 		.bridge_speed = OpenTTDFixtureMapService<uint16_t, uint32_t>,
 		.is_water_tile = OpenTTDFixtureMapService<bool, uint32_t>,
+		.map_log_x = OpenTTDFixtureMapService<uint8_t>,
+		.map_max_x = OpenTTDFixtureMapService<uint32_t>,
+		.map_max_y = OpenTTDFixtureMapService<uint32_t>,
+		.plane_speed = OpenTTDFixtureMapService<uint8_t>,
+		.no_jetcrash = OpenTTDFixtureMapService<bool>,
+		.plane_crashes = OpenTTDFixtureMapService<uint8_t>,
+		.service_at_helipad = OpenTTDFixtureMapService<bool>,
+		.disaster_sound = OpenTTDFixtureMapService<bool>,
+		.economy_date = OpenTTDFixtureMapService<int32_t>,
+		.calendar_date = OpenTTDFixtureMapService<int32_t>,
+		.slope = OpenTTDFixtureMapService<int32_t, int32_t, int32_t>,
+		.tile_height = OpenTTDFixtureMapService<int32_t, uint32_t>,
 	};
 }
 #endif /* RUST_SERVICES_FFI_H */

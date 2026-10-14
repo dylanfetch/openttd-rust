@@ -40,6 +40,35 @@ struct OpenTTDVehiclePreviousTile {
 	uint32_t tile;
 	bool exists;
 };
+struct OpenTTDVehicleCoordinates {
+	int32_t x;
+	int32_t y;
+	int32_t z;
+};
+struct OpenTTDVehicleXY {
+	int32_t x;
+	int32_t y;
+};
+struct OpenTTDVehicleSpeedInputs {
+	uint16_t speed;
+	uint16_t max_speed;
+	uint8_t acceleration;
+	uint8_t status;
+	uint8_t subspeed;
+};
+struct OpenTTDVehicleDirectionProgress {
+	uint8_t direction;
+	uint8_t progress;
+};
+struct OpenTTDVehicleTickStatus {
+	uint8_t tick;
+	uint8_t status;
+};
+struct OpenTTDVehicleDayCost {
+	int64_t profit;
+	uint8_t running;
+};
+struct OpenTTDVehicleAltitudeInputs { uint16_t max_speed; uint8_t direction; };
 struct OpenTTDVehicleServices {
 	void (OPENTTD_VEHICLE_CALL *write_counters)(OpenTTDVehicle *, uint8_t, uint8_t, int32_t) noexcept;
 	OpenTTDVehicleBreakdown (OPENTTD_VEHICLE_CALL *handle_breakdown)(OpenTTDVehicle *) noexcept;
@@ -91,6 +120,44 @@ struct OpenTTDVehicleServices {
 	uint8_t (OPENTTD_VEHICLE_CALL *order_type)(OpenTTDVehicle *) noexcept;
 	uint16_t (OPENTTD_VEHICLE_CALL *order_destination)(OpenTTDVehicle *) noexcept;
 	uint8_t (OPENTTD_VEHICLE_CALL *order_nonstop)(OpenTTDVehicle *) noexcept;
+	uint8_t (OPENTTD_VEHICLE_CALL *subtype)(OpenTTDVehicle *) noexcept;
+	int32_t (OPENTTD_VEHICLE_CALL *x)(OpenTTDVehicle *) noexcept;
+	int32_t (OPENTTD_VEHICLE_CALL *y)(OpenTTDVehicle *) noexcept;
+	int32_t (OPENTTD_VEHICLE_CALL *z)(OpenTTDVehicle *) noexcept;
+	uint8_t (OPENTTD_VEHICLE_CALL *tick)(OpenTTDVehicle *) noexcept;
+	uint8_t (OPENTTD_VEHICLE_CALL *owner)(OpenTTDVehicle *) noexcept;
+	uint16_t (OPENTTD_VEHICLE_CALL *speed)(OpenTTDVehicle *) noexcept;
+	uint8_t (OPENTTD_VEHICLE_CALL *subspeed)(OpenTTDVehicle *) noexcept;
+	uint8_t (OPENTTD_VEHICLE_CALL *running)(OpenTTDVehicle *) noexcept;
+	int32_t (OPENTTD_VEHICLE_CALL *order_time)(OpenTTDVehicle *) noexcept;
+	uint8_t (OPENTTD_VEHICLE_CALL *vehicle_type)(OpenTTDVehicle *) noexcept;
+	void (OPENTTD_VEHICLE_CALL *write_x)(OpenTTDVehicle *, int32_t) noexcept;
+	void (OPENTTD_VEHICLE_CALL *write_y)(OpenTTDVehicle *, int32_t) noexcept;
+	void (OPENTTD_VEHICLE_CALL *write_z)(OpenTTDVehicle *, int32_t) noexcept;
+	void (OPENTTD_VEHICLE_CALL *write_tile)(OpenTTDVehicle *, uint32_t) noexcept;
+	void (OPENTTD_VEHICLE_CALL *write_status)(OpenTTDVehicle *, uint8_t) noexcept;
+	void (OPENTTD_VEHICLE_CALL *write_subspeed)(OpenTTDVehicle *, uint8_t) noexcept;
+	void (OPENTTD_VEHICLE_CALL *write_breakdown_counter)(OpenTTDVehicle *, uint8_t) noexcept;
+	void (OPENTTD_VEHICLE_CALL *write_running)(OpenTTDVehicle *, uint8_t) noexcept;
+	void (OPENTTD_VEHICLE_CALL *write_order_time)(OpenTTDVehicle *, int32_t) noexcept;
+	void (OPENTTD_VEHICLE_CALL *write_profit)(OpenTTDVehicle *, int64_t) noexcept;
+	void (OPENTTD_VEHICLE_CALL *write_economy_service)(OpenTTDVehicle *, int32_t) noexcept;
+	void (OPENTTD_VEHICLE_CALL *write_calendar_service)(OpenTTDVehicle *, int32_t) noexcept;
+	void (OPENTTD_VEHICLE_CALL *write_breakdowns)(OpenTTDVehicle *, uint8_t) noexcept;
+	void (OPENTTD_VEHICLE_CALL *write_reliability)(OpenTTDVehicle *, uint16_t) noexcept;
+	void (OPENTTD_VEHICLE_CALL *write_cargo_age)(OpenTTDVehicle *, uint16_t) noexcept;
+	OpenTTDVehicleCoordinates (OPENTTD_VEHICLE_CALL *coordinates)(OpenTTDVehicle *) noexcept;
+	OpenTTDVehicleXY (OPENTTD_VEHICLE_CALL *xy)(OpenTTDVehicle *) noexcept;
+	OpenTTDVehicleSpeedInputs (OPENTTD_VEHICLE_CALL *speed_inputs)(OpenTTDVehicle *) noexcept;
+	OpenTTDVehicleDirectionProgress (OPENTTD_VEHICLE_CALL *direction_progress)(OpenTTDVehicle *) noexcept;
+	OpenTTDVehicleTickStatus (OPENTTD_VEHICLE_CALL *tick_status)(OpenTTDVehicle *) noexcept;
+	OpenTTDVehicleDayCost (OPENTTD_VEHICLE_CALL *day_cost)(OpenTTDVehicle *) noexcept;
+	void (OPENTTD_VEHICLE_CALL *make_dummy)(OpenTTDVehicle *) noexcept;
+	void (OPENTTD_VEHICLE_CALL *loading)(OpenTTDVehicle *, bool) noexcept;
+	uint8_t (OPENTTD_VEHICLE_CALL *breakdown)(OpenTTDVehicle *) noexcept;
+	void (OPENTTD_VEHICLE_CALL *check_orders_only)(OpenTTDVehicle *) noexcept;
+	void (OPENTTD_VEHICLE_CALL *write_coordinates)(OpenTTDVehicle *, int32_t, int32_t, int32_t) noexcept;
+	OpenTTDVehicleAltitudeInputs (OPENTTD_VEHICLE_CALL *altitude_inputs)(OpenTTDVehicle *) noexcept;
 };
 struct OpenTTDGroundMoved {
 	int32_t old_z;

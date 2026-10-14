@@ -40,6 +40,19 @@ inline uint8_t RustGroundCachedLength(const T *v) noexcept { return v->gcache.ca
 template <class T>
 inline bool RustGroundHasArticulated(const T *v) noexcept { return v->HasArticulatedPart(); }
 
+inline uint8_t RustVehicleSubtype(const Vehicle *v) noexcept { return v->subtype; }
+inline int32_t RustVehicleX(const Vehicle *v) noexcept { return v->x_pos; }
+inline int32_t RustVehicleY(const Vehicle *v) noexcept { return v->y_pos; }
+inline int32_t RustVehicleZ(const Vehicle *v) noexcept { return v->z_pos; }
+inline uint16_t RustVehicleSpeed(const Vehicle *v) noexcept { return v->cur_speed; }
+inline uint8_t RustVehicleSubspeed(const Vehicle *v) noexcept { return v->subspeed; }
+inline uint8_t RustVehicleAcceleration(const Vehicle *v) noexcept { return v->acceleration; }
+inline uint16_t RustVehicleMaxSpeed(const Vehicle *v) noexcept { return v->vcache.cached_max_speed; }
+inline uint8_t RustVehicleRunning(const Vehicle *v) noexcept { return v->running_ticks; }
+inline int32_t RustVehicleOrderTime(const Vehicle *v) noexcept { return v->current_order_time; }
+inline int64_t RustVehicleProfit(const Vehicle *v) noexcept { return v->profit_this_year; }
+inline uint8_t RustVehicleVehicleType(const Vehicle *v) noexcept { return v->type; }
+
 /** Base vehicle cargo and articulated fields shared by loading and link refresh. */
 inline uint8_t RustVehicleCargoType(OpenTTDVehicle *handle) noexcept { return VehicleOf(handle)->cargo_type; }
 inline uint8_t RustVehicleOwnerOf(OpenTTDVehicle *handle) noexcept { return RustVehicleOwner(VehicleOf(handle)); }
