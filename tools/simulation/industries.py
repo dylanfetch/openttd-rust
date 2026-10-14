@@ -7,6 +7,15 @@ from . import companies, disasters, economy
 from .core import SNAPSHOT_TICKS, TICKS_PER_DAY, read_save, run_game
 
 AI_FOLDER = "industry-scenario-ai"
+# Calibrated on the pinned original with this one-town, treeless input. The
+# first executed prospect enters after 216 shared draws: state (0, 123456789)
+# returns FFFFFFFF (unlucky); (8, 123456789) returns 0 and exhausts all sites.
+# AITestMode consumes zero draws, execution consumes 1 or 10001. These fixed
+# 32-tick checkpoints include subsequent ordinary world draws in both modes.
+PROSPECT_FAILURES = {
+    "prospect-unlucky": ((407793002, 3937062389), (990010970, 234727308)),
+    "prospect-exhausted": ((2882038248, 3636532106), (2420427660, 3018271737)),
+}
 
 
 def uses_ai(scenario):
@@ -14,6 +23,8 @@ def uses_ai(scenario):
         "lumber",
         "fund",
         "prospect",
+        "prospect-unlucky",
+        "prospect-exhausted",
         "clear",
         "terraform",
         "water-check",
@@ -103,7 +114,14 @@ def scenarios(soak):
                 "industry_generation_empty": density == 0,
             }
         )
-    for mode in ("fund", "prospect", "clear", "terraform"):
+    for mode in (
+        "fund",
+        "prospect",
+        "prospect-unlucky",
+        "prospect-exhausted",
+        "clear",
+        "terraform",
+    ):
         result.append(
             {
                 "name": "industry-command-" + mode,
@@ -119,16 +137,28 @@ def scenarios(soak):
                         "max_loan": 5000000,
                     },
                     "construction": {
-                        "raw_industry_construction": 2 if mode == "prospect" else 1,
+                        "raw_industry_construction": 2
+                        if mode.startswith("prospect")
+                        else 1,
                         "autoslope": True,
                     },
                 },
                 "console": [
                     "setting difficulty.disasters 0",
+                    "setting economy.multiple_industry_per_town "
+                    + str(int(mode == "clear")),
                     "start_ai MigrationIndustries",
                 ],
             }
         )
+    for scenario in result:
+        if scenario.get("industry") in ("prospect-unlucky", "prospect-exhausted"):
+            scenario.update(ticks=32, short_checkpoint=True)
+            scenario["settings"]["difficulty"].update(number_towns=4)
+            scenario["settings"]["game_creation"] = {
+                "custom_town_number": 1,
+                "tree_placer": 0,
+            }
     result.extend(
         {
             "name": "industry-water-check-" + obstruction,
@@ -193,7 +223,7 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
         )
         result["industry_chosen"] = chosen
         return dict(scenario, save=str(target))
-    if mode in ("clear", "terraform"):
+    if mode in ("clear", "terraform", "prospect-unlucky", "prospect-exhausted"):
         folder = out / scenario["name"] / "input"
         setup = dict(
             scenario,
@@ -217,6 +247,16 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
         industries = economy.rows(read_save(source), "INDY")
         chosen = next(index for index, row in industries.items() if row["type"] == 0)
         edits = {"CHTS": {0: {"magic_bulldozer.value": int(mode == "clear")}}}
+        if mode in PROSPECT_FAILURES:
+            towns = economy.rows(read_save(source), "CITY")
+            if len(towns) != 1 or industries[chosen]["town"] != next(iter(towns)) + 1:
+                raise RuntimeError(
+                    "prospect exhaustion requires one town and its coal mine"
+                )
+            seed, _ = PROSPECT_FAILURES[mode]
+            edits["DATE"] = {
+                0: {f"random_state[{i}]": word for i, word in enumerate(seed)}
+            }
         target = folder / "input.sav"
         result["industry_input"] = disasters.patch(source, target, edits)
         result["industry_chosen"] = chosen
@@ -225,6 +265,9 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
             kind="save",
             save=str(target),
             industry_target=industries[chosen]["location.tile"],
+            console=["setting difficulty.industry_density 0", *scenario["console"]]
+            if mode.startswith("prospect-")
+            else scenario["console"],
         )
     if mode == "lumber":
         setup = dict(
@@ -417,7 +460,7 @@ def check(scenario, run, mode, role, result):
         )
         if not facts["lumber_harvest"]:
             result["problems"].append(f"{mode}/{role}: no actual lumber harvest")
-    if kind in ("fund", "prospect", "clear", "terraform"):
+    if kind in ("fund", "prospect", "clear", "terraform", *PROSPECT_FAILURES):
         marker = f"INDUSTRY-COMMAND {kind} ready true"
         facts["command_completed"] = any(marker in line for line in run["log"])
         if not facts["command_completed"]:
@@ -428,6 +471,36 @@ def check(scenario, run, mode, role, result):
             for row in sample.values()
         ):
             result["problems"].append(f"{mode}/{role}: no player-funded raw industry")
+        if kind in PROSPECT_FAILURES:
+            before = economy.rows(read_save(Path(scenario["save"])), "INDY")
+
+            def identity(sample):
+                return {
+                    index: tuple(
+                        row[key] for key in ("type", "town", "location.tile", "founder")
+                    )
+                    for index, row in sample.items()
+                }
+
+            facts["unchanged_identity"] = all(
+                identity(sample) == identity(before) for sample in rows
+            )
+            date = economy.rows(saved[-1], "DATE")[0]
+            facts["random_state"] = tuple(date[f"random_state[{i}]"] for i in (0, 1))
+            facts["checkpoint"] = (date["tick_counter"], date["economy_date_fract"])
+            facts["company_restored"] = (
+                economy.rows(saved[-1], "PLYR")[1]["name"] == "Industry " + kind
+            )
+            if not facts["unchanged_identity"] or not facts["company_restored"]:
+                result["problems"].append(
+                    f"{mode}/{role}: prospect changed identity/company context"
+                )
+            if facts["random_state"] != PROSPECT_FAILURES[kind][1] or facts[
+                "checkpoint"
+            ] != (6048, 32):
+                result["problems"].append(
+                    f"{mode}/{role}: {kind} RNG checkpoint missing: {facts['random_state']} at {facts['checkpoint']}"
+                )
         if kind == "clear":
             before = economy.rows(read_save(Path(scenario["save"])), "INDY")
             chosen = result["industry_chosen"]
@@ -453,6 +526,7 @@ def check(scenario, run, mode, role, result):
             "generation",
             "fund",
             "prospect",
+            *PROSPECT_FAILURES,
             "clear",
             "terraform",
             "transfer",
