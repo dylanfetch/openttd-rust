@@ -10,6 +10,9 @@
 #![allow(unsafe_code, clippy::cast_possible_truncation)]
 use std::ffi::c_void;
 
+/// Original `TILE_HEIGHT`, shared by raw-to-pixel map consumers.
+pub const TILE_HEIGHT: u32 = 8;
+
 /// Native stack-owned command result, including encoded error parameters.
 /// Rust only borrows its address and invokes the native operations below.
 #[repr(C)]
