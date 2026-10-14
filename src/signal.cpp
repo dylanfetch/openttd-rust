@@ -260,7 +260,7 @@ static SmallSet<DiagDirection, SIG_GLOB_SIZE> _globset("_globset"); ///< set of 
 /** Check whether there is a train on rail, not in a depot */
 static bool IsTrainAndNotInDepot(const Vehicle *v)
 {
-	return RustVehicleVehicleType(v) == VEH_TRAIN && Train::From(v)->GetTrack() != TRACK_BIT_DEPOT;
+	return v->type == VEH_TRAIN && Train::From(v)->GetTrack() != TRACK_BIT_DEPOT;
 }
 
 
