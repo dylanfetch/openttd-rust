@@ -55,12 +55,23 @@ pub struct IndustryServices {
     pub generation: *const industry::GenerationServices,
 }
 
+/// Original snow/ground/density facts, read only on their consuming branches.
+#[repr(C)]
+pub struct ClearObservation {
+    pub snow: bool,
+    pub ground: u8,
+    pub density: u32,
+}
+
 /// Each native handler remains separately typed; map reads use the shared table.
 #[repr(C)]
 pub struct Services {
     pub shared: *const services::Services,
     pub trees: *const trees::TreeServices,
     pub industry: IndustryServices,
+    pub ambient_callback: bool,
+    pub clear_observation: extern "C" fn(u32) -> ClearObservation,
+    pub nonflooding_water: extern "C" fn(u32) -> bool,
     pub clear_loop: extern "C" fn(u32),
     pub rail_loop: extern "C" fn(u32),
     pub road_loop: extern "C" fn(u32),
@@ -80,13 +91,39 @@ unsafe fn dispatch(tile: u32, log_x: u8, settings: trees::LoopSettings, s: &Serv
     #[cfg(landscape_loop_count)]
     crate::witness::hit(crate::witness::LANDSCAPE + usize::from(tile_type));
     match tile_type {
-        0 => (s.clear_loop)(tile),
+        0 => {
+            // Temporary P1 feasibility experiment. Without a NewGRF ambient
+            // callback, temperate clear observes only the original early-return
+            // fields. The complete native body retains every remaining branch.
+            if !s.ambient_callback && settings.climate == 0 {
+                #[cfg(landscape_loop_count)]
+                crate::witness::hit(crate::witness::LANDSCAPE + 13);
+                let clear = (s.clear_observation)(tile);
+                if clear.snow || (clear.ground == 0 && clear.density == 3) {
+                    #[cfg(landscape_loop_count)]
+                    crate::witness::hit(crate::witness::LANDSCAPE + 15);
+                    return;
+                }
+            }
+            (s.clear_loop)(tile);
+        }
         1 => (s.rail_loop)(tile),
         2 => (s.road_loop)(tile),
         3 => (s.house_loop)(tile),
         4 => unsafe { trees::openttd_rust_trees_tile_loop(tile, settings, s.trees, s.shared) },
         5 => (s.station_loop)(tile),
-        6 => (s.water_loop)(tile),
+        6 => {
+            if !s.ambient_callback {
+                #[cfg(landscape_loop_count)]
+                crate::witness::hit(crate::witness::LANDSCAPE + 14);
+                if (s.nonflooding_water)(tile) {
+                    #[cfg(landscape_loop_count)]
+                    crate::witness::hit(crate::witness::LANDSCAPE + 16);
+                    return;
+                }
+            }
+            (s.water_loop)(tile);
+        }
         7 => (s.void_loop)(tile),
         8 => unsafe {
             industry::openttd_rust_industry_tile_loop(

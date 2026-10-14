@@ -43,7 +43,7 @@ extern "C" {
  * 393 fleet group services, 394 transaction services, 395 native costs,
  * 396 pending services; 397-399 reserved for fleet additions.
  * 780 landscape industry-loop tables, 781 landscape scheduler services;
- * 782-819 reserved for landscape additions.
+ * 782 clear early-return observation; 783-819 reserved for landscape additions.
  * Existing train allocation spans 248-385; other existing low IDs remain.
  * Reserved component blocks: company 400-429, town 430-459,
  * shared vehicle/road services 460-499. Allocate within the component's block.
