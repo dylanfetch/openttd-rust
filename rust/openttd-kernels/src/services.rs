@@ -10,6 +10,58 @@
 #![allow(unsafe_code, clippy::cast_possible_truncation)]
 use std::ffi::c_void;
 
+/// Original `TILE_HEIGHT`, shared by raw-to-pixel map consumers.
+pub const TILE_HEIGHT: u32 = 8;
+
+/// Native stack-owned command result, including encoded error parameters.
+/// Rust only borrows its address and invokes the native operations below.
+#[repr(C)]
+pub struct CommandCost {
+    _private: [u8; 0],
+}
+/// Copied immutable command-result operations. Every input/output denotes a live
+/// native object for this call; C++ owns construction, storage and destruction.
+/// Moves and additions use the original native implementation without snapshots.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct CommandCostServices {
+    /// Assign native successful zero cost.
+    pub zero: extern "C" fn(*mut CommandCost),
+    /// Assign the native `StringID` error constructor, including `INVALID_STRING_ID`.
+    pub error: extern "C" fn(*mut CommandCost, u32),
+    /// Assign native `ExpensesType` and saturating `Money` value.
+    pub expense_money: extern "C" fn(*mut CommandCost, u8, i64),
+    /// Use native `CommandCostWithParam(StringID, uint64_t)` encoding.
+    pub error_param: extern "C" fn(*mut CommandCost, u32, u64),
+    /// Add the moved native result, retaining first-error semantics.
+    pub add: extern "C" fn(*mut CommandCost, *mut CommandCost),
+    /// Move-assign every native field, including encoded parameters.
+    pub move_cost: extern "C" fn(*mut CommandCost, *mut CommandCost),
+    /// Add native Money with its original saturation.
+    pub amount: extern "C" fn(*mut CommandCost, i64),
+    /// Query native `Succeeded()`.
+    pub success: extern "C" fn(*const CommandCost) -> bool,
+    /// Query native `GetErrorMessage()`.
+    pub error_message: extern "C" fn(*const CommandCost) -> u32,
+    /// Query native `GetCost()`.
+    pub money: extern "C" fn(*const CommandCost) -> i64,
+}
+
+/// Ordinary direct commands. Native result storage retains complete errors and
+/// parameters; owner accesses must end before a command can reenter Rust.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct CommandServices {
+    /// Original `CMD_LANDSCAPE_CLEAR`, with actual `DoCommandFlags` width.
+    pub landscape_clear: extern "C" fn(*mut CommandCost, u32, u16),
+}
+
+/// Opaque native town shell. Its address identifies the shell, not the Rust owner.
+#[repr(C)]
+pub struct TownHandle {
+    _private: [u8; 0],
+}
+
 /// Source `TileType::MP_HOUSE`.
 pub const MP_HOUSE: u8 = 3;
 /// Synchronous borrowed bytes, including embedded NULs. The producing entry
@@ -64,8 +116,72 @@ pub struct Services {
     pub bridge_speed: extern "C" fn(u32) -> u16,
     /// `IsWaterTile`: water category and clear subtype (sea, canal or river).
     pub is_water_tile: extern "C" fn(u32) -> bool,
+    /// Whether this company pool ID is live.
+    pub company_valid: extern "C" fn(u8) -> bool,
+    /// Next live company at or after this ID; 255 denotes end.
+    pub next_company: extern "C" fn(u8) -> u8,
+    /// Current native command actor, read at the original short-circuit point.
+    pub current_company: extern "C" fn() -> u8,
+    /// Original native nearest-town spatial lookup; the result may be null.
+    pub closest_town: extern "C" fn(u32, u32) -> *const TownHandle,
+    /// Resolve the single Rust owner of a live native town shell.
+    pub town_owner: extern "C" fn(*const TownHandle) -> *mut crate::town::State,
+    /// Original native `tile_valid` map observation.
+    pub tile_valid: extern "C" fn(u32) -> bool,
+    /// Original native `distance_from_edge` map observation.
+    pub distance_from_edge: extern "C" fn(u32) -> u32,
+    /// Original native `tile_max_z` map observation.
+    pub tile_max_z: extern "C" fn(u32) -> i32,
+    /// Original native `tile_height` map observation.
+    pub tile_height: extern "C" fn(u32) -> u32,
+    /// Original native `bridge_axis` map observation.
+    pub bridge_axis: extern "C" fn(u32) -> u8,
+    /// Original native `has_water_ground` map observation.
+    pub has_water_ground: extern "C" fn(u32) -> bool,
+    /// Original native `is_sea` map observation.
+    pub is_sea: extern "C" fn(u32) -> bool,
+    /// Original native `is_plain_rail` map observation.
+    pub is_plain_rail: extern "C" fn(u32) -> bool,
+    /// Original native `is_bridge` map observation.
+    pub is_bridge: extern "C" fn(u32) -> bool,
+    /// Original native `tunnel_transport` map observation.
+    pub tunnel_transport: extern "C" fn(u32) -> u8,
+    /// Original native `other_tunnel_end` map observation.
+    pub other_tunnel_end: extern "C" fn(u32) -> u32,
+    /// Original native `is_road_depot` map observation.
+    pub is_road_depot: extern "C" fn(u32) -> bool,
+    /// Original native `road_depot_direction` map observation.
+    pub road_depot_direction: extern "C" fn(u32) -> u8,
+    /// Original native `is_normal_road` map observation.
+    pub is_normal_road: extern "C" fn(u32) -> bool,
+    /// Original native `disallowed_road_directions` map observation.
+    pub disallowed_road_directions: extern "C" fn(u32) -> u8,
+    /// Original native `is_bay_stop` map observation.
+    pub is_bay_stop: extern "C" fn(u32) -> bool,
+    /// Original native `bay_stop_direction` map observation.
+    pub bay_stop_direction: extern "C" fn(u32) -> u8,
+    /// Original native `is_drive_through_stop` map observation.
+    pub is_drive_through_stop: extern "C" fn(u32) -> bool,
+    /// Original native `drive_through_axis` map observation.
+    pub drive_through_axis: extern "C" fn(u32) -> u8,
+    /// Original native `is_any_road_stop` map observation.
+    pub is_any_road_stop: extern "C" fn(u32) -> bool,
+    /// Original native `road_type` map observation.
+    pub road_type: extern "C" fn(u32) -> u8,
+    /// Original native `has_road_type` map observation.
+    pub has_road_type: extern "C" fn(u32) -> bool,
+    /// Original native `road_owner` map observation.
+    pub road_owner: extern "C" fn(u32) -> u8,
+    /// Original native `town_index` map observation.
+    pub town_index: extern "C" fn(u32) -> u16,
+    /// Original `GetAnyRoadBits`, parameterized by `RoadTramType`.
+    pub road_bits: extern "C" fn(u32, u8, bool) -> u8,
+    /// Current snow line used by town, industry and trees.
+    pub snow_line: extern "C" fn() -> u8,
+    /// Current calendar year used by town and industry.
+    pub calendar_year: extern "C" fn() -> i32,
     /// Shared live map log x observation.
-    pub map_log_x: extern "C" fn() -> u8,
+    pub map_log_x: extern "C" fn() -> u32,
     /// Shared live map max x observation.
     pub map_max_x: extern "C" fn() -> u32,
     /// Shared live map max y observation.
@@ -86,8 +202,6 @@ pub struct Services {
     pub calendar_date: extern "C" fn() -> i32,
     /// Shared live slope observation.
     pub slope: extern "C" fn(i32, i32) -> i32,
-    /// Shared live tile height observation.
-    pub tile_height: extern "C" fn(u32) -> i32,
 }
 impl Services {
     /// Draw one shared random word.
@@ -109,13 +223,19 @@ pub fn fixture(
     random: extern "C" fn(*mut c_void) -> u32,
     industry: extern "C" fn(i32, i32, *mut u32) -> u32,
 ) -> Services {
+    extern "C" fn zero_byte() -> u8 {
+        0
+    }
+    extern "C" fn zero_year() -> i32 {
+        0
+    }
     extern "C" fn byte(_: u32) -> u8 {
         0
     }
     extern "C" fn flag(_: u32) -> bool {
         false
     }
-    extern "C" fn word(_: u32) -> u16 {
+    extern "C" fn short(_: u32) -> u16 {
         0
     }
     extern "C" fn height(_: u32) -> i32 {
@@ -123,16 +243,19 @@ pub fn fixture(
     }
     extern "C" fn tile(_: u32) {}
     extern "C" fn zone(_: u32, _: u8) {}
+    extern "C" fn word(_: u32) -> u32 {
+        0
+    }
+    extern "C" fn index(_: u32) -> u16 {
+        0
+    }
+    extern "C" fn bits(_: u32, _: u8, _: bool) -> u8 {
+        0
+    }
     extern "C" fn flag0() -> bool {
         false
     }
-    extern "C" fn byte0() -> u8 {
-        0
-    }
     extern "C" fn word0() -> u32 {
-        0
-    }
-    extern "C" fn int0() -> i32 {
         0
     }
     extern "C" fn slope(_: i32, _: i32) -> i32 {
@@ -150,24 +273,55 @@ pub fn fixture(
         mark_dirty: tile,
         set_tropic_zone: zone,
         tile_owner: byte,
-        station_index: word,
-        depot_index: word,
+        station_index: short,
+        depot_index: short,
         is_level_crossing: flag,
         tunnel_bridge_direction: byte,
-        bridge_speed: word,
+        bridge_speed: short,
         is_water_tile: flag,
-        map_log_x: byte0,
+        company_valid: unused_company_valid,
+        next_company: unused_next_company,
+        current_company: unused_current_company,
+        closest_town: unused_closest_town,
+        town_owner: unused_town_owner,
+        tile_valid: flag,
+        distance_from_edge: word,
+        tile_max_z: height,
+        tile_height: word,
+        bridge_axis: byte,
+        has_water_ground: flag,
+        is_sea: flag,
+        is_plain_rail: flag,
+        is_bridge: flag,
+        tunnel_transport: byte,
+        other_tunnel_end: word,
+        is_road_depot: flag,
+        road_depot_direction: byte,
+        is_normal_road: flag,
+        disallowed_road_directions: byte,
+        is_bay_stop: flag,
+        bay_stop_direction: byte,
+        is_drive_through_stop: flag,
+        drive_through_axis: byte,
+        is_any_road_stop: flag,
+        road_type: byte,
+        has_road_type: flag,
+        road_owner: byte,
+        town_index: index,
+        road_bits: bits,
+        snow_line: zero_byte,
+        calendar_year: zero_year,
+        map_log_x: word0,
         map_max_x: word0,
         map_max_y: word0,
-        plane_speed: byte0,
+        plane_speed: zero_byte,
         no_jetcrash: flag0,
-        plane_crashes: byte0,
+        plane_crashes: zero_byte,
         service_at_helipad: flag0,
         disaster_sound: flag0,
-        economy_date: int0,
-        calendar_date: int0,
+        economy_date: zero_year,
+        calendar_date: zero_year,
         slope,
-        tile_height: height,
     }
 }
 /// Map dimensions read once per entry.
@@ -191,6 +345,13 @@ impl Map {
     #[must_use]
     pub fn tile_y(self, tile: u32) -> u32 {
         tile >> self.log_x
+    }
+    /// Original `DistanceSquare` over captured map dimensions.
+    #[must_use]
+    pub fn distance_square(self, a: u32, b: u32) -> u32 {
+        let x = self.tile_x(a).cast_signed() - self.tile_x(b).cast_signed();
+        let y = self.tile_y(a).cast_signed() - self.tile_y(b).cast_signed();
+        (x * x + y * y).cast_unsigned()
     }
     /// `TileDiffXY`: `y * Map::SizeX() + x` in unsigned arithmetic.
     #[must_use]
@@ -228,6 +389,29 @@ impl Map {
 #[must_use]
 pub fn chance16_i(a: u32, b: u32, r: u32) -> bool {
     (((r & 65535).wrapping_mul(b).wrapping_add(b / 2)) >> 16) < a
+}
+
+#[cfg(test)]
+pub(crate) extern "C" fn unused_company_valid(_: u8) -> bool {
+    false
+}
+#[cfg(test)]
+pub(crate) extern "C" fn unused_next_company(_: u8) -> u8 {
+    u8::MAX
+}
+
+#[cfg(test)]
+pub(crate) extern "C" fn unused_closest_town(_: u32, _: u32) -> *const TownHandle {
+    std::ptr::null()
+}
+#[cfg(test)]
+pub(crate) extern "C" fn unused_town_owner(_: *const TownHandle) -> *mut crate::town::State {
+    std::ptr::null_mut()
+}
+
+#[cfg(test)]
+pub(crate) extern "C" fn unused_current_company() -> u8 {
+    u8::MAX
 }
 
 #[cfg(test)]

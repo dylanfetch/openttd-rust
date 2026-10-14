@@ -1412,32 +1412,34 @@ witnesses (`ship_yapf.*` counters); node limits use injected graphs, not
 reachable-map claims. Arbitrary maps/NewGRFs and complete legacy saves are not
 exhaustive.
 
-### Town growth control and private state
+### Town growth and lifecycle state
 
-Issue #120 moves town tick traversal, complete road walking/build choices,
-bridge/tunnel/terraform retries, house selection/layout/placement and expansion
-retries into Rust. Rust owns each shell's growth counters/rate, action months and
-entire flags byte. Map/pools, specs, caches, house tile simulation, cargo and
-unrelated monthly accounting remain C++; monthly decrements precede statistics
-rotation and growth recomputation follows it. Portable bodies remain compiled
-only without `WITH_RUST`.
-Direct bundled `noexcept` observations and leaves preserve shared RNG and write
-order. Only road/bridge/tunnel/terraform/clear commands and NewGRF allow-construction
-and construction animation yield to C++, with no private/world borrow retained.
-An invocation future owns its candidate probabilities. Shell member RAII releases
-state even during pool-cleanup early returns; task RAII handles command exceptions
-and company restoration. Panics/environmental failures abort. ABI IDs 60/61 cover
-copied actions/leaves. CITY and legacy descriptors keep names/types; scoped staging
-commits partial loads and restores nested staging. GUI/script/NewGRF/road consumers
-read thin scalar/flag accessors over the one owner.
-`python3 tools/migration.py simulate town-growth` compares actual house/road,
-bridge/terrain, growth-state, funding expiry, cargo goals, layouts/climates and
-modern reload; `--self`/`--soak` extend the same component scenarios. Native ABI and
-CTest check console-unreachable expansion modes/retries, first-road command failure,
-callback reentry, sequential multi-tile writes, indexed construction, cleanup/reuse
-and partial legacy staging. A bounded unchanged-reference tunnel comparison checks
-slopes, target/length, commands, RNG and execute effects. Natural tunnel construction,
-real custom NewGRF callbacks and complete historical saves remain evidence limits.
+Issue #120 owns town tick traversal, road walking/build choices,
+bridge/tunnel/terraform retries, house selection/layout/placement and expansion.
+The partial #148 extension owns metadata, population/house counts, radii, ratings,
+masks, goals, received/supplied histories, rebuild counters and building counts.
+Population/radius, monthly histories, yearly aging, authority and rating policy
+run in Rust. Founding/generation, house tile loops and commands remain in C++.
+Original globals are process-wide under the game-state mutex, including GUI commands.
+C++ shells expose native field aliases to the single Rust owner; scoped save
+staging preserves modern/legacy formats, nested loads and partial load commits.
+Growth entries call named synchronous `noexcept` services; fixed probability
+scratch preserves original candidate order without per-attempt heap allocation.
+Native stack CommandCost services preserve full errors/params/expense/move state;
+owner accesses end before commands and NewGRF callbacks that may reenter.
+Portable original bodies remain under the non-Rust branches. Panics and
+exceptional environmental failures abort; save/load errors stay native.
+`python3 tools/migration.py simulate town-growth --jobs 2` compares house/road,
+bridge/terrain, growth state, funding expiry, cargo goals, layouts/climates and
+modern reload; the default buildings case requires a saved yearly-age witness.
+`--self`/`--soak` extend these scenarios. Native and Cargo tests
+cover expansion modes, first-road failures, reentry, multi-tile writes, canonical
+aliases, count reuse, cross-thread globals and partial staging. Default CI rejects
+production thread-local state except per-call depot scratch. Mandatory reference
+probes compare unchanged tunnels, full-width histories/radii and nested rating
+scratch/authority thresholds and transported-percent overflow.
+Natural tunnel construction, real custom NewGRF callbacks and complete historical
+saves remain evidence limits; #148 is not yet a complete lifecycle ownership port.
 
 ### Road vehicle control and private state
 

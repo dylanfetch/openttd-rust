@@ -224,8 +224,19 @@ def tunnel_reference_gap(out, archive=None):
     migration.ensure_reference()
     source = (migration.REFERENCE / "src/town_cmd.cpp").read_text()
     bodies = {}
-    for name in ("CanRoadContinueIntoNextTile", "GrowTownWithTunnel"):
-        start = source.index(f"static bool {name}(")
+    signatures = {
+        "CanRoadContinueIntoNextTile": "static bool CanRoadContinueIntoNextTile(",
+        "GrowTownWithTunnel": "static bool GrowTownWithTunnel(",
+        "SumHistory": "template <>\nTown::SuppliedHistory SumHistory(",
+        "SetTownRatingTestMode": "void SetTownRatingTestMode(",
+        "GetRating": "static int GetRating(",
+        "ChangeTownRating": "void ChangeTownRating(",
+        "UpdateTownRadius": "void UpdateTownRadius(",
+        "CheckIfAuthorityAllowsNewStation": "CommandCost CheckIfAuthorityAllowsNewStation(",
+        "CheckforTownRating": "CommandCost CheckforTownRating(",
+    }
+    for name, signature in signatures.items():
+        start = source.index(signature)
         end = source.index("{", start) + 1
         depth = 1
         # These pinned bodies have balanced braces, including their comments.
@@ -233,7 +244,17 @@ def tunnel_reference_gap(out, archive=None):
             depth += (source[end] == "{") - (source[end] == "}")
             end += 1
         bodies[name] = source[start:end]
+    header = (migration.REFERENCE / "src/town.h").read_text()
+    start = header.index("uint8_t PctTransported() const")
+    end = header.index("{", start) + 1
+    depth = 1
+    while depth:
+        depth += (header[end] == "{") - (header[end] == "}")
+        end += 1
+    percent_body = header[start:end]
+    (out / "town-percent-original.hpp").write_text(percent_body + "\n")
     (out / "town-tunnel-original.hpp").write_text("\n\n".join(bodies.values()) + "\n")
+    bodies["PctTransported"] = percent_body
     build = ROOT / "build-rust"
     configuration = migration.rust_configuration(build)
     archive = archive or migration.rust_archive(build)
@@ -242,8 +263,8 @@ def tunnel_reference_gap(out, archive=None):
         for line in (build / "CMakeCache.txt").read_text().splitlines()
         if line.startswith("CMAKE_CXX_COMPILER:FILEPATH=")
     )
-    fixture = Path(__file__).with_name("town-tunnel-reference.cpp")
-    binary = out / "town-tunnel-reference"
+    fixture = Path(__file__).with_name("town-reference-gaps.cpp")
+    binary = out / "town-reference-gaps"
     command = [
         compiler,
         "-std=c++20",
@@ -269,9 +290,39 @@ def tunnel_reference_gap(out, archive=None):
     match = re.search(rb"\nPASS (\d+) unchanged-reference tunnel cases\n$", run.stdout)
     if not match or int(match[1]) == 0:
         raise RuntimeError("town tunnel reference gap omitted completion/count marker")
+    history = re.search(
+        rb"\nPASS (\d+) unchanged-reference history cases\n", run.stdout
+    )
+    if not history or int(history[1]) == 0:
+        raise RuntimeError("town history reference gap omitted completion/count marker")
+    rating = re.search(rb"\nPASS (\d+) unchanged-reference rating cases\n", run.stdout)
+    if not rating or int(rating[1]) == 0:
+        raise RuntimeError("town rating reference gap omitted completion/count marker")
+    radius = re.search(rb"\nPASS (\d+) unchanged-reference radius cases\n", run.stdout)
+    if not radius or int(radius[1]) == 0:
+        raise RuntimeError("town radius reference gap omitted completion/count marker")
+    authority = re.search(
+        rb"\nPASS (\d+) unchanged-reference authority cases\n", run.stdout
+    )
+    if not authority or int(authority[1]) == 0:
+        raise RuntimeError(
+            "town authority reference gap omitted completion/count marker"
+        )
+    percent = re.search(
+        rb"\nPASS (\d+) unchanged-reference percent cases\n", run.stdout
+    )
+    if not percent or int(percent[1]) == 0:
+        raise RuntimeError(
+            "town transported-percent gap omitted completion/count marker"
+        )
     migration.ensure_reference()
     report = {
         "passed": True,
+        "history_cases": int(history[1]),
+        "rating_cases": int(rating[1]),
+        "radius_cases": int(radius[1]),
+        "authority_cases": int(authority[1]),
+        "percent_cases": int(percent[1]),
         "cases": int(match[1]),
         "successful_tunnel_cases": len(re.findall(rb" result=1 ", run.stdout)),
         "execute_effect_cases": len(re.findall(rb" effects=1 ", run.stdout)),
@@ -287,11 +338,14 @@ def tunnel_reference_gap(out, archive=None):
         "commands": [command, [str(binary)]],
         "limits": [
             "Controlled world and command outcomes; the paired save corpus has no actual tunnel build.",
+            "Original int history accumulation compares full uint32 edges; ordinary saves cannot reach these extreme histories.",
+            "Nested rating scratch, company changes, shell reuse and early-return service ordering are absent from ordinary console saves.",
+            "Radius table/linear boundary and full house-count widths supplement the ordinary generated-town populations.",
             "Ordered road-mask/info services, command arguments, result, RNG and partial execute effects compare exactly.",
             "Pure C++ map getter calls and Rust bundled records have different granularity; their call counts/order are not compared.",
             "One active town-buildable road type; shared command internals and road-type selection are outside this gap check.",
         ],
-        "agent": "/root/town_tunnel_reference_gap",
+        "agent": "/root/town_lifecycle_148",
         "model": "gpt-6.1-sol",
         "reasoning_effort": "high",
     }
@@ -446,6 +500,33 @@ def check_growth(scenario, run):
         raise RuntimeError("town built roads while road expansion was disabled")
     if not houses or (scenario["town_growth"] == "roads" and not roads + changed_roads):
         raise RuntimeError("town-growth scenario did not build houses/roads")
+    aged_houses = 0
+    if scenario.get("yearly_age_witness"):
+        if core.save_moment(paths[-1])[0] - core.save_moment(paths[0])[0] < 366:
+            raise RuntimeError("yearly house-age scenario did not cross a year")
+        # Completion lives in M3LO bit 7; MAP5 is age only for completed houses.
+        # Count surviving unchanged house IDs/town owners with the expected age.
+        # Full semantic comparison still checks every saved tile, including the
+        # construction, replacement and saturation paths outside this witness.
+        for i, (before, after) in enumerate(
+            zip(tile_types[0], tile_types[-1], strict=True)
+        ):
+            if before >> 4 != 3 or after >> 4 != 3:
+                continue
+            if not initial["M3LO"]["raw"][i] & final["M3LO"]["raw"][i] & 128:
+                continue
+            if any(
+                initial[key]["raw"][2 * i : 2 * i + 2]
+                != final[key]["raw"][2 * i : 2 * i + 2]
+                for key in ("MAP2", "MAP8")
+            ):
+                continue
+            old_age, new_age = initial["MAP5"]["raw"][i], final["MAP5"]["raw"][i]
+            aged_houses += old_age < 255 and new_age == old_age + 1
+        if not aged_houses:
+            raise RuntimeError(
+                "yearly traversal did not age any surviving completed house"
+            )
     moments = [core.save_moment(path)[2] for path in paths]
     failed_intervals = 0
     for index, case in scenario["growth_assignments"].items():
@@ -533,6 +614,7 @@ def check_growth(scenario, run):
             for index, history in zip(ids, rows, strict=True)
         }
     return {
+        "yearly_aged_houses": aged_houses,
         "new_house_tiles": houses,
         "new_road_tiles": roads,
         "changed_road_bits": changed_roads,
@@ -569,7 +651,9 @@ def growth_scenarios(soak):
             "map_log2": 7,
             "land_generator": 1,
             "town_growth": mode,
-            "ticks": (365 if soak else 210) * TICKS_PER_DAY + SNAPSHOT_TICKS,
+            "ticks": (370 if soak or mode == "buildings" else 210) * TICKS_PER_DAY
+            + SNAPSHOT_TICKS,
+            "yearly_age_witness": mode == "buildings",
             "console": [
                 f"setting economy.allow_town_roads {int(mode != 'buildings')}",
                 f"setting economy.town_growth_rate {0 if mode == 'disabled' else 4}",
@@ -622,7 +706,7 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
             with _TUNNEL_LOCK:
                 if out not in _TUNNEL_REPORTS:
                     _TUNNEL_REPORTS[out] = tunnel_reference_gap(
-                        out / "town-tunnel-reference"
+                        out / "town-reference-gaps"
                     )
                 result["tunnel_reference_gap"] = _TUNNEL_REPORTS[out]
         scenario, result["reload_input"] = prepare_growth(
@@ -665,9 +749,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description=tunnel_reference_gap.__doc__)
-    parser.add_argument(
-        "--out", type=Path, default=ROOT / ".local/town-tunnel-reference"
-    )
+    parser.add_argument("--out", type=Path, default=ROOT / ".local/town-reference-gaps")
     parser.add_argument("--archive", type=Path)
     args = parser.parse_args()
     report = tunnel_reference_gap(args.out.resolve(), args.archive)

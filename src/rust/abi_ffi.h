@@ -27,7 +27,7 @@ extern "C" {
  * 46 water patch, 47 water diagnostic snapshot, 48 water shared-service leaves.
  * 49 cargo specification, 50 cargo payment saved fields, 51 cargo services.
  * 52 ship YAPF input, 53 leaves, 54 follower, 55 tile, 56 choice result.
- * 60 town action, 61 town direct leaves.
+ * 60-61 retired town action/leaves; 430 town command result, 431 town services; 432-438 canonical town records; 439-442 narrow town spec reads.
  * 110 station cargo metadata, 111 station scalars, 112 station services,
  * 113 station edge observations, 114 station links, 115 station loading.
  * 130-138 industry storage, observation, world services and production result.

@@ -25,7 +25,11 @@
 
 #include "safeguards.h"
 
+#ifdef WITH_RUST
+static RustTownBuildingCounts<uint32_t> _building_counts{};
+#else
 static BuildingCounts<uint32_t> _building_counts{};
+#endif
 static std::vector<HouseClassMapping> _class_mapping{};
 
 HouseOverrideManager _house_mngr(NEW_HOUSE_OFFSET, NUM_HOUSES, INVALID_HOUSE_ID);
@@ -190,6 +194,9 @@ std::span<const uint> GetBuildingHouseIDCounts()
  */
 void IncreaseBuildingCount(Town *t, HouseID house_id)
 {
+#ifdef WITH_RUST
+	openttd_rust_town_increase_building(t->growth_owner.get(), house_id, HouseSpec::Get(house_id)->class_id);
+#else
 	HouseClassID class_id = HouseSpec::Get(house_id)->class_id;
 
 	t->cache.building_counts.id_count[house_id]++;
@@ -199,6 +206,7 @@ void IncreaseBuildingCount(Town *t, HouseID house_id)
 
 	t->cache.building_counts.class_count[class_id]++;
 	_building_counts.class_count[class_id]++;
+#endif
 }
 
 /**
@@ -209,6 +217,9 @@ void IncreaseBuildingCount(Town *t, HouseID house_id)
  */
 void DecreaseBuildingCount(Town *t, HouseID house_id)
 {
+#ifdef WITH_RUST
+	openttd_rust_town_decrease_building(t->growth_owner.get(), house_id, HouseSpec::Get(house_id)->class_id);
+#else
 	HouseClassID class_id = HouseSpec::Get(house_id)->class_id;
 
 	if (t->cache.building_counts.id_count[house_id] > 0) t->cache.building_counts.id_count[house_id]--;
@@ -218,6 +229,7 @@ void DecreaseBuildingCount(Town *t, HouseID house_id)
 
 	if (t->cache.building_counts.class_count[class_id] > 0) t->cache.building_counts.class_count[class_id]--;
 	if (_building_counts.class_count[class_id] > 0) _building_counts.class_count[class_id]--;
+#endif
 }
 
 /* virtual */ uint32_t HouseScopeResolver::GetRandomBits() const
