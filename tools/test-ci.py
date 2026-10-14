@@ -726,6 +726,29 @@ const github = {{paginate: async () => structuredClone(caches), rest: {{
         result = self.cache_model(dict(scenario, deleteFailure=True))
         self.assertIn("error", result)
         self.assertNotIn("key", result["outputs"])
+        payload["legacy"] = [dict(legacy, version=None)]
+        result = self.cache_model(scenario)
+        self.assertIn("error", result)
+        self.assertEqual(result["deleted"], [])
+        self.assertNotIn("key", result["outputs"])
+
+    def test_raw_cache_api_identities_must_be_complete_before_admission(self):
+        # Do not use cache_model's convenient metadata defaults: these are the
+        # unmodified REST records that reach the production inventory checker.
+        result = node(f"""
+const policy = require({json.dumps(str(ROOT / "tools/cache_policy.cjs"))});
+const original = {{id: 1, key: 'restore-only', ref: 'refs/heads/rust-migration',
+  version: 'legacy-version', size_in_bytes: 1}};
+const rejected = [];
+for (const field of ['id', 'key', 'ref', 'version']) {{
+  for (const value of [undefined, null, '', 0]) {{
+    try {{ policy.inventory([{{...original, [field]: value}}]); rejected.push(false); }}
+    catch {{ rejected.push(true); }}
+  }}
+}}
+console.log(JSON.stringify(rejected));
+""")
+        self.assertEqual(result, [True] * 16)
 
     def test_three_overlapping_merges_have_two_fixed_slots_per_family_in_both_orders(
         self,

@@ -41,9 +41,10 @@ function inventory(caches) {
   let other = 0;
   const ids = new Set();
   for (const cache of caches) {
-    if (!Number.isSafeInteger(cache.id) || ids.has(cache.id) ||
+    if (!Number.isSafeInteger(cache.id) || cache.id <= 0 || ids.has(cache.id) ||
+        !['key', 'ref', 'version'].every(field => typeof cache[field] === 'string' && cache[field].length > 0) ||
         !Number.isSafeInteger(cache.size_in_bytes) || cache.size_in_bytes <= 0) {
-      throw Error('Ambiguous cache inventory ID/size');
+      throw Error('Ambiguous cache inventory identity/size');
     }
     ids.add(cache.id);
     const family = familyFor(cache.key);
@@ -114,6 +115,7 @@ async function control({github, context, core, family, operation, read, write}) 
       for (const legacy of payload.legacy || []) {
         if (familyFor(legacy.key) !== family || legacy.key.startsWith('bounded-') ||
             legacy.ref !== protectedRef || !Number.isSafeInteger(legacy.id) || legacy.id <= 0 ||
+            typeof legacy.version !== 'string' || legacy.version.length === 0 ||
             !/-[0-9a-f]{40}$/.test(legacy.key)) throw Error('Invalid legacy predecessor identity');
         const listed = caches.find(cache => cache.id === legacy.id);
         if (listed) {
