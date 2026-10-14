@@ -205,6 +205,7 @@ static OpenTTDAircraftLeaves AircraftTestLeaves(OpenTTDVehicleServices &vehicle,
 	shared.is_level_crossing = AircraftUnexpectedService<decltype(shared.is_level_crossing)>::Call;
 	shared.tunnel_bridge_direction = AircraftUnexpectedService<decltype(shared.tunnel_bridge_direction)>::Call;
 	shared.bridge_speed = AircraftUnexpectedService<decltype(shared.bridge_speed)>::Call;
+	shared.is_water_tile = AircraftUnexpectedService<decltype(shared.is_water_tile)>::Call;
 	shared.map_log_x = AircraftUnexpectedService<decltype(shared.map_log_x)>::Call;
 	shared.map_max_x = AircraftUnexpectedService<decltype(shared.map_max_x)>::Call;
 	shared.map_max_y = AircraftUnexpectedService<decltype(shared.map_max_y)>::Call;

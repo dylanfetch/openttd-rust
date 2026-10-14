@@ -1649,6 +1649,7 @@ static void AircraftDirectBoundary()
 {
 	auto &p = aircraft_probe;
 	p.leaves = AircraftTestLeaves(p.vehicle_services, p.shared_services);
+	CHECK(p.shared_services.is_water_tile != nullptr);
 	auto &vehicle = p.vehicle_services;
 	auto &shared = p.shared_services;
 	auto &leaves = p.leaves;
