@@ -79,6 +79,11 @@
 
 #include <bitset>
 
+#ifdef WITH_RUST
+#include "rust/vehicle_services.h"
+#include "rust/station_services.h"
+#endif
+
 #include "safeguards.h"
 
 /**
@@ -590,6 +595,7 @@ CargoArray GetAcceptanceAroundTiles(TileIndex center_tile, int w, int h, int rad
 #ifdef WITH_RUST
 struct RustStationTileCursor {
 	BitmapTileIterator iterator;
+	CargoArray acceptance{};
 	bool started = false;
 	RustStationTileCursor(Station *st) : iterator(st->catchment_tiles) {}
 };
@@ -597,206 +603,279 @@ struct RustStationTruncation {
 	StationCargoAmountMap amounts;
 	StationCargoAmountMap::iterator iterator;
 };
-static uint32_t RustStationRead(void *handle, uint8_t field, uint32_t arg) noexcept
-{
-	switch (field) {
-		case 0: return static_cast<uint32_t>(BaseStation::GetPoolSize());
-		case 1: return static_cast<uint32_t>(TimerGameTick::counter);
-		case 21: return TimerGameTick::counter >> 32;
-		case 2: return _game_mode == GM_EDITOR;
-		case 10: return _settings_game.order.selectgoods;
-		case 11: return _cheats.station_rating.value;
-		case 14: return CargoSpec::Get(arg)->IsValid();
-		case 15: return CargoSpec::Get(arg)->callback_mask.Test(CargoCallbackMask::StationRatingCalc);
-		case 16: return IsCargoInClass(arg, CargoClass::Passengers);
-		case 19: return CargoPacket::CanAllocateItem();
-		case 20: return IsTileType(TileIndex(arg), MP_HOUSE);
-	}
-	BaseStation *bst = static_cast<BaseStation *>(handle);
-	switch (field) {
-		case 3: return bst->facilities.base();
-		case 4: return bst->IsInUse();
-		case 5: return Station::IsExpected(bst);
-		case 6: return bst->owner.base();
-		case 7: return bst->owner == _local_company;
-		case 8: return bst->rect.IsEmpty();
-		case 9: return Company::IsValidID(bst->owner) && bst->town->statues.Test(bst->owner);
-		case 12: return Station::From(bst)->goods[arg].AvailableCount();
-		case 13: {
-			GoodsEntry &ge = Station::From(bst)->goods[arg];
-			return ge.HasData() ? static_cast<uint32_t>(ge.GetData().cargo.MapSize()) : 0;
-		}
-		case 17: return bst->town->exclusive_counter;
-		case 18: return bst->town->exclusivity.base();
-	}
-	NOT_REACHED();
-}
-static void RustStationEffect(void *handle, uint8_t effect, uint32_t a, uint32_t b, uint32_t c) noexcept
-{
-	BaseStation *bst = static_cast<BaseStation *>(handle);
-	switch (effect) {
-		case 0:
-			if (a != 0) SetWindowDirty(WC_STATION_VIEW, bst->index);
-			else SetWindowWidgetDirty(WC_STATION_VIEW, bst->index, WID_SV_ACCEPT_RATING_LIST);
-			break;
-		case 1: {
-			GoodsEntry &ge = Station::From(bst)->goods[a];
-			if (LinkGraph::IsValidID(ge.link_graph)) (*LinkGraph::Get(ge.link_graph))[ge.node].SetDemand(b);
-			break;
-		}
-		case 2: ShowRejectOrAcceptNews(Station::From(bst), CargoTypes(a) | CargoTypes(b) << 32, c != 0); break;
-		case 3: SetWindowWidgetDirty(WC_STATION_VIEW, bst->index, WID_SV_ACCEPT_RATING_LIST); break;
-		case 4: delete bst; break;
-		case 5:
-			TriggerStationAnimation(bst, bst->xy, StationAnimationTrigger::AcceptanceTick);
-			TriggerRoadStopAnimation(bst, bst->xy, StationAnimationTrigger::AcceptanceTick);
-			if (Station::IsExpected(bst)) TriggerAirportAnimation(Station::From(bst), AirportAnimationTrigger::AcceptanceTick);
-			break;
-		case 6: TriggerHouseAnimation_WatchedCargoAccepted(TileIndex(a), CargoTypes(b) | CargoTypes(c) << 32); break;
-		case 7: {
-			Station *st = Station::From(bst);
-			GoodsEntry &ge = st->goods[a];
-			StationID next = ge.GetVia(st->index);
-			ge.GetOrCreateData().cargo.Append(new CargoPacket(st->index, b, Source(SourceID(c & 0xFFFF), static_cast<SourceType>(c >> 16))), next);
-			break;
-		}
-		case 8: {
-			Station *st = Station::From(bst);
-			GoodsEntry &ge = st->goods[a];
-			LinkGraph *lg = nullptr;
-			if (ge.link_graph == LinkGraphID::Invalid()) {
-				if (LinkGraph::CanAllocateItem()) {
-					lg = new LinkGraph(a);
-					LinkGraphSchedule::instance.Queue(lg);
-					ge.link_graph = lg->index;
-					ge.node = lg->AddNode(st);
-				} else {
-					Debug(misc, 0, "Can't allocate link graph");
-				}
-			} else {
-				lg = LinkGraph::Get(ge.link_graph);
-			}
-			if (lg != nullptr) (*lg)[ge.node].UpdateSupply(b);
-			break;
-		}
-		case 9: InvalidateWindowData(WC_STATION_LIST, bst->owner); break;
-		case 10: {
-			Station *st = Station::From(bst);
-			TriggerStationRandomisation(st, st->xy, StationRandomTrigger::NewCargo, a);
-			TriggerStationAnimation(st, st->xy, StationAnimationTrigger::NewCargo, a);
-			TriggerAirportAnimation(st, AirportAnimationTrigger::NewCargo, a);
-			TriggerRoadStopRandomisation(st, st->xy, StationRandomTrigger::NewCargo, a);
-			TriggerRoadStopAnimation(st, st->xy, StationAnimationTrigger::NewCargo, a);
-			break;
-		}
-		case 11:
-			SetWindowDirty(WC_STATION_VIEW, bst->index);
-			Station::From(bst)->MarkTilesDirty(true);
-			break;
-		default: NOT_REACHED();
-	}
-}
 static const OpenTTDStationServices _rust_station_services = {
-	[](uint32_t id) noexcept -> void * { return BaseStation::GetIfValid(StationID(id)); },
-	[](void *st) noexcept { return static_cast<BaseStation *>(st)->rust_service.get(); },
-	RustStationRead, RustStationEffect,
-	[](void *, uint8_t cargo, uint32_t var10, uint32_t var18) noexcept { return GetCargoCallback(CBID_CARGO_STATION_RATING_CALC, var10, var18, CargoSpec::Get(cargo)); },
-	[](void *st) noexcept -> void * { return new RustStationTileCursor(Station::From(static_cast<BaseStation *>(st))); },
-	[](void *handle, uint8_t) noexcept {
+	.station = [](uint16_t id) noexcept -> OpenTTDLoadingStation {
+		Station *st = Station::Get(StationID(id));
+		return {.native = st, .base = st, .state = st->rust_service.get()};
+	},
+	.station_owner = [](OpenTTDBaseStation *handle) noexcept -> uint8_t {
+		return OpenTTDStationOwner(handle).base();
+	},
+	.station_exclusivity = [](OpenTTDBaseStation *handle) noexcept -> OpenTTDStationExclusivity {
+		BaseStation *st = static_cast<BaseStation *>(handle);
+		return {
+			st->town->exclusive_counter, st->town->exclusivity.base()
+		};
+	},
+	.station_next = [](void *handle) noexcept -> OpenTTDBaseStation * {
+		auto *cursor = static_cast<std::pair<StationList::const_iterator, StationList::const_iterator> *>(handle);
+		if (cursor->first == cursor->second) return nullptr;
+		return *cursor->first++;
+	},
+	.rating_counts = [](OpenTTDBaseStation *handle, uint8_t cargo) noexcept -> OpenTTDRatingCounts {
+		GoodsEntry &ge = Station::From(static_cast<BaseStation *>(handle))->goods[cargo];
+		return {
+			ge.AvailableCount(), ge.HasData() ? static_cast<uint32_t>(ge.GetData().cargo.MapSize()) : 0
+		};
+	},
+	.get = [](uint16_t id) noexcept -> OpenTTDBaseStation * {
+		return BaseStation::GetIfValid(StationID(id));
+	},
+	.owner = [](OpenTTDBaseStation *handle) noexcept -> OpenTTDStationService * {
+		return static_cast<BaseStation *>(handle)->rust_service.get();
+	},
+	.pool_size = []() noexcept -> size_t {
+		return BaseStation::GetPoolSize();
+	},
+	.tick_counter = []() noexcept -> uint64_t {
+		return openttd_orders_tick_counter();
+	},
+	.editor = []() noexcept -> bool {
+		return _game_mode == GM_EDITOR;
+	},
+	.facilities = [](OpenTTDBaseStation *handle) noexcept -> uint8_t {
+		return static_cast<BaseStation *>(handle)->facilities.base();
+	},
+	.in_use = [](OpenTTDBaseStation *handle) noexcept -> bool {
+		return static_cast<BaseStation *>(handle)->IsInUse();
+	},
+	.is_station = [](OpenTTDBaseStation *handle) noexcept -> bool {
+		return Station::IsExpected(static_cast<BaseStation *>(handle));
+	},
+	.local_owner = [](OpenTTDBaseStation *handle) noexcept -> bool {
+		return static_cast<BaseStation *>(handle)->owner == _local_company;
+	},
+	.rectangle_empty = [](OpenTTDBaseStation *handle) noexcept -> bool {
+		return static_cast<BaseStation *>(handle)->rect.IsEmpty();
+	},
+	.town_statue = [](OpenTTDBaseStation *handle) noexcept -> bool {
+		return Company::IsValidID(static_cast<BaseStation *>(handle)->owner) && static_cast<BaseStation *>(handle)->town->statues.Test(static_cast<BaseStation *>(handle)->owner);
+	},
+	.select_goods = []() noexcept -> bool {
+		return _settings_game.order.selectgoods;
+	},
+	.rating_cheat = []() noexcept -> bool {
+		return _cheats.station_rating.value;
+	},
+	.available = [](OpenTTDBaseStation *handle, uint8_t cargo) noexcept -> uint32_t {
+		return Station::From(static_cast<BaseStation *>(handle))->goods[cargo].AvailableCount();
+	},
+	.cargo_valid = [](uint8_t cargo) noexcept -> bool {
+		return CargoSpec::Get(cargo)->IsValid();
+	},
+	.rating_callback_enabled = [](uint8_t cargo) noexcept -> bool {
+		return CargoSpec::Get(cargo)->callback_mask.Test(CargoCallbackMask::StationRatingCalc);
+	},
+	.passenger_cargo = [](uint8_t cargo) noexcept -> bool {
+		return IsCargoInClass(cargo, CargoClass::Passengers);
+	},
+	.packet_available = []() noexcept -> bool {
+		return CargoPacket::CanAllocateItem();
+	},
+	.rating_redraw = [](OpenTTDBaseStation *handle, bool waiting_changed) noexcept -> void {
+		BaseStation *st = static_cast<BaseStation *>(handle);
+		if (waiting_changed) SetWindowDirty(WC_STATION_VIEW, st->index);
+		else SetWindowWidgetDirty(WC_STATION_VIEW, st->index, WID_SV_ACCEPT_RATING_LIST);
+	},
+	.set_demand = [](OpenTTDBaseStation *handle, uint8_t cargo, uint32_t amount) noexcept -> void {
+		GoodsEntry &ge = Station::From(static_cast<BaseStation *>(handle))->goods[cargo];
+		if (LinkGraph::IsValidID(ge.link_graph)) (*LinkGraph::Get(ge.link_graph))[ge.node].SetDemand(amount);
+	},
+	.acceptance_news = [](OpenTTDBaseStation *handle, uint64_t cargoes, bool reject) noexcept -> void {
+		ShowRejectOrAcceptNews(Station::From(static_cast<BaseStation *>(handle)), cargoes, reject);
+	},
+	.acceptance_redraw = [](OpenTTDBaseStation *handle) noexcept -> void {
+		SetWindowWidgetDirty(WC_STATION_VIEW, static_cast<BaseStation *>(handle)->index, WID_SV_ACCEPT_RATING_LIST);
+	},
+	.delete_station = [](OpenTTDBaseStation *handle) noexcept -> void {
+		delete static_cast<BaseStation *>(handle);
+	},
+	.acceptance_animation = [](OpenTTDBaseStation *handle) noexcept -> void {
+		BaseStation *bst = static_cast<BaseStation *>(handle);
+		TriggerStationAnimation(bst, bst->xy, StationAnimationTrigger::AcceptanceTick);
+		TriggerRoadStopAnimation(bst, bst->xy, StationAnimationTrigger::AcceptanceTick);
+		if (Station::IsExpected(bst)) TriggerAirportAnimation(Station::From(bst), AirportAnimationTrigger::AcceptanceTick);
+	},
+	.watched_animation = [](uint32_t tile, uint64_t cargoes) noexcept -> void {
+		TriggerHouseAnimation_WatchedCargoAccepted(TileIndex(tile), cargoes);
+	},
+	.append_packet = [](OpenTTDBaseStation *handle, uint8_t cargo, uint32_t amount, OpenTTDCargoSource source) noexcept -> void {
+		Station *st = Station::From(static_cast<BaseStation *>(handle));
+		GoodsEntry &ge = st->goods[cargo];
+		StationID next = ge.GetVia(st->index);
+		ge.GetOrCreateData().cargo.Append(new CargoPacket(st->index, amount, Source(source.id, source.type)), next);
+	},
+	.update_supply = [](OpenTTDBaseStation *handle, uint8_t cargo, uint32_t amount) noexcept -> void {
+		Station *st = Station::From(static_cast<BaseStation *>(handle));
+		GoodsEntry &ge = st->goods[cargo];
+		LinkGraph *lg = nullptr;
+		if (ge.link_graph == LinkGraphID::Invalid()) {
+			if (LinkGraph::CanAllocateItem()) {
+				lg = new LinkGraph(cargo);
+				LinkGraphSchedule::instance.Queue(lg);
+				ge.link_graph = lg->index;
+				ge.node = lg->AddNode(st);
+			} else {
+				Debug(misc, 0, "Can't allocate link graph");
+			}
+		} else {
+			lg = LinkGraph::Get(ge.link_graph);
+		} if (lg != nullptr) (*lg)[ge.node].UpdateSupply(amount);
+	},
+	.station_list_invalidation = [](OpenTTDBaseStation *handle) noexcept -> void {
+		InvalidateWindowData(WC_STATION_LIST, static_cast<BaseStation *>(handle)->owner);
+	},
+	.new_cargo_animation = [](OpenTTDBaseStation *handle, uint8_t cargo) noexcept -> void {
+		Station *st = Station::From(static_cast<BaseStation *>(handle));
+		TriggerStationRandomisation(st, st->xy, StationRandomTrigger::NewCargo, cargo);
+		TriggerStationAnimation(st, st->xy, StationAnimationTrigger::NewCargo, cargo);
+		TriggerAirportAnimation(st, AirportAnimationTrigger::NewCargo, cargo);
+		TriggerRoadStopRandomisation(st, st->xy, StationRandomTrigger::NewCargo, cargo);
+		TriggerRoadStopAnimation(st, st->xy, StationAnimationTrigger::NewCargo, cargo);
+	},
+	.waiting_redraw = [](OpenTTDBaseStation *handle) noexcept -> void {
+		SetWindowDirty(WC_STATION_VIEW, static_cast<BaseStation *>(handle)->index);
+		Station::From(static_cast<BaseStation *>(handle))->MarkTilesDirty(true);
+	},
+	.rating_callback = [](OpenTTDBaseStation *, uint8_t cargo, uint32_t var10, uint32_t var18) noexcept -> uint16_t {
+		return GetCargoCallback(CBID_CARGO_STATION_RATING_CALC, var10, var18, CargoSpec::Get(cargo));
+	},
+	.with_tiles = [](OpenTTDBaseStation *handle, void *context, OpenTTDStationScope body) noexcept {
+		RustStationTileCursor cursor(Station::From(static_cast<BaseStation *>(handle)));
+		body(context, &cursor);
+	},
+	.tile_next = [](void *handle) noexcept -> uint32_t {
 		auto *cursor = static_cast<RustStationTileCursor *>(handle);
 		if (cursor->started) ++cursor->iterator;
 		cursor->started = true;
 		return static_cast<TileIndex>(cursor->iterator).base();
 	},
-	[](void *handle) noexcept { delete static_cast<RustStationTileCursor *>(handle); },
-	[](uint32_t tile, uint32_t *amounts, uint64_t *always) noexcept {
-		CargoArray acceptance{};
-		std::copy_n(amounts, NUM_CARGO, acceptance.begin());
-		AddAcceptedCargo(TileIndex(tile), acceptance, always);
-		std::copy(acceptance.begin(), acceptance.end(), amounts);
+	.accept_tile = [](void *handle, uint32_t tile, uint64_t *always) noexcept {
+		AddAcceptedCargo(TileIndex(tile), static_cast<RustStationTileCursor *>(handle)->acceptance, always);
 	},
-	[](void *handle, uint8_t cargo, uint32_t amount) noexcept -> void * {
-		auto *result = new RustStationTruncation;
+	.acceptance_amounts = [](void *handle) noexcept -> const uint32_t * {
+		return static_cast<RustStationTileCursor *>(handle)->acceptance.data();
+	},
+	.with_truncation = [](OpenTTDBaseStation *handle, uint8_t cargo, uint32_t amount, void *context, OpenTTDStationScope body) noexcept {
+		RustStationTruncation result;
 		GoodsEntry &ge = static_cast<Station *>(handle)->goods[cargo];
-		if (ge.HasData()) ge.GetData().cargo.Truncate(amount, &result->amounts);
-		result->iterator = result->amounts.begin();
-		return result;
+		if (ge.HasData()) ge.GetData().cargo.Truncate(amount, &result.amounts);
+		result.iterator = result.amounts.begin();
+		body(context, &result);
 	},
-	[](void *handle, uint32_t *amount) noexcept -> uint32_t {
+	.truncate_next = [](void *handle) noexcept -> OpenTTDTruncatedSource {
 		auto *result = static_cast<RustStationTruncation *>(handle);
-		if (result->iterator == result->amounts.end()) return UINT32_MAX;
-		*amount = result->iterator->second;
-		return (result->iterator++)->first.base();
+		if (result->iterator == result->amounts.end()) return {0, 0, false};
+		const auto &[source, amount] = *result->iterator++;
+		return {amount, source.base(), true};
 	},
-	[](void *handle) noexcept { delete static_cast<RustStationTruncation *>(handle); },
-	[]() noexcept { return Random(); },
+	.shared = &GetRustSharedServices(),
 };
 static const OpenTTDStationLinks _rust_station_links = {
-	[](void *st, uint8_t cargo) noexcept -> void * { return LinkGraph::GetIfValid(static_cast<Station *>(st)->goods[cargo].link_graph); },
-	[](void *handle, uint8_t field, uint32_t a, uint32_t b) noexcept -> uint32_t {
-		switch (field) {
-			case 0: return _settings_game.linkgraph.GetDistributionType(a) != DT_MANUAL;
-			case 1: return static_cast<Station *>(handle)->goods[a].node;
-			case 2: return static_cast<uint32_t>((*static_cast<LinkGraph *>(handle))[a].edges.size());
-			case 3: return TimerGameEconomy::date.base();
-			case 4: return static_cast<Station *>(handle)->index.base();
-			case 5: return (*static_cast<LinkGraph *>(handle))[a].edges[b].LastUpdate().base();
-			case 6: return static_cast<LinkGraph *>(handle)->LastCompression().base();
-		}
-		NOT_REACHED();
+	.graph = [](OpenTTDBaseStation *handle, uint8_t cargo) noexcept -> OpenTTDLinkGraph * {
+		return LinkGraph::GetIfValid(static_cast<Station *>(handle)->goods[cargo].link_graph);
 	},
-	[](void *handle, uint16_t node, uint32_t index, OpenTTDStationEdge *out) noexcept {
+	.automatic_distribution = [](uint8_t cargo) noexcept -> bool {
+		return _settings_game.linkgraph.GetDistributionType(cargo) != DT_MANUAL;
+	},
+	.node = [](OpenTTDBaseStation *handle, uint8_t cargo) noexcept -> uint16_t {
+		return static_cast<Station *>(handle)->goods[cargo].node;
+	},
+	.edge_count = [](OpenTTDLinkGraph *handle, uint16_t node) noexcept -> size_t {
+		return (*static_cast<LinkGraph *>(handle))[node].edges.size();
+	},
+	.date = []() noexcept -> int32_t {
+		return TimerGameEconomy::date.base();
+	},
+	.station_id = [](OpenTTDBaseStation *handle) noexcept -> uint16_t {
+		return static_cast<Station *>(handle)->index.base();
+	},
+	.edge_last_update = [](OpenTTDLinkGraph *handle, uint16_t node, size_t index) noexcept -> int32_t {
+		return (*static_cast<LinkGraph *>(handle))[node].edges[index].LastUpdate().base();
+	},
+	.last_compression = [](OpenTTDLinkGraph *handle) noexcept -> int32_t {
+		return static_cast<LinkGraph *>(handle)->LastCompression().base();
+	},
+	.edge = [](OpenTTDLinkGraph *handle, uint16_t node, size_t index, OpenTTDBaseStation *from_handle) noexcept -> OpenTTDStationEdge {
 		LinkGraph *graph = static_cast<LinkGraph *>(handle);
 		const Edge &edge = (*graph)[node].edges[index];
-		Station *from = Station::Get((*graph)[node].station);
+		Station *from = static_cast<Station *>(from_handle);
 		Station *to = Station::Get((*graph)[edge.dest_node].station);
-		*out = {to, edge.LastUpdate().base(), edge.last_unrestricted_update.base(), edge.last_restricted_update.base(), DistanceManhattan(from->xy, to->xy), edge.dest_node};
+		return {to, edge.LastUpdate().base(), DistanceManhattan(from->xy, to->xy)};
 	},
-	[](void *handle, uint8_t effect, uint16_t a, uint16_t b) noexcept {
-		switch (effect) {
-			case 0: {
-				GoodsEntry &ge = static_cast<Station *>(handle)->goods[a];
-				if (ge.HasData()) ge.GetData().flows.DeleteFlows(StationID(b));
-				break;
-			}
-			case 1: (*static_cast<LinkGraph *>(handle))[a][b].Restrict(); break;
-			case 2: {
-				GoodsEntry &ge = static_cast<Station *>(handle)->goods[a];
-				if (ge.HasData()) ge.GetData().flows.RestrictFlows(StationID(b));
-				break;
-			}
-			case 3: (*static_cast<LinkGraph *>(handle))[a][b].Release(); break;
-			case 4: (*static_cast<LinkGraph *>(handle))[a].RemoveEdge(b); break;
-			case 5: static_cast<LinkGraph *>(handle)->Compress(); break;
-			default: NOT_REACHED();
-		}
+	.edge_unrestricted = [](OpenTTDLinkGraph *handle, uint16_t node, size_t index) noexcept -> int32_t {
+		return (*static_cast<LinkGraph *>(handle))[node].edges[index].last_unrestricted_update.base();
 	},
-	[](uint32_t id) noexcept -> void * { return OrderList::GetIfValid(OrderListID(id)); },
-	[](void *handle, uint8_t field, size_t arg) noexcept -> size_t {
-		if (field == 0) return OrderList::GetPoolSize();
-		OrderList *list = static_cast<OrderList *>(handle);
-		if (field == 1) return list->GetOrders().size();
-		const Order *order = &list->GetOrders()[arg];
-		return order->IsType(OT_GOTO_STATION) || order->IsType(OT_IMPLICIT) ? order->GetDestination().base() : UINT32_MAX;
+	.edge_restricted = [](OpenTTDLinkGraph *handle, uint16_t node, size_t index) noexcept -> int32_t {
+		return (*static_cast<LinkGraph *>(handle))[node].edges[index].last_restricted_update.base();
 	},
-	[](void *list) noexcept -> void * { return static_cast<OrderList *>(list)->GetFirstSharedVehicle(); },
-	[](void *handle, uint8_t shared) noexcept -> void * { return shared ? static_cast<Vehicle *>(handle)->NextShared() : static_cast<Vehicle *>(handle)->Next(); },
-	[](void *handle, uint8_t field) noexcept -> uint32_t {
-		Vehicle *vehicle = static_cast<Vehicle *>(handle);
-		switch (field) {
-			case 0: return vehicle->IsStoppedInDepot();
-			case 1: return vehicle->date_of_last_service.base();
-			case 2: return vehicle->cargo_type;
-		}
-		NOT_REACHED();
+	.delete_flows = [](OpenTTDBaseStation *handle, uint8_t cargo, uint16_t destination) noexcept -> void {
+		GoodsEntry &ge = static_cast<Station *>(handle)->goods[cargo];
+		if (ge.HasData()) ge.GetData().flows.DeleteFlows(StationID(destination));
 	},
-	[](void *vehicle) noexcept { LinkRefresher::Run(static_cast<Vehicle *>(vehicle), false); },
-	[](void *handle, void *vehicle, uint8_t cargo, uint16_t avoid, uint16_t avoid2) noexcept {
+	.restrict_edge = [](OpenTTDLinkGraph *handle, uint16_t from, size_t index) noexcept -> void {
+		(*static_cast<LinkGraph *>(handle))[from].edges[index].Restrict();
+	},
+	.restrict_flows = [](OpenTTDBaseStation *handle, uint8_t cargo, uint16_t destination) noexcept -> void {
+		GoodsEntry &ge = static_cast<Station *>(handle)->goods[cargo];
+		if (ge.HasData()) ge.GetData().flows.RestrictFlows(StationID(destination));
+	},
+	.release_edge = [](OpenTTDLinkGraph *handle, uint16_t from, size_t index) noexcept -> void {
+		(*static_cast<LinkGraph *>(handle))[from].edges[index].Release();
+	},
+	.remove_edge = [](OpenTTDLinkGraph *handle, uint16_t from, uint16_t to) noexcept -> void {
+		(*static_cast<LinkGraph *>(handle))[from].RemoveEdge(to);
+	},
+	.compress = [](OpenTTDLinkGraph *handle) noexcept -> void {
+		static_cast<LinkGraph *>(handle)->Compress();
+	},
+	.order_list = [](uint16_t id) noexcept -> OpenTTDOrderList * {
+		return OrderList::GetIfValid(OrderListID(id));
+	},
+	.order_pool_size = []() noexcept -> size_t {
+		return OrderList::GetPoolSize();
+	},
+	.order_count = [](OpenTTDOrderList *handle) noexcept -> size_t {
+		return static_cast<OrderList *>(handle)->GetOrders().size();
+	},
+	.order_destination = [](OpenTTDOrderList *handle, size_t index) noexcept -> OpenTTDOrderDestination {
+		const Order *order = &static_cast<OrderList *>(handle)->GetOrders()[index];
+		if (!order->IsType(OT_GOTO_STATION) && !order->IsType(OT_IMPLICIT)) return {0, false};
+		return {order->GetDestination().base(), true};
+	},
+	.order_vehicle = [](OpenTTDOrderList *handle) noexcept -> OpenTTDVehicle * {
+		return RustVehicle(static_cast<OrderList *>(handle)->GetFirstSharedVehicle());
+	},
+	.next_vehicle = GetRustVehicleServices().next,
+	.next_shared = [](OpenTTDVehicle *handle) noexcept -> OpenTTDVehicle * {
+		return RustVehicle(VehicleOf(handle)->NextShared());
+	},
+	.stopped_in_depot = [](OpenTTDVehicle *handle) noexcept -> bool {
+		return VehicleOf(handle)->IsStoppedInDepot();
+	},
+	.last_service = [](OpenTTDVehicle *handle) noexcept -> int32_t {
+		return VehicleOf(handle)->date_of_last_service.base();
+	},
+	.cargo_type = RustVehicleCargoType,
+	.refresh = [](OpenTTDVehicle *handle) noexcept -> void {
+		LinkRefresher::Run(VehicleOf(handle), false);
+	},
+	.reroute = [](OpenTTDBaseStation *handle, OpenTTDVehicle *vehicle, uint8_t cargo, uint16_t avoid, uint16_t avoid2) noexcept -> void {
 		GoodsEntry &ge = static_cast<Station *>(handle)->goods[cargo];
 		if (vehicle == nullptr) {
 			if (ge.HasData()) ge.GetData().cargo.Reroute(UINT_MAX, &ge.GetData().cargo, StationID(avoid), StationID(avoid2), &ge);
 		} else {
-			Vehicle *v = static_cast<Vehicle *>(vehicle);
+			Vehicle *v = VehicleOf(vehicle);
 			v->cargo.Reroute(UINT_MAX, &v->cargo, StationID(avoid), StationID(avoid2), &ge);
 		}
 	},
@@ -4864,8 +4943,8 @@ static bool CanMoveGoodsToStation(const Station *st, CargoType cargo)
 uint MoveGoodsToStation(CargoType cargo, uint amount, Source source, const StationList &all_stations, Owner exclusivity)
 {
 #ifdef WITH_RUST
-	std::vector<void *> stations(all_stations.begin(), all_stations.end());
-	return openttd_rust_station_distribute(cargo, amount, source.id | uint32_t(source.type) << 16, stations.data(), stations.size(), exclusivity.base(), &_rust_station_services);
+	std::pair cursor(all_stations.begin(), all_stations.end());
+	return openttd_rust_station_distribute(cargo, amount, {source.id, source.type}, &cursor, exclusivity.base(), &_rust_station_services);
 #else
 	/* Return if nothing to do. Also the rounding below fails for 0. */
 	if (all_stations.empty()) return 0;

@@ -4,23 +4,23 @@ Root owns selection here; `AGENTS.md` and `docs/rust-migration.md` define proces
 If an issue conflicts, follow this roadmap and report it to root. Keep this
 forward-looking, about 200 lines; completed work is one row, with evidence in PRs.
 
-## Where the fork stands (2026-10-13, `62ef446d1e`)
+## Where the fork stands (2026-10-13, `3b3b931099`)
 
 - Twenty-three ownership ports. Whole fork against the pinned original: Rust
-  55,082 / tooling 28,602 / C++ glue 24,602 / original C++ retired 36,162 (7.68%
+  55,453 / tooling 28,635 / C++ glue 25,307 / original C++ retired 36,162 (7.68%
   of all `src/` sources); simulation-source share 28,215 / 102,615 (27.50%, #226).
-- #230 caps, #236 water fidelity and #240 coverage are integrated and cleaned up.
-  No additional original code retired. Six branches include the two ownership
-  prototypes and selected #243 cache-peak repair; reviews precede more integration.
+- #230/#236/#240/#217 are integrated and cleaned up. The fourth integration
+  leaves original retirement unchanged; five branches remain. Finish the bounded
+  ownership experiments or defer them, then #219 before further conversions.
 - Current calibrated ratios: Opus 1.258, Grok 1.254, Padhattan-1996 1.275,
   Padhattan-2000 1.349, Padhattan-2016 1.427, TGP 1.164. TGP remains above
   1.15. Aircraft's final six-case medians pass; a matched Padhattan-2016
   diagnosis shows 4.51% improvement. Initial noisy samples remain in #238.
-- #212 P0/P1 fail TGP: +28/+38 ms against 11 ms; no broad port starts.
-  Select only R0, the planned shared raw tile-type read experiment (#108),
-  retaining C++ arrays and native assertion policy. #213's tick prototype is active.
-- #233 is incomplete: concurrent cache writes peaked at 10.37 GiB and evicted
-  entries; root pruned duplicates. #243 selects bounded protected writers per
+- #212 P0/P1/R0 fail TGP: +28/+38/+31 ms against 11 ms; defer the owner and
+  map-read experiment. #213 P0 fails 6 ns/current cap; only its selected
+  two-phase scalar-address revision remains. Start whole signal ownership #219.
+- #233 is incomplete: concurrent cache writes peaked at 10.37 GiB; missing
+  entries suggest eviction. Root pruned duplicates. #243 selects protected writers per
   family, without artifact input or candidate write privileges. Warm timing and
   three-merge acceptance repeat after repair; no target is waived.
 - Open #156 gaps include threaded execution, NewGRF/refit callbacks, positive
@@ -118,6 +118,7 @@ retirement, with net glue in the PR (#223).
 | #234 (industry water fidelity) | #236 | direct | `b7a1429d38` | 5 / 97 / 32 / 0; net glue +32 |
 | #229 (six calibrated caps) | #230 | direct | `e69df25522` | 0 / 12 / 0 / 0; net glue 0 |
 | #239/#156 (prospect/overlap coverage) | #240 | direct | `62ef446d1e` | 0 / 114 / 0 / 0; net glue 0 |
+| #214/#168 (typed station/loading) | #217 | direct | `3b3b931099` | 1018 / 42 / 1147 / 0; net glue +705 |
 
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -136,56 +137,60 @@ go in `KNOWN_FAILURES` with an issue, never in masks (`docs/rust-migration.md`).
    its median of three beats it by more than the invocation spread (about 2%).
    Targets: play saves 1.5x, generation 1.15x. The null driver redraws whenever
    1 ms has elapsed, so a slower candidate draws more frames.
-3. **#156 coverage, standing capacity.** #239/#240 covers failed prospecting
-   and automatic overlap rejection and is integrated. Random and crash branches first. The
-   tenth review added station stale-link restriction, town station ratings,
-   exclusivity and unwanted months, and #218's NewGRF and game-script paths.
-4. **#234 fidelity fix (#236)** and **#229 caps (#230)** are integrated.
-   Diagnose aircraft timing against these caps; do not select passing minima.
+3. **#156 coverage, standing capacity.** Random/crash branches first; station
+   stale links, town station ratings/exclusivity/unwanted months and #218's
+   NewGRF/game-script paths remain. #239/#240 prospect/overlap checks are integrated.
 
 ## Phase 2: current work, in order
 
 Integrate reviewed work first, in order of readiness; at most six unintegrated
 branches (#157). Independent items (#156, #223, caps) may run in parallel.
 
-1. **#217 station/loading** needs the Windows macro fix review/checks, then full CI.
-2. **#216 town, narrowed** needs shared-table conflict resolution against the
-   integrated base and then #217, fresh narrow review and full CI; then town
+1. **#216 town, narrowed** adopts integrated #217, with fresh conflict review
+   and full CI; then town
    founding/generation, the house tile loop, and town commands, authority
    actions and deletion as their own ports.
-3. **#199/#237 aircraft conversion (#238)** has passing final timing; review active.
-4. **New ownership:** only #212 R0 shared map-read experiment and #213 vehicle
-   prototype now; broad ports require the unchanged budgets. #212 R0 follows
-   the linked plan on its issue, including layout/lifetime/default checks.
-   Then #219 signal blocks and #220 engines (#220 after #213 and #148).
-5. **Conversions:** train and ship after #213; the #168 tail (orders, effect,
+2. **#199/#237 aircraft (#238)** passed full CI; fresh #217 conflict review runs.
+3. **New ownership:** start complete #219 signal-block traversal/work sets from
+   integrated base; no dependency on the failed landscape draft or vehicle draft.
+   #213's selected revision keeps the unchanged budget; failure defers it.
+   #220 engines follows #213/#148 or a fresh dependency selection after deferral.
+4. **Conversions:** train and ship after #213; the #168 tail (orders, effect,
    disaster, #218's accessors) never blocks ownership.
 
-#108 retains C++ map arrays; measured #212 failure now selects one bounded raw
-read backend, with one shared tile-type helper and callback fallback for unaudited
-owners/fixtures. Prove native layout/allocation stability and serial access; no
-Rust references/slices survive callbacks. GetTileType's assertion policy stays.
-No storage transfer, unchecked timing proxy, new accessor copy or budget waiver.
+#108 retains C++ map arrays and integrated typed services. #212's bounded raw
+type-reader also failed; defer it with the owner, without an unchecked timing
+proxy or budget waiver. New owners reuse integrated services, never draft copies.
+
+#213 selects two shared typed native scalar-address bundles, only for post-tick
+cargo and motion/sound phases, following the linked source/lifetime plan on #213.
+Rust dereferences fields at original branches; status stays a typed service.
+No Vehicle/STL layout view, offsets, storage transfer, reference across callback,
+joined phase record or timer change. Preserve native assertion configurations.
+Measure crossings/bytes and matched CPU/wall time; both 6 ns and current cap must
+pass. Failure defers this owner; broad maintenance remains unstarted.
 
 ## Resume checkpoint
 
-Active continuous development. #240's tested tree is the merged tree; post-merge
-cache refresh is expected. Earlier code post-merge runs pass. CI peak acceptance
-failed and #243 is selected first. Landscape P0/P1 failed; only R0 is selected.
+Active continuous development. #217 passed full CI and is merged/cleaned; its
+post-merge native policy hit a GitHub API failure and root reran it. More merges
+wait for main recovery. #243 is first. #212 is deferred; #213's revision remains.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #214 / #217 | `station-loading-direct-214`, `de6266066a` | Fresh fixing review/native checks active, then full CI. |
-| #148 / #216 | `town-lifecycle-148`, `3504fc4706` | Clean/pushed; final #217 adoption and fresh conflict review wait. |
-| #237 / #238 | `aircraft-shared-boundary-237`, `a019d4279e` | All six caps pass; fresh fixing review active. |
-| #212 / #241 | `landscape-budget-prototype-212`, `6b33b1f45a` | P0/P1 fail; count attribution, then selected R0 experiment. |
-| #213 / #242 | `vehicle-budget-prototype-213`, `649aa1d9fb` | Cargo passes; native/Opus feasibility pending. |
-| #233 / #243 | `ci-cache-peak-233`, pending | Selected protected-writer fix starts from integrated base. |
+| #148 / #216 | `town-lifecycle-148`, `3d1164d918` | #217 adoption pushed; fresh conflict checks active. |
+| #237 / #238 | `aircraft-shared-boundary-237`, `ca601fd547` | Earlier full passed; #217 conflicts resolved; fresh checks active. |
+| #212 / #241 | `landscape-budget-prototype-212`, `45633ef6d6` | R0 fails budget/cap; final attribution/disposition then deferred. |
+| #213 / #242 | `vehicle-budget-prototype-213`, `d9a3d55043` | Scalar-address revision Cargo passes; native/semantics then budget gate. |
+| #233 / #244 | `ci-cache-peak-233`, `85dd778eb1` | #243 protected-only two-slot publisher in progress; bootstrap after review. |
+| #219 | fresh integrated-base branch pending | Whole signal owner selected; starts when prototype task frees slot. |
 
-Next unstarted: #219/#220. ABI blocks: train through 385, tree additions 386-389,
+Next unstarted after #219: #220; fresh owner planning follows #219 kickoff.
+ABI blocks: train through 385, tree additions 386-389,
 fleet 390-399, company 400-429, town 430-459, road 460-499, station/loading 500-559,
 industry 560-619 (572 shared ByteSpan), CommandCost 620-629, town lifecycle 630-669,
-aircraft 670-739, vehicle scheduling 740-779, landscape 780-819. Only consumed layouts.
+aircraft 670-739, vehicle 740-779, deferred landscape 780-819, signals 820-859.
+Only consumed layouts.
 
 Preserve the pinned reference, paused curve worktrees and evidence branches
 `evidence-disaster-vehicles` (`a775543162`) and `evidence-water-regions`
@@ -194,15 +199,12 @@ Preserve the pinned reference, paused curve worktrees and evidence branches
 
 ## Out of scope for the near term
 
-More `src/3rdparty` ports (monocypher, squirrel, others). GUI rendering and
-layout. Platform or toolchain expansion. Deferred behavior improvements stay in
-`deferred-improvement` issues.
+More `src/3rdparty` ports, GUI rendering/layout and platform/toolchain expansion.
+Deferred behavior improvements stay in `deferred-improvement` issues.
 
 ## Progress metric
 
-Every port PR pastes `python3 tools/port-metrics.py`: Rust / tooling / C++ glue
-added, original C++ retired, fork glue removed and net glue. Conversions report
-net glue; `--whole-fork` gives totals and the share of simulation sources retired.
-Retire more original C++ than net glue plus tooling, or explain why.
-Data tables inflate retirement; judge progress
-by game logic owned and avoid utility-kernel extraction.
+Every port PR pastes `python3 tools/port-metrics.py`: Rust/tooling/glue added,
+original retired, fork glue removed and net glue; `--whole-fork` gives totals and
+simulation share. Retire more original C++ than net glue plus tooling or explain
+why. Judge game logic owned; data tables inflate retirement. Avoid utility kernels.

@@ -58,6 +58,18 @@ end every affected Rust borrow before calling a typed service directly.
 Neither C++ exceptions nor Rust panics unwind
 across FFI; for ordinary-play failures preserve source failure order.
 
+#213's selected post-tick experiment may return addresses of named native scalar
+members, in separate cargo and motion/sound bundles. C++ keeps the vehicle shells
+and allocation; Rust forms no Vehicle/container layout view or reference. Native
+types and address identity are checked, including write-through. Access occurs
+only at original branches under the game-state mutex; all raw accesses end before
+callbacks. The audited cargo/sound paths may reenter but cannot destroy these
+shells, reset pools or yield the mutex. Addresses are acquired after Tick survives
+and discarded before another Tick, pool iteration or fleet drain. Shared status
+remains a typed service; no bitset-layout cast is permitted. This bounded contract
+does not authorize other raw field access or broad maintenance. Its measured
+crossing/byte cost and both CPU/wall gates decide whether it proceeds.
+
 Per-field callbacks inside tile or vehicle loops may dominate runtime. Prefer
 copied records for fields observed together and batches only where the original
 has no intervening observable operation. Do not batch RNG or defer writes across
@@ -74,7 +86,9 @@ records over one callback per bitfield; trees already copy ten words per read,
 and water-region traversal calls track/follower services rather than individual
 map fields. The measurements in [PR #116](https://github.com/dylanfetch/openttd-rust/pull/116)
 and [PR #114](https://github.com/dylanfetch/openttd-rust/pull/114) establish crossing density,
-not a map-access bottleneck. No shared-storage implementation is selected now.
+not a map-access bottleneck. C++ storage ownership remains selected. #212's
+entry-resolved raw tile-type experiment also failed its budget and is deferred
+with that owner. New owners use integrated typed services; no transfer is selected.
 
 For the 256x512 tree soak, generation uses 191,315 (temperate) / 321,489 (tropic)
 map-service calls. Tree updates average 204--245 map calls per 512-tile batch

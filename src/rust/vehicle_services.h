@@ -40,6 +40,11 @@ inline uint8_t RustGroundCachedLength(const T *v) noexcept { return v->gcache.ca
 template <class T>
 inline bool RustGroundHasArticulated(const T *v) noexcept { return v->HasArticulatedPart(); }
 
+/** Base vehicle cargo and articulated fields shared by loading and link refresh. */
+inline uint8_t RustVehicleCargoType(OpenTTDVehicle *handle) noexcept { return VehicleOf(handle)->cargo_type; }
+inline uint8_t RustVehicleOwnerOf(OpenTTDVehicle *handle) noexcept { return RustVehicleOwner(VehicleOf(handle)); }
+inline bool RustVehicleHasArticulated(OpenTTDVehicle *handle) noexcept { return RustGroundHasArticulated(VehicleOf(handle)); }
+
 /** GRF version of a live engine; the original default-engine value is zero. */
 inline uint8_t RustEngineGRFVersion(const Engine *engine) noexcept
 {

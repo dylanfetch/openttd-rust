@@ -22,6 +22,13 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::c_void;
 
+/// Native cargo Source, passed by value without packing its ID and type.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct Source {
+    pub(crate) id: u16,
+    pub(crate) source_type: u8,
+}
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct Packet {
