@@ -44,7 +44,8 @@ static uint32_t SharedIndustry(int32_t x, int32_t y, uint32_t *index) noexcept
 static uint8_t MapSvcTileOwner(uint32_t tile) noexcept { return GetTileOwner(TileIndex(tile)).base(); }
 static uint16_t MapSvcStationIndex(uint32_t tile) noexcept { return GetStationIndex(TileIndex(tile)).base(); }
 static uint16_t MapSvcDepotIndex(uint32_t tile) noexcept { return GetDepotIndex(TileIndex(tile)).base(); }
-static bool MapSvcIsLevelCrossing(uint32_t tile) noexcept { return IsLevelCrossingTile(TileIndex(tile)); }
+static bool MapSvcRoadIsLevelCrossing(uint32_t tile) noexcept { return IsLevelCrossing(TileIndex(tile)); }
+static bool MapSvcIsLevelCrossing(uint32_t tile) noexcept { return SharedTileType(tile) == MP_ROAD && MapSvcRoadIsLevelCrossing(tile); }
 static uint8_t MapSvcTunnelBridgeDirection(uint32_t tile) noexcept { return GetTunnelBridgeDirection(TileIndex(tile)); }
 static uint16_t MapSvcBridgeSpeed(uint32_t tile) noexcept { return GetBridgeSpec(GetBridgeType(TileIndex(tile)))->speed; }
 static bool MapSvcIsWaterTile(uint32_t tile) noexcept { return IsWaterTile(TileIndex(tile)); }
@@ -77,9 +78,18 @@ static bool SharedRail_is_rail_depot(uint32_t t) noexcept { return IsRailDepot(T
 static uint8_t SharedRail_rail_depot_direction(uint32_t t) noexcept { return GetRailDepotDirection(TileIndex(t)); }
 static uint8_t SharedRail_rail_tracks(uint32_t t) noexcept { return GetTrackBits(TileIndex(t)); }
 static bool SharedRail_has_signals(uint32_t t) noexcept { return HasSignals(TileIndex(t)); }
-static bool SharedRail_has_signal_track(uint32_t t, uint8_t a) noexcept { return HasSignalOnTrack(TileIndex(t), static_cast<Track>(a)); }
+static uint32_t SharedRailPresentSignals(uint32_t tile) noexcept { return GetPresentSignals(TileIndex(tile)); }
+static bool SharedRail_has_signal_track(uint32_t tile, uint8_t track) noexcept
+{
+	assert(IsValidTrack(static_cast<Track>(track)));
+	return SharedRail_has_signals(tile) && (SharedRailPresentSignals(tile) & SignalOnTrack(static_cast<Track>(track))) != 0;
+}
 static uint8_t SharedRail_signal_type(uint32_t t, uint8_t a) noexcept { return GetSignalType(TileIndex(t), static_cast<Track>(a)); }
-static bool SharedRail_has_signal_trackdir(uint32_t t, uint8_t a) noexcept { return HasSignalOnTrackdir(TileIndex(t), static_cast<Trackdir>(a)); }
+static bool SharedRail_has_signal_trackdir(uint32_t tile, uint8_t td) noexcept
+{
+	assert(IsValidTrackdir(static_cast<Trackdir>(td)));
+	return SharedRail_has_signals(tile) && (SharedRailPresentSignals(tile) & SignalAlongTrackdir(static_cast<Trackdir>(td))) != 0;
+}
 static uint8_t SharedRail_signal_state(uint32_t t, uint8_t a) noexcept { return GetSignalStateByTrackdir(TileIndex(t), static_cast<Trackdir>(a)); }
 static void SharedRail_set_signal_state(uint32_t t, uint8_t a, uint8_t b) noexcept { SetSignalStateByTrackdir(TileIndex(t), static_cast<Trackdir>(a), static_cast<SignalState>(b)); }
 static uint32_t SharedRail_other_tunnel_bridge_end(uint32_t t) noexcept { return GetOtherTunnelBridgeEnd(TileIndex(t)).base(); }
@@ -92,14 +102,13 @@ static OpenTTDRailTraversal SharedRail_traversal(uint32_t tile) noexcept
 	if (!r.depot) r.tracks = SharedRail_rail_tracks(tile);
 	return r;
 }
-static OpenTTDRailSignalPresence SharedRail_signal_presence(uint32_t tile, uint8_t td) noexcept
+static OpenTTDRailSignalPresence SharedRail_signal_presence(uint32_t tile, uint8_t masked_tracks, uint8_t td) noexcept
 {
-	TileIndex t(tile);
 	Trackdir dir = static_cast<Trackdir>(td);
-	Track track = TrackdirToTrack(dir);
 	OpenTTDRailSignalPresence r{.signals = SharedRail_has_signals(tile), .track = false, .kind = 0, .forward = false, .reverse = false};
 	if (r.signals) {
-		uint present = GetPresentSignals(t);
+		Track track = TrackBitsToTrack(static_cast<TrackBits>(masked_tracks));
+		uint present = SharedRailPresentSignals(tile);
 		r.track = (present & SignalOnTrack(track)) != 0;
 		if (r.track) {
 			r.kind = SharedRail_signal_type(tile, track);
@@ -134,7 +143,7 @@ static OpenTTDRailStationAdmission SharedRail_station_admission(uint32_t tile, u
 static OpenTTDRailCrossingAdmission SharedRail_crossing_admission(uint32_t tile, uint8_t owner) noexcept
 {
 	TileIndex t(tile);
-	OpenTTDRailCrossingAdmission r{.crossing = IsLevelCrossing(t), .owner = INVALID_OWNER.base(), .axis = 0};
+	OpenTTDRailCrossingAdmission r{.crossing = MapSvcRoadIsLevelCrossing(tile), .owner = INVALID_OWNER.base(), .axis = 0};
 	if (r.crossing) {
 		r.owner = MapSvcTileOwner(tile);
 		if (r.owner == owner) r.axis = GetCrossingRoadAxis(t);

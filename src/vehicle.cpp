@@ -572,7 +572,11 @@ CommandCost TunnelBridgeIsFree(TileIndex tile, TileIndex endtile, const Vehicle 
  * @param track_bits The track bits.
  * @return \c true if no train that interacts, is found. \c false if a train is found.
  */
+#ifdef WITH_RUST
+CommandCost EnsureNoTrainOnTrackBits(TileIndex tile, TrackBits track_bits, uint64_t *accessor_count)
+#else
 CommandCost EnsureNoTrainOnTrackBits(TileIndex tile, TrackBits track_bits)
+#endif /* WITH_RUST */
 {
 	/* Value v is not safe in MP games, however, it is used to generate a local
 	 * error message only (which may be different for different machines).
@@ -582,7 +586,17 @@ CommandCost EnsureNoTrainOnTrackBits(TileIndex tile, TrackBits track_bits)
 		if (v->type != VEH_TRAIN) continue;
 
 		const Train *t = Train::From(v);
+#ifdef WITH_RUST
+		/* Count only actual facade reads, preserving the original short circuit.
+		 * Unrelated callers pass no counter; no query policy or read is added. */
+		auto track = [&]() {
+			if (accessor_count != nullptr) ++*accessor_count;
+			return t->GetTrack();
+		};
+		if ((track() != track_bits) && !TracksOverlap(track() | track_bits)) continue;
+#else
 		if ((t->GetTrack() != track_bits) && !TracksOverlap(t->GetTrack() | track_bits)) continue;
+#endif /* WITH_RUST */
 
 		return CommandCost(STR_ERROR_TRAIN_IN_THE_WAY + v->type);
 	}

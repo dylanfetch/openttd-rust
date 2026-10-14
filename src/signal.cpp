@@ -24,24 +24,37 @@
 
 #ifdef WITH_RUST
 #include "rust/signal_ffi.h"
+#include "rust/witness.h"
 
 /** Native spatial query; Rust retains traversal and occupancy branching. */
 static bool SignalTrainOnTile(uint32_t tile) noexcept
 {
-	return HasVehicleOnTile(TileIndex(tile), [](const Vehicle *v) {
-		return v->type == VEH_TRAIN && Train::From(v)->GetTrack() != TRACK_BIT_DEPOT;
+	bool count = RustWitnessEnabled();
+	uint64_t reads = 0;
+	bool occupied = HasVehicleOnTile(TileIndex(tile), [&](const Vehicle *v) {
+		if (v->type != VEH_TRAIN) return false;
+		if (count) ++reads;
+		return Train::From(v)->GetTrack() != TRACK_BIT_DEPOT;
 	});
+	/* One diagnostic report, excluded from boundary counts and disabled in timing.
+	 * Each counted read is the unchanged scalar facade's C++-to-Rust crossing. */
+	if (count) openttd_rust_signal_count_occupancy(reads);
+	return occupied;
 }
 static bool SignalTrainOnTracks(uint32_t tile, uint8_t tracks) noexcept
 {
-	return EnsureNoTrainOnTrackBits(TileIndex(tile), static_cast<TrackBits>(tracks)).Failed();
+	bool count = RustWitnessEnabled();
+	uint64_t reads = 0;
+	bool occupied = EnsureNoTrainOnTrackBits(TileIndex(tile), static_cast<TrackBits>(tracks), count ? &reads : nullptr).Failed();
+	if (count) openttd_rust_signal_count_occupancy(reads);
+	return occupied;
 }
 static void SignalOverflowTbu() noexcept { Debug(misc, 0, "SignalSegment too complex. Set _tbuset is full (maximum 64)"); }
 static void SignalOverflowTbd() noexcept { Debug(misc, 0, "SignalSegment too complex. Set _tbdset is full (maximum 256)"); }
 static void SignalOverflowGlobal() noexcept { Debug(misc, 0, "SignalSegment too complex. Set _globset is full (maximum 128)"); }
-static void SignalAssertCompany(uint8_t owner) noexcept { assert(Company::IsValidID(CompanyID(owner))); }
-static void SignalAssertCondition(bool condition) noexcept { assert(condition); }
-static void SignalAssertWormholeStart(uint32_t tile, uint8_t dir) noexcept
+static void SignalAssertCompany([[maybe_unused]] uint8_t owner) noexcept { assert(Company::IsValidID(CompanyID(owner))); }
+static void SignalAssertCondition([[maybe_unused]] bool condition) noexcept { assert(condition); }
+static void SignalAssertWormholeStart([[maybe_unused]] uint32_t tile, [[maybe_unused]] uint8_t dir) noexcept
 {
 	assert(GetTunnelBridgeTransportType(TileIndex(tile)) == TRANSPORT_RAIL);
 	assert(dir == INVALID_DIAGDIR || dir == ReverseDiagDir(GetTunnelBridgeDirection(TileIndex(tile))));
@@ -64,7 +77,7 @@ static const OpenTTDSignalServices _signal_services{
 
 OpenTTDSignalContext GetRustSignalContext() noexcept
 {
-	return {&GetRustSharedServices(), &GetRustRailMapServices(), &_signal_services, Map::LogX()};
+	return {&GetRustSharedServices(), &GetRustRailMapServices(), &_signal_services, static_cast<uint8_t>(Map::LogX())};
 }
 
 void UpdateSignalsInBuffer()

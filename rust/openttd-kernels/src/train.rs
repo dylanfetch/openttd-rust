@@ -1360,15 +1360,22 @@ impl Game<'_> {
         (self.leaves.show_reservation)(id)
     }
     fn svc_signals_both(&self, _id: Handle, a: u64, b: u64, c: u64) -> u64 {
-        (self.leaves.signal_context)().both(a as u32, b as u8, c as u8);
+        crate::signal::acquire_context(self.leaves.signal_context).both(a as u32, b as u8, c as u8);
         0
     }
     fn svc_signals_update(&self, id: Handle, a: u64, b: u64) -> u64 {
         let owner = self.read_owner(id);
-        u64::from((self.leaves.signal_context)().segment(a as u32, b as u8, owner))
+        crate::signal::count_context_owner_read();
+        u64::from(
+            crate::signal::acquire_context(self.leaves.signal_context)
+                .segment(a as u32, b as u8, owner),
+        )
     }
     fn svc_signals_update_owner(&self, _id: Handle, a: u64, b: u64, c: u64) -> u64 {
-        u64::from((self.leaves.signal_context)().segment(a as u32, b as u8, c as u8))
+        u64::from(
+            crate::signal::acquire_context(self.leaves.signal_context)
+                .segment(a as u32, b as u8, c as u8),
+        )
     }
     fn svc_signal_has_pbs(&self, id: Handle, a: u64, b: u64) -> u64 {
         (self.leaves.signal_has_pbs)(id, a as u32, b as u8)

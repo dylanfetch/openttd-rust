@@ -11,7 +11,7 @@ ADAPTER = core.ROOT / "tools/simulation/signals-console.cpp"
 
 
 def scenarios(soak):
-    return [
+    cases = [
         {
             "name": f"signals-{year}",
             "kind": "save",
@@ -23,6 +23,43 @@ def scenarios(soak):
         }
         for year in (1996, 2000, 2006)
     ]
+
+    cases.append(
+        dict(
+            cases[0],
+            name="signals-worksets",
+            signals="sets",
+            short_checkpoint=True,
+            ticks=1,
+            console=["signals_scenario sets", "unpause"],
+        )
+    )
+    cases.append(
+        dict(
+            cases[0],
+            name="signals-overflow",
+            signals="overflow",
+            short_checkpoint=True,
+            ticks=74 if soak else 1,
+            console=["signals_scenario overflow", "unpause"],
+        )
+    )
+    cases.append(
+        dict(
+            cases[1],
+            name="signals-reload",
+            signals="reload",
+            short_checkpoint=True,
+            ticks=74,
+            console=["signals_scenario inspect-live", "unpause"],
+        )
+    )
+    return cases
+
+
+def install(scenario, run_dir):
+    if "signals" in scenario:
+        (run_dir / "signals-live.scr").write_text("signals_scenario inspect-live\n")
 
 
 def game_environment(scenario):
@@ -46,7 +83,12 @@ def adapter(build, folder, env):
         next(row["file"] for row in commands if row["file"].endswith("/signal.cpp"))
     )
     source = folder / "signals-source.cpp"
-    source.write_text(f'#include "{signal}"\n' + ADAPTER.read_text())
+    source.write_text(
+        f'#include "{signal}"\n'
+        + ADAPTER.read_text().replace(
+            "../../../src/rust/signal_ffi.h", str(core.ROOT / "src/rust/signal_ffi.h")
+        )
+    )
     binary, receipt = console_adapter(
         build, folder, env, source, "signals", replace_objects=("/src/signal.cpp.o",)
     )
@@ -98,13 +140,165 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
                     builds[role] / name, target_is_directory=True
                 )
     result["signals_adapter"] = provenance
+    if scenario["signals"] == "reload":
+        saves, logs = {}, {}
+        capture = dict(
+            scenario,
+            save=str(source),
+            ticks=32 * core.TICKS_PER_DAY + core.SNAPSHOT_TICKS,
+            console=["signals_scenario ordinary", "unpause"],
+        )
+        for role in ("reference", "candidate"):
+            run = core.run_game(
+                capture,
+                executables[role],
+                builds[role],
+                folder / role / "capture",
+                timeout,
+                env,
+                desync=False,
+            )
+            if run["exit"] or not run["snapshots"]:
+                raise RuntimeError("signal reload capture failed")
+            saves[role] = run["snapshots"][-1]
+            logs[role] = [line for line in run["log"] if line.startswith("SIGNALS ")]
+        differences = core.compare_saves(
+            saves["reference"],
+            saves["candidate"],
+            scenario["name"],
+            20,
+            result["stats"],
+        )
+        if differences or logs["reference"] != logs["candidate"]:
+            raise RuntimeError("signal live reload input differs")
+        result["signals_capture"] = {
+            role: {
+                "sha256": hashlib.sha256(save.read_bytes()).hexdigest(),
+                "witnesses": logs[role],
+            }
+            for role, save in saves.items()
+        }
+        normalized = {
+            role: normalize(save, folder / role / "reload")[0]
+            for role, save in saves.items()
+        }
+        return dict(
+            scenario,
+            executables=executables,
+            role_inputs={
+                role: {"save": str(save)} for role, save in normalized.items()
+            },
+        )
     return dict(scenario, save=str(source), executables=executables)
+
+
+def boundary_profile(counts):
+    if counts is None:
+        return None
+    total = sum(
+        counts[name]
+        for name in (
+            "entries",
+            "services",
+            "context_acquisitions",
+            "context_owner_reads",
+            "occupancy_accessors",
+        )
+    )
+    copied = (
+        counts["bytes"]
+        + counts["context_bytes"]
+        + counts["context_owner_reads"]
+        + counts["occupancy_accessors"]
+        + counts["classification_bytes"]
+    )
+    return {
+        "counts": counts,
+        "total_crossings": total,
+        "returned_bytes": copied,
+        "top_level_services_per_tile": counts["services"] / counts["tiles"]
+        if counts["tiles"]
+        else None,
+        "total_crossings_per_tile": total / counts["tiles"]
+        if counts["tiles"]
+        else None,
+        "total_crossings_per_update": total / counts["updates"]
+        if counts["updates"]
+        else None,
+        "returned_bytes_per_tile": copied / counts["tiles"]
+        if counts["tiles"]
+        else None,
+        "returned_bytes_per_update": copied / counts["updates"]
+        if counts["updates"]
+        else None,
+        "scope": "ordinary facade entries, signal world services, direct train/reservation context and owner reads, actual nested occupancy GetTrack accessors; returned typed records/context/scalars include padding; excludes call arguments, diagnostic snapshots/probe and witness reporting; counters disabled during timing",
+    }
 
 
 def check(scenario, run, mode, role, result):
     if "signals" not in scenario or run["exit"] or not run["snapshots"]:
         return
     lines = [line for line in run["log"] if line.startswith("SIGNALS ")]
+    if scenario["signals"] == "reload":
+        for name in ("live-states", "pending live"):
+            if not any(line.startswith(f"SIGNALS {name} ") for line in lines):
+                result["problems"].append(
+                    f"{mode}/{role}: missing live signal reload witness"
+                )
+        key = mode + "_signals_reload"
+        if role == "reference":
+            result[key] = lines
+        elif result[key] != lines:
+            result["problems"].append(f"{mode}: live signal reload state differs")
+        counts = core.branch_witnesses(
+            scenario,
+            run,
+            role,
+            "signal",
+            ("updates", "tiles", "train", "reserved_skip"),
+        )
+        if counts is not None:
+            result[mode + "_signals_profile"] = boundary_profile(counts)
+        return
+    if scenario["signals"] == "overflow":
+        for line in (
+            "SIGNALS overflow 1",
+            "SIGNALS follow-up 0",
+            "SIGNALS owner-barrier 0",
+        ):
+            if line not in lines:
+                result["problems"].append(f"{mode}/{role}: missing {line}")
+        for name in ("overflow-reset", "overflow-follow-up"):
+            if not any(
+                line.startswith(f"SIGNALS pending {name} 0 0 0 false false false ")
+                for line in lines
+            ):
+                result["problems"].append(
+                    f"{mode}/{role}: missing reset/follow-up state"
+                )
+        key = mode + "_signals_overflow"
+        if role == "reference":
+            result[key] = lines
+        elif result[key] != lines:
+            result["problems"].append(f"{mode}: signal overflow input/state differs")
+        counts = core.branch_witnesses(
+            scenario, run, role, "signal", ("tbu_overflow", "reset", "owner_barrier")
+        )
+        if counts is not None:
+            result[mode + "_signals_profile"] = boundary_profile(counts)
+        return
+    if scenario["signals"] == "sets":
+        for size in (64, 256, 128):
+            if not any(line.startswith(f"SIGNALS sets {size} ") for line in lines):
+                result["problems"].append(
+                    f"{mode}/{role}: missing unchanged-body fixed-set probe {size}"
+                )
+        key = mode + "_signals_worksets"
+        if role == "reference":
+            result[key] = lines
+        elif result[key] != lines:
+            result["problems"].append(f"{mode}: fixed-set source probe differs")
+        return
     for name in (
         "initial",
         "duplicates",
@@ -122,6 +316,11 @@ def check(scenario, run, mode, role, result):
         line.startswith("SIGNALS states ") for line in lines
     ):
         result["problems"].append(f"{mode}/{role}: missing signal return/RNG witness")
+    live = [line for line in lines if line.startswith("SIGNALS live-states ")]
+    if not live or any(int(count) == 0 for count in live[0].split()[2:]):
+        result["problems"].append(
+            f"{mode}/{role}: missing free/occupied/PBS return classifications during live play"
+        )
     key = mode + "_signals_witnesses"
     if role == "reference":
         result[key] = lines
@@ -129,12 +328,45 @@ def check(scenario, run, mode, role, result):
         result["problems"].append(
             f"{mode}: native signal state/command witnesses differ"
         )
+    from .rails import vehicle_rows
+
+    positions = {}
+    for path in [Path(scenario["save"]), *run["snapshots"]]:
+        for vehicle, row in vehicle_rows(path).items():
+            if row["type"] == 0:
+                positions.setdefault(vehicle, set()).add(
+                    (row["tile"], row["x_pos"], row["y_pos"])
+                )
+    moving = [vehicle for vehicle, poses in positions.items() if len(poses) > 1]
+    if not moving:
+        result["problems"].append(
+            f"{mode}/{role}: signal fixture has no actual train movement"
+        )
+    result[f"{mode}_{role}_signals_moving"] = moving
     counts = core.branch_witnesses(
         scenario,
         run,
         role,
         "signal",
-        ("updates", "tiles", "forced_flush", "changed", "train"),
+        (
+            "updates",
+            "tiles",
+            "forced_flush",
+            "changed",
+            "train",
+            "depot",
+            "split",
+            "pbs",
+            "multi_enter",
+            "exit",
+            "green_exit",
+            "station",
+            "reserved_skip",
+            "combo",
+            "propagate",
+            *(("crossing",) if scenario["signals"] in ("2000", "2006") else ()),
+            *(("wormhole",) if scenario["signals"] == "2006" else ()),
+        ),
     )
     if counts is not None:
-        result[mode + "_signals_profile"] = counts
+        result[mode + "_signals_profile"] = boundary_profile(counts)

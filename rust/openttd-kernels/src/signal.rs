@@ -248,7 +248,7 @@ fn explore(w: &World<'_>, owner: u8) -> u16 {
                     let td = ((u32::from(tracks) * 0x101)
                         & u32::from(ENTER_TRACKDIRS[usize::from(dir)]))
                     .trailing_zeros() as u8;
-                    let signal = read!(w, rail, signal_presence, tile, td);
+                    let signal = read!(w, rail, signal_presence, tile, masked, td);
                     if signal.signals {
                         if signal.track {
                             let kind = signal.kind;
@@ -513,6 +513,28 @@ fn force_flush(w: &World<'_>) {
         access(|s| s.last_owner = INVALID);
     }
 }
+fn flush(w: &World<'_>) {
+    if access(|s| s.global.count != 0) {
+        update_buffer(w, access(|s| s.last_owner));
+        access(|s| s.last_owner = INVALID);
+    }
+}
+fn add_side(w: &World<'_>, tile: u32, side: u8, owner: u8) {
+    source_assert(w, access(|s| s.global.count == 0 || owner == s.last_owner));
+    access(|s| s.last_owner = owner);
+    add_global(w, Item { tile, dir: side });
+    force_flush(w);
+}
+fn segment(w: &World<'_>, tile: u32, side: u8, owner: u8) -> u8 {
+    source_assert(w, access(|s| s.global.count == 0));
+    add_global(w, Item { tile, dir: side });
+    update_buffer(w, owner)
+}
+fn both(w: &World<'_>, tile: u32, track: u8, owner: u8) {
+    source_assert(w, access(|s| s.global.count == 0));
+    add_track(w, tile, track, owner);
+    update_buffer(w, owner);
+}
 // SAFETY for every exported entry: immutable tables outlive the synchronous
 // invocation. Game-state mutex is held; callbacks do not retain any Rust owner
 // borrow and cannot throw ordinary-play exceptions. No entry draws Random.
@@ -542,11 +564,9 @@ pub unsafe extern "C" fn openttd_rust_signal_flush(
     native: *const SignalServices,
     log_x: u8,
 ) {
+    crate::witness::hit(crate::witness::SIGNAL_ENTRIES);
     let w = unsafe { world(shared, rail, native, log_x) };
-    if access(|s| s.global.count != 0) {
-        update_buffer(&w, access(|s| s.last_owner));
-        access(|s| s.last_owner = INVALID);
-    }
+    flush(&w);
 }
 /// Queue both ends of a track and preserve the 64-entry forced flush.
 /// # Safety
@@ -561,6 +581,7 @@ pub unsafe extern "C" fn openttd_rust_signal_add_track(
     track: u8,
     owner: u8,
 ) {
+    crate::witness::hit(crate::witness::SIGNAL_ENTRIES);
     let w = unsafe { world(shared, rail, native, log_x) };
     add_track(&w, tile, track, owner);
 }
@@ -577,11 +598,9 @@ pub unsafe extern "C" fn openttd_rust_signal_add_side(
     side: u8,
     owner: u8,
 ) {
+    crate::witness::hit(crate::witness::SIGNAL_ENTRIES);
     let w = unsafe { world(shared, rail, native, log_x) };
-    source_assert(&w, access(|s| s.global.count == 0 || owner == s.last_owner));
-    access(|s| s.last_owner = owner);
-    add_global(&w, Item { tile, dir: side });
-    force_flush(&w);
+    add_side(&w, tile, side, owner);
 }
 /// Update a segment, returning the classification of the first explored block.
 /// # Safety
@@ -596,10 +615,11 @@ pub unsafe extern "C" fn openttd_rust_signal_segment(
     side: u8,
     owner: u8,
 ) -> u8 {
+    crate::witness::hit(crate::witness::SIGNAL_ENTRIES);
     let w = unsafe { world(shared, rail, native, log_x) };
-    source_assert(&w, access(|s| s.global.count == 0));
-    add_global(&w, Item { tile, dir: side });
-    update_buffer(&w, owner)
+    let state = segment(&w, tile, side, owner);
+    crate::witness::hit(crate::witness::SIGNAL_CLASSIFICATION_BYTES);
+    state
 }
 /// Update both track ends with the original private flush owner lifetime.
 /// # Safety
@@ -614,10 +634,9 @@ pub unsafe extern "C" fn openttd_rust_signal_both(
     track: u8,
     owner: u8,
 ) {
+    crate::witness::hit(crate::witness::SIGNAL_ENTRIES);
     let w = unsafe { world(shared, rail, native, log_x) };
-    source_assert(&w, access(|s| s.global.count == 0));
-    add_track(&w, tile, track, owner);
-    update_buffer(&w, owner);
+    both(&w, tile, track, owner);
 }
 
 /// Call-scoped diagnostic image of the private signal work sets. No live map or
@@ -747,53 +766,151 @@ pub struct Context {
     pub log_x: u8,
 }
 impl Context {
+    fn world(&self) -> World<'_> {
+        // SAFETY: native acquisition supplied immutable process-lifetime tables;
+        // the caller holds the game-state mutex throughout this synchronous call.
+        unsafe { world(self.shared, self.rail, self.native, self.log_x) }
+    }
     pub(crate) fn segment(self, tile: u32, side: u8, owner: u8) -> u8 {
-        // SAFETY: context is returned under the game-state mutex by the native
-        // service, with immutable tables valid through the synchronous call.
-        unsafe {
-            openttd_rust_signal_segment(
-                self.shared,
-                self.rail,
-                self.native,
-                self.log_x,
-                tile,
-                side,
-                owner,
-            )
-        }
+        segment(&self.world(), tile, side, owner)
     }
     pub(crate) fn both(self, tile: u32, track: u8, owner: u8) {
-        // SAFETY: same native service contract as segment.
-        unsafe {
-            openttd_rust_signal_both(
-                self.shared,
-                self.rail,
-                self.native,
-                self.log_x,
-                tile,
-                track,
-                owner,
-            );
-        }
+        both(&self.world(), tile, track, owner);
     }
     pub(crate) fn add_side(self, tile: u32, side: u8, owner: u8) {
-        // SAFETY: same native service contract as segment.
-        unsafe {
-            openttd_rust_signal_add_side(
-                self.shared,
-                self.rail,
-                self.native,
-                self.log_x,
-                tile,
-                side,
-                owner,
-            );
-        }
+        add_side(&self.world(), tile, side, owner);
     }
     pub(crate) fn flush(self) {
-        // SAFETY: same native service contract as segment.
-        unsafe {
-            openttd_rust_signal_flush(self.shared, self.rail, self.native, self.log_x);
+        flush(&self.world());
+    }
+}
+/// Acquire call-scoped context while counting its real Rust-to-native crossing.
+pub(crate) fn acquire_context(get: extern "C" fn() -> Context) -> Context {
+    let context = get();
+    crate::witness::hit(crate::witness::SIGNAL_CONTEXT_ACQUISITIONS);
+    crate::witness::add(
+        crate::witness::SIGNAL_CONTEXT_BYTES,
+        std::mem::size_of::<Context>() as u64,
+    );
+    context
+}
+/// One actual native owner read at a direct signal-call branch (one byte).
+pub(crate) fn count_context_owner_read() {
+    crate::witness::hit(crate::witness::SIGNAL_CONTEXT_OWNER_READS);
+}
+/// Bounded report from the unchanged native occupancy predicate. Reporting
+/// itself is measurement overhead, excluded from simulation crossing counts.
+#[unsafe(no_mangle)]
+pub extern "C" fn openttd_rust_signal_count_occupancy(reads: u64) {
+    crate::witness::add(crate::witness::SIGNAL_OCCUPANCY_ACCESSORS, reads);
+}
+
+/// Narrow unchanged-body probe trace for `SmallSet` operations not reachable from
+/// the stock rail layouts (not a production signal entry or second authority).
+#[repr(C)]
+pub struct SetTrace {
+    /// Duplicates remain after one first-match/swap-last removal.
+    pub duplicate_count: u32,
+    /// LIFO drain after the duplicate/reverse removal sequence.
+    pub duplicate_pop: [SignalItem; 3],
+    /// Add on a full fixed array failed.
+    pub full_failed: bool,
+    /// Failure set the sticky overflow flag.
+    pub overflow_full: bool,
+    /// Swap-last preserved the last element at the removed first position.
+    pub first_after_remove: SignalItem,
+    /// Add succeeds again after removal, with sentinel direction preserved.
+    pub refill_succeeded: bool,
+    /// First LIFO item after refill.
+    pub refill_pop: SignalItem,
+    /// Drained set is empty.
+    pub drained_count: u32,
+    /// Drain keeps the overflow flag.
+    pub overflow_drained: bool,
+    /// Reset clears the overflow flag.
+    pub overflow_reset: bool,
+}
+impl From<Item> for SignalItem {
+    fn from(item: Item) -> Self {
+        Self {
+            tile: item.tile,
+            dir: item.dir,
         }
+    }
+}
+fn probe_set<const N: usize>(overflow: extern "C" fn()) -> SetTrace {
+    let mut set = SmallSet::<N>::new();
+    let a = Item { tile: 1, dir: 0 };
+    for item in [
+        a,
+        Item {
+            tile: 2,
+            dir: INVALID,
+        },
+        a,
+        Item { tile: 1, dir: 2 },
+    ] {
+        set.add(item);
+    }
+    set.remove(a);
+    let duplicate_count = set.count as u32;
+    let duplicate_pop = std::array::from_fn(|_| SignalItem::from(set.get().unwrap()));
+    set.reset();
+    for tile in 0..N {
+        set.add(Item {
+            tile: tile as u32,
+            dir: (tile & 3) as u8,
+        });
+    }
+    let full_failed = !set.add(Item {
+        tile: u32::MAX,
+        dir: INVALID,
+    });
+    if full_failed {
+        overflow();
+    }
+    let overflow_full = set.overflowed;
+    set.remove(Item { tile: 0, dir: 0 });
+    let first_after_remove = set.data[0].into();
+    let refill_succeeded = set.add(Item {
+        tile: u32::MAX,
+        dir: INVALID,
+    });
+    let refill_pop = set.get().unwrap().into();
+    while set.get().is_some() {}
+    let drained_count = set.count as u32;
+    let overflow_drained = set.overflowed;
+    set.reset();
+    SetTrace {
+        duplicate_count,
+        duplicate_pop,
+        full_failed,
+        overflow_full,
+        first_after_remove,
+        refill_succeeded,
+        refill_pop,
+        drained_count,
+        overflow_drained,
+        overflow_reset: set.overflowed,
+    }
+}
+/// Compare all three fixed capacities against the unchanged source `SmallSet`
+/// body. Ordinary saves cannot expose its sticky overflow bookkeeping.
+/// # Safety
+/// Native services are immutable and output holds three writable `SetTrace` values.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_signal_workset_probe(
+    native: *const SignalServices,
+    output: *mut SetTrace,
+) {
+    // SAFETY: caller supplies live immutable callbacks and three output records.
+    unsafe {
+        output.write(probe_set::<64>((*native).overflow_tbu));
+        output
+            .add(1)
+            .write(probe_set::<256>((*native).overflow_tbd));
+        output
+            .add(2)
+            .write(probe_set::<128>((*native).overflow_global));
     }
 }

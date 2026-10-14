@@ -54,7 +54,7 @@ struct OpenTTDRailWormholeAdmission { uint8_t owner; uint8_t transport; uint8_t 
  * whole tile record, opcode or allocation crosses this boundary. */
 struct OpenTTDRailMapServices {
 	OpenTTDRailTraversal (*traversal)(uint32_t) noexcept;
-	OpenTTDRailSignalPresence (*signal_presence)(uint32_t, uint8_t) noexcept;
+	OpenTTDRailSignalPresence (*signal_presence)(uint32_t, uint8_t, uint8_t) noexcept;
 	OpenTTDRailSignalUpdate (*signal_update)(uint32_t, uint8_t) noexcept;
 	OpenTTDRailStationAdmission (*station_admission)(uint32_t, uint8_t, uint8_t) noexcept;
 	OpenTTDRailCrossingAdmission (*crossing_admission)(uint32_t, uint8_t) noexcept;

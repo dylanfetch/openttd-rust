@@ -19,6 +19,10 @@
 #include "station_base.h"
 #include "tunnelbridge_map.h"
 #include "company_base.h"
+#include "clear_map.h"
+#include "../../../src/rust/signal_ffi.h"
+
+extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
 
 [[noreturn]] static void SignalFixtureAbort(int line)
 {
@@ -71,13 +75,137 @@ static std::vector<std::pair<TileIndex, Track>> SignalTracks(Owner owner)
 	std::vector<std::pair<TileIndex, Track>> tracks;
 	for (TileIndex tile(0); tile < Map::Size(); ++tile) {
 		if (!IsTileType(tile, MP_RAILWAY) || GetTileOwner(tile) != owner || !HasSignals(tile)) continue;
-		for (Track track = TRACK_BEGIN; track < TRACK_END; ++track) if (HasSignalOnTrack(tile, track)) tracks.emplace_back(tile, track);
+		for (Track track = TRACK_BEGIN; track < TRACK_END; ++track) if (HasTrack(tile, track) && HasSignalOnTrack(tile, track)) tracks.emplace_back(tile, track);
 	}
 	return tracks;
 }
-static bool SignalsScenario([[maybe_unused]] uint8_t argc, std::span<std::string_view> args)
+static void SignalClassify(const std::vector<std::pair<TileIndex, Track>> &tracks, Owner owner, const char *name)
 {
-	if (argc != 2) return false;
+	uint states[3] = {};
+	for (auto [tile, track] : tracks) ++states[UpdateSignalsOnSegment(tile, TrackdirToExitdir(TrackToTrackdir(track)), owner)];
+	fmt::print(stderr, "SIGNALS {} {} {} {}\n", name, states[0], states[1], states[2]);
+}
+#ifndef WITH_RUST
+template <typename Direction, uint N>
+static OpenTTDSignalSetTrace SignalSetTrace(std::string_view name)
+{
+	SmallSet<Direction, N> set(name);
+	Direction zero = static_cast<Direction>(0), invalid = static_cast<Direction>(255);
+	set.Add(TileIndex(1), zero);
+	set.Add(TileIndex(2), invalid);
+	set.Add(TileIndex(1), zero);
+	set.Add(TileIndex(1), static_cast<Direction>(2));
+	set.Remove(TileIndex(1), zero);
+	OpenTTDSignalSetTrace r{};
+	r.duplicate_count = set.Items();
+	TileIndex tile;
+	Direction dir;
+	for (auto &item : r.duplicate_pop) { set.Get(&tile, &dir); item = {tile.base(), static_cast<uint8_t>(dir)}; }
+	set.Reset();
+	for (uint i = 0; i < N; ++i) set.Add(TileIndex(i), static_cast<Direction>(i & 3));
+	r.full_failed = !set.Add(TileIndex(UINT32_MAX), invalid);
+	r.overflow_full = set.Overflowed();
+	set.Remove(TileIndex(0), zero);
+	/* Drain/restore exposes the first element without accessing private data. */
+	std::array<std::pair<TileIndex, Direction>, N> buffer;
+	uint count = set.Items();
+	for (uint i = count; i > 0; --i) set.Get(&buffer[i - 1].first, &buffer[i - 1].second);
+	r.first_after_remove = {buffer[0].first.base(), static_cast<uint8_t>(buffer[0].second)};
+	for (uint i = 0; i < count; ++i) set.Add(buffer[i].first, buffer[i].second);
+	r.refill_succeeded = set.Add(TileIndex(UINT32_MAX), invalid);
+	set.Get(&tile, &dir);
+	r.refill_pop = {tile.base(), static_cast<uint8_t>(dir)};
+	while (set.Get(&tile, &dir)) { }
+	r.drained_count = set.Items();
+	r.overflow_drained = set.Overflowed();
+	set.Reset();
+	r.overflow_reset = set.Overflowed();
+	return r;
+}
+#endif
+static void SignalSetProbe()
+{
+	OpenTTDSignalSetTrace traces[3];
+#ifdef WITH_RUST
+	openttd_rust_signal_workset_probe(&_signal_services, traces);
+#else
+	traces[0] = SignalSetTrace<Trackdir, 64>("_tbuset");
+	traces[1] = SignalSetTrace<DiagDirection, 256>("_tbdset");
+	traces[2] = SignalSetTrace<DiagDirection, 128>("_globset");
+#endif
+	for (uint i = 0; i < 3; ++i) {
+		auto &r = traces[i];
+		fmt::print(stderr, "SIGNALS sets {} {}", std::array{64, 256, 128}[i], r.duplicate_count);
+		for (auto &item : r.duplicate_pop) fmt::print(stderr, " {}:{}", item.tile, item.dir);
+		fmt::print(stderr, " {} {} {}:{} {} {}:{} {} {} {}\n", r.full_failed, r.overflow_full, r.first_after_remove.tile, r.first_after_remove.dir, r.refill_succeeded, r.refill_pop.tile, r.refill_pop.dir, r.drained_count, r.overflow_drained, r.overflow_reset);
+	}
+}
+static void SignalOverflowLayout(Owner owner)
+{
+	/* Declared terrain input: flatten an unused clear/tree rectangle. The rail
+	 * and signal geometry is built through real commands, never raw rail bits. */
+	constexpr uint N = 20;
+	TileIndex origin = INVALID_TILE;
+	for (uint y = 2; y + N + 2 < Map::SizeY() && origin == INVALID_TILE; ++y) {
+		for (uint x = 2; x + N + 2 < Map::SizeX(); ++x) {
+			bool clear = true;
+			for (uint dy = 0; dy < N + 2 && clear; ++dy) for (uint dx = 0; dx < N + 2; ++dx) {
+				TileType type = GetTileType(TileXY(x + dx, y + dy));
+				if (type != MP_CLEAR && type != MP_TREES) { clear = false; break; }
+			}
+			if (clear) { origin = TileXY(x, y); break; }
+		}
+	}
+	if (origin == INVALID_TILE) SignalFixtureAbort(__LINE__);
+	for (uint y = 0; y < N + 2; ++y) for (uint x = 0; x < N + 2; ++x) {
+		TileIndex tile = origin + TileDiffXY(x, y);
+		SetTileHeight(tile, 1);
+		MakeClear(tile, CLEAR_GRASS, 3);
+	}
+	Company *c = Company::Get(owner);
+#ifdef WITH_RUST
+	c->Finances().money = Money(1000000000);
+#else
+	c->money = Money(1000000000);
+#endif
+	std::vector<std::pair<TileIndex, Track>> boundary;
+	for (uint y = 1; y <= N; ++y) for (uint x = 1; x <= N; ++x) {
+		TileIndex tile = origin + TileDiffXY(x, y);
+		bool edge_x = x == 1 || x == N, edge_y = y == 1 || y == N;
+		if (edge_x && edge_y) continue;
+		if (!edge_y) SignalCost("rail-x", Command<CMD_BUILD_SINGLE_RAIL>::Do(DoCommandFlag::Execute, tile, RAILTYPE_RAIL, TRACK_X, false));
+		if (!edge_x) SignalCost("rail-y", Command<CMD_BUILD_SINGLE_RAIL>::Do(DoCommandFlag::Execute, tile, RAILTYPE_RAIL, TRACK_Y, false));
+		if (edge_x || edge_y) boundary.emplace_back(tile, edge_x ? TRACK_X : TRACK_Y);
+	}
+	for (auto [tile, track] : boundary) SignalCost("boundary", Command<CMD_BUILD_SINGLE_SIGNAL>::Do(DoCommandFlag::Execute, tile, track, SIGTYPE_BLOCK, SIG_ELECTRIC, false, false, false, SIGTYPE_BLOCK, SIGTYPE_PBS_ONEWAY, 0, 0));
+	UpdateSignalsInBuffer();
+	TileIndex center = origin + TileDiffXY(2, 2);
+	fmt::print(stderr, "SIGNALS overflow {}\n", static_cast<uint8_t>(UpdateSignalsOnSegment(center, DIAGDIR_NE, owner)));
+	SignalPending("overflow-reset");
+	for (uint i = 0; i < 12; ++i) SignalCost("open-boundary", Command<CMD_REMOVE_SINGLE_SIGNAL>::Do(DoCommandFlag::Execute, boundary[i].first, boundary[i].second));
+	UpdateSignalsInBuffer();
+	fmt::print(stderr, "SIGNALS follow-up {}\n", static_cast<uint8_t>(UpdateSignalsOnSegment(center, DIAGDIR_NE, owner)));
+	SignalPending("overflow-follow-up");
+	CompanyID other = CompanyID::Invalid();
+	for (const Company *company : Company::Iterate()) if (company->index != owner) { other = company->index; break; }
+	if (other == CompanyID::Invalid()) {
+		Company *company = DoStartupNewCompany(false, CompanyID::Invalid());
+		if (company == nullptr) SignalFixtureAbort(__LINE__);
+		other = company->index;
+	}
+	if (other == CompanyID::Invalid()) SignalFixtureAbort(__LINE__);
+	TileIndex foreign = origin + TileDiffXY(0, 2);
+	Backup<CompanyID> foreign_company(_current_company, other);
+	SignalCost("foreign-rail", Command<CMD_BUILD_SINGLE_RAIL>::Do(DoCommandFlag::Execute, foreign, RAILTYPE_RAIL, TRACK_X, false));
+	UpdateSignalsInBuffer();
+	foreign_company.Restore();
+	fmt::print(stderr, "SIGNALS owner-barrier {}\n", static_cast<uint8_t>(UpdateSignalsOnSegment(foreign, DIAGDIR_SW, owner)));
+
+}
+static bool SignalsScenario(std::span<std::string_view> args)
+{
+	if (args.size() != 2) return false;
+	if (args[1] == "sets") { SignalSetProbe(); return true; }
 	UpdateSignalsInBuffer();
 	if (args[1] == "inspect") { SignalPending("reload"); return true; }
 	Train *train = nullptr;
@@ -85,8 +213,10 @@ static bool SignalsScenario([[maybe_unused]] uint8_t argc, std::span<std::string
 	if (train == nullptr) SignalFixtureAbort(__LINE__);
 	Owner owner = train->owner;
 	Backup<CompanyID> company(_current_company, owner);
+	if (args[1] == "overflow") { SignalOverflowLayout(owner); company.Restore(); return true; }
 	auto tracks = SignalTracks(owner);
-	if (tracks.size() < 12) SignalFixtureAbort(__LINE__);
+	if (args[1] == "inspect-live") { SignalClassify(tracks, owner, "live-states"); SignalPending("live"); company.Restore(); return true; }
+	if (tracks.size() < 6) SignalFixtureAbort(__LINE__);
 	auto [tile, track] = tracks.front();
 	SavedRandomSeeds before, after;
 	SaveRandomSeeds(&before);
@@ -103,14 +233,7 @@ static bool SignalsScenario([[maybe_unused]] uint8_t argc, std::span<std::string
 	SignalPending("forced-flush");
 	SetSignalsOnBothDir(tile, track, owner);
 	SignalPending("private-flush");
-	uint states[3] = {};
-	for (auto [signal_tile, signal_track] : tracks) {
-		DiagDirection side = TrackdirToExitdir(TrackToTrackdir(signal_track));
-		SigSegState state = UpdateSignalsOnSegment(signal_tile, side, owner);
-		++states[state];
-	}
-	/* Original state classification is observable independently of saved map bits. */
-	fmt::print(stderr, "SIGNALS states {} {} {}\n", states[0], states[1], states[2]);
+	SignalClassify(tracks, owner, "states");
 	SaveRandomSeeds(&after);
 	bool same_rng = before.random.state[0] == after.random.state[0] && before.random.state[1] == after.random.state[1] && before.interactive_random.state[0] == after.interactive_random.state[0] && before.interactive_random.state[1] == after.interactive_random.state[1];
 	fmt::print(stderr, "SIGNALS rng {}\n", same_rng);
@@ -125,6 +248,8 @@ static bool SignalsScenario([[maybe_unused]] uint8_t argc, std::span<std::string
 	}
 	UpdateSignalsInBuffer();
 	SignalPending("commands");
+	SignalClassify(tracks, owner, "command-states");
+	IConsoleCmdExec("schedule on-next-calendar-month signals-live.scr");
 	company.Restore();
 	return true;
 }

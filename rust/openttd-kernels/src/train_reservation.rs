@@ -455,7 +455,9 @@ impl Game<'_> {
     }
     fn svc_signal_buffer(&self, id: Handle, a: u64, b: u64) -> u64 {
         let owner = (self.leaves.signal_owner)(id);
-        (self.leaves.signal_context)().add_side(a as u32, b as u8, owner);
+        crate::signal::count_context_owner_read();
+        crate::signal::acquire_context(self.leaves.signal_context)
+            .add_side(a as u32, b as u8, owner);
         0
     }
     fn svc_start_stop(&self, id: Handle) -> u64 {
@@ -501,7 +503,7 @@ impl Game<'_> {
         0
     }
     fn svc_update_buffer(&self, _id: Handle) -> u64 {
-        (self.leaves.signal_context)().flush();
+        crate::signal::acquire_context(self.leaves.signal_context).flush();
         0
     }
     fn svc_write_dest(&self, id: Handle, a: u64) -> u64 {

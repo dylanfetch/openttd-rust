@@ -286,7 +286,20 @@ pub const SIGNAL_FORCED_FLUSH: usize = 123;
 /// Bytes returned by signal-facing typed native services.
 pub const SIGNAL_BYTES: usize = 124;
 
-pub const NAMES: [&str; 125] = [
+/// Signal boundary `entries` counter.
+pub const SIGNAL_ENTRIES: usize = 125;
+/// Signal boundary `context_acquisitions` counter.
+pub const SIGNAL_CONTEXT_ACQUISITIONS: usize = 126;
+/// Signal boundary `context_owner_reads` counter.
+pub const SIGNAL_CONTEXT_OWNER_READS: usize = 127;
+/// Signal boundary `occupancy_accessors` counter.
+pub const SIGNAL_OCCUPANCY_ACCESSORS: usize = 128;
+/// Signal boundary `context_bytes` counter.
+pub const SIGNAL_CONTEXT_BYTES: usize = 129;
+/// Signal boundary `classification_bytes` counter.
+pub const SIGNAL_CLASSIFICATION_BYTES: usize = 130;
+
+pub const NAMES: [&str; 131] = [
     "train.tick_first",
     "train.tick_second",
     "train.reversal",
@@ -412,6 +425,12 @@ pub const NAMES: [&str; 125] = [
     "signal.reset",
     "signal.forced_flush",
     "signal.bytes",
+    "signal.entries",
+    "signal.context_acquisitions",
+    "signal.context_owner_reads",
+    "signal.occupancy_accessors",
+    "signal.context_bytes",
+    "signal.classification_bytes",
 ];
 
 static ENABLED: AtomicBool = AtomicBool::new(false);

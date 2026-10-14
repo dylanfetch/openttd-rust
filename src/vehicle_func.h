@@ -305,7 +305,11 @@ inline StringID GetCmdSendToDepotMsg(const BaseVehicle *v)
 }
 
 CommandCost EnsureNoVehicleOnGround(TileIndex tile);
+#ifdef WITH_RUST
+CommandCost EnsureNoTrainOnTrackBits(TileIndex tile, TrackBits track_bits, uint64_t *accessor_count = nullptr);
+#else
 CommandCost EnsureNoTrainOnTrackBits(TileIndex tile, TrackBits track_bits);
+#endif /* WITH_RUST */
 
 bool CanVehicleUseStation(EngineID engine_type, const struct Station *st);
 bool CanVehicleUseStation(const Vehicle *v, const struct Station *st);

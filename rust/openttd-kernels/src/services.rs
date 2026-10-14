@@ -272,7 +272,7 @@ pub struct RailMapServices {
     /// Consumed source-phase observation; guarded fields are not hoisted.
     pub traversal: extern "C" fn(u32) -> RailTraversal,
     /// Consumed source-phase observation; guarded fields are not hoisted.
-    pub signal_presence: extern "C" fn(u32, u8) -> RailSignalPresence,
+    pub signal_presence: extern "C" fn(u32, u8, u8) -> RailSignalPresence,
     /// Consumed source-phase observation; guarded fields are not hoisted.
     pub signal_update: extern "C" fn(u32, u8) -> RailSignalUpdate,
     /// Consumed source-phase observation; guarded fields are not hoisted.

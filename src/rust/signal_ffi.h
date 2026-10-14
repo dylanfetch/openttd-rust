@@ -42,7 +42,20 @@ struct OpenTTDSignalContext {
 };
 OpenTTDSignalContext GetRustSignalContext() noexcept;
 
+struct OpenTTDSignalSetTrace {
+	uint32_t duplicate_count;
+	OpenTTDSignalItem duplicate_pop[3];
+	bool full_failed, overflow_full;
+	OpenTTDSignalItem first_after_remove;
+	bool refill_succeeded;
+	OpenTTDSignalItem refill_pop;
+	uint32_t drained_count;
+	bool overflow_drained, overflow_reset;
+};
+
 extern "C" {
+void openttd_rust_signal_count_occupancy(uint64_t);
+void openttd_rust_signal_workset_probe(const OpenTTDSignalServices *, OpenTTDSignalSetTrace *);
 void openttd_rust_signal_inspect(OpenTTDSignalSnapshot *);
 void openttd_rust_signal_flush(const OpenTTDSharedServices *, const OpenTTDRailMapServices *, const OpenTTDSignalServices *, uint8_t);
 void openttd_rust_signal_add_track(const OpenTTDSharedServices *, const OpenTTDRailMapServices *, const OpenTTDSignalServices *, uint8_t, uint32_t, uint8_t, uint8_t);

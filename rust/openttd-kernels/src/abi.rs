@@ -26,6 +26,9 @@ macro_rules! layout {
 #[allow(clippy::too_many_lines)]
 pub fn layout(type_id: u16, item: u8) -> usize {
     match type_id {
+        831 => {
+            layout!(crate::signal::SetTrace, item; duplicate_count, duplicate_pop, full_failed, overflow_full, first_after_remove, refill_succeeded, refill_pop, drained_count, overflow_drained, overflow_reset)
+        }
         830 => layout!(crate::signal::Context, item; shared, rail, native, log_x),
         824 => layout!(crate::services::RailTraversal, item; depot, tracks),
         825 => {

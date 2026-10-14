@@ -247,6 +247,7 @@ add_files(
     rust/company_adapter.cpp
     rust/services.cpp
     rust/witness.cpp
+    rust/witness.h
     rust/vehicle_services.cpp
     rust/vehicle_services.h
     rust/vehicle_ffi.h
