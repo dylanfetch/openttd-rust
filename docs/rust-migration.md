@@ -9,7 +9,7 @@ and `AGENTS.md` states the selection rules.
 
 ## Repository and reference
 
-The fork is https://github.com/dylanfetch/openttd-rust. `origin` points to the fork;
+The fork is https://github.com/fetch-laboratories/openttd-rust. `origin` points to the fork;
 `upstream` points to https://github.com/OpenTTD/OpenTTD.git. The migration starts
 from OpenTTD 15.3, commit `14ec60f248547d4d062a1160f0fc26d742319888`, pinned in
 `migration/baseline.json`.
@@ -432,6 +432,11 @@ Runner settings are `CI_LINUX_HEAVY`, `CI_LINUX_COMPARISONS`,
 `CI_MACOS_HEAVY` (default `macos-latest`). Heavy native jobs use `nproc` slots.
 One full request peaks around 16 jobs; overlapping requests may queue against
 account/runner capacity. Runner size and account plan remain repository settings.
+The repository belongs to the `fetch-laboratories` organization (GitHub Free) so
+that an organization-installed runner provider such as Blacksmith can serve it;
+until one is approved the variables stay unset and jobs use GitHub-hosted runners.
+Switching a job means setting its variable to the provider's label (for example
+`blacksmith-8vcpu-ubuntu-2404`), with no workflow change.
 
 `python3 tools/preflight.py --base origin/rust-migration --verification REPORT`
 runs the pinned inherited commit checker and checks explicit candidate compiler
@@ -1494,7 +1499,7 @@ order and abandoned startup frames. Subsidies, exclusive rights, goals/story
 pages, hostile purchase, multiplayer runtime and NewGRFs remain evidence limits.
 ### Rail YAPF search, caches and reservation
 
-[#133](https://github.com/dylanfetch/openttd-rust/pull/133) moves all four searches,
+[#133](https://github.com/fetch-laboratories/openttd-rust/pull/133) moves all four searches,
 node/segment arenas, exact-order heap, costs, lookahead, limits and reconstruction
 into Rust. Rust owns six specialization-specific cache banks, rail-change
 invalidation, reservation traversal and ordered signal rollback. C++ retains
