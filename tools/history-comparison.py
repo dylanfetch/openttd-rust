@@ -32,31 +32,51 @@ def sha256(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def specialization(source, signature):
+    """Read the actual specialization, including any owner facade."""
+    start = source.index("template <>\n" + signature + "\n{")
+    opened = source.index("{", start)
+    depth, end = 1, opened + 1
+    # These three functions have balanced braces, including their lambdas.
+    while depth:
+        depth += (source[end] == "{") - (source[end] == "}")
+        end += 1
+    return source[start:end] + "\n"
+
+
+def portable_specialization(text):
+    """Retain the original body behind the town owner's WITH_RUST facade."""
+    if "\n#ifdef WITH_RUST\n" not in text:
+        return text
+    header, branches = text.split("\n#ifdef WITH_RUST\n", 1)
+    _, portable = branches.split("\n#else\n", 1)
+    body, tail = portable.split("\n#endif\n", 1)
+    return header + "\n" + body.lstrip("\n") + "\n" + tail
+
+
 def reducers():
-    """Extract actual unchanged production specializations, including int accumulators."""
-    pieces, hashes = [], {}
+    """Extract each source's reducers; require unchanged portable reference bodies."""
+    pieces = {"reference": [], "candidate": []}
+    hashes = {"reference": {}, "candidate": {}}
     for filename, signatures in REDUCERS.items():
         source = (REFERENCE / filename).read_text()
         candidate = (ROOT / filename).read_text()
         for signature in signatures:
-            start = source.index("template <>\n" + signature + "\n{")
-            opened = source.index("{", start)
-            depth, end = 1, opened + 1
-            # These three functions have balanced braces, including their lambdas.
-            while depth:
-                depth += (source[end] == "{") - (source[end] == "}")
-                end += 1
-            text = source[start:end] + "\n"
-            if text not in candidate:
+            original = specialization(source, signature)
+            current = specialization(candidate, signature)
+            if portable_specialization(current) != original:
                 raise RuntimeError(f"Production reducer changed: {signature}")
-            pieces.append(text)
-            hashes[signature] = sha256(text.encode())
-    path = OUT / "production-reducers.cpp"
-    path.write_text(
-        '#include "stdafx.h"\n#include "misc/history_func.hpp"\n#include "industry.h"\n#include "town.h"\n'
-        + "\n".join(pieces)
-    )
-    return path, hashes
+            for label, text in (("reference", original), ("candidate", current)):
+                pieces[label].append(text)
+                hashes[label][signature] = sha256(text.encode())
+    paths = {}
+    for label, bodies in pieces.items():
+        paths[label] = OUT / f"{label}-production-reducers.cpp"
+        paths[label].write_text(
+            '#include "stdafx.h"\n#include "misc/history_func.hpp"\n#include "industry.h"\n#include "town.h"\n'
+            + "\n".join(bodies)
+        )
+    return paths, hashes
 
 
 def run(command, env, name):
@@ -102,7 +122,7 @@ def main():
                 "-I",
                 str(source / "src"),
                 str(fixture),
-                str(production),
+                str(production["reference" if label == "reference" else "candidate"]),
                 str(source / "src/misc/history.cpp"),
                 "-Wl,--gc-sections",
                 "-o",
@@ -184,7 +204,8 @@ def main():
         "validity_disagreement_records": len(validity_disagreement),
         "validity_disagreement_example": validity_disagreement[0],
         "production_grouping_example": "grouping 0 1",
-        "production_reducers_sha256": hashes,
+        "production_reducers_sha256": hashes["reference"],
+        "candidate_production_reducers_sha256": hashes["candidate"],
         "reference_source_sha256": {
             name: sha256((REFERENCE / name).read_bytes())
             for name in STRUCTURE + tuple(REDUCERS)
