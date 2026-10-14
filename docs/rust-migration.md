@@ -223,10 +223,7 @@ or complete log/stdout difference fails. Both modes compare their exit saves.
   `--candidate` uses data beside that executable. Reports hash the executed
   copies before running; `candidate_commit`/`candidate_status` describe the
   initial checkout, not proof of an arbitrary binary's source revision (#97).
-  Runtime copies are deleted on completion, including failed and benchmark runs.
-  Startup keeps the newest ten completed runs; active runs are left alone.
-  Reports and retained scenario failures remain under
-  `.local/simulation/<time>-<pid>/report.json`.
+  Evidence: `.local/simulation/<time>-<pid>/report.json`.
 
 Simulation speed (#155) is reported for every scenario as `plain_speed`:
 paired process wall seconds and candidate/reference ratios, plus their median.
@@ -244,11 +241,9 @@ runs only plain pairs, isolates each timed game from other clone-wide harness
 games, and compares each exit save and full logs. Both roles use #154's serial
 offline thread-failure fallback, recorded as `execution` in the report. These
 are total offline times, not normal threaded frame latency. It retains the final
-pair of scenario outputs, but deletes both runtime copies. For optional `perf record`
-replay through `tools/simulation/game_launcher.py`, adapt `plain_commands` to the
-source binaries recorded in the report and their data directories. Preserve the
-run's HOME/XDG directories and runtime libraries; keep profiling separate from
-timing samples.
+pair and runtimes; `plain_commands` supplies arguments for optional `perf record`
+replay through `tools/simulation/game_launcher.py`. Preserve the run's HOME/XDG
+directories and runtime libraries; keep profiling separate from timing samples.
 Timings include startup, loading, serial link-graph work and save I/O. Benchmark
 games wait directly for child exit with a timeout watchdog; ordinary runs retain
 subprocess timeout polling, which can add about 50 ms.
@@ -1570,30 +1565,33 @@ separate index-zero serialized fixtures; the original source stays unchanged.
 ### Station cargo service
 
 Issue #125 moves the ordered loading queue, station service counters, acceptance
-mask and per-cargo rating/pickup/speed/age/waiting/fraction metadata into one
-canonical opaque Rust owner per BaseStation. C++ scalar references and the queue
-facade address that allocation; ordinary/indexed construction, retirement, reuse,
+mask and cargo rating/pickup/speed/age/waiting/fraction metadata into one opaque
+Rust owner per BaseStation. Native scalar references and the queue facade share
+it; ordinary/indexed construction, retirement, reuse,
 STNN/STNS and legacy fixups share it without persistent native mirrors. Rust owns
 PrepareUnload, complete station/vehicle loading, refit/reservation/completion,
 acceptance, ratings/truncation, admission/distribution and periodic/stale-link
 control. Packet, flow, link-graph, map and geometry storage remain C++.
 
-ABI IDs 110-115 pin layouts and direct noexcept service tables. Raw field-sized
-access ends before every service; native refit/cache/command-scope GUI readers and
-payment/industry reentry see current canonical state. Stable raw-owned queue nodes
-preserve list iterator identity. Save/fixup errors unwind through a native stack
-scope and retain partial list changes. #117 production flush remains once at the
-original end of LoadUnloadStation. Original bodies remain in portable builds.
+Issue #214 replaces numeric dispatch with borrowed typed noexcept tables (ABI
+110-115), narrow observations (500-515), and caller-owned native iterator/container
+frames. Raw field access ends before callbacks; refit and payment/industry reentry
+see current state. Empty station ticks enter Rust with the queue owner directly; per-vehicle
+lookup precedes next-station discovery. Cargo remaining counts read their Rust
+owner at each original observation. Stable queue nodes preserve iterator identity. Native save
+scopes retain partial changes on failure. #117 production flush remains once at
+the original end of LoadUnloadStation. Portable bodies remain unchanged.
 
 `python3 tools/migration.py simulate stations economy` uses the existing road/CAPY
 inputs for loading queues, fractional admission, acceptance loss, full/gradual
 loading, rating expiry/decay/capping, stale-link refresh/removal and active reload.
 `stations-loading-context` checks an accepted modern save with a distinct valid
 last-visited station, preserving the outer queue and staged cargo (#227/#75).
-`--self` and `--soak` reuse these cases. Native tests cover ABI, stable aliases,
-queue mutation, partial/nested save failure and actual retirement/indexed reuse.
-The corpus is not exhaustive for legacy versions, NewGRF cargo callbacks,
-articulated/multiheaded refits or every transport combination.
+`--self` and `--soak` reuse these cases. Required named station branches use the
+shared witness facility, disabled during timing. Native tests cover
+ABI, aliases, queue/reentry order, save failure and retirement/indexed reuse.
+Acceptance-loss precedes acceptance polling; full-gradual proves reservation and
+unloading, not a positive load. Legacy, NewGRF and refit gaps remain in #156.
 
 ### Ship controller and private state (#146)
 

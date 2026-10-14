@@ -101,6 +101,7 @@ struct OpenTTDVehicleServices {
 	void (OPENTTD_VEHICLE_CALL *write_day)(OpenTTDVehicle *, uint8_t) noexcept;
 	void (OPENTTD_VEHICLE_CALL *write_direction)(OpenTTDVehicle *, uint8_t) noexcept;
 	void (OPENTTD_VEHICLE_CALL *write_speed)(OpenTTDVehicle *, uint16_t) noexcept;
+	uint16_t (OPENTTD_VEHICLE_CALL *last_station)(OpenTTDVehicle *) noexcept;
 	void (OPENTTD_VEHICLE_CALL *write_last_station)(OpenTTDVehicle *, uint16_t) noexcept;
 	void (OPENTTD_VEHICLE_CALL *write_dest)(OpenTTDVehicle *, uint32_t) noexcept;
 	void (OPENTTD_VEHICLE_CALL *write_progress)(OpenTTDVehicle *, uint8_t) noexcept;
@@ -129,7 +130,6 @@ struct OpenTTDVehicleServices {
 	uint8_t (OPENTTD_VEHICLE_CALL *subspeed)(OpenTTDVehicle *) noexcept;
 	uint8_t (OPENTTD_VEHICLE_CALL *running)(OpenTTDVehicle *) noexcept;
 	int32_t (OPENTTD_VEHICLE_CALL *order_time)(OpenTTDVehicle *) noexcept;
-	uint16_t (OPENTTD_VEHICLE_CALL *last_station)(OpenTTDVehicle *) noexcept;
 	uint8_t (OPENTTD_VEHICLE_CALL *vehicle_type)(OpenTTDVehicle *) noexcept;
 	void (OPENTTD_VEHICLE_CALL *write_x)(OpenTTDVehicle *, int32_t) noexcept;
 	void (OPENTTD_VEHICLE_CALL *write_y)(OpenTTDVehicle *, int32_t) noexcept;

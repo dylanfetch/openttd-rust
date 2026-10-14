@@ -66,7 +66,7 @@ static uint8_t OPENTTD_AIRCRAFT_CALL Aircraft_airport_type(const OpenTTDStation 
 static uint8_t OPENTTD_AIRCRAFT_CALL Aircraft_station_owner(const OpenTTDStation *s) noexcept
 {
 	const Station *st = StationOf(s);
-	return RustStationOwner(st);
+	return OpenTTDStationOwner(st).base();
 }
 
 static bool OPENTTD_AIRCRAFT_CALL Aircraft_has_hangar(const OpenTTDStation *s) noexcept
@@ -469,7 +469,7 @@ static OpenTTDAircraftLayoutRoute OPENTTD_AIRCRAFT_CALL Aircraft_layout_route(co
 static OpenTTDAircraftHangarCandidate OPENTTD_AIRCRAFT_CALL Aircraft_hangar_candidate(const OpenTTDStation *station, uint8_t vehicle_owner) noexcept
 {
 	const Station *st = StationOf(station);
-	uint8_t owner = RustStationOwner(st);
+	uint8_t owner = OpenTTDStationOwner(st).base();
 	bool airport = owner == vehicle_owner && RustStationHasAirport(st);
 	return {.owner = owner, .airport = airport, .hangar = airport && RustStationHasHangar(st)};
 }

@@ -10,6 +10,8 @@
 #![allow(unsafe_code, clippy::cast_possible_truncation)]
 use std::ffi::c_void;
 
+/// Source `TileType::MP_HOUSE`.
+pub const MP_HOUSE: u8 = 3;
 /// Synchronous borrowed bytes, including embedded NULs. The producing entry
 /// specifies lifetime; no native callback may retain this view after mutation.
 #[repr(C)]

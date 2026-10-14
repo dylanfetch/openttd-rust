@@ -13,6 +13,12 @@
 )]
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
+
+/// Opaque live native `LinkGraph`; never dereferenced by Rust.
+#[repr(C)]
+pub struct NativeGraph {
+    _private: [u8; 0],
+}
 use std::ffi::c_void;
 
 #[derive(Clone, Copy)]

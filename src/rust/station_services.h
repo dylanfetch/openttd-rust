@@ -10,12 +10,13 @@
 #define RUST_STATION_SERVICES_H
 #include "services_ffi.h"
 #include "../station_base.h"
+#include "../base_station_base.h"
 
 inline const OpenTTDStation *RustStation(const Station *s) noexcept { return reinterpret_cast<const OpenTTDStation *>(s); }
 inline const Station *StationOf(const OpenTTDStation *s) noexcept { return reinterpret_cast<const Station *>(s); }
 inline uint32_t RustStationAirportTile(const Station *s) noexcept { return s->airport.tile.base(); }
 inline uint32_t RustStationLocation(const Station *s) noexcept { return s->xy.base(); }
-inline uint8_t RustStationOwner(const Station *s) noexcept { return s->owner.base(); }
+inline Owner OpenTTDStationOwner(const BaseStation *station) noexcept { return station->owner; }
 inline bool RustStationHasAirport(const Station *s) noexcept { return s->facilities.Test(StationFacility::Airport); }
 inline bool RustStationHasHangar(const Station *s) noexcept { return s->airport.HasHangar(); }
 #endif /* RUST_STATION_SERVICES_H */

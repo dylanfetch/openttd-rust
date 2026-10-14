@@ -221,23 +221,37 @@ pub const ROAD_VISITORS: usize = 93;
 /// Selected road controller entries, including reentrant helpers.
 pub const ROAD_ENTRIES: usize = 94;
 
-/// Counter names, grouped by the prefix the harness selects.
-/// Primary aircraft ticks, including both event passes.
-pub const AIRCRAFT_TICKS: usize = 95;
-/// Aircraft calls into native services, including shared services.
-pub const AIRCRAFT_SERVICES: usize = 96;
-/// Native calls into aircraft controllers/helpers (excluding owner allocation).
-pub const AIRCRAFT_ENTRIES: usize = 97;
-/// Aircraft service station-pool resolutions.
-pub const AIRCRAFT_STATIONS: usize = 98;
-/// Bytes returned by aircraft observations (including record padding).
-pub const AIRCRAFT_BYTES: usize = 99;
-/// Cache helper ingress, also included in total entries.
-pub const AIRCRAFT_CACHE_ENTRIES: usize = 100;
-/// Ownerless flight helper ingress, also included in total entries.
-pub const AIRCRAFT_DISASTER_ENTRIES: usize = 101;
+/// `station.rejected_delivery` branch.
+pub const STATION_REJECTED_DELIVERY: usize = 95;
+/// `station.stale_remove` branch.
+pub const STATION_STALE_REMOVE: usize = 96;
+/// `station.stale_refresh` branch.
+pub const STATION_STALE_REFRESH: usize = 97;
+/// `station.unload_cargo` branch.
+pub const STATION_UNLOAD_CARGO: usize = 98;
+/// `station.gradual_unload` branch.
+pub const STATION_GRADUAL_UNLOAD: usize = 99;
 
-pub const NAMES: [&str; 102] = [
+/// `station.full_load_reserve` branch.
+pub const STATION_FULL_LOAD_RESERVE: usize = 100;
+
+/// Primary aircraft ticks, including both event passes.
+pub const AIRCRAFT_TICKS: usize = 101;
+/// Aircraft calls into native services, including shared services.
+pub const AIRCRAFT_SERVICES: usize = 102;
+/// Native calls into aircraft controllers/helpers (excluding owner allocation).
+pub const AIRCRAFT_ENTRIES: usize = 103;
+/// Aircraft service station-pool resolutions.
+pub const AIRCRAFT_STATIONS: usize = 104;
+/// Bytes returned by aircraft observations (including record padding).
+pub const AIRCRAFT_BYTES: usize = 105;
+/// Cache helper ingress, also included in total entries.
+pub const AIRCRAFT_CACHE_ENTRIES: usize = 106;
+/// Ownerless flight helper ingress, also included in total entries.
+pub const AIRCRAFT_DISASTER_ENTRIES: usize = 107;
+
+/// Counter names, grouped by the prefix the harness selects.
+pub const NAMES: [&str; 108] = [
     "train.tick_first",
     "train.tick_second",
     "train.reversal",
@@ -333,6 +347,12 @@ pub const NAMES: [&str; 102] = [
     "road.services",
     "road.visitors",
     "road.entries",
+    "station.rejected_delivery",
+    "station.stale_remove",
+    "station.stale_refresh",
+    "station.unload_cargo",
+    "station.gradual_unload",
+    "station.full_load_reserve",
     "aircraft.ticks",
     "aircraft.services",
     "aircraft.entries",

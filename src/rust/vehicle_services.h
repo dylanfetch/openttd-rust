@@ -51,8 +51,12 @@ inline uint16_t RustVehicleMaxSpeed(const Vehicle *v) noexcept { return v->vcach
 inline uint8_t RustVehicleRunning(const Vehicle *v) noexcept { return v->running_ticks; }
 inline int32_t RustVehicleOrderTime(const Vehicle *v) noexcept { return v->current_order_time; }
 inline int64_t RustVehicleProfit(const Vehicle *v) noexcept { return v->profit_this_year; }
-inline uint16_t RustVehicleLastStation(const Vehicle *v) noexcept { return v->last_station_visited.base(); }
 inline uint8_t RustVehicleVehicleType(const Vehicle *v) noexcept { return v->type; }
+
+/** Base vehicle cargo and articulated fields shared by loading and link refresh. */
+inline uint8_t RustVehicleCargoType(OpenTTDVehicle *handle) noexcept { return VehicleOf(handle)->cargo_type; }
+inline uint8_t RustVehicleOwnerOf(OpenTTDVehicle *handle) noexcept { return RustVehicleOwner(VehicleOf(handle)); }
+inline bool RustVehicleHasArticulated(OpenTTDVehicle *handle) noexcept { return RustGroundHasArticulated(VehicleOf(handle)); }
 
 /** GRF version of a live engine; the original default-engine value is zero. */
 inline uint8_t RustEngineGRFVersion(const Engine *engine) noexcept

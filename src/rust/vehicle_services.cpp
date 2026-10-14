@@ -135,6 +135,7 @@ static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcCheckOrders(OpenTTDVehicle *v) noe
 static void OPENTTD_VEHICLE_CALL VehicleSvcWriteDay(OpenTTDVehicle *v, uint8_t day) noexcept { VehicleOf(v)->day_counter = day; }
 static void OPENTTD_VEHICLE_CALL VehicleSvcWriteDirection(OpenTTDVehicle *v, uint8_t direction) noexcept { VehicleOf(v)->direction = static_cast<Direction>(direction); }
 static void OPENTTD_VEHICLE_CALL VehicleSvcWriteSpeed(OpenTTDVehicle *v, uint16_t speed) noexcept { VehicleOf(v)->cur_speed = speed; }
+static uint16_t OPENTTD_VEHICLE_CALL VehicleSvcLastStation(OpenTTDVehicle *v) noexcept { return VehicleOf(v)->last_station_visited.base(); }
 static void OPENTTD_VEHICLE_CALL VehicleSvcWriteLastStation(OpenTTDVehicle *v, uint16_t station) noexcept { VehicleOf(v)->last_station_visited = StationID(station); }
 static void OPENTTD_VEHICLE_CALL VehicleSvcWriteDest(OpenTTDVehicle *v, uint32_t tile) noexcept { VehicleOf(v)->dest_tile = TileIndex(tile); }
 static void OPENTTD_VEHICLE_CALL VehicleSvcWriteProgress(OpenTTDVehicle *v, uint8_t progress) noexcept { RustWriteVehicleProgress(VehicleOf(v), progress); }
@@ -180,7 +181,6 @@ static uint16_t OPENTTD_VEHICLE_CALL VehicleSvcSpeed(OpenTTDVehicle *v) noexcept
 static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcSubspeed(OpenTTDVehicle *v) noexcept { return RustVehicleSubspeed(VehicleOf(v)); }
 static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcRunning(OpenTTDVehicle *v) noexcept { return RustVehicleRunning(VehicleOf(v)); }
 static int32_t OPENTTD_VEHICLE_CALL VehicleSvcOrderTime(OpenTTDVehicle *v) noexcept { return RustVehicleOrderTime(VehicleOf(v)); }
-static uint16_t OPENTTD_VEHICLE_CALL VehicleSvcLastStation(OpenTTDVehicle *v) noexcept { return RustVehicleLastStation(VehicleOf(v)); }
 static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcVehicleType(OpenTTDVehicle *v) noexcept { return RustVehicleVehicleType(VehicleOf(v)); }
 static void OPENTTD_VEHICLE_CALL VehicleSvcWriteX(OpenTTDVehicle *v, int32_t value) noexcept { VehicleOf(v)->x_pos = value; }
 static void OPENTTD_VEHICLE_CALL VehicleSvcWriteY(OpenTTDVehicle *v, int32_t value) noexcept { VehicleOf(v)->y_pos = value; }
@@ -270,6 +270,7 @@ const OpenTTDVehicleServices &GetRustVehicleServices() noexcept
 		.write_day = VehicleSvcWriteDay,
 		.write_direction = VehicleSvcWriteDirection,
 		.write_speed = VehicleSvcWriteSpeed,
+		.last_station = VehicleSvcLastStation,
 		.write_last_station = VehicleSvcWriteLastStation,
 		.write_dest = VehicleSvcWriteDest,
 		.write_progress = VehicleSvcWriteProgress,
@@ -298,7 +299,6 @@ const OpenTTDVehicleServices &GetRustVehicleServices() noexcept
 		.subspeed = VehicleSvcSubspeed,
 		.running = VehicleSvcRunning,
 		.order_time = VehicleSvcOrderTime,
-		.last_station = VehicleSvcLastStation,
 		.vehicle_type = VehicleSvcVehicleType,
 		.write_x = VehicleSvcWriteX,
 		.write_y = VehicleSvcWriteY,
