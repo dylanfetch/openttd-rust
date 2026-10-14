@@ -282,6 +282,81 @@ class GateTests(unittest.TestCase):
 
 
 class CacheTests(unittest.TestCase):
+    def test_real_ccache_fit_evicts_with_environment_limits_and_preserves_fallback(
+        self,
+    ):
+        executable = shutil.which("ccache")
+        compiler = shutil.which("cc")
+        self.assertIsNotNone(executable, "Default cache checks require ccache")
+        self.assertIsNotNone(compiler, "Default cache checks require a C compiler")
+        config = ROOT / "migration/ccache.conf"
+        config_bytes = config.read_bytes()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            sources = [root / "reference", root / "candidate"]
+            env = {
+                key: value
+                for key, value in os.environ.items()
+                if not key.startswith("CCACHE_")
+            }
+            env.update(
+                CCACHE_CONFIGPATH=str(config),
+                CCACHE_MAXSIZE="0",
+                CCACHE_TEMPDIR=str(root / "tmp"),
+            )
+            # Four small, real compilations create valid incompressible results.
+            # No game build or synthetic files masquerading as ccache entries.
+            data = "".join(f"\\x{byte:02x}" for byte in os.urandom(768 * 1024))
+            for index in range(4):
+                source = root / f"{index}.c"
+                source.write_text(f'const unsigned char value{index}[] = "{data}";\n')
+                subprocess.run(
+                    [
+                        executable,
+                        compiler,
+                        "-c",
+                        str(source),
+                        "-o",
+                        str(root / "object.o"),
+                    ],
+                    env=dict(env, CCACHE_DIR=str(sources[index // 2])),
+                    check=True,
+                    capture_output=True,
+                )
+            for source in sources:
+                self.assertEqual(len(list(source.rglob("*R"))), 2)
+                (source / "ccache.conf").write_text("max_size = 7GiB\n")
+            fallback = root / "fallback.tgz"
+            cache_payload.pack(fallback, sources, "native", "image", BASE)
+            fallback_bytes = fallback.read_bytes()
+            allocations = [cache_payload.allocated_size(source) for source in sources]
+            with (
+                patch.dict(os.environ, dict(env, CCACHE_EXE=executable), clear=True),
+                patch.dict(cache_payload.POLICY["families"], {"native": 4}),
+                patch.object(cache_payload, "pack", wraps=cache_payload.pack) as pack,
+                patch.object(
+                    cache_payload.subprocess, "run", wraps=subprocess.run
+                ) as cleanup,
+            ):
+                item = cache_payload.pack_to_fit(
+                    root / "upload.tgz", sources, "native", "image", HEAD
+                )
+            self.assertGreater(pack.call_count, 1)
+            self.assertEqual(cleanup.call_count, 2)
+            for source, before, call in zip(
+                sources, allocations, cleanup.call_args_list, strict=True
+            ):
+                self.assertEqual(call.kwargs["env"]["CCACHE_DIR"], str(source))
+                self.assertRegex(call.kwargs["env"]["CCACHE_MAXSIZE"], r"^[1-9]\d*KiB$")
+                self.assertLess(cache_payload.allocated_size(source), before)
+                self.assertLess(len(list(source.rglob("*R"))), 2)
+                self.assertEqual(
+                    (source / "ccache.conf").read_text(), "max_size = 7GiB\n"
+                )
+            self.assertLessEqual(item["envelope"], 4 * 1024**2)
+            self.assertEqual(fallback.read_bytes(), fallback_bytes)
+            self.assertEqual(config.read_bytes(), config_bytes)
+
     def test_measured_oversize_trims_current_roots_and_repacks_before_admission(self):
         path_stat = Path.stat
 
