@@ -170,6 +170,9 @@ add_files(
     elrail.cpp
     elrail_func.h
     engine.cpp
+    rust/engine_lifecycle.hpp
+    rust/engine_ffi.h
+    rust/engine_adapter.hpp
     engine_base.h
     engine_cmd.h
     engine_func.h

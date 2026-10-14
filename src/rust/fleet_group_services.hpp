@@ -39,7 +39,7 @@ static void * FleetGroup_renew_state(void *shell) noexcept { return static_cast<
 static void * FleetGroup_next_renew(uint32_t from) noexcept { for (EngineRenew *er : EngineRenew::Iterate(from)) { if (er->index.base() >= from) return er; } return nullptr; }
 static uint32_t FleetGroup_renew_id(void *shell) noexcept { return static_cast<EngineRenew *>(shell)->index.base(); }
 static uint8_t FleetGroup_engine_type(uint16_t engine) noexcept { return Engine::Get(EngineID(engine))->type; }
-static uint8_t FleetGroup_current_company() noexcept { return OpenTTDCurrentCompany().base(); }
+static uint8_t FleetGroup_current_company() noexcept { return RustCurrentCompanyID(); }
 static bool FleetGroup_buildable_type(uint8_t type) noexcept { return IsCompanyBuildableVehicleType(static_cast<VehicleType>(type)); }
 static bool FleetGroup_can_allocate() noexcept { return Group::CanAllocateItem(); }
 static uint16_t FleetGroup_allocate(uint8_t owner, uint8_t type) noexcept { return (new Group(CompanyID(owner), static_cast<VehicleType>(type)))->index.base(); }

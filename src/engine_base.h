@@ -16,6 +16,9 @@
 #include "core/pool_type.hpp"
 #include "newgrf_commons.h"
 #include "timer/timer_game_calendar.h"
+#ifdef WITH_RUST
+#include "rust/engine_lifecycle.hpp"
+#endif
 
 struct WagonOverride {
 	std::vector<EngineID> engines;
@@ -37,6 +40,26 @@ extern EnginePool _engine_pool;
 
 class Engine : public EnginePool::PoolItem<&_engine_pool> {
 public:
+#ifdef WITH_RUST
+	EngineLifecycleOwner rust_lifecycle;
+	CompanyMask &company_avail = this->rust_lifecycle.state->company_avail;
+	CompanyMask &company_hidden = this->rust_lifecycle.state->company_hidden;
+	CompanyMask &preview_asked = this->rust_lifecycle.state->preview_asked;
+	TimerGameCalendar::Date &intro_date = this->rust_lifecycle.state->intro_date;
+	int32_t &age = this->rust_lifecycle.state->age;
+	uint16_t &reliability = this->rust_lifecycle.state->reliability;
+	uint16_t &reliability_spd_dec = this->rust_lifecycle.state->reliability_spd_dec;
+	uint16_t &reliability_start = this->rust_lifecycle.state->reliability_start;
+	uint16_t &reliability_max = this->rust_lifecycle.state->reliability_max;
+	uint16_t &reliability_final = this->rust_lifecycle.state->reliability_final;
+	uint16_t &duration_phase_1 = this->rust_lifecycle.state->duration_phase_1;
+	uint16_t &duration_phase_2 = this->rust_lifecycle.state->duration_phase_2;
+	uint16_t &duration_phase_3 = this->rust_lifecycle.state->duration_phase_3;
+	EngineFlags &flags = this->rust_lifecycle.state->flags;
+	CompanyID &preview_company = this->rust_lifecycle.state->preview_company;
+	uint8_t &preview_wait = this->rust_lifecycle.state->preview_wait;
+	EngineName name{this->rust_lifecycle.state};
+#else
 	CompanyMask company_avail{}; ///< Bit for each company whether the engine is available for that company.
 	CompanyMask company_hidden{}; ///< Bit for each company whether the engine is normally hidden in the build gui for that company.
 	CompanyMask preview_asked{}; ///< Bit for each company which has already been offered a preview.
@@ -58,6 +81,7 @@ public:
 
 	CompanyID preview_company = CompanyID::Invalid();  ///< Company which is currently being offered a preview \c CompanyID::Invalid() means no company.
 	uint8_t preview_wait = 0; ///< Daily countdown timer for timeout of offering the engine to the #preview_company company.
+#endif
 	uint8_t original_image_index = 0; ///< Original vehicle image index, thus the image index of the overridden vehicle
 	VehicleType type = VEH_INVALID; ///< %Vehicle type, ie #VEH_ROAD, #VEH_TRAIN, etc.
 
@@ -78,6 +102,11 @@ private:
 
 public:
 	Engine() {}
+#ifdef WITH_RUST
+	Engine(Engine &&) noexcept = default;
+	Engine(const Engine &) = delete;
+	Engine &operator=(const Engine &) = delete;
+#endif
 	Engine(VehicleType type, uint16_t local_id);
 	bool IsEnabled() const;
 

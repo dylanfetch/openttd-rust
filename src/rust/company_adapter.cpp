@@ -9,6 +9,7 @@
 #ifdef WITH_RUST
 #include "company_adapter.h"
 #include "company_services.h"
+#include "settings_services.h"
 #include "../company_base.h"
 #include "../company_func.h"
 #include "../company_cmd.h"
@@ -118,7 +119,7 @@ static OpenTTDCompanyRef Co_company_next(uint32_t from) noexcept
 static bool Co_company_is_ai(uint8_t id) noexcept { return Company::Get(id)->is_ai; }
 static size_t Co_company_count() noexcept { return Company::GetNumItems(); }
 static bool Co_can_allocate_company() noexcept { return Company::CanAllocateItem(); }
-static uint8_t Co_local_company() noexcept { return _local_company.base(); }
+static uint8_t Co_local_company() noexcept { return RustLocalCompanyID(); }
 static bool Co_network_server() noexcept { return _network_server; }
 static OpenTTDCompanyVehicleCounts Co_company_vehicle_counts(uint8_t id) noexcept
 {
@@ -129,8 +130,7 @@ static OpenTTDCompanyVehicleCounts Co_company_vehicle_counts(uint8_t id) noexcep
 }
 static OpenTTDCompanyVehicleCounts Co_vehicle_limits() noexcept
 {
-	const auto &v = _settings_game.vehicle;
-	return {v.max_trains, v.max_roadveh, v.max_ships, v.max_aircraft};
+	return {RustTrainLimit(), RustRoadVehicleLimit(), RustShipLimit(), RustAircraftLimit()};
 }
 static void Co_company_admin_update(uint8_t id) noexcept { CompanyAdminUpdate(Company::Get(id)); }
 static void Co_company_in_trouble(uint8_t id) noexcept

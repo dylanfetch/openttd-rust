@@ -48,7 +48,7 @@ static constexpr bool FLEET_ASSERTIONS = false;
 #endif
 static bool FleetTransaction_needs_renew(void *shell, bool settings) noexcept { return static_cast<Vehicle *>(shell)->NeedsAutorenewing(Company::Get(OpenTTDCurrentCompany()), settings); }
 static bool FleetTransaction_engine_valid(uint16_t id) noexcept { return Engine::IsValidID(EngineID(id)); }
-static bool FleetTransaction_company_valid(uint8_t id) noexcept { return Company::IsValidID(CompanyID(id)); }
+static bool FleetTransaction_company_valid(uint8_t id) noexcept { return RustCompanyValid(id); }
 static bool FleetTransaction_engine_buildable(uint16_t id, uint8_t type, uint8_t company) noexcept { return IsEngineBuildable(EngineID(id), static_cast<VehicleType>(type), CompanyID(company)); }
 static uint64_t FleetTransaction_rail_compatible(uint16_t id) noexcept { return GetAllCompatibleRailTypes(RailVehInfo(EngineID(id))->railtypes).base(); }
 static uint64_t FleetTransaction_road_powered(uint16_t id) noexcept { return GetRoadTypeInfo(RoadVehInfo(EngineID(id))->roadtype)->powered_roadtypes.base(); }
@@ -85,8 +85,8 @@ static void FleetTransaction_news(void *old, void *replacement) noexcept { Chang
 static void FleetTransaction_transfer_cargo(void *old, void *replacement, bool chain) noexcept { TransferCargo(static_cast<Vehicle *>(old), static_cast<Vehicle *>(replacement), chain); }
 static void FleetTransaction_capacity(void *shell) noexcept { CheckCargoCapacity(static_cast<Vehicle *>(shell)); }
 static void FleetTransaction_event(void *old, void *replacement) noexcept { auto *v = static_cast<Vehicle *>(old); AI::NewEvent(v->owner, new ScriptEventVehicleAutoReplaced(v->index, static_cast<Vehicle *>(replacement)->index)); }
-static void FleetTransaction_save_rng(void *seeds) noexcept { SaveRandomSeeds(static_cast<SavedRandomSeeds *>(seeds)); }
-static void FleetTransaction_restore_rng(void *seeds) noexcept { RestoreRandomSeeds(*static_cast<SavedRandomSeeds *>(seeds)); }
+static void FleetTransaction_save_rng(void *seeds) noexcept { *static_cast<SavedRandomSeeds *>(seeds) = std::bit_cast<SavedRandomSeeds>(GetRustRandomServices().save()); }
+static void FleetTransaction_restore_rng(void *seeds) noexcept { GetRustRandomServices().restore(std::bit_cast<OpenTTDRandomSeeds>(*static_cast<SavedRandomSeeds *>(seeds))); }
 static void FleetTransaction_rule_window(uint16_t engine, uint16_t group) noexcept { InvalidateAutoreplaceWindow(EngineID(engine), GroupID(group)); }
 static const OpenTTDFleetTransactionServices _fleet_transaction_services{
 	.cost_zero = FleetTransaction_cost_zero,

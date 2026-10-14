@@ -54,6 +54,15 @@ struct OpenTTDSharedServices {
 	int32_t (*tile_height)(uint32_t) noexcept;
 };
 const OpenTTDSharedServices &GetRustSharedServices() noexcept;
+/** Shared save/reseed/restore of BOTH original RNG streams. */
+struct OpenTTDRandomSeeds { uint32_t random[2], interactive[2]; };
+struct OpenTTDRandomServices {
+	OpenTTDRandomSeeds (*save)() noexcept;
+	void (*restore)(OpenTTDRandomSeeds) noexcept;
+	void (*set_seed)(uint32_t) noexcept;
+};
+const OpenTTDRandomServices &GetRustRandomServices() noexcept;
+int32_t RustCalendarYear() noexcept;
 
 /* Standalone fixtures without a game map: map predicates return zero and writes do nothing. */
 template <typename Result, typename... Args>

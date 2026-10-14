@@ -15,4 +15,7 @@
 inline CompanyID OpenTTDCurrentCompany() noexcept { return _current_company; }
 inline void OpenTTDSetCurrentCompany(CompanyID company) noexcept { _current_company = company; }
 inline uint16_t RustCompanyAircraftServiceInterval(CompanyID owner) noexcept { return Company::Get(owner)->settings.vehicle.servint_aircraft; }
+inline uint8_t RustCurrentCompanyID() noexcept { return OpenTTDCurrentCompany().base(); }
+inline uint8_t RustLocalCompanyID() noexcept { return _local_company.base(); }
+inline bool RustCompanyValid(uint8_t id) noexcept { return Company::IsValidID(CompanyID{id}); }
 #endif /* RUST_COMPANY_SERVICES_H */

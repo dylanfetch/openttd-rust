@@ -61,6 +61,7 @@ static uint8_t SharedPlaneCrashes() noexcept { return RustPlaneCrashes(); }
 static bool SharedServiceAtHelipad() noexcept { return RustServiceAtHelipad(); }
 static bool SharedDisasterSound() noexcept { return RustDisasterSound(); }
 static int32_t SharedEconomyDate() noexcept { return TimerGameEconomy::date.base(); }
+int32_t RustCalendarYear() noexcept { return TimerGameCalendar::year.base(); }
 static int32_t SharedCalendarDate() noexcept { return TimerGameCalendar::date.base(); }
 static int32_t SharedSlope(int32_t x, int32_t y) noexcept { return GetSlopePixelZ(x, y); }
 static int32_t SharedTileHeight(uint32_t tile) noexcept { return TileHeight(TileIndex{tile}) * TILE_HEIGHT; }
@@ -98,6 +99,22 @@ const OpenTTDSharedServices &GetRustSharedServices() noexcept
 		.slope = SharedSlope,
 		.tile_height = SharedTileHeight,
 	};
+	return services;
+}
+static OpenTTDRandomSeeds SharedSaveRandomSeeds() noexcept
+{
+	SavedRandomSeeds seeds;
+	SaveRandomSeeds(&seeds);
+	return {.random = {seeds.random.state[0], seeds.random.state[1]}, .interactive = {seeds.interactive_random.state[0], seeds.interactive_random.state[1]}};
+}
+static void SharedRestoreRandomSeeds(OpenTTDRandomSeeds seeds) noexcept
+{
+	RestoreRandomSeeds({{seeds.random[0], seeds.random[1]}, {seeds.interactive[0], seeds.interactive[1]}});
+}
+static void SharedSetRandomSeed(uint32_t seed) noexcept { SetRandomSeed(seed); }
+const OpenTTDRandomServices &GetRustRandomServices() noexcept
+{
+	static const OpenTTDRandomServices services{.save = SharedSaveRandomSeeds, .restore = SharedRestoreRandomSeeds, .set_seed = SharedSetRandomSeed};
 	return services;
 }
 #endif /* WITH_RUST */
