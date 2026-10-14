@@ -626,7 +626,7 @@ static void TileLoop_Town(TileIndex tile)
 #endif
 {
 #ifdef WITH_RUST
-	const TileIndex tile{tile_index};
+	TileIndex tile{tile_index};
 #endif
 	HouseID house_id = GetHouseType(tile);
 
