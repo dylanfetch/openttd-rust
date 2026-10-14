@@ -39,6 +39,7 @@ Actions, in order:
    - Gate: interleaved A/B against tip within 11 ms on TGP; attribute any miss with callgrind (AGENTS.md).
 6. **Re-select #213 from integrated tip.**
    - Boundary: a pool-cursor descriptor instead of a `next()` call per vehicle, one slim dispatch record and one post-tick bundle, the assert check in Rust, and about three C++ calls per vehicle at most.
+   - The selected growth-checked cursor and read-only actual status-member addresses are bounded by `docs/design/world-state.md`; count all semantic callbacks too.
    - Gate: at most 6 ns per vehicle-tick visit, A/B against tip on Opus.
    - #212 and #213 may run concurrently within the WIP cap.
 7. **Town #246** carries the #216 follow-ups listed on #246, including deleting the save staging if it is redundant. Select the house-tile-loop owner no later than #247.
@@ -159,18 +160,19 @@ that a `SaveLoad` descriptor cannot address through the alias.
 
 ## Resume checkpoint
 
-The user paused root at 334df5ef8c, and a `/start-development` restart resumes from here.
-`rust-migration` is green. No agents are running.
+Root resumed from `fe337e4e40` with `/start-development`. The last code revision
+is green. #253 is in bootstrap CI; #254 has a fresh fixing reviewer. #245/#248
+remain with implementation agents. Root owns CI/integration and #233 observation.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #233 / #243 / #244 | `ci-cache-peak-233`, `1288db61b4` | Measure, then close or resume (action 1). |
-| #252 | none | New, first: Windows CI on Blacksmith via `CI_WINDOWS_HEAVY`. |
-| #249 | none | New: shared-accessor check in quick CI. |
-| #219 / #245 | `signal-owner-219`, `df2f77b247` | Draft: apply the steering comment, then final-head validation, timing, review and CI. |
-| #220 / #248 | `engine-lifecycle-220`, `9c4b950b56` | Draft, does not build: apply the steering comment, add the harness, then review and CI. |
-| #212 / #241 | `landscape-budget-prototype-212`, `45633ef6d6` | Re-selected: new branch from tip with the action-5 boundary. |
-| #213 / #242 | `vehicle-budget-prototype-213`, `92b8a04075` | Re-selected: new branch from tip with the action-6 boundary. |
+| #233 / #243 / #244 | `ci-cache-peak-233`, `1288db61b4` | Root sampling; zero of three code merges observed. Leave #244 idle (action 1). |
+| #252 / #253 | `windows-blacksmith-252`, `300c1215f4` | Review passed; first Blacksmith compatibility/full run active. Root restores CI variables after disposition. |
+| #249 / #254 | `shared-accessor-check-249`, `eb32fd73e7` | `accessor_check_review_254`: fix parameterless lambda coverage, then bootstrap/full CI. |
+| #219 / #245 | `signal-owner-219`, `73dc726db9` | `signals_final_245`: steering fixes pushed, final native/semantic validation before timing and fresh review. |
+| #220 / #248 | `engine-lifecycle-220`, `69932dbd30` | `engine_final_248`: base adopted; build/boundary/witness corrections under native validation. |
+| #212 / #241 | `landscape-budget-prototype-212`, `45633ef6d6` | Read-only handoff on #212; new tip branch after capacity frees. No trampoline or handler-pointer cast. |
+| #213 / #242 | `vehicle-budget-prototype-213`, `92b8a04075` | Read-only handoff on #213; action-6/world-state boundary selected, new tip branch after capacity frees. |
 | #64 / #66 | `issue/64-curve-family`, `aab5211801` | Paused draft/worktree; leave untouched, not a fallback. |
 | Paused integration | `integration/curve-script`, `c19f09cf8b` | Locked worktree preserved; no work. |
 | Disaster evidence | `evidence-disaster-vehicles`, `a775543162` | Locked evidence worktree preserved; no work. |

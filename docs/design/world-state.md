@@ -58,17 +58,27 @@ end every affected Rust borrow before calling a typed service directly.
 Neither C++ exceptions nor Rust panics unwind
 across FFI; for ordinary-play failures preserve source failure order.
 
-#213's selected post-tick experiment may return addresses of named native scalar
-members, in separate cargo and motion/sound bundles. C++ keeps the vehicle shells
-and allocation; Rust forms no Vehicle/container layout view or reference. Native
-types and address identity are checked, including write-through. Access occurs
-only at original branches under the game-state mutex; all raw accesses end before
-callbacks. The audited cargo/sound paths may reenter but cannot destroy these
-shells, reset pools or yield the mutex. Addresses are acquired after Tick survives
-and discarded before another Tick, pool iteration or fleet drain. Shared status
-remains a typed service; no bitset-layout cast is permitted. This bounded contract
-does not authorize other raw field access or broad maintenance. Its measured
-crossing/byte cost and both CPU/wall gates decide whether it proceeds.
+#213's selected post-tick experiment returns one bundle of named native scalar
+addresses. C++ keeps vehicle shells and allocation; Rust forms no Vehicle,
+container or bitset layout view or reference. A read-only `BaseBitSet::base_address`
+returns the actual `const Tstorage *` member; one canonical typed vehicle service
+exposes front/current status addresses. No bitset layout cast is permitted. Native
+tests check actual types, address identity, source-order reads and permitted writes.
+Addresses are acquired after Tick survives, used only at original branches under
+the game-state mutex and discarded before another Tick or fleet drain. All raw
+accesses end before callbacks. Audited cargo/sound paths may reenter but cannot
+destroy these shells, reset pools or yield the mutex.
+
+A call-scoped pool descriptor exposes the actual slot array, its initialized
+`data.size()` and the address of canonical `first_unused`, not a vector-object
+layout or shadow state. Rust reads that scalar after potentially allocating
+callbacks before accessing any cached slot. A value beyond captured size requires
+a fresh descriptor: every reallocation raises `first_unused` beyond the old size.
+Native tests compare live growth, deletion, holes and ID reuse to PoolIterator.
+No selected callback can reset the pool; descriptors end before load/reset or fleet
+drain. Tick is a typed native facade retaining controller timing; Rust owns the
+surrounding scheduler and post-tick policy. This contract authorizes no other raw
+field access. Measured total crossings, bytes and CPU/wall gates decide acceptance.
 
 Per-field callbacks inside tile or vehicle loops may dominate runtime. Prefer
 copied records for fields observed together and batches only where the original
