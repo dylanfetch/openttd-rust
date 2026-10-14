@@ -1,11 +1,14 @@
 name: CI (Windows)
 
-# Only the protected cache writer grants cache upload access.
-cache-mode: read
+# Inherit the explicit caller cache ceiling; never over-request in a reusable worker.
 
 on:
   workflow_call:
     inputs:
+      protected-writer:
+        required: false
+        type: boolean
+        default: false
       checkout-ref:
         required: false
         type: string
@@ -27,6 +30,10 @@ env:
 
 jobs:
   windows:
+    concurrency:
+      group: ${{ inputs.protected-writer && format('protected-cache-msvc-{0}', inputs.arch) || format('cache-reader-msvc-{0}-{1}', github.run_id, inputs.arch) }}
+      cancel-in-progress: false
+      queue: max
     name: CI
 
     # The pinned breakpad dependency uses stdext::checked_array_iterator,
@@ -34,10 +41,22 @@ jobs:
     runs-on: windows-2022
 
     steps:
+    - name: Require immutable protected writer source
+      if: inputs.protected-writer
+      shell: bash
+      env:
+        CHECKOUT_REF: ${{ inputs.checkout-ref }}
+        EVENT: ${{ github.event_name }}
+        REF: ${{ github.ref }}
+      run: |
+        test -z "$CHECKOUT_REF"
+        test "$EVENT" = push
+        test "$REF" = refs/heads/rust-migration
+
     - name: Checkout
       uses: actions/checkout@v6
       with:
-        ref: ${{ inputs.checkout-ref }}
+        ref: ${{ inputs.protected-writer && github.sha || inputs.checkout-ref }}
         persist-credentials: false
 
     - name: Setup vcpkg
@@ -78,6 +97,11 @@ jobs:
         mkdir -p .local/windows-evidence
         rustc -vV | tee .local/windows-evidence/rustc.txt
         rustup target list --installed --toolchain "$channel" | tee .local/windows-evidence/installed-targets.txt
+
+    - name: Check actual cache archive admission on this platform
+      if: inputs.rust && !inputs.cache-only
+      shell: bash
+      run: python tools/test-ci.py CacheTests.test_actual_sdk_compressor_stream_and_file_outputs_are_capped_before_upload
 
     - name: Rust checks for actual selected target
       if: inputs.rust && !inputs.cache-only
@@ -124,13 +148,13 @@ jobs:
     - name: Restore compiler cache
       if: inputs.rust
       id: compiler-cache
-      uses: actions/cache/restore@v4
+      continue-on-error: ${{ inputs.protected-writer }}
+      uses: ./.github/actions/bounded-compiler-cache
       with:
-        path: ${{ runner.temp }}/ccache
-        # compiler_check=content hashes cl.exe but not its backend DLLs, so the
-        # runner image (and with it the MSVC toolset) is part of the key.
-        key: ccache-msvc-v1-${{ inputs.arch }}-${{ steps.runner-image.outputs.version }}-${{ hashFiles('migration/ccache.conf') }}-${{ inputs.checkout-ref || github.sha }}
-        restore-keys: ccache-msvc-v1-${{ inputs.arch }}-${{ steps.runner-image.outputs.version }}-${{ hashFiles('migration/ccache.conf') }}-
+        writer: ${{ inputs.protected-writer }}
+        family: msvc-${{ inputs.arch }}
+        prefix: ccache-msvc-v1-${{ inputs.arch }}-${{ steps.runner-image.outputs.version }}-${{ hashFiles('migration/ccache.conf') }}
+        paths: ${{ runner.temp }}/ccache
 
     - name: Build
       shell: bash
@@ -171,7 +195,7 @@ jobs:
         echo "::endgroup::"
 
     - name: Trim compiler cache
-      if: inputs.rust && github.event_name == 'push' && github.ref == 'refs/heads/rust-migration'
+      if: inputs.rust && inputs.protected-writer
       shell: bash
       env:
         CCACHE_CONFIGPATH: ${{ github.workspace }}/migration/ccache.conf
@@ -180,11 +204,16 @@ jobs:
       run: '"$CCACHE_EXE" --cleanup'
 
     - name: Save compiler cache
-      if: inputs.rust && github.event_name == 'push' && github.ref == 'refs/heads/rust-migration' && steps.compiler-cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
+      if: inputs.rust && inputs.protected-writer && steps.compiler-cache.outcome == 'success'
+      id: cache-publication
+      continue-on-error: true
+      uses: ./.github/actions/bounded-compiler-cache
       with:
-        path: ${{ runner.temp }}/ccache
-        key: ${{ steps.compiler-cache.outputs.cache-primary-key }}
+        operation: publish
+        writer: 'true'
+        family: msvc-${{ inputs.arch }}
+        prefix: ccache-msvc-v1-${{ inputs.arch }}-${{ steps.runner-image.outputs.version }}-${{ hashFiles('migration/ccache.conf') }}
+        paths: ${{ runner.temp }}/ccache
 
     - name: Test
       if: ${{ !inputs.cache-only }}
@@ -259,3 +288,13 @@ jobs:
           ${{ steps.vcpkg.outputs.vcpkg-location }}/buildtrees/**/*.log
           build/vcpkg-manifest-install.log
           build/CMakeFiles/CMakeConfigureLog.yaml
+
+    - name: Require successful bounded publication
+      if: always() && inputs.protected-writer
+      shell: bash
+      env:
+        RESTORE: ${{ steps.compiler-cache.outcome }}
+        PUBLICATION: ${{ steps.cache-publication.outcome }}
+      run: |
+        test "$RESTORE" = success
+        test "$PUBLICATION" = success

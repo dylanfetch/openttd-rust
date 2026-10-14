@@ -1,8 +1,11 @@
 name: Native compiler cache
-description: Restore or trim and save compatible native compilation artifacts
+description: Restore or trim and publish the bounded native compiler family
 inputs:
   save:
     description: Save instead of restore
+    default: 'false'
+  writer:
+    description: Fixed protected writer route
     default: 'false'
   prefix:
     description: Previously computed compatibility prefix when saving
@@ -32,13 +35,14 @@ runs:
           output.write(f"prefix={identity['prefix']}\n")
       PY
   - if: inputs.save != 'true'
-    uses: actions/cache/restore@v4
+    uses: ./.github/actions/bounded-compiler-cache
     with:
-      path: |
+      writer: ${{ inputs.writer }}
+      family: native
+      prefix: ${{ steps.identity.outputs.prefix }}
+      paths: |
         .local/compiler-cache/reference
         .local/compiler-cache/candidate
-      key: ${{ steps.identity.outputs.prefix }}-${{ github.sha }}
-      restore-keys: ${{ steps.identity.outputs.prefix }}-
   - if: inputs.save == 'true'
     shell: bash
     run: |
@@ -46,9 +50,12 @@ runs:
         CCACHE_DIR="$GITHUB_WORKSPACE/.local/compiler-cache/$role" CCACHE_MAXSIZE=750M ccache --cleanup
       done
   - if: inputs.save == 'true'
-    uses: actions/cache/save@v4
+    uses: ./.github/actions/bounded-compiler-cache
     with:
-      path: |
+      operation: publish
+      writer: ${{ inputs.writer }}
+      family: native
+      prefix: ${{ inputs.prefix }}
+      paths: |
         .local/compiler-cache/reference
         .local/compiler-cache/candidate
-      key: ${{ inputs.prefix }}-${{ github.sha }}

@@ -1,0 +1,63 @@
+name: Protected migration validation
+
+cache-mode: read
+
+on:
+  push:
+    branches: [rust-migration]
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+  statuses: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.sha }}
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  policy:
+    uses: ./.github/workflows/ci-policy.yml
+
+  build:
+    needs: policy
+    if: ${{ !cancelled() && (needs.policy.outputs.heavy == 'true' || needs.policy.outputs.covered == 'true') }}
+    permissions:
+      contents: read
+      actions: write
+    cache-mode: write
+    uses: ./.github/workflows/ci-native-build.yml
+    with:
+      protected-writer: true
+      covered: ${{ needs.policy.outputs.covered == 'true' }}
+
+  validation:
+    needs: [policy, build]
+    # A cache publication failure must not suppress exported tests/scenarios.
+    if: ${{ !cancelled() && needs.build.outputs.shards != '' && needs.policy.outputs.heavy == 'true' }}
+    cache-mode: read
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci-native-validation.yml
+    with:
+      checkout-ref: ${{ github.sha }}
+      shards: ${{ needs.build.outputs.shards }}
+
+  complete:
+    needs: [policy, build, validation]
+    if: ${{ always() && (needs.policy.outputs.heavy == 'true' || needs.policy.outputs.covered == 'true') }}
+    runs-on: ubuntu-latest
+    steps:
+    - env:
+        BUILD: ${{ needs.build.result }}
+        COVERED: ${{ needs.policy.outputs.covered }}
+        VALIDATION: ${{ needs.validation.result }}
+        VALIDATED: ${{ needs.validation.outputs.validated }}
+      run: |
+        test "$BUILD" = success
+        if [ "$COVERED" != true ]; then
+          test "$VALIDATION" = success
+          test "$VALIDATED" = true
+        fi

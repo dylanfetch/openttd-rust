@@ -1,0 +1,133 @@
+name: Native comparisons and simulation validation
+
+cache-mode: read
+
+on:
+  workflow_call:
+    inputs:
+      checkout-ref:
+        type: string
+        required: true
+      shards:
+        type: string
+        required: true
+    outputs:
+      validated:
+        value: ${{ jobs.complete.outputs.validated }}
+        description: Every comparison, shard and exact inventory gate succeeded
+
+permissions:
+  contents: read
+
+jobs:
+  comparisons:
+    if: ${{ !cancelled() }}
+    runs-on: ${{ vars.CI_LINUX_COMPARISONS || 'ubuntu-24.04' }}
+    timeout-minutes: 20
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.checkout-ref }}
+        fetch-depth: 1
+        persist-credentials: false
+    - uses: ./.github/actions/native-environment
+    - uses: actions/download-artifact@v4
+      with:
+        name: native-build-inputs
+        path: .local/native-inputs
+    - uses: actions/download-artifact@v4
+      with:
+        name: native-comparison-inputs
+        path: .local/native-inputs
+    - name: Restore frozen native probe inputs
+      run: |
+        python3 tools/ci_native.py unpack .local/native-inputs/native-support.tar
+        python3 tools/ci_native.py unpack .local/native-inputs/native-comparison-support.tar
+    - name: Compare every migrated component with the pinned original
+      run: python3 tools/run-comparisons.py --jobs "$(nproc)"
+    - name: Collect component evidence
+      if: always()
+      run: python3 tools/ci_native.py evidence .local/ci-evidence
+    - name: Retain component evidence
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: migration-comparison-evidence
+        path: .local/ci-evidence
+        include-hidden-files: true
+
+  simulation:
+    if: ${{ !cancelled() }}
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(inputs.shards) }}
+    runs-on: ${{ vars.CI_LINUX_SIMULATION || 'ubuntu-24.04' }}
+    timeout-minutes: 20
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.checkout-ref }}
+        fetch-depth: 1
+        persist-credentials: false
+    - uses: ./.github/actions/native-environment
+    - uses: actions/download-artifact@v4
+      with:
+        name: native-build-inputs
+        path: .local/native-inputs
+    - name: Restore frozen runtimes and narrow probe build inputs
+      run: |
+        tar -xf .local/native-inputs/native-runtimes.tar -C .local
+        python3 tools/ci_native.py unpack .local/native-inputs/native-support.tar
+    - name: Compare assigned simulation inventory
+      run: python3 tools/ci_native.py shard ${{ matrix.shard }} --jobs "$(nproc)" --output .local/shard-${{ matrix.shard }}.json
+    - name: Collect simulation evidence
+      if: always()
+      run: python3 tools/ci_native.py evidence .local/ci-evidence
+    - name: Retain shard report and evidence
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: migration-simulation-${{ matrix.shard }}
+        path: |
+          .local/shard-${{ matrix.shard }}.json
+          .local/ci-evidence
+        include-hidden-files: true
+
+  complete:
+    needs: [comparisons, simulation]
+    if: always()
+    runs-on: ubuntu-latest
+    outputs:
+      validated: ${{ steps.validated.outputs.validated }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.checkout-ref }}
+        fetch-depth: 1
+        persist-credentials: false
+    - name: Require every native job
+      env:
+        RESULTS: ${{ toJSON(needs) }}
+      run: |
+        python3 - <<'PY'
+        import json, os
+        results = json.loads(os.environ['RESULTS'])
+        failed = [job for job in ('comparisons', 'simulation') if results.get(job, {}).get('result') != 'success']
+        if failed:
+            raise SystemExit(f'Required native jobs failed, skipped or cancelled: {failed}')
+        PY
+    - uses: actions/download-artifact@v4
+      with:
+        name: native-shard-plan
+        path: .local/native-runtimes
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: migration-simulation-*
+        path: .local/shard-reports
+        merge-multiple: true
+    - name: Require exactly the complete scenario inventory and frozen build identity
+      id: validated
+      run: |
+        python3 tools/ci_native.py report .local/shard-reports
+        echo 'validated=true' >> "$GITHUB_OUTPUT"

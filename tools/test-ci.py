@@ -2,14 +2,22 @@
 """Exercise request identity and the actual privileged full-result publisher."""
 
 import argparse
+import gzip
+import io
 import json
+import os
 import re
+import shutil
 import subprocess
+import sys
+import tarfile
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import cache_payload
+import cache_zstd
 import ci
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -272,6 +280,183 @@ class GateTests(unittest.TestCase):
 
 
 class CacheTests(unittest.TestCase):
+    def test_actual_sdk_compressor_stream_and_file_outputs_are_capped_before_upload(
+        self,
+    ):
+        binary = shutil.which("zstd")
+        self.assertIsNotNone(binary, "Default cache policy checks require zstd")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "payload").write_bytes(os.urandom(256 * 1024))
+            (root / "manifest.txt").write_text("payload\n")
+            guard = root / "guard"
+            guard.mkdir()
+            receipt = root / "outer.json"
+            for name, text in cache_zstd.wrappers(
+                Path(sys.executable).as_posix(),
+                (ROOT / "tools/cache_zstd.py").as_posix(),
+                Path(binary).as_posix(),
+                1024 * 1024,
+                str(receipt),
+            ).items():
+                path = guard / name
+                path.write_text(text)
+                path.chmod(0o755)
+            env = dict(os.environ, PATH=f"{guard}{os.pathsep}{os.environ['PATH']}")
+            # Exact pinned SDK GNU-tar flags and compressor invocation; the
+            # real outer archive (not its inner payload) reaches the guard.
+            command = [
+                "tar",
+                "--posix",
+                "-cf",
+                "cache.tzst",
+                "--exclude",
+                "cache.tzst",
+                "-P",
+                "-C",
+                str(root),
+                "--files-from",
+                "manifest.txt",
+                "--use-compress-program",
+                "zstd -T0" if sys.platform == "win32" else "zstdmt",
+            ]
+            if sys.platform == "win32":
+                command.append("--force-local")
+            subprocess.run(command, cwd=root, env=env, check=True, capture_output=True)
+            measured = json.loads(receipt.read_text())["size"]
+            self.assertEqual(measured, (root / "cache.tzst").stat().st_size)
+            self.assertGreater(measured, (root / "payload").stat().st_size)
+            with patch.dict(os.environ, env):
+                cache_zstd.probe(1024 * 1024, receipt)
+            # Missing PATH injection stops before the SDK can upload.
+            with self.assertRaises(subprocess.CalledProcessError):
+                cache_zstd.probe(1024 * 1024, receipt)
+            # Exceeding the cap fails tar. SDK reserve/upload follows only a
+            # successful tar call, so no oversized replacement can be uploaded.
+            receipt.unlink()
+            for name, text in cache_zstd.wrappers(
+                Path(sys.executable).as_posix(),
+                (ROOT / "tools/cache_zstd.py").as_posix(),
+                Path(binary).as_posix(),
+                measured - 1,
+                str(receipt),
+            ).items():
+                (guard / name).write_text(text)
+            rejected = subprocess.run(command, cwd=root, env=env, capture_output=True)
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertFalse(receipt.exists())
+            # The SDK's Windows BSD-tar fallback uses zstd -o instead of stdout.
+            for limit, success in ((1024 * 1024, True), (1, False)):
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(ROOT / "tools/cache_zstd.py"),
+                        "--binary",
+                        binary,
+                        "--limit",
+                        str(limit),
+                        "--",
+                        "-T0",
+                        "--force",
+                        "-o",
+                        str(root / "file.tzst"),
+                        str(root / "payload"),
+                    ],
+                    capture_output=True,
+                )
+                self.assertEqual(result.returncode == 0, success)
+            version_command = [str(guard / "zstd"), "--quiet", "--version"]
+            if sys.platform == "win32":
+                version_command = [
+                    "cmd",
+                    "/d",
+                    "/c",
+                    str(guard / "zstd.cmd"),
+                    "--quiet",
+                    "--version",
+                ]
+            version = subprocess.check_output(version_command)
+            self.assertEqual(
+                version, subprocess.check_output([binary, "--quiet", "--version"])
+            )
+            launcher = cache_zstd.wrappers(
+                "C:/Python/python.exe",
+                "C:/repo/cache_zstd.py",
+                "C:/Program Files/zstd.exe",
+                123,
+                "C:/repo/outer.json",
+            )
+            self.assertIn('"C:/Program Files/zstd.exe"', launcher["zstd.cmd"])
+            self.assertIn(" -- %*", launcher["zstd.cmd"])
+
+    def test_restored_payload_body_must_match_claimed_manifest_before_prune(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            sources = [root / "reference", root / "candidate"]
+            for source in sources:
+                source.mkdir()
+                (source / "object").write_bytes(b"compiler object")
+            archive = root / "original.tgz"
+            cache_payload.pack(archive, sources, "native", "image", HEAD)
+            changed = root / "tampered.tgz"
+            with (
+                tarfile.open(archive, "r:gz") as original,
+                tarfile.open(changed, "w:gz") as target,
+            ):
+                for member in original.getmembers():
+                    data = (
+                        original.extractfile(member).read() if member.isfile() else None
+                    )
+                    if member.name == "root0/object":
+                        data = b"altered! object"
+                        member.size = len(data)
+                    target.addfile(
+                        member, io.BytesIO(data) if data is not None else None
+                    )
+            with self.assertRaisesRegex(ValueError, "content hash"):
+                cache_payload.metadata(changed)
+
+    def test_real_packing_preserves_roots_and_rejects_oversize_or_wrong_compatibility(
+        self,
+    ):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            sources = [root / "reference", root / "candidate"]
+            for index, source in enumerate(sources):
+                (source / "ab").mkdir(parents=True)
+                (source / "ab" / "object").write_bytes(os.urandom(32768 + index))
+            archive = root / "native.tgz"
+            receipt = cache_payload.pack(
+                archive, sources, "native", "compiler/image", HEAD
+            )
+            # Exercise the real tar + compressor envelope with incompressible
+            # input, alongside the conservative pre-upload bound.
+            outer = io.BytesIO()
+            with tarfile.open(
+                fileobj=outer, mode="w", format=tarfile.PAX_FORMAT
+            ) as packed:
+                packed.add(archive, arcname=".local/cache-payload/native.tgz")
+            self.assertLessEqual(
+                len(gzip.compress(outer.getvalue())), receipt["envelope"]
+            )
+            destinations = [root / "restored-reference", root / "restored-candidate"]
+            self.assertFalse(
+                cache_payload.unpack(archive, destinations, "native", "different-image")
+            )
+            self.assertTrue(
+                cache_payload.unpack(archive, destinations, "native", "compiler/image")
+            )
+            for source, restored in zip(sources, destinations, strict=True):
+                self.assertEqual(
+                    (source / "ab/object").read_bytes(),
+                    (restored / "ab/object").read_bytes(),
+                )
+            with patch.dict(cache_payload.POLICY["families"], {"native": 1}):
+                with self.assertRaisesRegex(ValueError, "envelope"):
+                    cache_payload.pack(
+                        archive, sources, "native", "compiler/image", HEAD
+                    )
+
     def test_candidate_callers_limit_cache_access_and_dependencies_do_not_save(self):
         for filename, jobs in (
             ("ci-request.yml", ("quick", "rust", "native", "platform")),
@@ -297,60 +482,387 @@ class CacheTests(unittest.TestCase):
             "cache: false", (ROOT / ".github/workflows/ci-mingw.yml").read_text()
         )
 
-    def prune(self, caches):
-        script = script_for("ci-cache.yml", "prune")
+    def cache_model(self, scenario):
+        """Execute the same controller module that the protected action invokes."""
         return node(f"""
-const deleted = [], failures = [], context = {{repo: {{}}}};
-const core = {{info: () => {{}}, setFailed: value => failures.push(value)}};
-const github = {{paginate: async () => {json.dumps(caches)}, rest: {{actions: {{
-  getActionsCacheList: () => {{}}, deleteActionsCacheById: async value => deleted.push(value.cache_id)
-}}}}}};
-(async () => {{{script}}})().then(() => console.log(JSON.stringify({{deleted, failures}})));
+const policy = require({json.dumps(str(ROOT / "tools/cache_policy.cjs"))});
+const scenario = {json.dumps(scenario)};
+let caches = scenario.caches || [], files = scenario.files || {{}}, deleted = [], outputs = {{}};
+const versions = Object.fromEntries(Object.keys(policy.policy.families).map(f => [f, policy.versionFor(f)]));
+for (const cache of caches) {{
+  cache.ref ??= 'refs/heads/rust-migration';
+  const match = /^bounded-v1-(.+)-[01]$/.exec(cache.key);
+  cache.version ??= match ? versions[match[1]] : 'dependency-version';
+}}
+const context = {{repo: {{}}, eventName: scenario.event || 'push',
+  ref: scenario.ref || 'refs/heads/rust-migration', sha: scenario.sha || {json.dumps(HEAD)}}};
+const core = {{info: () => {{}}, setOutput: (key, value) => outputs[key] = value}};
+const github = {{paginate: async () => structuredClone(caches), rest: {{
+  actions: {{getActionsCacheList: () => {{}}, deleteActionsCacheById: async ({{cache_id}}) => {{
+    if (scenario.deleteFailure) throw Error('delete failed');
+    deleted.push(cache_id);
+    if (!scenario.staleDeletion) caches = caches.filter(cache => cache.id !== cache_id);
+    return {{status: 204}};
+  }}}},
+  repos: {{compareCommitsWithBasehead: async ({{basehead}}) => {{
+    const [base, head] = basehead.split('...');
+    return {{data: {{status: scenario.diverged ? 'diverged' :
+      head === base ? 'identical' : head > base ? 'ahead' : 'behind'}}}};
+  }}}}
+}}}};
+(async () => {{
+  try {{
+    if (scenario.inventoryOnly) policy.inventory(caches);
+    else await policy.control({{github, context, core, family: scenario.family || 'native',
+      operation: scenario.operation || 'prepare',
+      read: name => files[name] || null, write: (name, value) => files[name] = value}});
+    console.log(JSON.stringify({{outputs, deleted, caches, files}}));
+  }} catch (error) {{console.log(JSON.stringify({{error: error.message, outputs, deleted, caches, files}}));}}
+}})();
 """)
 
-    def test_actual_cache_controller_keeps_one_entry_per_prefix_and_eight_gib(self):
-        gib = 1024**3
-        caches = [
-            {
-                "id": i,
-                "key": prefix + "-" + str(i) * 40,
-                "created_at": f"2026-10-{i:02}",
-                "size_in_bytes": gib,
-            }
-            for i, prefix in enumerate(
-                (
-                    "compiler-v1-linux",
-                    "compiler-v1-linux",
-                    "ccache-linux-v2-gcc",
-                    "ccache-macos-v2-arm64",
-                    "ccache-msvc-v1-x64",
-                ),
-                start=1,
-            )
-        ]
-        result = self.prune(caches)
-        self.assertEqual(result["deleted"], [1])
-        self.assertEqual(result["failures"], [])
-        caches[-1]["size_in_bytes"] = 7 * gib
-        result = self.prune(caches)
-        self.assertEqual(result["deleted"], [1, 2, 3])
-        self.assertEqual(result["failures"], [])
-        result = self.prune(
-            [
+    @staticmethod
+    def slot(family, slot, sha=HEAD, size=1024):
+        key = f"bounded-v1-{family}-{slot}"
+        cache = {"id": slot + 10, "key": key, "size_in_bytes": size}
+        payload = {
+            "schema": 1,
+            "family": family,
+            "sha": sha,
+            "key": key,
+            "hash": "e" * 64,
+            "content_hash": "d" * 64,
+            "bytes": size,
+            "compatibility": "image/compiler/config",
+        }
+        return cache, payload
+
+    def test_fixed_slot_protocol_confirms_before_deleting_and_preserves_newer_ancestry(
+        self,
+    ):
+        older, old_payload = self.slot("native", 0, "a" * 40)
+        newer, new_payload = self.slot("native", 1, "b" * 40)
+        for creation in ("earlier", "later"):
+            newer["created_at"] = creation  # Wall-clock ordering is irrelevant.
+            result = self.cache_model(
                 {
-                    "id": 99,
-                    "key": "unmanaged",
-                    "created_at": "date",
-                    "size_in_bytes": 9 * gib,
+                    "caches": [older, newer],
+                    "files": {"0.json": old_payload, "1.json": new_payload},
+                    "sha": "c" * 40,
                 }
-            ]
+            )
+            self.assertNotIn("error", result)
+            self.assertEqual(result["deleted"], [older["id"]])
+            self.assertEqual(result["outputs"]["key"], older["key"])
+        result = self.cache_model({"caches": [newer], "files": {"1.json": new_payload}})
+        self.assertEqual(result["outputs"]["publish"], "false")
+        self.assertEqual(result["deleted"], [])
+
+    def test_failure_cancellation_stale_metadata_and_versions_stop_publication(self):
+        older, payload = self.slot("native", 0)
+        replacement, replacement_payload = self.slot("native", 1, "b" * 40)
+        cases = [
+            {"caches": [older]},  # Listed slot could not actually be restored.
+            {"files": {"0.json": payload}},  # Restore hit missing from stale list.
+            {"caches": [dict(older, version="different-compression")]},
+            {"caches": [dict(older, ref="refs/pull/123/merge")]},
+            {"caches": [older, dict(older, id=99)]},
+            {"caches": [dict(older, size_in_bytes=1100 * 1024**2 + 1)]},
+            {
+                "caches": [
+                    {"id": 99, "key": "setup-uv-old", "size_in_bytes": 1024**3 + 1}
+                ]
+            },
+            {
+                "caches": [older, replacement],
+                "files": {"0.json": payload, "1.json": replacement_payload},
+                "deleteFailure": True,
+            },
+            {
+                "caches": [older, replacement],
+                "files": {"0.json": payload, "1.json": replacement_payload},
+                "staleDeletion": True,
+            },
+            {
+                "caches": [older, replacement],
+                "files": {"0.json": payload, "1.json": replacement_payload},
+                "diverged": True,
+            },
+            {"event": "pull_request"},
+            {"ref": "refs/heads/feature"},
+        ]
+        for scenario in cases:
+            with self.subTest(scenario=scenario):
+                result = self.cache_model(scenario)
+                self.assertIn("error", result)
+                self.assertNotIn("key", result["outputs"])
+        # Failed/cancelled/unfinished uploads cannot authorize predecessor deletion.
+        state = {"family": "native", "sha": HEAD, "target": 1, "predecessor": older}
+        files = {
+            "0.json": payload,
+            "publication.json": state,
+            "upload.json": dict(payload, envelope=2048),
+        }
+        result = self.cache_model(
+            {"operation": "finish", "caches": [older], "files": files}
         )
-        self.assertTrue(result["failures"])
-        workflow = (ROOT / ".github/workflows/ci-cache.yml").read_text()
-        self.assertIn("actions: write", workflow)
-        self.assertNotIn("actions/checkout", workflow)
-        self.assertNotIn("download-artifact", workflow)
-        self.assertNotRegex(workflow, r"(?m)^\s+(?:- )?run:")
+        self.assertIn("error", result)
+        self.assertEqual(result["deleted"], [])
+        # Save@v4 warns instead of failing on reservation collision: a restored
+        # old replacement hash is still rejected by the actual final controller.
+        files["1.json"] = dict(replacement_payload, hash="f" * 64)
+        result = self.cache_model(
+            {"operation": "finish", "caches": [older, replacement], "files": files}
+        )
+        self.assertIn("error", result)
+        self.assertEqual(result["deleted"], [])
+
+    def test_every_image_key_generation_counts_in_family_transition(self):
+        legacy = {
+            "id": 1,
+            "key": "compiler-v19-other-image-" + HEAD,
+            "size_in_bytes": 1024,
+        }
+        slot, payload = self.slot("native", 0, "b" * 40)
+        result = self.cache_model({"caches": [legacy], "sha": "b" * 40})
+        self.assertEqual(result["outputs"]["key"], slot["key"])
+        result = self.cache_model(
+            {"caches": [legacy, slot], "files": {"0.json": payload}, "sha": "c" * 40}
+        )
+        self.assertEqual(result["deleted"], [1])
+        self.assertEqual(result["outputs"]["key"], "bounded-v1-native-1")
+        for key in (
+            "ccache-linux-v19-gcc-e3b0c44298fc-new-image-config-" + HEAD,
+            "ccache-macos-v19-arm64-new-image-a763a3567032-config-" + HEAD,
+            "ccache-msvc-v19-x64-new-image-config-" + HEAD,
+        ):
+            result = self.cache_model(
+                {
+                    "caches": [{"id": 1, "key": key, "size_in_bytes": 1024}],
+                    "inventoryOnly": True,
+                }
+            )
+            self.assertNotIn("error", result)
+        self.assertIn(
+            "error",
+            self.cache_model(
+                {
+                    "caches": [
+                        {
+                            "id": 1,
+                            "key": "ccache-macos-v1-unclassified",
+                            "size_in_bytes": 1024,
+                        }
+                    ],
+                    "inventoryOnly": True,
+                }
+            ),
+        )
+        self.assertIn(
+            "error",
+            self.cache_model(
+                {
+                    "caches": [legacy, dict(slot, key="bounded-v1-native-1")],
+                    "inventoryOnly": True,
+                }
+            ),
+        )
+
+    def test_hidden_legacy_predecessor_is_reconciled_before_slot_one_admission(self):
+        legacy = {
+            "id": 1,
+            "key": "compiler-v1-old-image-" + "a" * 40,
+            "ref": "refs/heads/rust-migration",
+            "version": "legacy-version",
+            "size_in_bytes": 1024,
+        }
+        slot, payload = self.slot("native", 0, "b" * 40)
+        payload["legacy"] = [legacy]
+        scenario = {"caches": [slot], "files": {"0.json": payload}, "sha": "c" * 40}
+        result = self.cache_model(scenario)
+        self.assertNotIn("error", result)
+        self.assertEqual(result["deleted"], [legacy["id"]])
+        self.assertEqual(result["outputs"]["key"], "bounded-v1-native-1")
+        self.assertEqual(result["files"]["publication.json"]["legacy"], [])
+        result = self.cache_model(dict(scenario, deleteFailure=True))
+        self.assertIn("error", result)
+        self.assertNotIn("key", result["outputs"])
+
+    def test_three_overlapping_merges_have_two_fixed_slots_per_family_in_both_orders(
+        self,
+    ):
+        # Execute the publication controller with all families' save waves in
+        # flight together. The workflow lock serializes owners within a family;
+        # cache reservations include unfinished uploads and immutable identity.
+        harness = f"""
+const p = require({json.dumps(str(ROOT / "tools/cache_policy.cjs"))});
+let peak = 0, completed = 0;
+const MiB = 1024 ** 2, families = Object.keys(p.policy.families);
+(async () => {{
+  for (const order of [['a','b','c'], ['c','b','a']]) {{
+    let caches = [], next = 100;
+    const record = () => {{
+      p.inventory(caches);
+      peak = Math.max(peak, caches.reduce((sum, cache) => sum + cache.size_in_bytes, 0) + p.policy.other_mib * MiB);
+    }};
+    const github = {{paginate: async () => {{record(); return structuredClone(caches);}}, rest: {{
+      actions: {{getActionsCacheList: () => {{}}, deleteActionsCacheById: async ({{cache_id}}) => {{
+        caches = caches.filter(cache => cache.id !== cache_id); record(); return {{status: 204}};
+      }}}},
+      repos: {{compareCommitsWithBasehead: async ({{basehead}}) => {{
+        const [base, head] = basehead.split('...');
+        return {{data: {{status: head === base ? 'identical' : head > base ? 'ahead' : 'behind'}}}};
+      }}}}
+    }}}};
+    for (const letter of order) {{
+      const actors = [];
+      for (const family of families) {{
+        const sha = letter.repeat(40), files = {{}}, outputs = {{}};
+        for (let slot = 0; slot < 2; slot++) {{
+          const cache = caches.find(cache => cache.key === p.slotKey(family, slot));
+          if (cache) files[`${{slot}}.json`] = cache.payload;
+        }}
+        const core = {{info: () => {{}}, setOutput: (k,v) => outputs[k] = v}};
+        const context = {{repo: {{}}, eventName: 'push', ref: 'refs/heads/rust-migration', sha}};
+        const actor = {{github, context, core, family, read: name => files[name] || null,
+          write: (name, value) => files[name] = value}};
+        await p.control({{...actor, operation: 'prepare'}});
+        if (outputs.publish === 'false') continue; // Late older protected run.
+        const slot = Number(outputs.slot), bytes = p.policy.families[family] * MiB;
+        const payload = {{schema: 1, family, sha, key: outputs.key, compatibility: `image-${{letter}}`,
+          hash: letter.repeat(64), content_hash: letter.repeat(64), bytes: Math.floor(bytes / 2)}};
+        // Backend reserve rejects an occupied or unfinished key/version/ref.
+        if (caches.some(cache => cache.key === outputs.key)) throw Error('Slot reservation collision');
+        caches.push({{id: next++, key: outputs.key, version: p.versionFor(family),
+          ref: context.ref, size_in_bytes: bytes, payload}});
+        record();
+        files[`${{slot}}.json`] = payload; // Actual successful backend restore/hash check.
+        files['upload.json'] = {{...payload, envelope: bytes}};
+        files['outer.json'] = {{size: bytes, cap: p.policy.families[family] * MiB, sha}};
+        actors.push(actor);
+      }}
+      // Save-before-delete: all families have replacements at the same time.
+      for (const actor of actors.reverse()) {{
+        await p.control({{...actor, operation: 'finish'}}); completed++;
+      }}
+    }}
+    if (caches.length !== families.length || caches.some(cache => cache.payload.sha !== 'c'.repeat(40))) {{
+      throw Error('An older merge replaced newer protected cache state');
+    }}
+  }}
+  console.log(JSON.stringify({{peak, completed,
+    settled: (Object.values(p.policy.families).reduce((a,b) => a+b,0) + p.policy.other_mib) * MiB}}));
+}})().catch(error => {{ console.error(error); process.exit(1); }});
+"""
+        result = node(harness)
+        self.assertEqual(result["peak"], 9960 * 1024**2)
+        self.assertEqual(result["settled"], 5492 * 1024**2)
+        self.assertEqual(result["completed"], 28)
+        self.assertLess(result["peak"], 10 * 1024**3)
+        self.assertLessEqual(result["settled"], 8 * 1024**3)
+
+    def test_protected_routes_lock_stable_families_and_never_accept_candidate_artifacts(
+        self,
+    ):
+        for filename in (
+            "ci-native-build.yml",
+            "ci-linux.yml",
+            "ci-macos.yml",
+            "ci-windows.yml",
+        ):
+            text = (ROOT / ".github/workflows" / filename).read_text()
+            self.assertIn("queue: max", text)
+            self.assertIn("cancel-in-progress: false", text)
+            self.assertIn("protected-cache-", text)
+            self.assertIn('test -z "$CHECKOUT_REF"', text)
+            self.assertIn('test "$REF" = refs/heads/rust-migration', text)
+            self.assertIn(
+                "ref: ${{ inputs.protected-writer && github.sha || inputs.checkout-ref }}",
+                text,
+            )
+            self.assertNotIn("download-artifact", text)
+        action = (
+            ROOT / ".github/actions/bounded-compiler-cache/action.yml"
+        ).read_text()
+        self.assertIn("0057852bfaa89a56745cba8c7296529d2fc39830", action)
+        self.assertIn("fail-on-cache-miss: true", action)
+        self.assertLess(
+            action.index("cache-guard-probe"),
+            action.index("Save the admitted immutable slot"),
+        )
+        self.assertIn("cache_payload.py verify", action)
+        self.assertLess(
+            action.index("cache_payload.py verify"), action.index("'finish'")
+        )
+        audit = (ROOT / ".github/workflows/ci-cache.yml").read_text()
+        self.assertIn("actions: read", audit)
+        self.assertNotIn("deleteActionsCache", audit)
+
+    def test_candidate_and_protected_graphs_share_checks_without_permission_overrequests(
+        self,
+    ):
+        for filename in ("ci-build.yml", "rust-migration.yml"):
+            text = (ROOT / ".github/workflows" / filename).read_text()
+            self.assertNotIn("actions: write", text)
+        for filename in (
+            "ci-native-build.yml",
+            "ci-linux.yml",
+            "ci-macos.yml",
+            "ci-windows.yml",
+        ):
+            text = (ROOT / ".github/workflows" / filename).read_text()
+            # GitHub rejects an explicit callee write request beyond a caller's
+            # read ceiling. These shared workers inherit their explicit caller.
+            self.assertNotRegex(text, r"(?m)^\s*cache-mode:")
+            self.assertNotIn("actions: write", text)
+        for filename in ("ci-protected-native.yml", "ci-protected-platform.yml"):
+            text = (ROOT / ".github/workflows" / filename).read_text()
+            self.assertIn("branches: [rust-migration]", text)
+            self.assertNotIn("workflow_call:", text)
+            self.assertNotIn("workflow_dispatch:", text)
+            self.assertNotIn("checkout-ref: ${{ inputs.", text)
+            self.assertIn("actions: write", text)
+            self.assertIn("cache-mode: write", text)
+            self.assertNotIn("download-artifact", text)
+        worker = (ROOT / ".github/workflows/ci-native-validation.yml").read_text()
+        self.assertIn("python3 tools/run-comparisons.py", worker)
+        self.assertIn("python3 tools/ci_native.py shard", worker)
+        self.assertIn("python3 tools/ci_native.py report", worker)
+        self.assertIn("shard: ${{ fromJSON(inputs.shards) }}", worker)
+        self.assertNotIn("concurrency:", worker)
+        native = (ROOT / ".github/workflows/ci-native-build.yml").read_text()
+        for command in (
+            "migration.py tools",
+            "migration.py verify",
+            "migration.py build",
+            "ci_native.py pack --shards 6",
+        ):
+            self.assertIn(command, native)
+        for filename in ("ci-linux.yml", "ci-macos.yml", "ci-windows.yml"):
+            text = (ROOT / ".github/workflows" / filename).read_text()
+            self.assertIn("continue-on-error: true", text)
+            self.assertIn("Require successful bounded publication", text)
+            self.assertIn("ctest", text)
+        protected = (ROOT / ".github/workflows/ci-protected-native.yml").read_text()
+        self.assertIn("needs.build.outputs.shards != ''", protected)
+        self.assertIn('test "$BUILD" = success', protected)
+
+    def test_lock_identity_uses_stable_family_not_compatibility_or_runner_image(self):
+        for filename in ("ci-linux.yml", "ci-macos.yml"):
+            text = (ROOT / ".github/workflows" / filename).read_text()
+            group = re.search(r"      group: (.+)", text)[1].split(" || ", 1)[0]
+            self.assertIn("inputs.cache-family", group)
+            self.assertNotIn("inputs.extra-cmake-parameters", group)
+            self.assertNotIn("runner-image", group)
+        for filename in ("ci-build.yml", "ci-protected-platform.yml"):
+            text = (ROOT / ".github/workflows" / filename).read_text()
+            for family in (
+                "linux-sdl2",
+                "linux-dedicated",
+                "macos-debug",
+                "macos-release",
+            ):
+                self.assertIn(f"cache-family: {family}", text)
 
 
 class PolicyTests(unittest.TestCase):
@@ -414,7 +926,7 @@ class PolicyTests(unittest.TestCase):
     def test_heavy_predicates_bypass_skipped_policy_but_respect_cancellation(self):
         for filename, jobs in (
             ("ci-build.yml", ("emscripten", "linux", "macos", "windows")),
-            ("rust-migration.yml", ("build", "comparisons", "simulation")),
+            ("rust-migration.yml", ("build", "validation")),
         ):
             workflow = (ROOT / ".github/workflows" / filename).read_text()
             for job in jobs:
@@ -434,6 +946,10 @@ class PolicyTests(unittest.TestCase):
                     needs = {
                         "policy": {"outputs": {"heavy": heavy}},
                         "build": {"result": "success"},
+                        "protected-build": {
+                            "result": "skipped",
+                            "outputs": {"shards": ""},
+                        },
                     }
                     with self.subTest(filename=filename, job=job, cancelled=cancelled):
                         result = evaluate(
@@ -442,6 +958,10 @@ class PolicyTests(unittest.TestCase):
                             ).replace("cancelled()", str(cancelled).lower()),
                             inputs=inputs,
                             needs=needs,
+                            github={
+                                "event_name": "pull_request",
+                                "ref": "refs/pull/170/merge",
+                            },
                         )
                         self.assertEqual(result, expected)
 
@@ -541,64 +1061,6 @@ class PolicyTests(unittest.TestCase):
                 full=full, marker=marker, same_run=same_run, tree=tree, merged=merged
             ):
                 self.assertEqual(node(harness)["heavy"], expected)
-
-    def test_cache_retention_removes_duplicate_prefixes_and_stays_below_budget(self):
-        script = script_for("ci-cache.yml", "prune")
-        gib = 1024**3
-        caches = [
-            {
-                "id": 1,
-                "key": "compiler-v1-test-" + "a" * 40,
-                "created_at": "2026-01-01",
-                "size_in_bytes": 3 * gib,
-            },
-            {
-                "id": 2,
-                "key": "compiler-v1-test-" + "b" * 40,
-                "created_at": "2026-01-03",
-                "size_in_bytes": 2 * gib,
-            },
-            {
-                "id": 3,
-                "key": "ccache-macos-v1-arm64-" + "a" * 40,
-                "created_at": "2026-01-02",
-                "size_in_bytes": 2 * gib,
-            },
-            {
-                "id": 4,
-                "key": "ccache-linux-v2-gcc-" + "a" * 40,
-                "created_at": "2026-01-04",
-                "size_in_bytes": 2 * gib,
-            },
-            {
-                "id": 5,
-                "key": "opengfx-0.6.0",
-                "created_at": "2026-01-01",
-                "size_in_bytes": gib,
-            },
-        ]
-        harness = f"""
-        const removed = [], failures = [];
-        const context = {{repo: {{}}}};
-        const core = {{info: () => {{}}, setFailed: message => failures.push(message)}};
-        const github = {{paginate: async () => {json.dumps(caches)}, rest: {{actions: {{
-          deleteActionsCacheById: async value => removed.push(value.cache_id)
-        }}}}}};
-        (async () => {{{script}}})().then(() => console.log(JSON.stringify({{removed, failures}})));
-        """
-        result = node(harness)
-        self.assertIn(1, result["removed"])
-        self.assertNotIn(5, result["removed"])
-        self.assertFalse(result["failures"])
-        retained = sum(
-            c["size_in_bytes"] for c in caches if c["id"] not in result["removed"]
-        )
-        self.assertLessEqual(retained, 8 * gib)
-        workflow = (ROOT / ".github/workflows/ci-cache.yml").read_text()
-        self.assertNotIn("actions/checkout", workflow)
-        self.assertNotIn("download-artifact", workflow)
-        self.assertIn("github.event.workflow_run.event == 'push'", workflow)
-        self.assertIn("head_branch == 'rust-migration'", workflow)
 
 
 class RequestTests(unittest.TestCase):

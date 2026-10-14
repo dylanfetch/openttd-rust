@@ -1,11 +1,18 @@
 name: CI (Linux)
 
-# Only the protected cache writer grants cache upload access.
-cache-mode: read
+# Inherit the explicit caller cache ceiling; never over-request in a reusable worker.
 
 on:
   workflow_call:
     inputs:
+      cache-family:
+        required: false
+        type: string
+        default: ''
+      protected-writer:
+        required: false
+        type: boolean
+        default: false
       checkout-ref:
         required: false
         type: string
@@ -32,8 +39,12 @@ env:
 
 jobs:
   linux:
+    concurrency:
+      group: ${{ inputs.protected-writer && format('protected-cache-{0}', inputs.cache-family) || format('cache-reader-linux-{0}-{1}-{2}', github.run_id, inputs.compiler, inputs.extra-cmake-parameters) }}
+      cancel-in-progress: false
+      queue: max
     name: CI
-    if: ${{ !inputs.cache-only || inputs.compiler != 'clang' }}
+    if: ${{ (!inputs.cache-only || inputs.compiler != 'clang') && (inputs.protected-writer || inputs.compiler == 'clang' || inputs.checkout-ref != '' || github.event_name != 'push' || github.ref != 'refs/heads/rust-migration') }}
 
     runs-on: ${{ vars.CI_LINUX_PLATFORM || 'ubuntu-24.04' }}
     env:
@@ -41,10 +52,24 @@ jobs:
       CXX: ${{ inputs.cxxcompiler }}
 
     steps:
+    - name: Require immutable protected writer source
+      if: inputs.protected-writer
+      shell: bash
+      env:
+        CACHE_FAMILY: ${{ inputs.cache-family }}
+        CHECKOUT_REF: ${{ inputs.checkout-ref }}
+        EVENT: ${{ github.event_name }}
+        REF: ${{ github.ref }}
+      run: |
+        case "$CACHE_FAMILY" in linux-sdl2|linux-dedicated) ;; *) exit 1 ;; esac
+        test -z "$CHECKOUT_REF"
+        test "$EVENT" = push
+        test "$REF" = refs/heads/rust-migration
+
     - name: Checkout
       uses: actions/checkout@v6
       with:
-        ref: ${{ inputs.checkout-ref }}
+        ref: ${{ inputs.protected-writer && github.sha || inputs.checkout-ref }}
         persist-credentials: false
         fetch-depth: 1
 
@@ -61,11 +86,13 @@ jobs:
     - name: Restore compiler cache
       if: inputs.compiler != 'clang'
       id: compiler-cache
-      uses: actions/cache/restore@v4
+      continue-on-error: ${{ inputs.protected-writer }}
+      uses: ./.github/actions/bounded-compiler-cache
       with:
-        path: ${{ runner.temp }}/ccache
-        key: ccache-linux-v2-${{ inputs.compiler }}-${{ steps.compiler-image.outputs.flavour }}-${{ steps.compiler-image.outputs.version }}-${{ hashFiles('migration/ccache.conf') }}-${{ inputs.checkout-ref || github.sha }}
-        restore-keys: ccache-linux-v2-${{ inputs.compiler }}-${{ steps.compiler-image.outputs.flavour }}-${{ steps.compiler-image.outputs.version }}-${{ hashFiles('migration/ccache.conf') }}-
+        writer: ${{ inputs.protected-writer }}
+        family: ${{ inputs.cache-family }}
+        prefix: ccache-linux-v2-${{ inputs.compiler }}-${{ steps.compiler-image.outputs.flavour }}-${{ steps.compiler-image.outputs.version }}-${{ hashFiles('migration/ccache.conf') }}
+        paths: ${{ runner.temp }}/ccache
 
     - name: Setup vcpkg
       id: vcpkg
@@ -157,7 +184,7 @@ jobs:
         git diff --exit-code
 
     - name: Trim compiler cache
-      if: inputs.compiler != 'clang' && github.event_name == 'push' && github.ref == 'refs/heads/rust-migration'
+      if: inputs.compiler != 'clang' && inputs.protected-writer
       env:
         CCACHE_CONFIGPATH: ${{ github.workspace }}/migration/ccache.conf
         CCACHE_DIR: ${{ runner.temp }}/ccache
@@ -165,8 +192,23 @@ jobs:
       run: ccache --cleanup
 
     - name: Save compiler cache
-      if: inputs.compiler != 'clang' && github.event_name == 'push' && github.ref == 'refs/heads/rust-migration' && steps.compiler-cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
+      if: inputs.compiler != 'clang' && inputs.protected-writer && steps.compiler-cache.outcome == 'success'
+      id: cache-publication
+      continue-on-error: true
+      uses: ./.github/actions/bounded-compiler-cache
       with:
-        path: ${{ runner.temp }}/ccache
-        key: ${{ steps.compiler-cache.outputs.cache-primary-key }}
+        operation: publish
+        writer: 'true'
+        family: ${{ inputs.cache-family }}
+        prefix: ccache-linux-v2-${{ inputs.compiler }}-${{ steps.compiler-image.outputs.flavour }}-${{ steps.compiler-image.outputs.version }}-${{ hashFiles('migration/ccache.conf') }}
+        paths: ${{ runner.temp }}/ccache
+
+    - name: Require successful bounded publication
+      if: always() && inputs.protected-writer
+      shell: bash
+      env:
+        RESTORE: ${{ steps.compiler-cache.outcome }}
+        PUBLICATION: ${{ steps.cache-publication.outcome }}
+      run: |
+        test "$RESTORE" = success
+        test "$PUBLICATION" = success

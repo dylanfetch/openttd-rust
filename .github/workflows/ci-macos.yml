@@ -1,11 +1,18 @@
 name: CI (MacOS)
 
-# Only the protected cache writer grants cache upload access.
-cache-mode: read
+# Inherit the explicit caller cache ceiling; never over-request in a reusable worker.
 
 on:
   workflow_call:
     inputs:
+      cache-family:
+        required: false
+        type: string
+        default: ''
+      protected-writer:
+        required: false
+        type: boolean
+        default: false
       checkout-ref:
         required: false
         type: string
@@ -34,6 +41,10 @@ env:
 
 jobs:
   macos:
+    concurrency:
+      group: ${{ inputs.protected-writer && format('protected-cache-{0}', inputs.cache-family) || format('cache-reader-macos-{0}-{1}', github.run_id, inputs.extra-cmake-parameters) }}
+      cancel-in-progress: false
+      queue: max
     name: CI
 
     runs-on: ${{ vars.CI_MACOS_HEAVY || 'macos-latest' }}
@@ -46,10 +57,24 @@ jobs:
       with:
         xcode-version: latest-stable
 
+    - name: Require immutable protected writer source
+      if: inputs.protected-writer
+      shell: bash
+      env:
+        CACHE_FAMILY: ${{ inputs.cache-family }}
+        CHECKOUT_REF: ${{ inputs.checkout-ref }}
+        EVENT: ${{ github.event_name }}
+        REF: ${{ github.ref }}
+      run: |
+        case "$CACHE_FAMILY" in macos-debug|macos-release) ;; *) exit 1 ;; esac
+        test -z "$CHECKOUT_REF"
+        test "$EVENT" = push
+        test "$REF" = refs/heads/rust-migration
+
     - name: Checkout
       uses: actions/checkout@v6
       with:
-        ref: ${{ inputs.checkout-ref }}
+        ref: ${{ inputs.protected-writer && github.sha || inputs.checkout-ref }}
         persist-credentials: false
         fetch-depth: 1
 
@@ -63,6 +88,10 @@ jobs:
         mkdir -p .local/macos-evidence
         rustc -vV | tee .local/macos-evidence/rustc.txt
         rustup target list --installed | tee .local/macos-evidence/installed-targets.txt
+
+    - name: Check actual cache archive admission on this platform
+      if: inputs.rust && !inputs.cache-only
+      run: python3 tools/test-ci.py CacheTests.test_actual_sdk_compressor_stream_and_file_outputs_are_capped_before_upload
 
     - name: Rust checks
       if: inputs.rust && !inputs.cache-only
@@ -110,12 +139,13 @@ jobs:
     - name: Restore compiler cache
       if: inputs.rust
       id: compiler-cache
-      uses: actions/cache/restore@v4
+      continue-on-error: ${{ inputs.protected-writer }}
+      uses: ./.github/actions/bounded-compiler-cache
       with:
-        path: ${{ runner.temp }}/ccache
-        # The runner image pins the Xcode toolchain, so it is part of the key.
-        key: ccache-macos-v2-${{ inputs.arch }}-${{ steps.runner-image.outputs.version }}-${{ steps.runner-image.outputs.flavour }}-${{ hashFiles('migration/ccache.conf') }}-${{ inputs.checkout-ref || github.sha }}
-        restore-keys: ccache-macos-v2-${{ inputs.arch }}-${{ steps.runner-image.outputs.version }}-${{ steps.runner-image.outputs.flavour }}-${{ hashFiles('migration/ccache.conf') }}-
+        writer: ${{ inputs.protected-writer }}
+        family: ${{ inputs.cache-family }}
+        prefix: ccache-macos-v2-${{ inputs.arch }}-${{ steps.runner-image.outputs.version }}-${{ steps.runner-image.outputs.flavour }}-${{ hashFiles('migration/ccache.conf') }}
+        paths: ${{ runner.temp }}/ccache
 
     - name: Install OpenGFX
       uses: ./.github/actions/install-opengfx
@@ -160,7 +190,7 @@ jobs:
         fi
 
     - name: Trim compiler cache
-      if: inputs.rust && github.event_name == 'push' && github.ref == 'refs/heads/rust-migration'
+      if: inputs.rust && inputs.protected-writer
       env:
         CCACHE_CONFIGPATH: ${{ github.workspace }}/migration/ccache.conf
         CCACHE_DIR: ${{ runner.temp }}/ccache
@@ -168,11 +198,16 @@ jobs:
       run: '"$CCACHE_EXE" --cleanup'
 
     - name: Save compiler cache
-      if: inputs.rust && github.event_name == 'push' && github.ref == 'refs/heads/rust-migration' && steps.compiler-cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
+      if: inputs.rust && inputs.protected-writer && steps.compiler-cache.outcome == 'success'
+      id: cache-publication
+      continue-on-error: true
+      uses: ./.github/actions/bounded-compiler-cache
       with:
-        path: ${{ runner.temp }}/ccache
-        key: ${{ steps.compiler-cache.outputs.cache-primary-key }}
+        operation: publish
+        writer: 'true'
+        family: ${{ inputs.cache-family }}
+        prefix: ccache-macos-v2-${{ inputs.arch }}-${{ steps.runner-image.outputs.version }}-${{ steps.runner-image.outputs.flavour }}-${{ hashFiles('migration/ccache.conf') }}
+        paths: ${{ runner.temp }}/ccache
 
     - name: Test
       if: ${{ !inputs.cache-only }}
@@ -266,3 +301,13 @@ jobs:
           .local/build-tools-macos/CMakeCache.txt
           .local/build-tools-macos/compile_commands.json
           .local/build-tools-macos/rust-*.log
+
+    - name: Require successful bounded publication
+      if: always() && inputs.protected-writer
+      shell: bash
+      env:
+        RESTORE: ${{ steps.compiler-cache.outcome }}
+        PUBLICATION: ${{ steps.cache-publication.outcome }}
+      run: |
+        test "$RESTORE" = success
+        test "$PUBLICATION" = success

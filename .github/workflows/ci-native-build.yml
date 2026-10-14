@@ -1,0 +1,133 @@
+name: Native build worker
+
+# Inherit the explicit caller cache ceiling; only protected push callers write.
+
+on:
+  workflow_call:
+    inputs:
+      checkout-ref:
+        type: string
+        default: ''
+      covered:
+        type: boolean
+        default: false
+      protected-writer:
+        type: boolean
+        default: false
+    outputs:
+      shards:
+        value: ${{ jobs.build.outputs.shards }}
+        description: Complete native scenario shard inventory
+
+jobs:
+  build:
+    concurrency:
+      group: ${{ inputs.protected-writer && 'protected-cache-native' || format('cache-reader-native-{0}', github.run_id) }}
+      cancel-in-progress: false
+      queue: max
+    runs-on: ${{ vars.CI_LINUX_HEAVY || 'ubuntu-24.04' }}
+    timeout-minutes: 30
+    outputs:
+      shards: ${{ steps.pack.outputs.shards }}
+    steps:
+    - name: Require immutable protected writer source
+      if: inputs.protected-writer
+      env:
+        CHECKOUT_REF: ${{ inputs.checkout-ref }}
+        EVENT: ${{ github.event_name }}
+        REF: ${{ github.ref }}
+      run: |
+        test -z "$CHECKOUT_REF"
+        test "$EVENT" = push
+        test "$REF" = refs/heads/rust-migration
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.protected-writer && github.sha || inputs.checkout-ref }}
+        fetch-depth: 1
+        persist-credentials: false
+    - uses: ./.github/actions/native-environment
+    - id: cache
+      continue-on-error: ${{ inputs.protected-writer }}
+      uses: ./.github/actions/native-cache
+      with:
+        writer: ${{ inputs.protected-writer }}
+    - name: Build native Rust generators without the game
+      run: python3 tools/migration.py tools --jobs "$(nproc)" --ccache
+    - name: Check Rust and compare original and migration builds
+      if: ${{ !inputs.covered }}
+      run: python3 tools/migration.py verify --jobs "$(nproc)" --ccache
+    - name: Refresh compiler caches for an already validated merged tree
+      if: inputs.covered
+      run: python3 tools/migration.py build --jobs "$(nproc)" --ccache
+    - name: Freeze runtime and scenario adapters, then partition the complete inventory
+      id: pack
+      if: ${{ !inputs.covered }}
+      run: |
+        python3 tools/ci_native.py pack --shards 6
+        python3 - <<'PY'
+        import json, os
+        from pathlib import Path
+        plan = json.loads(Path('.local/native-runtimes/shard-plan.json').read_text())
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+            output.write('shards=' + json.dumps([s['id'] for s in plan['shards']]) + '\n')
+        PY
+    - name: Export frozen runtime and probe build inputs
+      if: ${{ !inputs.covered }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: native-build-inputs
+        path: |
+          .local/native-runtimes.tar
+          .local/native-support.tar
+        retention-days: 1
+        include-hidden-files: true
+        compression-level: 1
+    - name: Export frozen native comparison inputs
+      if: ${{ !inputs.covered }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: native-comparison-inputs
+        path: .local/native-comparison-support.tar
+        retention-days: 1
+        include-hidden-files: true
+        compression-level: 1
+    - name: Export the mandatory shard plan
+      if: ${{ !inputs.covered }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: native-shard-plan
+        path: |
+          .local/native-runtimes/runtime-manifest.json
+          .local/native-runtimes/shard-plan.json
+        include-hidden-files: true
+    - name: Save bounded protected-branch compiler caches
+      id: cache-publication
+      continue-on-error: true
+      if: success() && inputs.protected-writer && steps.cache.outcome == 'success'
+      uses: ./.github/actions/native-cache
+      with:
+        save: 'true'
+        writer: 'true'
+        prefix: ${{ steps.cache.outputs.prefix }}
+    - name: Collect native build evidence
+      if: always()
+      run: python3 tools/ci_native.py evidence .local/ci-evidence
+    - name: Retain native build evidence
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: migration-build-evidence
+        path: |
+          .local/compiler-cache-identity.json
+          .local/ci-evidence
+        include-hidden-files: true
+
+    - name: Require successful bounded publication
+      if: always() && inputs.protected-writer
+      env:
+        RESTORE: ${{ steps.cache.outcome }}
+        PUBLICATION: ${{ steps.cache-publication.outcome }}
+      run: |
+        test "$RESTORE" = success
+        test "$PUBLICATION" = success
+

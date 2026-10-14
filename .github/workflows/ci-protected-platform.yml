@@ -1,0 +1,139 @@
+name: CI - Protected Build
+
+cache-mode: read
+
+on:
+  push:
+    branches: [rust-migration]
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+  statuses: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.sha }}
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  policy:
+    uses: ./.github/workflows/ci-policy.yml
+
+  emscripten:
+    needs: policy
+    if: ${{ !cancelled() && needs.policy.outputs.heavy == 'true' }}
+    cache-mode: read
+    uses: ./.github/workflows/ci-emscripten.yml
+    with:
+      checkout-ref: ${{ github.sha }}
+
+  clang:
+    needs: policy
+    if: ${{ !cancelled() && needs.policy.outputs.heavy == 'true' }}
+    cache-mode: read
+    uses: ./.github/workflows/ci-linux.yml
+    with:
+      checkout-ref: ${{ github.sha }}
+      compiler: clang
+      cxxcompiler: clang++
+      libraries: libsdl2-dev
+      extra-cmake-parameters: ''
+
+  protected-linux:
+    permissions:
+      contents: read
+      actions: write
+    cache-mode: write
+    needs: policy
+    if: ${{ (!cancelled() && (needs.policy.outputs.heavy == 'true' || needs.policy.outputs.covered == 'true')) && github.event_name == 'push' && github.ref == 'refs/heads/rust-migration' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - name: GCC - SDL2
+          cache-family: linux-sdl2
+          compiler: gcc
+          cxxcompiler: g++
+          libraries: libsdl2-dev
+        - name: GCC - Dedicated
+          cache-family: linux-dedicated
+          compiler: gcc
+          cxxcompiler: g++
+          libraries: grfcodec
+          extra-cmake-parameters: -DOPTION_DEDICATED=ON -DCMAKE_CXX_FLAGS_INIT="-DRANDOM_DEBUG" -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON
+          # Compile without SDL / SDL2, as that should compile fine too.
+
+    name: Linux (${{ matrix.name }})
+
+    uses: ./.github/workflows/ci-linux.yml
+
+    with:
+      cache-family: ${{ matrix.cache-family }}
+      protected-writer: true
+      compiler: ${{ matrix.compiler }}
+      cxxcompiler: ${{ matrix.cxxcompiler }}
+      libraries: ${{ matrix.libraries }}
+      extra-cmake-parameters: ${{ matrix.extra-cmake-parameters }}
+      cache-only: ${{ github.event_name == 'push' && github.ref == 'refs/heads/rust-migration' && needs.policy.outputs.covered == 'true' }}
+
+  protected-macos:
+    permissions:
+      contents: read
+      actions: write
+    cache-mode: write
+    needs: policy
+    if: ${{ (!cancelled() && (needs.policy.outputs.heavy == 'true' || needs.policy.outputs.covered == 'true')) && github.event_name == 'push' && github.ref == 'refs/heads/rust-migration' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - name: arm64 - Debug
+          cache-family: macos-debug
+          arch: arm64
+          full_arch: arm64
+          extra-cmake-parameters: -DCMAKE_BUILD_TYPE=Debug -DOPTION_USE_ASSERTS=ON
+        - name: arm64 - Release
+          cache-family: macos-release
+          arch: arm64
+          full_arch: arm64
+          extra-cmake-parameters: -DCMAKE_BUILD_TYPE=RelWithDebInfo -DOPTION_USE_ASSERTS=OFF
+
+    name: Mac OS (${{ matrix.name }})
+
+    uses: ./.github/workflows/ci-macos.yml
+
+    with:
+      cache-family: ${{ matrix.cache-family }}
+      protected-writer: true
+      rust: true
+      arch: ${{ matrix.arch }}
+      full_arch: ${{ matrix.full_arch }}
+      extra-cmake-parameters: ${{ matrix.extra-cmake-parameters }}
+      cache-only: ${{ github.event_name == 'push' && github.ref == 'refs/heads/rust-migration' && needs.policy.outputs.covered == 'true' }}
+
+  protected-windows:
+    permissions:
+      contents: read
+      actions: write
+    cache-mode: write
+    needs: policy
+    if: ${{ (!cancelled() && (needs.policy.outputs.heavy == 'true' || needs.policy.outputs.covered == 'true')) && github.event_name == 'push' && github.ref == 'refs/heads/rust-migration' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - arch: x86
+        - arch: x64
+
+    name: Windows (${{ matrix.arch }})
+
+    uses: ./.github/workflows/ci-windows.yml
+
+    with:
+      protected-writer: true
+      rust: true
+      arch: ${{ matrix.arch }}
+      cache-only: ${{ github.event_name == 'push' && github.ref == 'refs/heads/rust-migration' && needs.policy.outputs.covered == 'true' }}
+

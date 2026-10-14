@@ -1,51 +1,42 @@
 name: Bound compilation caches
 
-# Only the protected cache writer grants cache upload access.
+# Publication and deletion belong to each locked family writer, never a janitor.
 cache-mode: read
 
 on:
   workflow_run:
-    workflows: [Migration baseline validation, CI - Build]
+    workflows: [Protected migration validation, CI - Protected Build]
     types: [requested, completed]
 
 permissions:
-  actions: write
+  actions: read
   contents: read
 
 concurrency:
-  group: protected-compilation-cache-retention
+  group: protected-compilation-cache-audit
   cancel-in-progress: false
+  queue: max
 
 jobs:
-  prune:
+  audit:
     if: github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'rust-migration'
     runs-on: ubuntu-latest
     steps:
-    # Trusted default-branch definition only. Never check out candidate code or
-    # consume artifacts in a cache writer with repository Actions permissions.
+    # workflow_run uses the trusted default-branch definition and immutable SHA.
+    # This read-only audit accepts neither candidate code nor candidate artifacts.
+    - uses: actions/checkout@v6
+      with:
+        ref: ${{ github.sha }}
+        persist-credentials: false
     - uses: actions/github-script@v7
       with:
         script: |
+          const policy = require(`${process.env.GITHUB_WORKSPACE}/tools/cache_policy.cjs`);
           const caches = await github.paginate(github.rest.actions.getActionsCacheList, {
             ...context.repo, per_page: 100
           });
-          const owned = key => /^(compiler-v\d+-|ccache-(linux|macos|msvc)-v\d+-|vcpkg-bin-)/.test(key);
-          const newest = new Set();
-          const obsolete = new Set();
-          const sorted = [...caches].sort((a, b) => b.created_at.localeCompare(a.created_at));
-          for (const cache of sorted) {
-            if (!owned(cache.key)) continue;
-            const prefix = cache.key.replace(/-[0-9a-f]{40}$/, '');
-            if (newest.has(prefix)) obsolete.add(cache.id);
-            else newest.add(prefix);
-          }
-          let bytes = caches.reduce((sum, cache) => sum + cache.size_in_bytes, 0);
-          const limit = 8 * 1024 ** 3; // Leave 2 GiB below GitHub's repository limit.
-          for (const cache of [...sorted].reverse()) {
-            if (!owned(cache.key) || (!obsolete.has(cache.id) && bytes <= limit)) continue;
-            await github.rest.actions.deleteActionsCacheById({...context.repo, cache_id: cache.id});
-            bytes -= cache.size_in_bytes;
-            core.info(`Removed ${cache.key} (${cache.size_in_bytes} bytes)`);
-          }
-          core.info(`Retained cache usage: ${bytes} bytes (budget ${limit})`);
-          if (bytes > limit) core.setFailed('Unmanaged caches alone exceed the repository budget');
+          const snapshot = policy.inventory(caches);
+          const peak = (2 * Object.values(policy.policy.families).reduce((sum, size) => sum + size, 0)
+            + policy.policy.other_mib) * 1024 ** 2;
+          core.info(`Cache list: ${snapshot.bytes} bytes; hard peak envelope ${peak}`);
+          if (snapshot.bytes > peak) core.setFailed('Repository cache peak envelope exceeded');

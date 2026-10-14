@@ -20,7 +20,6 @@ on:
   push:
     branches:
     - master
-    - rust-migration
 
 permissions:
   contents: read
@@ -64,10 +63,12 @@ jobs:
           cxxcompiler: clang++
           libraries: libsdl2-dev
         - name: GCC - SDL2
+          cache-family: linux-sdl2
           compiler: gcc
           cxxcompiler: g++
           libraries: libsdl2-dev
         - name: GCC - Dedicated
+          cache-family: linux-dedicated
           compiler: gcc
           cxxcompiler: g++
           libraries: grfcodec
@@ -79,6 +80,7 @@ jobs:
     uses: ./.github/workflows/ci-linux.yml
 
     with:
+      cache-family: ${{ matrix.cache-family }}
       checkout-ref: ${{ inputs.checkout-ref }}
       compiler: ${{ matrix.compiler }}
       cxxcompiler: ${{ matrix.cxxcompiler }}
@@ -89,16 +91,18 @@ jobs:
   macos:
     cache-mode: read
     needs: policy
-    if: ${{ !cancelled() && (inputs.checkout-ref != '' || needs.policy.outputs.heavy == 'true' || needs.policy.outputs.covered == 'true') && inputs.profile != 'native' }}
+    if: ${{ (!cancelled() && (inputs.checkout-ref != '' || needs.policy.outputs.heavy == 'true' || needs.policy.outputs.covered == 'true') && inputs.profile != 'native') }}
     strategy:
       fail-fast: false
       matrix:
         include:
         - name: arm64 - Debug
+          cache-family: macos-debug
           arch: arm64
           full_arch: arm64
           extra-cmake-parameters: -DCMAKE_BUILD_TYPE=Debug -DOPTION_USE_ASSERTS=ON
         - name: arm64 - Release
+          cache-family: macos-release
           arch: arm64
           full_arch: arm64
           extra-cmake-parameters: -DCMAKE_BUILD_TYPE=RelWithDebInfo -DOPTION_USE_ASSERTS=OFF
@@ -108,6 +112,7 @@ jobs:
     uses: ./.github/workflows/ci-macos.yml
 
     with:
+      cache-family: ${{ matrix.cache-family }}
       checkout-ref: ${{ inputs.checkout-ref }}
       rust: true
       arch: ${{ matrix.arch }}
@@ -118,7 +123,7 @@ jobs:
   windows:
     cache-mode: read
     needs: policy
-    if: ${{ !cancelled() && (inputs.checkout-ref != '' || needs.policy.outputs.heavy == 'true' || needs.policy.outputs.covered == 'true') && inputs.profile != 'native' }}
+    if: ${{ (!cancelled() && (inputs.checkout-ref != '' || needs.policy.outputs.heavy == 'true' || needs.policy.outputs.covered == 'true') && inputs.profile != 'native') }}
     strategy:
       fail-fast: false
       matrix:

@@ -1,0 +1,163 @@
+name: Bounded compiler cache
+description: Two immutable protected slots, measured payloads and confirmed replacement
+inputs:
+  operation:
+    default: restore
+    description: Restore or publish
+  writer:
+    default: 'false'
+    description: Protected writer route only
+  family:
+    required: true
+    description: Stable family from migration/cache-policy.json
+  prefix:
+    required: true
+    description: Existing compiler compatibility prefix
+  paths:
+    required: true
+    description: Compiler cache directories, one per line
+outputs:
+  publish:
+    value: ${{ steps.prepare.outputs.publish }}
+    description: This protected commit may publish
+runs:
+  using: composite
+  steps:
+  - name: Identify fixed payload path
+    id: identify
+    shell: bash
+    env:
+      CACHE_FAMILY: ${{ inputs.family }}
+      CACHE_PREFIX: ${{ inputs.prefix }}
+      CACHE_PATHS: ${{ inputs.paths }}
+    run: |
+      # Compression changes the cache version. Never fall back to gzip.
+      zstd --quiet --version
+      ${{ runner.os == 'Windows' && 'python' || 'python3' }} tools/cache_payload.py identify
+  - id: slot0
+    if: inputs.operation == 'restore'
+    uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0; SDK 4.1.0
+    with:
+      path: ${{ steps.identify.outputs.path }}
+      key: bounded-v1-${{ inputs.family }}-0
+      enableCrossOsArchive: true
+  - name: Remember slot zero
+    if: inputs.operation == 'restore'
+    shell: bash
+    env:
+      CACHE_FAMILY: ${{ inputs.family }}
+      CACHE_PREFIX: ${{ inputs.prefix }}
+      CACHE_PATHS: ${{ inputs.paths }}
+      MATCHED_KEY: ${{ steps.slot0.outputs.cache-matched-key }}
+    run: ${{ runner.os == 'Windows' && 'python' || 'python3' }} tools/cache_payload.py remember --slot 0
+  - id: slot1
+    if: inputs.operation == 'restore'
+    uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0; SDK 4.1.0
+    with:
+      path: ${{ steps.identify.outputs.path }}
+      key: bounded-v1-${{ inputs.family }}-1
+      enableCrossOsArchive: true
+  - name: Remember slot one
+    if: inputs.operation == 'restore'
+    shell: bash
+    env:
+      CACHE_FAMILY: ${{ inputs.family }}
+      CACHE_PREFIX: ${{ inputs.prefix }}
+      CACHE_PATHS: ${{ inputs.paths }}
+      MATCHED_KEY: ${{ steps.slot1.outputs.cache-matched-key }}
+    run: ${{ runner.os == 'Windows' && 'python' || 'python3' }} tools/cache_payload.py remember --slot 1
+  - name: Unpack compatible compiler files
+    if: inputs.operation == 'restore'
+    id: unpack
+    shell: bash
+    env:
+      CACHE_FAMILY: ${{ inputs.family }}
+      CACHE_PREFIX: ${{ inputs.prefix }}
+      CACHE_PATHS: ${{ inputs.paths }}
+    run: ${{ runner.os == 'Windows' && 'python' || 'python3' }} tools/cache_payload.py unpack
+  - name: Restore legacy fallback during transition
+    if: inputs.operation == 'restore' && steps.unpack.outputs.restored != 'true'
+    uses: actions/cache/restore@v4
+    with:
+      path: ${{ inputs.paths }}
+      key: ${{ inputs.prefix }}-${{ github.sha }}
+      restore-keys: ${{ inputs.prefix }}-
+  - name: Reconcile and admit this protected family
+    if: inputs.operation == 'publish' && inputs.writer == 'true'
+    id: prepare
+    uses: actions/github-script@v7
+    env:
+      CACHE_FAMILY: ${{ inputs.family }}
+    with:
+      script: |
+        await require(`${process.env.GITHUB_WORKSPACE}/tools/cache_policy.cjs`).run(
+          {github, context, core}, 'prepare', process.env.CACHE_FAMILY);
+  - name: Pack and measure the entire compiler archive envelope
+    if: inputs.operation == 'publish' && steps.prepare.outputs.publish == 'true'
+    shell: bash
+    env:
+      CACHE_FAMILY: ${{ inputs.family }}
+      CACHE_PREFIX: ${{ inputs.prefix }}
+      CACHE_PATHS: ${{ inputs.paths }}
+    run: ${{ runner.os == 'Windows' && 'python' || 'python3' }} tools/cache_payload.py pack
+  - name: Verify SDK compressor routing before any reservation or upload
+    if: inputs.operation == 'publish' && steps.prepare.outputs.publish == 'true'
+    uses: actions/github-script@v7
+    env:
+      CACHE_FAMILY: ${{ inputs.family }}
+      CACHE_PREFIX: ${{ inputs.prefix }}
+      CACHE_PATHS: ${{ inputs.paths }}
+    with:
+      script: |
+        const policy = require(`${process.env.GITHUB_WORKSPACE}/tools/cache_policy.cjs`).policy;
+        let output = '';
+        await exec.exec('zstd', ['--cache-guard-probe'], {
+          listeners: {stdout: data => output += data.toString()}
+        });
+        const witness = JSON.parse(output);
+        if (witness.cap !== policy.families[process.env.CACHE_FAMILY] * 1024 ** 2 || witness.sha !== context.sha) {
+          throw Error('SDK executable lookup did not select the protected archive guard');
+        }
+        await exec.exec(process.platform === 'win32' ? 'python' : 'python3', ['tools/cache_payload.py', 'guard']);
+  - name: Save the admitted immutable slot
+    if: inputs.operation == 'publish' && steps.prepare.outputs.publish == 'true'
+    uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0; SDK 4.1.0
+    with:
+      path: ${{ steps.identify.outputs.path }}
+      key: ${{ steps.prepare.outputs.key }}
+      enableCrossOsArchive: true
+  - name: Remove local upload copy before confirmation
+    if: inputs.operation == 'publish' && steps.prepare.outputs.publish == 'true'
+    shell: bash
+    env:
+      PAYLOAD: ${{ steps.identify.outputs.path }}
+    run: rm "$PAYLOAD"
+  - name: Restore the replacement from the cache backend
+    if: inputs.operation == 'publish' && steps.prepare.outputs.publish == 'true'
+    uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0; SDK 4.1.0
+    with:
+      path: ${{ steps.identify.outputs.path }}
+      key: ${{ steps.prepare.outputs.key }}
+      enableCrossOsArchive: true
+      fail-on-cache-miss: true
+  - name: Verify exact protected replacement bytes and manifest
+    if: inputs.operation == 'publish' && steps.prepare.outputs.publish == 'true'
+    shell: bash
+    env:
+      CACHE_FAMILY: ${{ inputs.family }}
+      CACHE_PREFIX: ${{ inputs.prefix }}
+      CACHE_PATHS: ${{ inputs.paths }}
+      MATCHED_KEY: ${{ steps.prepare.outputs.key }}
+      SLOT: ${{ steps.prepare.outputs.slot }}
+    run: |
+      ${{ runner.os == 'Windows' && 'python' || 'python3' }} tools/cache_payload.py verify
+      ${{ runner.os == 'Windows' && 'python' || 'python3' }} tools/cache_payload.py remember --slot "$SLOT"
+  - name: Confirm committed ID and size, then prune the predecessor
+    if: inputs.operation == 'publish' && steps.prepare.outputs.publish == 'true'
+    uses: actions/github-script@v7
+    env:
+      CACHE_FAMILY: ${{ inputs.family }}
+    with:
+      script: |
+        await require(`${process.env.GITHUB_WORKSPACE}/tools/cache_policy.cjs`).run(
+          {github, context, core}, 'finish', process.env.CACHE_FAMILY);

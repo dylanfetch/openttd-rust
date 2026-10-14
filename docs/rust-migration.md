@@ -154,8 +154,8 @@ with no code or data differences in the objects.
 CI restores both cache roles keyed only by OS, architecture, baseline, compiler
 versions and `ccache.conf`. ccache itself hashes compiler content, arguments and
 every included file. Workflow and driver edits do not change the key (#79).
-Successful `rust-migration` pushes save the cache, and PRs restore it. Windows and
-macOS keep vcpkg binaries in an actions/cache files store keyed by runner image;
+Protected `rust-migration` push writers publish compiler caches, and PRs restore
+them. Windows and macOS restore vcpkg binaries keyed by runner image;
 vcpkg's ABI hashes make stale entries miss. Their Rust jobs also compile through
 ccache 4.14.1 (checksummed download) with PCH off; MSVC uses embedded `/Z7` debug
 info (CMP0141), which ccache requires. Platform CI also runs on `rust-migration`
@@ -427,10 +427,31 @@ Original verification binaries stay intact; `tools/evidence.py` joins explicit
 derived simulation identities to their verified parent hashes. Probe
 workers receive prebuilt generators/archives and the widget probe's real link
 objects; build metadata relocation has its own receipt. Reports/logs and retained
-failing saves are artifacts; build inputs expire after one day. Tests and their results are never cached. Cache writers trim native roles
-to 750 MB, Linux flavours to 600 MB and macOS flavours to 650 MB. The trusted
-cache-retention workflow keeps the latest entry per prefix and bounds total usage
-to 8 GiB (below the 10 GiB repository limit).
+failing saves are artifacts; build inputs expire after one day. Tests and their
+results are never cached. Separate push-only protected native/platform routes
+reuse the build workers; candidate calls have explicit `cache-mode: read` ceilings.
+Each compiler family holds a non-cancelling `queue: max` lock through restore,
+build, save, backend restore/hash confirmation and predecessor deletion. Native
+comparisons and simulation shards consume exported inputs outside that lock.
+
+`migration/cache-policy.json` caps actual archive envelopes: native 1100 MiB,
+Linux 320 MiB/flavour, macOS 340 MiB/flavour and MSVC 1024 MiB/architecture.
+Two fixed immutable slots per family, across all image/compatibility generations,
+plus 1024 MiB for all restore-only caches bound peak to 9960 MiB and settled to
+5492 MiB. The packed compiler payload includes protected commit, compatibility
+and verified content identity. A guard counts the pinned SDK's actual compressed
+tar bytes, including metadata and framing, and fails compression above the cap
+before reservation/upload. Routing probes require SDK executable and tar lookups
+to select that guard. ccache cleanup and the early packing estimate are not the bound.
+The cache action uses a fixed relative path, zstd and cross-OS archive version;
+changing these requires a reviewed transition. Publication compares protected
+ancestry, restores/verifies exact replacement bytes, confirms REST ID/version/ref
+and equality with the pre-upload size receipt, then deletes its predecessor. Conflicts,
+stale metadata, oversize and uncertain uploads retain fallback and fail publication;
+exported tests still run. Root drains old unbounded writers before transition.
+The cache workflow audits inventory read-only; every dependency autosave is disabled
+or capped by a read ceiling. Three-merge live peak/settled and warm timing acceptance
+remain required in #233/#243; the envelope model is not a live acceptance claim.
 
 Runner settings are `CI_LINUX_HEAVY`, `CI_LINUX_COMPARISONS`,
 `CI_LINUX_SIMULATION`, `CI_LINUX_PLATFORM` (default `ubuntu-24.04`), and
