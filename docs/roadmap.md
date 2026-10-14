@@ -114,6 +114,7 @@ retirement, with net glue in the PR (#223).
 | #214/#168 (typed station/loading) | #217 | direct | `3b3b931099` | 1018 / 42 / 1147 / 0; net glue +705 |
 | #250 (CI waiter survives base pushes) | #251 | direct | `409cdb253e` | 0 / 53 / 0 / 0; net glue 0 |
 | #237/#199 (typed aircraft boundary) | #238 | direct | `141e4ce397` | 798 / 420 / 470 / 0; net glue -310 |
+| #252 (Windows runner; warm acceptance pending) | #253 | direct | `cfc98a16a7` | 0 / 0 / 0 / 0 |
 
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -161,17 +162,17 @@ that a `SaveLoad` descriptor cannot address through the alias.
 ## Resume checkpoint
 
 Root resumed from `fe337e4e40` with `/start-development`. The last code revision
-is green. #253 is in bootstrap CI; #254 has a fresh fixing reviewer. #245/#248
-remain with implementation agents. Root owns CI/integration and #233 observation.
+is green. #253 is integrated; its protected cache save and #252 warm acceptance
+remain. #254 passed fixing review. Root owns CI/integration and #233 observation.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #233 / #243 / #244 | `ci-cache-peak-233`, `1288db61b4` | Root sampling; zero of three code merges observed. Leave #244 idle (action 1). |
-| #252 / #253 | `windows-blacksmith-252`, `300c1215f4` | Review passed; first Blacksmith compatibility/full run active. Root restores CI variables after disposition. |
-| #249 / #254 | `shared-accessor-check-249`, `eb32fd73e7` | `accessor_check_review_254`: fix parameterless lambda coverage, then bootstrap/full CI. |
-| #219 / #245 | `signal-owner-219`, `73dc726db9` | `signals_final_245`: steering fixes pushed, final native/semantic validation before timing and fresh review. |
-| #220 / #248 | `engine-lifecycle-220`, `69932dbd30` | `engine_final_248`: base adopted; build/boundary/witness corrections under native validation. |
-| #212 / #241 | `landscape-budget-prototype-212`, `45633ef6d6` | Read-only handoff on #212; new tip branch after capacity frees. No trampoline or handler-pointer cast. |
+| #233 / #243 / #244 | `ci-cache-peak-233`, `1288db61b4` | Root sampling; one of three code merges observed. Leave #244 idle (action 1). |
+| #252 / #253 | integrated, worktree removed | Compatibility/full CI passed; root collecting warm/cache/CPU evidence. On-demand scheduling restored. |
+| #249 / #254 | `shared-accessor-check-249`, `7254b9bb11` | Fixing review passed; root verified fixes and conflict-free base adoption. Bootstrap/full CI next. |
+| #219 / #245 | `signal-owner-219`, `31f8c786e9` | `signals_final_245`: verify/focused pair/self passed; soak/default before timing and fresh review. |
+| #220 / #248 | `engine-lifecycle-220`, `81dabc9668` | `engine_final_248`: corrections pushed; final native/semantic validation before timing and fresh review. |
+| #212 | `landscape-owner-212`, from `cfc98a16a7` | `landscape_owner_212`: direct scheduler/handler ABI and native validation; quiet TGP gate before full scope. |
 | #213 / #242 | `vehicle-budget-prototype-213`, `92b8a04075` | Read-only handoff on #213; action-6/world-state boundary selected, new tip branch after capacity frees. |
 | #64 / #66 | `issue/64-curve-family`, `aab5211801` | Paused draft/worktree; leave untouched, not a fallback. |
 | Paused integration | `integration/curve-script`, `c19f09cf8b` | Locked worktree preserved; no work. |
