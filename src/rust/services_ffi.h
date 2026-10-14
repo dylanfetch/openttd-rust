@@ -42,6 +42,38 @@ struct OpenTTDSharedServices {
 };
 const OpenTTDSharedServices &GetRustSharedServices() noexcept;
 
+struct OpenTTDRailTraversal { bool depot; uint8_t tracks; };
+struct OpenTTDRailSignalPresence { bool signals; bool track; uint8_t kind; bool forward; bool reverse; };
+struct OpenTTDRailSignalUpdate { uint8_t kind; uint8_t reservations; };
+struct OpenTTDRailStationAdmission { bool rail; uint8_t owner; uint8_t axis; bool blocked; };
+struct OpenTTDRailCrossingAdmission { bool crossing; uint8_t owner; uint8_t axis; };
+struct OpenTTDRailWormholeAdmission { uint8_t owner; uint8_t transport; uint8_t direction; };
+
+/* Canonical rail/signal map leaves. A consuming owner calls each phase only at
+ * the source observation point; signal writes are immediate. No map pointer,
+ * whole tile record, opcode or allocation crosses this boundary. */
+struct OpenTTDRailMapServices {
+	OpenTTDRailTraversal (*traversal)(uint32_t) noexcept;
+	OpenTTDRailSignalPresence (*signal_presence)(uint32_t, uint8_t) noexcept;
+	OpenTTDRailSignalUpdate (*signal_update)(uint32_t, uint8_t) noexcept;
+	OpenTTDRailStationAdmission (*station_admission)(uint32_t, uint8_t, uint8_t) noexcept;
+	OpenTTDRailCrossingAdmission (*crossing_admission)(uint32_t, uint8_t) noexcept;
+	OpenTTDRailWormholeAdmission (*wormhole_admission)(uint32_t, uint8_t) noexcept;
+
+	bool (*is_rail_depot)(uint32_t) noexcept;
+	uint8_t (*rail_depot_direction)(uint32_t) noexcept;
+	uint8_t (*rail_tracks)(uint32_t) noexcept;
+	bool (*has_signals)(uint32_t) noexcept;
+	bool (*has_signal_track)(uint32_t, uint8_t) noexcept;
+	uint8_t (*signal_type)(uint32_t, uint8_t) noexcept;
+	bool (*has_signal_trackdir)(uint32_t, uint8_t) noexcept;
+	uint8_t (*signal_state)(uint32_t, uint8_t) noexcept;
+	void (*set_signal_state)(uint32_t, uint8_t, uint8_t) noexcept;
+	uint32_t (*other_tunnel_bridge_end)(uint32_t) noexcept;
+	uint32_t (*rail_track_status)(uint32_t, uint8_t) noexcept;
+};
+const OpenTTDRailMapServices &GetRustRailMapServices() noexcept;
+
 /* Standalone fixtures without a game map: map predicates return zero and writes do nothing. */
 template <typename Result, typename... Args>
 Result OpenTTDFixtureMapService(Args...) noexcept

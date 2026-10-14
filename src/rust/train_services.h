@@ -301,7 +301,7 @@ static void TrainDeleteVehicle(OpenTTDTrainHandle id) noexcept
 }
 static uint64_t TrainDepotDir(OpenTTDTrainHandle, uint32_t a) noexcept
 {
-	return GetRailDepotDirection(TileIndex(a));
+	return GetRustRailMapServices().rail_depot_direction(a);
 }
 static void TrainDepotDirty(OpenTTDTrainHandle id) noexcept
 {
@@ -398,15 +398,15 @@ static uint64_t TrainHasReserved(OpenTTDTrainHandle, uint32_t a, uint8_t b) noex
 }
 static uint64_t TrainHasSignal(OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
-	return HasSignalOnTrack(TileIndex(a), static_cast<Track>(b));
+	return GetRustRailMapServices().has_signal_track(a, b);
 }
 static uint64_t TrainHasSignals(OpenTTDTrainHandle, uint32_t a) noexcept
 {
-	return HasSignals(TileIndex(a));
+	return GetRustRailMapServices().has_signals(a);
 }
 static uint64_t TrainHasSignalTd(OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
-	return HasSignalOnTrackdir(TileIndex(a), static_cast<Trackdir>(b));
+	return GetRustRailMapServices().has_signal_trackdir(a, b);
 }
 static void TrainHideFill(OpenTTDTrainHandle id) noexcept
 {
@@ -561,7 +561,7 @@ static uint64_t TrainOrderStop(OpenTTDTrainHandle id, uint16_t a) noexcept
 }
 static uint64_t TrainOtherEnd(OpenTTDTrainHandle, uint32_t a) noexcept
 {
-	return GetOtherTunnelBridgeEnd(TileIndex(a)).base();
+	return GetRustRailMapServices().other_tunnel_bridge_end(a);
 }
 static void TrainPayRunning(OpenTTDTrainHandle id, int64_t a) noexcept
 {
@@ -683,7 +683,7 @@ static void TrainSetPlatformRes(OpenTTDTrainHandle, uint32_t a, uint8_t b, uint8
 }
 static void TrainSetSignalState(OpenTTDTrainHandle, uint32_t a, uint8_t b, uint8_t c) noexcept
 {
-	SetSignalStateByTrackdir(TileIndex(a), static_cast<Trackdir>(b), static_cast<SignalState>(c));
+	GetRustRailMapServices().set_signal_state(a, b, c);
 }
 static void TrainSetTunnelRes(OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
@@ -698,19 +698,6 @@ static uint64_t TrainShowReservation(OpenTTDTrainHandle) noexcept
 {
 	return _settings_client.gui.show_track_reservation;
 }
-static void TrainSignalsBoth(OpenTTDTrainHandle, uint32_t a, uint8_t b, uint8_t c) noexcept
-{
-	SetSignalsOnBothDir(TileIndex(a), static_cast<Track>(b), Owner(c));
-}
-static uint64_t TrainSignalsUpdate(OpenTTDTrainHandle id, uint32_t a, uint8_t b) noexcept
-{
-	Train *v = static_cast<Train *>(id.shell);
-	return UpdateSignalsOnSegment(TileIndex(a), static_cast<DiagDirection>(b), v->owner);
-}
-static uint64_t TrainSignalsUpdateOwner(OpenTTDTrainHandle, uint32_t a, uint8_t b, uint8_t c) noexcept
-{
-	return UpdateSignalsOnSegment(TileIndex(a), static_cast<DiagDirection>(b), Owner(c));
-}
 static uint64_t TrainSignalHasPbs(OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
 	return HasPbsSignalOnTrackdir(TileIndex(a), static_cast<Trackdir>(b));
@@ -721,7 +708,7 @@ static uint64_t TrainSignalPbs(OpenTTDTrainHandle, uint8_t a) noexcept
 }
 static uint64_t TrainSignalType(OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
-	return GetSignalType(TileIndex(a), static_cast<Track>(b));
+	return GetRustRailMapServices().signal_type(a, b);
 }
 static uint64_t TrainSigsegFull(OpenTTDTrainHandle) noexcept
 {
@@ -814,7 +801,7 @@ static uint64_t TrainTrackdirReaches(OpenTTDTrainHandle, uint8_t a) noexcept
 }
 static uint64_t TrainTrackBits(OpenTTDTrainHandle, uint32_t a) noexcept
 {
-	return GetTrackBits(TileIndex(a));
+	return GetRustRailMapServices().rail_tracks(a);
 }
 static uint64_t TrainTrackCrosses(OpenTTDTrainHandle, uint8_t a) noexcept
 {
@@ -826,7 +813,7 @@ static uint64_t TrainTrackDirection(OpenTTDTrainHandle, uint8_t a, uint8_t b) no
 }
 static uint64_t TrainTrackStatus(OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
-	return GetTileTrackStatus(TileIndex(a), TRANSPORT_RAIL, 0, static_cast<DiagDirection>(b));
+	return GetRustRailMapServices().rail_track_status(a, b);
 }
 static void TrainTrainList(OpenTTDTrainHandle) noexcept
 {

@@ -633,9 +633,7 @@ pub struct Leaves {
     pub set_tunnel_res: extern "C" fn(Handle, u32, u8),
     pub show_effect: extern "C" fn(Handle),
     pub show_reservation: extern "C" fn(Handle) -> u64,
-    pub signals_both: extern "C" fn(Handle, u32, u8, u8),
-    pub signals_update: extern "C" fn(Handle, u32, u8) -> u64,
-    pub signals_update_owner: extern "C" fn(Handle, u32, u8, u8) -> u64,
+    pub signal_context: extern "C" fn() -> crate::signal::Context,
     pub signal_has_pbs: extern "C" fn(Handle, u32, u8) -> u64,
     pub signal_pbs: extern "C" fn(Handle, u8) -> u64,
     pub signal_type: extern "C" fn(Handle, u32, u8) -> u64,
@@ -1361,15 +1359,16 @@ impl Game<'_> {
     fn svc_show_reservation(&self, id: Handle) -> u64 {
         (self.leaves.show_reservation)(id)
     }
-    fn svc_signals_both(&self, id: Handle, a: u64, b: u64, c: u64) -> u64 {
-        (self.leaves.signals_both)(id, a as u32, b as u8, c as u8);
+    fn svc_signals_both(&self, _id: Handle, a: u64, b: u64, c: u64) -> u64 {
+        (self.leaves.signal_context)().both(a as u32, b as u8, c as u8);
         0
     }
     fn svc_signals_update(&self, id: Handle, a: u64, b: u64) -> u64 {
-        (self.leaves.signals_update)(id, a as u32, b as u8)
+        let owner = self.read_owner(id);
+        u64::from((self.leaves.signal_context)().segment(a as u32, b as u8, owner))
     }
-    fn svc_signals_update_owner(&self, id: Handle, a: u64, b: u64, c: u64) -> u64 {
-        (self.leaves.signals_update_owner)(id, a as u32, b as u8, c as u8)
+    fn svc_signals_update_owner(&self, _id: Handle, a: u64, b: u64, c: u64) -> u64 {
+        u64::from((self.leaves.signal_context)().segment(a as u32, b as u8, c as u8))
     }
     fn svc_signal_has_pbs(&self, id: Handle, a: u64, b: u64) -> u64 {
         (self.leaves.signal_has_pbs)(id, a as u32, b as u8)

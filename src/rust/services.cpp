@@ -20,6 +20,7 @@
 #include "../tunnelbridge_map.h"
 #include "../bridge.h"
 #include "../water_map.h"
+#include "../pbs.h"
 #include "../safeguards.h"
 
 static uint32_t SharedRandom(void *) noexcept { return Random(); }
@@ -68,6 +69,110 @@ const OpenTTDSharedServices &GetRustSharedServices() noexcept
 		.tunnel_bridge_direction = MapSvcTunnelBridgeDirection,
 		.bridge_speed = MapSvcBridgeSpeed,
 		.is_water_tile = MapSvcIsWaterTile,
+	};
+	return services;
+}
+
+static bool SharedRail_is_rail_depot(uint32_t t) noexcept { return IsRailDepot(TileIndex(t)); }
+static uint8_t SharedRail_rail_depot_direction(uint32_t t) noexcept { return GetRailDepotDirection(TileIndex(t)); }
+static uint8_t SharedRail_rail_tracks(uint32_t t) noexcept { return GetTrackBits(TileIndex(t)); }
+static bool SharedRail_has_signals(uint32_t t) noexcept { return HasSignals(TileIndex(t)); }
+static bool SharedRail_has_signal_track(uint32_t t, uint8_t a) noexcept { return HasSignalOnTrack(TileIndex(t), static_cast<Track>(a)); }
+static uint8_t SharedRail_signal_type(uint32_t t, uint8_t a) noexcept { return GetSignalType(TileIndex(t), static_cast<Track>(a)); }
+static bool SharedRail_has_signal_trackdir(uint32_t t, uint8_t a) noexcept { return HasSignalOnTrackdir(TileIndex(t), static_cast<Trackdir>(a)); }
+static uint8_t SharedRail_signal_state(uint32_t t, uint8_t a) noexcept { return GetSignalStateByTrackdir(TileIndex(t), static_cast<Trackdir>(a)); }
+static void SharedRail_set_signal_state(uint32_t t, uint8_t a, uint8_t b) noexcept { SetSignalStateByTrackdir(TileIndex(t), static_cast<Trackdir>(a), static_cast<SignalState>(b)); }
+static uint32_t SharedRail_other_tunnel_bridge_end(uint32_t t) noexcept { return GetOtherTunnelBridgeEnd(TileIndex(t)).base(); }
+static uint32_t SharedRail_rail_track_status(uint32_t t, uint8_t a) noexcept { return GetTileTrackStatus(TileIndex(t), TRANSPORT_RAIL, 0, static_cast<DiagDirection>(a)); }
+
+
+static OpenTTDRailTraversal SharedRail_traversal(uint32_t tile) noexcept
+{
+	OpenTTDRailTraversal r{.depot = SharedRail_is_rail_depot(tile), .tracks = 0};
+	if (!r.depot) r.tracks = SharedRail_rail_tracks(tile);
+	return r;
+}
+static OpenTTDRailSignalPresence SharedRail_signal_presence(uint32_t tile, uint8_t td) noexcept
+{
+	TileIndex t(tile);
+	Trackdir dir = static_cast<Trackdir>(td);
+	Track track = TrackdirToTrack(dir);
+	OpenTTDRailSignalPresence r{.signals = SharedRail_has_signals(tile), .track = false, .kind = 0, .forward = false, .reverse = false};
+	if (r.signals) {
+		uint present = GetPresentSignals(t);
+		r.track = (present & SignalOnTrack(track)) != 0;
+		if (r.track) {
+			r.kind = SharedRail_signal_type(tile, track);
+			r.forward = (present & SignalAlongTrackdir(dir)) != 0;
+			r.reverse = (present & SignalAlongTrackdir(ReverseTrackdir(dir))) != 0;
+		}
+	}
+	return r;
+}
+static OpenTTDRailSignalUpdate SharedRail_signal_update(uint32_t tile, uint8_t td) noexcept
+{
+	TileIndex t(tile);
+	assert(HasSignalOnTrackdir(t, static_cast<Trackdir>(td)));
+	SignalType kind = static_cast<SignalType>(SharedRail_signal_type(tile, TrackdirToTrack(static_cast<Trackdir>(td))));
+	OpenTTDRailSignalUpdate r{.kind = kind, .reservations = 0};
+	if (IsPbsSignal(kind)) r.reservations = GetRailReservationTrackBits(t);
+	return r;
+}
+static OpenTTDRailStationAdmission SharedRail_station_admission(uint32_t tile, uint8_t owner, uint8_t dir) noexcept
+{
+	TileIndex t(tile);
+	OpenTTDRailStationAdmission r{.rail = HasStationRail(t), .owner = INVALID_OWNER.base(), .axis = 0, .blocked = false};
+	if (r.rail) {
+		r.owner = MapSvcTileOwner(tile);
+		if (r.owner == owner) {
+			r.axis = GetRailStationAxis(t);
+			if (DiagDirToAxis(static_cast<DiagDirection>(dir)) == r.axis) r.blocked = IsStationTileBlocked(t);
+		}
+	}
+	return r;
+}
+static OpenTTDRailCrossingAdmission SharedRail_crossing_admission(uint32_t tile, uint8_t owner) noexcept
+{
+	TileIndex t(tile);
+	OpenTTDRailCrossingAdmission r{.crossing = IsLevelCrossing(t), .owner = INVALID_OWNER.base(), .axis = 0};
+	if (r.crossing) {
+		r.owner = MapSvcTileOwner(tile);
+		if (r.owner == owner) r.axis = GetCrossingRoadAxis(t);
+	}
+	return r;
+}
+static OpenTTDRailWormholeAdmission SharedRail_wormhole_admission(uint32_t tile, uint8_t owner) noexcept
+{
+	TileIndex t(tile);
+	OpenTTDRailWormholeAdmission r{.owner = MapSvcTileOwner(tile), .transport = 0, .direction = 0};
+	if (r.owner == owner) {
+		r.transport = GetTunnelBridgeTransportType(t);
+		if (r.transport == TRANSPORT_RAIL) r.direction = MapSvcTunnelBridgeDirection(tile);
+	}
+	return r;
+}
+
+const OpenTTDRailMapServices &GetRustRailMapServices() noexcept
+{
+	static const OpenTTDRailMapServices services{
+		.traversal = SharedRail_traversal,
+		.signal_presence = SharedRail_signal_presence,
+		.signal_update = SharedRail_signal_update,
+		.station_admission = SharedRail_station_admission,
+		.crossing_admission = SharedRail_crossing_admission,
+		.wormhole_admission = SharedRail_wormhole_admission,
+
+		.is_rail_depot = SharedRail_is_rail_depot,
+		.rail_depot_direction = SharedRail_rail_depot_direction,
+		.rail_tracks = SharedRail_rail_tracks,
+		.has_signals = SharedRail_has_signals,
+		.has_signal_track = SharedRail_has_signal_track,
+		.signal_type = SharedRail_signal_type,
+		.has_signal_trackdir = SharedRail_has_signal_trackdir,
+		.signal_state = SharedRail_signal_state,
+		.set_signal_state = SharedRail_set_signal_state,
+		.other_tunnel_bridge_end = SharedRail_other_tunnel_bridge_end,
+		.rail_track_status = SharedRail_rail_track_status,
 	};
 	return services;
 }

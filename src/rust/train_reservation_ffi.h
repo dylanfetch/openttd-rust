@@ -130,7 +130,8 @@ struct OpenTTDTrainReservationLeaves {
 	void (*set_signal)(void *, OpenTTDTrainHandle, uint32_t, uint8_t, uint8_t) noexcept;
 	void (*set_tunnel)(void *, OpenTTDTrainHandle, uint32_t, uint8_t) noexcept;
 	uint64_t (*show_res)(void *, OpenTTDTrainHandle) noexcept;
-	void (*signal_buffer)(void *, OpenTTDTrainHandle, uint32_t, uint8_t) noexcept;
+	OpenTTDSignalContext (*signal_context)() noexcept;
+	uint8_t (*signal_owner)(OpenTTDTrainHandle) noexcept;
 	void (*start_stop)(void *, OpenTTDTrainHandle) noexcept;
 	uint64_t (*station)(void *, OpenTTDTrainHandle, uint32_t) noexcept;
 	uint64_t (*station_train)(void *, OpenTTDTrainHandle, uint16_t) noexcept;
@@ -144,7 +145,6 @@ struct OpenTTDTrainReservationLeaves {
 	uint64_t (*tunnel_dir)(void *, OpenTTDTrainHandle, uint32_t) noexcept;
 	uint64_t (*tunnel_free)(void *, OpenTTDTrainHandle, uint32_t, uint32_t) noexcept;
 	void (*unreserve)(void *, OpenTTDTrainHandle, uint32_t, uint8_t) noexcept;
-	void (*update_buffer)(void *, OpenTTDTrainHandle) noexcept;
 	void (*write_dest)(void *, OpenTTDTrainHandle, uint32_t) noexcept;
 	void (*write_last)(void *, OpenTTDTrainHandle, uint16_t) noexcept;
 	void (*write_suppress)(void *, OpenTTDTrainHandle, uint8_t) noexcept;

@@ -389,11 +389,11 @@ static OpenTTDCompanySignalTile Co_signal_tile(uint32_t t) noexcept
 	r.crossing = !r.railway && IsLevelCrossingTile(tile);
 	/* House and industry tiles have no owner; only the two tested kinds are read. */
 	if (r.railway || r.crossing) r.owner = GetTileOwner(tile).base();
-	r.has_signals = r.railway && HasSignals(tile);
-	if (r.has_signals) r.tracks = GetTrackBits(tile);
+	r.has_signals = r.railway && GetRustRailMapServices().has_signals(t);
+	if (r.has_signals) r.tracks = GetRustRailMapServices().rail_tracks(t);
 	return r;
 }
-static bool Co_has_signal_on_track(uint32_t tile, uint8_t track) noexcept { return HasSignalOnTrack(TileIndex(tile), static_cast<Track>(track)); }
+static bool Co_has_signal_on_track(uint32_t tile, uint8_t track) noexcept { return GetRustRailMapServices().has_signal_track(tile, track); }
 static void Co_add_track_to_signal_buffer(uint32_t tile, uint8_t track, uint8_t owner) noexcept { AddTrackToSignalBuffer(TileIndex(tile), static_cast<Track>(track), CompanyID(owner)); }
 static void Co_update_level_crossing(uint32_t tile) noexcept { UpdateLevelCrossing(TileIndex(tile)); }
 static void Co_update_signals_in_buffer() noexcept { UpdateSignalsInBuffer(); }

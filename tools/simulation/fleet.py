@@ -1,9 +1,6 @@
 """Fleet hierarchy, renewal and actual replacement transactions."""
 
 import hashlib
-import json
-import shlex
-import subprocess
 from pathlib import Path
 
 from .core import ROOT, RUNTIME_DIRECTORIES, compare_saves, run_game
@@ -62,35 +59,9 @@ def install(scenario, run_dir):
 
 
 def adapter(build, folder, env):
-    """Relink this fleet-only adapter with the game's unchanged built objects."""
-    folder.mkdir(parents=True, exist_ok=True)
-    commands = json.loads((build / "compile_commands.json").read_text())
-    entry = next(item for item in commands if item["file"].endswith("/console.cpp"))
-    compile_args = shlex.split(entry["command"])
-    compile_args[compile_args.index("-o") + 1] = str(folder / "fleet.o")
-    compile_args[compile_args.index("-c") + 1] = str(ADAPTER)
-    compile_args += ["-I" + str(Path(entry["file"]).parent)]
-    subprocess.run(compile_args, cwd=entry["directory"], env=env, check=True)
-    target = "openttd-rust" if (build / "openttd-rust").exists() else "openttd"
-    ordinary_hash = hashlib.sha256((build / target).read_bytes()).hexdigest()
-    command = subprocess.check_output(
-        ["ninja", "-t", "commands", target], cwd=build, env=env, text=True
-    ).splitlines()[-1]
-    link_args = shlex.split(command.removeprefix(": && ").removesuffix(" && :"))
-    binary = folder / "openttd-fleet"
-    link_args[link_args.index("-o") + 1] = str(binary)
-    link_args = [
-        arg for arg in link_args if not arg.startswith("-Wl,--dependency-file=")
-    ]
-    link_args += [str(folder / "fleet.o"), "-Wl,--wrap=_Z22IConsoleStdLibRegisterv"]
-    subprocess.run(link_args, cwd=build, env=env, check=True)
-    return binary, {
-        "binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
-        "ordinary_binary_sha256": ordinary_hash,
-        "adapter_sha256": hashlib.sha256(ADAPTER.read_bytes()).hexdigest(),
-        "compile": compile_args,
-        "link": link_args,
-    }
+    from .console_adapter import console_adapter
+
+    return console_adapter(build, folder, env, ADAPTER, "fleet")
 
 
 def prepare(scenario, binaries, builds, out, timeout, env, result):

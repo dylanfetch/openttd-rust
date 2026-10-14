@@ -200,7 +200,8 @@ pub struct Leaves {
     pub set_signal: extern "C" fn(*mut std::ffi::c_void, Handle, u32, u8, u8),
     pub set_tunnel: extern "C" fn(*mut std::ffi::c_void, Handle, u32, u8),
     pub show_res: extern "C" fn(*mut std::ffi::c_void, Handle) -> u64,
-    pub signal_buffer: extern "C" fn(*mut std::ffi::c_void, Handle, u32, u8),
+    pub signal_context: extern "C" fn() -> crate::signal::Context,
+    pub signal_owner: extern "C" fn(Handle) -> u8,
     pub start_stop: extern "C" fn(*mut std::ffi::c_void, Handle),
     pub station: extern "C" fn(*mut std::ffi::c_void, Handle, u32) -> u64,
     pub station_train: extern "C" fn(*mut std::ffi::c_void, Handle, u16) -> u64,
@@ -214,7 +215,6 @@ pub struct Leaves {
     pub tunnel_dir: extern "C" fn(*mut std::ffi::c_void, Handle, u32) -> u64,
     pub tunnel_free: extern "C" fn(*mut std::ffi::c_void, Handle, u32, u32) -> u64,
     pub unreserve: extern "C" fn(*mut std::ffi::c_void, Handle, u32, u8),
-    pub update_buffer: extern "C" fn(*mut std::ffi::c_void, Handle),
     pub write_dest: extern "C" fn(*mut std::ffi::c_void, Handle, u32),
     pub write_last: extern "C" fn(*mut std::ffi::c_void, Handle, u16),
     pub write_suppress: extern "C" fn(*mut std::ffi::c_void, Handle, u8),
@@ -454,7 +454,8 @@ impl Game<'_> {
         (self.leaves.show_res)(self.context, id)
     }
     fn svc_signal_buffer(&self, id: Handle, a: u64, b: u64) -> u64 {
-        (self.leaves.signal_buffer)(self.context, id, a as u32, b as u8);
+        let owner = (self.leaves.signal_owner)(id);
+        (self.leaves.signal_context)().add_side(a as u32, b as u8, owner);
         0
     }
     fn svc_start_stop(&self, id: Handle) -> u64 {
@@ -499,8 +500,8 @@ impl Game<'_> {
         (self.leaves.unreserve)(self.context, id, a as u32, b as u8);
         0
     }
-    fn svc_update_buffer(&self, id: Handle) -> u64 {
-        (self.leaves.update_buffer)(self.context, id);
+    fn svc_update_buffer(&self, _id: Handle) -> u64 {
+        (self.leaves.signal_context)().flush();
         0
     }
     fn svc_write_dest(&self, id: Handle, a: u64) -> u64 {
@@ -1454,7 +1455,8 @@ mod tests {
             set_signal: unused!((*mut std::ffi::c_void, Handle, u32, u8, u8); ()),
             set_tunnel: unused!((*mut std::ffi::c_void, Handle, u32, u8); ()),
             show_res: unused!((*mut std::ffi::c_void, Handle); u64),
-            signal_buffer: unused!((*mut std::ffi::c_void, Handle, u32, u8); ()),
+            signal_context: unused!(() ; crate::signal::Context),
+            signal_owner: unused!((Handle); u8),
             start_stop: unused!((*mut std::ffi::c_void, Handle); ()),
             station: unused!((*mut std::ffi::c_void, Handle, u32); u64),
             station_train: unused!((*mut std::ffi::c_void, Handle, u16); u64),
@@ -1468,7 +1470,6 @@ mod tests {
             tunnel_dir: unused!((*mut std::ffi::c_void, Handle, u32); u64),
             tunnel_free: unused!((*mut std::ffi::c_void, Handle, u32, u32); u64),
             unreserve: unused!((*mut std::ffi::c_void, Handle, u32, u8); ()),
-            update_buffer: unused!((*mut std::ffi::c_void, Handle); ()),
             write_dest: unused!((*mut std::ffi::c_void, Handle, u32); ()),
             write_last: unused!((*mut std::ffi::c_void, Handle, u16); ()),
             write_suppress: unused!((*mut std::ffi::c_void, Handle, u8); ()),

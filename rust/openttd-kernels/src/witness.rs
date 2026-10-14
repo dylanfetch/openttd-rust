@@ -235,8 +235,58 @@ pub const STATION_GRADUAL_UNLOAD: usize = 99;
 /// `station.full_load_reserve` branch.
 pub const STATION_FULL_LOAD_RESERVE: usize = 100;
 
+/// Signal `updates` witness.
+pub const SIGNAL_UPDATES: usize = 101;
+/// Signal `tiles` witness.
+pub const SIGNAL_TILES: usize = 102;
+/// Signal `services` witness.
+pub const SIGNAL_SERVICES: usize = 103;
+/// Signal `tbu_overflow` witness.
+pub const SIGNAL_TBU_OVERFLOW: usize = 104;
+/// Signal `tbd_overflow` witness.
+pub const SIGNAL_TBD_OVERFLOW: usize = 105;
+/// Signal `global_overflow` witness.
+pub const SIGNAL_GLOBAL_OVERFLOW: usize = 106;
+/// Signal `train` witness.
+pub const SIGNAL_TRAIN: usize = 107;
+/// Signal `owner_barrier` witness.
+pub const SIGNAL_OWNER_BARRIER: usize = 108;
+/// Signal `depot` witness.
+pub const SIGNAL_DEPOT: usize = 109;
+/// Signal `split` witness.
+pub const SIGNAL_SPLIT: usize = 110;
+/// Signal `pbs` witness.
+pub const SIGNAL_PBS: usize = 111;
+/// Signal `multi_enter` witness.
+pub const SIGNAL_MULTI_ENTER: usize = 112;
+/// Signal `exit` witness.
+pub const SIGNAL_EXIT: usize = 113;
+/// Signal `green_exit` witness.
+pub const SIGNAL_GREEN_EXIT: usize = 114;
+/// Signal `station` witness.
+pub const SIGNAL_STATION: usize = 115;
+/// Signal `crossing` witness.
+pub const SIGNAL_CROSSING: usize = 116;
+/// Signal `wormhole` witness.
+pub const SIGNAL_WORMHOLE: usize = 117;
+/// Signal `reserved_skip` witness.
+pub const SIGNAL_RESERVED_SKIP: usize = 118;
+/// Signal `combo` witness.
+pub const SIGNAL_COMBO: usize = 119;
+/// Signal `propagate` witness.
+pub const SIGNAL_PROPAGATE: usize = 120;
+/// Signal `changed` witness.
+pub const SIGNAL_CHANGED: usize = 121;
+/// Signal `reset` witness.
+pub const SIGNAL_RESET: usize = 122;
+/// Signal `forced_flush` witness.
+pub const SIGNAL_FORCED_FLUSH: usize = 123;
+
 /// Counter names, grouped by the prefix the harness selects.
-pub const NAMES: [&str; 101] = [
+/// Bytes returned by signal-facing typed native services.
+pub const SIGNAL_BYTES: usize = 124;
+
+pub const NAMES: [&str; 125] = [
     "train.tick_first",
     "train.tick_second",
     "train.reversal",
@@ -338,6 +388,30 @@ pub const NAMES: [&str; 101] = [
     "station.unload_cargo",
     "station.gradual_unload",
     "station.full_load_reserve",
+    "signal.updates",
+    "signal.tiles",
+    "signal.services",
+    "signal.tbu_overflow",
+    "signal.tbd_overflow",
+    "signal.global_overflow",
+    "signal.train",
+    "signal.owner_barrier",
+    "signal.depot",
+    "signal.split",
+    "signal.pbs",
+    "signal.multi_enter",
+    "signal.exit",
+    "signal.green_exit",
+    "signal.station",
+    "signal.crossing",
+    "signal.wormhole",
+    "signal.reserved_skip",
+    "signal.combo",
+    "signal.propagate",
+    "signal.changed",
+    "signal.reset",
+    "signal.forced_flush",
+    "signal.bytes",
 ];
 
 static ENABLED: AtomicBool = AtomicBool::new(false);

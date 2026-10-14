@@ -86,6 +86,7 @@ def scenario_modules():
         rails,
         roads,
         ships,
+        signals,
         stations,
         towns,
         trees,
@@ -100,6 +101,7 @@ def scenario_modules():
         fleet,
         rails,
         ships,
+        signals,
         aircraft,
         disasters,
         economy,
@@ -1052,7 +1054,7 @@ def run_simulation(args, scenarios, migration, out, parser, stamp):
             source = bundle / manifest["roles"][role]["binary"]
             sources[role] = source
             binaries[role] = copy_runtime(source.parent, source, builds[role])
-            for name in ("fleet", "orders"):
+            for name in ("fleet", "orders", "signals"):
                 shutil.copytree(source.parent / name, builds[role] / name)
             shutil.copy2(
                 source.parent / "adapters.json", builds[role] / "adapters.json"
