@@ -59,8 +59,8 @@ fork; the remaining upstream documentation explains behavior and architecture.
   typed definition used by every port, not a per-port copy. Until the default-CI
   check (#249) lands, reviewers search for copies themselves. A PR that adds a
   shared accessor deletes the integrated copies. Services return their real
-  types on both sides and tables use designated initializers. Existing ports convert under #168 and #199. Root
-  grants no exceptions at integration: a port whose hot path allocates per call,
+  types on both sides and tables use designated initializers. Existing ports
+  convert under #168 and #199. Root grants no exceptions at integration: a port whose hot path allocates per call,
   dispatches by opcode or copies whole records is fixed before it integrates.
 - A port that misses a speed budget gets a profile-guided fix round before it
   is deferred. Attribute the cost per function (callgrind instruction counts
@@ -108,8 +108,7 @@ checks that run; do not restate them in paragraphs.
 - Infrastructure work (CI, caches, evidence plumbing) states a tooling budget in
   its issue and prefers platform defaults and settings (LRU cache eviction,
   concurrency groups) over custom controllers. A draft that outgrows its budget
-  stops and goes to root, not another review round; root asks the user before
-  closing or re-scoping it.
+  returns to root for re-selection, not another review round.
 - Review report: reviewed commit, findings with their fixing commits (or why one
   went to root), plus one line naming the functions or files compared against
   the original body and one line naming any new callback that duplicates a
@@ -176,8 +175,8 @@ For substantive changes:
    verifies the reviewer's fix commits before integration. Findings that need a
    scope or policy decision go to root unfixed. Updating a reviewed PR from its
    base needs no new review when the update has no conflicts in `src/`,
-   `rust/`, `tools/` or `.github/` and CI passes; otherwise a fresh reviewer checks and fixes only the conflict
-   resolution.
+   `rust/`, `tools/` or `.github/` and CI passes; otherwise a fresh reviewer
+   checks and fixes only the conflict resolution.
 4. Root integrates after review and required checks, records completion, and
    removes the merged worktree. A red check on `rust-migration` itself is fixed
    before more integrations.
@@ -261,14 +260,7 @@ and rebuildable output. Delete ad hoc `.local/` output (downloaded CI artifacts,
 probe runs, logs) once the PR or issue records what it showed.
 
 Docs-only changes (only `docs/` or `*.md` files, such as roadmap updates) are
-committed directly to `rust-migration` as a single commit, without a PR. Changes
-to `AGENTS.md` or `docs/skills/` need the user's approval first.
-
-User decisions bind every agent, including steering reviews. Record each one in
-the roadmap as the user's (for example "paused by the user"). Only the user
-reverses it: no agent closes, merges, resumes or re-scopes work the user paused
-or directed without asking. Steering-review findings are recommendations until
-the user approves them.
+committed directly to `rust-migration` as a single commit, without a PR.
 Everything else (code, tools, workflows, saves) goes through a PR that passes
 CI before it merges; never merge a PR past CI with `--admin`.
 

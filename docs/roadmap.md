@@ -9,7 +9,7 @@ forward-looking, about 200 lines; completed work is one row, with evidence in PR
 - Twenty-four ownership ports. Whole fork: Rust 56,978 / tooling 29,319 / glue 26,077 / original retired 36,502 of 470,612 `src/` lines (7.76%). Simulation: 28,522 / 102,615 (27.80%); source counts, not behavioral completion.
 - Since the tenth review, six integrations retired 340 original lines (all #216) and added 2,709 tooling and 1,507 glue lines. Both large owners (#212, #213) were deferred after prototype timing failures; #244 grew to 1,644 tooling lines.
 - Speed at tip (eleventh-review audit, median of three): TGP 1.123, Opus 1.250, Grok 1.245, Ridge 1996 1.225, 2000 1.293, 2016 1.344. All are inside their caps.
-- Drafts: #245 signals and #248 engine, both faithful with listed fixes. #244 and #66 are paused.
+- Drafts: #244 CI cache, #245 signals and #248 engine, the last two faithful with listed fixes. #66 is paused.
 - Largest original simulation files remaining: station_cmd 4.5k lines, rail_cmd 3.2k, vehicle 3.0k, road_cmd 2.7k, town_cmd 2.5k, tunnelbridge 2.2k, landscape 1.8k, water 1.5k, engine 1.3k.
 
 ## Eleventh steering review (2026-10-14, throughput and enforcement)
@@ -21,14 +21,14 @@ The ports are faithful. Retirement stalled for three reasons, each fixable:
   - #241 R0 profile: the per-tile closure in `sequence` (`tile_loop.rs`) is not inlined (47 instructions per visit against C++'s 18). The `noexcept` lambdas at `landscape.cpp:832-840` add a call frame per native tile. Fixing both measured 402 ms against base 406 ms on TGP.
   - #242 P1's +11.5 ns per vehicle visit is mostly a pool rescan in `VehicleSchedulerNext` on every call, a large dispatch struct, an assert crossing and timing wrappers (`vehicle_services.cpp:224-288`). About 9 ns is estimated recoverable.
 - **The duplicate-accessor review rule did not hold.** There are about 122 meanings with about 286 extra definitions tree-wide, yet the final reviews of #216, #217 and #238 each said "none". #249 makes this a CI check.
-- **CI tooling grew.** #233's wall-time and concurrency goals are met: 13.8 min for a small PR, 17-19 min for ports. Its cache-peak criterion produced #243/#244 (1,644 tooling lines); the user paused #244, unmerged, and that criterion stays open.
+- **CI tooling grew.** #233's wall-time and concurrency goals are met: 13.8 min for a small PR, 17-19 min for ports. Its cache-peak criterion produced #243/#244 (1,644 tooling lines) and stays open.
 - **Measured costs at tip:**
   - On TGP, the tree facade adds 16.8 ms and industry `next_tick` adds 13.2 ms.
   - Aircraft make 94 C++ calls per aircraft tick; road vehicles make 12.6 per tick.
   - On play saves, the null driver redraws per elapsed millisecond, which inflates game-logic cost about 1.33x in wall ratios.
 
 Actions, in order:
-1. **#233/#243/#244 are paused by the user, not closed.** Do not merge, close or resume #244 until the user re-selects it.
+1. **Finish #244 (#233/#243).** Fix the platform gate failure and the quick-validation ccache fixture (`ccache` missing in the quick job), then bootstrap, full CI and #233 live acceptance. Linux caches now live in Blacksmith's store, not GitHub's 10 GiB.
 2. **#249 shared-accessor check:** small infrastructure, run in parallel. Do not block ports on it.
 3. **#245 signals:** apply the two fixes in its steering comment, record its gaps (posted on #156), then do final-head validation, timing, a fresh fixing review, full CI and integrate.
 4. **#248 engine:** fix the build break, add `engines.py` witnesses, delete the duplicated accessors and apply the rest of its steering comment. Then review, CI and integrate.
@@ -105,7 +105,7 @@ retirement, with net glue in the PR (#223).
 | #227 (loading context fidelity) | #228 | direct | `9ee89f69ad` | 3 / 47 / 0 / 0 |
 | #231 (OpenGFX cache) | #232 | direct | `21e2c9ea60` | 0 / 0 / 0 / 0; workflow net -6 |
 | #223 (original-retirement metric) | #226 | direct | `86322c8422` | 0 / 274 / 0 / 0; net glue 0 |
-| #233 (CI throughput; cache acceptance paused) | #235 | direct | `21eeb445be` | 0 / 1567 / 0 / 0; net glue 0 |
+| #233 (CI throughput; cache acceptance pending) | #235 | direct | `21eeb445be` | 0 / 1567 / 0 / 0; net glue 0 |
 | #234 (industry water fidelity) | #236 | direct | `b7a1429d38` | 5 / 97 / 32 / 0; net glue +32 |
 | #229 (six calibrated caps) | #230 | direct | `e69df25522` | 0 / 12 / 0 / 0; net glue 0 |
 | #239/#156 (prospect/overlap coverage) | #240 | direct | `62ef446d1e` | 0 / 114 / 0 / 0; net glue 0 |
@@ -163,7 +163,7 @@ The user paused root at 334df5ef8c, and a `/start-development` restart resumes f
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #233 / #243 / #244 | `ci-cache-peak-233`, `1288db61b4` | Paused by the user, unmerged; keep branch and worktree. On re-selection: fix the platform gate failure, bootstrap, full CI, #233 live acceptance. |
+| #233 / #243 / #244 | `ci-cache-peak-233`, `1288db61b4` | Draft: action 1. |
 | #249 | none | New: shared-accessor check in quick CI. |
 | #219 / #245 | `signal-owner-219`, `df2f77b247` | Draft: apply the steering comment, then final-head validation, timing, review and CI. |
 | #220 / #248 | `engine-lifecycle-220`, `9c4b950b56` | Draft, does not build: apply the steering comment, add the harness, then review and CI. |
