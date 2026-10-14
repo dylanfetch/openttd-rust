@@ -1,4 +1,5 @@
 require("parameters.nut");
+require("water-check.nut");
 class MigrationIndustries extends AIController {
 	function Start();
 	function Check(label, task, target);
@@ -53,6 +54,8 @@ function MigrationIndustries::Start()
 			}
 		}
 		print("INDUSTRY-LUMBER ready " + found);
+	} else if (INDUSTRY_MODE == "water-check") {
+		IndustryWaterCheck();
 	} else if (INDUSTRY_MODE == "fund") {
 		local rejected;
 		{ local test = AITestMode(); rejected = !AIIndustryType.BuildIndustry(0, 0); }
