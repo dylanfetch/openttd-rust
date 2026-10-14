@@ -429,7 +429,8 @@ to 8 GiB (below the 10 GiB repository limit).
 
 Runner settings are `CI_LINUX_HEAVY`, `CI_LINUX_COMPARISONS`,
 `CI_LINUX_SIMULATION`, `CI_LINUX_PLATFORM` (default `ubuntu-24.04`), and
-`CI_MACOS_HEAVY` (default `macos-latest`). Heavy native jobs use `nproc` slots.
+`CI_MACOS_HEAVY` (default `macos-latest`) and `CI_WINDOWS_HEAVY` (default
+`windows-2022`). Heavy native jobs use `nproc` slots.
 One full request peaks around 16 jobs; overlapping requests may queue against
 account/runner capacity. Runner size and account plan remain repository settings.
 The repository belongs to the `fetch-laboratories` organization, where Blacksmith
