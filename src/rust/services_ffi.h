@@ -12,6 +12,16 @@
 #include <type_traits>
 #include "station_ffi.h"
 
+/* Allocation-derived base array address, never a reference to tile zero's byte.
+ * Only an audited serialized entry may retain it. It expires before map reset or
+ * mutex yield. Raw reads consume only type@0 of each actual eight-byte base tile;
+ * C++ owns allocation/construction/reset/destruction and every write. */
+struct OpenTTDTileTypeAllocation {
+	const uint8_t *base;
+	uint32_t count;
+};
+OpenTTDTileTypeAllocation GetRustTileTypeAllocation() noexcept;
+
 /* Immutable function table. All functions are noexcept and cannot reenter Rust.
  * Context may be null in the game; test fixtures supply their own world.
  * No Rust references into the map/pools survive calls. Output is call-scoped.
@@ -87,6 +97,9 @@ struct OpenTTDSharedServices {
 	int32_t (*slope)(int32_t, int32_t) noexcept;
 };
 const OpenTTDSharedServices &GetRustSharedServices() noexcept;
+/* Shared reader ABI used by default allocation/layout/oracle tests, not game
+ * dispatch. Null base selects the existing callback backend. No pointer retained. */
+extern "C" uint8_t openttd_rust_shared_tile_type(OpenTTDTileTypeAllocation, uint8_t (*callback)(uint32_t) noexcept, uint32_t tile);
 
 /* Standalone fixtures without a game map: map predicates return zero and writes do nothing. */
 template <typename Result, typename... Args>

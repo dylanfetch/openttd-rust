@@ -255,8 +255,15 @@ static void TileLoopClearDesert(TileIndex tile)
 	MarkTileDirtyByTile(tile);
 }
 
+#ifdef WITH_RUST
+static void TileLoop_Clear(uint32_t tile_index) noexcept
+#else
 static void TileLoop_Clear(TileIndex tile)
+#endif
 {
+#ifdef WITH_RUST
+	const TileIndex tile{tile_index};
+#endif
 	AmbientSoundEffect(tile);
 
 	switch (_settings_game.game_creation.landscape) {

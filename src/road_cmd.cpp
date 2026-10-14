@@ -2002,8 +2002,15 @@ static const Roadside _town_road_types_2[][2] = {
 static_assert(lengthof(_town_road_types_2) == NUM_HOUSE_ZONES);
 
 
+#ifdef WITH_RUST
+static void TileLoop_Road(uint32_t tile_index) noexcept
+#else
 static void TileLoop_Road(TileIndex tile)
+#endif
 {
+#ifdef WITH_RUST
+	const TileIndex tile{tile_index};
+#endif
 	switch (_settings_game.game_creation.landscape) {
 		case LandscapeType::Arctic: {
 			/* Roads on flat foundations use the snow level of the height they are elevated to. All others use the snow level of their minimum height. */

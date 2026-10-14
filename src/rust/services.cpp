@@ -31,6 +31,7 @@
 #include "../landscape_cmd.h"
 #include "../town.h"
 #include "../timer/timer_game_calendar.h"
+#include "tile_type_access.hpp"
 #include "../safeguards.h"
 #include "settings_services.h"
 #include "environment_services.h"
@@ -75,6 +76,11 @@ const OpenTTDCommandServices &GetRustCommandServices() noexcept
 
 static uint8_t SharedSnowLine() noexcept { return GetSnowLine(); }
 static int32_t SharedCalendarYear() noexcept { return TimerGameCalendar::year.base(); }
+
+OpenTTDTileTypeAllocation GetRustTileTypeAllocation() noexcept
+{
+	return OpenTTDNativeTileTypeAccess::Acquire();
+}
 
 static uint32_t SharedRandom(void *) noexcept { return Random(); }
 static uint8_t SharedTileType(uint32_t tile) noexcept { return GetTileType(TileIndex{tile}); }

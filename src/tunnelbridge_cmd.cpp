@@ -1828,8 +1828,15 @@ static void GetTileDesc_TunnelBridge(TileIndex tile, TileDesc &td)
 }
 
 
+#ifdef WITH_RUST
+static void TileLoop_TunnelBridge(uint32_t tile_index) noexcept
+#else
 static void TileLoop_TunnelBridge(TileIndex tile)
+#endif
 {
+#ifdef WITH_RUST
+	const TileIndex tile{tile_index};
+#endif
 	bool snow_or_desert = HasTunnelBridgeSnowOrDesert(tile);
 	switch (_settings_game.game_creation.landscape) {
 		case LandscapeType::Arctic: {

@@ -2592,8 +2592,15 @@ static Foundation GetFoundation_Track(TileIndex tile, Slope tileh)
 	return IsPlainRail(tile) ? GetRailFoundation(tileh, GetTrackBits(tile)) : FlatteningFoundation(tileh);
 }
 
+#ifdef WITH_RUST
+static void TileLoop_Track(uint32_t tile_index) noexcept
+#else
 static void TileLoop_Track(TileIndex tile)
+#endif
 {
+#ifdef WITH_RUST
+	const TileIndex tile{tile_index};
+#endif
 	RailGroundType old_ground = GetRailGroundType(tile);
 	RailGroundType new_ground;
 

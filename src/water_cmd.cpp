@@ -1266,8 +1266,15 @@ static void DoDryUp(TileIndex tile)
  *
  * @param tile the water/shore tile that floods
  */
+#ifdef WITH_RUST
+void TileLoop_Water(uint32_t tile_index) noexcept
+#else
 void TileLoop_Water(TileIndex tile)
+#endif
 {
+#ifdef WITH_RUST
+	const TileIndex tile{tile_index};
+#endif
 	if (IsTileType(tile, MP_WATER)) {
 		AmbientSoundEffect(tile);
 		if (IsNonFloodingWaterTile(tile)) return;

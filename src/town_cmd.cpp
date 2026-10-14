@@ -619,8 +619,15 @@ static void TownGenerateCargoBinomial(Town *t, TownProductionEffect tpe, uint8_t
  * Tile callback function. Periodic tick handler for the tiles of a town.
  * @param tile been asked to do its stuff
  */
+#ifdef WITH_RUST
+static void TileLoop_Town(uint32_t tile_index) noexcept
+#else
 static void TileLoop_Town(TileIndex tile)
+#endif
 {
+#ifdef WITH_RUST
+	const TileIndex tile{tile_index};
+#endif
 	HouseID house_id = GetHouseType(tile);
 
 	/* NewHouseTileLoop returns false if Callback 21 succeeded, i.e. the house

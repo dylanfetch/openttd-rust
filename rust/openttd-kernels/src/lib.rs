@@ -36,6 +36,7 @@ mod station_cargo;
 mod station_service;
 mod string_validation;
 mod tgp;
+mod tile_loop;
 mod town;
 mod townname;
 mod townname_data;
