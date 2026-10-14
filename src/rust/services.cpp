@@ -19,6 +19,7 @@
 #include "../rail_map.h"
 #include "../tunnelbridge_map.h"
 #include "../bridge.h"
+#include "../water_map.h"
 #include "../safeguards.h"
 
 static uint32_t SharedRandom(void *) noexcept { return Random(); }
@@ -45,6 +46,7 @@ static uint16_t MapSvcDepotIndex(uint32_t tile) noexcept { return GetDepotIndex(
 static bool MapSvcIsLevelCrossing(uint32_t tile) noexcept { return IsLevelCrossingTile(TileIndex(tile)); }
 static uint8_t MapSvcTunnelBridgeDirection(uint32_t tile) noexcept { return GetTunnelBridgeDirection(TileIndex(tile)); }
 static uint16_t MapSvcBridgeSpeed(uint32_t tile) noexcept { return GetBridgeSpec(GetBridgeType(TileIndex(tile)))->speed; }
+static bool MapSvcIsWaterTile(uint32_t tile) noexcept { return IsWaterTile(TileIndex(tile)); }
 
 const OpenTTDSharedServices &GetRustSharedServices() noexcept
 {
@@ -65,6 +67,7 @@ const OpenTTDSharedServices &GetRustSharedServices() noexcept
 		.is_level_crossing = MapSvcIsLevelCrossing,
 		.tunnel_bridge_direction = MapSvcTunnelBridgeDirection,
 		.bridge_speed = MapSvcBridgeSpeed,
+		.is_water_tile = MapSvcIsWaterTile,
 	};
 	return services;
 }

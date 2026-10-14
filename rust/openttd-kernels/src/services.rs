@@ -62,6 +62,8 @@ pub struct Services {
     pub tunnel_bridge_direction: extern "C" fn(u32) -> u8,
     /// Bridge specification speed at this bridge tile.
     pub bridge_speed: extern "C" fn(u32) -> u16,
+    /// `IsWaterTile`: water category and clear subtype (sea, canal or river).
+    pub is_water_tile: extern "C" fn(u32) -> bool,
 }
 impl Services {
     /// Draw one shared random word.
@@ -114,6 +116,7 @@ pub fn fixture(
         is_level_crossing: flag,
         tunnel_bridge_direction: byte,
         bridge_speed: word,
+        is_water_tile: flag,
     }
 }
 /// Map dimensions read once per entry.

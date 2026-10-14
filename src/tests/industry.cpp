@@ -16,6 +16,7 @@
 #include "../rust/industry_generation_adapter.hpp"
 #include "../object_base.h"
 #include "../industrytype.h"
+#include "../water_map.h"
 static_assert(EV_CHIMNEY_SMOKE == 0 && EV_BUBBLE == 9 && EV_COPPER_MINE_SMOKE == 11);
 static_assert(SND_0B_MINE == 9 && SND_0C_POWER_STATION == 10 && SND_29_SUGAR_MINE_2 == 41);
 static_assert(SND_2A_TOY_FACTORY_3 == 42 && SND_2B_TOY_FACTORY_2 == 43 && SND_2C_TOY_FACTORY_1 == 44);
@@ -46,6 +47,7 @@ TEST_CASE("Industry - canonical native layouts")
 		for (size_t expected : fields) CHECK(openttd_rust_abi_layout(type, item++) == expected);
 		CHECK(openttd_rust_abi_layout(type, item) == SIZE_MAX);
 	};
+	layout(42, {sizeof(OpenTTDSharedServices), alignof(OpenTTDSharedServices), offsetof(OpenTTDSharedServices, context), offsetof(OpenTTDSharedServices, random), offsetof(OpenTTDSharedServices, industry), offsetof(OpenTTDSharedServices, tile_type), offsetof(OpenTTDSharedServices, bridge_above), offsetof(OpenTTDSharedServices, tropic_zone), offsetof(OpenTTDSharedServices, tile_z), offsetof(OpenTTDSharedServices, tile_slope), offsetof(OpenTTDSharedServices, mark_dirty), offsetof(OpenTTDSharedServices, set_tropic_zone), offsetof(OpenTTDSharedServices, tile_owner), offsetof(OpenTTDSharedServices, station_index), offsetof(OpenTTDSharedServices, depot_index), offsetof(OpenTTDSharedServices, is_level_crossing), offsetof(OpenTTDSharedServices, tunnel_bridge_direction), offsetof(OpenTTDSharedServices, bridge_speed), offsetof(OpenTTDSharedServices, is_water_tile)});
 	layout(586, {sizeof(OpenTTDIndustryLocationResult), alignof(OpenTTDIndustryLocationResult), offsetof(OpenTTDIndustryLocationResult, callback), offsetof(OpenTTDIndustryLocationResult, registers)});
 	layout(579, {sizeof(OpenTTDIndustryClearArea), alignof(OpenTTDIndustryClearArea), offsetof(OpenTTDIndustryClearArea, first_tile), offsetof(OpenTTDIndustryClearArea, area)});
 	layout(580, {sizeof(OpenTTDIndustryClearAreas), alignof(OpenTTDIndustryClearAreas), offsetof(OpenTTDIndustryClearAreas, data), offsetof(OpenTTDIndustryClearAreas, size)});
@@ -244,6 +246,31 @@ TEST_CASE("Industry - generation cancellation restores company before return")
 		CHECK(F::sets == sets);
 		CHECK(fields->wanted_inds == (complete ? 0 : 123));
 		openttd_rust_industry_builder_destroy(builder);
+	}
+}
+
+TEST_CASE("Industry - shared plain water predicate excludes depot and lock parts")
+{
+	Map::Allocate(64, 64);
+	const auto &shared = GetRustSharedServices();
+	TileIndex tile = TileXY(20, 20);
+	SetTileType(tile, MP_CLEAR);
+	CHECK_FALSE(shared.is_water_tile(tile.base()));
+	MakeSea(tile);
+	CHECK(shared.is_water_tile(tile.base()));
+	MakeCanal(tile, Owner(0), 0);
+	CHECK(shared.is_water_tile(tile.base()));
+	MakeRiver(tile, 0);
+	CHECK(shared.is_water_tile(tile.base()));
+	MakeShore(tile);
+	CHECK_FALSE(shared.is_water_tile(tile.base()));
+	for (DepotPart part : {DepotPart::North, DepotPart::South}) {
+		MakeShipDepot(tile, Owner(0), DepotID(0), part, AXIS_X, WaterClass::Sea);
+		CHECK_FALSE(shared.is_water_tile(tile.base()));
+	}
+	for (LockPart part : {LockPart::Lower, LockPart::Middle, LockPart::Upper}) {
+		MakeLockTile(tile, Owner(0), part, DIAGDIR_NE, WaterClass::Sea);
+		CHECK_FALSE(shared.is_water_tile(tile.base()));
 	}
 }
 
