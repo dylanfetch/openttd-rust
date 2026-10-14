@@ -159,16 +159,17 @@ that a `SaveLoad` descriptor cannot address through the alias.
 
 ## Resume checkpoint
 
-The user paused root at 334df5ef8c, and a `/start-development` restart resumes from here.
-`rust-migration` is green. No agents are running.
+Root resumed from `fe337e4e40` with `/start-development`. The last code revision
+is green. Four implementation agents own #252, #249, #245 and #248; root owns
+review, CI, integration and the three-merge GitHub cache observation on #233.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #233 / #243 / #244 | `ci-cache-peak-233`, `1288db61b4` | Measure, then close or resume (action 1). |
-| #252 | none | New, first: Windows CI on Blacksmith via `CI_WINDOWS_HEAVY`. |
-| #249 | none | New: shared-accessor check in quick CI. |
-| #219 / #245 | `signal-owner-219`, `df2f77b247` | Draft: apply the steering comment, then final-head validation, timing, review and CI. |
-| #220 / #248 | `engine-lifecycle-220`, `9c4b950b56` | Draft, does not build: apply the steering comment, add the harness, then review and CI. |
+| #233 / #243 / #244 | `ci-cache-peak-233`, `1288db61b4` | Root sampling; zero of three code merges observed. Leave #244 idle (action 1). |
+| #252 | `windows-blacksmith-252` | `windows_blacksmith_252`: first, prepare runner variable and toolset inventory for review/bootstrap CI. |
+| #249 | `shared-accessor-check-249` | `shared_accessor_check_249`: bounded quick-CI detector and shrinking baseline. |
+| #219 / #245 | `signal-owner-219`, `df2f77b247` | `signals_final_245`: steering fixes and base adoption, then validation, timing and fresh review. |
+| #220 / #248 | `engine-lifecycle-220`, `9c4b950b56` | `engine_final_248`: build/boundary fixes and default witnesses, then validation and fresh review. |
 | #212 / #241 | `landscape-budget-prototype-212`, `45633ef6d6` | Re-selected: new branch from tip with the action-5 boundary. |
 | #213 / #242 | `vehicle-budget-prototype-213`, `92b8a04075` | Re-selected: new branch from tip with the action-6 boundary. |
 | #64 / #66 | `issue/64-curve-family`, `aab5211801` | Paused draft/worktree; leave untouched, not a fallback. |
