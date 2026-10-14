@@ -146,7 +146,7 @@ inline OpenTTDSharedServices OpenTTDFixtureSharedServices(void *context, uint32_
 		.road_bits = OpenTTDFixtureMapService<uint8_t, uint32_t, uint8_t, bool>,
 		.snow_line = OpenTTDFixtureMapService<uint8_t>,
 		.calendar_year = OpenTTDFixtureMapService<int32_t>,
-		.map_log_x = OpenTTDFixtureMapService<uint8_t>,
+		.map_log_x = OpenTTDFixtureMapService<uint32_t>,
 		.map_max_x = OpenTTDFixtureMapService<uint32_t>,
 		.map_max_y = OpenTTDFixtureMapService<uint32_t>,
 		.plane_speed = OpenTTDFixtureMapService<uint8_t>,
