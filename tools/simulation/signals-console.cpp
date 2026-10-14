@@ -22,6 +22,36 @@
 #include "clear_map.h"
 #include "../../../src/rust/signal_ffi.h"
 
+#ifdef WITH_RUST
+/* Measurement belongs only to this relinked fixture. The ordinary native query
+ * and scalar accessor remain unchanged; count actual short-circuited reads. */
+static uint64_t *_signal_occupancy_reads = nullptr;
+extern "C" uint8_t __real_openttd_rust_train_state_get_track(const OpenTTDTrainState *);
+extern "C" uint8_t __wrap_openttd_rust_train_state_get_track(const OpenTTDTrainState *state)
+{
+	if (_signal_occupancy_reads != nullptr) ++*_signal_occupancy_reads;
+	return __real_openttd_rust_train_state_get_track(state);
+}
+static bool SignalCountTrainOnTile(uint32_t tile) noexcept
+{
+	uint64_t reads = 0;
+	Backup<uint64_t *> counter(_signal_occupancy_reads, &reads);
+	bool result = SignalTrainOnTile(tile);
+	counter.Restore();
+	openttd_rust_signal_count_occupancy(reads);
+	return result;
+}
+static bool SignalCountTrainOnTracks(uint32_t tile, uint8_t tracks) noexcept
+{
+	uint64_t reads = 0;
+	Backup<uint64_t *> counter(_signal_occupancy_reads, &reads);
+	bool result = SignalTrainOnTracks(tile, tracks);
+	counter.Restore();
+	openttd_rust_signal_count_occupancy(reads);
+	return result;
+}
+#endif
+
 extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
 
 [[noreturn]] static void SignalFixtureAbort(int line)
@@ -186,6 +216,23 @@ static void SignalOverflowLayout(Owner owner)
 	UpdateSignalsInBuffer();
 	fmt::print(stderr, "SIGNALS follow-up {}\n", static_cast<uint8_t>(UpdateSignalsOnSegment(center, DIAGDIR_NE, owner)));
 	SignalPending("overflow-follow-up");
+	/* Command-built exit/combo geometry; declared live signal states isolate
+	 * no-green and multiple-green exit rules before ordinary propagation. */
+	for (uint i = 12; i < boundary.size(); ++i) {
+		auto [tile, track] = boundary[i];
+		SignalType kind = i == 12 ? SIGTYPE_COMBO : SIGTYPE_EXIT;
+		SignalCost("exit-combo", Command<CMD_BUILD_SINGLE_SIGNAL>::Do(DoCommandFlag::Execute, tile, track, kind, SIG_ELECTRIC, true, false, false, SIGTYPE_BLOCK, SIGTYPE_PBS_ONEWAY, 0, SignalOnTrack(track)));
+	}
+	UpdateSignalsInBuffer();
+	for (SignalState state : {SIGNAL_STATE_RED, SIGNAL_STATE_GREEN}) {
+		for (uint i = 12; i < boundary.size(); ++i) {
+			auto [tile, track] = boundary[i];
+			Trackdir td = TrackToTrackdir(track);
+			SetSignalStateByTrackdir(tile, td, state);
+			SetSignalStateByTrackdir(tile, ReverseTrackdir(td), state);
+		}
+		fmt::print(stderr, "SIGNALS combo-input {} {}\n", state, static_cast<uint8_t>(UpdateSignalsOnSegment(center, DIAGDIR_NE, owner)));
+	}
 	CompanyID other = CompanyID::Invalid();
 	for (const Company *company : Company::Iterate()) if (company->index != owner) { other = company->index; break; }
 	if (other == CompanyID::Invalid()) {
@@ -200,6 +247,10 @@ static void SignalOverflowLayout(Owner owner)
 	UpdateSignalsInBuffer();
 	foreign_company.Restore();
 	fmt::print(stderr, "SIGNALS owner-barrier {}\n", static_cast<uint8_t>(UpdateSignalsOnSegment(foreign, DIAGDIR_SW, owner)));
+	/* Empty perimeter and its empty neighbour exercise the buffer continue. */
+	AddSideToSignalBuffer(origin, DIAGDIR_SE, owner);
+	UpdateSignalsInBuffer();
+	SignalPending("empty-neighbour");
 
 }
 static bool SignalsScenario(std::span<std::string_view> args)

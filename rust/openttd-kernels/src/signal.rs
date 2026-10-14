@@ -273,12 +273,14 @@ fn explore(w: &World<'_>, owner: u8) -> u16 {
                             if flags & MULTI_GREEN == 0 && presignal_exit(kind) && signal.forward {
                                 if flags & EXIT != 0 {
                                     flags |= MULTI_EXIT;
+                                    crate::witness::hit(crate::witness::SIGNAL_MULTI_EXIT);
                                 }
                                 flags |= EXIT;
                                 crate::witness::hit(crate::witness::SIGNAL_EXIT);
                                 if read!(w, rail, signal_state, tile, td) == 1 {
                                     if flags & GREEN != 0 {
                                         flags |= MULTI_GREEN;
+                                        crate::witness::hit(crate::witness::SIGNAL_MULTI_GREEN);
                                     }
                                     flags |= GREEN;
                                     crate::witness::hit(crate::witness::SIGNAL_GREEN_EXIT);
@@ -380,6 +382,7 @@ fn update_around(w: &World<'_>, flags: u16) {
                         && read!(w, rail, signal_state, tile, td ^ 8) == 1))
             {
                 new_state = 0;
+                crate::witness::hit(crate::witness::SIGNAL_COMBO_RED);
             }
         } else if (kind == 1 || kind == 3) && flags & EXIT != 0 && flags & GREEN == 0 {
             new_state = 0;
@@ -458,6 +461,7 @@ fn update_buffer(w: &World<'_>, owner: u8) -> u8 {
                 & ENTER_TRACKS[usize::from(dir)])
                 == 0
             {
+                crate::witness::hit(crate::witness::SIGNAL_NEIGHBOUR_CONTINUE);
                 continue;
             }
             add_tbd(w, Item { tile, dir });
@@ -798,8 +802,8 @@ pub(crate) fn acquire_context(get: extern "C" fn() -> Context) -> Context {
 pub(crate) fn count_context_owner_read() {
     crate::witness::hit(crate::witness::SIGNAL_CONTEXT_OWNER_READS);
 }
-/// Bounded report from the unchanged native occupancy predicate. Reporting
-/// itself is measurement overhead, excluded from simulation crossing counts.
+/// Bounded report from the scenario adapter's occupancy accessor link wrapper.
+/// The ordinary game never calls this diagnostic entry.
 #[unsafe(no_mangle)]
 pub extern "C" fn openttd_rust_signal_count_occupancy(reads: u64) {
     crate::witness::add(crate::witness::SIGNAL_OCCUPANCY_ACCESSORS, reads);

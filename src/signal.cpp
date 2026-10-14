@@ -24,30 +24,17 @@
 
 #ifdef WITH_RUST
 #include "rust/signal_ffi.h"
-#include "rust/witness.h"
 
 /** Native spatial query; Rust retains traversal and occupancy branching. */
 static bool SignalTrainOnTile(uint32_t tile) noexcept
 {
-	bool count = RustWitnessEnabled();
-	uint64_t reads = 0;
-	bool occupied = HasVehicleOnTile(TileIndex(tile), [&](const Vehicle *v) {
-		if (v->type != VEH_TRAIN) return false;
-		if (count) ++reads;
-		return Train::From(v)->GetTrack() != TRACK_BIT_DEPOT;
+	return HasVehicleOnTile(TileIndex(tile), [](const Vehicle *v) {
+		return v->type == VEH_TRAIN && Train::From(v)->GetTrack() != TRACK_BIT_DEPOT;
 	});
-	/* One diagnostic report, excluded from boundary counts and disabled in timing.
-	 * Each counted read is the unchanged scalar facade's C++-to-Rust crossing. */
-	if (count) openttd_rust_signal_count_occupancy(reads);
-	return occupied;
 }
 static bool SignalTrainOnTracks(uint32_t tile, uint8_t tracks) noexcept
 {
-	bool count = RustWitnessEnabled();
-	uint64_t reads = 0;
-	bool occupied = EnsureNoTrainOnTrackBits(TileIndex(tile), static_cast<TrackBits>(tracks), count ? &reads : nullptr).Failed();
-	if (count) openttd_rust_signal_count_occupancy(reads);
-	return occupied;
+	return EnsureNoTrainOnTrackBits(TileIndex(tile), static_cast<TrackBits>(tracks)).Failed();
 }
 static void SignalOverflowTbu() noexcept { Debug(misc, 0, "SignalSegment too complex. Set _tbuset is full (maximum 64)"); }
 static void SignalOverflowTbd() noexcept { Debug(misc, 0, "SignalSegment too complex. Set _tbdset is full (maximum 256)"); }

@@ -1684,11 +1684,12 @@ allocates or draws Random. Native assertion configuration remains authoritative.
 `python3 tools/migration.py simulate signals --jobs 2` (also `--self`, `--soak`)
 compares real 1996/2000/2006 train movement, signal commands, return states,
 ordered pending prefixes, PBS/presignal updates, stations/crossings/wormholes,
-reload, command-built signal overflow/reset/follow-up and ownership barriers.
-Default witnesses fail when missing. A bounded unchanged-SmallSet-body probe
+reload, command-built signal overflow/reset/follow-up, combo red/multiple exits,
+empty-neighbour continuation and ownership barriers. Default witnesses fail when missing. A bounded unchanged-SmallSet-body probe
 covers otherwise-unreached Add failure, sticky drain/reset and duplicate removal
 at all capacities. ABI checks cover consumed tables/records; counters distinguish
-world services, facade/context calls and actual nested occupancy accessors.
+world services, facade/context calls and actual nested occupancy accessors counted
+only in the relinked scenario adapter; native occupancy signatures stay original.
 Real tbd/global propagation overflow, threaded play and arbitrary mod layouts
 remain #156 limits; the PR records validation and all six timing ratchets.
 

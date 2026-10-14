@@ -275,10 +275,6 @@ static uint64_t TrainReservationShowRes(void *, OpenTTDTrainHandle) noexcept
 {
 	return _settings_client.gui.show_track_reservation;
 }
-static uint8_t TrainReservationSignalOwner(OpenTTDTrainHandle id) noexcept
-{
-	return RustVehicleOwner(static_cast<const Train *>(id.shell));
-}
 static void TrainReservationStartStop(void *, OpenTTDTrainHandle id) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);

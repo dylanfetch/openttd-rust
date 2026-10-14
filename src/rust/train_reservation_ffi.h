@@ -10,6 +10,7 @@
 #define OPENTTD_RUST_TRAIN_RESERVATION_FFI_H
 #include <stdint.h>
 #include "train_ffi.h"
+#include "vehicle_ffi.h"
 extern "C" {
 struct OpenTTDTrainState;
 struct OpenTTDTrainReservationFollow {
@@ -131,7 +132,7 @@ struct OpenTTDTrainReservationLeaves {
 	void (*set_tunnel)(void *, OpenTTDTrainHandle, uint32_t, uint8_t) noexcept;
 	uint64_t (*show_res)(void *, OpenTTDTrainHandle) noexcept;
 	OpenTTDSignalContext (*signal_context)() noexcept;
-	uint8_t (*signal_owner)(OpenTTDTrainHandle) noexcept;
+	const OpenTTDVehicleServices *vehicle;
 	void (*start_stop)(void *, OpenTTDTrainHandle) noexcept;
 	uint64_t (*station)(void *, OpenTTDTrainHandle, uint32_t) noexcept;
 	uint64_t (*station_train)(void *, OpenTTDTrainHandle, uint16_t) noexcept;

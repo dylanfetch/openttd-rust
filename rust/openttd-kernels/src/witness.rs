@@ -314,7 +314,16 @@ pub const SIGNAL_CONTEXT_BYTES: usize = 136;
 /// Signal boundary `classification_bytes` counter.
 pub const SIGNAL_CLASSIFICATION_BYTES: usize = 137;
 
-pub const NAMES: [&str; 138] = [
+/// Signal multiple exit detection.
+pub const SIGNAL_MULTI_EXIT: usize = 138;
+/// Signal multiple green exit detection.
+pub const SIGNAL_MULTI_GREEN: usize = 139;
+/// Signal combo red rule with multiple exits.
+pub const SIGNAL_COMBO_RED: usize = 140;
+/// Signal empty neighbour buffer continue.
+pub const SIGNAL_NEIGHBOUR_CONTINUE: usize = 141;
+
+pub const NAMES: [&str; 142] = [
     "train.tick_first",
     "train.tick_second",
     "train.reversal",
@@ -453,6 +462,10 @@ pub const NAMES: [&str; 138] = [
     "signal.occupancy_accessors",
     "signal.context_bytes",
     "signal.classification_bytes",
+    "signal.multi_exit",
+    "signal.multi_green",
+    "signal.combo_red",
+    "signal.neighbour_continue",
 ];
 
 static ENABLED: AtomicBool = AtomicBool::new(false);

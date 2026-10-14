@@ -4861,7 +4861,7 @@ static const OpenTTDTrainReservationLeaves &GetTrainReservationServices()
 		.set_tunnel = TrainReservationSetTunnel,
 		.show_res = TrainReservationShowRes,
 		.signal_context = GetRustSignalContext,
-		.signal_owner = TrainReservationSignalOwner,
+		.vehicle = &GetRustVehicleServices(),
 		.start_stop = TrainReservationStartStop,
 		.station = TrainReservationSharedMap<uint64_t, &OpenTTDSharedServices::station_index>,
 		.station_train = TrainReservationStationTrain,

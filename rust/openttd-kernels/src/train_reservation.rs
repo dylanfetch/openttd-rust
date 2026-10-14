@@ -201,7 +201,7 @@ pub struct Leaves {
     pub set_tunnel: extern "C" fn(*mut std::ffi::c_void, Handle, u32, u8),
     pub show_res: extern "C" fn(*mut std::ffi::c_void, Handle) -> u64,
     pub signal_context: extern "C" fn() -> crate::signal::Context,
-    pub signal_owner: extern "C" fn(Handle) -> u8,
+    pub vehicle: *const crate::vehicle::VehicleServices,
     pub start_stop: extern "C" fn(*mut std::ffi::c_void, Handle),
     pub station: extern "C" fn(*mut std::ffi::c_void, Handle, u32) -> u64,
     pub station_train: extern "C" fn(*mut std::ffi::c_void, Handle, u16) -> u64,
@@ -454,7 +454,13 @@ impl Game<'_> {
         (self.leaves.show_res)(self.context, id)
     }
     fn svc_signal_buffer(&self, id: Handle, a: u64, b: u64) -> u64 {
-        let owner = (self.leaves.signal_owner)(id);
+        // SAFETY: The live Train shell starts with its Vehicle base; the shared
+        // table has process lifetime, and no owner borrow spans its callback.
+        let owner = unsafe {
+            let vehicle =
+                crate::vehicle::VehicleRef(std::ptr::NonNull::new_unchecked(id.shell.cast()));
+            ((*self.leaves.vehicle).owner)(vehicle)
+        };
         crate::signal::count_context_owner_read();
         crate::signal::acquire_context(self.leaves.signal_context)
             .add_side(a as u32, b as u8, owner);
@@ -1458,7 +1464,7 @@ mod tests {
             set_tunnel: unused!((*mut std::ffi::c_void, Handle, u32, u8); ()),
             show_res: unused!((*mut std::ffi::c_void, Handle); u64),
             signal_context: unused!(() ; crate::signal::Context),
-            signal_owner: unused!((Handle); u8),
+            vehicle: std::ptr::null(),
             start_stop: unused!((*mut std::ffi::c_void, Handle); ()),
             station: unused!((*mut std::ffi::c_void, Handle, u32); u64),
             station_train: unused!((*mut std::ffi::c_void, Handle, u16); u64),
