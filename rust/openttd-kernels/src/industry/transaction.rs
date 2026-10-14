@@ -329,9 +329,9 @@ impl Engine<'_> {
                     return self.fail(self.e.site);
                 }
                 if behaviour & 0x18 != 0
-                    || (behaviour & 32 != 0 && (self.s.shared().tile_type)(current) == 3)
+                    || (behaviour & 32 != 0 && self.s.shared().tile_type(current) == 3)
                 {
-                    if (self.s.shared().tile_type)(current) != 3 {
+                    if self.s.shared().tile_type(current) != 3 {
                         return self.fail(self.e.town);
                     }
                     let company = self.swap_company(15);
@@ -411,7 +411,7 @@ impl Engine<'_> {
         let map = self.map();
         if tile.is_multiple_of(map.size_x)
             || tile / map.size_x == 0
-            || (self.s.shared().tile_type)(tile) == 7
+            || self.s.shared().tile_type(tile) == 7
         {
             return false;
         }
@@ -419,8 +419,7 @@ impl Engine<'_> {
             for x in 0..2 {
                 let walk = self.offset(tile, x - 1, y - 1);
                 let current = unsafe { (self.x.tile_height)(walk) };
-                if (self.s.shared().tile_type)(walk) != 0 && (self.s.shared().tile_type)(walk) != 4
-                {
+                if self.s.shared().tile_type(walk) != 0 && self.s.shared().tile_type(walk) != 4 {
                     return false;
                 }
                 if internal != 0 && current.abs_diff(height) > 1 {

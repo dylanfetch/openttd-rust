@@ -24,6 +24,7 @@ struct OpenTTDIndustryLoopServices {
  * immutable and live for the synchronous invocation. All wrappers are noexcept. */
 struct OpenTTDLandscapeLoopServices {
 	const OpenTTDSharedServices *shared;
+	OpenTTDTileTypeAllocation tile_types;
 	const OpenTTDTreeServices *trees;
 	OpenTTDIndustryLoopServices industry;
 	void (*clear_loop)(uint32_t) noexcept;

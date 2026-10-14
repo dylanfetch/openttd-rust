@@ -134,7 +134,7 @@ fn bigger(
         8 => chimney(tile, map, t),
         24 => {
             let other = tile.wrapping_add(map.size_x());
-            if (s.shared().tile_type)(other) == 8 && unsafe { (t.gfx)(other) } == 24 {
+            if s.shared().tile_type(other) == 8 && unsafe { (t.gfx)(other) } == 24 {
                 let own = unsafe { (t.industry_index)(tile) };
                 let other = unsafe { (t.industry_index)(other) };
                 if own == other {
@@ -351,7 +351,7 @@ pub unsafe extern "C" fn openttd_rust_industry_tile_loop(
     if unsafe { (t.on_water)(tile) } {
         unsafe { (t.water_loop)(tile) };
     }
-    if (s.shared().tile_type)(tile) != 8 {
+    if s.shared().tile_type(tile) != 8 {
         return;
     }
     let industry = unsafe { (t.industry)(tile) };

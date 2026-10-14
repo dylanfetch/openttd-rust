@@ -826,6 +826,7 @@ void RunTileLoop()
 	static_assert(MP_CLEAR == 0 && MP_RAILWAY == 1 && MP_ROAD == 2 && MP_HOUSE == 3 && MP_TREES == 4 && MP_STATION == 5 && MP_WATER == 6 && MP_VOID == 7 && MP_INDUSTRY == 8 && MP_TUNNELBRIDGE == 9 && MP_OBJECT == 10);
 	const OpenTTDLandscapeLoopServices services{
 		.shared = &GetRustSharedServices(),
+		.tile_types = GetRustTileTypeAllocation(),
 		.trees = &GetRustTreeServices(),
 		.industry = GetRustIndustryLoopServices(),
 		.clear_loop = [](uint32_t tile) noexcept { _tile_type_clear_procs.tile_loop_proc(TileIndex{tile}); },

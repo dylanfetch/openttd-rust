@@ -226,7 +226,7 @@ pub const ROAD_ENTRIES: usize = 94;
 pub const LANDSCAPE: usize = 95;
 
 /// Counter names, grouped by the prefix the harness selects.
-pub const NAMES: [&str; 108] = [
+pub const NAMES: [&str; 110] = [
     "train.tick_first",
     "train.tick_second",
     "train.reversal",
@@ -335,6 +335,8 @@ pub const NAMES: [&str; 108] = [
     "landscape.object_visits",
     "landscape.batches",
     "landscape.tile_zero",
+    "landscape.raw_type_reads",
+    "landscape.callback_type_reads",
 ];
 
 static ENABLED: AtomicBool = AtomicBool::new(false);

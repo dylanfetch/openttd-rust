@@ -20,7 +20,13 @@
 #include "../tunnelbridge_map.h"
 #include "../bridge.h"
 #include "../water_map.h"
+#include "tile_type_access.hpp"
 #include "../safeguards.h"
+
+OpenTTDTileTypeAllocation GetRustTileTypeAllocation() noexcept
+{
+	return OpenTTDNativeTileTypeAccess::Acquire();
+}
 
 static uint32_t SharedRandom(void *) noexcept { return Random(); }
 static uint8_t SharedTileType(uint32_t tile) noexcept { return GetTileType(TileIndex{tile}); }

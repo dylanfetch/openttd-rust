@@ -769,9 +769,7 @@ impl Game<'_> {
         if state >= STOP || !straight(state & 15) {
             return;
         }
-        if service!(self.ss.tile_type)(s.tile) == MP_STATION
-            || service!(self.ss.tile_type)(ur.tile) == MP_STATION
-        {
+        if self.ss.tile_type(s.tile) == MP_STATION || self.ss.tile_type(ur.tile) == MP_STATION {
             return;
         }
         if service!(self.gs.has_articulated)(v.v) {
@@ -999,7 +997,7 @@ impl Game<'_> {
         let red = (ts >> 16) & 0x3f3f;
         let mut trackdirs = ts & 0x3f3f;
         let p = service!(self.l.path_read)(v.v);
-        let kind = service!(self.ss.tile_type)(tile);
+        let kind = self.ss.tile_type(tile);
         if kind == MP_ROAD {
             if service!(self.l.is_road_depot_tile)(tile)
                 && (service!(self.ss.tile_owner)(tile) != p.owner
@@ -1144,7 +1142,7 @@ impl Game<'_> {
         let state = prev.state();
         let dir;
         if state == WORMHOLE || state == DEPOT {
-            let diagonal = if service!(self.ss.tile_type)(tile) == MP_TUNNELBRIDGE {
+            let diagonal = if self.ss.tile_type(tile) == MP_TUNNELBRIDGE {
                 service!(self.ss.tunnel_bridge_direction)(tile)
             } else if service!(self.l.is_road_depot_tile)(tile) {
                 service!(self.l.depot_direction)(tile) ^ 2
@@ -1194,7 +1192,7 @@ impl Game<'_> {
     /// `IndividualRoadVehicleController`; `s` is a fresh observation of `v`.
     fn individual(&self, v: Part, prev: Option<Part>, s: &mut Step) -> bool {
         if v.overtaking() != 0 {
-            if service!(self.ss.tile_type)(s.tile) == MP_STATION {
+            if self.ss.tile_type(s.tile) == MP_STATION {
                 v.set(OVERTAKING, 0);
             } else {
                 let counter = v.get(OVERTAKING_CTR).wrapping_add(1) as u8;
@@ -1215,7 +1213,7 @@ impl Game<'_> {
                     return false;
                 }
             }
-            if service!(self.ss.tile_type)(gp.tile) == MP_TUNNELBRIDGE {
+            if self.ss.tile_type(gp.tile) == MP_TUNNELBRIDGE {
                 let e = service!(self.l.enter_tile)(v.v, gp.tile, gp.x, gp.y);
                 Self::observe(s, e);
                 if e.flags & VETS_ENTERED_WORMHOLE != 0 {
@@ -1312,7 +1310,7 @@ impl Game<'_> {
                 let e = service!(self.l.enter_tile)(v.v, tile, x, y);
                 Self::observe(s, e);
                 if e.flags & VETS_CANNOT_ENTER != 0 {
-                    if service!(self.ss.tile_type)(tile) != MP_TUNNELBRIDGE {
+                    if self.ss.tile_type(tile) != MP_TUNNELBRIDGE {
                         self.set_speed(v, s, 0);
                         return false;
                     }
@@ -1320,9 +1318,7 @@ impl Game<'_> {
                     continue;
                 }
                 let state = v.state();
-                if in_range(state, STOP, DT_STOP + 16)
-                    && service!(self.ss.tile_type)(s.tile) == MP_STATION
-                {
+                if in_range(state, STOP, DT_STOP + 16) && self.ss.tile_type(s.tile) == MP_STATION {
                     if reversing(dir) && in_range(state, STOP, STOP + 16) {
                         self.set_speed(v, s, 0);
                         return false;
@@ -1764,7 +1760,7 @@ impl Game<'_> {
         {
             return false;
         }
-        if service!(self.ss.tile_type)(r.tile) == MP_TUNNELBRIDGE
+        if self.ss.tile_type(r.tile) == MP_TUNNELBRIDGE
             && diag(r.direction) == service!(self.ss.tunnel_bridge_direction)(r.tile)
         {
             return false;

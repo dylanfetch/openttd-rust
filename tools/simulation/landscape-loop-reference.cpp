@@ -10,12 +10,19 @@
 #include <cstdio>
 #include <cstdlib>
 #include <initializer_list>
+#include <memory>
 #include "rust/landscape_loop_ffi.h"
 
 static uint8_t log_x, log_y;
 static uint64_t observed_hash, observed_count;
 static bool rust_run, reenter, nested;
 static uint32_t starting_cursor;
+struct BaseTile { uint8_t type = 0, height = 0; uint16_t m2 = 0; uint8_t m1 = 0, m3 = 0, m4 = 0, m5 = 0; };
+static_assert(sizeof(BaseTile) == 8 && alignof(BaseTile) == 2 && offsetof(BaseTile, type) == 0);
+static std::unique_ptr<BaseTile[]> tiles;
+static bool raw_backend, mutate;
+static uint32_t feedback;
+
 struct TileIndex {
 	uint32_t value = 0;
 	TileIndex() = default;
@@ -35,14 +42,21 @@ static constexpr uint32_t TILE_UPDATE_FREQUENCY_LOG = 8, TILE_UPDATE_FREQUENCY =
 template<typename T, size_t N> constexpr size_t lengthof(T (&)[N]) { return N; }
 using uint = unsigned int;
 
-static void NativeVisit(uint32_t tile) noexcept;
-static void ReferenceVisit(TileIndex tile) { NativeVisit(tile.base()); }
-static uint8_t Type(uint32_t tile) noexcept { return static_cast<uint8_t>((tile % 4)); }
+static void NativeVisit(uint32_t tile, uint8_t kind) noexcept;
+static uint8_t Type(uint32_t tile) noexcept { return tiles[tile].type >> 4; }
+static void Clear(uint32_t tile) noexcept { NativeVisit(tile, 0); }
+static void Rail(uint32_t tile) noexcept { NativeVisit(tile, 1); }
+static void Road(uint32_t tile) noexcept { NativeVisit(tile, 2); }
+static void House(uint32_t tile) noexcept { NativeVisit(tile, 3); }
+static void ReferenceClear(TileIndex tile) { Clear(tile.base()); }
+static void ReferenceRail(TileIndex tile) { Rail(tile.base()); }
+static void ReferenceRoad(TileIndex tile) { Road(tile.base()); }
+static void ReferenceHouse(TileIndex tile) { House(tile.base()); }
 static uint8_t GetTileType(uint32_t tile) { return Type(tile); }
 static uint8_t GetTileType(TileIndex tile) { return Type(tile.base()); }
 struct TileTypeProcs { void (*tile_loop_proc)(TileIndex); };
-static const TileTypeProcs procs{ReferenceVisit};
-static const TileTypeProcs * const _tile_type_procs[16] = {&procs, &procs, &procs, &procs};
+static const TileTypeProcs procs[4] = {{ReferenceClear}, {ReferenceRail}, {ReferenceRoad}, {ReferenceHouse}};
+static const TileTypeProcs * const _tile_type_procs[16] = {&procs[0], &procs[1], &procs[2], &procs[3]};
 static TileIndex _cur_tileloop_tile;
 #include <cassert>
 #include "landscape-loop-reference.inc"
@@ -50,19 +64,20 @@ static TileIndex _cur_tileloop_tile;
 static uint32_t Random(void *) noexcept { std::abort(); }
 static uint32_t Industry(int32_t, int32_t, uint32_t *) noexcept { std::abort(); }
 static OpenTTDSharedServices shared = OpenTTDFixtureSharedServices(nullptr, Random, Industry);
-static const OpenTTDLandscapeLoopServices services{
+static OpenTTDLandscapeLoopServices services{
 	.shared = &shared,
+	.tile_types = {nullptr, 0},
 	.trees = nullptr,
 	.industry = {},
-	.clear_loop = NativeVisit,
-	.rail_loop = NativeVisit,
-	.road_loop = NativeVisit,
-	.house_loop = NativeVisit,
-	.station_loop = NativeVisit,
-	.water_loop = NativeVisit,
-	.void_loop = NativeVisit,
-	.tunnel_bridge_loop = NativeVisit,
-	.object_loop = NativeVisit,
+	.clear_loop = Clear,
+	.rail_loop = Rail,
+	.road_loop = Road,
+	.house_loop = House,
+	.station_loop = Clear,
+	.water_loop = Clear,
+	.void_loop = Clear,
+	.tunnel_bridge_loop = Clear,
+	.object_loop = Clear,
 };
 static void RustRun()
 {
@@ -73,12 +88,17 @@ static void RustRun()
 		.extra = 0,
 		.ambient = false,
 	};
+	services.tile_types = raw_backend ? OpenTTDTileTypeAllocation{reinterpret_cast<const uint8_t *>(tiles.get()), 1U << (log_x + log_y)} : OpenTTDTileTypeAllocation{nullptr, 0};
 	openttd_rust_run_tile_loop(log_x, log_y, settings, &services);
 }
-static void NativeVisit(uint32_t tile) noexcept
+static void NativeVisit(uint32_t tile, uint8_t kind) noexcept
 {
-	observed_hash = (observed_hash ^ tile) * UINT64_C(1099511628211);
+	observed_hash = (observed_hash ^ (static_cast<uint64_t>(tile) << 4) ^ kind) * UINT64_C(1099511628211);
 	observed_count++;
+	if (mutate && tile != 0) {
+		uint32_t next = (tile >> 1) ^ (-(static_cast<int32_t>(tile & 1)) & feedback);
+		tiles[next].type = static_cast<uint8_t>((((Type(next) + 1) & 3) << 4) | (tiles[next].type & 15));
+	}
 	if (reenter && !nested) {
 		nested = true;
 		/* Both entries must retain the pre-batch canonical cursor until return. */
@@ -93,6 +113,8 @@ int main()
 	unsigned cases = 0;
 	for (log_x = 6; log_x <= 12; log_x++) {
 		for (log_y = 6; log_y <= 12; log_y++) {
+			tiles = std::make_unique<BaseTile[]>(1U << (log_x + log_y));
+			for (uint32_t tile = 0; tile < (1U << (log_x + log_y)); tile++) tiles[tile].type = static_cast<uint8_t>(((tile % 4) << 4) | (tile & 15));
 			for (uint64_t tick : {UINT64_C(0), UINT64_C(1), UINT64_C(255), UINT64_C(256), UINT64_MAX}) {
 				for (uint32_t start : {1U, (1U << (log_x + log_y)) - 1, 0x5A5U}) {
 					for (bool enter : {false, true}) {
@@ -105,17 +127,52 @@ int main()
 						RunTileLoop();
 						const uint64_t expected_hash = observed_hash, expected_count = observed_count;
 						const uint32_t expected_cursor = _cur_tileloop_tile.base();
-						*openttd_rust_tile_loop_cursor() = start;
-						observed_count = observed_hash = 0;
-						nested = false;
-						rust_run = true;
-						RustRun();
-						if (observed_hash != expected_hash || observed_count != expected_count || *openttd_rust_tile_loop_cursor() != expected_cursor) std::abort();
-						cases++;
+						for (bool raw : {false, true}) {
+							raw_backend = raw;
+							*openttd_rust_tile_loop_cursor() = start;
+							observed_count = observed_hash = 0;
+							nested = false;
+							rust_run = true;
+							RustRun();
+							if (observed_hash != expected_hash || observed_count != expected_count || *openttd_rust_tile_loop_cursor() != expected_cursor) std::abort();
+							cases++;
+						}
 					}
 				}
 			}
 		}
 	}
-	std::printf("landscape scheduler: %u unchanged-body map/phase/cursor/reentry cases passed\n", cases);
+	/* The first callback mutates the NEXT LFSR tile. Nested entries mutate the
+	 * same live allocation too; no descriptor spans a reset inside the batch. */
+	log_x = log_y = 6;
+	feedback = 0xD8F;
+	TimerGameTick::counter = 1;
+	mutate = true;
+	for (bool raw : {false, true}) {
+		raw_backend = raw;
+		uint64_t expected_hash = 0, expected_count = 0;
+		uint32_t expected_cursor = 0;
+		for (bool rust : {false, true}) {
+			/* Reset BETWEEN entries and reacquire; no stale pointer is read. */
+			tiles = std::make_unique<BaseTile[]>(4096);
+			for (uint32_t tile = 0; tile < 4096; tile++) tiles[tile].type = static_cast<uint8_t>((tile % 4) << 4);
+			rust_run = rust;
+			reenter = true;
+			nested = false;
+			starting_cursor = 1;
+			observed_count = observed_hash = 0;
+			if (rust) {
+				*openttd_rust_tile_loop_cursor() = 1;
+				RustRun();
+				if (observed_hash != expected_hash || observed_count != expected_count || *openttd_rust_tile_loop_cursor() != expected_cursor) std::abort();
+			} else {
+				_cur_tileloop_tile = TileIndex{1};
+				RunTileLoop();
+				expected_hash = observed_hash;
+				expected_count = observed_count;
+				expected_cursor = _cur_tileloop_tile.base();
+			}
+		}
+	}
+	std::printf("landscape scheduler: %u unchanged-body map/phase/cursor/reentry cases plus ordered mutation/reset passed\n", cases);
 }

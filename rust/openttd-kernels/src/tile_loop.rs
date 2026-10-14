@@ -16,6 +16,20 @@
 //! counter or client ambient settings. Generation progress also runs outside this
 //! entry. Thus the existing tree settings can be captured once per source batch;
 //! tree/map observations still occur inside each owner at original callback sites.
+//!
+//! Raw type descriptor lifetime: `Map::Allocate` is reached only from game reset
+//! (`InitializeGame`), MAPS/legacy loaders and tests. Mutex yield (`GameLoopPause`)
+//! occurs only in generation progress and GRF scanning; warmup callers place it
+//! outside this entry. `VideoDriver::GameLoop`/GUI input hold the game-state mutex;
+//! bootstrap is serial. House/ambient/animation `NewGRF` resolvers, road/landscape
+//! commands, water foundations/crashes/destruction, cargo and industry callbacks
+//! may mutate later tiles and reenter owners, but never run reset/load/progress or
+//! a script VM. AI/Game event insertion only queues via `InsertEvent`; script VMs
+//! run after this batch. Window invalidation cannot pump GUI commands here.
+//! Therefore only allocation metadata can span dispatch; each u8 read ends first.
+//! Nested entries acquire independently, and entries after reset reacquire. Link
+//! graph workers own copies; sound/compression do not mutate the arrays. Threaded
+//! and arbitrary `NewGRF` corpus limits remain source-review obligations in #156.
 #![allow(unsafe_code)]
 
 use crate::{industry, services, trees};
@@ -59,6 +73,7 @@ pub struct IndustryServices {
 #[repr(C)]
 pub struct Services {
     pub shared: *const services::Services,
+    pub tile_types: services::TileTypeAllocation,
     pub trees: *const trees::TreeServices,
     pub industry: IndustryServices,
     pub clear_loop: extern "C" fn(u32),
@@ -72,10 +87,16 @@ pub struct Services {
     pub object_loop: extern "C" fn(u32),
 }
 
-unsafe fn dispatch(tile: u32, log_x: u8, settings: trees::LoopSettings, s: &Services) {
+unsafe fn dispatch(
+    tile: u32,
+    log_x: u8,
+    settings: trees::LoopSettings,
+    s: &Services,
+    types: &services::TileTypeAccess,
+) {
     // SAFETY: All tables are immutable and live for the synchronous batch. Owner
     // entries end their accesses before callbacks; only scalar cursor is local.
-    let tile_type = unsafe { ((*s.shared).tile_type)(tile) };
+    let tile_type = types.read(tile);
     // These diagnostic hits are absent from normal and timing builds.
     #[cfg(landscape_loop_count)]
     crate::witness::hit(crate::witness::LANDSCAPE + usize::from(tile_type));
@@ -135,6 +156,10 @@ pub unsafe extern "C" fn openttd_rust_run_tile_loop(
     // SAFETY: The caller supplies a live immutable table; no state borrow spans
     // dispatch. A nested call therefore preserves original commit-after-batch.
     let s = unsafe { &*services };
+    // SAFETY: The native scheduler facade acquires the actual allocation once.
+    // Its serialized no-reset/no-yield call graph keeps it live for this batch;
+    // only descriptor metadata, never an actual map access, spans dispatch.
+    let types = unsafe { services::TileTypeAccess::raw(s.tile_types, (*s.shared).tile_type) };
     let tile = unsafe { CURSOR };
     #[cfg(landscape_loop_count)]
     {
@@ -148,7 +173,7 @@ pub unsafe extern "C" fn openttd_rust_run_tile_loop(
         log_x + log_y,
         settings.tick_counter.is_multiple_of(256),
         |tile| {
-            unsafe { dispatch(tile, log_x, settings, s) };
+            unsafe { dispatch(tile, log_x, settings, s, &types) };
         },
     );
     unsafe { CURSOR = next };
