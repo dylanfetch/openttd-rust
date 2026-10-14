@@ -39,7 +39,7 @@ TEST_CASE("Rust shared tile-type allocation and all native byte values")
 	CHECK(openttd_rust_shared_tile_type(allocation, shared.tile_type, 1) == MP_ROAD);
 	SetTileType(TileIndex{1}, MP_CLEAR);
 	CHECK(openttd_rust_shared_tile_type(allocation, shared.tile_type, 1) == MP_CLEAR);
-	/* No old descriptor survives reset; the next entry reacquires a live allocation. */
+	/* Reset between reader entries; the next entry acquires a live allocation. */
 	Map::Allocate(64, 64);
 	const auto next = GetRustTileTypeAllocation();
 	CHECK(next.count == Map::Size());
@@ -60,10 +60,13 @@ TEST_CASE("Rust shared tile-type out-of-range preserves callback policy")
 	calls = 0;
 	auto callback = [](uint32_t tile) noexcept -> uint8_t { calls++; observed = tile; return 231; };
 	CHECK(openttd_rust_shared_tile_type(allocation, callback, allocation.count) == 231);
-	CHECK(calls == 1 && observed == allocation.count);
+	CHECK(calls == 1);
+	CHECK(observed == allocation.count);
 	CHECK(openttd_rust_shared_tile_type(allocation, callback, UINT32_MAX) == 231);
-	CHECK(calls == 2 && observed == UINT32_MAX);
+	CHECK(calls == 2);
+	CHECK(observed == UINT32_MAX);
 	CHECK(openttd_rust_shared_tile_type({nullptr, 0}, callback, 0) == 231);
-	CHECK(calls == 3 && observed == 0);
+	CHECK(calls == 3);
+	CHECK(observed == 0);
 }
 #endif

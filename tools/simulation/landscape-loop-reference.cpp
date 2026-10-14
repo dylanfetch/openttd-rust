@@ -88,8 +88,10 @@ static void RustRun()
 		.extra = 0,
 		.ambient = false,
 	};
-	services.tile_types = raw_backend ? OpenTTDTileTypeAllocation{reinterpret_cast<const uint8_t *>(tiles.get()), 1U << (log_x + log_y)} : OpenTTDTileTypeAllocation{nullptr, 0};
-	openttd_rust_run_tile_loop(log_x, log_y, settings, &services);
+	/* Each nested entry has its own immutable table, like the native facade. */
+	auto batch_services = services;
+	batch_services.tile_types = raw_backend ? OpenTTDTileTypeAllocation{reinterpret_cast<const uint8_t *>(tiles.get()), 1U << (log_x + log_y)} : OpenTTDTileTypeAllocation{nullptr, 0};
+	openttd_rust_run_tile_loop(log_x, log_y, settings, &batch_services);
 }
 static void NativeVisit(uint32_t tile, uint8_t kind) noexcept
 {
