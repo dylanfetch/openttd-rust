@@ -28,6 +28,7 @@ The ports are faithful. Retirement stalled for three reasons, each fixable:
   - On play saves, the null driver redraws per elapsed millisecond, which inflates game-logic cost about 1.33x in wall ratios.
 
 Actions, in order:
+0. **#252 Windows CI on Blacksmith (user-selected, first).** Follow the issue: the first Blacksmith Windows run decides breakpad compatibility; if incompatible, leave Windows on GitHub, close it and continue.
 1. **Finish #244 (#233/#243).** Fix the platform gate failure and the quick-validation ccache fixture (`ccache` missing in the quick job), then bootstrap, full CI and #233 live acceptance. Linux caches now live in Blacksmith's store, not GitHub's 10 GiB.
 2. **#249 shared-accessor check:** small infrastructure, run in parallel. Do not block ports on it.
 3. **#245 signals:** apply the two fixes in its steering comment, record its gaps (posted on #156), then do final-head validation, timing, a fresh fixing review, full CI and integrate.
@@ -164,6 +165,7 @@ The user paused root at 334df5ef8c, and a `/start-development` restart resumes f
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
 | #233 / #243 / #244 | `ci-cache-peak-233`, `1288db61b4` | Draft: action 1. |
+| #252 | none | New, first: Windows CI on Blacksmith via `CI_WINDOWS_HEAVY`. |
 | #249 | none | New: shared-accessor check in quick CI. |
 | #219 / #245 | `signal-owner-219`, `df2f77b247` | Draft: apply the steering comment, then final-head validation, timing, review and CI. |
 | #220 / #248 | `engine-lifecycle-220`, `9c4b950b56` | Draft, does not build: apply the steering comment, add the harness, then review and CI. |
