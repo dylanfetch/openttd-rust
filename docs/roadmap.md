@@ -29,7 +29,7 @@ The ports are faithful. Retirement stalled for three reasons, each fixable:
 
 Actions, in order:
 0. **#252 Windows CI on Blacksmith (user-selected, first).** Follow the issue: the first Blacksmith Windows run decides breakpad compatibility; if incompatible, leave Windows on GitHub, close it and continue.
-1. **Do not work on #244.** Blacksmith moved the Linux caches out of GitHub's 10 GiB, so its cache-peak problem is likely gone. Over the next three code merges, record GitHub's peak cache usage on #233. If it stays under 10 GiB, close #233 as met and #243/#244 unmerged (keep the branch, remove the worktree). If not, report to the user.
+1. **Do not work on #244.** Blacksmith moved the Linux caches out of GitHub's 10 GiB, so its cache-peak problem is likely gone. Over the next three code merges, record GitHub's peak cache usage on #233. If it stays under 10 GiB, close #233 as met and #243/#244 unmerged (keep the branch, remove the worktree). If it goes over, resume #244: fix the platform gate failure and the quick-job ccache fixture, then bootstrap, full CI and #233 live acceptance.
 2. **#249 shared-accessor check:** small infrastructure, run in parallel. Do not block ports on it.
 3. **#245 signals:** apply the two fixes in its steering comment, record its gaps (posted on #156), then do final-head validation, timing, a fresh fixing review, full CI and integrate.
 4. **#248 engine:** fix the build break, add `engines.py` witnesses, delete the duplicated accessors and apply the rest of its steering comment. Then review, CI and integrate.
@@ -164,7 +164,7 @@ The user paused root at 334df5ef8c, and a `/start-development` restart resumes f
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #233 / #243 / #244 | `ci-cache-peak-233`, `1288db61b4` | Not worked on; measure, then close (action 1). |
+| #233 / #243 / #244 | `ci-cache-peak-233`, `1288db61b4` | Measure, then close or resume (action 1). |
 | #252 | none | New, first: Windows CI on Blacksmith via `CI_WINDOWS_HEAVY`. |
 | #249 | none | New: shared-accessor check in quick CI. |
 | #219 / #245 | `signal-owner-219`, `df2f77b247` | Draft: apply the steering comment, then final-head validation, timing, review and CI. |
