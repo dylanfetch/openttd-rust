@@ -29,11 +29,19 @@ inline uint8_t RustVehicleOwner(const Vehicle *v) noexcept { return v->owner.bas
 inline Direction RustVehicleDirection(const Vehicle *v) noexcept { return v->direction; }
 inline uint8_t RustVehicleProgress(const Vehicle *v) noexcept { return v->progress; }
 inline void RustWriteVehicleProgress(Vehicle *v, uint8_t progress) noexcept { v->progress = progress; }
-inline uint16_t RustVehicleSpeed(const Vehicle *v) noexcept { return v->cur_speed; }
-inline uint32_t RustVehicleMotionCounter(const Vehicle *v) noexcept { return v->motion_counter; }
-inline uint16_t RustVehicleCargoAgePeriod(const Vehicle *v) noexcept { return v->vcache.cached_cargo_age_period; }
-inline uint8_t RustVehicleSubtype(const Vehicle *v) noexcept { return v->subtype; }
-inline uint8_t RustVehicleTick(const Vehicle *v) noexcept { return v->tick_counter; }
+/* Canonical member addresses. Scalar readers use the same definitions; status
+ * stays a typed service because VehStates does not expose mutable storage. */
+inline const uint16_t *RustVehicleSpeedAddress(const Vehicle *v) noexcept { return &v->cur_speed; }
+inline uint32_t *RustVehicleMotionAddress(Vehicle *v) noexcept { return &v->motion_counter; }
+inline const uint16_t *RustVehicleCargoPeriodAddress(const Vehicle *v) noexcept { return &v->vcache.cached_cargo_age_period; }
+inline uint16_t *RustVehicleCargoCounterAddress(Vehicle *v) noexcept { return &v->cargo_age_counter; }
+inline const VehicleType *RustVehicleTypeAddress(const Vehicle *v) noexcept { return &v->type; }
+inline const uint8_t *RustVehicleSubtypeAddress(const Vehicle *v) noexcept { return &v->subtype; }
+inline const uint8_t *RustVehicleTickAddress(const Vehicle *v) noexcept { return &v->tick_counter; }
+inline uint16_t RustVehicleSpeed(const Vehicle *v) noexcept { return *RustVehicleSpeedAddress(v); }
+inline uint16_t RustVehicleCargoAgePeriod(const Vehicle *v) noexcept { return *RustVehicleCargoPeriodAddress(v); }
+inline uint8_t RustVehicleSubtype(const Vehicle *v) noexcept { return *RustVehicleSubtypeAddress(v); }
+inline uint8_t RustVehicleTick(const Vehicle *v) noexcept { return *RustVehicleTickAddress(v); }
 inline uint8_t RustVehicleStatus(const Vehicle *v) noexcept { return v->vehstatus.base(); }
 inline void RustWriteVehicleTick(Vehicle *v, uint8_t tick) noexcept { v->tick_counter = tick; }
 inline uint16_t RustVehicleEngineID(const Vehicle *v) noexcept { return v->engine_type.base(); }

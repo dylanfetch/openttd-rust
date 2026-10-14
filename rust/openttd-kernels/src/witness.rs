@@ -244,8 +244,27 @@ pub const VEHICLE_DAYS: usize = 112;
 /// Live stations visited by the loading loop.
 pub const VEHICLE_STATIONS: usize = 113;
 
+/// Post-tick `cargo_addresses` accounting.
+pub const VEHICLE_CARGO_ADDRESSES: usize = 114;
+/// Post-tick `cargo_owner` accounting.
+pub const VEHICLE_CARGO_OWNER: usize = 115;
+/// Post-tick `motion_addresses` accounting.
+pub const VEHICLE_MOTION_ADDRESSES: usize = 116;
+/// Post-tick status accounting.
+pub const VEHICLE_STATUS: usize = 117;
+/// Post-tick `running_sound` accounting.
+pub const VEHICLE_RUNNING_SOUND: usize = 118;
+/// Post-tick `periodic_sound` accounting.
+pub const VEHICLE_PERIODIC_SOUND: usize = 119;
+/// Post-tick `descriptor_bytes` accounting.
+pub const VEHICLE_DESCRIPTOR_BYTES: usize = 120;
+/// Post-tick `scalar_read_bytes` accounting.
+pub const VEHICLE_SCALAR_READ_BYTES: usize = 121;
+/// Post-tick `scalar_write_bytes` accounting.
+pub const VEHICLE_SCALAR_WRITE_BYTES: usize = 122;
+
 /// Counter names, grouped by the prefix the harness selects.
-pub const NAMES: [&str; 114] = [
+pub const NAMES: [&str; 123] = [
     "train.tick_first",
     "train.tick_second",
     "train.reversal",
@@ -360,6 +379,15 @@ pub const NAMES: [&str; 114] = [
     "vehicle.callback32",
     "vehicle.day_visits",
     "vehicle.station_visits",
+    "vehicle.cargo_addresses",
+    "vehicle.cargo_owner",
+    "vehicle.motion_addresses",
+    "vehicle.status",
+    "vehicle.running_sound",
+    "vehicle.periodic_sound",
+    "vehicle.descriptor_bytes",
+    "vehicle.scalar_read_bytes",
+    "vehicle.scalar_write_bytes",
 ];
 
 static ENABLED: AtomicBool = AtomicBool::new(false);

@@ -65,31 +65,18 @@ pub struct DayCallback {
     pub has_engine: bool,
 }
 #[repr(C)]
-pub struct CargoTick {
+pub struct CargoAddresses {
     pub front: VehicleRef,
-    pub cargo: *mut cargo_storage::List,
-    pub period: u16,
-    pub counter: u16,
+    pub period: *const u16,
+    pub counter: *mut u16,
 }
 #[repr(C)]
-pub struct MotionTick {
-    pub motion: u32,
-    pub speed: u16,
-    pub front_status: u8,
-    pub status: u8,
-    pub front_type: VehicleType,
-}
-#[repr(C)]
-pub struct SoundTick {
-    pub motion: u32,
-    pub speed: u16,
-    pub subtype: u8,
-}
-#[repr(C)]
-pub struct PeriodicSound {
-    pub speed: u16,
-    pub tick: u8,
-    pub front_status: u8,
+pub struct MotionAddresses {
+    pub motion: *mut u32,
+    pub speed: *const u16,
+    pub front_type: *const VehicleType,
+    pub subtype: *const u8,
+    pub tick: *const u8,
 }
 #[repr(C)]
 pub struct StationLookup {
@@ -108,14 +95,10 @@ pub struct SchedulerServices {
     pub unknown_day_callback: extern "C" fn(VehicleRef, u16),
     pub other_tick: extern "C" fn(VehicleRef) -> bool,
     pub assert_survival: Option<extern "C" fn(VehicleRef, u32, bool)>,
-    pub cargo_read: extern "C" fn(VehicleRef) -> CargoTick,
-    pub write_cargo_counter: extern "C" fn(VehicleRef, u16),
-    pub cargo_period: extern "C" fn(VehicleRef) -> u16,
-    pub motion_read: extern "C" fn(VehicleRef, VehicleRef) -> MotionTick,
-    pub write_motion: extern "C" fn(VehicleRef, u32),
-    pub sound_read: extern "C" fn(VehicleRef, VehicleRef) -> SoundTick,
+    pub cargo_addresses: extern "C" fn(VehicleRef) -> CargoAddresses,
+    pub cargo_owner: extern "C" fn(VehicleRef) -> *mut cargo_storage::List,
+    pub motion_addresses: extern "C" fn(VehicleRef, VehicleRef) -> MotionAddresses,
     pub running_sound: extern "C" fn(VehicleRef),
-    pub periodic_read: extern "C" fn(VehicleRef, VehicleRef) -> PeriodicSound,
     pub periodic_sound: extern "C" fn(VehicleRef, bool),
     pub next_station: extern "C" fn(u32) -> StationLookup,
     pub economy_begin: extern "C" fn() -> u64,
@@ -337,68 +320,175 @@ unsafe fn day<const COUNTED: bool>(
     }
 }
 
+// Call-local projection of existing typed service slots, constructed once at
+// entry. This is Rust-only; it adds no ABI, callback or world state.
+struct PostTickServices {
+    cargo_addresses: extern "C" fn(VehicleRef) -> CargoAddresses,
+    cargo_owner: extern "C" fn(VehicleRef) -> *mut cargo_storage::List,
+    motion_addresses: extern "C" fn(VehicleRef, VehicleRef) -> MotionAddresses,
+    running_sound: extern "C" fn(VehicleRef),
+    periodic_sound: extern "C" fn(VehicleRef, bool),
+    status: extern "C" fn(VehicleRef) -> u8,
+    cargo: *const cargo_storage::Services,
+}
+
+/// A field-sized raw access ends before the next service. These functions never
+/// form references into the native shell. COUNTED=false removes accounting.
+unsafe fn scalar_read<T: Copy, const COUNTED: bool>(address: *const T) -> T {
+    if COUNTED {
+        crate::witness::add(
+            crate::witness::VEHICLE_SCALAR_READ_BYTES,
+            std::mem::size_of::<T>() as u64,
+        );
+    }
+    unsafe { address.read() }
+}
+unsafe fn scalar_write<T, const COUNTED: bool>(address: *mut T, value: T) {
+    if COUNTED {
+        crate::witness::add(
+            crate::witness::VEHICLE_SCALAR_WRITE_BYTES,
+            std::mem::size_of::<T>() as u64,
+        );
+    }
+    unsafe { address.write(value) };
+}
+macro_rules! post_svc {
+    ($counted:ident, $slot:expr, $function:expr $(, $arg:expr)*) => {{
+        if $counted { crate::witness::hit($slot); }
+        svc!($counted, $function $(, $arg)*)
+    }};
+}
+
 /// # Safety
-/// The vehicle survived Tick; the saved First shell survives the original aging/sound services.
+/// Tick survived. Native shells are separately allocated: pool array growth
+/// cannot move their scalar members. Cargo packet lookup and `NewGRF` sound
+/// resolution may reenter, but cannot destroy these shells, reset the pool or
+/// yield the game-state mutex. Only addresses survive those audited callbacks;
+/// field loads/stores end before each callback and subsequent values are fresh.
+/// Never retain a descriptor across Tick, traversal, loading, day or fleet work.
 unsafe fn post_tick<const COUNTED: bool>(
-    tables: &Tables,
-    schedule: &SchedulerServices,
-    dispatch: Dispatch,
+    schedule: &PostTickServices,
+    vehicle_type: VehicleType,
     vehicle: VehicleRef,
 ) {
-    if dispatch.vehicle_type > AIRCRAFT {
+    if vehicle_type > AIRCRAFT {
         return;
     }
-    let cargo = svc!(COUNTED, schedule.cargo_read, vehicle);
-    if cargo.period != 0 {
-        // The original unsigned --counter underflows when the counter is zero.
-        let counter = cargo.counter.min(cargo.period).wrapping_sub(1);
-        svc!(COUNTED, schedule.write_cargo_counter, vehicle, counter);
+    let cargo = post_svc!(
+        COUNTED,
+        crate::witness::VEHICLE_CARGO_ADDRESSES,
+        schedule.cargo_addresses,
+        vehicle
+    );
+    if COUNTED {
+        crate::witness::add(
+            crate::witness::VEHICLE_DESCRIPTOR_BYTES,
+            std::mem::size_of::<CargoAddresses>() as u64,
+        );
+    }
+    let period = unsafe { scalar_read::<_, COUNTED>(cargo.period) };
+    if period != 0 {
+        let counter = unsafe { scalar_read::<_, COUNTED>(cargo.counter) }.min(period);
+        // Preserve the original clamp store, then unsigned predecrement store.
+        unsafe { scalar_write::<_, COUNTED>(cargo.counter, counter) };
+        let counter = counter.wrapping_sub(1);
+        unsafe { scalar_write::<_, COUNTED>(cargo.counter, counter) };
         if counter == 0 {
-            // SAFETY: Canonical list owner; no owner/world borrow spans packet services.
+            let owner = post_svc!(
+                COUNTED,
+                crate::witness::VEHICLE_CARGO_OWNER,
+                schedule.cargo_owner,
+                vehicle
+            );
             if COUNTED {
                 crate::witness::hit(crate::witness::VEHICLE_CARGO_AGES);
             }
-            unsafe { cargo_storage::openttd_rust_cargo_list_age(cargo.cargo, tables.cargo) };
-            svc!(
-                COUNTED,
-                schedule.write_cargo_counter,
-                vehicle,
-                svc!(COUNTED, schedule.cargo_period, vehicle)
-            );
+            unsafe { cargo_storage::openttd_rust_cargo_list_age(owner, schedule.cargo) };
+            let period = unsafe { scalar_read::<_, COUNTED>(cargo.period) };
+            unsafe { scalar_write::<_, COUNTED>(cargo.counter, period) };
         }
     }
-    let motion = svc!(COUNTED, schedule.motion_read, vehicle, cargo.front);
-    if motion.front_status & VS_CRASHED != 0 || motion.status & VS_HIDDEN != 0 {
+    let front_status = post_svc!(
+        COUNTED,
+        crate::witness::VEHICLE_STATUS,
+        schedule.status,
+        cargo.front
+    );
+    if front_status & VS_CRASHED != 0 {
         return;
     }
-    if motion.front_status & VS_STOPPED != 0 && (motion.front_type != TRAIN || motion.speed == 0) {
+    if post_svc!(
+        COUNTED,
+        crate::witness::VEHICLE_STATUS,
+        schedule.status,
+        vehicle
+    ) & VS_HIDDEN
+        != 0
+    {
+        return;
+    }
+    let motion = post_svc!(
+        COUNTED,
+        crate::witness::VEHICLE_MOTION_ADDRESSES,
+        schedule.motion_addresses,
+        vehicle,
+        cargo.front
+    );
+    if COUNTED {
+        crate::witness::add(
+            crate::witness::VEHICLE_DESCRIPTOR_BYTES,
+            std::mem::size_of::<MotionAddresses>() as u64,
+        );
+    }
+    if front_status & VS_STOPPED != 0
+        && (unsafe { scalar_read::<_, COUNTED>(motion.front_type) } != TRAIN
+            || unsafe { scalar_read::<_, COUNTED>(motion.speed) } == 0)
+    {
         return;
     }
     if COUNTED {
         crate::witness::hit(crate::witness::VEHICLE_MOTION);
     }
-    svc!(
-        COUNTED,
-        schedule.write_motion,
-        vehicle,
-        motion.motion.wrapping_add(u32::from(motion.speed))
-    );
-    let sound = svc!(COUNTED, schedule.sound_read, vehicle, cargo.front);
-    match dispatch.vehicle_type {
-        TRAIN if sound.subtype & ENGINE == 0 => return,
-        ROAD if sound.subtype & FRONT == 0 => return,
-        AIRCRAFT if sound.subtype > NORMAL_AIRCRAFT => return,
+    let speed = unsafe { scalar_read::<_, COUNTED>(motion.speed) };
+    let counter =
+        unsafe { scalar_read::<_, COUNTED>(motion.motion) }.wrapping_add(u32::from(speed));
+    unsafe { scalar_write::<_, COUNTED>(motion.motion, counter) };
+    // Ship has no subtype gate; do not read its subtype.
+    match vehicle_type {
+        TRAIN if unsafe { scalar_read::<_, COUNTED>(motion.subtype) } & ENGINE == 0 => return,
+        ROAD if unsafe { scalar_read::<_, COUNTED>(motion.subtype) } & FRONT == 0 => return,
+        AIRCRAFT if unsafe { scalar_read::<_, COUNTED>(motion.subtype) } > NORMAL_AIRCRAFT => {
+            return;
+        }
         _ => {}
     }
-    if sound.motion & 0xff < u32::from(sound.speed) {
-        svc!(COUNTED, schedule.running_sound, vehicle);
+    if unsafe { scalar_read::<_, COUNTED>(motion.motion) } & 0xff
+        < u32::from(unsafe { scalar_read::<_, COUNTED>(motion.speed) })
+    {
+        post_svc!(
+            COUNTED,
+            crate::witness::VEHICLE_RUNNING_SOUND,
+            schedule.running_sound,
+            vehicle
+        );
     }
-    // Running sound may reenter; the 16-tick decision observes fields afterward.
-    let periodic = svc!(COUNTED, schedule.periodic_read, vehicle, cargo.front);
-    if periodic.tick & 15 == 0 {
-        let running =
-            periodic.speed > 0 && periodic.front_status & (VS_STOPPED | TRAIN_SLOWING) == 0;
-        svc!(COUNTED, schedule.periodic_sound, vehicle, running);
+    // Running sound can change the following observations; load after it returns.
+    if unsafe { scalar_read::<_, COUNTED>(motion.tick) } & 15 == 0 {
+        let running = unsafe { scalar_read::<_, COUNTED>(motion.speed) } > 0
+            && post_svc!(
+                COUNTED,
+                crate::witness::VEHICLE_STATUS,
+                schedule.status,
+                cargo.front
+            ) & (VS_STOPPED | TRAIN_SLOWING)
+                == 0;
+        post_svc!(
+            COUNTED,
+            crate::witness::VEHICLE_PERIODIC_SOUND,
+            schedule.periodic_sound,
+            vehicle,
+            running
+        );
     }
 }
 
@@ -447,6 +537,15 @@ unsafe fn run_ticks<const COUNTED: bool>(
     // SAFETY: Facade supplies immutable live tables and serialized pools.
     let tables = unsafe { &*tables };
     let schedule = unsafe { &*tables.scheduler };
+    let post = PostTickServices {
+        cargo_addresses: schedule.cargo_addresses,
+        cargo_owner: schedule.cargo_owner,
+        motion_addresses: schedule.motion_addresses,
+        running_sound: schedule.running_sound,
+        periodic_sound: schedule.periodic_sound,
+        status: unsafe { (*(*tables.road).vehicle).status },
+        cargo: tables.cargo,
+    };
     unsafe { fleet::pending::openttd_rust_fleet_pending_clear() };
     if normal {
         unsafe { day::<COUNTED>(tables, schedule, false, date_fract) };
@@ -506,7 +605,7 @@ unsafe fn run_ticks<const COUNTED: bool>(
             }
             continue;
         }
-        unsafe { post_tick::<COUNTED>(tables, schedule, dispatch, vehicle) };
+        unsafe { post_tick::<COUNTED>(&post, dispatch.vehicle_type, vehicle) };
     }
     // SAFETY: No owner/world borrow spans commands in the canonical fleet drain.
     unsafe {
@@ -517,4 +616,370 @@ unsafe fn run_ticks<const COUNTED: bool>(
             cost,
         );
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ptr::{NonNull, null, null_mut};
+
+    // Only test-owned scalar cells, never a replica of the native Vehicle layout.
+    #[allow(clippy::struct_excessive_bools)] // Independent inaccessible-field probes.
+    struct Cells {
+        period: u16,
+        counter: u16,
+        motion: u32,
+        speed: u16,
+        kind: VehicleType,
+        subtype: u8,
+        tick: u8,
+        front_status: u8,
+        status: u8,
+        status_calls: u8,
+        hide_counter: bool,
+        hide_motion: bool,
+        hide_speed: bool,
+        hide_subtype: bool,
+        hide_tick: bool,
+        hide_kind: bool,
+        sound_changes: u8,
+        packet_reloads: bool,
+        events: Vec<&'static str>,
+        running: Option<bool>,
+        cargo: *mut cargo_storage::List,
+        packet: cargo_storage::Packet,
+    }
+    impl Cells {
+        fn new() -> Self {
+            Self {
+                period: 0,
+                counter: 9,
+                motion: 0,
+                speed: 0,
+                kind: ROAD,
+                subtype: FRONT,
+                tick: 1,
+                front_status: 0,
+                status: 0,
+                status_calls: 0,
+                hide_counter: false,
+                hide_motion: false,
+                hide_speed: false,
+                hide_subtype: false,
+                hide_tick: false,
+                hide_kind: false,
+                sound_changes: 0,
+                packet_reloads: false,
+                events: Vec::new(),
+                running: None,
+                cargo: null_mut(),
+                packet: cargo_storage::Packet {
+                    feeder_share: 0,
+                    source_xy: 0,
+                    count: 1,
+                    periods_in_transit: 0,
+                    first_station: 0,
+                    next_hop: 0,
+                    source_id: 0,
+                    travelled_x: 0,
+                    travelled_y: 0,
+                    source_type: 0,
+                    in_vehicle: 1,
+                },
+            }
+        }
+        fn handle(&mut self) -> VehicleRef {
+            VehicleRef(NonNull::from(self).cast())
+        }
+        fn run(&mut self, kind: VehicleType) {
+            let handle = self.handle();
+            let services = PostTickServices {
+                cargo_addresses,
+                cargo_owner,
+                motion_addresses,
+                running_sound,
+                periodic_sound,
+                status,
+                cargo: &raw const CARGO_SERVICES,
+            };
+            unsafe { post_tick::<false>(&services, kind, handle) };
+        }
+    }
+    unsafe fn cells(v: VehicleRef) -> *mut Cells {
+        v.0.as_ptr().cast()
+    }
+    extern "C" fn cargo_addresses(v: VehicleRef) -> CargoAddresses {
+        let c = unsafe { &mut *cells(v) };
+        c.events.push("cargo");
+        CargoAddresses {
+            front: v,
+            period: &raw const c.period,
+            counter: if c.hide_counter {
+                null_mut()
+            } else {
+                &raw mut c.counter
+            },
+        }
+    }
+    extern "C" fn cargo_owner(v: VehicleRef) -> *mut cargo_storage::List {
+        let c = unsafe { &mut *cells(v) };
+        c.events.push("age-owner");
+        c.cargo
+    }
+    extern "C" fn status(v: VehicleRef) -> u8 {
+        let c = unsafe { &mut *cells(v) };
+        c.status_calls += 1;
+        c.events.push("status");
+        if c.status_calls == 2 {
+            c.status
+        } else {
+            c.front_status
+        }
+    }
+    extern "C" fn motion_addresses(v: VehicleRef, _: VehicleRef) -> MotionAddresses {
+        let c = unsafe { &mut *cells(v) };
+        c.events.push("motion");
+        MotionAddresses {
+            motion: if c.hide_motion {
+                null_mut()
+            } else {
+                &raw mut c.motion
+            },
+            speed: if c.hide_speed {
+                null()
+            } else {
+                &raw const c.speed
+            },
+            front_type: if c.hide_kind {
+                null()
+            } else {
+                &raw const c.kind
+            },
+            subtype: if c.hide_subtype {
+                null()
+            } else {
+                &raw const c.subtype
+            },
+            tick: if c.hide_tick {
+                null()
+            } else {
+                &raw const c.tick
+            },
+        }
+    }
+    extern "C" fn running_sound(v: VehicleRef) {
+        let c = unsafe { &mut *cells(v) };
+        c.events.push("running-sound");
+        match c.sound_changes {
+            1 => {
+                c.speed = 0;
+                c.tick = 0;
+                c.front_status = VS_STOPPED;
+            }
+            2 => {
+                c.speed = 3;
+                c.tick = 0;
+                c.front_status = VS_STOPPED;
+            }
+            3 => {
+                c.tick = 1;
+            }
+            _ => {}
+        }
+    }
+    extern "C" fn periodic_sound(v: VehicleRef, running: bool) {
+        let c = unsafe { &mut *cells(v) };
+        c.events.push("periodic-sound");
+        c.running = Some(running);
+    }
+    extern "C" fn packet(shell: *mut c_void) -> *mut cargo_storage::Packet {
+        let c = unsafe { &mut *shell.cast::<Cells>() };
+        if c.packet_reloads {
+            c.period = 17;
+            c.events.push("age-packet");
+        }
+        &raw mut c.packet
+    }
+    extern "C" fn destroy(_: *mut c_void) {}
+    extern "C" fn can_allocate() -> u8 {
+        1
+    }
+    extern "C" fn create(_: *const cargo_storage::Packet) -> *mut c_void {
+        null_mut()
+    }
+    extern "C" fn random(_: u32) -> u32 {
+        0
+    }
+    extern "C" fn coordinate(_: u32, _: u8) -> u32 {
+        0
+    }
+    extern "C" fn flow(
+        _: *const c_void,
+        _: u8,
+        _: u16,
+        _: u16,
+        _: u16,
+        _: *const u16,
+        _: usize,
+        _: *mut u8,
+    ) -> u16 {
+        0
+    }
+    extern "C" fn pay(_: *mut c_void, _: u8, _: u8, _: *const c_void, _: u32, _: u32) -> i64 {
+        0
+    }
+    extern "C" fn origin(_: *mut c_void, _: u16, _: u32, _: u8) {}
+    extern "C" fn flow_owner(_: *const c_void, _: u16) -> *mut crate::cargo_flow::Flow {
+        null_mut()
+    }
+    extern "C" fn random_draw() -> u32 {
+        0
+    }
+    extern "C" fn packet_next(_: *mut c_void) -> *mut c_void {
+        null_mut()
+    }
+    static CARGO_SERVICES: cargo_storage::Services = cargo_storage::Services {
+        can_allocate,
+        create,
+        packet,
+        destroy,
+        random,
+        coordinate,
+        flow,
+        pay,
+        origin,
+        flow_owner,
+        random_draw,
+        packet_next,
+    };
+
+    #[test]
+    fn cargo_short_circuit_wrap_clamp_and_period_reload() {
+        let mut c = Cells::new();
+        c.front_status = VS_CRASHED;
+        c.hide_counter = true; // Source never accesses the counter when period=0.
+        c.run(ROAD);
+        assert_eq!(c.counter, 9);
+        assert_eq!(c.events, ["cargo", "status"]);
+        for (counter, expected) in [(0, u16::MAX), (9, 3)] {
+            let mut c = Cells::new();
+            c.period = 4;
+            c.counter = counter;
+            c.front_status = VS_CRASHED;
+            c.run(ROAD);
+            assert_eq!(c.counter, expected);
+            assert_eq!(c.events, ["cargo", "status"]);
+        }
+        let mut c = Cells::new();
+        c.period = 4;
+        c.counter = 1;
+        c.front_status = VS_CRASHED;
+        c.cargo = cargo_storage::openttd_rust_cargo_list_new(1);
+        let shell = c.handle().0.as_ptr().cast();
+        unsafe {
+            cargo_storage::openttd_rust_cargo_list_append(
+                c.cargo,
+                &raw const CARGO_SERVICES,
+                shell,
+                2, // Cargo keep action, as in the existing cargo-storage fixture.
+            );
+        };
+        c.packet_reloads = true;
+        c.run(ROAD);
+        assert_eq!(c.counter, 17); // Packet callback changes the later period read.
+        assert_eq!(c.packet.periods_in_transit, 1);
+        assert_eq!(c.events, ["cargo", "age-owner", "age-packet", "status"]);
+        unsafe {
+            cargo_storage::openttd_rust_cargo_list_destroy(c.cargo, &raw const CARGO_SERVICES);
+        };
+    }
+
+    #[test]
+    fn hidden_stopped_and_type_gates_skip_inaccessible_members() {
+        let mut c = Cells::new();
+        c.status = VS_HIDDEN;
+        c.hide_motion = true;
+        c.run(ROAD);
+        assert_eq!(c.events, ["cargo", "status", "status"]);
+        for (kind, speed) in [(ROAD, 23), (TRAIN, 0)] {
+            let mut c = Cells::new();
+            c.kind = kind;
+            c.speed = speed;
+            c.front_status = VS_STOPPED;
+            c.hide_motion = true;
+            c.hide_subtype = true;
+            c.hide_tick = true;
+            c.hide_speed = kind == ROAD; // Native || skips speed on a stopped road.
+            c.run(kind);
+            assert_eq!(c.events, ["cargo", "status", "status", "motion"]);
+        }
+        for (kind, subtype) in [(ROAD, 0), (TRAIN, 0), (AIRCRAFT, 3)] {
+            let mut c = Cells::new();
+            c.speed = 5;
+            c.motion = u32::MAX;
+            c.subtype = subtype;
+            c.hide_kind = true;
+            c.hide_tick = true;
+            c.run(kind);
+            assert_eq!(c.motion, 4); // Original unsigned motion wraps.
+            assert_eq!(c.events, ["cargo", "status", "status", "motion"]);
+        }
+    }
+
+    #[test]
+    fn fresh_sound_observations_and_ship_subtype_short_circuit() {
+        let mut c = Cells::new();
+        c.speed = 8;
+        c.motion = 252;
+        c.sound_changes = 1;
+        c.run(ROAD);
+        assert_eq!(c.motion, 260);
+        assert_eq!(c.running, Some(false));
+        assert_eq!(c.status_calls, 2); // Fresh speed=0 skips periodic status.
+        assert_eq!(
+            c.events,
+            [
+                "cargo",
+                "status",
+                "status",
+                "motion",
+                "running-sound",
+                "periodic-sound"
+            ]
+        );
+        for change in [2, 3] {
+            let mut c = Cells::new();
+            c.speed = 8;
+            c.motion = 252;
+            c.tick = 0;
+            c.sound_changes = change;
+            c.run(ROAD);
+            if change == 2 {
+                assert_eq!(c.running, Some(false));
+                assert_eq!(c.status_calls, 3); // Fresh positive speed reads changed status.
+            } else {
+                assert_eq!(c.running, None); // Changed tick skips periodic observations.
+                assert_eq!(c.status_calls, 2);
+            }
+        }
+        let mut c = Cells::new();
+        c.speed = 5;
+        c.motion = 17;
+        c.tick = 0;
+        c.hide_subtype = true;
+        c.hide_kind = true;
+        c.run(SHIP);
+        assert_eq!(c.running, Some(true));
+        assert_eq!(c.status_calls, 3);
+        let mut c = Cells::new();
+        c.front_status = VS_STOPPED;
+        c.kind = TRAIN;
+        c.speed = 5;
+        c.subtype = ENGINE;
+        c.tick = 0;
+        c.motion = 17;
+        c.run(TRAIN); // A coasting stopped train still increments its motion.
+        assert_eq!(c.motion, 22);
+        assert_eq!(c.running, Some(false));
+    }
 }

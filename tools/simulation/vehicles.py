@@ -31,6 +31,15 @@ def check(scenario, run, mode, role, result):
             "day_visits",
             "station_visits",
             "motion_updates",
+            "cargo_addresses",
+            "cargo_owner",
+            "motion_addresses",
+            "status",
+            "running_sound",
+            "periodic_sound",
+            "descriptor_bytes",
+            "scalar_read_bytes",
+            "scalar_write_bytes",
         ),
     )
     if counts is None:
@@ -44,4 +53,7 @@ def check(scenario, run, mode, role, result):
         "counts": counts,
         "crossings_per_outer_visit": counts["scheduler_crossings"] / visits,
         "observed_bytes_per_outer_visit": counts["observed_bytes"] / visits,
+        "descriptor_bytes_per_outer_visit": counts["descriptor_bytes"] / visits,
+        "scalar_read_bytes_per_outer_visit": counts["scalar_read_bytes"] / visits,
+        "scalar_write_bytes_per_outer_visit": counts["scalar_write_bytes"] / visits,
     }

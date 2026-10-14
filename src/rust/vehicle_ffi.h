@@ -160,29 +160,19 @@ struct OpenTTDVehicleDayCallback {
 	uint8_t day;
 	bool has_engine;
 };
-/* First() is resolved once, after Tick survives; sound reads follow cargo aging. */
-struct OpenTTDVehicleCargoTick {
+/* Addresses of named scalar members only; acquired after Tick survives and
+ * discarded before the next pool operation. Forming these reads no value. */
+struct OpenTTDVehicleCargoAddresses {
 	OpenTTDVehicle *front;
-	OpenTTDCargoList *cargo;
-	uint16_t period;
-	uint16_t counter;
+	const uint16_t *period;
+	uint16_t *counter;
 };
-struct OpenTTDVehicleMotionTick {
-	uint32_t motion;
-	uint16_t speed;
-	uint8_t front_status;
-	uint8_t status;
-	VehicleType front_type;
-};
-struct OpenTTDVehicleSoundTick {
-	uint32_t motion;
-	uint16_t speed;
-	uint8_t subtype;
-};
-struct OpenTTDVehiclePeriodicSound {
-	uint16_t speed;
-	uint8_t tick;
-	uint8_t front_status;
+struct OpenTTDVehicleMotionAddresses {
+	uint32_t *motion;
+	const uint16_t *speed;
+	const VehicleType *front_type;
+	const uint8_t *subtype;
+	const uint8_t *tick;
 };
 struct OpenTTDVehicleStationLookup {
 	void *station;
@@ -199,14 +189,10 @@ struct OpenTTDVehicleSchedulerServices {
 	void (OPENTTD_VEHICLE_CALL *unknown_day_callback)(OpenTTDVehicle *, uint16_t) noexcept;
 	bool (OPENTTD_VEHICLE_CALL *other_tick)(OpenTTDVehicle *) noexcept;
 	void (OPENTTD_VEHICLE_CALL *assert_survival)(OpenTTDVehicle *, uint32_t, bool) noexcept;
-	OpenTTDVehicleCargoTick (OPENTTD_VEHICLE_CALL *cargo_read)(OpenTTDVehicle *) noexcept;
-	void (OPENTTD_VEHICLE_CALL *write_cargo_counter)(OpenTTDVehicle *, uint16_t) noexcept;
-	uint16_t (OPENTTD_VEHICLE_CALL *cargo_period)(OpenTTDVehicle *) noexcept;
-	OpenTTDVehicleMotionTick (OPENTTD_VEHICLE_CALL *motion_read)(OpenTTDVehicle *, OpenTTDVehicle *) noexcept;
-	void (OPENTTD_VEHICLE_CALL *write_motion)(OpenTTDVehicle *, uint32_t) noexcept;
-	OpenTTDVehicleSoundTick (OPENTTD_VEHICLE_CALL *sound_read)(OpenTTDVehicle *, OpenTTDVehicle *) noexcept;
+	OpenTTDVehicleCargoAddresses (OPENTTD_VEHICLE_CALL *cargo_addresses)(OpenTTDVehicle *) noexcept;
+	OpenTTDCargoList *(OPENTTD_VEHICLE_CALL *cargo_owner)(OpenTTDVehicle *) noexcept;
+	OpenTTDVehicleMotionAddresses (OPENTTD_VEHICLE_CALL *motion_addresses)(OpenTTDVehicle *, OpenTTDVehicle *) noexcept;
 	void (OPENTTD_VEHICLE_CALL *running_sound)(OpenTTDVehicle *) noexcept;
-	OpenTTDVehiclePeriodicSound (OPENTTD_VEHICLE_CALL *periodic_read)(OpenTTDVehicle *, OpenTTDVehicle *) noexcept;
 	void (OPENTTD_VEHICLE_CALL *periodic_sound)(OpenTTDVehicle *, bool) noexcept;
 	OpenTTDVehicleStationLookup (OPENTTD_VEHICLE_CALL *next_station)(uint32_t) noexcept;
 	uint64_t (OPENTTD_VEHICLE_CALL *economy_begin)() noexcept;

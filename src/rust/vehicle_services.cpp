@@ -278,31 +278,20 @@ static void OPENTTD_VEHICLE_CALL VehicleSchedulerAssertSurvival(OpenTTDVehicle *
 	assert(Vehicle::Get(id) == (survives ? VehicleOf(shell) : nullptr));
 }
 #endif
-static OpenTTDVehicleCargoTick OPENTTD_VEHICLE_CALL VehicleSchedulerCargoRead(OpenTTDVehicle *shell) noexcept
+static OpenTTDVehicleCargoAddresses OPENTTD_VEHICLE_CALL VehicleSchedulerCargoAddresses(OpenTTDVehicle *shell) noexcept
 {
 	Vehicle *v = VehicleOf(shell);
-	return {.front = RustVehicle(v->First()), .cargo = v->cargo.RustOwner(), .period = RustVehicleCargoAgePeriod(v), .counter = v->cargo_age_counter};
+	return {.front = RustVehicle(v->First()), .period = RustVehicleCargoPeriodAddress(v), .counter = RustVehicleCargoCounterAddress(v)};
 }
-static void OPENTTD_VEHICLE_CALL VehicleSchedulerWriteCargoCounter(OpenTTDVehicle *shell, uint16_t counter) noexcept { VehicleOf(shell)->cargo_age_counter = counter; }
-static uint16_t OPENTTD_VEHICLE_CALL VehicleSchedulerCargoPeriod(OpenTTDVehicle *shell) noexcept { return RustVehicleCargoAgePeriod(VehicleOf(shell)); }
-static OpenTTDVehicleMotionTick OPENTTD_VEHICLE_CALL VehicleSchedulerMotionRead(OpenTTDVehicle *shell, OpenTTDVehicle *first) noexcept
+/* One canonical shell-to-cargo-owner leaf, used only when aging actually runs. */
+static OpenTTDCargoList *OPENTTD_VEHICLE_CALL VehicleSchedulerCargoOwner(OpenTTDVehicle *shell) noexcept { return VehicleOf(shell)->cargo.RustOwner(); }
+static OpenTTDVehicleMotionAddresses OPENTTD_VEHICLE_CALL VehicleSchedulerMotionAddresses(OpenTTDVehicle *shell, OpenTTDVehicle *first) noexcept
 {
-	const Vehicle *v = VehicleOf(shell);
+	Vehicle *v = VehicleOf(shell);
 	const Vehicle *front = VehicleOf(first);
-	return {.motion = RustVehicleMotionCounter(v), .speed = RustVehicleSpeed(front), .front_status = RustVehicleStatus(front), .status = RustVehicleStatus(v), .front_type = front->type};
-}
-static void OPENTTD_VEHICLE_CALL VehicleSchedulerWriteMotion(OpenTTDVehicle *shell, uint32_t motion) noexcept { VehicleOf(shell)->motion_counter = motion; }
-static OpenTTDVehicleSoundTick OPENTTD_VEHICLE_CALL VehicleSchedulerSoundRead(OpenTTDVehicle *shell, OpenTTDVehicle *first) noexcept
-{
-	const Vehicle *v = VehicleOf(shell);
-	return {.motion = RustVehicleMotionCounter(v), .speed = RustVehicleSpeed(VehicleOf(first)), .subtype = RustVehicleSubtype(v)};
+	return {.motion = RustVehicleMotionAddress(v), .speed = RustVehicleSpeedAddress(front), .front_type = RustVehicleTypeAddress(front), .subtype = RustVehicleSubtypeAddress(v), .tick = RustVehicleTickAddress(v)};
 }
 static void OPENTTD_VEHICLE_CALL VehicleSchedulerRunningSound(OpenTTDVehicle *shell) noexcept { PlayVehicleSound(VehicleOf(shell), VSE_RUNNING); }
-static OpenTTDVehiclePeriodicSound OPENTTD_VEHICLE_CALL VehicleSchedulerPeriodicRead(OpenTTDVehicle *shell, OpenTTDVehicle *first) noexcept
-{
-	const Vehicle *front = VehicleOf(first);
-	return {.speed = RustVehicleSpeed(front), .tick = RustVehicleTick(VehicleOf(shell)), .front_status = RustVehicleStatus(front)};
-}
 static void OPENTTD_VEHICLE_CALL VehicleSchedulerPeriodicSound(OpenTTDVehicle *shell, bool running) noexcept { PlayVehicleSound(VehicleOf(shell), running ? VSE_RUNNING_16 : VSE_STOPPED_16); }
 static OpenTTDVehicleStationLookup OPENTTD_VEHICLE_CALL VehicleSchedulerNextStation(uint32_t from) noexcept
 {
@@ -343,14 +332,10 @@ const OpenTTDVehicleSchedulerServices &GetRustVehicleSchedulerServices() noexcep
 #else
 		.assert_survival = nullptr,
 #endif
-		.cargo_read = VehicleSchedulerCargoRead,
-		.write_cargo_counter = VehicleSchedulerWriteCargoCounter,
-		.cargo_period = VehicleSchedulerCargoPeriod,
-		.motion_read = VehicleSchedulerMotionRead,
-		.write_motion = VehicleSchedulerWriteMotion,
-		.sound_read = VehicleSchedulerSoundRead,
+		.cargo_addresses = VehicleSchedulerCargoAddresses,
+		.cargo_owner = VehicleSchedulerCargoOwner,
+		.motion_addresses = VehicleSchedulerMotionAddresses,
 		.running_sound = VehicleSchedulerRunningSound,
-		.periodic_read = VehicleSchedulerPeriodicRead,
 		.periodic_sound = VehicleSchedulerPeriodicSound,
 		.next_station = VehicleSchedulerNextStation,
 		.economy_begin = VehicleSchedulerEconomyBegin,
