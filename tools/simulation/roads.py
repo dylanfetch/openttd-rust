@@ -13,18 +13,19 @@ ROAD = "roadveh[0]/"
 COMMON = ROAD + "common[0]/"
 AI_FOLDER = "road-scenario-ai"
 
-# Coordinated idle-host caps (#155). TGP/Opus/Padhattan-1996/2016 use the
-# median of three --benchmark 3 invocation medians at 52e5becb1b (#218).
-# https://github.com/dylanfetch/openttd-rust/pull/218#issuecomment-6137474401
-# Grok/2000 retain earlier caps; #229 records the repeated calibration.
-# Lower these only after coordinated measurements; never raise them for a port.
+# Idle-host medians at d162b66bfe: median of three --benchmark 3 invocations.
+# All 54 pairs had equal semantic state/logs; invocation spread was 0.31-1.89%.
+# https://github.com/dylanfetch/openttd-rust/issues/155#issuecomment-6141061273
+# Recalibration (#229) is not a code improvement or a port regression waiver.
+# Lower a cap only when repeated improvement exceeds the invocation spread;
+# never raise one for a port.
 SPEED_BUDGETS = {
-    "play-opus-55-167-002-manual": 1.265625,
-    "play-grok-159-001-manual": 1.2427385892116183,
-    "play-padhattan-ridge-1996-manual": 1.270440251572327,
-    "play-padhattan-ridge-2000-manual": 1.3475177304964538,
-    "play-padhattan-ridge-2016-manual": 1.4327375352775165,
-    "generate-tgp-256-1": 1.154970760233918,
+    "generate-tgp-256-1": 1.1638418079096045,
+    "play-opus-55-167-002-manual": 1.2584556477345246,
+    "play-grok-159-001-manual": 1.2538677918424754,
+    "play-padhattan-ridge-1996-manual": 1.2747474747474747,
+    "play-padhattan-ridge-2000-manual": 1.3492537313432835,
+    "play-padhattan-ridge-2016-manual": 1.4270072992700729,
 }
 
 
