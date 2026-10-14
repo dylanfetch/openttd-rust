@@ -4,29 +4,28 @@ Root owns selection here; `AGENTS.md` and `docs/rust-migration.md` define proces
 If an issue conflicts, follow this roadmap and report it to root. Keep this
 forward-looking, about 200 lines; completed work is one row, with evidence in PRs.
 
-## Where the fork stands (2026-10-13, `e69df25522`)
+## Where the fork stands (2026-10-13, `62ef446d1e`)
 
 - Twenty-three ownership ports. Whole fork against the pinned original: Rust
-  55,082 / tooling 28,488 / C++ glue 24,602 / original C++ retired 36,162 (7.68%
+  55,082 / tooling 28,602 / C++ glue 24,602 / original C++ retired 36,162 (7.68%
   of all `src/` sources); simulation-source share 28,215 / 102,615 (27.50%, #226).
-- #230 caps and #236 water fidelity are integrated after independent review and
-  exact-head full CI. This pair retires no game code. Six branches are active:
-  town, station/loading, aircraft, coverage and two budget prototypes.
+- #230 caps, #236 water fidelity and #240 coverage are integrated and cleaned up.
+  No additional original code retired. Six branches include the two ownership
+  prototypes and selected #243 cache-peak repair; reviews precede more integration.
 - Current calibrated ratios: Opus 1.258, Grok 1.254, Padhattan-1996 1.275,
   Padhattan-2000 1.349, Padhattan-2016 1.427, TGP 1.164. TGP remains above
-  1.15. Aircraft's repeated Padhattan-2016 median is 1.470 with 10.8% spread,
-  marginally beyond cap+3%; matched base/candidate diagnosis precedes acceptance.
-- #212/#213 now prototype hot paths under the tenth steering budgets before
-  broad ownership. Preserve timing scopes and direct Rust controller dispatch;
-  inconclusive noise is no pass. No partial ground/maintenance port integrates
-  without root reselecting its scope here.
-- #233 warm small validation passed in 13.8 minutes; the water/shared-header
-  rebuild took 16.9. Concurrent statuses survived a docs push and another merge.
-  The third merge's cache writers and combined-tree post-merge checks are pending;
-  the broad-port timing sample is still open. No acceptance target is waived.
+  1.15. Aircraft's final six-case medians pass; a matched Padhattan-2016
+  diagnosis shows 4.51% improvement. Initial noisy samples remain in #238.
+- #212 P0/P1 fail TGP: +28/+38 ms against 11 ms; no broad port starts.
+  Select only R0, the planned shared raw tile-type read experiment (#108),
+  retaining C++ arrays and native assertion policy. #213's tick prototype is active.
+- #233 is incomplete: concurrent cache writes peaked at 10.37 GiB and evicted
+  entries; root pruned duplicates. #243 selects bounded protected writers per
+  family, without artifact input or candidate write privileges. Warm timing and
+  three-merge acceptance repeat after repair; no target is waived.
 - Open #156 gaps include threaded execution, NewGRF/refit callbacks, positive
   gradual loading and station acceptance polling. #240's new prospect/overlap
-  evidence is reviewed. No whole-game fidelity claim.
+  evidence is integrated. No whole-game fidelity claim.
 
 ## Tenth steering review (2026-10-13, CI)
 
@@ -118,6 +117,7 @@ retirement, with net glue in the PR (#223).
 | #233 (CI implementation; acceptance pending) | #235 | direct | `21eeb445be` | 0 / 1567 / 0 / 0; net glue 0 |
 | #234 (industry water fidelity) | #236 | direct | `b7a1429d38` | 5 / 97 / 32 / 0; net glue +32 |
 | #229 (six calibrated caps) | #230 | direct | `e69df25522` | 0 / 12 / 0 / 0; net glue 0 |
+| #239/#156 (prospect/overlap coverage) | #240 | direct | `62ef446d1e` | 0 / 114 / 0 / 0; net glue 0 |
 
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -126,9 +126,9 @@ Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas
 The default semantic harness runs in CI; regressions come first. Port differences
 go in `KNOWN_FAILURES` with an issue, never in masks (`docs/rust-migration.md`).
 
-1. **CI throughput (#233).** Parallel native jobs and simulation shards,
-   concurrent PR validation, no re-validation of an already-validated tree,
-   caches under the limit. Takes CI capacity ahead of other work.
+1. **CI throughput (#233/#243).** Protected-only family writers, measured hard
+   upload caps and retained warm fallback bound peak bytes across save waves.
+   Candidate routes stay read-only; no artifact handoff. Takes capacity first.
 2. **Speed ratchet (#155).** `SPEED_BUDGETS` in `tools/simulation/roads.py`
    holds the caps: the median of three `simulate <name> --benchmark 3 --jobs 2`
    invocations on an idle host. A PR may exceed a cap by 3% unless root accepts
@@ -136,8 +136,8 @@ go in `KNOWN_FAILURES` with an issue, never in masks (`docs/rust-migration.md`).
    its median of three beats it by more than the invocation spread (about 2%).
    Targets: play saves 1.5x, generation 1.15x. The null driver redraws whenever
    1 ms has elapsed, so a slower candidate draws more frames.
-3. **#156 coverage, standing capacity.** #239 covers failed industry prospecting
-   and automatic overlap rejection. Random and crash branches first. The
+3. **#156 coverage, standing capacity.** #239/#240 covers failed prospecting
+   and automatic overlap rejection and is integrated. Random and crash branches first. The
    tenth review added station stale-link restriction, town station ratings,
    exclusivity and unwanted months, and #218's NewGRF and game-script paths.
 4. **#234 fidelity fix (#236)** and **#229 caps (#230)** are integrated.
@@ -148,37 +148,39 @@ go in `KNOWN_FAILURES` with an issue, never in masks (`docs/rust-migration.md`).
 Integrate reviewed work first, in order of readiness; at most six unintegrated
 branches (#157). Independent items (#156, #223, caps) may run in parallel.
 
-1. **#217 station/loading** is reviewed and merges cleanly; full CI, integrate.
+1. **#217 station/loading** needs the Windows macro fix review/checks, then full CI.
 2. **#216 town, narrowed** needs shared-table conflict resolution against the
    integrated base and then #217, fresh narrow review and full CI; then town
    founding/generation, the house tile loop, and town commands, authority
    actions and deletion as their own ports.
-3. **#199/#237 aircraft conversion (#238)** is active (tenth review item 5).
-4. **New ownership:** #212 landscape and #213 base vehicle prototypes are
-   active within the tenth review's budgets; broad ports follow measured feasibility.
-   Then #219 signal blocks and #220 engine lifecycle (#220 after #213 and #148).
+3. **#199/#237 aircraft conversion (#238)** has passing final timing; review active.
+4. **New ownership:** only #212 R0 shared map-read experiment and #213 vehicle
+   prototype now; broad ports require the unchanged budgets. #212 R0 follows
+   the linked plan on its issue, including layout/lifetime/default checks.
+   Then #219 signal blocks and #220 engines (#220 after #213 and #148).
 5. **Conversions:** train and ship after #213; the #168 tail (orders, effect,
    disaster, #218's accessors) never blocks ownership.
 
-The #108 decision keeps C++ map arrays and direct bundled `noexcept` services.
-#199 selects a typed shared vehicle layer with per-operation reads.
+#108 retains C++ map arrays; measured #212 failure now selects one bounded raw
+read backend, with one shared tile-type helper and callback fallback for unaudited
+owners/fixtures. Prove native layout/allocation stability and serial access; no
+Rust references/slices survive callbacks. GetTileType's assertion policy stays.
+No storage transfer, unchecked timing proxy, new accessor copy or budget waiver.
 
 ## Resume checkpoint
 
-Active continuous development. #230/#236 integrated and their worktrees removed.
-Post-merge checks are pending; any red integration check takes priority. #217
-merges cleanly; #216 needs shared-service union fixes and a fresh conflict review.
-Aircraft has complete strict timing evidence but unresolved Padhattan-2016 spread.
-Both new ownership tasks are prototypes only until root accepts budget evidence.
+Active continuous development. #240's tested tree is the merged tree; post-merge
+cache refresh is expected. Earlier code post-merge runs pass. CI peak acceptance
+failed and #243 is selected first. Landscape P0/P1 failed; only R0 is selected.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #214 / #217 | `station-loading-direct-214`, `debe725826` | Reviewed; full CI, integrate before town. |
-| #148 / #216 | `town-lifecycle-148`, `78477f22bc` | Base update active; adopt #217 when integrated, fresh conflict review. |
-| #237 / #238 | `aircraft-shared-boundary-237`, `0f3a9cf066` | Strict timing complete; matched base diagnosis, then review. |
-| #239 / #240 | `industry-prospect-coverage-239`, `2081e85ce5` | Fresh independent review complete; full CI, integrate. |
-| #212 | `landscape-budget-prototype-212`, `e69df25522` | Source prototype active; measure before broad port. |
-| #213 | `vehicle-budget-prototype-213`, `e69df25522` | Fresh plan on issue; source prototype active. |
+| #214 / #217 | `station-loading-direct-214`, `de6266066a` | Fresh fixing review/native checks active, then full CI. |
+| #148 / #216 | `town-lifecycle-148`, `3504fc4706` | Clean/pushed; final #217 adoption and fresh conflict review wait. |
+| #237 / #238 | `aircraft-shared-boundary-237`, `a019d4279e` | All six caps pass; fresh fixing review active. |
+| #212 / #241 | `landscape-budget-prototype-212`, `6b33b1f45a` | P0/P1 fail; count attribution, then selected R0 experiment. |
+| #213 / #242 | `vehicle-budget-prototype-213`, `649aa1d9fb` | Cargo passes; native/Opus feasibility pending. |
+| #233 / #243 | `ci-cache-peak-233`, pending | Selected protected-writer fix starts from integrated base. |
 
 Next unstarted: #219/#220. ABI blocks: train through 385, tree additions 386-389,
 fleet 390-399, company 400-429, town 430-459, road 460-499, station/loading 500-559,
