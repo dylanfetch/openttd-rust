@@ -63,19 +63,19 @@ static inline uint8_t TownProtocol_house_extra_flags(uint16_t) noexcept { return
 static inline bool TownProtocol_house_allows_callback(uint16_t) noexcept { return town_protocol_world->house_callback; }
 static inline OpenTTDTownRoadChoice TownProtocol_road_info(uint8_t) noexcept { return {}; }
 static inline void TownProtocol_dirty_town(uint32_t town) noexcept { TownProtocolLeaf(1, town, 0, 0, 0); }
-static inline uint32_t TownProtocol_foundation_slope(uint32_t tile) noexcept { return TownProtocolLeaf(4, tile, 0, 0, 0); }
+static inline uint32_t TownProtocol_foundation_slope(uint32_t tile) noexcept { return static_cast<uint32_t>(TownProtocolLeaf(4, tile, 0, 0, 0)); }
 static inline int64_t TownProtocol_terraform_price() noexcept { return TownProtocolLeaf(5, 0, 0, 0, 0); }
-static inline uint32_t TownProtocol_clean_road_bits(uint32_t tile, uint32_t bits) noexcept { return TownProtocolLeaf(6, tile, bits, 0, 0); }
+static inline uint32_t TownProtocol_clean_road_bits(uint32_t tile, uint32_t bits) noexcept { return static_cast<uint32_t>(TownProtocolLeaf(6, tile, bits, 0, 0)); }
 static inline void TownProtocol_set_road_town(uint32_t tile, uint32_t town) noexcept { TownProtocolLeaf(7, tile, town, 0, 0); }
-static inline uint32_t TownProtocol_exchange_company(uint32_t company) noexcept { return TownProtocolLeaf(8, 0, company, 0, 0); }
+static inline uint32_t TownProtocol_exchange_company(uint32_t company) noexcept { return static_cast<uint32_t>(TownProtocolLeaf(8, 0, company, 0, 0)); }
 static inline uint16_t TownProtocol_house_class(uint16_t) noexcept { return town_protocol_world->house_class; }
 static inline void TownProtocol_make_house(uint32_t tile, uint32_t town, uint32_t house, uint32_t construction) noexcept { TownProtocolLeaf(10, tile, town, house, construction); }
 static inline void TownProtocol_add_animation(uint32_t tile) noexcept { TownProtocolLeaf(11, tile, 0, 0, 0); }
 static inline void TownProtocol_population_changed(uint32_t) noexcept { town_protocol_world->population = openttd_rust_town_simulation(town_protocol_world->owner)->population; }
 static inline void TownProtocol_nearby_stations(uint32_t town, uint32_t tile, uint32_t size) noexcept { TownProtocolLeaf(15, town, tile, size, 0); }
-static inline uint32_t TownProtocol_house_count() noexcept { return TownProtocolLeaf(17, 0, 0, 0, 0); }
+static inline uint32_t TownProtocol_house_count() noexcept { return static_cast<uint32_t>(TownProtocolLeaf(17, 0, 0, 0, 0)); }
 static inline void TownProtocol_update_max_pass(uint32_t town) noexcept { TownProtocolLeaf(19, town, 0, 0, 0); }
-static inline uint32_t TownProtocol_next_town(uint32_t from) noexcept { return TownProtocolLeaf(20, 0, from, 0, 0); }
+static inline uint32_t TownProtocol_next_town(uint32_t from) noexcept { return static_cast<uint32_t>(TownProtocolLeaf(20, 0, from, 0, 0)); }
 static inline uint64_t TownProtocol_road_mask() noexcept { return TownProtocolLeaf(21, 0, 0, 0, 0); }
 static inline bool TownProtocol_build_road(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t mode) noexcept
 {

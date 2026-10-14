@@ -1021,7 +1021,7 @@ static void RustTown_nearby_stations(uint32_t town, uint32_t tile, uint32_t size
 }
 static uint32_t RustTown_house_count() noexcept
 {
-	return HouseSpec::Specs().size();
+	return static_cast<uint32_t>(HouseSpec::Specs().size());
 }
 static void RustTown_update_max_pass(uint32_t town) noexcept
 {
