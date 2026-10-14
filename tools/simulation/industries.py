@@ -16,6 +16,7 @@ def uses_ai(scenario):
         "prospect",
         "clear",
         "terraform",
+        "water-check",
     )
 
 
@@ -26,6 +27,7 @@ def install(scenario, run_dir):
         (folder / "parameters.nut").write_text(
             f'INDUSTRY_MODE <- "{scenario["industry"]}";\n'
             f"INDUSTRY_TARGET <- {scenario.get('industry_target', 0)};\n"
+            f'INDUSTRY_WATER <- "{scenario.get("industry_water", "none")}";\n'
         )
 
 
@@ -127,6 +129,33 @@ def scenarios(soak):
                 ],
             }
         )
+    result.extend(
+        {
+            "name": "industry-water-check-" + obstruction,
+            "kind": "generate",
+            "seed": 12345,
+            "map_log2": 7,
+            "land_generator": 1,
+            "industry": "water-check",
+            "industry_water": obstruction,
+            "ticks": 6 * SNAPSHOT_TICKS,
+            "settings": {
+                "game_creation": {"starting_year": 1980},
+                "difficulty": {
+                    "industry_density": 0,
+                    "max_loan": 20000000,
+                    "terrain_type": 0,
+                    "quantity_sea_lakes": 3,
+                },
+                "construction": {"raw_industry_construction": 1},
+            },
+            "console": [
+                "setting difficulty.disasters 0",
+                "start_ai MigrationIndustries",
+            ],
+        }
+        for obstruction in ("depot", "lock")
+    )
     result.extend(
         dict(
             scenario,
@@ -282,6 +311,19 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
 
 def check(scenario, run, mode, role, result):
     kind = scenario.get("industry")
+    if kind == "water-check":
+        for branch in ("plain", scenario["industry_water"], "fund"):
+            marker = f"INDUSTRY-WATER {branch} ready true"
+            if not any(marker in line for line in run["log"]):
+                result["problems"].append(
+                    f"{mode}/{role}: water-check {branch} branch missing"
+                )
+        if not run["snapshots"] or not any(
+            row["type"] == 5 and row["founder"] < 15
+            for row in economy.rows(read_save(run["snapshots"][-1]), "INDY").values()
+        ):
+            result["problems"].append(f"{mode}/{role}: no player-funded oil rig")
+        return
     if kind == "transfer" and not run["snapshots"]:
         raise RuntimeError("industry ownership transfer witness has no output save")
     if kind is None or not run["snapshots"]:
