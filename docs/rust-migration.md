@@ -432,11 +432,18 @@ Runner settings are `CI_LINUX_HEAVY`, `CI_LINUX_COMPARISONS`,
 `CI_MACOS_HEAVY` (default `macos-latest`). Heavy native jobs use `nproc` slots.
 One full request peaks around 16 jobs; overlapping requests may queue against
 account/runner capacity. Runner size and account plan remain repository settings.
-The repository belongs to the `fetch-laboratories` organization (GitHub Free) so
-that an organization-installed runner provider such as Blacksmith can serve it;
-until one is approved the variables stay unset and jobs use GitHub-hosted runners.
-Switching a job means setting its variable to the provider's label (for example
-`blacksmith-8vcpu-ubuntu-2404`), with no workflow change.
+The repository belongs to the `fetch-laboratories` organization, where Blacksmith
+serves the Linux jobs: `CI_LINUX_HEAVY` is `blacksmith-8vcpu-ubuntu-2404` and the
+other Linux variables are `blacksmith-4vcpu-ubuntu-2404`. macOS, Windows and light
+jobs stay on GitHub-hosted runners (free for this public repository; Blacksmith
+bills macOS at 20x). Blacksmith serves `actions/cache` from its own co-located
+store on its runners, so the GitHub cache budget above covers only GitHub-hosted
+jobs. Unsetting a variable returns that job to GitHub with no workflow change.
+Profile CI time with the Blacksmith CLI (`blacksmith jobs list|steps|stats`,
+`jobs aggregate`, `jobs diagnose rightsize`) before changing runner sizes or
+sharding: `stats` gives each Blacksmith job's CPU and memory timeseries. Agents
+authenticate with an org token (`blacksmith org-token create`, admin only), never
+a copy of a person's `~/.blacksmith/credentials`.
 
 `python3 tools/preflight.py --base origin/rust-migration --verification REPORT`
 runs the pinned inherited commit checker and checks explicit candidate compiler
