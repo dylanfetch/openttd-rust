@@ -164,6 +164,11 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
                 (folder / role / name).symlink_to(
                     builds[role] / name, target_is_directory=True
                 )
+    if binaries["reference"] == binaries["candidate"]:
+        # Reuse the identical reference adapter in --self. Distinct output paths
+        # would incorrectly make the core expect Rust-only branch witnesses.
+        executables["candidate"] = executables["reference"]
+        provenance["candidate"] = provenance["reference"]
     result["signals_adapter"] = provenance
     if scenario["signals"] == "reload":
         saves, logs = {}, {}
