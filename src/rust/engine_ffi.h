@@ -16,8 +16,8 @@ struct OpenTTDEngineRef { const OpenTTDEngine *shell; OpenTTDEngineLifecycle *st
 struct OpenTTDEngineSyncVariant { uint16_t parent; bool sync; };
 struct OpenTTDEngineDisplayVariant { uint16_t parent, display; };
 struct OpenTTDEnginePreviewVariant { uint16_t parent; bool join; };
-struct OpenTTDEngineReliability { uint8_t base_life; int8_t retire_early; };
-struct OpenTTDEngineStartup { int32_t base_intro; uint32_t grfid; uint8_t decay_speed, base_life; bool climate; };
+struct OpenTTDEngineReliability { int32_t base_life; int8_t retire_early; };
+struct OpenTTDEngineStartup { int32_t base_intro; uint32_t grfid; int32_t base_life; uint8_t decay_speed; bool climate; };
 struct OpenTTDEngineSeed { int32_t base_intro, lifelength; uint8_t decay_speed; int8_t retire_early; };
 struct OpenTTDEngineYear { int32_t base_intro, lifelength; };
 struct OpenTTDEngineYMD { int32_t year; uint8_t month, day; };

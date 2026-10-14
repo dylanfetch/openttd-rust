@@ -118,15 +118,15 @@ pub struct PreviewVariant {
 }
 #[repr(C)]
 pub struct Reliability {
-    pub base_life: u8,
+    pub base_life: i32,
     pub retire_early: i8,
 }
 #[repr(C)]
 pub struct Startup {
     pub base_intro: i32,
     pub grfid: u32,
+    pub base_life: i32,
     pub decay_speed: u8,
-    pub base_life: u8,
     pub climate: bool,
 }
 #[repr(C)]
@@ -426,7 +426,11 @@ unsafe fn start_one(s: &Services, e: EngineRef, aging: Ymd, seed: u32) {
     write!(
         e,
         duration_phase_2,
-        (((r >> 5) & 15) as i32 + i32::from(cfg.base_life) * 12 - 96).max(0) as u16
+        cfg.base_life
+            .wrapping_mul(12)
+            .wrapping_add(((r >> 5) & 15) as i32)
+            .wrapping_sub(96)
+            .max(0) as u16
     );
     write!(e, duration_phase_3, ((r >> 9) & 127) as u16 + 120);
     unsafe {

@@ -31,6 +31,7 @@ EXPECTED = {
     ),
     "preview": ("offered true true", "joined true true", "penalty true true"),
     "reliability": (
+        "startup-life true",
         "retired true true true",
         "never-expire true true",
         "synced true",

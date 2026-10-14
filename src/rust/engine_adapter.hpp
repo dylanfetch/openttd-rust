@@ -49,12 +49,12 @@ static OpenTTDEnginePreviewVariant Engine_preview_variant(const OpenTTDEngine *e
 static OpenTTDEngineReliability Engine_reliability(const OpenTTDEngine *shell) noexcept
 {
 	const auto &info = EngineOf(shell)->info;
-	return {.base_life = static_cast<uint8_t>(info.base_life.base()), .retire_early = info.retire_early};
+	return {.base_life = info.base_life.base(), .retire_early = info.retire_early};
 }
 static OpenTTDEngineStartup Engine_startup(const OpenTTDEngine *shell) noexcept
 {
 	const Engine *e = EngineOf(shell); const auto &info = e->info;
-	return {.base_intro = info.base_intro.base(), .grfid = e->GetGRFID(), .decay_speed = info.decay_speed, .base_life = static_cast<uint8_t>(info.base_life.base()), .climate = info.climates.Test(OpenTTDLandscape())};
+	return {.base_intro = info.base_intro.base(), .grfid = e->GetGRFID(), .base_life = info.base_life.base(), .decay_speed = info.decay_speed, .climate = info.climates.Test(OpenTTDLandscape())};
 }
 static OpenTTDEngineSeed Engine_seed_config(const OpenTTDEngine *e) noexcept
 {

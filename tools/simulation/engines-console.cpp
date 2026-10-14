@@ -115,6 +115,10 @@ static bool EnginesScenario(std::span<std::string_view> args)
 		fmt::print(stderr, "ENGINE penalty {} {}\n", BlockPreview(c) == 20, e->flags.Test(EngineFlag::Available));
 	} else if (args[1] == "reliability") {
 		_settings_game.vehicle.never_expire_vehicles = false;
+		/* Exercise the native Calendar::Year domain beyond byte-sized NewGRF inputs. */
+		e->info.base_life = TimerGameCalendar::Year{511};
+		StartupOneEngine(e, TimerGameCalendar::ConvertDateToYMD(TimerGameCalendar::date), 0);
+		fmt::print(stderr, "ENGINE startup-life {}\n", e->duration_phase_2 > 5000);
 		e->age = 60;
 		e->duration_phase_1 = 10;
 		e->duration_phase_2 = 20;
