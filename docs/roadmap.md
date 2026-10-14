@@ -9,20 +9,23 @@ forward-looking, about 200 lines; completed work is one row, with evidence in PR
 - Twenty-three ownership ports. Whole fork against the pinned original: Rust
   55,453 / tooling 28,635 / C++ glue 25,307 / original C++ retired 36,162 (7.68%
   of all `src/` sources); simulation-source share 28,215 / 102,615 (27.50%, #226).
-- #230/#236/#240/#217 are integrated and cleaned up. The fourth integration
-  leaves original retirement unchanged; five branches remain. Finish the bounded
-  ownership experiments or defer them, then #219 before further conversions.
+- #230/#236/#240/#217/#238 are integrated and cleaned up. The fourth-integration
+  stock above leaves original retirement unchanged; refresh it after the sixth.
+  Five component branches remain, including deferred #212's retained branch.
+  Finish #213's final budget gate; prioritize whole owners #219 and #220.
 - Current calibrated ratios: Opus 1.258, Grok 1.254, Padhattan-1996 1.275,
   Padhattan-2000 1.349, Padhattan-2016 1.427, TGP 1.164. TGP remains above
   1.15. Aircraft's final six-case medians pass; a matched Padhattan-2016
   diagnosis shows 4.51% improvement. Initial noisy samples remain in #238.
 - #212 P0/P1/R0 fail TGP: +28/+38/+31 ms against 11 ms; defer the owner and
-  map-read experiment. #213 P0 fails 6 ns/current cap; only its selected
-  two-phase scalar-address revision remains. Start whole signal ownership #219.
+  map-read experiment. #213 P0 and scalar-address P1 both fail 6 ns/current cap;
+  defer the vehicle owner too. Continue whole signal/engine ownership #219/#220.
 - #233 is incomplete: concurrent cache writes peaked at 10.37 GiB; missing
   entries suggest eviction. Root pruned duplicates. #243 selects protected writers per
   family, without artifact input or candidate write privileges. Warm timing and
-  three-merge acceptance repeat after repair; no target is waived.
+  three-merge acceptance repeat after repair; no target is waived. Live macOS
+  archives exceed the draft cap: select 540 MiB/flavour and 448 MiB for all other
+  caches, preserving native/Linux/MSVC caps. Measured packing/trim must fit before upload.
 - Open #156 gaps include threaded execution, NewGRF/refit callbacks, positive
   gradual loading and station acceptance polling. #240's new prospect/overlap
   evidence is integrated. No whole-game fidelity claim.
@@ -35,14 +38,13 @@ Corrections and work order:
    #233. Runner size and account plan remain the user's decision; runner classes
    stay repository settings. Integrate reviewed work by readiness.
 2. **#234 fixed (#236)**: industry water checks reject ship depots/locks.
-3. **Reviewed corrections await integration.** #217 enters once before the empty
-   queue check, uses shared accessors and removes capacity_remaining. #216 uses
-   direct shared road functions/building counts. #230 uses all six new-base
-   calibrations rather than minima. Their evidence remains in the PRs.
+3. **Town correction (#216)** uses direct shared road functions/building counts;
+   its comparison and Windows annotation failures need fixing. Integrated
+   #217/#230 evidence remains in their PRs.
 4. **Shared accessors in review (AGENTS.md).** Review reports name each new
    callback that duplicates a shared accessor; there are no boundary exceptions.
-5. **Aircraft conversion (#199/#237/#238)** is active: the largest measured
-   recoverable boundary cost (0.13 of Padhattan-2016's ratio).
+5. **Aircraft conversion (#199/#237/#238)** is integrated; matched timing and
+   boundary reductions are recorded in #238, without a speed-cap waiver.
 6. **Budgets for #212 and #213.** TGP has about 11 ms of slack. #212's scope is
    about 177 of TGP's 352 reference ms over 14.4M tile visits: at most about
    0.8 ns extra per visit, and no Rust-to-C++-to-Rust crossing for tile types
@@ -119,6 +121,7 @@ retirement, with net glue in the PR (#223).
 | #229 (six calibrated caps) | #230 | direct | `e69df25522` | 0 / 12 / 0 / 0; net glue 0 |
 | #239/#156 (prospect/overlap coverage) | #240 | direct | `62ef446d1e` | 0 / 114 / 0 / 0; net glue 0 |
 | #214/#168 (typed station/loading) | #217 | direct | `3b3b931099` | 1018 / 42 / 1147 / 0; net glue +705 |
+| #237/#199 (typed aircraft boundary) | #238 | direct | `141e4ce397` | 798 / 420 / 470 / 0; net glue -310 |
 
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -146,50 +149,50 @@ go in `KNOWN_FAILURES` with an issue, never in masks (`docs/rust-migration.md`).
 Integrate reviewed work first, in order of readiness; at most six unintegrated
 branches (#157). Independent items (#156, #223, caps) may run in parallel.
 
-1. **#216 town, narrowed** adopts integrated #217, with fresh conflict review
-   and full CI; then town
-   founding/generation, the house tile loop, and town commands, authority
-   actions and deletion as their own ports.
-2. **#199/#237 aircraft (#238)** passed full CI; fresh #217 conflict review runs.
-3. **New ownership:** start complete #219 signal-block traversal/work sets from
+1. **#216 town, narrowed** adopts integrated #238; fresh fixing review covers
+   shared conflicts, the history comparison and Windows annotations, then full CI.
+2. **New ownership:** complete #219 signal-block traversal/work sets from
    integrated base; no dependency on the failed landscape draft or vehicle draft.
-   #213's selected revision keeps the unchanged budget; failure defers it.
-   #220 engines follows #213/#148 or a fresh dependency selection after deferral.
-4. **Conversions:** train and ship after #213; the #168 tail (orders, effect,
+   #213's selected revision failed the unchanged budget; its owner is deferred.
+   Root reselects #220 engine lifecycle next, independent of #213/#148: its
+   shared engine/company/ByteSpan services are integrated. No branch stacking.
+3. **Further town owners:** #246 founding/generation/names after integrated
+   #216; #247 commands/authority/deletion after #246. House tile loops need a
+   separate future selection. Reuse the sole town owner and generation unwind contract.
+4. **Conversions:** train and ship await a new selection after #213's deferral;
+   the #168 tail (orders, effect,
    disaster, #218's accessors) never blocks ownership.
 
 #108 retains C++ map arrays and integrated typed services. #212's bounded raw
 type-reader also failed; defer it with the owner, without an unchecked timing
 proxy or budget waiver. New owners reuse integrated services, never draft copies.
 
-#213 selects two shared typed native scalar-address bundles, only for post-tick
-cargo and motion/sound phases, following the linked source/lifetime plan on #213.
-Rust dereferences fields at original branches; status stays a typed service.
-No Vehicle/STL layout view, offsets, storage transfer, reference across callback,
-joined phase record or timer change. Preserve native assertion configurations.
-Measure crossings/bytes and matched CPU/wall time; both 6 ns and current cap must
-pass. Failure defers this owner; broad maintenance remains unstarted.
+#213's two-phase scalar-address revision also failed both gates: 12.1 ns added
+CPU per tick against 6 ns, and all three wall medians exceed the cap plus 3%.
+Defer its owner/address experiment; broad maintenance remains unstarted. No
+third boundary expansion, timer change or budget waiver is selected.
 
 ## Resume checkpoint
 
-Active continuous development. #217 passed full CI and is merged/cleaned; its
-post-merge native policy hit a GitHub API failure and root reran it. More merges
-wait for main recovery. #243 is first. #212 is deferred; #213's revision remains.
+Active continuous development. #217's post-merge API failure recovered; #238
+passed final full CI, merged/cleaned and passed protected cache refresh.
+#243 archive-fit repair precedes bootstrap. #212/#213 owners are deferred.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #148 / #216 | `town-lifecycle-148`, `3d1164d918` | #217 adoption pushed; fresh conflict checks active. |
-| #237 / #238 | `aircraft-shared-boundary-237`, `ca601fd547` | Earlier full passed; #217 conflicts resolved; fresh checks active. |
-| #212 / #241 | `landscape-budget-prototype-212`, `45633ef6d6` | R0 fails budget/cap; final attribution/disposition then deferred. |
-| #213 / #242 | `vehicle-budget-prototype-213`, `d9a3d55043` | Scalar-address revision Cargo passes; native/semantics then budget gate. |
-| #233 / #244 | `ci-cache-peak-233`, `85dd778eb1` | #243 protected-only two-slot publisher in progress; bootstrap after review. |
-| #219 | fresh integrated-base branch pending | Whole signal owner selected; starts when prototype task frees slot. |
+| #148 / #216 | `town-lifecycle-148`, `bab099e053` | Full CI failed comparison/annotations; fresh fixing round adopts #238. |
+| #212 / #241 | retained branch, `45633ef6d6` | R0 fails budget/cap; PR closed, worktree removed, owner deferred. |
+| #213 / #242 | `vehicle-budget-prototype-213`, `92b8a04075` | Cargo/native/298 cases pass; P1 CPU/wall fail, final disposition then cleanup. |
+| #233 / #244 | `ci-cache-peak-233`, `6b32bc8207` | Review fixes verified; correct live archive fit, fresh review, bootstrap and live acceptance. |
+| #219 / #245 | `signal-owner-219`, `999048c5db` | Native/focused semantics pass; finish fixtures, strict timing, fresh review. |
+| #220 | integrated-base branch pending | Engine lifecycle selected independently; starts below six-branch cap. |
 
-Next unstarted after #219: #220; fresh owner planning follows #219 kickoff.
+Next unstarted owners: #220, #246 and #247; the two town dependencies above apply.
 ABI blocks: train through 385, tree additions 386-389,
 fleet 390-399, company 400-429, town 430-459, road 460-499, station/loading 500-559,
 industry 560-619 (572 shared ByteSpan), CommandCost 620-629, town lifecycle 630-669,
-aircraft 670-739, vehicle 740-779, deferred landscape 780-819, signals 820-859.
+aircraft 670-739, deferred vehicle 740-779, deferred landscape 780-819,
+signals 820-859, engines 860-919.
 Only consumed layouts.
 
 Preserve the pinned reference, paused curve worktrees and evidence branches
