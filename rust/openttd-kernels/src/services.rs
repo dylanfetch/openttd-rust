@@ -59,6 +59,8 @@ pub struct TownHandle {
     _private: [u8; 0],
 }
 
+/// Source `TileType::MP_HOUSE`.
+pub const MP_HOUSE: u8 = 3;
 /// Synchronous borrowed bytes, including embedded NULs. The producing entry
 /// specifies lifetime; no native callback may retain this view after mutation.
 #[repr(C)]

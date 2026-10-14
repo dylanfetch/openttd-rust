@@ -7,6 +7,7 @@
 
 #include "command_cost_services.h"
 #include "services_ffi.h"
+#include "company_services.h"
 
 /* Named shared services and full native CommandCost storage. All callbacks are
  * noexcept, retain original move/AddCost behavior, and permit ordinary reentry.
@@ -47,7 +48,7 @@ static constexpr bool FLEET_ASSERTIONS = true;
 #else
 static constexpr bool FLEET_ASSERTIONS = false;
 #endif
-static bool FleetTransaction_needs_renew(void *shell, bool settings) noexcept { return static_cast<Vehicle *>(shell)->NeedsAutorenewing(Company::Get(_current_company), settings); }
+static bool FleetTransaction_needs_renew(void *shell, bool settings) noexcept { return static_cast<Vehicle *>(shell)->NeedsAutorenewing(Company::Get(OpenTTDCurrentCompany()), settings); }
 static bool FleetTransaction_engine_valid(uint16_t id) noexcept { return Engine::IsValidID(EngineID(id)); }
 static bool FleetTransaction_company_valid(uint8_t id) noexcept { return GetRustSharedServices().company_valid(id); }
 static bool FleetTransaction_engine_buildable(uint16_t id, uint8_t type, uint8_t company) noexcept { return IsEngineBuildable(EngineID(id), static_cast<VehicleType>(type), CompanyID(company)); }

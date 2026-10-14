@@ -8,6 +8,10 @@
 /** @file orders_ffi.h Canonical order, shared-list and timetable owners. */
 #ifndef RUST_ORDERS_FFI_H
 #define RUST_ORDERS_FFI_H
+
+/** Opaque live native entity, distinct from Rust-owned boundary state. */
+struct OrderList;
+using OpenTTDOrderList = OrderList;
 #include <cstddef>
 #include <cstdint>
 struct OpenTTDOrderFields {

@@ -80,7 +80,7 @@ static void TriggerIndustryAnimation(Industry *i, IndustryAnimationTrigger) { de
 
 static int CheckCargoDestinationGap(OpenTTDCargoServices s)
 {
-	s.near = [](uint16_t, uint32_t n) noexcept -> void * { return n < destination_station.industries_near.size() ? destination_station.industries_near[n].industry : nullptr; };
+	s.nearby_industry = [](uint16_t, uint32_t n) noexcept -> void * { return n < destination_station.industries_near.size() ? destination_station.industries_near[n].industry : nullptr; };
 	s.station_read = [](uint16_t, uint8_t field, uint8_t) noexcept -> uint32_t { return field == 0 ? destination_station.owner : 0; };
 	s.industry_read = [](void *p, uint8_t field, uint32_t slot) noexcept -> uint32_t {
 		auto *i = static_cast<Industry *>(p);

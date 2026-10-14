@@ -8,6 +8,12 @@
 /** @file linkgraph_ffi.h Owned computation of a copied link graph job. */
 #ifndef OPENTTD_RUST_LINKGRAPH_FFI_H
 #define OPENTTD_RUST_LINKGRAPH_FFI_H
+
+/** Opaque live native entity, distinct from Rust-owned boundary state. */
+#ifdef __cplusplus
+class LinkGraph;
+using OpenTTDLinkGraph = LinkGraph;
+#endif
 #include <stdint.h>
 #include <stddef.h>
 #if defined(_MSC_VER)
