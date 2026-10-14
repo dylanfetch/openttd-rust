@@ -21,7 +21,12 @@ REQUIRED = {
     "reload": (),
 }
 EXPECTED = {
-    "commands": ("company-bits true", "hidden true", "disabled true"),
+    "commands": (
+        "company-bits true",
+        "clear-special true",
+        "hidden true",
+        "disabled true",
+    ),
     "preview": ("offered true true", "joined true true", "penalty true true"),
     "reliability": (
         "retired true true true",

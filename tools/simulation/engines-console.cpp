@@ -23,6 +23,7 @@
 #include "console_func.h"
 
 void CalendarEnginesMonthlyLoop();
+void ClearEnginesHiddenFlagOfCompany(CompanyID);
 [[noreturn]] static void FixtureAbort(int line) { fmt::print(stderr, "ENGINE setup-failure {}\n", line); std::fflush(stderr); std::abort(); }
 static void Cost(const char *label, const CommandCost &cost)
 {
@@ -73,6 +74,10 @@ static bool EnginesScenario(std::span<std::string_view> args)
 		bool special_bits = true;
 		for (uint8_t id : {16, 17, 32, 33, 48, 49, 63}) special_bits &= !IsEngineBuildable(e->index, e->type, CompanyID{id});
 		fmt::print(stderr, "ENGINE company-bits {}\n", special_bits);
+		e->company_hidden.Set(c->index);
+		ClearEnginesHiddenFlagOfCompany(CompanyID{16});
+		fmt::print(stderr, "ENGINE clear-special {}\n", e->company_hidden.Test(c->index));
+		e->company_hidden.Reset(c->index);
 		Cost("rename-test", Command<CMD_RENAME_ENGINE>::Do({}, e->index, "Migration engine"));
 		Cost("rename", Command<CMD_RENAME_ENGINE>::Do(DoCommandFlag::Execute, e->index, "Migration engine"));
 		Cost("duplicate", Command<CMD_RENAME_ENGINE>::Do(DoCommandFlag::Execute, variant->index, "Migration engine"));

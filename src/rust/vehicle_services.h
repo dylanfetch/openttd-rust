@@ -19,9 +19,9 @@ inline OpenTTDVehicle *RustVehicle(const Vehicle *v) noexcept { return reinterpr
 inline Vehicle *VehicleOf(OpenTTDVehicle *v) noexcept { return reinterpret_cast<Vehicle *>(v); }
 
 /** Shared ascending vehicle pool traversal for lifecycle and fleet ports. */
-inline void *RustNextVehicle(uint32_t from) noexcept
+inline OpenTTDVehicle *RustNextVehicle(uint32_t from) noexcept
 {
-	for (Vehicle *v : Vehicle::Iterate(from)) return v;
+	for (Vehicle *v : Vehicle::Iterate(from)) return RustVehicle(v);
 	return nullptr;
 }
 

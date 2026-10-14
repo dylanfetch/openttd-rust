@@ -36,7 +36,7 @@ inline OpenTTDEngineCompany Engine_company_next(uint32_t from) noexcept
 }
 inline OpenTTDEngineVehicle Engine_vehicle_next(uint32_t from) noexcept
 {
-	const Vehicle *v = static_cast<Vehicle *>(RustNextVehicle(from));
+	const Vehicle *v = VehicleOf(RustNextVehicle(from));
 	return v == nullptr ? OpenTTDEngineVehicle{nullptr, UINT32_MAX, 0, VEH_INVALID} : OpenTTDEngineVehicle{RustVehicle(v), v->index.base(), RustVehicleOwner(v), RustVehicleVehicleType(v)};
 }
 #endif /* RUST_ENGINE_SERVICES_H */
