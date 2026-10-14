@@ -35,8 +35,9 @@ checkpoint and work order.
 3. When fewer than two unstarted components remain ahead of active work, spawn a
    fresh high-effort planning agent (Astra in Codex) to select the next whole
    simulation owners, guided by the world-state design and the latest speed
-   profile. Never fall back to utility kernels, src/3rdparty, GUI, or paused or
-   deferred issues.
+   profile. Never fall back to utility kernels, src/3rdparty, GUI, paused issues
+   or `deferred-improvement` issues. A simulation owner you set aside after a
+   failed gate stays yours to re-select once a profile shows the fix.
 4. After every second integration, take stock in "Where the fork stands": C++
    game logic retired, glue and tooling cost, play-save speed ratio, open
    coverage gaps, and the unintegrated branch count. If retirement stalls, speed

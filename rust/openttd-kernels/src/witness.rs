@@ -235,71 +235,86 @@ pub const STATION_GRADUAL_UNLOAD: usize = 99;
 /// `station.full_load_reserve` branch.
 pub const STATION_FULL_LOAD_RESERVE: usize = 100;
 
+/// Primary aircraft ticks, including both event passes.
+pub const AIRCRAFT_TICKS: usize = 101;
+/// Aircraft calls into native services, including shared services.
+pub const AIRCRAFT_SERVICES: usize = 102;
+/// Native calls into aircraft controllers/helpers (excluding owner allocation).
+pub const AIRCRAFT_ENTRIES: usize = 103;
+/// Aircraft service station-pool resolutions.
+pub const AIRCRAFT_STATIONS: usize = 104;
+/// Bytes returned by aircraft observations (including record padding).
+pub const AIRCRAFT_BYTES: usize = 105;
+/// Cache helper ingress, also included in total entries.
+pub const AIRCRAFT_CACHE_ENTRIES: usize = 106;
+/// Ownerless flight helper ingress, also included in total entries.
+pub const AIRCRAFT_DISASTER_ENTRIES: usize = 107;
+
 /// Signal `updates` witness.
-pub const SIGNAL_UPDATES: usize = 101;
+pub const SIGNAL_UPDATES: usize = 108;
 /// Signal `tiles` witness.
-pub const SIGNAL_TILES: usize = 102;
+pub const SIGNAL_TILES: usize = 109;
 /// Signal `services` witness.
-pub const SIGNAL_SERVICES: usize = 103;
+pub const SIGNAL_SERVICES: usize = 110;
 /// Signal `tbu_overflow` witness.
-pub const SIGNAL_TBU_OVERFLOW: usize = 104;
+pub const SIGNAL_TBU_OVERFLOW: usize = 111;
 /// Signal `tbd_overflow` witness.
-pub const SIGNAL_TBD_OVERFLOW: usize = 105;
+pub const SIGNAL_TBD_OVERFLOW: usize = 112;
 /// Signal `global_overflow` witness.
-pub const SIGNAL_GLOBAL_OVERFLOW: usize = 106;
+pub const SIGNAL_GLOBAL_OVERFLOW: usize = 113;
 /// Signal `train` witness.
-pub const SIGNAL_TRAIN: usize = 107;
+pub const SIGNAL_TRAIN: usize = 114;
 /// Signal `owner_barrier` witness.
-pub const SIGNAL_OWNER_BARRIER: usize = 108;
+pub const SIGNAL_OWNER_BARRIER: usize = 115;
 /// Signal `depot` witness.
-pub const SIGNAL_DEPOT: usize = 109;
+pub const SIGNAL_DEPOT: usize = 116;
 /// Signal `split` witness.
-pub const SIGNAL_SPLIT: usize = 110;
+pub const SIGNAL_SPLIT: usize = 117;
 /// Signal `pbs` witness.
-pub const SIGNAL_PBS: usize = 111;
+pub const SIGNAL_PBS: usize = 118;
 /// Signal `multi_enter` witness.
-pub const SIGNAL_MULTI_ENTER: usize = 112;
+pub const SIGNAL_MULTI_ENTER: usize = 119;
 /// Signal `exit` witness.
-pub const SIGNAL_EXIT: usize = 113;
+pub const SIGNAL_EXIT: usize = 120;
 /// Signal `green_exit` witness.
-pub const SIGNAL_GREEN_EXIT: usize = 114;
+pub const SIGNAL_GREEN_EXIT: usize = 121;
 /// Signal `station` witness.
-pub const SIGNAL_STATION: usize = 115;
+pub const SIGNAL_STATION: usize = 122;
 /// Signal `crossing` witness.
-pub const SIGNAL_CROSSING: usize = 116;
+pub const SIGNAL_CROSSING: usize = 123;
 /// Signal `wormhole` witness.
-pub const SIGNAL_WORMHOLE: usize = 117;
+pub const SIGNAL_WORMHOLE: usize = 124;
 /// Signal `reserved_skip` witness.
-pub const SIGNAL_RESERVED_SKIP: usize = 118;
+pub const SIGNAL_RESERVED_SKIP: usize = 125;
 /// Signal `combo` witness.
-pub const SIGNAL_COMBO: usize = 119;
+pub const SIGNAL_COMBO: usize = 126;
 /// Signal `propagate` witness.
-pub const SIGNAL_PROPAGATE: usize = 120;
+pub const SIGNAL_PROPAGATE: usize = 127;
 /// Signal `changed` witness.
-pub const SIGNAL_CHANGED: usize = 121;
+pub const SIGNAL_CHANGED: usize = 128;
 /// Signal `reset` witness.
-pub const SIGNAL_RESET: usize = 122;
+pub const SIGNAL_RESET: usize = 129;
 /// Signal `forced_flush` witness.
-pub const SIGNAL_FORCED_FLUSH: usize = 123;
+pub const SIGNAL_FORCED_FLUSH: usize = 130;
 
 /// Counter names, grouped by the prefix the harness selects.
 /// Bytes returned by signal-facing typed native services.
-pub const SIGNAL_BYTES: usize = 124;
+pub const SIGNAL_BYTES: usize = 131;
 
 /// Signal boundary `entries` counter.
-pub const SIGNAL_ENTRIES: usize = 125;
+pub const SIGNAL_ENTRIES: usize = 132;
 /// Signal boundary `context_acquisitions` counter.
-pub const SIGNAL_CONTEXT_ACQUISITIONS: usize = 126;
+pub const SIGNAL_CONTEXT_ACQUISITIONS: usize = 133;
 /// Signal boundary `context_owner_reads` counter.
-pub const SIGNAL_CONTEXT_OWNER_READS: usize = 127;
+pub const SIGNAL_CONTEXT_OWNER_READS: usize = 134;
 /// Signal boundary `occupancy_accessors` counter.
-pub const SIGNAL_OCCUPANCY_ACCESSORS: usize = 128;
+pub const SIGNAL_OCCUPANCY_ACCESSORS: usize = 135;
 /// Signal boundary `context_bytes` counter.
-pub const SIGNAL_CONTEXT_BYTES: usize = 129;
+pub const SIGNAL_CONTEXT_BYTES: usize = 136;
 /// Signal boundary `classification_bytes` counter.
-pub const SIGNAL_CLASSIFICATION_BYTES: usize = 130;
+pub const SIGNAL_CLASSIFICATION_BYTES: usize = 137;
 
-pub const NAMES: [&str; 131] = [
+pub const NAMES: [&str; 138] = [
     "train.tick_first",
     "train.tick_second",
     "train.reversal",
@@ -401,6 +416,13 @@ pub const NAMES: [&str; 131] = [
     "station.unload_cargo",
     "station.gradual_unload",
     "station.full_load_reserve",
+    "aircraft.ticks",
+    "aircraft.services",
+    "aircraft.entries",
+    "aircraft.station_resolutions",
+    "aircraft.observation_bytes",
+    "aircraft.cache_entries",
+    "aircraft.disaster_entries",
     "signal.updates",
     "signal.tiles",
     "signal.services",

@@ -40,6 +40,7 @@ static_assert(AM_REALISTIC == 1 && INVALID_TRACKDIR == 0xFF && INVALID_PRICE == 
 static_assert(EngineID::Invalid().base() == 0xFFFF);
 static_assert(CalendarTime::DAYS_IN_YEAR * Ticks::DAY_TICKS == 365 * 74);
 static_assert(SND_19_DEPARTURE_OLD_RV_1 == 23 && SND_1A_DEPARTURE_OLD_RV_2 == 24);
+static_assert(PROP_AIRCRAFT_SPEED == 0x0C);
 static_assert(HVOT_BUS == 4 && HVOT_TRUCK == 8);
 
 static void OPENTTD_VEHICLE_CALL VehicleSvcWriteCounters(OpenTTDVehicle *v, uint8_t tick, uint8_t running, int32_t order_time) noexcept
@@ -48,6 +49,20 @@ static void OPENTTD_VEHICLE_CALL VehicleSvcWriteCounters(OpenTTDVehicle *v, uint
 	RustWriteVehicleTick(u, tick);
 	u->running_ticks = running;
 	u->current_order_time = order_time;
+}
+static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcBreakdown(OpenTTDVehicle *v) noexcept
+{
+	Vehicle *u = VehicleOf(v);
+	u->HandleBreakdown();
+	return RustVehicleStatus(u);
+}
+static void OPENTTD_VEHICLE_CALL VehicleSvcCheckOrdersOnly(OpenTTDVehicle *v) noexcept { CheckOrders(VehicleOf(v)); }
+static void OPENTTD_VEHICLE_CALL VehicleSvcWriteCoordinates(OpenTTDVehicle *v, int32_t x, int32_t y, int32_t z) noexcept
+{
+	Vehicle *u = VehicleOf(v);
+	u->x_pos = x;
+	u->y_pos = y;
+	u->z_pos = z;
 }
 static OpenTTDVehicleBreakdown OPENTTD_VEHICLE_CALL VehicleSvcHandleBreakdown(OpenTTDVehicle *v) noexcept
 {
@@ -156,6 +171,71 @@ static OpenTTDEngineForLength OPENTTD_VEHICLE_CALL VehicleSvcEngineForLength(Ope
 
 static void OPENTTD_VEHICLE_CALL VehicleSvcWriteTick(OpenTTDVehicle *v, uint8_t tick) noexcept { RustWriteVehicleTick(VehicleOf(v), tick); }
 
+static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcSubtype(OpenTTDVehicle *v) noexcept { return RustVehicleSubtype(VehicleOf(v)); }
+static int32_t OPENTTD_VEHICLE_CALL VehicleSvcX(OpenTTDVehicle *v) noexcept { return RustVehicleX(VehicleOf(v)); }
+static int32_t OPENTTD_VEHICLE_CALL VehicleSvcY(OpenTTDVehicle *v) noexcept { return RustVehicleY(VehicleOf(v)); }
+static int32_t OPENTTD_VEHICLE_CALL VehicleSvcZ(OpenTTDVehicle *v) noexcept { return RustVehicleZ(VehicleOf(v)); }
+static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcTick(OpenTTDVehicle *v) noexcept { return RustVehicleTick(VehicleOf(v)); }
+static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcOwner(OpenTTDVehicle *v) noexcept { return RustVehicleOwner(VehicleOf(v)); }
+static uint16_t OPENTTD_VEHICLE_CALL VehicleSvcSpeed(OpenTTDVehicle *v) noexcept { return RustVehicleSpeed(VehicleOf(v)); }
+static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcSubspeed(OpenTTDVehicle *v) noexcept { return RustVehicleSubspeed(VehicleOf(v)); }
+static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcRunning(OpenTTDVehicle *v) noexcept { return RustVehicleRunning(VehicleOf(v)); }
+static int32_t OPENTTD_VEHICLE_CALL VehicleSvcOrderTime(OpenTTDVehicle *v) noexcept { return RustVehicleOrderTime(VehicleOf(v)); }
+static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcVehicleType(OpenTTDVehicle *v) noexcept { return RustVehicleVehicleType(VehicleOf(v)); }
+static void OPENTTD_VEHICLE_CALL VehicleSvcWriteX(OpenTTDVehicle *v, int32_t value) noexcept { VehicleOf(v)->x_pos = value; }
+static void OPENTTD_VEHICLE_CALL VehicleSvcWriteY(OpenTTDVehicle *v, int32_t value) noexcept { VehicleOf(v)->y_pos = value; }
+static void OPENTTD_VEHICLE_CALL VehicleSvcWriteZ(OpenTTDVehicle *v, int32_t value) noexcept { VehicleOf(v)->z_pos = value; }
+static void OPENTTD_VEHICLE_CALL VehicleSvcWriteTile(OpenTTDVehicle *v, uint32_t value) noexcept { VehicleOf(v)->tile = TileIndex(value); }
+static void OPENTTD_VEHICLE_CALL VehicleSvcWriteStatus(OpenTTDVehicle *v, uint8_t value) noexcept { VehicleOf(v)->vehstatus = VehStates{value}; }
+static void OPENTTD_VEHICLE_CALL VehicleSvcWriteSubspeed(OpenTTDVehicle *v, uint8_t value) noexcept { VehicleOf(v)->subspeed = value; }
+static void OPENTTD_VEHICLE_CALL VehicleSvcWriteBreakdownCounter(OpenTTDVehicle *v, uint8_t value) noexcept { VehicleOf(v)->breakdown_ctr = value; }
+static void OPENTTD_VEHICLE_CALL VehicleSvcWriteRunning(OpenTTDVehicle *v, uint8_t value) noexcept { VehicleOf(v)->running_ticks = value; }
+static void OPENTTD_VEHICLE_CALL VehicleSvcWriteOrderTime(OpenTTDVehicle *v, int32_t value) noexcept { VehicleOf(v)->current_order_time = value; }
+static void OPENTTD_VEHICLE_CALL VehicleSvcWriteProfit(OpenTTDVehicle *v, int64_t value) noexcept { VehicleOf(v)->profit_this_year = value; }
+static void OPENTTD_VEHICLE_CALL VehicleSvcWriteEconomyService(OpenTTDVehicle *v, int32_t value) noexcept { VehicleOf(v)->date_of_last_service = TimerGameEconomy::Date{value}; }
+static void OPENTTD_VEHICLE_CALL VehicleSvcWriteCalendarService(OpenTTDVehicle *v, int32_t value) noexcept { VehicleOf(v)->date_of_last_service_newgrf = TimerGameCalendar::Date{value}; }
+static void OPENTTD_VEHICLE_CALL VehicleSvcWriteBreakdowns(OpenTTDVehicle *v, uint8_t value) noexcept { VehicleOf(v)->breakdowns_since_last_service = value; }
+static void OPENTTD_VEHICLE_CALL VehicleSvcWriteReliability(OpenTTDVehicle *v, uint16_t value) noexcept { VehicleOf(v)->reliability = value; }
+static void OPENTTD_VEHICLE_CALL VehicleSvcWriteCargoAge(OpenTTDVehicle *v, uint16_t value) noexcept { VehicleOf(v)->vcache.cached_cargo_age_period = value; }
+static OpenTTDVehicleCoordinates OPENTTD_VEHICLE_CALL VehicleSvcCoordinates(OpenTTDVehicle *v) noexcept
+{
+	const Vehicle *u = VehicleOf(v);
+	return {.x = RustVehicleX(u), .y = RustVehicleY(u), .z = RustVehicleZ(u)};
+}
+static OpenTTDVehicleXY OPENTTD_VEHICLE_CALL VehicleSvcXy(OpenTTDVehicle *v) noexcept
+{
+	const Vehicle *u = VehicleOf(v);
+	return {.x = RustVehicleX(u), .y = RustVehicleY(u)};
+}
+static OpenTTDVehicleSpeedInputs OPENTTD_VEHICLE_CALL VehicleSvcSpeedInputs(OpenTTDVehicle *v) noexcept
+{
+	const Vehicle *u = VehicleOf(v);
+	return {.speed = RustVehicleSpeed(u), .max_speed = RustVehicleMaxSpeed(u), .acceleration = RustVehicleAcceleration(u), .status = RustVehicleStatus(u), .subspeed = RustVehicleSubspeed(u)};
+}
+static OpenTTDVehicleDirectionProgress OPENTTD_VEHICLE_CALL VehicleSvcDirectionProgress(OpenTTDVehicle *v) noexcept
+{
+	const Vehicle *u = VehicleOf(v);
+	return {.direction = RustVehicleDirection(u), .progress = RustVehicleProgress(u)};
+}
+static OpenTTDVehicleTickStatus OPENTTD_VEHICLE_CALL VehicleSvcTickStatus(OpenTTDVehicle *v) noexcept
+{
+	const Vehicle *u = VehicleOf(v);
+	return {.tick = RustVehicleTick(u), .status = RustVehicleStatus(u)};
+}
+static OpenTTDVehicleDayCost OPENTTD_VEHICLE_CALL VehicleSvcDayCost(OpenTTDVehicle *v) noexcept
+{
+	const Vehicle *u = VehicleOf(v);
+	return {.profit = RustVehicleProfit(u), .running = RustVehicleRunning(u)};
+}
+static void OPENTTD_VEHICLE_CALL VehicleSvcMakeDummy(OpenTTDVehicle *v) noexcept { VehicleOf(v)->current_order.MakeDummy(); }
+static void OPENTTD_VEHICLE_CALL VehicleSvcLoading(OpenTTDVehicle *v, bool second) noexcept { VehicleOf(v)->HandleLoading(second); }
+
+static OpenTTDVehicleAltitudeInputs OPENTTD_VEHICLE_CALL VehicleSvcAltitudeInputs(OpenTTDVehicle *v) noexcept
+{
+	const Vehicle *u = VehicleOf(v);
+	return {.max_speed = RustVehicleMaxSpeed(u), .direction = RustVehicleDirection(u)};
+}
+
 const OpenTTDVehicleServices &GetRustVehicleServices() noexcept
 {
 	static const OpenTTDVehicleServices services{
@@ -209,6 +289,44 @@ const OpenTTDVehicleServices &GetRustVehicleServices() noexcept
 		.order_type = VehicleSvcOrderType,
 		.order_destination = VehicleSvcOrderDestination,
 		.order_nonstop = VehicleSvcOrderNonStop,
+		.subtype = VehicleSvcSubtype,
+		.x = VehicleSvcX,
+		.y = VehicleSvcY,
+		.z = VehicleSvcZ,
+		.tick = VehicleSvcTick,
+		.owner = VehicleSvcOwner,
+		.speed = VehicleSvcSpeed,
+		.subspeed = VehicleSvcSubspeed,
+		.running = VehicleSvcRunning,
+		.order_time = VehicleSvcOrderTime,
+		.vehicle_type = VehicleSvcVehicleType,
+		.write_x = VehicleSvcWriteX,
+		.write_y = VehicleSvcWriteY,
+		.write_z = VehicleSvcWriteZ,
+		.write_tile = VehicleSvcWriteTile,
+		.write_status = VehicleSvcWriteStatus,
+		.write_subspeed = VehicleSvcWriteSubspeed,
+		.write_breakdown_counter = VehicleSvcWriteBreakdownCounter,
+		.write_running = VehicleSvcWriteRunning,
+		.write_order_time = VehicleSvcWriteOrderTime,
+		.write_profit = VehicleSvcWriteProfit,
+		.write_economy_service = VehicleSvcWriteEconomyService,
+		.write_calendar_service = VehicleSvcWriteCalendarService,
+		.write_breakdowns = VehicleSvcWriteBreakdowns,
+		.write_reliability = VehicleSvcWriteReliability,
+		.write_cargo_age = VehicleSvcWriteCargoAge,
+		.coordinates = VehicleSvcCoordinates,
+		.xy = VehicleSvcXy,
+		.speed_inputs = VehicleSvcSpeedInputs,
+		.direction_progress = VehicleSvcDirectionProgress,
+		.tick_status = VehicleSvcTickStatus,
+		.day_cost = VehicleSvcDayCost,
+		.make_dummy = VehicleSvcMakeDummy,
+		.loading = VehicleSvcLoading,
+		.breakdown = VehicleSvcBreakdown,
+		.check_orders_only = VehicleSvcCheckOrdersOnly,
+		.write_coordinates = VehicleSvcWriteCoordinates,
+		.altitude_inputs = VehicleSvcAltitudeInputs,
 	};
 	return services;
 }

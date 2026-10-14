@@ -16,25 +16,73 @@ struct RustTownDelete {
 };
 using RustTownOwner = std::unique_ptr<OpenTTDTownState, RustTownDelete>;
 
-template <typename T, uint8_t Field>
-struct RustTownScalar {
+/** Nonowning native views of the sole Rust supplied-history vector. Native
+ * trivial slot lifetimes start on insertion; Rust alone allocates and frees. */
+template <typename T> class RustTownSupplied {
 	OpenTTDTownState *owner;
-	operator T() const { return static_cast<T>(openttd_rust_town_get(this->owner, Field)); }
-	RustTownScalar &operator=(T value) { openttd_rust_town_set(this->owner, Field, value); return *this; }
-	T operator--(int) { T value = *this; *this = value - 1; return value; }
+public:
+	using value_type = T;
+	using iterator = T *;
+	using const_iterator = const T *;
+	explicit RustTownSupplied(OpenTTDTownState *owner) : owner(owner) {}
+	T *data() { return static_cast<T *>(openttd_rust_town_supplied_view(this->owner).data); }
+	const T *data() const { return static_cast<const T *>(openttd_rust_town_supplied_view(this->owner).data); }
+	size_t size() const { return openttd_rust_town_supplied_view(this->owner).size; }
+	bool empty() const { return this->size() == 0; }
+	iterator begin() { return this->data(); }
+	const_iterator begin() const { return this->data(); }
+	iterator end() { const auto v = openttd_rust_town_supplied_view(this->owner); return static_cast<T *>(v.data) + v.size; }
+	const_iterator end() const { const auto v = openttd_rust_town_supplied_view(this->owner); return static_cast<const T *>(v.data) + v.size; }
+	void reserve(size_t count) { openttd_rust_town_supplied_reserve(this->owner, count); }
+	iterator emplace(iterator at, uint8_t cargo)
+	{
+		const size_t offset = this->empty() ? 0 : at - this->begin();
+		auto *slot = reinterpret_cast<T *>(openttd_rust_town_supplied_insert(this->owner, offset, cargo));
+		return new (slot) T(cargo);
+	}
+	T &emplace_back(uint8_t cargo = UINT8_MAX) { return *this->emplace(this->end(), cargo); }
+};
+/** Compile-time-selected nonowning views preserve native counter widths. */
+template <typename T, bool Class> class RustTownCountsVector {
+	OpenTTDTownState *owner;
+	OpenTTDTownSlots View() const
+	{
+		if constexpr (sizeof(T) == 4) {
+			if constexpr (Class) return openttd_rust_town_global_class_counts();
+			else return openttd_rust_town_global_id_counts();
+		} else {
+			if constexpr (Class) return openttd_rust_town_class_counts(this->owner);
+			else return openttd_rust_town_id_counts(this->owner);
+		}
+	}
+public:
+	using value_type = T;
+	explicit RustTownCountsVector(OpenTTDTownState *owner = nullptr) : owner(owner) {}
+	T *data() { return static_cast<T *>(this->View().data); }
+	const T *data() const { return static_cast<const T *>(this->View().data); }
+	size_t size() const { return this->View().size; }
+	T *begin() { return this->data(); }
+	const T *begin() const { return this->data(); }
+	T *end() { const auto v = this->View(); return static_cast<T *>(v.data) + v.size; }
+	const T *end() const { const auto v = this->View(); return static_cast<const T *>(v.data) + v.size; }
+	T &operator[](size_t at) { return this->data()[at]; }
+	const T &operator[](size_t at) const { return this->data()[at]; }
+	void resize(size_t count)
+	{
+		if constexpr (sizeof(T) == 4) {
+			if constexpr (Class) openttd_rust_town_global_class_counts_resize(count);
+			else openttd_rust_town_global_id_counts_resize(count);
+		} else {
+			if constexpr (Class) openttd_rust_town_class_counts_resize(this->owner, count);
+			else openttd_rust_town_id_counts_resize(this->owner, count);
+		}
+	}
+	void clear() { this->resize(0); }
 };
 
-template <typename Flags, typename Flag>
-struct RustTownFlags {
-	OpenTTDTownState *owner;
-	operator Flags() const { return Flags(static_cast<uint8_t>(openttd_rust_town_get(this->owner, 4))); }
-	uint8_t base() const { return static_cast<Flags>(*this).base(); }
-	bool Test(Flag flag) const { return static_cast<Flags>(*this).Test(flag); }
-	bool Any(Flags flags) const { return static_cast<Flags>(*this).Any(flags); }
-	void Set(Flags flags) { Flags value = *this; value.Set(flags); openttd_rust_town_set(this->owner, 4, value.base()); }
-	void Set(Flag flag) { this->Set(Flags(flag)); }
-	void Reset(Flags flags) { Flags value = *this; value.Reset(flags); openttd_rust_town_set(this->owner, 4, value.base()); }
-	void Reset(Flag flag) { this->Reset(Flags(flag)); }
-	void Reset() { openttd_rust_town_set(this->owner, 4, 0); }
+template <typename T> struct RustTownBuildingCounts {
+	RustTownCountsVector<T, false> id_count;
+	RustTownCountsVector<T, true> class_count;
+	explicit RustTownBuildingCounts(OpenTTDTownState *owner = nullptr) : id_count(owner), class_count(owner) {}
 };
 #endif /* RUST_TOWN_OWNER_HPP */

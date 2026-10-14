@@ -5,6 +5,8 @@
  * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
  */
 
+#include "command_cost_services.h"
+#include "services_ffi.h"
 #include "company_services.h"
 
 /* Named shared services and full native CommandCost storage. All callbacks are
@@ -15,15 +17,15 @@ struct NativeFleetCosts {
 	SavedRandomSeeds seeds;
 	OpenTTDFleetCosts View() { return {&result, &replace, &build, &copy, &temporary, &seeds}; }
 };
-static void FleetTransaction_cost_zero(void *out) noexcept { *static_cast<CommandCost *>(out) = CommandCost(); }
-static void FleetTransaction_cost_vehicles(void *out) noexcept { *static_cast<CommandCost *>(out) = CommandCost(EXPENSES_NEW_VEHICLES, Money(0)); }
-static void FleetTransaction_cost_error(void *out, uint32_t error) noexcept { *static_cast<CommandCost *>(out) = CommandCost(error); }
-static void FleetTransaction_cost_add(void *out, void *item) noexcept { static_cast<CommandCost *>(out)->AddCost(std::move(*static_cast<CommandCost *>(item))); }
-static void FleetTransaction_cost_move(void *out, void *item) noexcept { *static_cast<CommandCost *>(out) = std::move(*static_cast<CommandCost *>(item)); }
-static void FleetTransaction_cost_amount(void *out, int64_t amount) noexcept { static_cast<CommandCost *>(out)->AddCost(Money(amount)); }
-static bool FleetTransaction_success(void *out) noexcept { return static_cast<CommandCost *>(out)->Succeeded(); }
-static uint32_t FleetTransaction_error(void *out) noexcept { return static_cast<CommandCost *>(out)->GetErrorMessage(); }
-static int64_t FleetTransaction_money(void *out) noexcept { return static_cast<CommandCost *>(out)->GetCost(); }
+static void FleetTransaction_cost_zero(void *out) noexcept { GetRustCommandCostServices().zero(RustCommandCost(static_cast<CommandCost *>(out))); }
+static void FleetTransaction_cost_vehicles(void *out) noexcept { GetRustCommandCostServices().expense_money(RustCommandCost(static_cast<CommandCost *>(out)), EXPENSES_NEW_VEHICLES, 0); }
+static void FleetTransaction_cost_error(void *out, uint32_t error) noexcept { GetRustCommandCostServices().error(RustCommandCost(static_cast<CommandCost *>(out)), error); }
+static void FleetTransaction_cost_add(void *out, void *item) noexcept { GetRustCommandCostServices().add(RustCommandCost(static_cast<CommandCost *>(out)), RustCommandCost(static_cast<CommandCost *>(item))); }
+static void FleetTransaction_cost_move(void *out, void *item) noexcept { GetRustCommandCostServices().move(RustCommandCost(static_cast<CommandCost *>(out)), RustCommandCost(static_cast<CommandCost *>(item))); }
+static void FleetTransaction_cost_amount(void *out, int64_t amount) noexcept { GetRustCommandCostServices().amount(RustCommandCost(static_cast<CommandCost *>(out)), amount); }
+static bool FleetTransaction_success(void *out) noexcept { return GetRustCommandCostServices().success(RustCommandCost(static_cast<CommandCost *>(out))); }
+static uint32_t FleetTransaction_error(void *out) noexcept { return GetRustCommandCostServices().error_message(RustCommandCost(static_cast<CommandCost *>(out))); }
+static int64_t FleetTransaction_money(void *out) noexcept { return GetRustCommandCostServices().money(RustCommandCost(static_cast<CommandCost *>(out))); }
 static void FleetTransaction_ownership(void *out, uint8_t owner) noexcept { *static_cast<CommandCost *>(out) = CheckOwnership(CompanyID(owner)); }
 static bool FleetTransaction_rear(void *shell) noexcept { auto *v = static_cast<Vehicle *>(shell); return Train::From(v)->IsRearDualheaded(); }
 static bool FleetTransaction_articulated(void *shell) noexcept { auto *v = static_cast<Vehicle *>(shell); return v->IsArticulatedPart(); }
@@ -48,7 +50,7 @@ static constexpr bool FLEET_ASSERTIONS = false;
 #endif
 static bool FleetTransaction_needs_renew(void *shell, bool settings) noexcept { return static_cast<Vehicle *>(shell)->NeedsAutorenewing(Company::Get(OpenTTDCurrentCompany()), settings); }
 static bool FleetTransaction_engine_valid(uint16_t id) noexcept { return Engine::IsValidID(EngineID(id)); }
-static bool FleetTransaction_company_valid(uint8_t id) noexcept { return Company::IsValidID(CompanyID(id)); }
+static bool FleetTransaction_company_valid(uint8_t id) noexcept { return GetRustSharedServices().company_valid(id); }
 static bool FleetTransaction_engine_buildable(uint16_t id, uint8_t type, uint8_t company) noexcept { return IsEngineBuildable(EngineID(id), static_cast<VehicleType>(type), CompanyID(company)); }
 static uint64_t FleetTransaction_rail_compatible(uint16_t id) noexcept { return GetAllCompatibleRailTypes(RailVehInfo(EngineID(id))->railtypes).base(); }
 static uint64_t FleetTransaction_road_powered(uint16_t id) noexcept { return GetRoadTypeInfo(RoadVehInfo(EngineID(id))->roadtype)->powered_roadtypes.base(); }

@@ -626,6 +626,46 @@ class RequestTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "head changed"):
             ci.validate_pull(PULL, "c" * 40)
 
+    def test_base_advance_during_run_keeps_waiting_on_unchanged_head(self):
+        run = {
+            "id": 123,
+            "status": "completed",
+            "conclusion": "success",
+            "html_url": "https://github.com/example/fork/actions/runs/123",
+        }
+        statuses = [
+            {"context": ci.CONTEXT, "target_url": run["html_url"], "state": "success"}
+        ]
+        for mergeable in (None, False):
+            pull = dict(
+                PULL,
+                mergeable=mergeable,
+                base={"sha": "e" * 40, "ref": "rust-migration"},
+            )
+            with self.assertRaisesRegex(ValueError, "mergeability"):
+                ci.validate_pull(pull)
+            with tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "request.json"
+                receipt = {
+                    "schema_version": 1,
+                    "repository": "example/fork",
+                    "pr": 170,
+                    "head": HEAD,
+                    "profile": "full",
+                    "run_id": 123,
+                }
+                ci.write_receipt(path, receipt)
+                with patch.object(ci, "api", side_effect=[pull, run]):
+                    self.assertEqual(ci.status(path), (receipt, run))
+                with patch.object(
+                    ci, "api", side_effect=[pull, {"statuses": statuses}]
+                ):
+                    ci.verify_completion(receipt, run)
+                moved = dict(pull, head={"sha": "c" * 40})
+                with patch.object(ci, "api", side_effect=[moved, run]):
+                    with self.assertRaisesRegex(ValueError, "head changed"):
+                        ci.status(path)
+
     def test_successful_run_without_full_status_is_rejected(self):
         receipt = {
             "repository": "example/fork",

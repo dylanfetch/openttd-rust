@@ -114,7 +114,7 @@ fn slot(d: Descriptor, age: u32) -> u32 {
     u32::from(d.first).wrapping_add(age).wrapping_sub(offset)
 }
 
-fn update(mask: u64, d: Descriptor, month: u32) -> u64 {
+pub(crate) fn update(mask: u64, d: Descriptor, month: u32) -> u64 {
     if has_bit(mask, u32::from(d.last).wrapping_sub(1))
         || !month.is_multiple_of(u32::from(d.total_division))
         || (d.division != 1
