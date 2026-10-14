@@ -11,6 +11,7 @@ from .core import (
     branch_witnesses,
     compare_saves,
     run_game,
+    witness_counts,
 )
 
 ADAPTER = ROOT / "tools/simulation/engines-console.cpp"
@@ -162,6 +163,12 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
 
 
 def check(scenario, run, mode, role, result):
+    if role == "candidate" and scenario.get("witnesses"):
+        counts = witness_counts(run, "engine")
+        if counts is not None:
+            result[mode + "_engine_crossings"] = {
+                key: counts[key] for key in ("entries", "services", "bytes")
+            }
     if "engines" not in scenario or run["exit"] or not run["snapshots"]:
         return
     variant = scenario["engines"]
