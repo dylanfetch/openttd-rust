@@ -152,6 +152,8 @@ pub struct VehicleServices {
     pub write_day: extern "C" fn(VehicleRef, u8),
     pub write_direction: extern "C" fn(VehicleRef, u8),
     pub write_speed: extern "C" fn(VehicleRef, u16),
+    /// Shared last visited station read, before station discovery callbacks.
+    pub last_station: extern "C" fn(VehicleRef) -> u16,
     pub write_last_station: extern "C" fn(VehicleRef, u16),
     pub write_dest: extern "C" fn(VehicleRef, u32),
     pub write_progress: extern "C" fn(VehicleRef, u8),

@@ -24,6 +24,12 @@
     clippy::collapsible_match
 )]
 use std::ffi::c_void;
+
+/// Opaque live native `OrderList`; never dereferenced by Rust.
+#[repr(C)]
+pub struct NativeOrderList {
+    _private: [u8; 0],
+}
 use std::mem::MaybeUninit;
 use std::ptr;
 

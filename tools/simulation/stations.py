@@ -13,6 +13,11 @@ PREFIX = "normal[0]/"
 VEHICLE = "roadveh[0]/common[0]/"
 
 
+def game_environment(scenario):
+    witnessed = scenario.get("station_service") and scenario.get("witnesses")
+    return core.WITNESS_ENVIRONMENT if witnessed else {}
+
+
 def scenarios(soak):
     return [
         {
@@ -195,7 +200,20 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
 
 
 def check(scenario, run, mode, role, result):
-    if "station_service" not in scenario or not run["snapshots"]:
+    if "station_service" not in scenario:
+        return
+    kind = scenario["station_service"]
+    required = {
+        "acceptance-loss": ["rejected_delivery"],
+        "full-gradual": ["full_load_reserve", "gradual_unload"],
+        "manual": ["unload_cargo"],
+        "cargodist": ["unload_cargo"],
+        "stale-remove": ["stale_remove"],
+        "stale-refresh": ["stale_refresh"],
+    }.get(kind, [])
+    if counts := core.branch_witnesses(scenario, run, role, "station", required):
+        result[f"{mode}_{role}_station_branches"] = counts
+    if not run["snapshots"]:
         return
     saved = [read_save(path) for path in run["snapshots"]]
     before = read_save(Path(scenario["save"]))

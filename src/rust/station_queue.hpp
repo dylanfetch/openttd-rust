@@ -26,9 +26,9 @@ public:
 	class iterator {
 		friend class RustStationLoadingQueue;
 		OpenTTDStationService *state = nullptr;
-		void *node = nullptr;
+		OpenTTDStationQueueEntry *node = nullptr;
 
-		iterator(OpenTTDStationService *state, void *node) : state(state), node(node) {}
+		iterator(OpenTTDStationService *state, OpenTTDStationQueueEntry *node) : state(state), node(node) {}
 
 	public:
 		using value_type = Vehicle *;
