@@ -4,31 +4,14 @@ Root owns selection here; `AGENTS.md` and `docs/rust-migration.md` define proces
 If an issue conflicts, follow this roadmap and report it to root. Keep this
 forward-looking, about 200 lines; completed work is one row, with evidence in PRs.
 
-## Where the fork stands (2026-10-13, `3b3b931099`)
+## Where the fork stands (2026-10-14, `59385bce59`)
 
-- Twenty-three ownership ports. Whole fork against the pinned original: Rust
-  55,453 / tooling 28,635 / C++ glue 25,307 / original C++ retired 36,162 (7.68%
-  of all `src/` sources); simulation-source share 28,215 / 102,615 (27.50%, #226).
-- #230/#236/#240/#217/#238 are integrated and cleaned up. The fourth-integration
-  stock above leaves original retirement unchanged; refresh it after the sixth.
-  Five component branches remain, including deferred #212's retained branch.
-  Finish #213's final budget gate; prioritize whole owners #219 and #220.
-- Current calibrated ratios: Opus 1.258, Grok 1.254, Padhattan-1996 1.275,
-  Padhattan-2000 1.349, Padhattan-2016 1.427, TGP 1.164. TGP remains above
-  1.15. Aircraft's final six-case medians pass; a matched Padhattan-2016
-  diagnosis shows 4.51% improvement. Initial noisy samples remain in #238.
-- #212 P0/P1/R0 fail TGP: +28/+38/+31 ms against 11 ms; defer the owner and
-  map-read experiment. #213 P0 and scalar-address P1 both fail 6 ns/current cap;
-  defer the vehicle owner too. Continue whole signal/engine ownership #219/#220.
-- #233 is incomplete: concurrent cache writes peaked at 10.37 GiB; missing
-  entries suggest eviction. Root pruned duplicates. #243 selects protected writers per
-  family, without artifact input or candidate write privileges. Warm timing and
-  three-merge acceptance repeat after repair; no target is waived. Live macOS
-  archives exceed the draft cap: select 540 MiB/flavour and 448 MiB for all other
-  caches, preserving native/Linux/MSVC caps. Measured packing/trim must fit before upload.
-- Open #156 gaps include threaded execution, NewGRF/refit callbacks, positive
-  gradual loading and station acceptance polling. #240's new prospect/overlap
-  evidence is integrated. No whole-game fidelity claim.
+- Twenty-four ownership ports. Whole fork: Rust 56,978 / tooling 29,319 / glue 26,077 / original retired 36,502 of 470,612 all `src/` source lines (7.76%). Simulation: 28,522 / 102,615 (27.80%, #226); source counts, not behavioral completion.
+- #230/#236/#240/#217/#238/#216 are integrated/cleaned. The sixth integration retires 340 original lines, adds 694 tooling and 1,080 net glue; scoped #216 does not complete #148. Three current drafts and two deferred source branches remain.
+- Calibrated ratios: Opus 1.258, Grok 1.254, Ridge 1996 1.275, Ridge 2000 1.349, Ridge 2016 1.427, TGP 1.164 (above 1.15). Aircraft strict medians pass; town prepared timing keeps its scope. No cap waiver or new final-head timing claim.
+- #212 P0/P1/R0 fail TGP (+28/+38/+31 ms against 11 ms); #213 P0/P1 fail CPU/wall gates (P1 12.1 ns versus 6 ns). Both PRs closed/worktrees removed; source branches retained, owners deferred.
+- #233 acceptance is open. Draft #244 local checks/review pass; pre-pause bootstrap hit platform archive-gate failures and was cancelled. CI_ON_DEMAND=true restored. Bootstrap/full CI/live acceptance and the user's runner/account-plan decision remain.
+- #156 tracks threaded execution, real NewGRF/refit, positive gradual loading and station polling. #240 prospect/overlap checks and town's corrected actual-facade history comparison are integrated.
 
 ## Tenth steering review (2026-10-13, CI)
 
@@ -95,6 +78,7 @@ Metrics are `tools/port-metrics.py`: Rust / tooling / C++ glue / C++ retired.
 | #146 | Ship controller and private state | #152 via #184 | `2a76d5f287` | 1101 / 270 / 893 / 721 |
 | #147 | Fleet groups and autoreplace | #197 | `a7a6e6650a` | 2686 / 577 / 1199 / 1454 |
 | #150 | Industry construction and lifecycle | #218 | `648d44e940` | 3066 / 701 / 1433 / 1736 |
+| #148 | Town canonical state and periodic policy (narrow scope) | #216 | `59385bce59` | 1848 / 694 / 1418 / 340 |
 
 Harness and process: #72 harness (#85), #84 play saves (#87), #97 provenance
 freeze (#100), #88 Ruff (#92), #75 partial-pixel fidelity (#91), #90 world-state
@@ -174,20 +158,23 @@ third boundary expansion, timer change or budget waiver is selected.
 
 ## Resume checkpoint
 
-Active continuous development. #217's post-merge API failure recovered; #238
-passed final full CI, merged/cleaned and passed protected cache refresh.
-#243 archive-fit repair precedes bootstrap. #212/#213 owners are deferred.
+Paused at the user's request. #216 passed full/post-merge CI and was cleaned up.
+No new components/planners/issues; #246/#247 unstarted. Work order unchanged;
+all agents/builds stopped. Resume only on user instruction.
+Engine had already pushed/opened #248 before stop; its requested uncommitted/not-pushed state was no longer current. Actual state is preserved below.
 
-| Issue / PR | Branch, head | State and next step |
+| Issue / PR | Remaining branch, head | State and next step |
 | --- | --- | --- |
-| #148 / #216 | `town-lifecycle-148`, `bab099e053` | Full CI failed comparison/annotations; fresh fixing round adopts #238. |
-| #212 / #241 | retained branch, `45633ef6d6` | R0 fails budget/cap; PR closed, worktree removed, owner deferred. |
-| #213 / #242 | `vehicle-budget-prototype-213`, `92b8a04075` | Cargo/native/298 cases pass; P1 CPU/wall fail, final disposition then cleanup. |
-| #233 / #244 | `ci-cache-peak-233`, `6b32bc8207` | Review fixes verified; correct live archive fit, fresh review, bootstrap and live acceptance. |
-| #219 / #245 | `signal-owner-219`, `999048c5db` | Native/focused semantics pass; finish fixtures, strict timing, fresh review. |
-| #220 | integrated-base branch pending | Engine lifecycle selected independently; starts below six-branch cap. |
+| #233 / #244 | `ci-cache-peak-233`, `1288db61b4` | Draft; recorded platform gate failure needs fixing on resume; bootstrap, full CI, then #233 live acceptance. |
+| #219 / #245 | `signal-owner-219`, `df2f77b247` | Draft; prepared native build/3 cases pass; final-head validation, strict timing, review and CI remain. |
+| #220 / #248 | `engine-lifecycle-220`, `9c4b950b56` | Already pushed before stop; clean work in `openttd-rust-engine-220` retained. Final build interrupted; validation/review/CI incomplete. |
+| #212 / #241 | `landscape-budget-prototype-212`, `45633ef6d6` | Closed/deferred, no worktree; retain source, await fresh selection. |
+| #213 / #242 | `vehicle-budget-prototype-213`, `92b8a04075` | Closed, P1 FAIL/defer final; no worktree, retain source. |
+| #64 / #66 | `issue/64-curve-family`, `aab5211801` | Paused draft/worktree; leave untouched, not a fallback. |
+| Paused integration | `integration/curve-script`, `c19f09cf8b` | Locked worktree preserved; no work. |
+| Disaster evidence | `evidence-disaster-vehicles`, `a775543162` | Locked evidence worktree preserved; no work. |
+| Water evidence | `evidence-water-regions`, `c752070cde` | Locked evidence worktree preserved; no work. |
 
-Next unstarted owners: #220, #246 and #247; the two town dependencies above apply.
 ABI blocks: train through 385, tree additions 386-389,
 fleet 390-399, company 400-429, town 430-459, road 460-499, station/loading 500-559,
 industry 560-619 (572 shared ByteSpan), CommandCost 620-629, town lifecycle 630-669,
@@ -195,10 +182,9 @@ aircraft 670-739, deferred vehicle 740-779, deferred landscape 780-819,
 signals 820-859, engines 860-919.
 Only consumed layouts.
 
-Preserve the pinned reference, paused curve worktrees and evidence branches
-`evidence-disaster-vehicles` (`a775543162`) and `evidence-water-regions`
-(`c752070cde`); do not reapply effect helper `73ccd511fb`. Build and test with
-`--jobs 2`; standalone fixture games share the benchmark lock.
+Preserve the pinned reference and all paused/evidence worktrees above; do not
+reapply effect helper `73ccd511fb`. Build/test with `--jobs 2`; standalone fixture
+games share the benchmark lock.
 
 ## Out of scope for the near term
 
