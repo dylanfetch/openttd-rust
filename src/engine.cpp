@@ -37,8 +37,8 @@
 #include "table/strings.h"
 #include "table/engines.h"
 
-#ifdef WITH_RUST
 void ShowEnginePreviewWindow(EngineID engine);
+#ifdef WITH_RUST
 #include "rust/engine_adapter.hpp"
 #endif
 
@@ -624,8 +624,6 @@ void SetupEngines()
 		}
 	}
 }
-
-void ShowEnginePreviewWindow(EngineID engine);
 
 /**
  * Determine whether an engine type is a wagon (and not a loco).
