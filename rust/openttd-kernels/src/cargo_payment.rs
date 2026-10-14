@@ -50,7 +50,7 @@ pub struct Fields {
 pub struct Services {
     pub(crate) spec: extern "C" fn(u8, *mut Spec),
     pub(crate) callback: extern "C" fn(u8, u32) -> u16,
-    pub(crate) near: extern "C" fn(u16, u32) -> *mut c_void,
+    pub(crate) nearby_industry: extern "C" fn(u16, u32) -> *mut c_void,
     pub(crate) station_read: extern "C" fn(u16, u8, u8) -> u32,
     pub(crate) industry_read: extern "C" fn(*mut c_void, u8, u32) -> u32,
     pub(crate) industry_write: extern "C" fn(*mut c_void, u8, u32, u32),
@@ -136,7 +136,7 @@ fn deliver(
     let mut accepted_ind = 0_u32;
     let mut index = 0;
     loop {
-        let ind = (s.near)(station, index);
+        let ind = (s.nearby_industry)(station, index);
         if ind.is_null() || remaining == 0 {
             break;
         }

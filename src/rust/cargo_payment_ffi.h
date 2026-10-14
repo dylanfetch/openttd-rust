@@ -60,7 +60,7 @@ struct OpenTTDCargoPaymentFields {
 struct OpenTTDCargoServices {
 	void (OPENTTD_CARGO_CALL *spec)(uint8_t, OpenTTDCargoSpec *) noexcept;
 	uint16_t (OPENTTD_CARGO_CALL *callback)(uint8_t, uint32_t) noexcept;
-	void *(OPENTTD_CARGO_CALL *near)(uint16_t, uint32_t) noexcept;
+	void *(OPENTTD_CARGO_CALL *nearby_industry)(uint16_t, uint32_t) noexcept;
 	uint32_t (OPENTTD_CARGO_CALL *station_read)(uint16_t, uint8_t, uint8_t) noexcept;
 	uint32_t (OPENTTD_CARGO_CALL *industry_read)(void *, uint8_t, uint32_t) noexcept;
 	void (OPENTTD_CARGO_CALL *industry_write)(void *, uint8_t, uint32_t, uint32_t) noexcept;
