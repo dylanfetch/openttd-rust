@@ -49,8 +49,6 @@
 #ifdef WITH_RUST
 #include "rust/ffi.h"
 #include "rust/landscape_loop_ffi.h"
-#include "newgrf_generic.h"
-#include "water_map.h"
 #endif
 
 #include "safeguards.h"
@@ -830,17 +828,6 @@ void RunTileLoop()
 		.shared = &GetRustSharedServices(),
 		.trees = &GetRustTreeServices(),
 		.industry = GetRustIndustryLoopServices(),
-		.ambient_callback = HasGrfMiscBit(GrfMiscBit::AmbientSoundCallback),
-		.clear_observation = [](uint32_t index) noexcept {
-			TileIndex tile{index};
-			OpenTTDClearLoopObservation observation{.snow = IsSnowTile(tile), .ground = 0, .density = 0};
-			if (!observation.snow) {
-				observation.ground = GetClearGround(tile);
-				if (observation.ground == CLEAR_GRASS) observation.density = GetClearDensity(tile);
-			}
-			return observation;
-		},
-		.nonflooding_water = [](uint32_t tile) noexcept { return IsNonFloodingWaterTile(TileIndex{tile}); },
 		.clear_loop = [](uint32_t tile) noexcept { _tile_type_clear_procs.tile_loop_proc(TileIndex{tile}); },
 		.rail_loop = [](uint32_t tile) noexcept { _tile_type_rail_procs.tile_loop_proc(TileIndex{tile}); },
 		.road_loop = [](uint32_t tile) noexcept { _tile_type_road_procs.tile_loop_proc(TileIndex{tile}); },

@@ -19,13 +19,6 @@ struct OpenTTDIndustryLoopServices {
 	const OpenTTDIndustryTileServices *tiles;
 	const OpenTTDIndustryGenerationServices *generation;
 };
-/* Only clear fields consumed by the original early-return branches. Density is
- * GetClearDensity's uint return type and read only on nonsnow grass. */
-struct OpenTTDClearLoopObservation {
-	bool snow;
-	uint8_t ground;
-	uint32_t density;
-};
 /* Native handlers retain their complete original bodies. No generic dispatch slot.
  * World callbacks may mutate/reenter; no cursor borrow spans a callback. Tables are
  * immutable and live for the synchronous invocation. All wrappers are noexcept. */
@@ -33,9 +26,6 @@ struct OpenTTDLandscapeLoopServices {
 	const OpenTTDSharedServices *shared;
 	const OpenTTDTreeServices *trees;
 	OpenTTDIndustryLoopServices industry;
-	bool ambient_callback;
-	OpenTTDClearLoopObservation (*clear_observation)(uint32_t) noexcept;
-	bool (*nonflooding_water)(uint32_t) noexcept;
 	void (*clear_loop)(uint32_t) noexcept;
 	void (*rail_loop)(uint32_t) noexcept;
 	void (*road_loop)(uint32_t) noexcept;
