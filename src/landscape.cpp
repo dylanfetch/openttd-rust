@@ -838,6 +838,8 @@ void RunTileLoop()
 		.tunnel_bridge_loop = [](uint32_t tile) noexcept { _tile_type_tunnelbridge_procs.tile_loop_proc(TileIndex{tile}); },
 		.object_loop = [](uint32_t tile) noexcept { _tile_type_object_procs.tile_loop_proc(TileIndex{tile}); },
 	};
+	/* Preserve the original assertion under the native build assertion policy. */
+	assert(*openttd_rust_tile_loop_cursor() != 0);
 	openttd_rust_run_tile_loop(Map::LogX(), Map::LogY(), GetRustTreeLoopSettings(), &services);
 #else
 

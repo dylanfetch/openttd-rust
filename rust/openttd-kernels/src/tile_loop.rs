@@ -7,13 +7,33 @@
 
 //! Complete tile scheduler. Native arrays stay canonical; existing Rust owners
 //! dispatch directly without a native trampoline. All panics abort at the C ABI.
+//!
+//! Batch settings are invariant under the original serialized game-state mutex:
+//! map allocation/load, tick advancement, setting commands and AI/Game script VMs
+//! run outside `RunTileLoop`. Ambient callbacks run only the `NewGRF` sound resolver;
+//! tile handlers may mutate tiles/pools, run landscape/road/crash commands or queue
+//! script events, but none changes map dimensions, climate, tree placement, tick
+//! counter or client ambient settings. Generation progress also runs outside this
+//! entry. Thus the existing tree settings can be captured once per source batch;
+//! tree/map observations still occur inside each owner at original callback sites.
 #![allow(unsafe_code)]
 
 use crate::{industry, services, trees};
 
 const FEEDBACKS: [u32; 13] = [
-    0xD8F, 0x1296, 0x2496, 0x4357, 0x8679, 0x1030E, 0x206CD, 0x403FE, 0x807B8, 0x1004B2, 0x2006A8,
-    0x4004B2, 0x800B87,
+    0xD8F,
+    0x1296,
+    0x2496,
+    0x4357,
+    0x8679,
+    0x1030E,
+    0x206CD,
+    0x403FE,
+    0x807B8,
+    0x0010_04B2,
+    0x0020_06A8,
+    0x0040_04B2,
+    0x0080_0B87,
 ];
 // Serialized by the game-state mutex on both GUI threads; raw save/load access
 // occurs only at the original serial boundaries. Never form a Rust reference.
@@ -89,7 +109,6 @@ unsafe fn dispatch(tile: u32, log_x: u8, settings: trees::LoopSettings, s: &Serv
 fn sequence(mut tile: u32, log_sum: u8, zero_phase: bool, mut visit: impl FnMut(u32)) -> u32 {
     let feedback = FEEDBACKS[usize::from(log_sum - 12)];
     let mut count = 1_u32 << (log_sum - 8);
-    debug_assert_ne!(tile, 0);
     if zero_phase {
         visit(0);
         count -= 1;
@@ -120,14 +139,14 @@ pub unsafe extern "C" fn openttd_rust_run_tile_loop(
     #[cfg(landscape_loop_count)]
     {
         crate::witness::hit(crate::witness::LANDSCAPE + 11);
-        if settings.tick_counter % 256 == 0 {
+        if settings.tick_counter.is_multiple_of(256) {
             crate::witness::hit(crate::witness::LANDSCAPE + 12);
         }
     }
     let next = sequence(
         tile,
         log_x + log_y,
-        settings.tick_counter % 256 == 0,
+        settings.tick_counter.is_multiple_of(256),
         |tile| {
             unsafe { dispatch(tile, log_x, settings, s) };
         },
