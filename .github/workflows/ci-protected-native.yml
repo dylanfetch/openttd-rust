@@ -52,11 +52,13 @@ jobs:
     steps:
     - env:
         BUILD: ${{ needs.build.result }}
+        CACHE_VALIDATED: ${{ needs.build.outputs.cache-validated }}
         COVERED: ${{ needs.policy.outputs.covered }}
         VALIDATION: ${{ needs.validation.result }}
         VALIDATED: ${{ needs.validation.outputs.validated }}
       run: |
         test "$BUILD" = success
+        test "$CACHE_VALIDATED" = true
         if [ "$COVERED" != true ]; then
           test "$VALIDATION" = success
           test "$VALIDATED" = true

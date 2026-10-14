@@ -846,6 +846,8 @@ const MiB = 1024 ** 2, families = Object.keys(p.policy.families);
         protected = (ROOT / ".github/workflows/ci-protected-native.yml").read_text()
         self.assertIn("needs.build.outputs.shards != ''", protected)
         self.assertIn('test "$BUILD" = success', protected)
+        self.assertIn('test "$CACHE_VALIDATED" = true', protected)
+        self.assertIn("cache-validated: ${{ !inputs.protected-writer", native)
 
     def test_lock_identity_uses_stable_family_not_compatibility_or_runner_image(self):
         for filename in ("ci-linux.yml", "ci-macos.yml"):

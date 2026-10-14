@@ -15,6 +15,9 @@ on:
         type: boolean
         default: false
     outputs:
+      cache-validated:
+        value: ${{ jobs.build.outputs.cache-validated }}
+        description: Protected cache restoration and publication succeeded
       shards:
         value: ${{ jobs.build.outputs.shards }}
         description: Complete native scenario shard inventory
@@ -28,6 +31,7 @@ jobs:
     runs-on: ${{ vars.CI_LINUX_HEAVY || 'ubuntu-24.04' }}
     timeout-minutes: 30
     outputs:
+      cache-validated: ${{ !inputs.protected-writer || (steps.cache.outcome == 'success' && steps.cache-publication.outcome == 'success') }}
       shards: ${{ steps.pack.outputs.shards }}
     steps:
     - name: Require immutable protected writer source
@@ -121,13 +125,4 @@ jobs:
           .local/compiler-cache-identity.json
           .local/ci-evidence
         include-hidden-files: true
-
-    - name: Require successful bounded publication
-      if: always() && inputs.protected-writer
-      env:
-        RESTORE: ${{ steps.cache.outcome }}
-        PUBLICATION: ${{ steps.cache-publication.outcome }}
-      run: |
-        test "$RESTORE" = success
-        test "$PUBLICATION" = success
 
