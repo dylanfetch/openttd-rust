@@ -33,7 +33,8 @@ pub struct State {
     pub turn_counter: u8,
     pub flags: u8,
 }
-use crate::services::{Map, Services, Station, chance16_i};
+use crate::services::{Map, Services, chance16_i};
+use crate::station::Station;
 use crate::vehicle::PROP_AIRCRAFT_SPEED;
 use crate::vehicle::{
     AltitudeInputs, Coordinates, DayCost, DirectionProgress, OpenTTDVehicle, SpeedInputs,

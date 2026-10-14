@@ -133,6 +133,7 @@ static OpenTTDAircraftLeaves AircraftTestLeaves(OpenTTDVehicleServices &vehicle,
 	vehicle.write_day = AircraftUnexpectedService<decltype(vehicle.write_day)>::Call;
 	vehicle.write_direction = AircraftUnexpectedService<decltype(vehicle.write_direction)>::Call;
 	vehicle.write_speed = AircraftUnexpectedService<decltype(vehicle.write_speed)>::Call;
+	vehicle.last_station = AircraftUnexpectedService<decltype(vehicle.last_station)>::Call;
 	vehicle.write_last_station = AircraftUnexpectedService<decltype(vehicle.write_last_station)>::Call;
 	vehicle.write_dest = AircraftUnexpectedService<decltype(vehicle.write_dest)>::Call;
 	vehicle.write_progress = AircraftUnexpectedService<decltype(vehicle.write_progress)>::Call;
@@ -161,7 +162,6 @@ static OpenTTDAircraftLeaves AircraftTestLeaves(OpenTTDVehicleServices &vehicle,
 	vehicle.subspeed = AircraftUnexpectedService<decltype(vehicle.subspeed)>::Call;
 	vehicle.running = AircraftUnexpectedService<decltype(vehicle.running)>::Call;
 	vehicle.order_time = AircraftUnexpectedService<decltype(vehicle.order_time)>::Call;
-	vehicle.last_station = AircraftUnexpectedService<decltype(vehicle.last_station)>::Call;
 	vehicle.vehicle_type = AircraftUnexpectedService<decltype(vehicle.vehicle_type)>::Call;
 	vehicle.write_x = AircraftUnexpectedService<decltype(vehicle.write_x)>::Call;
 	vehicle.write_y = AircraftUnexpectedService<decltype(vehicle.write_y)>::Call;

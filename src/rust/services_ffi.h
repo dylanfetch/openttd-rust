@@ -10,6 +10,7 @@
 #define RUST_SERVICES_FFI_H
 #include <cstdint>
 #include <type_traits>
+#include "station_ffi.h"
 
 /* Immutable function table. All functions are noexcept and cannot reenter Rust.
  * Context may be null in the game; test fixtures supply their own world.
@@ -21,7 +22,6 @@
  * Industry query returns 0 not industry,1 industry,2 bubble catcher and writes
  * TileVirtXY(x,y). It observes only type and industry graphics.
  * An environmental exception terminates rather than unwinding through Rust. */
-struct OpenTTDStation;
 struct OpenTTDSharedServices {
 	void *context;
 	uint32_t (*random)(void *) noexcept;

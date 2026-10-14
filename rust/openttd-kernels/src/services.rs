@@ -22,12 +22,6 @@ pub struct ByteSpan {
     pub size: usize,
 }
 
-/// Opaque live C++ station; Rust never views its native layout.
-#[repr(C)]
-pub struct Station {
-    _private: [u8; 0],
-}
-
 /// Immutable call table supplied by the game (or isolated test world). No global
 /// registration or game symbol imports are needed by standalone Cargo binaries.
 /// The context and function addresses outlive the component invocation; callbacks
