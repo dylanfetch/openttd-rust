@@ -62,6 +62,10 @@ inline const uint16_t *RustVehicleCargoPeriodAddress(const Vehicle *v) noexcept 
 inline uint16_t *RustVehicleCargoCounterAddress(Vehicle *v) noexcept { return &v->cargo_age_counter; }
 inline uint32_t *RustVehicleMotionAddress(Vehicle *v) noexcept { return &v->motion_counter; }
 
+/** Legacy indexed callback adapter; canonical read stays shared, owner resolves once. */
+template <typename Result, auto Read>
+static Result RustIndexedVehicleRead(uint32_t id) noexcept { return Read(Vehicle::Get(VehicleID(id))); }
+
 /** Base vehicle cargo and articulated fields shared by loading and link refresh. */
 inline uint8_t RustVehicleCargoType(OpenTTDVehicle *handle) noexcept { return VehicleOf(handle)->cargo_type; }
 inline uint8_t RustVehicleOwnerOf(OpenTTDVehicle *handle) noexcept { return RustVehicleOwner(VehicleOf(handle)); }
@@ -82,7 +86,7 @@ static OpenTTDGroundMoved OPENTTD_VEHICLE_CALL GroundSvcMoveIncline(OpenTTDVehic
 	u->y_pos = y;
 	u->UpdatePosition();
 	int old_z = u->UpdateInclination(new_tile, update_delta);
-	return {.old_z = old_z, .z = u->z_pos, .cur_speed = u->cur_speed, .max_track_speed = u->gcache.cached_max_track_speed};
+	return {.old_z = old_z, .z = u->z_pos, .cur_speed = RustVehicleSpeed(u), .max_track_speed = u->gcache.cached_max_track_speed};
 }
 template <class T>
 static OpenTTDGroundViewportNext OPENTTD_VEHICLE_CALL GroundSvcUpdateViewportThenNext(OpenTTDVehicle *part, OpenTTDVehicle *front) noexcept
@@ -106,7 +110,7 @@ static OpenTTDGroundSpeed OPENTTD_VEHICLE_CALL GroundSvcDoUpdateSpeed(OpenTTDVeh
 {
 	T *u = T::From(VehicleOf(v));
 	int distance = u->RustDoUpdateSpeed(accel, min_speed, max_speed);
-	return {.distance = distance, .cur_speed = u->cur_speed};
+	return {.distance = distance, .cur_speed = RustVehicleSpeed(u)};
 }
 template <class T>
 static OpenTTDGroundLastSpeed OPENTTD_VEHICLE_CALL GroundSvcSetLastSpeed(OpenTTDVehicle *v) noexcept

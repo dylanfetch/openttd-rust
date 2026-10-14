@@ -59,9 +59,8 @@ def check(scenario, run, mode, role, result):
         counts[f"visits.{kind}"]
         for kind in ("train", "road", "ship", "aircraft", "effect", "disaster", "end")
     )
-    core.require(
-        surviving + counts["deleted"] == visits, "scheduler survival accounting"
-    )
+    if surviving + counts["deleted"] != visits:
+        raise RuntimeError("scheduler survival accounting")
     result[f"{mode}_{role}_vehicle_scheduler"] = {
         "outer_visits": visits,
         "counts": counts,

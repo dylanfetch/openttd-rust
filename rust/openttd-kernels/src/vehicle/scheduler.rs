@@ -82,8 +82,7 @@ pub struct SchedulerServices {
     pub running_sound: extern "C" fn(VehicleRef),
     pub periodic_sound: extern "C" fn(VehicleRef, bool),
     pub next_station: extern "C" fn(u32) -> StationLookup,
-    pub economy_begin: extern "C" fn() -> u64,
-    pub economy_end: extern "C" fn(u64),
+    pub with_loading_timer: extern "C" fn(*const Tables, extern "C" fn(*const Tables)),
     pub reset_accumulators: extern "C" fn(),
 }
 #[repr(C)]
@@ -244,7 +243,14 @@ unsafe fn post_tick<const COUNTED: bool>(schedule: &PostTickServices, vehicle: V
     );
     let vehicle_type = cargo.vehicle_type;
     if COUNTED {
-        crate::witness::hit(crate::witness::VEHICLE_VISITS + vehicle_type as usize);
+        crate::witness::hit(
+            crate::witness::VEHICLE_VISITS
+                + if vehicle_type == VehicleType::Invalid {
+                    7
+                } else {
+                    vehicle_type as usize
+                },
+        );
     }
     if vehicle_type > AIRCRAFT {
         return;
@@ -285,7 +291,7 @@ unsafe fn post_tick<const COUNTED: bool>(schedule: &PostTickServices, vehicle: V
         return;
     }
     let motion = &cargo;
-    if front_status & VS_STOPPED != 0
+    if unsafe { scalar_read::<_, COUNTED>(cargo.front_status) } & VS_STOPPED != 0
         && (unsafe { scalar_read::<_, COUNTED>(motion.front_type) } != TRAIN
             || unsafe { scalar_read::<_, COUNTED>(motion.speed) } == 0)
     {
@@ -367,18 +373,11 @@ pub unsafe extern "C" fn openttd_rust_vehicle_ticks(
         unsafe { run_ticks::<false>(&*tables, normal, date_fract, cost) };
     }
 }
-unsafe fn run_ticks<const COUNTED: bool>(
-    tables: &Tables,
-    normal: bool,
-    date_fract: usize,
-    cost: *mut (),
-) {
+// The native RAII scope invokes this synchronous callback without retaining it.
+// No world/owner borrow spans any station loading service.
+extern "C" fn load_stations<const COUNTED: bool>(tables: *const Tables) {
+    let tables = unsafe { &*tables };
     let s = unsafe { &*tables.scheduler };
-    unsafe { fleet::pending::openttd_rust_fleet_pending_clear() };
-    if normal {
-        unsafe { day::<COUNTED>(tables, s, false, date_fract) };
-    }
-    let start = svc!(COUNTED, s.economy_begin);
     let mut station_from = 0;
     loop {
         let station = svc!(COUNTED, s.next_station, station_from);
@@ -397,7 +396,24 @@ unsafe fn run_ticks<const COUNTED: bool>(
             );
         };
     }
-    svc!(COUNTED, s.economy_end, start);
+}
+unsafe fn run_ticks<const COUNTED: bool>(
+    tables: &Tables,
+    normal: bool,
+    date_fract: usize,
+    cost: *mut (),
+) {
+    let s = unsafe { &*tables.scheduler };
+    unsafe { fleet::pending::openttd_rust_fleet_pending_clear() };
+    if normal {
+        unsafe { day::<COUNTED>(tables, s, false, date_fract) };
+    }
+    svc!(
+        COUNTED,
+        s.with_loading_timer,
+        std::ptr::from_ref(tables),
+        load_stations::<COUNTED>
+    );
     svc!(COUNTED, s.reset_accumulators);
     let post = PostTickServices {
         post_tick: s.post_tick,

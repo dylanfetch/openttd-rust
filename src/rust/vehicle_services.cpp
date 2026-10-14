@@ -381,8 +381,11 @@ static OpenTTDVehicleStationLookup OPENTTD_VEHICLE_CALL VehicleSchedulerNextStat
 	Station *st = *it;
 	return {.station = st->rust_service.get(), .id = st->index.base()};
 }
-static uint64_t OPENTTD_VEHICLE_CALL VehicleSchedulerEconomyBegin() noexcept { return PerformanceMeasurer::Begin(PFE_GL_ECONOMY); }
-static void OPENTTD_VEHICLE_CALL VehicleSchedulerEconomyEnd(uint64_t start) noexcept { PerformanceMeasurer::End(PFE_GL_ECONOMY, start); }
+static void OPENTTD_VEHICLE_CALL VehicleSchedulerWithLoadingTimer(const OpenTTDVehicleSchedulerTables *tables, void (OPENTTD_VEHICLE_CALL *load)(const OpenTTDVehicleSchedulerTables *)) noexcept
+{
+	PerformanceMeasurer framerate(PFE_GL_ECONOMY);
+	load(tables);
+}
 static void OPENTTD_VEHICLE_CALL VehicleSchedulerResetAccumulators() noexcept
 {
 	PerformanceAccumulator::Reset(PFE_GL_TRAINS);
@@ -413,8 +416,7 @@ const OpenTTDVehicleSchedulerServices &GetRustVehicleSchedulerServices() noexcep
 		.running_sound = VehicleSchedulerRunningSound,
 		.periodic_sound = VehicleSchedulerPeriodicSound,
 		.next_station = VehicleSchedulerNextStation,
-		.economy_begin = VehicleSchedulerEconomyBegin,
-		.economy_end = VehicleSchedulerEconomyEnd,
+		.with_loading_timer = VehicleSchedulerWithLoadingTimer,
 		.reset_accumulators = VehicleSchedulerResetAccumulators,
 	};
 	return services;

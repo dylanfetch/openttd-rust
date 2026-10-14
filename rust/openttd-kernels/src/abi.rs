@@ -556,7 +556,7 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         743 => layout!(crate::vehicle::scheduler::DayCallback, item; day, has_engine),
         748 => layout!(crate::vehicle::scheduler::StationLookup, item; station, id),
         749 => {
-            layout!(crate::vehicle::scheduler::SchedulerServices, item; pool, assertions, tick, post_tick, calendar_day, economy_day, day_callback_read, day_callback, randomise_callback, first_dirty, unknown_day_callback, cargo_owner, running_sound, periodic_sound, next_station, economy_begin, economy_end, reset_accumulators)
+            layout!(crate::vehicle::scheduler::SchedulerServices, item; pool, assertions, tick, post_tick, calendar_day, economy_day, day_callback_read, day_callback, randomise_callback, first_dirty, unknown_day_callback, cargo_owner, running_sound, periodic_sound, next_station, with_loading_timer, reset_accumulators)
         }
         750 => {
             layout!(crate::vehicle::scheduler::Tables, item; scheduler, cargo, station, loading, pending, transaction, group)

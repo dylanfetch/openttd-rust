@@ -290,7 +290,7 @@ pub const VEHICLE_STATIONS: usize = 125;
 /// Scheduler evidence counter.
 pub const VEHICLE_VISITS: usize = 126;
 
-pub const NAMES: [&str; 133] = [
+pub const NAMES: [&str; 134] = [
     "train.tick_first",
     "train.tick_second",
     "train.reversal",
@@ -424,6 +424,7 @@ pub const NAMES: [&str; 133] = [
     "vehicle.visits.effect",
     "vehicle.visits.disaster",
     "vehicle.visits.end",
+    "vehicle.visits.invalid",
 ];
 
 static ENABLED: AtomicBool = AtomicBool::new(false);

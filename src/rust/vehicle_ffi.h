@@ -231,6 +231,7 @@ struct OpenTTDVehiclePostTick {
 };
 struct OpenTTDVehicleDayCallback { uint8_t day; bool has_engine; };
 struct OpenTTDVehicleStationLookup { OpenTTDStationService *station; uint32_t id; };
+struct OpenTTDVehicleSchedulerTables;
 struct OpenTTDVehicleSchedulerServices {
 	OpenTTDVehiclePoolCursor (OPENTTD_VEHICLE_CALL *pool)() noexcept;
 	bool assertions;
@@ -247,8 +248,7 @@ struct OpenTTDVehicleSchedulerServices {
 	void (OPENTTD_VEHICLE_CALL *running_sound)(OpenTTDVehicle *) noexcept;
 	void (OPENTTD_VEHICLE_CALL *periodic_sound)(OpenTTDVehicle *, bool) noexcept;
 	OpenTTDVehicleStationLookup (OPENTTD_VEHICLE_CALL *next_station)(uint32_t) noexcept;
-	uint64_t (OPENTTD_VEHICLE_CALL *economy_begin)() noexcept;
-	void (OPENTTD_VEHICLE_CALL *economy_end)(uint64_t) noexcept;
+	void (OPENTTD_VEHICLE_CALL *with_loading_timer)(const OpenTTDVehicleSchedulerTables *, void (OPENTTD_VEHICLE_CALL *)(const OpenTTDVehicleSchedulerTables *)) noexcept;
 	void (OPENTTD_VEHICLE_CALL *reset_accumulators)() noexcept;
 };
 struct OpenTTDVehicleSchedulerTables {

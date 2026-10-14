@@ -4519,7 +4519,7 @@ static const OpenTTDTrainServices &GetTrainServices()
 		.read_length = TrainVehicleRead<uint16_t, RustGroundCachedLength<Train>>,
 		.read_total_length = TrainReadTotalLength,
 		.read_max_track_speed = TrainReadMaxTrackSpeed,
-		.read_speed = TrainReadSpeed,
+		.read_speed = TrainVehicleRead<uint16_t, RustVehicleSpeed>,
 		.read_gv_flags = TrainReadGvFlags,
 		.read_refit_cap = TrainReadRefitCap,
 		.read_last_station = TrainReadLastStation,
