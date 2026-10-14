@@ -914,6 +914,25 @@ static void VehicleEnteredDepotThisTick(Vehicle *v)
 	v->vehstatus.Set(VehState::Stopped);
 }
 
+#ifdef WITH_RUST
+#include "rust/vehicle_ffi.h"
+#include "rust/station_service_ffi.h"
+static OpenTTDVehicleSchedulerTables VehicleSchedulerTables() noexcept
+{
+	return {.scheduler = &GetRustVehicleSchedulerServices(), .cargo = CargoStorageServices(), .station = &GetRustStationServices(), .loading = &GetRustStationLoading(), .pending = &_fleet_pending_services, .transaction = &FleetTransactionServices(), .group = &FleetGroupServices()};
+}
+void RunVehicleCalendarDayProc()
+{
+	const auto tables = VehicleSchedulerTables();
+	openttd_rust_vehicle_calendar_day(&tables, _game_mode == GM_NORMAL, TimerGameCalendar::date_fract);
+}
+void CallVehicleTicks()
+{
+	const auto tables = VehicleSchedulerTables();
+	CommandCost replacement_cost;
+	openttd_rust_vehicle_ticks(&tables, _game_mode == GM_NORMAL, TimerGameEconomy::date_fract, &replacement_cost);
+}
+#else
 /**
  * Age all vehicles, spreading out the action using the current TimerGameCalendar::date_fract.
  */
@@ -1102,6 +1121,8 @@ void CallVehicleTicks()
 	cur_company.Restore();
 #endif /* WITH_RUST */
 }
+
+#endif /* WITH_RUST */
 
 /**
  * Add vehicle sprite for drawing to the screen.

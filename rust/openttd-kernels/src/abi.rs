@@ -549,6 +549,18 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         677 => layout!(crate::aircraft::LayoutRoute, item; node, next, next_position, heading),
         678 => layout!(crate::vehicle::AltitudeInputs, item; max_speed, direction),
         679 => layout!(crate::aircraft::HangarCandidate, item; owner, airport, hangar),
+        740 => layout!(crate::vehicle::scheduler::PoolCursor, item; slots, slots_len, first_unused),
+        741 => {
+            layout!(crate::vehicle::scheduler::PostTick, item; vehicle_type, front, period, counter, motion, speed, front_type, subtype, tick, front_status, status)
+        }
+        743 => layout!(crate::vehicle::scheduler::DayCallback, item; day, has_engine),
+        748 => layout!(crate::vehicle::scheduler::StationLookup, item; station, id),
+        749 => {
+            layout!(crate::vehicle::scheduler::SchedulerServices, item; pool, assertions, tick, post_tick, calendar_day, economy_day, day_callback_read, day_callback, randomise_callback, first_dirty, unknown_day_callback, cargo_owner, running_sound, periodic_sound, next_station, economy_begin, economy_end, reset_accumulators)
+        }
+        750 => {
+            layout!(crate::vehicle::scheduler::Tables, item; scheduler, cargo, station, loading, pending, transaction, group)
+        }
         _ => usize::MAX,
     }
 }

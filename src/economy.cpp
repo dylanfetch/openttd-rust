@@ -2549,6 +2549,10 @@ static void LoadUnloadVehicle(Vehicle *front)
  * they entered.
  * @param st the station to do the loading/unloading for
  */
+#ifdef WITH_RUST
+const OpenTTDStationLoading &GetRustStationLoading() noexcept { return _rust_station_loading; }
+#endif
+
 void LoadUnloadStation(Station *st)
 {
 #ifdef WITH_RUST

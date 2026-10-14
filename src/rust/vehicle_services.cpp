@@ -29,6 +29,8 @@
 #include "../window_func.h"
 #include "../widgets/vehicle_widget.h"
 #include "../sound_type.h"
+#include "../framerate_type.h"
+#include "../station_base.h"
 #include "../safeguards.h"
 
 /* Values the Rust side names in rust/openttd-kernels/src/vehicle.rs. */
@@ -327,6 +329,93 @@ const OpenTTDVehicleServices &GetRustVehicleServices() noexcept
 		.check_orders_only = VehicleSvcCheckOrdersOnly,
 		.write_coordinates = VehicleSvcWriteCoordinates,
 		.altitude_inputs = VehicleSvcAltitudeInputs,
+	};
+	return services;
+}
+
+
+static OpenTTDVehiclePoolCursor OPENTTD_VEHICLE_CALL VehicleSchedulerPool() noexcept
+{
+	return {.slots = _vehicle_pool.data.data(), .slots_len = _vehicle_pool.data.size(), .first_unused = &_vehicle_pool.first_unused};
+}
+/* Existing virtual facades own the original controller timing scopes. The
+ * timing destructor completes before this callback returns to Rust assertions. */
+static bool OPENTTD_VEHICLE_CALL VehicleSchedulerTick(OpenTTDVehicle *shell) noexcept { return VehicleOf(shell)->Tick(); }
+static void OPENTTD_VEHICLE_CALL VehicleSchedulerCalendarDay(OpenTTDVehicle *shell) noexcept { VehicleOf(shell)->OnNewCalendarDay(); }
+static void OPENTTD_VEHICLE_CALL VehicleSchedulerEconomyDay(OpenTTDVehicle *shell) noexcept { VehicleOf(shell)->OnNewEconomyDay(); }
+static OpenTTDVehiclePostTick OPENTTD_VEHICLE_CALL VehicleSchedulerPostTick(OpenTTDVehicle *shell) noexcept
+{
+	Vehicle *v = VehicleOf(shell);
+	const VehicleType type = v->type; // Fresh after Tick survives and its assertion.
+	if (type > VEH_AIRCRAFT) return {.type = type};
+	Vehicle *front = v->First();
+	return {.type = type, .front = RustVehicle(front), .period = RustVehicleCargoPeriodAddress(v), .counter = RustVehicleCargoCounterAddress(v), .motion = RustVehicleMotionAddress(v), .speed = RustVehicleSpeedAddress(front), .front_type = RustVehicleVehicleTypeAddress(front), .subtype = RustVehicleSubtypeAddress(v), .tick = RustVehicleTickAddress(v), .front_status = RustVehicleStatusAddress(front), .status = RustVehicleStatusAddress(v)};
+}
+static OpenTTDCargoList *OPENTTD_VEHICLE_CALL VehicleSchedulerCargoOwner(OpenTTDVehicle *shell) noexcept { return VehicleOf(shell)->cargo.RustOwner(); }
+static OpenTTDVehicleDayCallback OPENTTD_VEHICLE_CALL VehicleSchedulerDayCallbackRead(OpenTTDVehicle *shell) noexcept
+{
+	const Vehicle *v = VehicleOf(shell);
+	return {.day = v->day_counter, .has_engine = v->HasEngineType()};
+}
+static uint16_t OPENTTD_VEHICLE_CALL VehicleSchedulerDayCallback(OpenTTDVehicle *shell) noexcept
+{
+	Vehicle *v = VehicleOf(shell);
+	return GetVehicleCallback(CBID_VEHICLE_32DAY_CALLBACK, 0, 0, v->engine_type, v);
+}
+static void OPENTTD_VEHICLE_CALL VehicleSchedulerRandomiseCallback(OpenTTDVehicle *shell) noexcept
+{
+	TriggerVehicleRandomisation(VehicleOf(shell), VehicleRandomTrigger::Callback32);
+}
+static void OPENTTD_VEHICLE_CALL VehicleSchedulerFirstDirty(OpenTTDVehicle *shell) noexcept { VehicleOf(shell)->First()->MarkDirty(); }
+static void OPENTTD_VEHICLE_CALL VehicleSchedulerUnknownDayCallback(OpenTTDVehicle *shell, uint16_t result) noexcept
+{
+	ErrorUnknownCallbackResult(VehicleOf(shell)->GetGRFID(), CBID_VEHICLE_32DAY_CALLBACK, result);
+}
+static void OPENTTD_VEHICLE_CALL VehicleSchedulerRunningSound(OpenTTDVehicle *shell) noexcept { PlayVehicleSound(VehicleOf(shell), VSE_RUNNING); }
+static void OPENTTD_VEHICLE_CALL VehicleSchedulerPeriodicSound(OpenTTDVehicle *shell, bool running) noexcept { PlayVehicleSound(VehicleOf(shell), running ? VSE_RUNNING_16 : VSE_STOPPED_16); }
+static OpenTTDVehicleStationLookup OPENTTD_VEHICLE_CALL VehicleSchedulerNextStation(uint32_t from) noexcept
+{
+	auto range = Station::Iterate(from);
+	auto it = range.begin();
+	if (it == range.end()) return {};
+	Station *st = *it;
+	return {.station = st->rust_service.get(), .id = st->index.base()};
+}
+static uint64_t OPENTTD_VEHICLE_CALL VehicleSchedulerEconomyBegin() noexcept { return PerformanceMeasurer::Begin(PFE_GL_ECONOMY); }
+static void OPENTTD_VEHICLE_CALL VehicleSchedulerEconomyEnd(uint64_t start) noexcept { PerformanceMeasurer::End(PFE_GL_ECONOMY, start); }
+static void OPENTTD_VEHICLE_CALL VehicleSchedulerResetAccumulators() noexcept
+{
+	PerformanceAccumulator::Reset(PFE_GL_TRAINS);
+	PerformanceAccumulator::Reset(PFE_GL_ROADVEHS);
+	PerformanceAccumulator::Reset(PFE_GL_SHIPS);
+	PerformanceAccumulator::Reset(PFE_GL_AIRCRAFT);
+}
+
+const OpenTTDVehicleSchedulerServices &GetRustVehicleSchedulerServices() noexcept
+{
+	static const OpenTTDVehicleSchedulerServices services{
+		.pool = VehicleSchedulerPool,
+#if !defined(NDEBUG) || defined(WITH_ASSERT)
+		.assertions = true,
+#else
+		.assertions = false,
+#endif
+		.tick = VehicleSchedulerTick,
+		.post_tick = VehicleSchedulerPostTick,
+		.calendar_day = VehicleSchedulerCalendarDay,
+		.economy_day = VehicleSchedulerEconomyDay,
+		.day_callback_read = VehicleSchedulerDayCallbackRead,
+		.day_callback = VehicleSchedulerDayCallback,
+		.randomise_callback = VehicleSchedulerRandomiseCallback,
+		.first_dirty = VehicleSchedulerFirstDirty,
+		.unknown_day_callback = VehicleSchedulerUnknownDayCallback,
+		.cargo_owner = VehicleSchedulerCargoOwner,
+		.running_sound = VehicleSchedulerRunningSound,
+		.periodic_sound = VehicleSchedulerPeriodicSound,
+		.next_station = VehicleSchedulerNextStation,
+		.economy_begin = VehicleSchedulerEconomyBegin,
+		.economy_end = VehicleSchedulerEconomyEnd,
+		.reset_accumulators = VehicleSchedulerResetAccumulators,
 	};
 	return services;
 }

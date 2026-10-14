@@ -13,6 +13,8 @@
 //! A handle is a live `Vehicle *`, valid until the service that deletes it.
 //! Services are synchronous and `noexcept`; none retains a Rust reference, and
 //! callers end every owner borrow before calling one that can reenter Rust.
+pub(crate) mod scheduler;
+
 use std::ptr::NonNull;
 
 /// Opaque C++ `Vehicle`.

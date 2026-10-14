@@ -7,6 +7,7 @@
 
 /** @file windows-abi.cpp Bounded first-32-bit layout and real C ABI call checks. */
 #include "rust/abi_ffi.h"
+#include "rust/vehicle_ffi.h"
 #include "rust/command_cost_ffi.h"
 #include "rust/command_services_ffi.h"
 #include "rust/water_regions_ffi.h"
@@ -83,6 +84,13 @@ static void Layout(uint16_t type, const char *name, std::initializer_list<size_t
 
 static void Layouts()
 {
+	Layout(740, "OpenTTDVehiclePoolCursor", {sizeof(OpenTTDVehiclePoolCursor), alignof(OpenTTDVehiclePoolCursor), offsetof(OpenTTDVehiclePoolCursor, slots), offsetof(OpenTTDVehiclePoolCursor, slots_len), offsetof(OpenTTDVehiclePoolCursor, first_unused)});
+	Layout(741, "OpenTTDVehiclePostTick", {sizeof(OpenTTDVehiclePostTick), alignof(OpenTTDVehiclePostTick), offsetof(OpenTTDVehiclePostTick, type), offsetof(OpenTTDVehiclePostTick, front), offsetof(OpenTTDVehiclePostTick, period), offsetof(OpenTTDVehiclePostTick, counter), offsetof(OpenTTDVehiclePostTick, motion), offsetof(OpenTTDVehiclePostTick, speed), offsetof(OpenTTDVehiclePostTick, front_type), offsetof(OpenTTDVehiclePostTick, subtype), offsetof(OpenTTDVehiclePostTick, tick), offsetof(OpenTTDVehiclePostTick, front_status), offsetof(OpenTTDVehiclePostTick, status)});
+	Layout(743, "OpenTTDVehicleDayCallback", {sizeof(OpenTTDVehicleDayCallback), alignof(OpenTTDVehicleDayCallback), offsetof(OpenTTDVehicleDayCallback, day), offsetof(OpenTTDVehicleDayCallback, has_engine)});
+	Layout(748, "OpenTTDVehicleStationLookup", {sizeof(OpenTTDVehicleStationLookup), alignof(OpenTTDVehicleStationLookup), offsetof(OpenTTDVehicleStationLookup, station), offsetof(OpenTTDVehicleStationLookup, id)});
+	Layout(749, "OpenTTDVehicleSchedulerServices", {sizeof(OpenTTDVehicleSchedulerServices), alignof(OpenTTDVehicleSchedulerServices), offsetof(OpenTTDVehicleSchedulerServices, pool), offsetof(OpenTTDVehicleSchedulerServices, assertions), offsetof(OpenTTDVehicleSchedulerServices, tick), offsetof(OpenTTDVehicleSchedulerServices, post_tick), offsetof(OpenTTDVehicleSchedulerServices, calendar_day), offsetof(OpenTTDVehicleSchedulerServices, economy_day), offsetof(OpenTTDVehicleSchedulerServices, day_callback_read), offsetof(OpenTTDVehicleSchedulerServices, day_callback), offsetof(OpenTTDVehicleSchedulerServices, randomise_callback), offsetof(OpenTTDVehicleSchedulerServices, first_dirty), offsetof(OpenTTDVehicleSchedulerServices, unknown_day_callback), offsetof(OpenTTDVehicleSchedulerServices, cargo_owner), offsetof(OpenTTDVehicleSchedulerServices, running_sound), offsetof(OpenTTDVehicleSchedulerServices, periodic_sound), offsetof(OpenTTDVehicleSchedulerServices, next_station), offsetof(OpenTTDVehicleSchedulerServices, economy_begin), offsetof(OpenTTDVehicleSchedulerServices, economy_end), offsetof(OpenTTDVehicleSchedulerServices, reset_accumulators)});
+	Layout(750, "OpenTTDVehicleSchedulerTables", {sizeof(OpenTTDVehicleSchedulerTables), alignof(OpenTTDVehicleSchedulerTables), offsetof(OpenTTDVehicleSchedulerTables, scheduler), offsetof(OpenTTDVehicleSchedulerTables, cargo), offsetof(OpenTTDVehicleSchedulerTables, station), offsetof(OpenTTDVehicleSchedulerTables, loading), offsetof(OpenTTDVehicleSchedulerTables, pending), offsetof(OpenTTDVehicleSchedulerTables, transaction), offsetof(OpenTTDVehicleSchedulerTables, group)});
+
 	Layout(445, "OpenTTDTownYearlyServices", {sizeof(OpenTTDTownYearlyServices), alignof(OpenTTDTownYearlyServices), offsetof(OpenTTDTownYearlyServices, completed), offsetof(OpenTTDTownYearlyServices, age), offsetof(OpenTTDTownYearlyServices, set_age)});
 	Layout(444, "OpenTTDTownSuppliedEntry", {sizeof(OpenTTDTownSuppliedEntry), alignof(OpenTTDTownSuppliedEntry), offsetof(OpenTTDTownSuppliedEntry, entry), offsetof(OpenTTDTownSuppliedEntry, created)});
 	Layout(443, "OpenTTDTownAuthorityServices", {sizeof(OpenTTDTownAuthorityServices), alignof(OpenTTDTownAuthorityServices), offsetof(OpenTTDTownAuthorityServices, council_tolerance), offsetof(OpenTTDTownAuthorityServices, bulldozer), offsetof(OpenTTDTownAuthorityServices, authority_distance), offsetof(OpenTTDTownAuthorityServices, town_index), offsetof(OpenTTDTownAuthorityServices, refusal)});

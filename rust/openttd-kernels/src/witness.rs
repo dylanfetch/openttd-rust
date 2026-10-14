@@ -251,7 +251,46 @@ pub const AIRCRAFT_CACHE_ENTRIES: usize = 106;
 pub const AIRCRAFT_DISASTER_ENTRIES: usize = 107;
 
 /// Counter names, grouped by the prefix the harness selects.
-pub const NAMES: [&str; 108] = [
+/// Scheduler evidence counter.
+pub const VEHICLE_CALLBACK32: usize = 108;
+/// Scheduler evidence counter.
+pub const VEHICLE_CARGO_AGES: usize = 109;
+/// Scheduler evidence counter.
+pub const VEHICLE_CARGO_OWNER: usize = 110;
+/// Scheduler evidence counter.
+pub const VEHICLE_CROSSINGS: usize = 111;
+/// Scheduler evidence counter.
+pub const VEHICLE_DAYS: usize = 112;
+/// Scheduler evidence counter.
+pub const VEHICLE_DELETED: usize = 113;
+/// Scheduler evidence counter.
+pub const VEHICLE_DESCRIPTOR_BYTES: usize = 114;
+/// Scheduler evidence counter.
+pub const VEHICLE_MOTION: usize = 115;
+/// Scheduler evidence counter.
+pub const VEHICLE_OBSERVED_BYTES: usize = 116;
+/// Scheduler evidence counter.
+pub const VEHICLE_OUTER_VISITS: usize = 117;
+/// Scheduler evidence counter.
+pub const VEHICLE_PACKET_LOOKUPS: usize = 118;
+/// Scheduler evidence counter.
+pub const VEHICLE_PERIODIC_SOUND: usize = 119;
+/// Scheduler evidence counter.
+pub const VEHICLE_POOL_GROWTH: usize = 120;
+/// Scheduler evidence counter.
+pub const VEHICLE_POST_TICK: usize = 121;
+/// Scheduler evidence counter.
+pub const VEHICLE_RUNNING_SOUND: usize = 122;
+/// Scheduler evidence counter.
+pub const VEHICLE_SCALAR_READ_BYTES: usize = 123;
+/// Scheduler evidence counter.
+pub const VEHICLE_SCALAR_WRITE_BYTES: usize = 124;
+/// Scheduler evidence counter.
+pub const VEHICLE_STATIONS: usize = 125;
+/// Scheduler evidence counter.
+pub const VEHICLE_VISITS: usize = 126;
+
+pub const NAMES: [&str; 133] = [
     "train.tick_first",
     "train.tick_second",
     "train.reversal",
@@ -360,6 +399,31 @@ pub const NAMES: [&str; 108] = [
     "aircraft.observation_bytes",
     "aircraft.cache_entries",
     "aircraft.disaster_entries",
+    "vehicle.callback32",
+    "vehicle.cargo_ages",
+    "vehicle.cargo_owner",
+    "vehicle.crossings",
+    "vehicle.days",
+    "vehicle.deleted",
+    "vehicle.descriptor_bytes",
+    "vehicle.motion",
+    "vehicle.observed_bytes",
+    "vehicle.outer_visits",
+    "vehicle.packet_lookups",
+    "vehicle.periodic_sound",
+    "vehicle.pool_growth",
+    "vehicle.post_tick",
+    "vehicle.running_sound",
+    "vehicle.scalar_read_bytes",
+    "vehicle.scalar_write_bytes",
+    "vehicle.stations",
+    "vehicle.visits.train",
+    "vehicle.visits.road",
+    "vehicle.visits.ship",
+    "vehicle.visits.aircraft",
+    "vehicle.visits.effect",
+    "vehicle.visits.disaster",
+    "vehicle.visits.end",
 ];
 
 static ENABLED: AtomicBool = AtomicBool::new(false);
