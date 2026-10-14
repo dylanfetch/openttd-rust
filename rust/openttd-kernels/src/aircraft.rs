@@ -382,8 +382,8 @@ impl World<'_> {
     fn map(&self) -> Map {
         self.map.get().unwrap_or_else(|| {
             let log_x = (self.ss.map_log_x)();
-            service_witness("map_log_x", 1);
-            let map = Map { log_x };
+            service_witness("map_log_x", std::mem::size_of_val(&log_x));
+            let map = Map { log_x: log_x as u8 };
             self.map.set(Some(map));
             map
         })
