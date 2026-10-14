@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Run the real #249 CLI for every seeded category, upstream scope and ratchet."""
 
-import json
 import subprocess
 import tempfile
 from pathlib import Path
@@ -14,7 +13,6 @@ EXPRESSIONS = (
     "Canonical(v)|to_underlying(Canonical(v))|static_cast<Vehicle *>(context)->owner|"
     "Company::Get(id)->money"
 ).split("|")
-
 with tempfile.TemporaryDirectory() as directory:
     root = Path(directory)
     for name in ["src/rust", "tools", "migration"]:
@@ -32,12 +30,12 @@ with tempfile.TemporaryDirectory() as directory:
     git("add", ".")
     git("commit", "-qm", "Add: Reference fixture")
     (root / "migration/baseline.json").write_text(
-        json.dumps({"commit": git("rev-parse", "HEAD")})
+        '{"commit":"%s"}' % git("rev-parse", "HEAD")
     )
     (root / "tools/shared-accessors.py").write_text(SCRIPT.read_text())
-    (root / "src/rust/services.h").write_text(
-        "int Canonical(Vehicle *v) { return v->owner; }"
-    )
+    canonical = "int Canonical(Vehicle *v) { return v->owner; }"
+    for shared in ["services.h", "engine_services.h", "presentation_services.h"]:
+        (root / "src/rust" / shared).write_text(canonical)
     baseline = root / "tools/shared-accessor-baseline.txt"
     baseline.write_text("")
     git("add", ".")
@@ -57,18 +55,22 @@ with tempfile.TemporaryDirectory() as directory:
         for prefix in ["int Renamed", "[]"]:
             port.write_text(
                 original
-                + f"{prefix}(Vehicle *v, Station *s, BaseStation *b, Company *c) noexcept {{ return {expression}; }}"
+                + f"{prefix}(const Vehicle *const v, Station *s, BaseStation *b, Company *c) noexcept {{ return {expression}; }}"
             )
+            if prefix == "[]" and expression == "Map::Size()":
+                port.write_text(original + "[] { return Map::Size(); }")
             result = check()
-            assert result.returncode == 1 and "new shared accessor:" in result.stdout, (
-                result
-            )
+            assert result.returncode == 1 and "new shared accessor:" in result.stdout
     fingerprint = result.stdout.split("new shared accessor: ")[1].splitlines()[0]
     baseline.write_text(fingerprint + "\n")
     assert "addition forbidden" in check().stdout and check().returncode == 1
     git("commit", "-qam", "Change: Grandfather fixture fingerprint")
     base = git("rev-parse", "HEAD")
     assert check().returncode == 0
+    copy = port.read_text()[len(original) :]
+    for changed in [original + copy * 2, original + copy.replace("money", "owner")]:
+        port.write_text(changed)
+        assert "new shared accessor:" in check().stdout and check().returncode == 1
     port.write_text(original)
     assert "remove retired" in check().stdout
     baseline.write_text("")

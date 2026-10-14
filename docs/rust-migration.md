@@ -457,8 +457,11 @@ checks, legacy receipts, dirty source and unknown provenance remain labelled.
 
 `python3 tools/shared-accessors.py --base-ref origin/rust-migration` enforces
 #249 in quick CI. It checks fork-added functions/lambdas outside the named shared
-service files for single shared-world reads or shared-helper forwarding. Existing
-definition fingerprints are in `tools/shared-accessor-baseline.txt`: remove retired
+service files for single shared-world reads or shared-helper forwarding. The
+shared files include the canonical `engine_services.h` and
+`presentation_services.h`; root selected these exact filenames for #248, and its
+independent review verifies their consumer adoption and deletion of port copies.
+Existing definition fingerprints are in `tools/shared-accessor-baseline.txt`: remove retired
 entries, never add exemptions. CI compares that baseline with the PR base or prior
 protected-branch commit. `tools/test-shared-accessors.py` runs CLI category and
 ratchet regressions by default. This small syntactic check covers typed parameters,

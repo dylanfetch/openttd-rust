@@ -12,12 +12,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = "tools/shared-accessor-baseline.txt"
 SHARED = re.compile(
-    r"^src/rust/(?:services[^/]*|vehicle_services[^/]*|environment_services\.h|"
-    r"settings_services\.h|company_services\.h)$"
+    r"^src/rust/(?:services[^/]*|vehicle_services[^/]*|"
+    r"(?:environment|settings|company|engine|presentation)_services\.h)$"
 )
 HEADER = re.compile(
     r"(?P<header>\b\w+(?:::\w+)*\s*\([^{};]*\)\s*(?:const\s*)?(?:noexcept\s*)?"
-    r"|\[[^\]\n]*\]\s*\([^{};]*\)\s*(?:(?:noexcept|mutable)\s*)?(?:->[^{};]+)?)\{"
+    r"|\[[^\]\n]*\]\s*(?:\([^{};]*\)\s*)?(?:(?:noexcept|mutable)\s*)*(?:->[^{};]+)?)\{"
 )
 OWNER = r"(?:Vehicle|BaseStation|Station|Company)"
 WORLD = re.compile(
@@ -41,7 +41,6 @@ def definitions(source):
         header = " ".join(match["header"].split())
         if header.split("(")[0].strip() in {"if", "while", "switch", "for", "catch"}:
             continue
-        # A selected single-read body has no nested braces; nested bodies are rejected.
         body = source[match.end() : source.find("}", match.end())]
         yield header, body, source[: match.start()].count("\n") + 1
 
@@ -60,7 +59,7 @@ def single_read(header, body, helpers):
     if re.search(r"(?<![=!<>])=(?!=)|\+\+|--|\b(?:new|delete|throw)\b", expression):
         return False
     reads = len(WORLD.findall(expression))
-    owners = aliases + re.findall(rf"\b{OWNER}\s*[*&]\s*(\w+)", header)
+    owners = aliases + re.findall(rf"\b{OWNER}[ *&]+(?:const[ *&]+)?(\w+)", header)
     reads += sum(
         len(re.findall(rf"\b{owner}\s*(?:->|\.)\s*\w+(?!\w|\s*\()", expression))
         for owner in owners
@@ -128,11 +127,10 @@ def main():
     hits = collect(files, originals)
     baseline = set((ROOT / BASELINE).read_text().splitlines())
     previous = baseline
-    if (
-        args.base_ref
-        and BASELINE in git("ls-tree", "-r", "--name-only", args.base_ref).splitlines()
-    ):
-        previous = set(git("show", f"{args.base_ref}:{BASELINE}").splitlines())
+    if args.base_ref:
+        tracked_base = git("ls-tree", "-r", "--name-only", args.base_ref).splitlines()
+        if BASELINE in tracked_base:
+            previous = set(git("show", f"{args.base_ref}:{BASELINE}").splitlines())
     new, growth = set(hits) - baseline, baseline - previous
     for key in new:
         print(f"{key.split(' | ')[0]}:{hits[key]}: new shared accessor: {key}")
