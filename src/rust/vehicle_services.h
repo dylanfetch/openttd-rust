@@ -29,6 +29,10 @@ inline uint8_t RustVehicleOwner(const Vehicle *v) noexcept { return v->owner.bas
 inline Direction RustVehicleDirection(const Vehicle *v) noexcept { return v->direction; }
 inline uint8_t RustVehicleProgress(const Vehicle *v) noexcept { return v->progress; }
 inline void RustWriteVehicleProgress(Vehicle *v, uint8_t progress) noexcept { v->progress = progress; }
+inline uint16_t RustVehicleSpeed(const Vehicle *v) noexcept { return v->cur_speed; }
+inline uint32_t RustVehicleMotionCounter(const Vehicle *v) noexcept { return v->motion_counter; }
+inline uint16_t RustVehicleCargoAgePeriod(const Vehicle *v) noexcept { return v->vcache.cached_cargo_age_period; }
+inline uint8_t RustVehicleSubtype(const Vehicle *v) noexcept { return v->subtype; }
 inline uint8_t RustVehicleTick(const Vehicle *v) noexcept { return v->tick_counter; }
 inline uint8_t RustVehicleStatus(const Vehicle *v) noexcept { return v->vehstatus.base(); }
 inline void RustWriteVehicleTick(Vehicle *v, uint8_t tick) noexcept { v->tick_counter = tick; }
@@ -55,7 +59,7 @@ static OpenTTDGroundMoved OPENTTD_VEHICLE_CALL GroundSvcMoveIncline(OpenTTDVehic
 	u->y_pos = y;
 	u->UpdatePosition();
 	int old_z = u->UpdateInclination(new_tile, update_delta);
-	return {.old_z = old_z, .z = u->z_pos, .cur_speed = u->cur_speed, .max_track_speed = u->gcache.cached_max_track_speed};
+	return {.old_z = old_z, .z = u->z_pos, .cur_speed = RustVehicleSpeed(u), .max_track_speed = u->gcache.cached_max_track_speed};
 }
 template <class T>
 static OpenTTDGroundViewportNext OPENTTD_VEHICLE_CALL GroundSvcUpdateViewportThenNext(OpenTTDVehicle *part, OpenTTDVehicle *front) noexcept
@@ -79,7 +83,7 @@ static OpenTTDGroundSpeed OPENTTD_VEHICLE_CALL GroundSvcDoUpdateSpeed(OpenTTDVeh
 {
 	T *u = T::From(VehicleOf(v));
 	int distance = u->RustDoUpdateSpeed(accel, min_speed, max_speed);
-	return {.distance = distance, .cur_speed = u->cur_speed};
+	return {.distance = distance, .cur_speed = RustVehicleSpeed(u)};
 }
 template <class T>
 static OpenTTDGroundLastSpeed OPENTTD_VEHICLE_CALL GroundSvcSetLastSpeed(OpenTTDVehicle *v) noexcept

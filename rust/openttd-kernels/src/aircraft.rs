@@ -1919,6 +1919,11 @@ pub unsafe extern "C" fn openttd_rust_airport_blocks_destroy(blocks: *mut u64) {
 /// Raw scalar accesses end before noexcept callbacks; no borrow survives reentry.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_aircraft_tick(leaves: *const Leaves, id: Vehicle) -> bool {
+    // SAFETY: The synchronous native entry establishes the internal helper contract.
+    unsafe { tick(leaves, id) }
+}
+
+pub(crate) unsafe fn tick(leaves: *const Leaves, id: Vehicle) -> bool {
     let w = World {
         leaves: unsafe { &*leaves },
     };
@@ -1930,6 +1935,11 @@ pub unsafe extern "C" fn openttd_rust_aircraft_tick(leaves: *const Leaves, id: V
 /// Raw scalar accesses end before noexcept callbacks; no borrow survives reentry.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_aircraft_calendar_day(leaves: *const Leaves, id: Vehicle) {
+    // SAFETY: The synchronous native entry establishes the internal helper contract.
+    unsafe { calendar_day(leaves, id) }
+}
+
+pub(crate) unsafe fn calendar_day(leaves: *const Leaves, id: Vehicle) {
     let w = World {
         leaves: unsafe { &*leaves },
     };
@@ -1941,6 +1951,11 @@ pub unsafe extern "C" fn openttd_rust_aircraft_calendar_day(leaves: *const Leave
 /// Raw scalar accesses end before noexcept callbacks; no borrow survives reentry.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_aircraft_economy_day(leaves: *const Leaves, id: Vehicle) {
+    // SAFETY: The synchronous native entry establishes the internal helper contract.
+    unsafe { economy_day(leaves, id) }
+}
+
+pub(crate) unsafe fn economy_day(leaves: *const Leaves, id: Vehicle) {
     let w = World {
         leaves: unsafe { &*leaves },
     };

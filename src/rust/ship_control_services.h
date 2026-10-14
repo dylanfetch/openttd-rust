@@ -211,7 +211,7 @@ static uint32_t Ship_tracks_reach(uint32_t direction) noexcept { return DiagdirR
 static bool Ship_busy_tile(uint32_t id) noexcept
 {
 	Ship *v = Ship::Get(VehicleID(id));
-	return HasVehicleOnTile(v->tile, [](const Vehicle *u) { return u->type == VEH_SHIP && u->cur_speed != 0; });
+	return HasVehicleOnTile(v->tile, [](const Vehicle *u) { return u->type == VEH_SHIP && RustVehicleSpeed(u) != 0; });
 }
 
 static size_t Ship_path_size(uint32_t id) noexcept { Ship *v = Ship::Get(VehicleID(id)); return v->path.size(); }
@@ -360,7 +360,7 @@ static uint32_t Ship_z(uint32_t id) noexcept { const Ship *v = Ship::Get(Vehicle
 
 static uint32_t Ship_direction(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(RustVehicleDirection(v)); }
 
-static uint32_t Ship_speed(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(v->cur_speed); }
+static uint32_t Ship_speed(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(RustVehicleSpeed(v)); }
 
 static uint32_t Ship_tick(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(RustVehicleTick(v)); }
 
@@ -405,7 +405,7 @@ static bool Ship_next_depot(uint32_t first, OpenTTDShipDepot *out) noexcept
 	}
 	return false;
 }
-static const OpenTTDShipLeaves &GetShipServices()
+const OpenTTDShipLeaves &GetShipServices() noexcept
 {
 	static const OpenTTDShipLeaves leaves{
 		.depot_dir = Ship_depot_dir, .depot_axis = Ship_depot_axis,

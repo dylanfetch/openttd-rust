@@ -1832,6 +1832,16 @@ pub unsafe extern "C" fn openttd_rust_road_tick(
     read: *const TickRead,
     leaves: *const Leaves,
 ) -> bool {
+    // SAFETY: The synchronous native entry establishes the internal helper contract.
+    unsafe { tick(v, state, read, leaves) }
+}
+
+pub(crate) unsafe fn tick(
+    v: VehicleRef,
+    state: *mut State,
+    read: *const TickRead,
+    leaves: *const Leaves,
+) -> bool {
     crate::witness::hit(crate::witness::ROAD_TICKS);
     // SAFETY: Records are borrowed for this call only.
     let t = unsafe { &*read };
@@ -1898,6 +1908,11 @@ pub unsafe extern "C" fn openttd_rust_road_calendar_day(
     front: bool,
     leaves: *const Leaves,
 ) {
+    // SAFETY: The synchronous native entry establishes the internal helper contract.
+    unsafe { calendar_day(v, front, leaves) }
+}
+
+pub(crate) unsafe fn calendar_day(v: VehicleRef, front: bool, leaves: *const Leaves) {
     crate::witness::hit(crate::witness::ROAD_ENTRIES);
     if front {
         // SAFETY: Static tables.
@@ -1908,6 +1923,16 @@ pub unsafe extern "C" fn openttd_rust_road_calendar_day(
 /// As `openttd_rust_road_tick`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_road_economy_day(
+    v: VehicleRef,
+    state: *mut State,
+    front: bool,
+    leaves: *const Leaves,
+) {
+    // SAFETY: The synchronous native entry establishes the internal helper contract.
+    unsafe { economy_day(v, state, front, leaves) }
+}
+
+pub(crate) unsafe fn economy_day(
     v: VehicleRef,
     state: *mut State,
     front: bool,

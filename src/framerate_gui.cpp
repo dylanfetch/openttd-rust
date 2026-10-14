@@ -244,18 +244,20 @@ static TimingMeasurement GetPerformanceTimer()
  * Begin a cycle of a measured element.
  * @param elem The element to be measured
  */
-PerformanceMeasurer::PerformanceMeasurer(PerformanceElement elem)
+PerformanceMeasurer::PerformanceMeasurer(PerformanceElement elem) : elem(elem), start_time(Begin(elem)) {}
+
+TimingMeasurement PerformanceMeasurer::Begin([[maybe_unused]] PerformanceElement elem)
 {
 	assert(elem < PFE_MAX);
-
-	this->elem = elem;
-	this->start_time = GetPerformanceTimer();
+	return GetPerformanceTimer();
 }
 
 /** Finish a cycle of a measured element and store the measurement taken. */
-PerformanceMeasurer::~PerformanceMeasurer()
+PerformanceMeasurer::~PerformanceMeasurer() { End(this->elem, this->start_time); }
+
+void PerformanceMeasurer::End(PerformanceElement elem, TimingMeasurement start_time)
 {
-	if (this->elem == PFE_ALLSCRIPTS) {
+	if (elem == PFE_ALLSCRIPTS) {
 		/* Hack to not record scripts total when no scripts are active */
 		bool any_active = _pf_data[PFE_GAMESCRIPT].num_valid > 0;
 		for (uint e = PFE_AI0; e < PFE_MAX; e++) any_active |= _pf_data[e].num_valid > 0;
@@ -264,7 +266,7 @@ PerformanceMeasurer::~PerformanceMeasurer()
 			return;
 		}
 	}
-	if (this->elem == PFE_SOUND) {
+	if (elem == PFE_SOUND) {
 		/* PFE_SOUND measurements are made from the mixer thread.
 		 * _pf_data cannot be concurrently accessed from the mixer thread
 		 * and the main thread, so store the measurement results in a
@@ -273,12 +275,12 @@ PerformanceMeasurer::~PerformanceMeasurer()
 		TimingMeasurement end = GetPerformanceTimer();
 		std::lock_guard lk(_sound_perf_lock);
 		if (_sound_perf_measurements.size() >= NUM_FRAMERATE_POINTS * 2) return;
-		_sound_perf_measurements.push_back(this->start_time);
+		_sound_perf_measurements.push_back(start_time);
 		_sound_perf_measurements.push_back(end);
 		_sound_perf_pending.store(true, std::memory_order_release);
 		return;
 	}
-	_pf_data[this->elem].Add(this->start_time, GetPerformanceTimer());
+	_pf_data[elem].Add(start_time, GetPerformanceTimer());
 }
 
 /** Set the rate of expected cycles per second of a performance element. */
@@ -310,18 +312,20 @@ void PerformanceMeasurer::SetExpectedRate(double rate)
  * Begin measuring one block of the accumulating value.
  * @param elem The element to be measured
  */
-PerformanceAccumulator::PerformanceAccumulator(PerformanceElement elem)
+PerformanceAccumulator::PerformanceAccumulator(PerformanceElement elem) : elem(elem), start_time(Begin(elem)) {}
+
+TimingMeasurement PerformanceAccumulator::Begin([[maybe_unused]] PerformanceElement elem)
 {
 	assert(elem < PFE_MAX);
-
-	this->elem = elem;
-	this->start_time = GetPerformanceTimer();
+	return GetPerformanceTimer();
 }
 
 /** Finish and add one block of the accumulating value. */
-PerformanceAccumulator::~PerformanceAccumulator()
+PerformanceAccumulator::~PerformanceAccumulator() { End(this->elem, this->start_time); }
+
+void PerformanceAccumulator::End(PerformanceElement elem, TimingMeasurement start_time)
 {
-	_pf_data[this->elem].AddAccumulate(GetPerformanceTimer() - this->start_time);
+	_pf_data[elem].AddAccumulate(GetPerformanceTimer() - start_time);
 }
 
 /**

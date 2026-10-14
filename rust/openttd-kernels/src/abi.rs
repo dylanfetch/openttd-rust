@@ -478,6 +478,25 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         396 => {
             layout!(crate::fleet::pending::Services, item; set_current, restart, x, y, z, reserve, subtract, command, animation, length_news, failed_news, cash, limit)
         }
+        740 => layout!(crate::vehicle::scheduler::TickOwner, item; road, train, ship, aircraft),
+        741 => {
+            layout!(crate::vehicle::scheduler::Dispatch, item; vehicle, owner, id, vehicle_type, subtype, road_tick)
+        }
+        742 => layout!(crate::vehicle::scheduler::DayLookup, item; vehicle, end),
+        743 => layout!(crate::vehicle::scheduler::DayCallback, item; day, has_engine),
+        744 => layout!(crate::vehicle::scheduler::CargoTick, item; front, cargo, period, counter),
+        745 => {
+            layout!(crate::vehicle::scheduler::MotionTick, item; motion, speed, front_status, status, front_type)
+        }
+        746 => layout!(crate::vehicle::scheduler::SoundTick, item; motion, speed, subtype),
+        747 => layout!(crate::vehicle::scheduler::PeriodicSound, item; speed, tick, front_status),
+        748 => layout!(crate::vehicle::scheduler::StationLookup, item; station, id),
+        749 => {
+            layout!(crate::vehicle::scheduler::SchedulerServices, item; next, day_at, dispatch, day_callback_read, day_callback, randomise_callback, first_dirty, unknown_day_callback, other_tick, assert_survival, cargo_read, write_cargo_counter, cargo_period, motion_read, write_motion, sound_read, running_sound, periodic_read, periodic_sound, next_station, economy_begin, economy_end, reset_accumulators, train_begin, road_begin, ship_begin, aircraft_begin, train_end, road_end, ship_end, aircraft_end)
+        }
+        750 => {
+            layout!(crate::vehicle::scheduler::Tables, item; scheduler, road, train, ship, aircraft, shared, cargo, station, loading, pending, transaction, group)
+        }
         _ => usize::MAX,
     }
 }

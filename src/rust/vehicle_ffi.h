@@ -129,4 +129,130 @@ struct OpenTTDGroundServices {
 	bool (OPENTTD_VEHICLE_CALL *has_articulated)(OpenTTDVehicle *) noexcept;
 };
 const OpenTTDVehicleServices &GetRustVehicleServices() noexcept;
+enum VehicleType : uint8_t;
+/* ABI 740-750 pin only these consumed scheduler layouts.
+ * A tagged owner is opaque: only the current type's pointer is read. */
+struct OpenTTDRoadState;
+struct OpenTTDTrainState;
+struct OpenTTDShipState;
+struct OpenTTDAircraftState;
+struct OpenTTDCargoList;
+union OpenTTDVehicleTickOwner {
+	OpenTTDRoadState *road;
+	OpenTTDTrainState *train;
+	OpenTTDShipState *ship;
+	OpenTTDAircraftState *aircraft;
+};
+struct OpenTTDVehicleDispatch {
+	OpenTTDVehicle *vehicle;
+	OpenTTDVehicleTickOwner owner;
+	uint32_t id;
+	VehicleType type;
+	uint8_t subtype;
+	uint8_t road_tick;
+};
+/* Day lookup checks the live bound; a hole has a null vehicle but end=false. */
+struct OpenTTDVehicleDayLookup {
+	OpenTTDVehicle *vehicle;
+	bool end;
+};
+struct OpenTTDVehicleDayCallback {
+	uint8_t day;
+	bool has_engine;
+};
+/* First() is resolved once, after Tick survives; sound reads follow cargo aging. */
+struct OpenTTDVehicleCargoTick {
+	OpenTTDVehicle *front;
+	OpenTTDCargoList *cargo;
+	uint16_t period;
+	uint16_t counter;
+};
+struct OpenTTDVehicleMotionTick {
+	uint32_t motion;
+	uint16_t speed;
+	uint8_t front_status;
+	uint8_t status;
+	VehicleType front_type;
+};
+struct OpenTTDVehicleSoundTick {
+	uint32_t motion;
+	uint16_t speed;
+	uint8_t subtype;
+};
+struct OpenTTDVehiclePeriodicSound {
+	uint16_t speed;
+	uint8_t tick;
+	uint8_t front_status;
+};
+struct OpenTTDVehicleStationLookup {
+	void *station;
+	uint32_t id;
+};
+struct OpenTTDVehicleSchedulerServices {
+	OpenTTDVehicleDispatch (OPENTTD_VEHICLE_CALL *next)(uint32_t) noexcept;
+	OpenTTDVehicleDayLookup (OPENTTD_VEHICLE_CALL *day_at)(uint32_t) noexcept;
+	OpenTTDVehicleDispatch (OPENTTD_VEHICLE_CALL *dispatch)(OpenTTDVehicle *) noexcept;
+	OpenTTDVehicleDayCallback (OPENTTD_VEHICLE_CALL *day_callback_read)(OpenTTDVehicle *) noexcept;
+	uint16_t (OPENTTD_VEHICLE_CALL *day_callback)(OpenTTDVehicle *) noexcept;
+	void (OPENTTD_VEHICLE_CALL *randomise_callback)(OpenTTDVehicle *) noexcept;
+	void (OPENTTD_VEHICLE_CALL *first_dirty)(OpenTTDVehicle *) noexcept;
+	void (OPENTTD_VEHICLE_CALL *unknown_day_callback)(OpenTTDVehicle *, uint16_t) noexcept;
+	bool (OPENTTD_VEHICLE_CALL *other_tick)(OpenTTDVehicle *) noexcept;
+	void (OPENTTD_VEHICLE_CALL *assert_survival)(OpenTTDVehicle *, uint32_t, bool) noexcept;
+	OpenTTDVehicleCargoTick (OPENTTD_VEHICLE_CALL *cargo_read)(OpenTTDVehicle *) noexcept;
+	void (OPENTTD_VEHICLE_CALL *write_cargo_counter)(OpenTTDVehicle *, uint16_t) noexcept;
+	uint16_t (OPENTTD_VEHICLE_CALL *cargo_period)(OpenTTDVehicle *) noexcept;
+	OpenTTDVehicleMotionTick (OPENTTD_VEHICLE_CALL *motion_read)(OpenTTDVehicle *, OpenTTDVehicle *) noexcept;
+	void (OPENTTD_VEHICLE_CALL *write_motion)(OpenTTDVehicle *, uint32_t) noexcept;
+	OpenTTDVehicleSoundTick (OPENTTD_VEHICLE_CALL *sound_read)(OpenTTDVehicle *, OpenTTDVehicle *) noexcept;
+	void (OPENTTD_VEHICLE_CALL *running_sound)(OpenTTDVehicle *) noexcept;
+	OpenTTDVehiclePeriodicSound (OPENTTD_VEHICLE_CALL *periodic_read)(OpenTTDVehicle *, OpenTTDVehicle *) noexcept;
+	void (OPENTTD_VEHICLE_CALL *periodic_sound)(OpenTTDVehicle *, bool) noexcept;
+	OpenTTDVehicleStationLookup (OPENTTD_VEHICLE_CALL *next_station)(uint32_t) noexcept;
+	uint64_t (OPENTTD_VEHICLE_CALL *economy_begin)() noexcept;
+	void (OPENTTD_VEHICLE_CALL *economy_end)(uint64_t) noexcept;
+	void (OPENTTD_VEHICLE_CALL *reset_accumulators)() noexcept;
+	uint64_t (OPENTTD_VEHICLE_CALL *train_begin)() noexcept;
+	uint64_t (OPENTTD_VEHICLE_CALL *road_begin)() noexcept;
+	uint64_t (OPENTTD_VEHICLE_CALL *ship_begin)() noexcept;
+	uint64_t (OPENTTD_VEHICLE_CALL *aircraft_begin)() noexcept;
+	void (OPENTTD_VEHICLE_CALL *train_end)(uint64_t) noexcept;
+	void (OPENTTD_VEHICLE_CALL *road_end)(uint64_t) noexcept;
+	void (OPENTTD_VEHICLE_CALL *ship_end)(uint64_t) noexcept;
+	void (OPENTTD_VEHICLE_CALL *aircraft_end)(uint64_t) noexcept;
+};
+struct OpenTTDRoadLeaves;
+struct OpenTTDTrainServices;
+struct OpenTTDShipLeaves;
+struct OpenTTDAircraftLeaves;
+struct OpenTTDSharedServices;
+struct OpenTTDCargoStorageServices;
+struct OpenTTDStationServices;
+struct OpenTTDStationLoading;
+struct OpenTTDFleetPendingServices;
+struct OpenTTDFleetTransactionServices;
+struct OpenTTDFleetGroupServices;
+struct OpenTTDVehicleSchedulerTables {
+	const OpenTTDVehicleSchedulerServices *scheduler;
+	const OpenTTDRoadLeaves *road;
+	const OpenTTDTrainServices *train;
+	const OpenTTDShipLeaves *ship;
+	const OpenTTDAircraftLeaves *aircraft;
+	const OpenTTDSharedServices *shared;
+	const OpenTTDCargoStorageServices *cargo;
+	const OpenTTDStationServices *station;
+	const OpenTTDStationLoading *loading;
+	const OpenTTDFleetPendingServices *pending;
+	const OpenTTDFleetTransactionServices *transaction;
+	const OpenTTDFleetGroupServices *group;
+};
+const OpenTTDRoadLeaves &GetRoadLeaves() noexcept;
+const OpenTTDTrainServices &GetTrainServices() noexcept;
+const OpenTTDShipLeaves &GetShipServices() noexcept;
+const OpenTTDAircraftLeaves &GetAircraftLeaves() noexcept;
+const OpenTTDVehicleSchedulerServices &GetRustVehicleSchedulerServices() noexcept;
+extern "C" {
+void OPENTTD_VEHICLE_CALL openttd_rust_vehicle_calendar_day(const OpenTTDVehicleSchedulerTables *, bool, uint32_t);
+void OPENTTD_VEHICLE_CALL openttd_rust_vehicle_ticks(const OpenTTDVehicleSchedulerTables *, bool, uint32_t, void *);
+}
 #endif /* RUST_VEHICLE_FFI_H */

@@ -44,7 +44,6 @@
 #ifdef WITH_RUST
 #include "rust/train_ffi.h"
 #include "rust/train_reservation_ffi.h"
-static const OpenTTDTrainServices &GetTrainServices();
 static const OpenTTDTrainReservationLeaves &GetTrainReservationServices();
 static inline OpenTTDTrainHandle TrainHandle(const Train *v) noexcept
 {
@@ -4505,7 +4504,7 @@ uint16_t Train::GetMaxWeight() const
 
 #ifdef WITH_RUST
 
-static const OpenTTDTrainServices &GetTrainServices()
+const OpenTTDTrainServices &GetTrainServices() noexcept
 {
 	static const OpenTTDTrainServices services{
 		.read_first = TrainReadFirst,

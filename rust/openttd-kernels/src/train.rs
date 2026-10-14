@@ -3570,6 +3570,11 @@ pub unsafe extern "C" fn openttd_rust_train_tick(
     leaves: *const Leaves,
     services: *const Services,
 ) -> u8 {
+    // SAFETY: The synchronous native entry establishes the internal helper contract.
+    unsafe { tick(id, leaves, services) }
+}
+
+pub(crate) unsafe fn tick(id: Handle, leaves: *const Leaves, services: *const Services) -> u8 {
     // SAFETY: Immutable descriptors are live for this call; unaligned supports MSVC x86.
     let g = Game {
         leaves: unsafe { &*leaves },
@@ -3586,6 +3591,11 @@ pub unsafe extern "C" fn openttd_rust_train_calendar_day(
     leaves: *const Leaves,
     services: *const Services,
 ) {
+    // SAFETY: The synchronous native entry establishes the internal helper contract.
+    unsafe { calendar_day(id, leaves, services) }
+}
+
+pub(crate) unsafe fn calendar_day(id: Handle, leaves: *const Leaves, services: *const Services) {
     // SAFETY: Immutable descriptors are live for this call; unaligned supports MSVC x86.
     let g = Game {
         leaves: unsafe { &*leaves },
@@ -3602,6 +3612,11 @@ pub unsafe extern "C" fn openttd_rust_train_economy_day(
     leaves: *const Leaves,
     services: *const Services,
 ) {
+    // SAFETY: The synchronous native entry establishes the internal helper contract.
+    unsafe { economy_day(id, leaves, services) }
+}
+
+pub(crate) unsafe fn economy_day(id: Handle, leaves: *const Leaves, services: *const Services) {
     // SAFETY: Immutable descriptors are live for this call; unaligned supports MSVC x86.
     let g = Game {
         leaves: unsafe { &*leaves },

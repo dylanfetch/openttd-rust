@@ -1692,6 +1692,8 @@ static const OpenTTDStationLoading _rust_station_loading = {
 		return execute != 0 ? result.Succeeded() : capacity;
 	},
 };
+
+const OpenTTDStationLoading &GetRustStationLoading() noexcept { return _rust_station_loading; }
 #endif
 
 /**

@@ -31,7 +31,7 @@ static OpenTTDAircraftVehicle AircraftVehicle(Vehicle *v) noexcept
 static uint8_t OPENTTD_AIRCRAFT_CALL Aircraft_subtype(OpenTTDAircraftVehicle vehicle) noexcept
 {
 	const Vehicle *v = static_cast<const Vehicle *>(vehicle.handle);
-	return v->subtype;
+	return RustVehicleSubtype(v);
 }
 
 static int32_t OPENTTD_AIRCRAFT_CALL Aircraft_x(OpenTTDAircraftVehicle vehicle) noexcept
@@ -98,7 +98,7 @@ static void OPENTTD_AIRCRAFT_CALL Aircraft_set_vehicle_status(OpenTTDAircraftVeh
 static uint16_t OPENTTD_AIRCRAFT_CALL Aircraft_current_speed(OpenTTDAircraftVehicle vehicle) noexcept
 {
 	const Vehicle *v = static_cast<const Vehicle *>(vehicle.handle);
-	return v->cur_speed;
+	return RustVehicleSpeed(v);
 }
 
 static void OPENTTD_AIRCRAFT_CALL Aircraft_set_current_speed(OpenTTDAircraftVehicle vehicle, uint16_t value) noexcept
@@ -1059,6 +1059,8 @@ static const OpenTTDAircraftLeaves _aircraft_leaves{
 	.route_node = Aircraft_route_node,
 	.block_choice = Aircraft_block_choice,
 };
+const OpenTTDAircraftLeaves &GetAircraftLeaves() noexcept { return _aircraft_leaves; }
+
 bool Aircraft::Tick()
 {
 	if (!this->IsNormalAircraft()) return true;

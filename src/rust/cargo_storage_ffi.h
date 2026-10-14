@@ -10,6 +10,8 @@
 #define RUST_CARGO_STORAGE_FFI_H
 #include <cstdint>
 #include <cstddef>
+struct OpenTTDCargoStorageServices;
+const OpenTTDCargoStorageServices &GetRustCargoStorageServices() noexcept;
 struct OpenTTDCargoPacket;
 struct OpenTTDCargoList;
 struct OpenTTDCargoFlow;

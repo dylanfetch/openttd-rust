@@ -849,12 +849,28 @@ pub unsafe extern "C" fn openttd_rust_ship_tick(
     leaves: *const Leaves,
     services: *const Services,
 ) -> bool {
+    // SAFETY: The synchronous native entry establishes the internal helper contract.
+    unsafe { tick(id, leaves, services) }
+}
+
+pub(crate) unsafe fn tick(id: u32, leaves: *const Leaves, services: *const Services) -> bool {
+    // SAFETY: The native entry supplies the live shell and immutable table.
+    let owner = unsafe { ((*leaves).state_owner)(id) };
+    unsafe { tick_resolved(id, owner, leaves, services) }
+}
+
+pub(crate) unsafe fn tick_resolved(
+    id: u32,
+    owner: *mut State,
+    leaves: *const Leaves,
+    services: *const Services,
+) -> bool {
     // SAFETY: The service tables remain immutable/live for this entry; owner borrows end before calls.
     let leaves = unsafe { &*leaves };
     let game = Game {
         leaves,
         services: unsafe { &*services },
-        owner: (leaves.state_owner)(id),
+        owner,
     };
     let observed_running = (game.leaves.running)(id);
     let observed_status = (game.leaves.status)(id);
@@ -870,6 +886,11 @@ pub unsafe extern "C" fn openttd_rust_ship_calendar_day(
     leaves: *const Leaves,
     services: *const Services,
 ) {
+    // SAFETY: The synchronous native entry establishes the internal helper contract.
+    unsafe { calendar_day(id, leaves, services) }
+}
+
+pub(crate) unsafe fn calendar_day(id: u32, leaves: *const Leaves, services: *const Services) {
     // SAFETY: The service tables remain immutable/live for this entry; owner borrows end before calls.
     let leaves = unsafe { &*leaves };
     let game = Game {
@@ -885,12 +906,28 @@ pub unsafe extern "C" fn openttd_rust_ship_economy_day(
     leaves: *const Leaves,
     services: *const Services,
 ) {
+    // SAFETY: The synchronous native entry establishes the internal helper contract.
+    unsafe { economy_day(id, leaves, services) }
+}
+
+pub(crate) unsafe fn economy_day(id: u32, leaves: *const Leaves, services: *const Services) {
+    // SAFETY: The native entry supplies the live shell and immutable table.
+    let owner = unsafe { ((*leaves).state_owner)(id) };
+    unsafe { economy_day_resolved(id, owner, leaves, services) };
+}
+
+pub(crate) unsafe fn economy_day_resolved(
+    id: u32,
+    owner: *mut State,
+    leaves: *const Leaves,
+    services: *const Services,
+) {
     // SAFETY: The service tables remain immutable/live for this entry; owner borrows end before calls.
     let leaves = unsafe { &*leaves };
     let game = Game {
         leaves,
         services: unsafe { &*services },
-        owner: (leaves.state_owner)(id),
+        owner,
     };
     crate::witness::hit(crate::witness::SHIP_ECONOMY_DAY);
     (game.leaves.economy_age)(id);

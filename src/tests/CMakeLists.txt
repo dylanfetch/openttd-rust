@@ -25,6 +25,7 @@ add_test_files(
     train.cpp
     rail_yapf_protocol.hpp
     road_yapf.cpp
+    vehicle_scheduler.cpp
     roadvehicle.cpp
     station_service.cpp
     spiral_iterator_state.cpp

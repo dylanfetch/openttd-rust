@@ -1,0 +1,47 @@
+"""Base-vehicle scheduler observations on the existing fixed Opus replay (#213)."""
+
+from . import core
+
+OPUS = "play-opus-55-167-002-manual"
+
+
+def scenarios(soak):
+    # Reuse the existing replay and its exact endpoints; do not duplicate it in CI.
+    return []
+
+
+def game_environment(scenario):
+    witnessed = scenario["name"] == OPUS and scenario.get("witnesses")
+    return core.WITNESS_ENVIRONMENT if witnessed else {}
+
+
+def check(scenario, run, mode, role, result):
+    if scenario["name"] != OPUS:
+        return
+    counts = core.branch_witnesses(
+        scenario,
+        run,
+        role,
+        "vehicle",
+        (
+            "visits.road",
+            "primary.road",
+            "scheduler_crossings",
+            "observed_bytes",
+            "day_visits",
+            "station_visits",
+            "motion_updates",
+        ),
+    )
+    if counts is None:
+        return
+    visits = sum(
+        counts[f"visits.{kind}"]
+        for kind in ("train", "road", "ship", "aircraft", "effect", "disaster")
+    )
+    result[f"{mode}_{role}_vehicle_scheduler"] = {
+        "outer_visits": visits,
+        "counts": counts,
+        "crossings_per_outer_visit": counts["scheduler_crossings"] / visits,
+        "observed_bytes_per_outer_visit": counts["observed_bytes"] / visits,
+    }

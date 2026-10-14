@@ -42,7 +42,6 @@
 
 #ifdef WITH_RUST
 #include "rust/services_ffi.h"
-static const OpenTTDShipLeaves &GetShipServices();
 #endif
 #include "safeguards.h"
 

@@ -221,8 +221,31 @@ pub const ROAD_VISITORS: usize = 93;
 /// Selected road controller entries, including reentrant helpers.
 pub const ROAD_ENTRIES: usize = 94;
 
+/// Actual outer scheduler visits, in `VehicleType` order (including chained parts).
+pub const VEHICLE_VISITS: usize = 95;
+/// Primary transport visit counters, in `VehicleType` order.
+pub const VEHICLE_PRIMARY: usize = 101;
+/// A Tick returned false, before advancing the numeric cursor.
+pub const VEHICLE_DELETED: usize = 105;
+/// Scheduler-only native calls; controller callbacks remain separate.
+pub const VEHICLE_CROSSINGS: usize = 106;
+/// Bytes returned by scheduler observation/timing services (not their inputs).
+pub const VEHICLE_OBSERVED_BYTES: usize = 107;
+/// Calls through the existing effect/disaster Tick facade.
+pub const VEHICLE_TAIL_CROSSINGS: usize = 108;
+/// Internal cargo-list age entries.
+pub const VEHICLE_CARGO_AGES: usize = 109;
+/// Surviving transport parts reaching motion accumulation.
+pub const VEHICLE_MOTION: usize = 110;
+/// Actual 32-day callback executions.
+pub const VEHICLE_CALLBACK32: usize = 111;
+/// Live shells observed by the calendar/economy day loop.
+pub const VEHICLE_DAYS: usize = 112;
+/// Live stations visited by the loading loop.
+pub const VEHICLE_STATIONS: usize = 113;
+
 /// Counter names, grouped by the prefix the harness selects.
-pub const NAMES: [&str; 95] = [
+pub const NAMES: [&str; 114] = [
     "train.tick_first",
     "train.tick_second",
     "train.reversal",
@@ -318,6 +341,25 @@ pub const NAMES: [&str; 95] = [
     "road.services",
     "road.visitors",
     "road.entries",
+    "vehicle.visits.train",
+    "vehicle.visits.road",
+    "vehicle.visits.ship",
+    "vehicle.visits.aircraft",
+    "vehicle.visits.effect",
+    "vehicle.visits.disaster",
+    "vehicle.primary.train",
+    "vehicle.primary.road",
+    "vehicle.primary.ship",
+    "vehicle.primary.aircraft",
+    "vehicle.deleted",
+    "vehicle.scheduler_crossings",
+    "vehicle.observed_bytes",
+    "vehicle.tail_crossings",
+    "vehicle.cargo_ages",
+    "vehicle.motion_updates",
+    "vehicle.callback32",
+    "vehicle.day_visits",
+    "vehicle.station_visits",
 ];
 
 static ENABLED: AtomicBool = AtomicBool::new(false);

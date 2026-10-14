@@ -66,6 +66,8 @@ static const OpenTTDCargoStorageServices _cargo_storage_services = {
 	CargoCanAllocate, CargoCreate, CargoOwner, CargoDestroy, CargoRandom, CargoCoordinate, CargoFlow, CargoPay, CargoOrigin, CargoFlowOwner, CargoRandomDraw, CargoNextPacket,
 };
 
+const OpenTTDCargoStorageServices &GetRustCargoStorageServices() noexcept { return _cargo_storage_services; }
+
 CargoPacket::CargoPacket() : CargoPacket(OpenTTDCargoPacketFields{}) {}
 CargoPacket::CargoPacket(const OpenTTDCargoPacketFields &fields) : state(openttd_rust_cargo_packet_new(&fields)) {}
 CargoPacket::CargoPacket(StationID first, uint16_t count, Source source) : CargoPacket()

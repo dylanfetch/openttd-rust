@@ -89,6 +89,7 @@ def scenario_modules():
         stations,
         towns,
         trees,
+        vehicles,
     )
 
     return (
@@ -109,6 +110,7 @@ def scenario_modules():
         industries,
         cargo_storage,
         orders,
+        vehicles,
     )
 
 
