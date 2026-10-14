@@ -221,7 +221,83 @@ def prepare_aircraft_save(migration, out, timeout):
     print(f"Prepared {destination}; raw input and logs: {out}")
 
 
+CROSSING_CAPS = {
+    "aircraft-controller-traffic": 85,
+    "aircraft-route-manual": 75,
+    "play-padhattan-ridge-2000-manual": 110,
+    "play-padhattan-ridge-2016-manual": 110,
+}
+
+
+def counted_scenario(scenario):
+    return (
+        scenario.get("aircraft_control")
+        or scenario.get("aircraft_fixture")
+        or scenario.get("name", "").startswith("play-")
+        or "disasters" in scenario
+    )
+
+
+def game_environment(scenario):
+    return (
+        {"OPENTTD_WITNESS": "1"}
+        if counted_scenario(scenario) and scenario.get("witnesses")
+        else {}
+    )
+
+
 def check(scenario, run, mode, role, result):
+    if counted_scenario(scenario):
+        counts = core.branch_witnesses(
+            scenario,
+            run,
+            role,
+            "aircraft",
+            (
+                *(
+                    ("ticks", "station_resolutions")
+                    if scenario.get("aircraft_control")
+                    or scenario.get("aircraft_fixture")
+                    or "padhattan-ridge-2000" in scenario.get("name", "")
+                    or "padhattan-ridge-2016" in scenario.get("name", "")
+                    else ()
+                ),
+                *(
+                    ("disaster_entries",)
+                    if scenario.get("family") in ("airplane", "helicopter")
+                    and scenario.get("disasters")
+                    in ("industry-reset", "industry-release", "init-soak")
+                    else ()
+                ),
+                "services",
+                "entries",
+                "observation_bytes",
+            ),
+        )
+        if counts is not None:
+            result[f"{mode}_{role}_aircraft_boundary"] = dict(
+                counts,
+                services_per_tick=counts["services"] / counts["ticks"]
+                if counts["ticks"]
+                else None,
+                entries_per_tick=counts["entries"] / counts["ticks"]
+                if counts["ticks"]
+                else None,
+                observation_bytes_per_tick=counts["observation_bytes"] / counts["ticks"]
+                if counts["ticks"]
+                else None,
+            )
+
+            cap = CROSSING_CAPS.get(scenario["name"])
+            if (
+                mode == "plain"
+                and cap is not None
+                and counts["services"] / counts["ticks"] > cap
+            ):
+                raise RuntimeError(
+                    f"aircraft boundary exceeds {cap} outgoing services/tick: {counts}"
+                )
+
     if scenario.get("aircraft_control"):
         check_control(scenario, run, mode, role, result)
         return

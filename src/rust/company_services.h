@@ -10,7 +10,9 @@
 #define RUST_COMPANY_SERVICES_H
 #include "../company_type.h"
 #include "../company_func.h"
+#include "../company_base.h"
 
 inline CompanyID OpenTTDCurrentCompany() noexcept { return _current_company; }
 inline void OpenTTDSetCurrentCompany(CompanyID company) noexcept { _current_company = company; }
+inline uint16_t RustCompanyAircraftServiceInterval(CompanyID owner) noexcept { return Company::Get(owner)->settings.vehicle.servint_aircraft; }
 #endif /* RUST_COMPANY_SERVICES_H */
