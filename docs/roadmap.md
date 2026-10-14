@@ -16,9 +16,9 @@ forward-looking, about 200 lines; completed work is one row, with evidence in PR
   Padhattan-2000 1.349, Padhattan-2016 1.427, TGP 1.164. TGP remains above
   1.15. Aircraft's final six-case medians pass; a matched Padhattan-2016
   diagnosis shows 4.51% improvement. Initial noisy samples remain in #238.
-- #212 P0/P1 fail TGP: +28/+38 ms against 11 ms; only R0 shared raw tile-type
-  reads are selected. #213 P0 fails: about 16.8 ns/visit against 6 ns and above
-  the wall cap. Select only the two-phase scalar-address experiment below.
+- #212 P0/P1/R0 fail TGP: +28/+38/+31 ms against 11 ms; defer the owner and
+  map-read experiment. #213 P0 fails 6 ns/current cap; only its selected
+  two-phase scalar-address revision remains. Start whole signal ownership #219.
 - #233 is incomplete: concurrent cache writes peaked at 10.37 GiB; missing
   entries suggest eviction. Root pruned duplicates. #243 selects protected writers per
   family, without artifact input or candidate write privileges. Warm timing and
@@ -151,18 +151,16 @@ branches (#157). Independent items (#156, #223, caps) may run in parallel.
    founding/generation, the house tile loop, and town commands, authority
    actions and deletion as their own ports.
 2. **#199/#237 aircraft (#238)** passed full CI; fresh #217 conflict review runs.
-3. **New ownership:** only #212 R0 shared map-read experiment and #213 vehicle
-   prototype now; broad ports require the unchanged budgets. #212 R0 follows
-   the linked plan on its issue, including layout/lifetime/default checks.
-   Then #219 signal blocks and #220 engines (#220 after #213 and #148).
+3. **New ownership:** start complete #219 signal-block traversal/work sets from
+   integrated base; no dependency on the failed landscape draft or vehicle draft.
+   #213's selected revision keeps the unchanged budget; failure defers it.
+   #220 engines follows #213/#148 or a fresh dependency selection after deferral.
 4. **Conversions:** train and ship after #213; the #168 tail (orders, effect,
    disaster, #218's accessors) never blocks ownership.
 
-#108 retains C++ map arrays; measured #212 failure now selects one bounded raw
-read backend, with one shared tile-type helper and callback fallback for unaudited
-owners/fixtures. Prove native layout/allocation stability and serial access; no
-Rust references/slices survive callbacks. GetTileType's assertion policy stays.
-No storage transfer, unchecked timing proxy, new accessor copy or budget waiver.
+#108 retains C++ map arrays and integrated typed services. #212's bounded raw
+type-reader also failed; defer it with the owner, without an unchecked timing
+proxy or budget waiver. New owners reuse integrated services, never draft copies.
 
 #213 selects two shared typed native scalar-address bundles, only for post-tick
 cargo and motion/sound phases, following the linked source/lifetime plan on #213.
@@ -176,20 +174,23 @@ pass. Failure defers this owner; broad maintenance remains unstarted.
 
 Active continuous development. #217 passed full CI and is merged/cleaned; its
 post-merge native policy hit a GitHub API failure and root reran it. More merges
-wait for main recovery. #243 is first; each failed owner has one bounded revision.
+wait for main recovery. #243 is first. #212 is deferred; #213's revision remains.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
 | #148 / #216 | `town-lifecycle-148`, `3d1164d918` | #217 adoption pushed; fresh conflict checks active. |
 | #237 / #238 | `aircraft-shared-boundary-237`, `ca601fd547` | Earlier full passed; #217 conflicts resolved; fresh checks active. |
-| #212 / #241 | `landscape-budget-prototype-212`, `650b55321a` | R0 native checks; fixture reentry fix pending before timing. |
-| #213 / #242 | `vehicle-budget-prototype-213`, `d1d2e4bad0` | Native/semantics pass; P0 budget fails; scalar-address revision selected. |
+| #212 / #241 | `landscape-budget-prototype-212`, `45633ef6d6` | R0 fails budget/cap; final attribution/disposition then deferred. |
+| #213 / #242 | `vehicle-budget-prototype-213`, `d9a3d55043` | Scalar-address revision Cargo passes; native/semantics then budget gate. |
 | #233 / #244 | `ci-cache-peak-233`, `85dd778eb1` | #243 protected-only two-slot publisher in progress; bootstrap after review. |
+| #219 | fresh integrated-base branch pending | Whole signal owner selected; starts when prototype task frees slot. |
 
-Next unstarted: #219/#220. ABI blocks: train through 385, tree additions 386-389,
+Next unstarted after #219: #220; fresh owner planning follows #219 kickoff.
+ABI blocks: train through 385, tree additions 386-389,
 fleet 390-399, company 400-429, town 430-459, road 460-499, station/loading 500-559,
 industry 560-619 (572 shared ByteSpan), CommandCost 620-629, town lifecycle 630-669,
-aircraft 670-739, vehicle scheduling 740-779, landscape 780-819. Only consumed layouts.
+aircraft 670-739, vehicle 740-779, deferred landscape 780-819, signals 820-859.
+Only consumed layouts.
 
 Preserve the pinned reference, paused curve worktrees and evidence branches
 `evidence-disaster-vehicles` (`a775543162`) and `evidence-water-regions`
