@@ -228,6 +228,7 @@ pub struct Leaves {
 }
 #[derive(Clone, Copy)]
 struct Game<'a> {
+    vehicle: *mut crate::vehicle::OpenTTDVehicle,
     leaves: &'a Leaves,
     context: *mut std::ffi::c_void,
 }
@@ -453,12 +454,13 @@ impl Game<'_> {
     fn svc_show_res(&self, id: Handle) -> u64 {
         (self.leaves.show_res)(self.context, id)
     }
-    fn svc_signal_buffer(&self, id: Handle, a: u64, b: u64) -> u64 {
-        // SAFETY: The live Train shell starts with its Vehicle base; the shared
-        // table has process lifetime, and no owner borrow spans its callback.
+    fn svc_signal_buffer(&self, _id: Handle, a: u64, b: u64) -> u64 {
+        // SAFETY: C++ supplies the adjusted Vehicle base of the entry train.
+        // The live shell and immutable table survive this call; no owner borrow
+        // spans the canonical shared callback. free() retains that entry train.
         let owner = unsafe {
             let vehicle =
-                crate::vehicle::VehicleRef(std::ptr::NonNull::new_unchecked(id.shell.cast()));
+                crate::vehicle::VehicleRef(std::ptr::NonNull::new_unchecked(self.vehicle));
             ((*self.leaves.vehicle).owner)(vehicle)
         };
         crate::signal::count_context_owner_read();
@@ -1204,11 +1206,13 @@ fn check_next(g: &Game, id: Handle) {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_train_reservation_check_next(
     id: Handle,
+    vehicle: crate::vehicle::VehicleRef,
     leaves: *const Leaves,
     context: *mut std::ffi::c_void,
 ) {
     // SAFETY: The native stack owns these immutable services throughout the call.
     let g = Game {
+        vehicle: vehicle.0.as_ptr(),
         leaves: unsafe { &*leaves },
         context,
     };
@@ -1221,6 +1225,7 @@ pub unsafe extern "C" fn openttd_rust_train_reservation_check_next(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_train_reservation_clear(
     id: Handle,
+    vehicle: crate::vehicle::VehicleRef,
     tile: u32,
     td: u8,
     leaves: *const Leaves,
@@ -1228,6 +1233,7 @@ pub unsafe extern "C" fn openttd_rust_train_reservation_clear(
 ) {
     // SAFETY: The native stack owns these immutable services throughout the call.
     let g = Game {
+        vehicle: vehicle.0.as_ptr(),
         leaves: unsafe { &*leaves },
         context,
     };
@@ -1240,11 +1246,13 @@ pub unsafe extern "C" fn openttd_rust_train_reservation_clear(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_train_reservation_free(
     id: Handle,
+    vehicle: crate::vehicle::VehicleRef,
     leaves: *const Leaves,
     context: *mut std::ffi::c_void,
 ) {
     // SAFETY: The native stack owns these immutable services throughout the call.
     let g = Game {
+        vehicle: vehicle.0.as_ptr(),
         leaves: unsafe { &*leaves },
         context,
     };
@@ -1257,6 +1265,7 @@ pub unsafe extern "C" fn openttd_rust_train_reservation_free(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_train_reservation_choose(
     id: Handle,
+    vehicle: crate::vehicle::VehicleRef,
     tile: u32,
     dir: u8,
     tracks: u8,
@@ -1267,6 +1276,7 @@ pub unsafe extern "C" fn openttd_rust_train_reservation_choose(
 ) -> Choice {
     // SAFETY: The native stack owns these immutable services throughout the call.
     let g = Game {
+        vehicle: vehicle.0.as_ptr(),
         leaves: unsafe { &*leaves },
         context,
     };
@@ -1283,6 +1293,7 @@ pub unsafe extern "C" fn openttd_rust_train_reservation_choose(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_train_reservation_try_path(
     id: Handle,
+    vehicle: crate::vehicle::VehicleRef,
     mark: u8,
     first_okay: u8,
     leaves: *const Leaves,
@@ -1290,6 +1301,7 @@ pub unsafe extern "C" fn openttd_rust_train_reservation_try_path(
 ) -> u8 {
     // SAFETY: The native stack owns these immutable services throughout the call.
     let g = Game {
+        vehicle: vehicle.0.as_ptr(),
         leaves: unsafe { &*leaves },
         context,
     };
@@ -1302,11 +1314,13 @@ pub unsafe extern "C" fn openttd_rust_train_reservation_try_path(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_train_reservation_check_reverse(
     id: Handle,
+    vehicle: crate::vehicle::VehicleRef,
     leaves: *const Leaves,
     context: *mut std::ffi::c_void,
 ) -> u8 {
     // SAFETY: The native stack owns these immutable services throughout the call.
     let g = Game {
+        vehicle: vehicle.0.as_ptr(),
         leaves: unsafe { &*leaves },
         context,
     };
@@ -1327,12 +1341,14 @@ pub unsafe extern "C" fn openttd_rust_train_reservation_check_reverse(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_train_reservation_station_location(
     id: Handle,
+    vehicle: crate::vehicle::VehicleRef,
     station: u16,
     leaves: *const Leaves,
     context: *mut std::ffi::c_void,
 ) -> u32 {
     // SAFETY: The native stack owns these immutable services throughout the call.
     let g = Game {
+        vehicle: vehicle.0.as_ptr(),
         leaves: unsafe { &*leaves },
         context,
     };
@@ -1353,11 +1369,13 @@ pub unsafe extern "C" fn openttd_rust_train_reservation_station_location(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_train_reservation_reserve_under(
     id: Handle,
+    vehicle: crate::vehicle::VehicleRef,
     leaves: *const Leaves,
     context: *mut std::ffi::c_void,
 ) {
     // SAFETY: The native stack owns these immutable services throughout the call.
     let g = Game {
+        vehicle: vehicle.0.as_ptr(),
         leaves: unsafe { &*leaves },
         context,
     };
@@ -1612,6 +1630,7 @@ mod tests {
         let h = m.handle();
         let ls = extension_leaves();
         let g = Game {
+            vehicle: std::ptr::null_mut(),
             leaves: &ls,
             context: std::ptr::null_mut(),
         };
@@ -1642,6 +1661,7 @@ mod tests {
             let h = m.handle();
             let ls = extension_leaves();
             let g = Game {
+                vehicle: std::ptr::null_mut(),
                 leaves: &ls,
                 context: std::ptr::null_mut(),
             };
@@ -1726,6 +1746,7 @@ mod tests {
             let ls = order_leaves();
             let mut outer_context = OrderContext { saved: 0 };
             let g = Game {
+                vehicle: std::ptr::null_mut(),
                 leaves: &ls,
                 context: std::ptr::from_mut(&mut outer_context).cast(),
             };
@@ -1738,6 +1759,7 @@ mod tests {
                 {
                     let mut inner_context = OrderContext { saved: 0 };
                     let inner_game = Game {
+                        vehicle: std::ptr::null_mut(),
                         leaves: &ls,
                         context: std::ptr::from_mut(&mut inner_context).cast(),
                     };
@@ -1772,6 +1794,7 @@ mod tests {
                 unsafe {
                     openttd_rust_train_reservation_check_reverse(
                         h,
+                        crate::vehicle::VehicleRef(std::ptr::NonNull::dangling()),
                         &raw const ls,
                         std::ptr::null_mut(),
                     )
@@ -1791,6 +1814,7 @@ mod tests {
             ..leaves()
         };
         let g = Game {
+            vehicle: std::ptr::null_mut(),
             leaves: &ls,
             context: std::ptr::null_mut(),
         };

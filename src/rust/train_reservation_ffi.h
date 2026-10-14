@@ -162,13 +162,13 @@ struct OpenTTDTrainReservationLeaves {
  * controls restoration exactly once and keeps the original ordered signal rollback
  * scratch. Ordinary-play callbacks are direct noexcept calls; escaping exceptions
  * and Rust panics terminate. Immutable table/context pointers live until return. */
-void openttd_rust_train_reservation_check_next(OpenTTDTrainHandle, const OpenTTDTrainReservationLeaves *, void *);
-void openttd_rust_train_reservation_clear(OpenTTDTrainHandle, uint32_t, uint8_t, const OpenTTDTrainReservationLeaves *, void *);
-void openttd_rust_train_reservation_free(OpenTTDTrainHandle, const OpenTTDTrainReservationLeaves *, void *);
-OpenTTDTrainReservationChoice openttd_rust_train_reservation_choose(OpenTTDTrainHandle, uint32_t, uint8_t, uint8_t, uint8_t, uint8_t, const OpenTTDTrainReservationLeaves *, void *);
-uint8_t openttd_rust_train_reservation_try_path(OpenTTDTrainHandle, uint8_t, uint8_t, const OpenTTDTrainReservationLeaves *, void *);
-uint8_t openttd_rust_train_reservation_check_reverse(OpenTTDTrainHandle, const OpenTTDTrainReservationLeaves *, void *);
-uint32_t openttd_rust_train_reservation_station_location(OpenTTDTrainHandle, uint16_t, const OpenTTDTrainReservationLeaves *, void *);
-void openttd_rust_train_reservation_reserve_under(OpenTTDTrainHandle, const OpenTTDTrainReservationLeaves *, void *);
+void openttd_rust_train_reservation_check_next(OpenTTDTrainHandle, OpenTTDVehicle *, const OpenTTDTrainReservationLeaves *, void *);
+void openttd_rust_train_reservation_clear(OpenTTDTrainHandle, OpenTTDVehicle *, uint32_t, uint8_t, const OpenTTDTrainReservationLeaves *, void *);
+void openttd_rust_train_reservation_free(OpenTTDTrainHandle, OpenTTDVehicle *, const OpenTTDTrainReservationLeaves *, void *);
+OpenTTDTrainReservationChoice openttd_rust_train_reservation_choose(OpenTTDTrainHandle, OpenTTDVehicle *, uint32_t, uint8_t, uint8_t, uint8_t, uint8_t, const OpenTTDTrainReservationLeaves *, void *);
+uint8_t openttd_rust_train_reservation_try_path(OpenTTDTrainHandle, OpenTTDVehicle *, uint8_t, uint8_t, const OpenTTDTrainReservationLeaves *, void *);
+uint8_t openttd_rust_train_reservation_check_reverse(OpenTTDTrainHandle, OpenTTDVehicle *, const OpenTTDTrainReservationLeaves *, void *);
+uint32_t openttd_rust_train_reservation_station_location(OpenTTDTrainHandle, OpenTTDVehicle *, uint16_t, const OpenTTDTrainReservationLeaves *, void *);
+void openttd_rust_train_reservation_reserve_under(OpenTTDTrainHandle, OpenTTDVehicle *, const OpenTTDTrainReservationLeaves *, void *);
 }
 #endif
