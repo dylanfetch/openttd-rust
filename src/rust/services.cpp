@@ -154,7 +154,6 @@ static uint8_t SharedPlaneCrashes() noexcept { return RustPlaneCrashes(); }
 static bool SharedServiceAtHelipad() noexcept { return RustServiceAtHelipad(); }
 static bool SharedDisasterSound() noexcept { return RustDisasterSound(); }
 static int32_t SharedEconomyDate() noexcept { return TimerGameEconomy::date.base(); }
-int32_t RustCalendarYear() noexcept { return TimerGameCalendar::year.base(); }
 static int32_t SharedCalendarDate() noexcept { return TimerGameCalendar::date.base(); }
 static int32_t SharedSlope(int32_t x, int32_t y) noexcept { return GetSlopePixelZ(x, y); }
 

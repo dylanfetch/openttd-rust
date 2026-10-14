@@ -48,6 +48,7 @@ struct State {
 }
 #[unsafe(no_mangle)]
 pub extern "C" fn openttd_rust_engine_new() -> *mut Lifecycle {
+    crate::witness::hit(crate::witness::ENGINE_ENTRIES);
     Box::into_raw(Box::new(State {
         lifecycle: Lifecycle {
             preview_company: 255,
@@ -59,11 +60,13 @@ pub extern "C" fn openttd_rust_engine_new() -> *mut Lifecycle {
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_engine_destroy(state: *mut Lifecycle) {
+    crate::witness::hit(crate::witness::ENGINE_ENTRIES);
     // SAFETY: The shell transfers its sole live allocation at destruction.
     drop(unsafe { Box::from_raw(state.cast::<State>()) });
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_engine_name(state: *const Lifecycle) -> ByteSpan {
+    crate::witness::hit(crate::witness::ENGINE_ENTRIES);
     // SAFETY: Caller keeps the live owner stable until the borrowed bytes expire.
     let name = unsafe { &(*state.cast::<State>()).name };
     ByteSpan {
@@ -73,6 +76,7 @@ pub unsafe extern "C" fn openttd_rust_engine_name(state: *const Lifecycle) -> By
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_engine_set_name(state: *mut Lifecycle, text: ByteSpan) {
+    crate::witness::hit(crate::witness::ENGINE_ENTRIES);
     // SAFETY: Owner is live and serialized; source may alias this owner's name,
     // so copy before replacing. Empty spans may have a null pointer.
     let name = if text.size == 0 {
@@ -204,7 +208,7 @@ pub struct Services {
     pub enabled: unsafe extern "C" fn(*const OpenTTDEngine) -> bool,
     pub climate: unsafe extern "C" fn(*const OpenTTDEngine) -> bool,
     pub rail_kind: unsafe extern "C" fn(*const OpenTTDEngine) -> u8,
-    pub clear_variant: unsafe extern "C" fn(*const OpenTTDEngine),
+    pub clear_last_variant: unsafe extern "C" fn(*const OpenTTDEngine),
     pub refresh_type: unsafe extern "C" fn(u8),
     pub refresh_lists: unsafe extern "C" fn(bool),
     pub company_next: unsafe extern "C" fn(u32) -> Company,
@@ -238,15 +242,24 @@ pub struct Services {
     pub available_news: unsafe extern "C" fn(u16),
     pub no_engines: unsafe extern "C" fn(i32),
     pub screen_dirty: unsafe extern "C" fn(),
-    pub utf8_length: unsafe extern "C" fn(ByteSpan) -> u32,
+    pub utf8_length: unsafe extern "C" fn(*const u8, usize) -> usize,
 }
 
 const AVAILABLE: u8 = 1;
 const EXCLUSIVE: u8 = 2;
-const INVALID: u16 = u16::MAX;
+use crate::company::OWNER_DEITY;
+use crate::vehicle::INVALID_ENGINE as INVALID;
 // Original static year is process-wide; all engine entries run serialized by
 // the game-state mutex, including main-thread GUI commands and game timers.
 static mut AGING_STOPS: i32 = 0;
+macro_rules! call {
+    ($s:expr, $field:ident $(, $arg:expr)* $(,)?) => {{
+        let result = ($s.$field)($($arg),*);
+        crate::witness::hit(crate::witness::ENGINE_SERVICES);
+        crate::witness::add(crate::witness::ENGINE_BYTES, std::mem::size_of_val(&result) as u64);
+        result
+    }};
+}
 macro_rules! read {
     ($e:expr, $field:ident) => {
         unsafe { addr_of!((*$e.state).$field).read() }
@@ -260,50 +273,47 @@ macro_rules! write {
 }
 unsafe fn parent(s: &Services, mut e: EngineRef) -> EngineRef {
     loop {
-        let v = unsafe { (s.sync_variant)(e.shell) };
+        let v = unsafe { call!(s, sync_variant, e.shell) };
         if v.parent == INVALID || !v.sync {
             return e;
         }
-        e = unsafe { (s.resolve)(v.parent) };
+        crate::witness::hit(crate::witness::ENGINE_SYNC);
+        e = unsafe { call!(s, resolve, v.parent) };
     }
 }
-unsafe fn clear_variant(s: &Services, e: EngineRef) {
-    let id = unsafe { (s.engine_id)(e.shell) };
-    let mut from = 0;
-    loop {
-        let other = unsafe { (s.next)(from) };
-        if other.shell.is_null() {
-            break;
-        }
-        from = u32::from(other.id) + 1;
-        if other.kind == e.kind && unsafe { (s.display_variant)(other.shell) }.display == id {
-            unsafe {
-                (s.clear_variant)(other.shell);
-            }
-        }
+unsafe fn clear_last_variant(s: &Services, e: EngineRef) {
+    unsafe {
+        call!(s, clear_last_variant, e.shell);
     }
+}
+unsafe fn never_expire(s: &Services) -> bool {
+    let enabled = unsafe { call!(s, never_expire) };
+    if enabled {
+        crate::witness::hit(crate::witness::ENGINE_NEVER_EXPIRE);
+    }
+    enabled
 }
 unsafe fn reliability(s: &Services, e: EngineRef, month: bool) {
     let re = unsafe { parent(s, e) };
     let mut age = read!(re, age) as u32;
     if month
-        && unsafe { (s.engine_id)(re.shell) > (s.engine_id)(e.shell) }
+        && unsafe { call!(s, engine_id, re.shell) > call!(s, engine_id, e.shell) }
         && age != i32::MAX as u32
     {
         age = age.wrapping_add(1);
     }
-    let cfg = unsafe { (s.reliability)(e.shell) };
+    let cfg = unsafe { call!(s, reliability, e.shell) };
     let phase1 = u32::from(read!(e, duration_phase_1));
     let phase2 = u32::from(read!(e, duration_phase_2));
     let phase3 = u32::from(read!(e, duration_phase_3));
-    if read!(e, company_avail) != 0 && !unsafe { (s.never_expire)() } && cfg.base_life != 255 {
+    if read!(e, company_avail) != 0 && !unsafe { never_expire(s) } && cfg.base_life != 255 {
         let early = i32::from(cfg.retire_early);
         let max_age = ((phase1 + phase2) as i32 - early * 12).max(0) as u32;
         if early != 0 && age >= max_age {
             write!(e, company_avail, 0);
             unsafe {
-                clear_variant(s, e);
-                (s.refresh_type)(e.kind);
+                clear_last_variant(s, e);
+                call!(s, refresh_type, e.kind);
             }
         }
     }
@@ -314,7 +324,7 @@ unsafe fn reliability(s: &Services, e: EngineRef, month: bool) {
             + start;
     } else {
         age = age.wrapping_sub(phase1);
-        if age < phase2 || unsafe { (s.never_expire)() } || cfg.base_life == 255 {
+        if age < phase2 || unsafe { never_expire(s) } || cfg.base_life == 255 {
             value = u32::from(read!(e, reliability_max));
         } else {
             age = age.wrapping_sub(phase2);
@@ -325,11 +335,12 @@ unsafe fn reliability(s: &Services, e: EngineRef, month: bool) {
                 write!(e, reliability, value.wrapping_add(max) as u16);
                 return;
             }
+            crate::witness::hit(crate::witness::ENGINE_RETIRE);
             write!(e, company_avail, 0);
             write!(e, reliability, read!(e, reliability_final));
             unsafe {
-                clear_variant(s, e);
-                (s.refresh_type)(e.kind);
+                clear_last_variant(s, e);
+                call!(s, refresh_type, e.kind);
             }
             return;
         }
@@ -342,6 +353,7 @@ pub unsafe extern "C" fn openttd_rust_engine_reliability(
     e: EngineRef,
     month: bool,
 ) {
+    crate::witness::hit(crate::witness::ENGINE_ENTRIES);
     // SAFETY: Entry borrows its immutable native table; state accesses are raw,
     // field-sized and end before every possibly reentrant callback.
     unsafe {
@@ -349,22 +361,24 @@ pub unsafe extern "C" fn openttd_rust_engine_reliability(
     }
 }
 unsafe fn start_one(s: &Services, e: EngineRef, aging: Ymd, seed: u32) {
-    let cfg = unsafe { (s.startup)(e.shell) };
-    let settings = unsafe { (s.start_settings)() };
+    let cfg = unsafe { call!(s, startup, e.shell) };
+    let settings = unsafe { call!(s, start_settings) };
     write!(e, age, 0);
     write!(e, flags, 0);
     write!(e, company_avail, 0);
     write!(e, company_hidden, 0);
     let rng = unsafe { &*s.rng };
     let shared = unsafe { &*s.shared };
-    let saved = unsafe { (rng.save)() };
+    let saved = unsafe { call!(rng, save) };
     unsafe {
-        (rng.set_seed)(
+        call!(
+            rng,
+            set_seed,
             settings.generation_seed ^ seed ^ cfg.base_intro as u32 ^ u32::from(e.kind) ^ cfg.grfid,
         );
     }
-    let r = (shared.random)(shared.context);
-    let cutoff = unsafe { (s.ymd_to_date)(settings.starting_year.wrapping_add(2), 0, 1) };
+    let r = call!(shared, random, shared.context);
+    let cutoff = unsafe { call!(s, ymd_to_date, settings.starting_year.wrapping_add(2), 0, 1) };
     let intro = if cfg.base_intro <= cutoff {
         cfg.base_intro
     } else {
@@ -372,7 +386,7 @@ unsafe fn start_one(s: &Services, e: EngineRef, aging: Ymd, seed: u32) {
     };
     write!(e, intro_date, intro);
     if intro <= settings.date {
-        let ymd = unsafe { (s.date_to_ymd)(intro) };
+        let ymd = unsafe { call!(s, date_to_ymd, intro) };
         let aging_months = aging
             .year
             .wrapping_mul(12)
@@ -387,12 +401,14 @@ unsafe fn start_one(s: &Services, e: EngineRef, aging: Ymd, seed: u32) {
         write!(e, flags, read!(e, flags) | AVAILABLE);
     }
     let re = unsafe { parent(s, e) };
-    let re_cfg = unsafe { (s.seed_config)(re.shell) };
+    let re_cfg = unsafe { call!(s, seed_config, re.shell) };
     unsafe {
-        (rng.set_seed)(
+        call!(
+            rng,
+            set_seed,
             settings.generation_seed
                 ^ seed
-                ^ (u32::from((s.engine_id)(re.shell)) << 16)
+                ^ (u32::from(call!(s, engine_id, re.shell)) << 16)
                 ^ (re_cfg.base_intro as u32).wrapping_shl(12)
                 ^ (u32::from(re_cfg.decay_speed) << 8)
                 ^ (re_cfg.lifelength as u32).wrapping_shl(4)
@@ -401,10 +417,10 @@ unsafe fn start_one(s: &Services, e: EngineRef, aging: Ymd, seed: u32) {
                 ^ cfg.grfid,
         );
     }
-    let r = (shared.random)(shared.context);
+    let r = call!(shared, random, shared.context);
     write!(e, reliability_start, ((r >> 16) & 16383) as u16 + 0x7ae0);
     write!(e, reliability_max, (r & 16383) as u16 + 0xbfff);
-    let r = (shared.random)(shared.context);
+    let r = call!(shared, random, shared.context);
     write!(e, reliability_final, ((r >> 16) & 16383) as u16 + 0x3fff);
     write!(e, duration_phase_1, (r & 31) as u16 + 7);
     write!(
@@ -414,7 +430,7 @@ unsafe fn start_one(s: &Services, e: EngineRef, aging: Ymd, seed: u32) {
     );
     write!(e, duration_phase_3, ((r >> 9) & 127) as u16 + 120);
     unsafe {
-        (rng.restore)(saved);
+        call!(rng, restore, saved);
     }
     write!(e, reliability_spd_dec, u16::from(cfg.decay_speed) << 2);
     if !cfg.climate {
@@ -429,29 +445,31 @@ pub unsafe extern "C" fn openttd_rust_engine_start_one(
     aging: Ymd,
     seed: u32,
 ) {
+    crate::witness::hit(crate::witness::ENGINE_ENTRIES);
     unsafe {
         start_one(&*s, e, aging, seed);
     }
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_engine_aging_stops(s: *const Services) {
+    crate::witness::hit(crate::witness::ENGINE_ENTRIES);
     let s = unsafe { &*s };
     let mut year = 2050;
     let mut from = 0;
     loop {
-        let e = unsafe { (s.next)(from) };
+        let e = unsafe { call!(s, next, from) };
         if e.shell.is_null() {
             break;
         }
         from = u32::from(e.id) + 1;
-        if !unsafe { (s.climate)(e.shell) } || unsafe { wagon(s, e) } {
+        if !unsafe { call!(s, climate, e.shell) } || unsafe { wagon(s, e) } {
             continue;
         }
-        let cfg = unsafe { (s.aging_year)(e.shell) };
+        let cfg = unsafe { call!(s, aging_year, e.shell) };
         let date = cfg
             .base_intro
             .wrapping_add(cfg.lifelength.wrapping_mul(366) / 2);
-        year = year.max(unsafe { (s.date_to_ymd)(date) }.year);
+        year = year.max(unsafe { call!(s, date_to_ymd, date) }.year);
     }
     unsafe {
         AGING_STOPS = year;
@@ -459,15 +477,16 @@ pub unsafe extern "C" fn openttd_rust_engine_aging_stops(s: *const Services) {
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_engine_start_all(s: *const Services) {
+    crate::witness::hit(crate::witness::ENGINE_ENTRIES);
     let s = unsafe { &*s };
-    let date =
-        unsafe { ((*s.shared).calendar_date)() }.min(unsafe { (s.ymd_to_date)(AGING_STOPS, 0, 1) });
-    let aging = unsafe { (s.date_to_ymd)(date) };
+    let date = unsafe { call!(&*s.shared, calendar_date) }
+        .min(unsafe { call!(s, ymd_to_date, AGING_STOPS, 0, 1) });
+    let aging = unsafe { call!(s, date_to_ymd, date) };
     let shared = unsafe { &*s.shared };
-    let seed = (shared.random)(shared.context);
+    let seed = call!(shared, random, shared.context);
     let mut from = 0;
     loop {
-        let e = unsafe { (s.next)(from) };
+        let e = unsafe { call!(s, next, from) };
         if e.shell.is_null() {
             break;
         }
@@ -478,7 +497,7 @@ pub unsafe extern "C" fn openttd_rust_engine_start_all(s: *const Services) {
     }
     from = 0;
     loop {
-        let e = unsafe { (s.next)(from) };
+        let e = unsafe { call!(s, next, from) };
         if e.shell.is_null() {
             break;
         }
@@ -489,29 +508,29 @@ pub unsafe extern "C" fn openttd_rust_engine_start_all(s: *const Services) {
     }
     from = 0;
     loop {
-        let c = unsafe { (s.company_next)(from) };
+        let c = unsafe { call!(s, company_next, from) };
         if c.id == 255 {
             break;
         }
         from = u32::from(c.id) + 1;
         unsafe {
-            (s.update_railtypes)(c.id);
-            (s.update_roadtypes)(c.id);
+            call!(s, update_railtypes, c.id);
+            call!(s, update_roadtypes, c.id);
         }
     }
     unsafe {
-        (s.refresh_lists)(true);
+        call!(s, refresh_lists, true);
     }
 }
 unsafe fn wagon(s: &Services, e: EngineRef) -> bool {
-    e.kind == 0 && unsafe { (s.rail_kind)(e.shell) } == 2
+    e.kind == 0 && unsafe { call!(s, rail_kind, e.shell) } == 2
 }
 unsafe fn disabled(s: &Services, kind: u8, ai: bool) -> bool {
     match kind {
-        0 => unsafe { (s.train_limit)() == 0 || (ai && (s.ai_train_disabled)()) },
-        1 => unsafe { (s.road_limit)() == 0 || (ai && (s.ai_road_disabled)()) },
-        2 => unsafe { (s.ship_limit)() == 0 || (ai && (s.ai_ship_disabled)()) },
-        3 => unsafe { (s.aircraft_limit)() == 0 || (ai && (s.ai_aircraft_disabled)()) },
+        0 => unsafe { call!(s, train_limit) == 0 || (ai && call!(s, ai_train_disabled)) },
+        1 => unsafe { call!(s, road_limit) == 0 || (ai && call!(s, ai_road_disabled)) },
+        2 => unsafe { call!(s, ship_limit) == 0 || (ai && call!(s, ai_ship_disabled)) },
+        3 => unsafe { call!(s, aircraft_limit) == 0 || (ai && call!(s, ai_aircraft_disabled)) },
         _ => unreachable!(),
     }
 }
@@ -523,15 +542,15 @@ unsafe fn enable(s: &Services, e: EngineRef, company: u8) {
     );
     unsafe {
         if e.kind == 0 {
-            (s.update_railtypes)(company);
+            call!(s, update_railtypes, company);
         } else if e.kind == 1 {
-            (s.update_roadtypes)(company);
+            call!(s, update_roadtypes, company);
         }
     }
-    if company == unsafe { (s.local_company)() } {
+    if company == unsafe { call!(s, local_company) } {
         unsafe {
-            (s.refresh_type)(e.kind);
-            (s.toolbar_enable)(e.kind);
+            call!(s, refresh_type, e.kind);
+            call!(s, toolbar_enable, e.kind);
         }
     }
 }
@@ -543,31 +562,36 @@ unsafe fn disable(s: &Services, e: EngineRef, company: u8) {
     );
     unsafe {
         if e.kind == 0 {
-            (s.update_railtypes)(company);
+            call!(s, update_railtypes, company);
         } else if e.kind == 1 {
-            (s.update_roadtypes)(company);
+            call!(s, update_roadtypes, company);
         }
     }
-    if company == unsafe { (s.local_company)() } {
+    if company == unsafe { call!(s, local_company) } {
         unsafe {
-            clear_variant(s, e);
-            (s.refresh_type)(e.kind);
+            clear_last_variant(s, e);
+            call!(s, refresh_type, e.kind);
         }
     }
 }
 unsafe fn accept(s: &Services, e: EngineRef, company: u8, depth: i32) {
+    crate::witness::hit(if depth == 0 {
+        crate::witness::ENGINE_ACCEPT
+    } else {
+        crate::witness::ENGINE_JOIN
+    });
     write!(e, preview_company, 255);
     write!(e, preview_asked, u16::MAX);
     unsafe {
         enable(s, e, company);
-        (s.invalidate_preview)(e.id);
+        call!(s, invalidate_preview, e.id);
     }
     if depth >= 10 {
         return;
     }
     let mut from = 0;
     loop {
-        let ve = unsafe { (s.next)(from) };
+        let ve = unsafe { call!(s, next, from) };
         if ve.shell.is_null() {
             break;
         }
@@ -575,7 +599,7 @@ unsafe fn accept(s: &Services, e: EngineRef, company: u8, depth: i32) {
         if ve.kind != e.kind {
             continue;
         }
-        let v = unsafe { (s.preview_variant)(ve.shell) };
+        let v = unsafe { call!(s, preview_variant, ve.shell) };
         if ve.id != e.id && v.parent == e.id && v.join {
             unsafe {
                 accept(s, ve, company, depth + 1);
@@ -587,18 +611,18 @@ unsafe fn preview_company(s: &Services, e: EngineRef) -> u8 {
     let mask = if e.kind == 0 {
         u64::MAX
     } else {
-        unsafe { (s.refit_mask)(e.shell) }
+        unsafe { call!(s, refit_mask, e.shell) }
     };
     let mut best = 255;
     let mut performance = -1;
     let mut from = 0;
     loop {
-        let c = unsafe { (s.company_next)(from) };
+        let c = unsafe { call!(s, company_next, from) };
         if c.id == 255 {
             break;
         }
         from = u32::from(c.id) + 1;
-        let preview = unsafe { (s.company_preview)(c.shell) };
+        let preview = unsafe { call!(s, company_preview, c.shell) };
         if preview.blocked != 0
             || read!(e, preview_asked) & (1 << c.id) != 0
             || preview.performance <= performance
@@ -607,7 +631,7 @@ unsafe fn preview_company(s: &Services, e: EngineRef) -> u8 {
         }
         let mut veh_from = 0;
         loop {
-            let v = unsafe { (s.vehicle_next)(veh_from) };
+            let v = unsafe { call!(s, vehicle_next, veh_from) };
             if v.shell.is_null() {
                 break;
             }
@@ -615,8 +639,8 @@ unsafe fn preview_company(s: &Services, e: EngineRef) -> u8 {
             if v.owner != c.id || v.kind != e.kind {
                 continue;
             }
-            let cargo = unsafe { (s.vehicle_cargo)(v.shell) };
-            if !unsafe { (s.can_carry)(cargo.engine) }
+            let cargo = unsafe { call!(s, vehicle_cargo, v.shell) };
+            if !unsafe { call!(s, can_carry, cargo.engine) }
                 || mask & 1u64.wrapping_shl(u32::from(cargo.cargo)) == 0
             {
                 continue;
@@ -630,25 +654,27 @@ unsafe fn preview_company(s: &Services, e: EngineRef) -> u8 {
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_engine_daily(s: *const Services) {
+    crate::witness::hit(crate::witness::ENGINE_ENTRIES);
     let s = unsafe { &*s };
-    let date = unsafe { ((*s.shared).calendar_date)() };
+    let date = unsafe { call!(&*s.shared, calendar_date) };
     let mut from = 0;
     loop {
-        let c = unsafe { (s.company_next)(from) };
+        let c = unsafe { call!(s, company_next, from) };
         if c.id == 255 {
             break;
         }
         from = u32::from(c.id) + 1;
         unsafe {
-            (s.date_company_types)(c.id, date);
+            call!(s, date_company_types, c.id, date);
         }
     }
-    if unsafe { (s.calendar_year)() } >= unsafe { AGING_STOPS } {
+    if unsafe { call!(s, calendar_year) } >= unsafe { AGING_STOPS } {
+        crate::witness::hit(crate::witness::ENGINE_CUTOFF);
         return;
     }
     from = 0;
     loop {
-        let e = unsafe { (s.next)(from) };
+        let e = unsafe { call!(s, next, from) };
         if e.shell.is_null() {
             break;
         }
@@ -661,7 +687,7 @@ pub unsafe extern "C" fn openttd_rust_engine_daily(s: *const Services) {
             write!(e, preview_wait, wait);
             if wait == 0 {
                 unsafe {
-                    (s.close_preview)(e.id);
+                    call!(s, close_preview, e.id);
                 }
                 write!(e, preview_company, 255);
             }
@@ -676,7 +702,8 @@ pub unsafe extern "C" fn openttd_rust_engine_daily(s: *const Services) {
             write!(e, preview_wait, 20);
             let ai = !unsafe { disabled(s, e.kind, true) };
             unsafe {
-                (s.offer_preview)(e.id, company, ai);
+                crate::witness::hit(crate::witness::ENGINE_OFFER);
+                call!(s, offer_preview, e.id, company, ai);
             }
         }
     }
@@ -685,7 +712,7 @@ unsafe fn available(s: &Services, e: EngineRef, date: i32) {
     if read!(e, flags) & EXCLUSIVE != 0 {
         let mut from = 0;
         loop {
-            let c = unsafe { (s.company_next)(from) };
+            let c = unsafe { call!(s, company_next, from) };
             if c.id == 255 {
                 break;
             }
@@ -693,76 +720,80 @@ unsafe fn available(s: &Services, e: EngineRef, date: i32) {
             if read!(e, company_avail) & (1 << c.id) == 0 {
                 continue;
             }
-            if unsafe { (s.company_engine_count)(c.id, e.id) } == 0 {
+            if unsafe { call!(s, company_engine_count, c.id, e.id) } == 0 {
                 unsafe {
-                    (s.block_preview)(c.id);
+                    crate::witness::hit(crate::witness::ENGINE_PENALTY);
+                    call!(s, block_preview, c.id);
                 }
             }
         }
     }
     write!(e, flags, (read!(e, flags) & !EXCLUSIVE) | AVAILABLE);
     unsafe {
-        (s.refresh_type)(e.kind);
+        call!(s, refresh_type, e.kind);
     }
     write!(e, company_avail, u16::MAX);
     if unsafe { wagon(s, e) } {
         return;
     }
     if e.kind == 0 {
-        let introduced = unsafe { (s.introduces_railtypes)(e.shell) };
+        let introduced = unsafe { call!(s, introduces_railtypes, e.shell) };
         let mut from = 0;
         loop {
-            let c = unsafe { (s.company_next)(from) };
+            let c = unsafe { call!(s, company_next, from) };
             if c.id == 255 {
                 break;
             }
             from = u32::from(c.id) + 1;
-            let types = unsafe { (s.company_railtypes)(c.id) } | introduced;
+            let types = unsafe { call!(s, company_railtypes, c.id) } | introduced;
             unsafe {
-                (s.set_railtypes)(c.id, types, date);
+                call!(s, set_railtypes, c.id, types, date);
             }
         }
     } else if e.kind == 1 {
-        let introduced = unsafe { (s.introduces_roadtypes)(e.shell) };
+        let introduced = unsafe { call!(s, introduces_roadtypes, e.shell) };
         let mut from = 0;
         loop {
-            let c = unsafe { (s.company_next)(from) };
+            let c = unsafe { call!(s, company_next, from) };
             if c.id == 255 {
                 break;
             }
             from = u32::from(c.id) + 1;
-            let types = unsafe { (s.company_roadtypes)(c.id) } | introduced;
+            let types = unsafe { call!(s, company_roadtypes, c.id) } | introduced;
             unsafe {
-                (s.set_roadtypes)(c.id, types, date);
+                call!(s, set_roadtypes, c.id, types, date);
             }
         }
     }
     if !unsafe { disabled(s, e.kind, true) } {
         unsafe {
-            (s.available_event)(e.id);
+            call!(s, available_event, e.id);
         }
     }
-    if !unsafe { disabled(s, e.kind, false) } && unsafe { (s.extra_flags)(e.shell) } & 1 == 0 {
+    if !unsafe { disabled(s, e.kind, false) } && unsafe { call!(s, extra_flags, e.shell) } & 1 == 0
+    {
         unsafe {
-            (s.available_news)(e.id);
+            call!(s, available_news, e.id);
         }
     }
     unsafe {
-        (s.toolbar_release)(e.kind);
-        (s.close_preview)(e.id);
+        call!(s, toolbar_release, e.kind);
+        call!(s, close_preview, e.id);
     }
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_engine_monthly(s: *const Services) {
+    crate::witness::hit(crate::witness::ENGINE_ENTRIES);
     let s = unsafe { &*s };
-    if unsafe { (s.calendar_year)() } >= unsafe { AGING_STOPS } {
+    if unsafe { call!(s, calendar_year) } >= unsafe { AGING_STOPS } {
+        crate::witness::hit(crate::witness::ENGINE_CUTOFF);
         return;
     }
-    let date = unsafe { ((*s.shared).calendar_date)() };
+    let date = unsafe { call!(&*s.shared, calendar_date) };
     let mut refresh = false;
     let mut from = 0;
     loop {
-        let e = unsafe { (s.next)(from) };
+        let e = unsafe { call!(s, next, from) };
         if e.shell.is_null() {
             break;
         }
@@ -774,7 +805,7 @@ pub unsafe extern "C" fn openttd_rust_engine_monthly(s: *const Services) {
             }
             refresh = true;
         }
-        if !unsafe { (s.enabled)(e.shell) } {
+        if !unsafe { call!(s, enabled, e.shell) } {
             continue;
         }
         if read!(e, flags) & AVAILABLE == 0 && date >= read!(e, intro_date).wrapping_add(365) {
@@ -784,7 +815,7 @@ pub unsafe extern "C" fn openttd_rust_engine_monthly(s: *const Services) {
         } else if read!(e, flags) & (AVAILABLE | EXCLUSIVE) == 0 && date >= read!(e, intro_date) {
             if unsafe { disabled(s, e.kind, false) }
                 || unsafe { wagon(s, e) }
-                || unsafe { (s.extra_flags)(e.shell) } & 2 != 0
+                || unsafe { call!(s, extra_flags, e.shell) } & 2 != 0
             {
                 continue;
             }
@@ -794,15 +825,16 @@ pub unsafe extern "C" fn openttd_rust_engine_monthly(s: *const Services) {
         }
     }
     unsafe {
-        (s.refresh_lists)(refresh);
+        call!(s, refresh_lists, refresh);
     }
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_engine_clear_hidden(s: *const Services, company: u8) {
+    crate::witness::hit(crate::witness::ENGINE_ENTRIES);
     let s = unsafe { &*s };
     let mut from = 0;
     loop {
-        let e = unsafe { (s.next)(from) };
+        let e = unsafe { call!(s, next, from) };
         if e.shell.is_null() {
             break;
         }
@@ -810,32 +842,39 @@ pub unsafe extern "C" fn openttd_rust_engine_clear_hidden(s: *const Services, co
         write!(
             e,
             company_hidden,
-            read!(e, company_hidden) & !(1 << company)
+            read!(e, company_hidden) & !company_mask(company)
         );
     }
+}
+fn company_mask(company: u8) -> u16 {
+    if company < 16 { 1 << company } else { 0 }
 }
 unsafe fn buildable(s: &Services, e: EngineRef, kind: u8, company: u8) -> bool {
     if e.shell.is_null() || e.kind != kind {
         return false;
     }
-    if company == 18 {
+    if company == OWNER_DEITY {
         if read!(e, flags) & AVAILABLE == 0 || read!(e, company_avail) == 0 {
             return false;
         }
-    } else if read!(e, company_avail) & 1u16.wrapping_shl(u32::from(company)) == 0 {
+    } else if read!(e, company_avail) & company_mask(company) == 0 {
         return false;
     }
-    if !unsafe { (s.enabled)(e.shell) } {
+    if !unsafe { call!(s, enabled, e.shell) } {
         return false;
     }
-    if company != 18 {
+    if company != OWNER_DEITY {
         if kind == 0
-            && unsafe { (s.compatible_railtypes)(e.shell) & (s.company_railtypes)(company) } == 0
+            && unsafe {
+                call!(s, compatible_railtypes, e.shell) & call!(s, company_railtypes, company)
+            } == 0
         {
             return false;
         }
         if kind == 1
-            && unsafe { (s.powered_roadtypes)(e.shell) & (s.company_roadtypes)(company) } == 0
+            && unsafe {
+                call!(s, powered_roadtypes, e.shell) & call!(s, company_roadtypes, company)
+            } == 0
         {
             return false;
         }
@@ -849,6 +888,7 @@ pub unsafe extern "C" fn openttd_rust_engine_buildable(
     kind: u8,
     company: u8,
 ) -> bool {
+    crate::witness::hit(crate::witness::ENGINE_ENTRIES);
     unsafe { buildable(&*s, e, kind, company) }
 }
 #[unsafe(no_mangle)]
@@ -857,6 +897,7 @@ pub unsafe extern "C" fn openttd_rust_engine_variant_hidden(
     e: EngineRef,
     company: u8,
 ) -> bool {
+    crate::witness::hit(crate::witness::ENGINE_ENTRIES);
     if company >= 15 {
         return false;
     }
@@ -866,17 +907,17 @@ pub unsafe extern "C" fn openttd_rust_engine_variant_hidden(
     let s = unsafe { &*s };
     let mut re = e;
     loop {
-        let variant = unsafe { (s.display_variant)(re.shell) };
+        let variant = unsafe { call!(s, display_variant, re.shell) };
         let ve = if variant.display == re.id || variant.display == INVALID {
             re
         } else {
-            unsafe { (s.resolve)(variant.display) }
+            unsafe { call!(s, resolve, variant.display) }
         };
         let hidden = read!(ve, company_hidden) & (1 << company) != 0;
         if hidden || variant.parent == INVALID {
             return hidden;
         }
-        re = unsafe { (s.resolve)(variant.parent) };
+        re = unsafe { call!(s, resolve, variant.parent) };
     }
 }
 #[unsafe(no_mangle)]
@@ -886,12 +927,14 @@ pub unsafe extern "C" fn openttd_rust_engine_visibility(
     hide: bool,
     execute: bool,
 ) -> u8 {
+    crate::witness::hit(crate::witness::ENGINE_ENTRIES);
     let s = unsafe { &*s };
-    let company = unsafe { (s.current_company)() };
+    let company = unsafe { call!(s, current_company) };
     if e.shell.is_null() || company >= 15 || !unsafe { buildable(s, e, e.kind, company) } {
         return 1;
     }
     if execute {
+        crate::witness::hit(crate::witness::ENGINE_VISIBILITY);
         let mask = 1 << company;
         write!(
             e,
@@ -903,7 +946,7 @@ pub unsafe extern "C" fn openttd_rust_engine_visibility(
             }
         );
         unsafe {
-            (s.refresh_type)(e.kind);
+            call!(s, refresh_type, e.kind);
         }
     }
     0
@@ -914,8 +957,9 @@ pub unsafe extern "C" fn openttd_rust_engine_want_preview(
     e: EngineRef,
     execute: bool,
 ) -> u8 {
+    crate::witness::hit(crate::witness::ENGINE_ENTRIES);
     let s = unsafe { &*s };
-    let company = unsafe { (s.current_company)() };
+    let company = unsafe { call!(s, current_company) };
     if e.shell.is_null() || read!(e, flags) & EXCLUSIVE == 0 || read!(e, preview_company) != company
     {
         return 1;
@@ -935,14 +979,16 @@ pub unsafe extern "C" fn openttd_rust_engine_control(
     allow: bool,
     execute: bool,
 ) -> u8 {
+    crate::witness::hit(crate::witness::ENGINE_ENTRIES);
     let s = unsafe { &*s };
-    if unsafe { (s.current_company)() } != 18
+    if unsafe { call!(s, current_company) } != 18
         || e.shell.is_null()
-        || !unsafe { (s.company_valid)(company) }
+        || !unsafe { call!(s, company_valid, company) }
     {
         return 1;
     }
     if execute {
+        crate::witness::hit(crate::witness::ENGINE_CONTROL);
         if allow {
             unsafe {
                 enable(s, e, company);
@@ -962,24 +1008,19 @@ pub unsafe extern "C" fn openttd_rust_engine_rename(
     name: ByteSpan,
     execute: bool,
 ) -> u8 {
+    crate::witness::hit(crate::witness::ENGINE_ENTRIES);
     if e.shell.is_null() {
         return 1;
     }
     let s = unsafe { &*s };
     if name.size != 0 {
-        if unsafe {
-            (s.utf8_length)(ByteSpan {
-                data: name.data,
-                size: name.size,
-            })
-        } >= 32
-        {
+        if unsafe { call!(s, utf8_length, name.data, name.size) } >= 32 {
             return 1;
         }
         let bytes = unsafe { std::slice::from_raw_parts(name.data, name.size) };
         let mut from = 0;
         loop {
-            let other = unsafe { (s.next)(from) };
+            let other = unsafe { call!(s, next, from) };
             if other.shell.is_null() {
                 break;
             }
@@ -991,33 +1032,35 @@ pub unsafe extern "C" fn openttd_rust_engine_rename(
         }
     }
     if execute {
+        crate::witness::hit(crate::witness::ENGINE_RENAME);
         unsafe {
             openttd_rust_engine_set_name(e.state, name);
-            (s.screen_dirty)();
+            call!(s, screen_dirty);
         }
     }
     0
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_engine_check(s: *const Services) {
+    crate::witness::hit(crate::witness::ENGINE_ENTRIES);
     let s = unsafe { &*s };
     let mut min = i32::MAX;
     let mut from = 0;
     loop {
-        let e = unsafe { (s.next)(from) };
+        let e = unsafe { call!(s, next, from) };
         if e.shell.is_null() {
             break;
         }
         from = u32::from(e.id) + 1;
-        if !unsafe { (s.enabled)(e.shell) } || unsafe { wagon(s, e) } {
+        if !unsafe { call!(s, enabled, e.shell) } || unsafe { wagon(s, e) } {
             continue;
         }
         if read!(e, flags) & AVAILABLE != 0 && read!(e, company_avail) != 0 {
             return;
         }
-        min = min.min(unsafe { (s.base_intro)(e.shell) });
+        min = min.min(unsafe { call!(s, base_intro, e.shell) });
     }
     unsafe {
-        (s.no_engines)(min);
+        call!(s, no_engines, min);
     }
 }

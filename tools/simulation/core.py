@@ -78,6 +78,7 @@ def scenario_modules():
         disasters,
         economy,
         effects,
+        engines,
         fleet,
         generated,
         industries,
@@ -97,6 +98,7 @@ def scenario_modules():
         towns,
         trees,
         effects,
+        engines,
         fleet,
         rails,
         ships,
@@ -668,11 +670,10 @@ def run_scenario(
                 )
         result["requested_ticks"] = scenario["ticks"]
         # Only a distinct candidate counts branches; timed runs keep counters off.
-        executables = scenario.get("executables", binaries)
         scenario = dict(
             scenario,
             witnesses=not benchmark_repetitions
-            and executables["candidate"] != executables["reference"],
+            and binaries["candidate"] != binaries["reference"],
         )
         modes = (
             (("plain", False),) * benchmark_repetitions
@@ -1052,7 +1053,7 @@ def run_simulation(args, scenarios, migration, out, parser, stamp):
             source = bundle / manifest["roles"][role]["binary"]
             sources[role] = source
             binaries[role] = copy_runtime(source.parent, source, builds[role])
-            for name in ("fleet", "orders"):
+            for name in ("fleet", "orders", "engines"):
                 shutil.copytree(source.parent / name, builds[role] / name)
             shutil.copy2(
                 source.parent / "adapters.json", builds[role] / "adapters.json"

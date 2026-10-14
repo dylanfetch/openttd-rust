@@ -410,7 +410,7 @@ pub extern "C" fn openttd_rust_company_tick() -> *mut u32 {
 const INVALID: u32 = u32::MAX;
 const INVALID_OWNER: u8 = 255;
 const OWNER_NONE: u8 = 16;
-const OWNER_DEITY: u8 = 18;
+pub const OWNER_DEITY: u8 = 18;
 const COMPANIES: u32 = 15;
 const PRICE_COUNT: usize = 71;
 const INITIAL_LOAN: i64 = 100_000;

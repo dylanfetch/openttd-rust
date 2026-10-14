@@ -61,7 +61,7 @@ struct OpenTTDEngineServices {
 	bool (*enabled)(const OpenTTDEngine *) noexcept;
 	bool (*climate)(const OpenTTDEngine *) noexcept;
 	uint8_t (*rail_kind)(const OpenTTDEngine *) noexcept;
-	void (*clear_variant)(const OpenTTDEngine *) noexcept;
+	void (*clear_last_variant)(const OpenTTDEngine *) noexcept;
 	void (*refresh_type)(uint8_t) noexcept;
 	void (*refresh_lists)(bool) noexcept;
 	OpenTTDEngineCompany (*company_next)(uint32_t) noexcept;
@@ -95,7 +95,7 @@ struct OpenTTDEngineServices {
 	void (*available_news)(uint16_t) noexcept;
 	void (*no_engines)(int32_t) noexcept;
 	void (*screen_dirty)() noexcept;
-	uint32_t (*utf8_length)(OpenTTDByteSpan) noexcept;
+	size_t (*utf8_length)(const uint8_t *, size_t) noexcept;
 };
 extern "C" {
 void openttd_rust_engine_reliability(const OpenTTDEngineServices *, OpenTTDEngineRef, bool);

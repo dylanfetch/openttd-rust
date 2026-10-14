@@ -48,14 +48,14 @@ def game_environment(scenario):
     return {"OPENTTD_ORDERS_CLIENT": "1"} if scenario.get("orders_client") else {}
 
 
-def adapter(build, folder, env):
-    """Relink this orders-only adapter with the game's unchanged built objects."""
+def adapter(build, folder, env, *, source=ADAPTER, name="orders", afterload=True):
+    """Relink a component console adapter with the game's unchanged objects."""
     folder.mkdir(parents=True, exist_ok=True)
     commands = json.loads((build / "compile_commands.json").read_text())
     entry = next(item for item in commands if item["file"].endswith("/console.cpp"))
     compile_args = shlex.split(entry["command"])
-    compile_args[compile_args.index("-o") + 1] = str(folder / "orders.o")
-    compile_args[compile_args.index("-c") + 1] = str(ADAPTER)
+    compile_args[compile_args.index("-o") + 1] = str(folder / f"{name}.o")
+    compile_args[compile_args.index("-c") + 1] = str(source)
     compile_args += ["-I" + str(Path(entry["file"]).parent)]
     subprocess.run(compile_args, cwd=entry["directory"], env=env, check=True)
     target = "openttd-rust" if (build / "openttd-rust").exists() else "openttd"
@@ -64,21 +64,21 @@ def adapter(build, folder, env):
         ["ninja", "-t", "commands", target], cwd=build, env=env, text=True
     ).splitlines()[-1]
     link_args = shlex.split(command.removeprefix(": && ").removesuffix(" && :"))
-    binary = folder / "openttd-orders"
+    binary = folder / f"openttd-{name}"
     link_args[link_args.index("-o") + 1] = str(binary)
     link_args = [
         arg for arg in link_args if not arg.startswith("-Wl,--dependency-file=")
     ]
     link_args += [
-        str(folder / "orders.o"),
+        str(folder / f"{name}.o"),
         "-Wl,--wrap=_Z22IConsoleStdLibRegisterv",
-        "-Wl,--wrap=_Z13AfterLoadGamev",
+        *(["-Wl,--wrap=_Z13AfterLoadGamev"] if afterload else []),
     ]
     subprocess.run(link_args, cwd=build, env=env, check=True)
     return binary, {
         "binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
         "ordinary_binary_sha256": ordinary_hash,
-        "adapter_sha256": hashlib.sha256(ADAPTER.read_bytes()).hexdigest(),
+        "adapter_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
         "compile": compile_args,
         "link": link_args,
     }

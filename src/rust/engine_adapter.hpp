@@ -10,6 +10,8 @@
 #include "vehicle_services.h"
 #include "company_services.h"
 #include "settings_services.h"
+#include "engine_services.h"
+#include "presentation_services.h"
 static_assert(MAX_COMPANIES == 15 && OWNER_DEITY.base() == 18 && MAX_LENGTH_ENGINE_NAME_CHARS == 32);
 static OpenTTDEngineRef EngineRef(const Engine *e) noexcept
 {
@@ -77,35 +79,29 @@ static OpenTTDEngineYMD Engine_date_to_ymd(int32_t date) noexcept
 static int32_t Engine_ymd_to_date(int32_t year, uint8_t month, uint8_t day) noexcept { return TimerGameCalendar::ConvertYMDToDate(TimerGameCalendar::Year{year}, month, day).base(); }
 static bool Engine_enabled(const OpenTTDEngine *e) noexcept { return EngineOf(e)->IsEnabled(); }
 
-static void Engine_clear_variant(const OpenTTDEngine *e) noexcept { const_cast<Engine *>(EngineOf(e))->display_last_variant = EngineID::Invalid(); }
+static void Engine_clear_last_variant(const OpenTTDEngine *shell) noexcept
+{
+	const Engine *removed = EngineOf(shell);
+	for (Engine *e : Engine::IterateType(removed->type)) {
+		if (e->display_last_variant == removed->index) e->display_last_variant = EngineID::Invalid();
+	}
+}
 static void Engine_refresh_type(uint8_t type) noexcept { AddRemoveEngineFromAutoreplaceAndBuildWindows(static_cast<VehicleType>(type)); }
 static void Engine_refresh_lists(bool dirty) noexcept
 {
 	InvalidateWindowClassesData(WC_BUILD_VEHICLE);
 	if (dirty) { SetWindowClassesDirty(WC_BUILD_VEHICLE); SetWindowClassesDirty(WC_REPLACE_VEHICLE); }
 }
-static OpenTTDEngineCompany Engine_company_next(uint32_t from) noexcept
-{
-	for (const Company *c : Company::Iterate(from)) return {.shell = c, .id = c->index.base()};
-	return {.shell = nullptr, .id = CompanyID::Invalid().base()};
-}
 static OpenTTDEngineCompanyPreview Engine_company_preview(const void *shell) noexcept
 {
 	const Company *c = static_cast<const Company *>(shell);
 	return {.blocked = c->Finances().block_preview, .performance = c->Finances().old_economy[0].performance_history};
-}
-static OpenTTDEngineVehicle Engine_vehicle_next(uint32_t from) noexcept
-{
-	for (const Vehicle *v : Vehicle::Iterate(from)) return {.shell = RustVehicle(v), .id = v->index.base(), .owner = RustVehicleOwner(v), .type = RustVehicleVehicleType(v)};
-	return {.shell = nullptr, .id = UINT32_MAX, .owner = 0, .type = VEH_INVALID};
 }
 static OpenTTDEngineVehicleCargo Engine_vehicle_cargo(OpenTTDVehicle *handle) noexcept
 {
 	const Vehicle *v = VehicleOf(handle);
 	return {.engine = RustEngine(v->GetEngine()), .cargo = RustVehicleCargoType(handle)};
 }
-static bool Engine_can_carry(const OpenTTDEngine *e) noexcept { return EngineOf(e)->CanCarryCargo(); }
-static uint64_t Engine_refit_mask(const OpenTTDEngine *e) noexcept { return GetUnionOfArticulatedRefitMasks(EngineOf(e)->index, true); }
 
 static void Engine_date_company_types(uint8_t company, int32_t date) noexcept
 {
@@ -113,7 +109,6 @@ static void Engine_date_company_types(uint8_t company, int32_t date) noexcept
 	c->avail_railtypes = AddDateIntroducedRailTypes(c->avail_railtypes, TimerGameCalendar::Date{date});
 	c->avail_roadtypes = AddDateIntroducedRoadTypes(c->avail_roadtypes, TimerGameCalendar::Date{date});
 }
-); }
 
 static uint16_t Engine_company_engine_count(uint8_t company, uint16_t engine) noexcept { return GetGroupNumEngines(CompanyID{company}, ALL_GROUP, EngineID{engine}); }
 static void Engine_block_preview(uint8_t company) noexcept { Company::Get(CompanyID{company})->Finances().block_preview = 20; }
@@ -132,7 +127,7 @@ static void Engine_invalidate_preview(uint16_t engine) noexcept { InvalidateWind
 static void Engine_offer_preview(uint16_t engine, uint8_t company, bool ai) noexcept
 {
 	if (ai) AI::NewEvent(CompanyID{company}, new ScriptEventEnginePreview(EngineID{engine}));
-	if (IsInteractiveCompany(CompanyID{company})) ShowEnginePreviewWindow(EngineID{engine});
+	if (RustIsInteractiveCompany(company)) ShowEnginePreviewWindow(EngineID{engine});
 }
 static void Engine_available_event(uint16_t engine) noexcept { AI::BroadcastNewEvent(new ScriptEventEngineAvailable(EngineID{engine})); }
 static void Engine_available_news(uint16_t engine) noexcept
@@ -145,14 +140,9 @@ static void Engine_no_engines(int32_t date) noexcept
 	if (date < INT32_MAX) ShowErrorMessage(GetEncodedString(STR_ERROR_NO_VEHICLES_AVAILABLE_YET), GetEncodedString(STR_ERROR_NO_VEHICLES_AVAILABLE_YET_EXPLANATION, TimerGameCalendar::Date{date}), WL_WARNING);
 	else ShowErrorMessage(GetEncodedString(STR_ERROR_NO_VEHICLES_AVAILABLE_AT_ALL), GetEncodedString(STR_ERROR_NO_VEHICLES_AVAILABLE_AT_ALL_EXPLANATION), WL_WARNING);
 }
-static void Engine_screen_dirty() noexcept { MarkWholeScreenDirty(); }
-static uint32_t Engine_utf8_length(OpenTTDByteSpan name) noexcept { return Utf8StringLength(std::string_view{reinterpret_cast<const char *>(name.data), name.size}); }
 static bool Engine_climate(const OpenTTDEngine *e) noexcept { return EngineOf(e)->info.climates.Test(_settings_game.game_creation.landscape); }
-static uint8_t Engine_rail_kind(const OpenTTDEngine *e) noexcept { return EngineOf(e)->VehInfo<RailVehicleInfo>().railveh_type; }
 static void Engine_update_railtypes(uint8_t id) noexcept { Company::Get(CompanyID{id})->avail_railtypes = GetCompanyRailTypes(CompanyID{id}); }
 static void Engine_update_roadtypes(uint8_t id) noexcept { Company::Get(CompanyID{id})->avail_roadtypes = GetCompanyRoadTypes(CompanyID{id}); }
-static uint64_t Engine_compatible_railtypes(const OpenTTDEngine *e) noexcept { return GetAllCompatibleRailTypes(EngineOf(e)->VehInfo<RailVehicleInfo>().railtypes).base(); }
-static uint64_t Engine_powered_roadtypes(const OpenTTDEngine *e) noexcept { return GetRoadTypeInfo(EngineOf(e)->VehInfo<RoadVehicleInfo>().roadtype)->powered_roadtypes.base(); }
 static uint64_t Engine_company_railtypes(uint8_t id) noexcept { return Company::Get(CompanyID{id})->avail_railtypes.base(); }
 static uint64_t Engine_company_roadtypes(uint8_t id) noexcept { return Company::Get(CompanyID{id})->avail_roadtypes.base(); }
 static uint64_t Engine_introduces_railtypes(const OpenTTDEngine *e) noexcept
@@ -186,7 +176,7 @@ static const OpenTTDEngineServices &EngineServices() noexcept
 		.seed_config = Engine_seed_config,
 		.base_intro = Engine_base_intro,
 		.aging_year = Engine_aging_year,
-		.calendar_year = RustCalendarYear,
+		.calendar_year = GetRustSharedServices().calendar_year,
 		.never_expire = RustNeverExpireVehicles,
 		.start_settings = Engine_start_settings,
 		.train_limit = RustTrainLimit,
@@ -202,7 +192,7 @@ static const OpenTTDEngineServices &EngineServices() noexcept
 		.enabled = Engine_enabled,
 		.climate = Engine_climate,
 		.rail_kind = Engine_rail_kind,
-		.clear_variant = Engine_clear_variant,
+		.clear_last_variant = Engine_clear_last_variant,
 		.refresh_type = Engine_refresh_type,
 		.refresh_lists = Engine_refresh_lists,
 		.company_next = Engine_company_next,
@@ -214,7 +204,7 @@ static const OpenTTDEngineServices &EngineServices() noexcept
 		.update_railtypes = Engine_update_railtypes,
 		.update_roadtypes = Engine_update_roadtypes,
 		.date_company_types = Engine_date_company_types,
-		.company_valid = RustCompanyValid,
+		.company_valid = GetRustSharedServices().company_valid,
 		.compatible_railtypes = Engine_compatible_railtypes,
 		.powered_roadtypes = Engine_powered_roadtypes,
 		.company_railtypes = Engine_company_railtypes,
@@ -235,8 +225,8 @@ static const OpenTTDEngineServices &EngineServices() noexcept
 		.available_event = Engine_available_event,
 		.available_news = Engine_available_news,
 		.no_engines = Engine_no_engines,
-		.screen_dirty = Engine_screen_dirty,
-		.utf8_length = Engine_utf8_length,
+		.screen_dirty = RustScreenDirty,
+		.utf8_length = RustUtf8Length,
 	};
 	return services;
 }

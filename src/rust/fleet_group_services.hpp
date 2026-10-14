@@ -7,6 +7,7 @@
 
 #include "vehicle_services.h"
 #include "company_services.h"
+#include "presentation_services.h"
 
 struct FleetVehicleListContext { VehicleList list; const VehicleListIdentifier &vli; };
 /* Fleet shared-world services. No selected group algorithm remains here.
@@ -14,8 +15,6 @@ struct FleetVehicleListContext { VehicleList list; const VehicleListIdentifier &
  * Rust ends canonical field accesses before callbacks/reentry/destruction. */
 static void * FleetGroup_group(uint16_t id) noexcept { auto *g = Group::GetIfValid(GroupID(id)); return g == nullptr ? nullptr : g->state.state; }
 static uint32_t FleetGroup_next_group(uint32_t from) noexcept { for (Group *g : Group::Iterate(from)) { if (g->index.base() >= from) return g->index.base(); } return UINT32_MAX; }
-static uint32_t FleetGroup_next_company(uint32_t from) noexcept { for (Company *c : Company::Iterate(from)) { if (c->index.base() >= from) return c->index.base(); } return UINT32_MAX; }
-static void * FleetGroup_next_vehicle(uint32_t from) noexcept { for (Vehicle *v : Vehicle::Iterate(from)) { if (v->index.base() >= from) return v; } return nullptr; }
 static void * FleetGroup_vehicle(uint32_t id) noexcept { return Vehicle::GetIfValid(VehicleID(id)); }
 static uint32_t FleetGroup_vehicle_id(void *shell) noexcept { auto *v = static_cast<Vehicle *>(shell); return v->index.base(); }
 static uint8_t FleetGroup_vehicle_type(void *shell) noexcept { auto *v = static_cast<Vehicle *>(shell); return v->type; }
@@ -54,7 +53,6 @@ static void FleetGroup_remove_rule(uint8_t owner, uint16_t engine, uint16_t id, 
 static void FleetGroup_remove_vehicles(uint16_t id, uint32_t flags) noexcept { Command<CMD_REMOVE_ALL_VEHICLES_GROUP>::Do(DoCommandFlags(static_cast<uint16_t>(flags)), GroupID(id)); }
 static void FleetGroup_delete_child(uint16_t id, uint32_t flags) noexcept { Command<CMD_DELETE_GROUP>::Do(DoCommandFlags(static_cast<uint16_t>(flags)), GroupID(id)); }
 static void FleetGroup_add_to_group(uint16_t id, uint32_t vehicle, uint32_t flags) noexcept { Command<CMD_ADD_VEHICLE_GROUP>::Do(DoCommandFlags(static_cast<uint16_t>(flags)), GroupID(id), VehicleID(vehicle), false, VehicleListIdentifier{}); }
-static size_t FleetGroup_utf8_length(const uint8_t *text, size_t length) noexcept { return Utf8StringLength(std::string_view(reinterpret_cast<const char *>(text), length)); }
 static void FleetGroup_list_dirty(uint8_t owner, uint8_t type) noexcept { InvalidateWindowData(GetWindowClassForVehicleType(static_cast<VehicleType>(type)), VehicleListIdentifier(VL_GROUP_LIST, static_cast<VehicleType>(type), CompanyID(owner)).ToWindowNumber()); }
 static void FleetGroup_list_set_dirty(uint8_t owner, uint8_t type) noexcept { SetWindowDirty(GetWindowClassForVehicleType(static_cast<VehicleType>(type)), VehicleListIdentifier(VL_GROUP_LIST, static_cast<VehicleType>(type), CompanyID(owner)).ToWindowNumber()); }
 static void FleetGroup_colour_dirty(uint8_t owner, uint8_t type) noexcept { InvalidateWindowData(WC_COMPANY_COLOUR, CompanyID(owner), static_cast<VehicleType>(type)); }
@@ -75,8 +73,8 @@ static void FleetGroup_renew_delete(void *shell) noexcept { delete static_cast<E
 static const OpenTTDFleetGroupServices _fleet_group_services{
 	.group = FleetGroup_group,
 	.next_group = FleetGroup_next_group,
-	.next_company = FleetGroup_next_company,
-	.next_vehicle = FleetGroup_next_vehicle,
+	.next_company = RustNextCompanyID,
+	.next_vehicle = RustNextVehicle,
 	.vehicle = FleetGroup_vehicle,
 	.vehicle_id = FleetGroup_vehicle_id,
 	.vehicle_type = FleetGroup_vehicle_type,
@@ -116,7 +114,7 @@ static const OpenTTDFleetGroupServices _fleet_group_services{
 	.remove_vehicles = FleetGroup_remove_vehicles,
 	.delete_child = FleetGroup_delete_child,
 	.add_to_group = FleetGroup_add_to_group,
-	.utf8_length = FleetGroup_utf8_length,
+	.utf8_length = RustUtf8Length,
 	.list_dirty = FleetGroup_list_dirty,
 	.list_set_dirty = FleetGroup_list_set_dirty,
 	.colour_dirty = FleetGroup_colour_dirty,

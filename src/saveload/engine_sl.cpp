@@ -18,49 +18,41 @@
 
 #include "../safeguards.h"
 #ifdef WITH_RUST
-/** Native decode frame only. Rust-owned temporary engines receive partial
- * decoding at native scope exit, including exceptions; live engines receive
- * saved fields only in CopyTempEngineData, after pool/NewGRF reconstruction. */
-struct EngineSaveData : OpenTTDEngineLifecycle {
-	std::string name;
-	EngineSaveData(Engine *e) : OpenTTDEngineLifecycle(*e->rust_lifecycle.state), name(e->name.View()) {}
-};
-struct EngineLoadScope {
+/** Only the opaque Rust name needs native string decoding. Scalar descriptors
+ * address canonical aliases directly, including partial writes on load failure. */
+static std::string _engine_name;
+struct EngineNameScope {
 	Engine *engine;
-	EngineSaveData data;
-	EngineLoadScope(Engine *engine) : engine(engine), data(engine) {}
-	~EngineLoadScope()
-	{
-		*this->engine->rust_lifecycle.state = this->data;
-		this->engine->name = this->data.name;
-	}
+	EngineNameScope(Engine *e) : engine(e) { _engine_name = e->name.View(); }
+	~EngineNameScope() { this->engine->name = _engine_name; }
 };
-using EngineSaveObject = EngineSaveData;
-#else
-using EngineSaveObject = Engine;
 #endif
 
 static const SaveLoad _engine_desc[] = {
-	 SLE_CONDVAR(EngineSaveObject, intro_date,          SLE_FILE_U16 | SLE_VAR_I32,  SL_MIN_VERSION,  SLV_31),
-	 SLE_CONDVAR(EngineSaveObject, intro_date,          SLE_INT32,                  SLV_31, SL_MAX_VERSION),
-	 SLE_CONDVAR(EngineSaveObject, age,                 SLE_FILE_U16 | SLE_VAR_I32,  SL_MIN_VERSION,  SLV_31),
-	 SLE_CONDVAR(EngineSaveObject, age,                 SLE_INT32,                  SLV_31, SL_MAX_VERSION),
-	     SLE_VAR(EngineSaveObject, reliability,         SLE_UINT16),
-	     SLE_VAR(EngineSaveObject, reliability_spd_dec, SLE_UINT16),
-	     SLE_VAR(EngineSaveObject, reliability_start,   SLE_UINT16),
-	     SLE_VAR(EngineSaveObject, reliability_max,     SLE_UINT16),
-	     SLE_VAR(EngineSaveObject, reliability_final,   SLE_UINT16),
-	     SLE_VAR(EngineSaveObject, duration_phase_1,    SLE_UINT16),
-	     SLE_VAR(EngineSaveObject, duration_phase_2,    SLE_UINT16),
-	     SLE_VAR(EngineSaveObject, duration_phase_3,    SLE_UINT16),
-	     SLE_VAR(EngineSaveObject, flags,               SLE_UINT8),
-	 SLE_CONDVAR(EngineSaveObject, preview_asked,       SLE_UINT16,                SLV_179, SL_MAX_VERSION),
-	 SLE_CONDVAR(EngineSaveObject, preview_company,     SLE_UINT8,                 SLV_179, SL_MAX_VERSION),
-	     SLE_VAR(EngineSaveObject, preview_wait,        SLE_UINT8),
-	 SLE_CONDVAR(EngineSaveObject, company_avail,       SLE_FILE_U8  | SLE_VAR_U16,  SL_MIN_VERSION, SLV_104),
-	 SLE_CONDVAR(EngineSaveObject, company_avail,       SLE_UINT16,                SLV_104, SL_MAX_VERSION),
-	 SLE_CONDVAR(EngineSaveObject, company_hidden,      SLE_UINT16,                SLV_193, SL_MAX_VERSION),
-	SLE_CONDSSTR(EngineSaveObject, name,                SLE_STR,                    SLV_84, SL_MAX_VERSION),
+	 SLE_CONDVAR(Engine, intro_date,          SLE_FILE_U16 | SLE_VAR_I32,  SL_MIN_VERSION,  SLV_31),
+	 SLE_CONDVAR(Engine, intro_date,          SLE_INT32,                  SLV_31, SL_MAX_VERSION),
+	 SLE_CONDVAR(Engine, age,                 SLE_FILE_U16 | SLE_VAR_I32,  SL_MIN_VERSION,  SLV_31),
+	 SLE_CONDVAR(Engine, age,                 SLE_INT32,                  SLV_31, SL_MAX_VERSION),
+	     SLE_VAR(Engine, reliability,         SLE_UINT16),
+	     SLE_VAR(Engine, reliability_spd_dec, SLE_UINT16),
+	     SLE_VAR(Engine, reliability_start,   SLE_UINT16),
+	     SLE_VAR(Engine, reliability_max,     SLE_UINT16),
+	     SLE_VAR(Engine, reliability_final,   SLE_UINT16),
+	     SLE_VAR(Engine, duration_phase_1,    SLE_UINT16),
+	     SLE_VAR(Engine, duration_phase_2,    SLE_UINT16),
+	     SLE_VAR(Engine, duration_phase_3,    SLE_UINT16),
+	     SLE_VAR(Engine, flags,               SLE_UINT8),
+	 SLE_CONDVAR(Engine, preview_asked,       SLE_UINT16,                SLV_179, SL_MAX_VERSION),
+	 SLE_CONDVAR(Engine, preview_company,     SLE_UINT8,                 SLV_179, SL_MAX_VERSION),
+	     SLE_VAR(Engine, preview_wait,        SLE_UINT8),
+	 SLE_CONDVAR(Engine, company_avail,       SLE_FILE_U8  | SLE_VAR_U16,  SL_MIN_VERSION, SLV_104),
+	 SLE_CONDVAR(Engine, company_avail,       SLE_UINT16,                SLV_104, SL_MAX_VERSION),
+	 SLE_CONDVAR(Engine, company_hidden,      SLE_UINT16,                SLV_193, SL_MAX_VERSION),
+#ifdef WITH_RUST
+	SLEG_CONDSSTR("name", _engine_name, SLE_STR, SLV_84, SL_MAX_VERSION),
+#else
+	SLE_CONDSSTR(Engine, name, SLE_STR, SLV_84, SL_MAX_VERSION),
+#endif
 };
 
 static TypedIndexContainer<std::vector<Engine>, EngineID> _temp_engine;
@@ -86,8 +78,8 @@ struct ENGNChunkHandler : ChunkHandler {
 		for (Engine *e : Engine::Iterate()) {
 			SlSetArrayIndex(e->index);
 #ifdef WITH_RUST
-			EngineSaveData data(e);
-			SlObject(&data, _engine_desc);
+			_engine_name = e->name.View();
+			SlObject(e, _engine_desc);
 #else
 			SlObject(e, _engine_desc);
 #endif
@@ -106,8 +98,8 @@ struct ENGNChunkHandler : ChunkHandler {
 			Engine *e = GetTempDataEngine(static_cast<EngineID>(index));
 #ifdef WITH_RUST
 			{
-				EngineLoadScope staging(e);
-				SlObject(&staging.data, slt);
+				EngineNameScope name(e);
+				SlObject(e, slt);
 			}
 #else
 			SlObject(e, slt);

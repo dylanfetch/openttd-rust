@@ -8,6 +8,7 @@
 #include "command_cost_services.h"
 #include "services_ffi.h"
 #include "company_services.h"
+#include "engine_services.h"
 
 /* Named shared services and full native CommandCost storage. All callbacks are
  * noexcept, retain original move/AddCost behavior, and permit ordinary reentry.
@@ -38,7 +39,6 @@ static void * FleetTransaction_prev_unit(void *shell) noexcept { auto *v = stati
 static uint16_t FleetTransaction_length(void *shell) noexcept { auto *v = static_cast<Vehicle *>(shell); return Train::From(v)->gcache.cached_total_length; }
 static bool FleetTransaction_flipped(void *shell) noexcept { auto *v = static_cast<Vehicle *>(shell); return Train::From(v)->GetTrainFlags().Test(VehicleRailFlag::Flipped); }
 static uint8_t FleetTransaction_cargo_type(void *shell) noexcept { auto *v = static_cast<Vehicle *>(shell); return v->cargo_type; }
-static bool FleetTransaction_can_carry(void *shell) noexcept { auto *v = static_cast<Vehicle *>(shell); return v->GetEngine()->CanCarryCargo(); }
 static bool FleetTransaction_stopped_in_depot(void *shell) noexcept { return static_cast<Vehicle *>(shell)->IsStoppedInDepot(); }
 static uint8_t FleetTransaction_max_length() noexcept { return _settings_game.vehicle.max_train_length; }
 /* Original assertion sites; Rust evaluates their conditions only when assertions is set. */
@@ -52,12 +52,8 @@ static bool FleetTransaction_needs_renew(void *shell, bool settings) noexcept { 
 static bool FleetTransaction_engine_valid(uint16_t id) noexcept { return Engine::IsValidID(EngineID(id)); }
 static bool FleetTransaction_company_valid(uint8_t id) noexcept { return GetRustSharedServices().company_valid(id); }
 static bool FleetTransaction_engine_buildable(uint16_t id, uint8_t type, uint8_t company) noexcept { return IsEngineBuildable(EngineID(id), static_cast<VehicleType>(type), CompanyID(company)); }
-static uint64_t FleetTransaction_rail_compatible(uint16_t id) noexcept { return GetAllCompatibleRailTypes(RailVehInfo(EngineID(id))->railtypes).base(); }
-static uint64_t FleetTransaction_road_powered(uint16_t id) noexcept { return GetRoadTypeInfo(RoadVehInfo(EngineID(id))->roadtype)->powered_roadtypes.base(); }
-static bool FleetTransaction_wagon(uint16_t id) noexcept { return RailVehInfo(EngineID(id))->railveh_type == RAILVEH_WAGON; }
 static bool FleetTransaction_tram(uint16_t id) noexcept { return Engine::Get(EngineID(id))->info.misc_flags.Test(EngineMiscFlag::RoadIsTram); }
 static uint8_t FleetTransaction_plane(uint16_t id) noexcept { return AircraftVehInfo(EngineID(id))->subtype & AIR_CTOL; }
-static uint64_t FleetTransaction_refit_mask(uint16_t id, bool initial) noexcept { return GetUnionOfArticulatedRefitMasks(EngineID(id), initial); }
 static void FleetTransaction_refit_masks(uint16_t id, uint64_t *union_mask, uint64_t *available) noexcept { GetArticulatedRefitMasks(EngineID(id), true, union_mask, available); }
 static uint64_t FleetTransaction_vehicle_cargo(void *shell, uint8_t *cargo) noexcept { return GetCargoTypesOfArticulatedVehicle(static_cast<Vehicle *>(shell), cargo); }
 static uint64_t FleetTransaction_default_cargo(uint16_t id) noexcept { return GetCargoTypesOfArticulatedParts(EngineID(id)); }

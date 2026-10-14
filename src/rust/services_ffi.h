@@ -95,7 +95,6 @@ struct OpenTTDRandomServices {
 	void (*set_seed)(uint32_t) noexcept;
 };
 const OpenTTDRandomServices &GetRustRandomServices() noexcept;
-int32_t RustCalendarYear() noexcept;
 
 /* Standalone fixtures without a game map: map predicates return zero and writes do nothing. */
 template <typename Result, typename... Args>

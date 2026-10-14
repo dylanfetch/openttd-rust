@@ -1,0 +1,173 @@
+"""Engine lifecycle commands, preview, reliability and canonical modern reload."""
+
+import hashlib
+import json
+
+from . import orders
+from .core import (
+    ROOT,
+    RUNTIME_DIRECTORIES,
+    WITNESS_ENVIRONMENT,
+    branch_witnesses,
+    compare_saves,
+    run_game,
+)
+
+ADAPTER = ROOT / "tools/simulation/engines-console.cpp"
+REQUIRED = {
+    "commands": ("rename", "visibility", "control"),
+    "preview": ("offer", "accept", "join", "penalty"),
+    "reliability": ("retire", "never_expire", "sync", "cutoff"),
+    "reload": (),
+}
+EXPECTED = {
+    "commands": ("company-bits true", "hidden true", "disabled true"),
+    "preview": ("offered true true", "joined true true", "penalty true true"),
+    "reliability": (
+        "retired true true true",
+        "never-expire true true",
+        "synced true",
+        "cutoff true",
+    ),
+    "reload": ("reloaded true",),
+}
+
+
+def scenarios(soak):
+    return [
+        {
+            "name": "engines-" + mode,
+            "kind": "save",
+            "save": str(ROOT / "migration/saves/padhattan-ridge-2000.sav"),
+            "engines": mode,
+            "short_checkpoint": True,
+            "ticks": 74 if soak else 1,
+        }
+        for mode in REQUIRED
+    ]
+
+
+def game_environment(scenario):
+    return (
+        WITNESS_ENVIRONMENT
+        if scenario.get("engines") and scenario.get("witnesses")
+        else {}
+    )
+
+
+def adapter(build, folder, env):
+    return orders.adapter(
+        build, folder, env, source=ADAPTER, name="engines", afterload=False
+    )
+
+
+def prepare(scenario, binaries, builds, out, timeout, env, result):
+    if "engines" not in scenario:
+        return scenario
+    import migration
+
+    from .runtime import prepared_adapter
+
+    folder = out / scenario["name"] / "input"
+    executables, provenance = {}, {}
+    for role in ("reference", "candidate"):
+        prepared = prepared_adapter("engines", role, binaries, builds, folder / role)
+        if prepared is None:
+            native = (
+                migration.REFERENCE_BUILD
+                if role == "reference" or binaries[role] == binaries["reference"]
+                else ROOT / "build-rust"
+            )
+            lock = (
+                migration.reference_lock(shared=True)
+                if native == migration.REFERENCE_BUILD
+                else migration.candidate_lock(native, shared=True)
+            )
+            with lock:
+                prepared = adapter(native, folder / role, env)
+        executables[role], provenance[role] = prepared
+        if (
+            provenance[role]["ordinary_binary_sha256"]
+            != hashlib.sha256(binaries[role].read_bytes()).hexdigest()
+        ):
+            raise RuntimeError("engine adapter objects differ from frozen game")
+        manifest = {}
+        for name in RUNTIME_DIRECTORIES:
+            if (builds[role] / name).is_dir():
+                (folder / role / name).symlink_to(
+                    builds[role] / name, target_is_directory=True
+                )
+            manifest.update(
+                {
+                    str(path.relative_to(builds[role])): hashlib.sha256(
+                        path.read_bytes()
+                    ).hexdigest()
+                    for path in (builds[role] / name).rglob("*")
+                    if path.is_file()
+                }
+            )
+        provenance[role]["runtime_sha256"] = hashlib.sha256(
+            json.dumps(manifest, sort_keys=True).encode()
+        ).hexdigest()
+    result["engines_adapter"] = provenance
+    if scenario["engines"] != "reload":
+        return dict(
+            scenario,
+            executables=executables,
+            console=["engines_scenario " + scenario["engines"], "unpause"],
+        )
+    saves, captures = {}, {}
+    for role in ("reference", "candidate"):
+        save = folder / role / "engines.sav"
+        setup = dict(
+            scenario,
+            console=[f'engines_scenario commands "{save}"', "unpause"],
+            ticks=1,
+        )
+        run = run_game(
+            setup,
+            executables[role],
+            builds[role],
+            folder / role / "capture",
+            timeout,
+            env,
+            False,
+        )
+        if run["exit"] or not save.is_file() or "ENGINE hidden true" not in run["log"]:
+            raise RuntimeError("engine reload capture failed")
+        saves[role] = save
+        captures[role] = [line for line in run["log"] if line.startswith("ENGINE ")]
+    differences = compare_saves(
+        saves["reference"],
+        saves["candidate"],
+        scenario["name"],
+        10,
+        {"chunks": 0, "elements": 0, "masked": {}},
+    )
+    if differences or captures["reference"] != captures["candidate"]:
+        result["differences"].extend(differences)
+        raise RuntimeError("engine reload capture differs")
+    result["engines_capture"] = captures
+    return dict(
+        scenario,
+        executables=executables,
+        role_inputs={role: {"save": str(save)} for role, save in saves.items()},
+        console=["engines_scenario inspect", "unpause"],
+    )
+
+
+def check(scenario, run, mode, role, result):
+    if "engines" not in scenario or run["exit"] or not run["snapshots"]:
+        return
+    variant = scenario["engines"]
+    for expected in EXPECTED[variant]:
+        if "ENGINE " + expected not in run["log"]:
+            raise RuntimeError("engine branch result missing: " + expected)
+    lines = [line for line in run["log"] if line.startswith("ENGINE ")]
+    key = mode + "_engine_results"
+    if role == "reference":
+        result[key] = lines
+    elif result[key] != lines:
+        raise RuntimeError("engine command/branch results differ")
+    if counts := branch_witnesses(scenario, run, role, "engine", REQUIRED[variant]):
+        result[mode + "_engine_branches"] = counts
