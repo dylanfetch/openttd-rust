@@ -4,12 +4,13 @@ Root owns selection here; `AGENTS.md` and `docs/rust-migration.md` define proces
 If an issue conflicts, follow this roadmap and report it to root. Keep this
 forward-looking, about 200 lines; completed work is one row, with evidence in PRs.
 
-## Where the fork stands (2026-10-14, `334df5ef8c`)
+## Where the fork stands (2026-10-14, `8f9d4fc906`)
 
-- Twenty-four ownership ports. Whole fork: Rust 56,978 / tooling 29,319 / glue 26,077 / original retired 36,502 of 470,612 `src/` lines (7.76%). Simulation: 28,522 / 102,615 (27.80%); source counts, not behavioral completion.
-- Since the tenth review, six integrations retired 340 original lines (all #216) and added 2,709 tooling and 1,507 glue lines. Both large owners (#212, #213) were deferred after prototype timing failures; #244 grew to 1,644 tooling lines.
-- Speed at tip (eleventh-review audit, median of three): TGP 1.123, Opus 1.250, Grok 1.245, Ridge 1996 1.225, 2000 1.293, 2016 1.344. All are inside their caps.
-- Drafts: #245 signals and #248 engine, both faithful with listed fixes. #244 is not to be worked on (action 1). #66 is paused.
+- Twenty-four ownership ports. Whole fork: Rust 56,978 / tooling 29,797 / glue 26,077 / original retired 36,502 of 470,612 `src/` lines (7.76%). Simulation: 28,522 / 102,615 (27.80%); source counts, not behavioral completion.
+- This restart integrated selected CI work #253/#254: zero original retirement, +431 tooling, unchanged glue. The next work is four simulation owners, not more CI tooling.
+- Latest accepted speed (eleventh-review audit): TGP 1.123, Opus 1.250, Grok 1.245, Ridge 1996 1.225, 2000 1.293, 2016 1.344. CI-only integrations change no game body; new owner timing is pending.
+- Six unintegrated branches: signals #245, engine #248, landscape #255, vehicle #213, idle #244 and paused #66. No new component starts until a slot frees.
+- #252 compatibility and warm acceptance passed; eight Windows vCPUs retained. #249 is enforced in quick CI. #233 has observed two of three code merges, below 10 GiB so far; #244 stays idle.
 - Largest original simulation files remaining: station_cmd 4.5k lines, rail_cmd 3.2k, vehicle 3.0k, road_cmd 2.7k, town_cmd 2.5k, tunnelbridge 2.2k, landscape 1.8k, water 1.5k, engine 1.3k.
 
 ## Eleventh steering review (2026-10-14, throughput and enforcement)
@@ -28,9 +29,9 @@ The ports are faithful. Retirement stalled for three reasons, each fixable:
   - On play saves, the null driver redraws per elapsed millisecond, which inflates game-logic cost about 1.33x in wall ratios.
 
 Actions, in order:
-0. **#252 Windows CI on Blacksmith (user-selected, first).** Follow the issue: the first Blacksmith Windows run decides breakpad compatibility; if incompatible, leave Windows on GitHub, close it and continue.
+0. **#252 Windows CI on Blacksmith (user-selected, first).** #253 integrated; compatibility, warm-cache/CPU acceptance passed and eight vCPUs retained (#252). macOS stays on GitHub.
 1. **Do not work on #244.** Blacksmith moved the Linux caches out of GitHub's 10 GiB, so its cache-peak problem is likely gone. Over the next three code merges, record GitHub's peak cache usage on #233. If it stays under 10 GiB, close #233 as met and #243/#244 unmerged (keep the branch, remove the worktree). If it goes over, resume #244: fix the platform gate failure and the quick-job ccache fixture, then bootstrap, full CI and #233 live acceptance.
-2. **#249 shared-accessor check:** small infrastructure, run in parallel. Do not block ports on it.
+2. **#249 shared-accessor check:** integrated in #254. Keep its baseline shrinking; do not block ownership on tooling-only base adoption.
 3. **#245 signals:** apply the two fixes in its steering comment, record its gaps (posted on #156), then do final-head validation, timing, a fresh fixing review, full CI and integrate.
 4. **#248 engine:** fix the build break, add `engines.py` witnesses, delete the duplicated accessors and apply the rest of its steering comment. Then review, CI and integrate.
 5. **Re-select #212 from integrated tip.**
@@ -39,6 +40,7 @@ Actions, in order:
    - Gate: interleaved A/B against tip within 11 ms on TGP; attribute any miss with callgrind (AGENTS.md).
 6. **Re-select #213 from integrated tip.**
    - Boundary: a pool-cursor descriptor instead of a `next()` call per vehicle, one slim dispatch record and one post-tick bundle, the assert check in Rust, and about three C++ calls per vehicle at most.
+   - The selected growth-checked cursor and read-only actual status-member addresses are bounded by `docs/design/world-state.md`; count all semantic callbacks too.
    - Gate: at most 6 ns per vehicle-tick visit, A/B against tip on Opus.
    - #212 and #213 may run concurrently within the WIP cap.
 7. **Town #246** carries the #216 follow-ups listed on #246, including deleting the save staging if it is redundant. Select the house-tile-loop owner no later than #247.
@@ -113,6 +115,8 @@ retirement, with net glue in the PR (#223).
 | #214/#168 (typed station/loading) | #217 | direct | `3b3b931099` | 1018 / 42 / 1147 / 0; net glue +705 |
 | #250 (CI waiter survives base pushes) | #251 | direct | `409cdb253e` | 0 / 53 / 0 / 0; net glue 0 |
 | #237/#199 (typed aircraft boundary) | #238 | direct | `141e4ce397` | 798 / 420 / 470 / 0; net glue -310 |
+| #252 (Windows runner) | #253 | direct | `cfc98a16a7` | 0 / 0 / 0 / 0 |
+| #249 (shared-accessor enforcement) | #254 | direct | `8f9d4fc906` | 0 / 431 / 0 / 0 |
 
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -143,7 +147,7 @@ unintegrated branches (#157). Independent items (#156, #249) may run in parallel
 
 1. **#245 signals, then #248 engine,** per the eleventh review's actions 3-4.
 2. **#212 landscape, then #213 vehicle tick,** per actions 5-6. These are the largest remaining simulation owners. They also delete the tree facade (16.8 ms on TGP) and the per-vehicle scheduler crossings.
-3. **Town:** #246 founding, generation and names from integrated #216; then the house tile loop; then #247 commands, authority and deletion. All of them reuse the sole town owner and the generation unwind contract.
+3. **Town:** #246 founding, generation and names from integrated #216; then #256 house lifecycle/tile simulation; then #247 commands, authority and deletion. Reuse the sole town owner and generation unwind contract.
 4. **Next owners**, planned when fewer than two unstarted components remain: station tile, cargo and rating control (`station_cmd`); rail and road track commands and tile procs; tunnel/bridge. Guide the selection by the world-state design and the tip profile.
 5. **Conversions buy speed headroom** and never block ownership:
    - aircraft (94 calls per tick);
@@ -160,18 +164,19 @@ that a `SaveLoad` descriptor cannot address through the alias.
 ## Resume checkpoint
 
 Root resumed from `fe337e4e40` with `/start-development`. The last code revision
-is green. Four implementation agents own #252, #249, #245 and #248; root owns
-review, CI, integration and the three-merge GitHub cache observation on #233.
+is green. #253/#254 are integrated and their worktrees removed. Root owns CI/integration and #233 observation. #252 acceptance is complete; four
+owner agents and the fresh signal reviewer are active.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #233 / #243 / #244 | `ci-cache-peak-233`, `1288db61b4` | Root sampling; zero of three code merges observed. Leave #244 idle (action 1). |
-| #252 | `windows-blacksmith-252` | `windows_blacksmith_252`: first, prepare runner variable and toolset inventory for review/bootstrap CI. |
-| #249 | `shared-accessor-check-249` | `shared_accessor_check_249`: bounded quick-CI detector and shrinking baseline. |
-| #219 / #245 | `signal-owner-219`, `df2f77b247` | `signals_final_245`: steering fixes and base adoption, then validation, timing and fresh review. |
-| #220 / #248 | `engine-lifecycle-220`, `9c4b950b56` | `engine_final_248`: build/boundary fixes and default witnesses, then validation and fresh review. |
-| #212 / #241 | `landscape-budget-prototype-212`, `45633ef6d6` | Re-selected: new branch from tip with the action-5 boundary. |
-| #213 / #242 | `vehicle-budget-prototype-213`, `92b8a04075` | Re-selected: new branch from tip with the action-6 boundary. |
+| #233 / #243 / #244 | `ci-cache-peak-233`, `1288db61b4` | Root sampling; two of three code merges observed. Leave #244 idle (action 1). |
+| #252 / #253 | integrated, worktree removed | Closed: compatibility/full CI and warm-cache/CPU acceptance passed; eight vCPUs retained, scheduling restored. |
+| #249 / #254 | integrated, worktree removed | Fixing review/full CI passed; 206 baseline fingerprints, no additions permitted. |
+| #219 / #245 | `signal-owner-219`, `6fdb1fd18f` | `signals_final_245`: focused pair/self/soak and portable source checks passed; frozen default, then tooling adoption/affected reruns, fixing review and timing. |
+| #220 / #248 | `engine-lifecycle-220`, `3c4f63a512` | `engine_final_248`: native/focused pair/self/soak passed; finish default and narrow adapter-provenance reruns before timing/review. |
+| #212 / #255 | `landscape-owner-212`, `87cd4cb673` | `landscape_owner_212`: native/focused pass; recorded interrupted timing prefix, fresh quiet gate before full scope. |
+| #213 / #257 | `vehicle-owner-213`, `61f2f93370` | `vehicle_owner_213`: cursor/post-tick boundary pushed; fix native loading-timer scope, then verify/quiet Opus gate. |
+| #246 / #256 / #247 | unstarted | Founding/names, then complete house lifecycle, then town commands/deletion. |
 | #64 / #66 | `issue/64-curve-family`, `aab5211801` | Paused draft/worktree; leave untouched, not a fallback. |
 | Paused integration | `integration/curve-script`, `c19f09cf8b` | Locked worktree preserved; no work. |
 | Disaster evidence | `evidence-disaster-vehicles`, `a775543162` | Locked evidence worktree preserved; no work. |
@@ -183,6 +188,7 @@ ABI blocks:
 - station/loading 500-559, industry 560-619 (572 is the shared ByteSpan), CommandCost 620-629
 - town lifecycle 630-669, aircraft 670-739
 - vehicle 740-779, landscape 780-819, signals 820-859, engines 860-919
+- house lifecycle 920-979
 
 Check only consumed layouts.
 
