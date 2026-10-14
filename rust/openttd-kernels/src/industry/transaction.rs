@@ -307,7 +307,7 @@ impl Engine<'_> {
                 return self.fail(self.e.site);
             }
             if gfx == 255 {
-                if (self.s.shared().tile_type)(current) != 6
+                if !(self.s.shared().is_water_tile)(current)
                     || (self.s.shared().tile_slope)(current) != 0
                 {
                     return self.fail(self.e.site);

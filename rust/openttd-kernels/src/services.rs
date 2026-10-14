@@ -66,6 +66,8 @@ pub struct Services {
     pub tunnel_bridge_direction: extern "C" fn(u32) -> u8,
     /// Bridge specification speed at this bridge tile.
     pub bridge_speed: extern "C" fn(u32) -> u16,
+    /// `IsWaterTile`: water category and clear subtype (sea, canal or river).
+    pub is_water_tile: extern "C" fn(u32) -> bool,
     /// Shared live map log x observation.
     pub map_log_x: extern "C" fn() -> u8,
     /// Shared live map max x observation.
@@ -157,6 +159,7 @@ pub fn fixture(
         is_level_crossing: flag,
         tunnel_bridge_direction: byte,
         bridge_speed: word,
+        is_water_tile: flag,
         map_log_x: byte0,
         map_max_x: word0,
         map_max_y: word0,

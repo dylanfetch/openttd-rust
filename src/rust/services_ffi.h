@@ -39,6 +39,7 @@ struct OpenTTDSharedServices {
 	bool (*is_level_crossing)(uint32_t) noexcept;
 	uint8_t (*tunnel_bridge_direction)(uint32_t) noexcept;
 	uint16_t (*bridge_speed)(uint32_t) noexcept;
+	bool (*is_water_tile)(uint32_t) noexcept;
 	uint8_t (*map_log_x)() noexcept;
 	uint32_t (*map_max_x)() noexcept;
 	uint32_t (*map_max_y)() noexcept;
@@ -79,6 +80,7 @@ inline OpenTTDSharedServices OpenTTDFixtureSharedServices(void *context, uint32_
 		.is_level_crossing = OpenTTDFixtureMapService<bool, uint32_t>,
 		.tunnel_bridge_direction = OpenTTDFixtureMapService<uint8_t, uint32_t>,
 		.bridge_speed = OpenTTDFixtureMapService<uint16_t, uint32_t>,
+		.is_water_tile = OpenTTDFixtureMapService<bool, uint32_t>,
 		.map_log_x = OpenTTDFixtureMapService<uint8_t>,
 		.map_max_x = OpenTTDFixtureMapService<uint32_t>,
 		.map_max_y = OpenTTDFixtureMapService<uint32_t>,

@@ -19,6 +19,7 @@
 #include "../rail_map.h"
 #include "../tunnelbridge_map.h"
 #include "../bridge.h"
+#include "../water_map.h"
 #include "../safeguards.h"
 #include "settings_services.h"
 #include "../cheat_type.h"
@@ -49,6 +50,7 @@ static uint16_t MapSvcDepotIndex(uint32_t tile) noexcept { return GetDepotIndex(
 static bool MapSvcIsLevelCrossing(uint32_t tile) noexcept { return IsLevelCrossingTile(TileIndex(tile)); }
 static uint8_t MapSvcTunnelBridgeDirection(uint32_t tile) noexcept { return GetTunnelBridgeDirection(TileIndex(tile)); }
 static uint16_t MapSvcBridgeSpeed(uint32_t tile) noexcept { return GetBridgeSpec(GetBridgeType(TileIndex(tile)))->speed; }
+static bool MapSvcIsWaterTile(uint32_t tile) noexcept { return IsWaterTile(TileIndex(tile)); }
 
 static uint8_t SharedMapLogX() noexcept { return Map::LogX(); }
 static uint32_t SharedMapMaxX() noexcept { return Map::MaxX(); }
@@ -82,6 +84,7 @@ const OpenTTDSharedServices &GetRustSharedServices() noexcept
 		.is_level_crossing = MapSvcIsLevelCrossing,
 		.tunnel_bridge_direction = MapSvcTunnelBridgeDirection,
 		.bridge_speed = MapSvcBridgeSpeed,
+		.is_water_tile = MapSvcIsWaterTile,
 		.map_log_x = SharedMapLogX,
 		.map_max_x = SharedMapMaxX,
 		.map_max_y = SharedMapMaxY,
