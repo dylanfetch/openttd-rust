@@ -382,8 +382,8 @@ impl World<'_> {
     fn map(&self) -> Map {
         self.map.get().unwrap_or_else(|| {
             let log_x = (self.ss.map_log_x)();
-            service_witness("map_log_x", 1);
-            let map = Map { log_x };
+            service_witness("map_log_x", std::mem::size_of_val(&log_x));
+            let map = Map { log_x: log_x as u8 };
             self.map.set(Some(map));
             map
         })
@@ -452,7 +452,8 @@ impl World<'_> {
         engine_reliability(self; v: Vehicle) => unsafe { (self.leaves.engine_reliability)(v) };
         vehicle_type(self; v: Vehicle) => (self.vs.vehicle_type)(v.base());
         slope(self; x: i64, y: i64) => (self.ss.slope)(x as i32, y as i32);
-        tile_height(self; tile: i64) => (self.ss.tile_height)(tile as u32);
+        // Original unsigned TileHeight * TILE_HEIGHT narrows to int before widening.
+        tile_height(self; tile: i64) => (self.ss.tile_height)(tile as u32).wrapping_mul(crate::services::TILE_HEIGHT) as i32;
         airport_entry(self; ap: *const c_void, direction: i64) => unsafe { (self.leaves.airport_entry)(ap, direction as u8) };
         direction_towards(self; v: Vehicle, x: i64, y: i64) => unsafe { (self.leaves.direction_towards)(v, x as i32, y as i32) };
         hangar_height(self; station: i64) => unsafe { (self.leaves.hangar_height)(station as u16) };

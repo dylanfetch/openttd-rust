@@ -122,14 +122,7 @@ static uint8_t OPENTTD_VEHICLE_CALL RoadSvcAnyRoadBits(OpenTTDVehicle *v, uint32
 	return GetAnyRoadBits(TileIndex(tile), GetRoadTramType(RoadOf(v)->roadtype), straight_only);
 }
 static uint8_t OPENTTD_VEHICLE_CALL RoadSvcTramBits(uint32_t tile) noexcept { return GetRoadBits(TileIndex(tile), RTT_TRAM); }
-static bool OPENTTD_VEHICLE_CALL RoadSvcIsRoadDepotTile(uint32_t tile) noexcept { return IsRoadDepotTile(TileIndex(tile)); }
-static uint8_t OPENTTD_VEHICLE_CALL RoadSvcDepotDirection(uint32_t tile) noexcept { return GetRoadDepotDirection(TileIndex(tile)); }
-static bool OPENTTD_VEHICLE_CALL RoadSvcIsNormalRoad(uint32_t tile) noexcept { return IsNormalRoadTile(TileIndex(tile)); }
 static bool OPENTTD_VEHICLE_CALL RoadSvcHasRoadWorks(uint32_t tile) noexcept { return HasRoadWorks(TileIndex(tile)); }
-static uint8_t OPENTTD_VEHICLE_CALL RoadSvcDisallowedDirections(uint32_t tile) noexcept { return GetDisallowedRoadDirections(TileIndex(tile)); }
-static bool OPENTTD_VEHICLE_CALL RoadSvcIsBayStop(uint32_t tile) noexcept { return IsBayRoadStopTile(TileIndex(tile)); }
-static uint8_t OPENTTD_VEHICLE_CALL RoadSvcBayDirection(uint32_t tile) noexcept { return GetBayRoadStopDir(TileIndex(tile)); }
-static bool OPENTTD_VEHICLE_CALL RoadSvcIsDriveThrough(uint32_t tile) noexcept { return IsDriveThroughStopTile(TileIndex(tile)); }
 static bool OPENTTD_VEHICLE_CALL RoadSvcIsStationRoadStop(uint32_t tile) noexcept { return IsStationRoadStop(TileIndex(tile)); }
 static uint8_t OPENTTD_VEHICLE_CALL RoadSvcStopType(uint32_t tile) noexcept { return to_underlying(GetRoadStopType(TileIndex(tile))); }
 static bool OPENTTD_VEHICLE_CALL RoadSvcHasFreeBay(uint32_t tile) noexcept
@@ -350,14 +343,14 @@ static const OpenTTDRoadLeaves &GetRoadLeaves()
 		.track_status = RoadSvcTrackStatus,
 		.any_road_bits = RoadSvcAnyRoadBits,
 		.tram_bits = RoadSvcTramBits,
-		.is_road_depot_tile = RoadSvcIsRoadDepotTile,
-		.depot_direction = RoadSvcDepotDirection,
-		.is_normal_road = RoadSvcIsNormalRoad,
+		.is_road_depot_tile = GetRustSharedServices().is_road_depot,
+		.depot_direction = GetRustSharedServices().road_depot_direction,
+		.is_normal_road = GetRustSharedServices().is_normal_road,
 		.has_road_works = RoadSvcHasRoadWorks,
-		.disallowed_directions = RoadSvcDisallowedDirections,
-		.is_bay_stop = RoadSvcIsBayStop,
-		.bay_direction = RoadSvcBayDirection,
-		.is_drive_through = RoadSvcIsDriveThrough,
+		.disallowed_directions = GetRustSharedServices().disallowed_road_directions,
+		.is_bay_stop = GetRustSharedServices().is_bay_stop,
+		.bay_direction = GetRustSharedServices().bay_stop_direction,
+		.is_drive_through = GetRustSharedServices().is_drive_through_stop,
 		.is_station_road_stop = RoadSvcIsStationRoadStop,
 		.stop_type = RoadSvcStopType,
 		.has_free_bay = RoadSvcHasFreeBay,

@@ -56,11 +56,16 @@ fork; the remaining upstream documentation explains behavior and architecture.
   positional array. Each entry resolves its owner once and reads, once, only
   the fields it uses: neither a whole-record view nor a call per field. A
   shared accessor (vehicle field, map predicate, setting, constant) has one
-  typed definition used by every port, not a per-port copy; services return
-  their real types on both sides and tables use designated initializers.
-  Existing ports convert under #168 and #199. Root grants no
-  exceptions at integration: a port whose hot path allocates per call, dispatches
-  by opcode or copies whole records is fixed before it integrates.
+  typed definition used by every port, not a per-port copy. Until the default-CI
+  check (#249) lands, reviewers search for copies themselves. A PR that adds a
+  shared accessor deletes the integrated copies. Services return their real
+  types on both sides and tables use designated initializers. Existing ports
+  convert under #168 and #199. Root grants no exceptions at integration: a port whose hot path allocates per call,
+  dispatches by opcode or copies whole records is fixed before it integrates.
+- A port that misses a speed budget gets a profile-guided fix round before it
+  is deferred. Attribute the cost per function (callgrind instruction counts
+  work on this host, where hardware counters do not) and fix the attributed
+  overhead. Deferral needs a profile showing the remaining cost is inherent.
 - Evidence for game-logic ports is the semantic simulation harness (`python3
   tools/migration.py simulate`, #72) plus the existing tests; a new game-logic
   port integrates only after the harness exists and its scenarios exercise the
@@ -100,6 +105,10 @@ checks that run; do not restate them in paragraphs.
   not cite `.local/` receipts, which nobody else can check.
 - Harness tooling for a port goes in that component's scenario module. Tooling
   is code to maintain; keep it proportionate to the C++ the port retires.
+- Infrastructure work (CI, caches, evidence plumbing) states a tooling budget in
+  its issue and prefers platform defaults and settings (LRU cache eviction,
+  concurrency groups) over custom controllers. A draft that outgrows its budget
+  returns to root for re-selection, not another review round.
 - Review report: reviewed commit, findings with their fixing commits (or why one
   went to root), plus one line naming the functions or files compared against
   the original body and one line naming any new callback that duplicates a
@@ -165,9 +174,9 @@ For substantive changes:
    the affected checks, and lists each finding with its fixing commit. Root
    verifies the reviewer's fix commits before integration. Findings that need a
    scope or policy decision go to root unfixed. Updating a reviewed PR from its
-   base needs no new review when the update has no conflicts in `src/` or `rust/`
-   and CI passes; otherwise a fresh reviewer checks and fixes only the conflict
-   resolution.
+   base needs no new review when the update has no conflicts in `src/`,
+   `rust/`, `tools/` or `.github/` and CI passes; otherwise a fresh reviewer
+   checks and fixes only the conflict resolution.
 4. Root integrates after review and required checks, records completion, and
    removes the merged worktree. A red check on `rust-migration` itself is fixed
    before more integrations.
@@ -240,8 +249,8 @@ still fixed before more integrations.
 
 Before pushing, run `python3 tools/preflight.py --base origin/rust-migration` for
 the inherited commit checker. Check receipts with `tools/evidence.py` rather than
-a hand-written script. Until #173 baselines preflight's warning scan, compare
-its warnings against the reference build log instead of cleaning them up.
+a hand-written script. Compare preflight's warnings against the reference build
+log instead of cleaning them up.
 
 A worktree exists only while its branch is unmerged. Once the PR merges, remove
 it with `git worktree remove PATH` and `git branch -d BRANCH`, both of which

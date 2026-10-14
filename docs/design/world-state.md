@@ -1,6 +1,6 @@
 # Incremental world-state ownership
 
-Design: [#90](https://github.com/dylanfetch/openttd-rust/issues/90). Implementation
+Design: [#90](https://github.com/fetch-laboratories/openttd-rust/issues/90). Implementation
 tasks require [roadmap](../roadmap.md) selection; this note moves no code.
 
 ## Constraints in the current game
@@ -84,11 +84,12 @@ Keep canonical map arrays in C++ and use direct `noexcept` operations for the
 next selected tile-heavy owners. Prefer existing semantic operations and copied
 records over one callback per bitfield; trees already copy ten words per read,
 and water-region traversal calls track/follower services rather than individual
-map fields. The measurements in [PR #116](https://github.com/dylanfetch/openttd-rust/pull/116)
-and [PR #114](https://github.com/dylanfetch/openttd-rust/pull/114) establish crossing density,
+map fields. The measurements in [PR #116](https://github.com/fetch-laboratories/openttd-rust/pull/116)
+and [PR #114](https://github.com/fetch-laboratories/openttd-rust/pull/114) establish crossing density,
 not a map-access bottleneck. C++ storage ownership remains selected. #212's
-entry-resolved raw tile-type experiment also failed its budget and is deferred
-with that owner. New owners use integrated typed services; no transfer is selected.
+raw tile-type read did not cause its budget miss. The eleventh steering review
+traced that miss to an uninlined dispatch closure and to lambda trampolines.
+New owners use integrated typed services; no transfer is selected.
 
 For the 256x512 tree soak, generation uses 191,315 (temperate) / 321,489 (tropic)
 map-service calls. Tree updates average 204--245 map calls per 512-tile batch

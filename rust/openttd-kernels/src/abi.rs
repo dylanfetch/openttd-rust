@@ -58,6 +58,15 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         877 => {
             layout!(crate::engine::Services, item; shared, rng, next, resolve, sync_variant, display_variant, preview_variant, extra_flags, engine_id, reliability, startup, seed_config, base_intro, aging_year, calendar_year, never_expire, start_settings, train_limit, road_limit, ship_limit, aircraft_limit, ai_train_disabled, ai_road_disabled, ai_ship_disabled, ai_aircraft_disabled, date_to_ymd, ymd_to_date, enabled, climate, rail_kind, clear_variant, refresh_type, refresh_lists, company_next, company_preview, vehicle_next, vehicle_cargo, can_carry, refit_mask, update_railtypes, update_roadtypes, date_company_types, company_valid, compatible_railtypes, powered_roadtypes, company_railtypes, company_roadtypes, company_engine_count, block_preview, introduces_railtypes, introduces_roadtypes, set_railtypes, set_roadtypes, current_company, local_company, toolbar_enable, toolbar_release, close_preview, invalidate_preview, offer_preview, available_event, available_news, no_engines, screen_dirty, utf8_length)
         }
+        445 => layout!(crate::town::YearlyServices, item; completed, age, set_age),
+        444 => layout!(crate::town::SuppliedEntry, item; entry, created),
+        443 => {
+            layout!(crate::town::AuthorityServices, item; council_tolerance, bulldozer, authority_distance, town_index, refusal)
+        }
+        621 => layout!(crate::services::CommandServices, item; landscape_clear),
+        620 => {
+            layout!(crate::services::CommandCostServices, item; zero, error, expense_money, error_param, add, move_cost, amount, success, error_message, money)
+        }
         210..=214 | 400..=417 => crate::company::abi_layout(type_id, item),
         320 => layout!(crate::ship_control::Position, item; x, y, old_tile, new_tile),
         321 => {
@@ -145,8 +154,9 @@ pub fn layout(type_id: u16, item: u8) -> usize {
             layout!(crate::effect::Leaves, item; observe, write, viewport, sound, animated)
         }
         42 => {
-            layout!(crate::services::Services, item; context, random, industry, tile_type, bridge_above, tropic_zone, tile_z, tile_slope, mark_dirty, set_tropic_zone, tile_owner, station_index, depot_index, is_level_crossing, tunnel_bridge_direction, bridge_speed, is_water_tile, map_log_x, map_max_x, map_max_y, plane_speed, no_jetcrash, plane_crashes, service_at_helipad, disaster_sound, economy_date, calendar_date, slope, tile_height)
-        } // ABI reservations: train 380-385; tree additions 386-389; fleet 390-399; company 400-429; town 430-459; shared vehicle/road 460-499; station 500-559; industry 560-619; shared CommandCost 620-629 (town-owned). Trees retain existing low IDs.
+            layout!(crate::services::Services, item; context, random, industry, tile_type, bridge_above, tropic_zone, tile_z, tile_slope, mark_dirty, set_tropic_zone, tile_owner, station_index, depot_index, is_level_crossing, tunnel_bridge_direction, bridge_speed, is_water_tile, company_valid, next_company, current_company, closest_town, town_owner, tile_valid, distance_from_edge, tile_max_z, tile_height, bridge_axis, has_water_ground, is_sea, is_plain_rail, is_bridge, tunnel_transport, other_tunnel_end, is_road_depot, road_depot_direction, is_normal_road, disallowed_road_directions, is_bay_stop, bay_stop_direction, is_drive_through_stop, drive_through_axis, is_any_road_stop, road_type, has_road_type, road_owner, town_index, road_bits, snow_line, calendar_year, map_log_x, map_max_x, map_max_y, plane_speed, no_jetcrash, plane_crashes, service_at_helipad, disaster_sound, economy_date, calendar_date, slope)
+        }
+        // ABI reservations: train 380-385; tree additions 386-389; fleet 390-399; company 400-429; town 430-459; shared vehicle/road 460-499; station 500-559; industry 560-619; shared CommandCost 620-629 (town-owned). Trees retain existing low IDs.
         461 => layout!(crate::vehicle::NewPosition, item; x, y, tile),
         462 => layout!(crate::vehicle::Breakdown, item; broken, status),
         460 => {
@@ -229,8 +239,25 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         54 => layout!(crate::ship_yapf::Follow, item; tile, skipped, dirs, followed),
         55 => layout!(crate::ship_yapf::Tile, item; ships, docking, sea, lock_middle, destination),
         56 => layout!(crate::ship_yapf::Result, item; direction, found, origin, stats),
-        60 => layout!(crate::town::Action, item; kind, town, tile, a, b, c, d, cost),
-        61 => layout!(crate::town::Leaves, item; observe, leaf, state, stations),
+        432 => {
+            layout!(crate::town::SimulationFields, item; valid_history, xy, num_houses, population, radius, goal, ratings, received, noise_reached, time_until_rebuild, statues, have_ratings, unwanted, exclusivity, exclusive_counter, larger_town, layout, townnamegrfid, townnametype, townnameparts)
+        }
+        433 => layout!(crate::town::Received, item; old_max, new_max, old_act, new_act),
+        434 => layout!(crate::town::SuppliedHistory, item; production, transported),
+        435 => layout!(crate::town::Supplied, item; cargo, history),
+        439 => layout!(crate::town::RoadChoice, item; introduction_date, max_speed, town_build),
+        440 => {
+            layout!(crate::town::HouseAvailability, item; zones, override_id, class_id, probability, enabled)
+        }
+        441 => layout!(crate::town::HousePlacement, item; min_year, max_year, flags, extra_flags),
+        442 => layout!(crate::town::HouseConstruction, item; extra_flags, population),
+        438 => layout!(crate::town::StationActivity, item; time_since_load, time_since_unload),
+        437 => layout!(crate::town::GrowthFields, item; counter, rate, funding, road, flags),
+        436 => layout!(crate::town::Slots, item; data, size),
+        430 => layout!(crate::town::CommandResult, item; cost, success),
+        431 => {
+            layout!(crate::town::Leaves, item; map_log_x, map_size_y, build_on_slopes, growth_rate, snow_line, editor, generating_world, allow_crossings, climate, highest_snow_line, calendar_year, allow_roads, calendar_date, road_flags, house_availability, house_placement, house_construction, house_flags, house_extra_flags, house_allows_callback, road_info, state, stations, station_activity, station_owner, dirty_authority, dirty_town, foundation_slope, terraform_price, clean_road_bits, set_road_town, exchange_company, house_class, make_house, add_animation, population_changed, nearby_stations, house_count, update_max_pass, next_town, road_mask, build_road, clear_land, terraform_land, build_bridge, build_tunnel, clear_house_land, allow_construction, construction_animation)
+        }
         90 => {
             layout!(crate::rail_yapf::Settings, item; max_nodes, firstred, firstred_exit, lastred, lastred_exit, station, slope, curve45, curve90, depot_reverse, crossing, lookahead, p0, p1, p2, pbs_cross, pbs_station, pbs_back, doubleslip, longer, longer_tile, shorter, shorter_tile, firstred_eol)
         }

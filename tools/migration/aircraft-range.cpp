@@ -58,7 +58,7 @@ static OpenTTDSharedServices shared;
 static OpenTTDAircraftLeaves RangeLeaves()
 {
 	auto leaves = AircraftTestLeaves(vehicle, shared);
-	shared.map_log_x = []() noexcept { return uint8_t{6}; };
+	shared.map_log_x = []() noexcept { return uint32_t{6}; };
 	leaves.station = [](uint16_t id) noexcept -> const OpenTTDStation * { return reinterpret_cast<const OpenTTDStation *>(Station::GetIfValid(id)); };
 	leaves.airport_tile = [](const OpenTTDStation *s) noexcept { return reinterpret_cast<const Station *>(s)->airport.tile; };
 	vehicle.status = [](OpenTTDVehicle *) noexcept { return static_cast<uint8_t>(fixture->aircraft.vehstatus.value); };
@@ -97,7 +97,7 @@ static OpenTTDAircraftLeaves RangeLeaves()
 	vehicle.vehicle_type = [](OpenTTDVehicle *) noexcept { return uint8_t{3}; };
 	vehicle.altitude_inputs = [](OpenTTDVehicle *) noexcept { return OpenTTDVehicleAltitudeInputs{100, 0}; };
 	shared.slope = [](int32_t, int32_t) noexcept { return int32_t{0}; };
-	shared.tile_height = [](uint32_t) noexcept { return int32_t{0}; };
+	shared.tile_height = [](uint32_t) noexcept { return uint32_t{0}; };
 	leaves.airport_entry = [](const void *, uint8_t) noexcept { return uint8_t{0}; };
 	vehicle.write_x = vehicle.write_y = vehicle.write_z = [](OpenTTDVehicle *, int32_t) noexcept {};
 	leaves.update_position = leaves.position_viewport = [](OpenTTDAircraftVehicle) noexcept {};

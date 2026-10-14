@@ -41,6 +41,12 @@
 #include "subsidy_func.h"
 #include "core/pool_func.hpp"
 #include "town.h"
+#ifdef WITH_RUST
+#include "rust/command_services.h"
+#include "rust/company_services.h"
+#include "rust/environment_services.h"
+#include "rust/station_services.h"
+#endif
 #include "town_kdtree.h"
 #include "townname_func.h"
 #include "core/random_func.hpp"
@@ -85,7 +91,11 @@ void RebuildTownKdtree()
 }
 
 /** Set if a town is being generated. */
+#ifndef WITH_RUST
 static bool _generating_town = false;
+#else
+static const OpenTTDTownLeaves &GetRustTownServices() noexcept;
+#endif
 
 /**
  * Check if a town 'owns' a bridge.
@@ -441,6 +451,9 @@ void ClearAllTownCachedNames()
  * @param t The town which has changed.
  * @param mod The population change (can be positive or negative).
  */
+#ifdef WITH_RUST
+static void ChangePopulation(Town *t, int mod) { openttd_rust_town_change_population(&GetRustTownServices(), t->growth_owner.get(), t->index.base(), mod); }
+#else
 static void ChangePopulation(Town *t, int mod)
 {
 	t->cache.population += mod;
@@ -451,17 +464,22 @@ static void ChangePopulation(Town *t, int mod)
 
 	InvalidateWindowData(WC_TOWN_DIRECTORY, 0, TDIWD_POPULATION_CHANGE);
 }
+#endif
 
 /**
  * Get the total population, the sum of all towns in the world.
  * @return The calculated population of the world
  */
+#ifdef WITH_RUST
+uint32_t GetWorldPopulation() { return openttd_rust_town_world_population(&GetRustTownServices()); }
+#else
 uint32_t GetWorldPopulation()
 {
 	uint32_t pop = 0;
 	for (const Town *t : Town::Iterate()) pop += t->cache.population;
 	return pop;
 }
+#endif
 
 /**
  * Remove stations from nearby station list if a town is no longer in the catchment area of each.
@@ -915,182 +933,223 @@ static void ChangeTileOwner_Town(TileIndex, Owner, Owner)
 }
 
 #ifdef WITH_RUST
-static uint32_t RustTownRun(uint32_t operation, Town *town = nullptr, TileIndex tile = INVALID_TILE, uint32_t a = 0, uint32_t b = 0, uint32_t c = 0, uint32_t d = 0);
-
-static void RustTownObserve(uint32_t kind, uint32_t id, uint32_t *v) noexcept
+/* Constants consumed by the Rust policy retain their original values. */
+static_assert(Ticks::TOWN_GROWTH_TICKS == 70 && MAX_BRIDGES == 13);
+static_assert(OWNER_TOWN.base() == 15 && OWNER_NONE.base() == 16);
+static_assert(CalendarTime::MAX_DATE.base() == 1826212865);
+static uint32_t RustTown_map_size_y() noexcept { return Map::SizeY(); }
+static bool RustTown_build_on_slopes() noexcept { return _settings_game.construction.build_on_slopes; }
+static uint8_t RustTown_growth_rate() noexcept { return _settings_game.economy.town_growth_rate; }
+static bool RustTown_allow_crossings() noexcept { return _settings_game.economy.allow_town_level_crossings; }
+static uint8_t RustTown_highest_snow_line() noexcept { return HighestSnowLine(); }
+static bool RustTown_allow_roads() noexcept { return _settings_game.economy.allow_town_roads; }
+static int32_t RustTown_calendar_date() noexcept { return TimerGameCalendar::date.base(); }
+static uint8_t RustTownRoadFlags(uint8_t id) noexcept { return GetRoadTypeInfo(static_cast<RoadType>(id))->flags.base(); }
+static OpenTTDTownHouseAvailability RustTownHouseAvailability(uint16_t id) noexcept
 {
-	std::fill_n(v, 32, 0);
-	switch (kind) {
-		case 0:
-			v[0] = Map::SizeX(); v[1] = Map::SizeY();
-			v[2] = _settings_game.construction.build_on_slopes;
-			v[3] = _settings_game.economy.town_growth_rate;
-			v[4] = Ticks::TOWN_GROWTH_TICKS; v[5] = GetSnowLine();
-			v[6] = _game_mode == GM_EDITOR; v[7] = _generating_world;
-			v[8] = _settings_game.economy.allow_town_level_crossings;
-			v[9] = MAX_BRIDGES; v[10] = to_underlying(_settings_game.game_creation.landscape);
-			v[11] = OWNER_TOWN.base(); v[12] = OWNER_NONE.base();
-			v[13] = HighestSnowLine(); v[14] = TimerGameCalendar::year.base();
-			v[15] = _settings_game.economy.allow_town_roads;
-			v[16] = TimerGameCalendar::date.base(); v[17] = CalendarTime::MAX_DATE.base();
-			break;
-		case 1: {
-			const Town *t = Town::Get(TownID(id));
-			v[0] = t->xy.base(); v[1] = t->index.base(); v[2] = t->cache.num_houses; v[3] = t->cache.population;
-			v[4] = t->layout; v[5] = t->larger_town;
-			std::ranges::copy(t->cache.squared_town_zone_radius, v + 6);
-			std::ranges::copy(t->goal, v + 11);
-			for (uint i = 0; i < NUM_TAE; i++) v[17 + i] = t->received[i].old_act;
-			break;
-		}
-		case 2: {
-			TileIndex tile{id};
-			v[6] = UINT32_MAX; v[8] = INVALID_ROADTYPE; v[12] = UINT32_MAX;
-			v[0] = MP_VOID; v[4] = IsValidTile(tile);
-			if (!v[4]) break;
-			v[0] = GetTileType(tile); v[1] = GetTileSlope(tile); v[2] = GetTileMaxZ(tile); v[3] = GetTileZ(tile);
-			v[5] = DistanceFromEdge(tile);
-			if (IsBridgeAbove(tile)) v[6] = GetBridgeAxis(tile);
-			v[7] = (IsRoadDepotTile(tile) || IsBayRoadStopTile(tile)) ? ROAD_NONE : GetAnyRoadBits(tile, RTT_ROAD, true);
-			if (IsTileType(tile, MP_ROAD) || IsAnyRoadStopTile(tile)) {
-				RoadType rt = GetRoadTypeRoad(tile); v[8] = rt;
-				if (rt != INVALID_ROADTYPE) {
-					const auto *rti = GetRoadTypeInfo(rt);
-					v[9] = (rti->flags.Test(RoadTypeFlag::NoHouses) ? 1 : 0) | (rti->flags.Test(RoadTypeFlag::TownBuild) ? 2 : 0);
-				}
-			}
-			if (IsTileType(tile, MP_ROAD)) {
-				if (HasTileRoadType(tile, RTT_ROAD)) v[10] = GetRoadOwner(tile, RTT_ROAD).base();
-				if (IsRoadDepot(tile)) v[12] = GetRoadDepotDirection(tile);
-				else v[11] = GetTownIndex(tile).base();
-			}
-			if (IsDriveThroughStopTile(tile)) { v[13] = 1; v[14] = GetDriveThroughStopAxis(tile); }
-			if (IsBayRoadStopTile(tile)) { v[13] = 2; v[14] = GetBayRoadStopDir(tile); }
-			if (IsTileType(tile, MP_TUNNELBRIDGE)) {
-				v[15] = GetTunnelBridgeTransportType(tile); v[16] = GetTunnelBridgeDirection(tile);
-				v[17] = GetOtherTunnelBridgeEnd(tile).base();
-			}
-			v[18] = HasTileWaterGround(tile); v[19] = IsWaterTile(tile) && IsSea(tile);
-			v[20] = IsPlainRailTile(tile); v[21] = IsNormalRoadTile(tile);
-			if (v[21]) v[22] = GetDisallowedRoadDirections(tile);
-			v[23] = TileHeight(tile); v[24] = IsWaterTile(tile); v[25] = IsBridgeTile(tile);
-			break;
-		}
-		case 4: {
-			const auto *rti = GetRoadTypeInfo(static_cast<RoadType>(id));
-			v[0] = rti->flags.Test(RoadTypeFlag::TownBuild);
-			v[1] = rti->introduction_date.base(); v[2] = rti->max_speed;
-			break;
-		}
-		case 3: {
-			const auto *hs = HouseSpec::Get(id);
-			v[0] = hs->building_availability.base(); v[1] = hs->enabled;
-			v[2] = hs->building_flags.base(); v[3] = hs->extra_flags.base();
-			v[4] = hs->grf_prop.override_id; v[5] = hs->probability;
-			v[6] = hs->min_year.base(); v[7] = hs->max_year.base();
-			v[8] = hs->class_id; v[9] = hs->population;
-			v[10] = hs->callback_mask.Test(HouseCallbackMask::AllowConstruction);
-			break;
-		}
-	}
+	const auto *hs = HouseSpec::Get(id);
+	return {.zones = hs->building_availability.base(), .override_id = hs->grf_prop.override_id, .class_id = hs->class_id, .probability = hs->probability, .enabled = hs->enabled};
 }
-
-static uint64_t RustTownLeaf(uint32_t op, uint32_t id, uint32_t a, uint32_t b, uint32_t c) noexcept
+static OpenTTDTownHousePlacement RustTownHousePlacement(uint16_t id) noexcept
 {
-	switch (op) {
-		case 21: return GetMaskForRoadTramType(RTT_ROAD).base();
-		case 1: SetWindowDirty(WC_TOWN_VIEW, TownID(id)); break;
-		case 2: return GetTropicZone(TileIndex{id});
-		case 3: return TileHeight(TileIndex{id});
-		case 4: return std::get<0>(GetFoundationSlope(TileIndex{id}));
-		case 5: return _price[PR_TERRAFORM];
-		case 6: return CleanUpRoadBits(TileIndex{id}, static_cast<RoadBits>(a));
-		case 7: SetRoadOwner(TileIndex{id}, RTT_ROAD, OWNER_TOWN); SetTownIndex(TileIndex{id}, TownID(a)); break;
-		case 8: { auto old = _current_company; _current_company = CompanyID(a); return old.base(); }
-		case 9: IncreaseBuildingCount(Town::Get(TownID(id)), a); break;
-		case 10: MakeHouseTile(TileIndex{id}, TownID(a), c & 0xFF, (c >> 8) & 0xFF, b, (c >> 16) & 0xFF, c >> 24); break;
-		case 11: AddAnimatedTile(TileIndex{id}, false); break;
-		case 12: MarkTileDirtyByTile(TileIndex{id}); break;
-		case 13: Town::Get(TownID(id))->cache.num_houses += a; break;
-		case 14: ChangePopulation(Town::Get(TownID(id)), a); break;
-		case 15: {
-			Town *t = Town::Get(TownID(id));
-			BuildingFlags size(static_cast<uint8_t>(b));
-			ForAllStationsAroundTiles(TileArea(TileIndex{a}, size.Any(BUILDING_2_TILES_X) ? 2 : 1, size.Any(BUILDING_2_TILES_Y) ? 2 : 1), [t](Station *st, TileIndex) { t->stations_near.insert(st); return true; });
-			break;
-		}
-		case 16: UpdateTownRadius(Town::Get(TownID(id))); break;
-		case 17: return HouseSpec::Specs().size();
-		case 18: {
-			const auto &counts = Town::Get(TownID(id))->cache.building_counts;
-			return b != HOUSE_NO_CLASS ? counts.class_count[b] : counts.id_count[a];
-		}
-		case 19: UpdateTownMaxPass(Town::Get(TownID(id))); break;
-		case 20: { auto range = Town::Iterate(a); auto it = range.begin(); return it == range.end() ? UINT32_MAX : (*it)->index.base(); }
-	}
-	return 0;
+	const auto *hs = HouseSpec::Get(id);
+	return {.min_year = hs->min_year.base(), .max_year = hs->max_year.base(), .flags = hs->building_flags.base(), .extra_flags = hs->extra_flags.base()};
 }
-
-static OpenTTDTownState *RustTownState(uint32_t id) noexcept { return Town::Get(TownID(id))->growth_owner.get(); }
-static void RustTownStations(uint32_t tile, uint32_t radius, void *context, void (*visit)(void *, uint32_t, uint32_t, uint32_t)) noexcept
+static OpenTTDTownHouseConstruction RustTownHouseConstruction(uint16_t id) noexcept
 {
-	ForAllStationsRadius(TileIndex{tile}, radius, [context, visit](const Station *st) { visit(context, st->xy.base(), st->time_since_load, st->time_since_unload); });
+	const auto *hs = HouseSpec::Get(id);
+	return {.extra_flags = hs->extra_flags.base(), .population = hs->population};
 }
-
-static uint32_t RustTownRun(uint32_t operation, Town *town, TileIndex tile, uint32_t a, uint32_t b, uint32_t c, uint32_t d)
+static uint8_t RustTownHouseFlags(uint16_t id) noexcept { return HouseSpec::Get(id)->building_flags.base(); }
+static uint8_t RustTownHouseExtraFlags(uint16_t id) noexcept { return HouseSpec::Get(id)->extra_flags.base(); }
+static bool RustTownHouseAllowsCallback(uint16_t id) noexcept { return HouseSpec::Get(id)->callback_mask.Test(HouseCallbackMask::AllowConstruction); }
+static OpenTTDTownRoadChoice RustTownRoadInfo(uint8_t id) noexcept
 {
-	static const OpenTTDTownLeaves leaves{RustTownObserve, RustTownLeaf, RustTownState, RustTownStations};
-	std::unique_ptr<OpenTTDTownTask, decltype(&openttd_rust_town_task_destroy)> task(openttd_rust_town_begin(&leaves, &GetRustSharedServices(), operation, town == nullptr ? 0 : town->index.base(), tile.base(), a, b, c, d), openttd_rust_town_task_destroy);
-	AutoRestoreBackup<CompanyID> company(_current_company, _current_company);
-	uint64_t result = 0; int64_t cost = 0;
-	OpenTTDTownAction action{};
-	while (!openttd_rust_town_step(task.get(), result, cost, &action)) {
-		TileIndex at{action.tile};
-		CommandCost command;
-		switch (action.kind) {
-			case 1: {
-				DoCommandFlags flags{DoCommandFlag::Auto};
-				if (action.c != 2) flags.Set(DoCommandFlag::NoWater);
-				if (action.c != 0) flags.Set(DoCommandFlag::Execute);
-				command = Command<CMD_BUILD_ROAD>::Do(flags, at, static_cast<RoadBits>(action.a), static_cast<RoadType>(action.b), DRD_NONE, TownID(action.town));
-				break;
-			}
-			case 2: case 6: {
-				DoCommandFlags flags{DoCommandFlag::Auto, DoCommandFlag::NoWater};
-				if (action.a != 0 || action.kind == 6) flags.Set(DoCommandFlag::Execute);
-				command = Command<CMD_LANDSCAPE_CLEAR>::Do(flags, at);
-				if (action.kind == 6) assert(command.Succeeded());
-				break;
-			}
-			case 3: {
-				DoCommandFlags flags{DoCommandFlag::Auto, DoCommandFlag::NoWater};
-				if (action.c != 0) flags.Set(DoCommandFlag::Execute);
-				command = std::get<0>(Command<CMD_TERRAFORM_LAND>::Do(flags, at, static_cast<Slope>(action.a), action.b != 0));
-				break;
-			}
-			case 4: {
-				auto flags = CommandFlagsToDCFlags(GetCommandFlags<CMD_BUILD_BRIDGE>());
-				if (action.d != 0) flags.Set(DoCommandFlag::Execute);
-				command = Command<CMD_BUILD_BRIDGE>::Do(flags, at, TileIndex{action.a}, TRANSPORT_ROAD, action.b, static_cast<RoadType>(action.c));
-				break;
-			}
-			case 5: {
-				auto flags = CommandFlagsToDCFlags(GetCommandFlags<CMD_BUILD_TUNNEL>());
-				if (action.b != 0) flags.Set(DoCommandFlag::Execute);
-				command = Command<CMD_BUILD_TUNNEL>::Do(flags, at, TRANSPORT_ROAD, static_cast<RoadType>(action.a));
-				break;
-			}
-			case 7: {
-				const HouseSpec *hs = HouseSpec::Get(action.a);
-				uint16_t cb = GetHouseCallback(CBID_HOUSE_ALLOW_CONSTRUCTION, 0, 0, action.a, Town::Get(TownID(action.town)), at, {}, true, action.b);
-				result = cb == CALLBACK_FAILED || Convert8bitBooleanCallback(hs->grf_prop.grffile, CBID_HOUSE_ALLOW_CONSTRUCTION, cb);
-				continue;
-			}
-			case 8: TriggerHouseAnimation_ConstructionStageChanged(at, true); result = 0; continue;
+	const auto *rti = GetRoadTypeInfo(static_cast<RoadType>(id));
+	return {.introduction_date = rti->introduction_date.base(), .max_speed = rti->max_speed, .town_build = rti->flags.Test(RoadTypeFlag::TownBuild)};
+}
+static void RustTown_dirty_town(uint32_t town) noexcept
+{
+	SetWindowDirty(WC_TOWN_VIEW, TownID(town));
+}
+static uint32_t RustTown_foundation_slope(uint32_t tile) noexcept
+{
+	return std::get<0>(GetFoundationSlope(TileIndex{tile}));
+}
+static int64_t RustTown_terraform_price() noexcept
+{
+	return _price[PR_TERRAFORM];
+}
+static uint32_t RustTown_clean_road_bits(uint32_t tile, uint32_t bits) noexcept
+{
+	return CleanUpRoadBits(TileIndex{tile}, static_cast<RoadBits>(bits));
+}
+static void RustTown_set_road_town(uint32_t tile, uint32_t town) noexcept
+{
+	SetRoadOwner(TileIndex{tile}, RTT_ROAD, OWNER_TOWN); SetTownIndex(TileIndex{tile}, TownID(town));
+}
+static uint32_t RustTown_exchange_company(uint32_t company) noexcept
+{
+	auto old = OpenTTDCurrentCompany();
+	OpenTTDSetCurrentCompany(CompanyID(company));
+	return old.base();
+}
+static uint16_t RustTownHouseClass(uint16_t house) noexcept { return HouseSpec::Get(house)->class_id; }
+static void RustTown_make_house(uint32_t tile, uint32_t town, uint32_t house, uint32_t construction) noexcept
+{
+	MakeHouseTile(TileIndex{tile}, TownID(town), construction & 0xFF, (construction >> 8) & 0xFF, house, (construction >> 16) & 0xFF, construction >> 24);
+}
+static void RustTown_add_animation(uint32_t tile) noexcept
+{
+	AddAnimatedTile(TileIndex{tile}, false);
+}
+static void RustTown_population_changed(uint32_t town) noexcept
+{
+	Town *t = Town::Get(TownID(town));
+	InvalidateWindowData(WC_TOWN_VIEW, t->index);
+	if (_settings_client.gui.population_in_label) t->UpdateVirtCoord();
+	InvalidateWindowData(WC_TOWN_DIRECTORY, 0, TDIWD_POPULATION_CHANGE);
+}
+static void RustTown_nearby_stations(uint32_t town, uint32_t tile, uint32_t size) noexcept
+{
+	{
+			Town *t = Town::Get(TownID(town));
+			BuildingFlags flags(static_cast<uint8_t>(size));
+			ForAllStationsAroundTiles(TileArea(TileIndex{tile}, flags.Any(BUILDING_2_TILES_X) ? 2 : 1, flags.Any(BUILDING_2_TILES_Y) ? 2 : 1), [t](Station *st, TileIndex) { t->stations_near.insert(st); return true; });
+
 		}
-		result = command.Succeeded(); cost = command.GetCost();
-	}
-	return action.a;
+}
+static uint32_t RustTown_house_count() noexcept
+{
+	return static_cast<uint32_t>(HouseSpec::Specs().size());
+}
+static void RustTown_update_max_pass(uint32_t town) noexcept
+{
+	UpdateTownMaxPass(Town::Get(TownID(town)));
+}
+static uint32_t RustTown_next_town(uint32_t from) noexcept
+{
+	{ auto range = Town::Iterate(from); auto it = range.begin(); return it == range.end() ? UINT32_MAX : (*it)->index.base(); }
+}
+static uint64_t RustTown_road_mask() noexcept
+{
+	return GetMaskForRoadTramType(RTT_ROAD).base();
+}
+static bool RustTown_build_road(uint32_t town, uint32_t tile, uint32_t bits, uint32_t road_type, uint32_t mode) noexcept
+{
+	DoCommandFlags flags{DoCommandFlag::Auto};
+	if (mode != 2) flags.Set(DoCommandFlag::NoWater);
+	if (mode != 0) flags.Set(DoCommandFlag::Execute);
+	return Command<CMD_BUILD_ROAD>::Do(flags, TileIndex{tile}, static_cast<RoadBits>(bits), static_cast<RoadType>(road_type), DRD_NONE, TownID(town)).Succeeded();
+}
+static bool RustTown_clear_land(uint32_t tile, uint32_t execute) noexcept
+{
+	DoCommandFlags flags{DoCommandFlag::Auto, DoCommandFlag::NoWater};
+	if (execute != 0) flags.Set(DoCommandFlag::Execute);
+	CommandCost result;
+	GetRustCommandServices().landscape_clear(RustCommandCost(&result), tile, flags.base());
+	return result.Succeeded();
+}
+static OpenTTDTownCommandResult RustTown_terraform_land(uint32_t tile, uint32_t slope, uint32_t up, uint32_t execute) noexcept
+{
+	DoCommandFlags flags{DoCommandFlag::Auto, DoCommandFlag::NoWater};
+	if (execute != 0) flags.Set(DoCommandFlag::Execute);
+	const auto result = std::get<0>(Command<CMD_TERRAFORM_LAND>::Do(flags, TileIndex{tile}, static_cast<Slope>(slope), up != 0));
+	return {.cost = result.GetCost(), .success = result.Succeeded()};
+}
+static bool RustTown_build_bridge(uint32_t tile, uint32_t end, uint32_t bridge, uint32_t road_type, uint32_t execute) noexcept
+{
+	auto flags = CommandFlagsToDCFlags(GetCommandFlags<CMD_BUILD_BRIDGE>());
+	if (execute != 0) flags.Set(DoCommandFlag::Execute);
+	return Command<CMD_BUILD_BRIDGE>::Do(flags, TileIndex{tile}, TileIndex{end}, TRANSPORT_ROAD, bridge, static_cast<RoadType>(road_type)).Succeeded();
+}
+static bool RustTown_build_tunnel(uint32_t tile, uint32_t road_type, uint32_t execute) noexcept
+{
+	auto flags = CommandFlagsToDCFlags(GetCommandFlags<CMD_BUILD_TUNNEL>());
+	if (execute != 0) flags.Set(DoCommandFlag::Execute);
+	return Command<CMD_BUILD_TUNNEL>::Do(flags, TileIndex{tile}, TRANSPORT_ROAD, static_cast<RoadType>(road_type)).Succeeded();
+}
+static void RustTown_clear_house_land(uint32_t tile) noexcept
+{
+	CommandCost result;
+	GetRustCommandServices().landscape_clear(RustCommandCost(&result), tile, DoCommandFlags{DoCommandFlag::Auto, DoCommandFlag::NoWater, DoCommandFlag::Execute}.base());
+	assert(result.Succeeded());
+}
+static bool RustTown_allow_construction(uint32_t town, uint32_t tile, uint32_t house, uint32_t random) noexcept
+{
+	const auto *hs = HouseSpec::Get(house);
+	uint16_t cb = GetHouseCallback(CBID_HOUSE_ALLOW_CONSTRUCTION, 0, 0, house, Town::Get(TownID(town)), TileIndex{tile}, {}, true, random);
+	return cb == CALLBACK_FAILED || Convert8bitBooleanCallback(hs->grf_prop.grffile, CBID_HOUSE_ALLOW_CONSTRUCTION, cb);
+}
+static void RustTown_construction_animation(uint32_t tile) noexcept { TriggerHouseAnimation_ConstructionStageChanged(TileIndex{tile}, true); }
+static OpenTTDTownState *RustTownState(uint32_t id) noexcept { return GetRustSharedServices().town_owner(reinterpret_cast<const OpenTTDTownHandle *>(Town::Get(TownID(id)))); }
+static void RustTownStations(uint32_t tile, uint32_t radius, void *context, void (*visit)(void *, const void *, uint32_t)) noexcept
+{
+	ForAllStationsRadius(TileIndex{tile}, radius, [context, visit](const Station *st) { visit(context, st, st->xy.base()); });
+}
+/* Thin FFI conversion facades over the shared station observations. */
+static OpenTTDTownStationActivity RustTownStationActivity(const void *station) noexcept
+{
+	const auto *st = static_cast<const Station *>(station);
+	return OpenTTDStationActivityOf(st);
+}
+static uint8_t RustTownStationOwner(const void *station) noexcept { return OpenTTDStationOwner(static_cast<const Station *>(station)).base(); }
+static void RustTownDirtyAuthority(uint32_t town) noexcept { SetWindowDirty(WC_TOWN_AUTHORITY, TownID(town)); }
+
+static const OpenTTDTownLeaves &GetRustTownServices() noexcept
+{
+	static const OpenTTDTownLeaves services{
+		.map_log_x = OpenTTDMapLogX,
+		.map_size_y = RustTown_map_size_y,
+		.build_on_slopes = RustTown_build_on_slopes,
+		.growth_rate = RustTown_growth_rate,
+		.snow_line = GetRustSharedServices().snow_line,
+		.editor = OpenTTDEditor,
+		.generating_world = OpenTTDGeneratingWorld,
+		.allow_crossings = RustTown_allow_crossings,
+		.climate = OpenTTDLandscapeValue,
+		.highest_snow_line = RustTown_highest_snow_line,
+		.calendar_year = GetRustSharedServices().calendar_year,
+		.allow_roads = RustTown_allow_roads,
+		.calendar_date = RustTown_calendar_date,
+		.road_flags = RustTownRoadFlags,
+		.house_availability = RustTownHouseAvailability,
+		.house_placement = RustTownHousePlacement,
+		.house_construction = RustTownHouseConstruction,
+		.house_flags = RustTownHouseFlags,
+		.house_extra_flags = RustTownHouseExtraFlags,
+		.house_allows_callback = RustTownHouseAllowsCallback,
+		.road_info = RustTownRoadInfo,
+		.state = RustTownState,
+		.stations = RustTownStations,
+		.station_activity = RustTownStationActivity,
+		.station_owner = RustTownStationOwner,
+		.dirty_authority = RustTownDirtyAuthority,
+		.dirty_town = RustTown_dirty_town,
+		.foundation_slope = RustTown_foundation_slope,
+		.terraform_price = RustTown_terraform_price,
+		.clean_road_bits = RustTown_clean_road_bits,
+		.set_road_town = RustTown_set_road_town,
+		.exchange_company = RustTown_exchange_company,
+		.house_class = RustTownHouseClass,
+		.make_house = RustTown_make_house,
+		.add_animation = RustTown_add_animation,
+		.population_changed = RustTown_population_changed,
+		.nearby_stations = RustTown_nearby_stations,
+		.house_count = RustTown_house_count,
+		.update_max_pass = RustTown_update_max_pass,
+		.next_town = RustTown_next_town,
+		.road_mask = RustTown_road_mask,
+		.build_road = RustTown_build_road,
+		.clear_land = RustTown_clear_land,
+		.terraform_land = RustTown_terraform_land,
+		.build_bridge = RustTown_build_bridge,
+		.build_tunnel = RustTown_build_tunnel,
+		.clear_house_land = RustTown_clear_house_land,
+		.allow_construction = RustTown_allow_construction,
+		.construction_animation = RustTown_construction_animation,
+	};
+	return services;
 }
 #endif /* WITH_RUST */
 
@@ -1122,7 +1181,7 @@ static void TownTickHandler(Town *t)
 
 /** Iterate through all towns and call their tick handler. */
 #ifdef WITH_RUST
-void OnTick_Town() { RustTownRun(3); }
+void OnTick_Town() { openttd_rust_town_tick_all(&GetRustTownServices(), &GetRustSharedServices()); }
 #else
 void OnTick_Town()
 {
@@ -1153,7 +1212,7 @@ static RoadBits GetTownRoadBits(TileIndex tile)
  * They may have built a different type in the past.
  */
 #ifdef WITH_RUST
-RoadType GetTownRoadType() { return static_cast<RoadType>(RustTownRun(10)); }
+RoadType GetTownRoadType() { return static_cast<RoadType>(openttd_rust_town_road_type(&GetRustTownServices(), &GetRustSharedServices())); }
 #else
 RoadType GetTownRoadType()
 {
@@ -1235,7 +1294,7 @@ bool CheckTownRoadTypes()
  * @return true if there is a parallel road.
  */
 #ifdef WITH_RUST
-static bool GrowTown(Town *t, TownExpandModes modes) { return RustTownRun(0, t, INVALID_TILE, modes.base()) != 0; }
+static bool GrowTown(Town *t, TownExpandModes modes) { return openttd_rust_town_grow(&GetRustTownServices(), &GetRustSharedServices(), t->index.base(), modes.base()); }
 #else
 static bool IsNeighbourRoadTile(TileIndex tile, const DiagDirection dir, uint dist_multi)
 {
@@ -2152,6 +2211,9 @@ static bool GrowTown(Town *t, TownExpandModes modes)
  * Update the cached town zone radii of a town, based on the number of houses.
  * @param t The town to update.
  */
+#ifdef WITH_RUST
+void UpdateTownRadius(Town *t) { openttd_rust_town_update_radius(t->growth_owner.get()); }
+#else
 void UpdateTownRadius(Town *t)
 {
 	static const std::array<std::array<uint32_t, NUM_HOUSE_ZONES>, 23> _town_squared_town_zone_radius_data = {{
@@ -2194,6 +2256,7 @@ void UpdateTownRadius(Town *t)
 		t->cache.squared_town_zone_radius[to_underlying(HouseZone::TownCentre)] = mass * 3 + 5;
 	}
 }
+#endif
 
 /**
  * Update the maximum amount of monthly passengers and mail for a town, based on its population.
@@ -2234,7 +2297,15 @@ static void UpdateTownGrowth(Town *t);
  */
 static void DoCreateTown(Town *t, TileIndex tile, uint32_t townnameparts, TownSize size, bool city, TownLayout layout, bool manual)
 {
+#ifdef WITH_RUST
+	/* Native scope cleanup survives ordinary generation unwinding; flag state is Rust-owned. */
+	struct GeneratingScope {
+		bool previous = openttd_rust_town_generating_exchange(true);
+		~GeneratingScope() { openttd_rust_town_generating_exchange(this->previous); }
+	} backup;
+#else
 	AutoRestoreBackup backup(_generating_town, true);
+#endif
 
 	t->xy = tile;
 	t->cache.num_houses = 0;
@@ -2740,9 +2811,9 @@ HouseZone GetTownRadiusGroup(const Town *t, TileIndex tile)
 #ifdef WITH_RUST
 static void BuildTownHouse(Town *t, TileIndex tile, const HouseSpec *, HouseID house, uint8_t random_bits, bool house_completed, bool is_protected)
 {
-	RustTownRun(2, t, tile, house, random_bits, house_completed, is_protected);
+	openttd_rust_town_build_house(&GetRustTownServices(), &GetRustSharedServices(), t->index.base(), tile.base(), house, random_bits, house_completed, is_protected);
 }
-static bool TryBuildTownHouse(Town *t, TileIndex tile, TownExpandModes modes) { return RustTownRun(1, t, tile, modes.base()) != 0; }
+static bool TryBuildTownHouse(Town *t, TileIndex tile, TownExpandModes modes) { return openttd_rust_town_try_house(&GetRustTownServices(), &GetRustSharedServices(), t->index.base(), tile.base(), modes.base()); }
 #else
 static inline void ClearMakeHouseTile(TileIndex tile, Town *t, uint8_t counter, uint8_t stage, HouseID type, uint8_t random_bits, bool is_protected)
 {
@@ -3408,7 +3479,7 @@ CommandCost CmdTownGrowthRate(DoCommandFlags flags, TownID town_id, uint16_t gro
 
 	if (flags.Test(DoCommandFlag::Execute)) {
 #ifdef WITH_RUST
-		RustTownRun(8, t, INVALID_TILE, growth_rate);
+		openttd_rust_town_custom_rate(&GetRustTownServices(), &GetRustSharedServices(), t->index.base(), growth_rate);
 #else
 		if (growth_rate == 0) {
 			/* Just clear the flag, UpdateTownGrowth will determine a proper growth rate */
@@ -3475,7 +3546,7 @@ CommandCost CmdExpandTown(DoCommandFlags flags, TownID town_id, uint32_t grow_am
 
 	if (flags.Test(DoCommandFlag::Execute)) {
 #ifdef WITH_RUST
-		RustTownRun(6, t, INVALID_TILE, grow_amount, modes.base());
+		openttd_rust_town_expand(&GetRustTownServices(), &GetRustSharedServices(), t->index.base(), grow_amount, modes.base());
 #else
 		/* The more houses, the faster we grow */
 		if (grow_amount == 0) {
@@ -3773,7 +3844,7 @@ static CommandCost TownActionFundBuildings(Town *t, DoCommandFlags flags)
 	if (flags.Test(DoCommandFlag::Execute)) {
 		/* And grow for 3 months */
 #ifdef WITH_RUST
-		RustTownRun(9, t);
+		openttd_rust_town_fund(&GetRustTownServices(), &GetRustSharedServices(), t->index.base());
 #else
 		t->fund_buildings_months = 3;
 
@@ -3964,6 +4035,7 @@ CommandCost CmdDoTownAction(DoCommandFlags flags, TownID town_id, TownAction act
 	return cost;
 }
 
+#ifndef WITH_RUST
 template <typename Func>
 static void ForAllStationsNearTown(Town *t, Func func)
 {
@@ -4014,6 +4086,8 @@ static void UpdateTownRating(Town *t)
 	SetWindowDirty(WC_TOWN_AUTHORITY, t->index);
 }
 
+#endif
+
 
 /**
  * Updates town grow counter after growth rate change.
@@ -4022,8 +4096,8 @@ static void UpdateTownRating(Town *t)
  * @param prev_growth_rate Town growth rate before it changed (one that was used with grow counter to be updated)
  */
 #ifdef WITH_RUST
-static void UpdateTownGrowthRate(Town *t) { RustTownRun(4, t); }
-static void UpdateTownGrowth(Town *t) { RustTownRun(5, t); }
+static void UpdateTownGrowthRate(Town *t) { openttd_rust_town_update_rate(&GetRustTownServices(), &GetRustSharedServices(), t->index.base()); }
+static void UpdateTownGrowth(Town *t) { openttd_rust_town_update_growth(&GetRustTownServices(), &GetRustSharedServices(), t->index.base()); }
 #else
 static void UpdateTownGrowCounter(Town *t, uint16_t prev_growth_rate)
 {
@@ -4143,8 +4217,30 @@ static void UpdateTownGrowth(Town *t)
  * @param flags Command flags. DoCommandFlag::NoTestTownRating is tested.
  * @return Succeeded or failed command.
  */
+#ifdef WITH_RUST
+static uint8_t RustTownCouncilTolerance() noexcept { return _settings_game.difficulty.town_council_tolerance; }
+static bool RustTownBulldozer() noexcept { return _cheats.magic_bulldozer.value; }
+static uint8_t RustTownAuthorityDistance() noexcept { return _settings_game.economy.dist_local_authority; }
+static uint16_t RustTownAuthorityIndex(const OpenTTDTownHandle *town) noexcept { return reinterpret_cast<const Town *>(town)->index.base(); }
+static const OpenTTDTownAuthorityServices &RustTownAuthorityServices() noexcept
+{
+	static const OpenTTDTownAuthorityServices services{
+		.council_tolerance = RustTownCouncilTolerance, .bulldozer = RustTownBulldozer,
+		.authority_distance = RustTownAuthorityDistance, .town_index = RustTownAuthorityIndex,
+		.refusal = STR_ERROR_LOCAL_AUTHORITY_REFUSES_TO_ALLOW_THIS,
+	};
+	return services;
+}
+#endif
+
 CommandCost CheckIfAuthorityAllowsNewStation(TileIndex tile, DoCommandFlags flags)
 {
+#ifdef WITH_RUST
+	CommandCost result;
+	openttd_rust_town_authority_station(&RustTownAuthorityServices(), &GetRustSharedServices(), &GetRustCommandCostServices(), RustCommandCost(&result), tile.base(), flags.Test(DoCommandFlag::NoTestTownRating));
+	return result;
+#else
+
 	/* The required rating is hardcoded to RATING_VERYPOOR (see below), not the authority attitude setting, so we can bail out like this. */
 	if (_settings_game.difficulty.town_council_tolerance == TOWN_COUNCIL_PERMISSIVE) return CommandCost();
 
@@ -4156,6 +4252,7 @@ CommandCost CheckIfAuthorityAllowsNewStation(TileIndex tile, DoCommandFlags flag
 	if (t->ratings[_current_company] > RATING_VERYPOOR) return CommandCost();
 
 	return CommandCostWithParam(STR_ERROR_LOCAL_AUTHORITY_REFUSES_TO_ALLOW_THIS, t->index);
+#endif
 }
 
 /**
@@ -4217,6 +4314,15 @@ Town *ClosestTownFromTile(TileIndex tile, uint threshold)
 	}
 }
 
+#ifdef WITH_RUST
+void SetTownRatingTestMode(bool mode) { openttd_rust_town_rating_test(mode); }
+void ChangeTownRating(Town *t, int add, int max, DoCommandFlags flags)
+{
+	openttd_rust_town_change_rating(&GetRustTownServices(), &GetRustSharedServices(), t == nullptr ? nullptr : t->growth_owner.get(),
+		t == nullptr ? TownID::Invalid().base() : t->index.base(), reinterpret_cast<uintptr_t>(t), _current_company.base(), add, max,
+		flags.Test(DoCommandFlag::NoModifyTownRating), _cheats.magic_bulldozer.value);
+}
+#else
 static bool _town_rating_test = false; ///< If \c true, town rating is in test-mode.
 static std::map<const Town *, int> _town_test_ratings; ///< Map of towns to modified ratings, while in town rating test-mode.
 
@@ -4293,6 +4399,8 @@ void ChangeTownRating(Town *t, int add, int max, DoCommandFlags flags)
 	}
 }
 
+#endif
+
 /**
  * Does the town authority allow the (destructive) action of the current company?
  * @param flags Checking flags of the command.
@@ -4302,6 +4410,12 @@ void ChangeTownRating(Town *t, int add, int max, DoCommandFlags flags)
  */
 CommandCost CheckforTownRating(DoCommandFlags flags, Town *t, TownRatingCheckType type)
 {
+#ifdef WITH_RUST
+	CommandCost result;
+	openttd_rust_town_authority_remove(&RustTownAuthorityServices(), &GetRustSharedServices(), &GetRustCommandCostServices(), RustCommandCost(&result), reinterpret_cast<const OpenTTDTownHandle *>(t), flags.Test(DoCommandFlag::NoTestTownRating), to_underlying(type));
+	return result;
+#else
+
 	/* if magic_bulldozer cheat is active, town doesn't restrict your destructive actions */
 	if (t == nullptr || !Company::IsValidID(_current_company) ||
 			_cheats.magic_bulldozer.value || flags.Test(DoCommandFlag::NoTestTownRating)) {
@@ -4328,27 +4442,33 @@ CommandCost CheckforTownRating(DoCommandFlags flags, Town *t, TownRatingCheckTyp
 	}
 
 	return CommandCost();
+#endif
 }
 
 template <>
 Town::SuppliedHistory SumHistory(std::span<const Town::SuppliedHistory> history)
 {
+#ifdef WITH_RUST
+	const auto sum = openttd_rust_town_sum_history(reinterpret_cast<const OpenTTDTownSuppliedHistory *>(history.data()), history.size());
+	return {.production = sum.production, .transported = sum.transported};
+#else
+
 	uint64_t production = std::accumulate(std::begin(history), std::end(history), 0, [](uint64_t r, const auto &s) { return r + s.production; });
 	uint64_t transported = std::accumulate(std::begin(history), std::end(history), 0, [](uint64_t r, const auto &s) { return r + s.transported; });
 	auto count = std::size(history);
 	return {.production = ClampTo<uint32_t>(production / count), .transported = ClampTo<uint32_t>(transported / count)};
+#endif
 }
 
 static const IntervalTimer<TimerGameEconomy> _economy_towns_monthly({TimerGameEconomy::MONTH, TimerGameEconomy::Priority::TOWN}, [](auto)
 {
+#ifdef WITH_RUST
+	openttd_rust_town_monthly_all(&GetRustTownServices(), &GetRustSharedServices(), TimerGameEconomy::month);
+#else
 	for (Town *t : Town::Iterate()) {
 		/* Check for active town actions and decrement their counters. */
-#ifdef WITH_RUST
-		RustTownRun(7, t);
-#else
 		if (t->road_build_months != 0) t->road_build_months--;
 		if (t->fund_buildings_months != 0) t->fund_buildings_months--;
-#endif
 
 		if (t->exclusive_counter != 0) {
 			if (--t->exclusive_counter == 0) t->exclusivity = CompanyID::Invalid();
@@ -4370,15 +4490,25 @@ static const IntervalTimer<TimerGameEconomy> _economy_towns_monthly({TimerGameEc
 
 		SetWindowDirty(WC_TOWN_VIEW, t->index);
 	}
+#endif
 });
 
 static const IntervalTimer<TimerGameEconomy> _economy_towns_yearly({TimerGameEconomy::YEAR, TimerGameEconomy::Priority::TOWN}, [](auto)
 {
+#ifdef WITH_RUST
+	static const OpenTTDTownYearlyServices houses{
+		.completed = [](uint32_t tile) noexcept { return IsHouseCompleted(TileIndex{tile}); },
+		.age = [](uint32_t tile) noexcept { return Tile(TileIndex{tile}).m5(); },
+		.set_age = [](uint32_t tile, uint8_t age) noexcept { Tile(TileIndex{tile}).m5() = age; },
+	};
+	openttd_rust_town_yearly(&GetRustSharedServices(), &houses, Map::Size());
+#else
 	/* Increment house ages */
 	for (const auto t : Map::Iterate()) {
 		if (!IsTileType(t, MP_HOUSE)) continue;
 		IncrementHouseAge(t);
 	}
+#endif
 });
 
 static CommandCost TerraformTile_Town(TileIndex tile, DoCommandFlags flags, int z_new, Slope tileh_new)

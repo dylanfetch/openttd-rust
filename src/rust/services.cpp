@@ -8,23 +8,73 @@
 /** @file services.cpp Direct shared-world leaves for Rust game owners. */
 #include "../stdafx.h"
 #include "services_ffi.h"
+#include "command_services.h"
+#include "command_cost_native_services.h"
+#include "company_services.h"
 #ifdef WITH_RUST
 #include "../industry_map.h"
 #include "../bridge_map.h"
+#include "../rail_map.h"
+#include "../road_map.h"
+#include "../station_map.h"
+#include "../tunnelbridge_map.h"
+#include "../water_map.h"
 #include "../landscape.h"
 #include "../viewport_func.h"
 #include "../core/random_func.hpp"
-#include "../station_map.h"
 #include "../depot_map.h"
-#include "../rail_map.h"
-#include "../tunnelbridge_map.h"
 #include "../bridge.h"
-#include "../water_map.h"
+#include "../company_base.h"
+#include "../company_func.h"
+#include "../command_type.h"
+#include "../command_func.h"
+#include "../landscape_cmd.h"
+#include "../town.h"
+#include "../timer/timer_game_calendar.h"
 #include "../safeguards.h"
 #include "settings_services.h"
+#include "environment_services.h"
 #include "../cheat_type.h"
-#include "../timer/timer_game_calendar.h"
 #include "../timer/timer_game_economy.h"
+
+static CommandCost *NativeCost(OpenTTDCommandCost *cost) noexcept { return reinterpret_cast<CommandCost *>(cost); }
+static const CommandCost *NativeCost(const OpenTTDCommandCost *cost) noexcept { return reinterpret_cast<const CommandCost *>(cost); }
+static void CostZero(OpenTTDCommandCost *out) noexcept { OpenTTDCommandCostZero(NativeCost(out)); }
+static void CostError(OpenTTDCommandCost *out, uint32_t message) noexcept { OpenTTDCommandCostError(NativeCost(out), message); }
+static void CostExpenseMoney(OpenTTDCommandCost *out, uint8_t expense, int64_t amount) noexcept { OpenTTDCommandCostExpenseMoney(NativeCost(out), static_cast<ExpensesType>(expense), Money(amount)); }
+static void CostErrorParam(OpenTTDCommandCost *out, uint32_t message, uint64_t parameter) noexcept { *NativeCost(out) = CommandCostWithParam(message, parameter); }
+static void CostAdd(OpenTTDCommandCost *out, OpenTTDCommandCost *item) noexcept { NativeCost(out)->AddCost(std::move(*NativeCost(item))); }
+static void CostMove(OpenTTDCommandCost *out, OpenTTDCommandCost *item) noexcept { *NativeCost(out) = std::move(*NativeCost(item)); }
+static void CostAmount(OpenTTDCommandCost *out, int64_t amount) noexcept { NativeCost(out)->AddCost(Money(amount)); }
+static bool CostSuccess(const OpenTTDCommandCost *cost) noexcept { return OpenTTDCommandCostSuccess(NativeCost(cost)); }
+static uint32_t CostErrorMessage(const OpenTTDCommandCost *cost) noexcept { return NativeCost(cost)->GetErrorMessage(); }
+static int64_t CostMoney(const OpenTTDCommandCost *cost) noexcept { return NativeCost(cost)->GetCost(); }
+const OpenTTDCommandCostServices &GetRustCommandCostServices() noexcept
+{
+	static const OpenTTDCommandCostServices services{
+		.zero = CostZero, .error = CostError, .expense_money = CostExpenseMoney,
+		.error_param = CostErrorParam, .add = CostAdd, .move = CostMove,
+		.amount = CostAmount, .success = CostSuccess, .error_message = CostErrorMessage, .money = CostMoney,
+	};
+	return services;
+}
+
+/* Direct command execution and its tile callbacks do not run a script VM or
+ * save/load code. They may reenter Rust owners, but ordinary play cannot unwind
+ * these leaves; allocation/error-formatting failures terminate under noexcept.
+ * The native returned object is moved whole into its caller's stack sink. */
+static void LandscapeClear(OpenTTDCommandCost *out, uint32_t tile, uint16_t flags) noexcept
+{
+	*NativeCost(out) = Command<CMD_LANDSCAPE_CLEAR>::Do(DoCommandFlags(flags), TileIndex{tile});
+}
+const OpenTTDCommandServices &GetRustCommandServices() noexcept
+{
+	static const OpenTTDCommandServices services{.landscape_clear = LandscapeClear};
+	return services;
+}
+
+static uint8_t SharedSnowLine() noexcept { return GetSnowLine(); }
+static int32_t SharedCalendarYear() noexcept { return TimerGameCalendar::year.base(); }
 
 static uint32_t SharedRandom(void *) noexcept { return Random(); }
 static uint8_t SharedTileType(uint32_t tile) noexcept { return GetTileType(TileIndex{tile}); }
@@ -52,7 +102,50 @@ static uint8_t MapSvcTunnelBridgeDirection(uint32_t tile) noexcept { return GetT
 static uint16_t MapSvcBridgeSpeed(uint32_t tile) noexcept { return GetBridgeSpec(GetBridgeType(TileIndex(tile)))->speed; }
 static bool MapSvcIsWaterTile(uint32_t tile) noexcept { return IsWaterTile(TileIndex(tile)); }
 
-static uint8_t SharedMapLogX() noexcept { return Map::LogX(); }
+static uint8_t SharedCurrentCompany() noexcept { return OpenTTDCurrentCompany().base(); }
+static bool SharedCompanyValid(uint8_t company) noexcept { return Company::IsValidID(CompanyID(company)); }
+static uint8_t SharedNextCompany(uint8_t from) noexcept
+{
+	auto range = Company::Iterate(from);
+	auto it = range.begin();
+	return it == range.end() ? CompanyID::Invalid().base() : (*it)->index.base();
+}
+
+static const OpenTTDTownHandle *SharedClosestTown(uint32_t tile, uint32_t threshold) noexcept
+{
+	return reinterpret_cast<const OpenTTDTownHandle *>(ClosestTownFromTile(TileIndex{tile}, threshold));
+}
+static OpenTTDTownState *SharedTownOwner(const OpenTTDTownHandle *town) noexcept
+{
+	return reinterpret_cast<const Town *>(town)->growth_owner.get();
+}
+
+static bool Shared_tile_valid(uint32_t tile) noexcept { return IsValidTile(TileIndex{tile}); }
+static uint32_t Shared_distance_from_edge(uint32_t tile) noexcept { return DistanceFromEdge(TileIndex{tile}); }
+static int32_t Shared_tile_max_z(uint32_t tile) noexcept { return GetTileMaxZ(TileIndex{tile}); }
+static_assert(TILE_HEIGHT == 8);
+static uint32_t Shared_tile_height(uint32_t tile) noexcept { return TileHeight(TileIndex{tile}); }
+static uint8_t Shared_bridge_axis(uint32_t tile) noexcept { return GetBridgeAxis(TileIndex{tile}); }
+static bool Shared_has_water_ground(uint32_t tile) noexcept { return HasTileWaterGround(TileIndex{tile}); }
+static bool Shared_is_sea(uint32_t tile) noexcept { return IsSea(TileIndex{tile}); }
+static bool Shared_is_plain_rail(uint32_t tile) noexcept { return IsPlainRailTile(TileIndex{tile}); }
+static bool Shared_is_bridge(uint32_t tile) noexcept { return IsBridgeTile(TileIndex{tile}); }
+static uint8_t Shared_tunnel_transport(uint32_t tile) noexcept { return GetTunnelBridgeTransportType(TileIndex{tile}); }
+static uint32_t Shared_other_tunnel_end(uint32_t tile) noexcept { return GetOtherTunnelBridgeEnd(TileIndex{tile}).base(); }
+static bool Shared_is_road_depot(uint32_t tile) noexcept { return IsRoadDepotTile(TileIndex{tile}); }
+static uint8_t Shared_road_depot_direction(uint32_t tile) noexcept { return GetRoadDepotDirection(TileIndex{tile}); }
+static bool Shared_is_normal_road(uint32_t tile) noexcept { return IsNormalRoadTile(TileIndex{tile}); }
+static uint8_t Shared_disallowed_road_directions(uint32_t tile) noexcept { return GetDisallowedRoadDirections(TileIndex{tile}); }
+static bool Shared_is_bay_stop(uint32_t tile) noexcept { return IsBayRoadStopTile(TileIndex{tile}); }
+static uint8_t Shared_bay_stop_direction(uint32_t tile) noexcept { return GetBayRoadStopDir(TileIndex{tile}); }
+static bool Shared_is_drive_through_stop(uint32_t tile) noexcept { return IsDriveThroughStopTile(TileIndex{tile}); }
+static uint8_t Shared_drive_through_axis(uint32_t tile) noexcept { return GetDriveThroughStopAxis(TileIndex{tile}); }
+static bool Shared_is_any_road_stop(uint32_t tile) noexcept { return IsAnyRoadStopTile(TileIndex{tile}); }
+static uint8_t Shared_road_type(uint32_t tile) noexcept { return GetRoadTypeRoad(TileIndex{tile}); }
+static bool Shared_has_road_type(uint32_t tile) noexcept { return HasTileRoadType(TileIndex{tile}, RTT_ROAD); }
+static uint8_t Shared_road_owner(uint32_t tile) noexcept { return GetRoadOwner(TileIndex{tile}, RTT_ROAD).base(); }
+static uint16_t Shared_town_index(uint32_t tile) noexcept { return GetTownIndex(TileIndex{tile}).base(); }
+static uint8_t Shared_road_bits(uint32_t tile, uint8_t type, bool straight) noexcept { return GetAnyRoadBits(TileIndex{tile}, static_cast<RoadTramType>(type), straight); }
 static uint32_t SharedMapMaxX() noexcept { return Map::MaxX(); }
 static uint32_t SharedMapMaxY() noexcept { return Map::MaxY(); }
 static uint8_t SharedPlaneSpeed() noexcept { return RustPlaneSpeed(); }
@@ -64,7 +157,6 @@ static int32_t SharedEconomyDate() noexcept { return TimerGameEconomy::date.base
 int32_t RustCalendarYear() noexcept { return TimerGameCalendar::year.base(); }
 static int32_t SharedCalendarDate() noexcept { return TimerGameCalendar::date.base(); }
 static int32_t SharedSlope(int32_t x, int32_t y) noexcept { return GetSlopePixelZ(x, y); }
-static int32_t SharedTileHeight(uint32_t tile) noexcept { return TileHeight(TileIndex{tile}) * TILE_HEIGHT; }
 
 const OpenTTDSharedServices &GetRustSharedServices() noexcept
 {
@@ -86,7 +178,36 @@ const OpenTTDSharedServices &GetRustSharedServices() noexcept
 		.tunnel_bridge_direction = MapSvcTunnelBridgeDirection,
 		.bridge_speed = MapSvcBridgeSpeed,
 		.is_water_tile = MapSvcIsWaterTile,
-		.map_log_x = SharedMapLogX,
+		.company_valid = SharedCompanyValid, .next_company = SharedNextCompany, .current_company = SharedCurrentCompany,
+		.closest_town = SharedClosestTown, .town_owner = SharedTownOwner,
+		.tile_valid = Shared_tile_valid,
+		.distance_from_edge = Shared_distance_from_edge,
+		.tile_max_z = Shared_tile_max_z,
+		.tile_height = Shared_tile_height,
+		.bridge_axis = Shared_bridge_axis,
+		.has_water_ground = Shared_has_water_ground,
+		.is_sea = Shared_is_sea,
+		.is_plain_rail = Shared_is_plain_rail,
+		.is_bridge = Shared_is_bridge,
+		.tunnel_transport = Shared_tunnel_transport,
+		.other_tunnel_end = Shared_other_tunnel_end,
+		.is_road_depot = Shared_is_road_depot,
+		.road_depot_direction = Shared_road_depot_direction,
+		.is_normal_road = Shared_is_normal_road,
+		.disallowed_road_directions = Shared_disallowed_road_directions,
+		.is_bay_stop = Shared_is_bay_stop,
+		.bay_stop_direction = Shared_bay_stop_direction,
+		.is_drive_through_stop = Shared_is_drive_through_stop,
+		.drive_through_axis = Shared_drive_through_axis,
+		.is_any_road_stop = Shared_is_any_road_stop,
+		.road_type = Shared_road_type,
+		.has_road_type = Shared_has_road_type,
+		.road_owner = Shared_road_owner,
+		.town_index = Shared_town_index,
+		.road_bits = Shared_road_bits,
+		.snow_line = SharedSnowLine,
+		.calendar_year = SharedCalendarYear,
+		.map_log_x = OpenTTDMapLogX,
 		.map_max_x = SharedMapMaxX,
 		.map_max_y = SharedMapMaxY,
 		.plane_speed = SharedPlaneSpeed,
@@ -97,7 +218,6 @@ const OpenTTDSharedServices &GetRustSharedServices() noexcept
 		.economy_date = SharedEconomyDate,
 		.calendar_date = SharedCalendarDate,
 		.slope = SharedSlope,
-		.tile_height = SharedTileHeight,
 	};
 	return services;
 }

@@ -62,7 +62,7 @@ and earn delivery revenue; aircraft must also reach flying state. Cargodist
 checkpoints require crossing 4668 to be barred and released. Other crossing
 states and subsidy offers/awards are recorded, without proving live crossing
 audio, every PBS route, buoy traversal or a particular subsidy multiplier.
-Remaining branch gaps are tracked in [#156](https://github.com/dylanfetch/openttd-rust/issues/156).
+Remaining branch gaps are tracked in [#156](https://github.com/fetch-laboratories/openttd-rust/issues/156).
 
 ## Later owner-built structures save (#183)
 
@@ -92,7 +92,7 @@ both plain/desync modes require respectively tile12192/y1529/z8,
 tile12448/y1560/z3 and tile12576/y1579/z0, comparing every semantic chunk.
 This witnesses canal movement, lowering and lower-part exit. Upward lock
 movement, road tunnels, rail bridges, tunnel reversal, arbitrary structures,
-stationary passenger routes and random/crash branches remain in [#156](https://github.com/dylanfetch/openttd-rust/issues/156).
+stationary passenger routes and random/crash branches remain in [#156](https://github.com/fetch-laboratories/openttd-rust/issues/156).
 
 ```sh
 python3 tools/migration.py simulate play-padhattan-ridge-2006 rail-owner-2006 --self --jobs 2
@@ -121,7 +121,7 @@ these in `play-padhattan-ridge-2016-manual`/`-cargodist` (two years, six with
 the `TRAIN_BRANCHES` witnesses both distributions reach. Occupancy is sampled
 every 32 days, so the new road bridge (heads 15037/15041), tunnel entry at tile
 1217 and the canal tile (cargodist only) are not required; branch gaps stay in
-[#156](https://github.com/dylanfetch/openttd-rust/issues/156).
+[#156](https://github.com/fetch-laboratories/openttd-rust/issues/156).
 
 ```sh
 python3 tools/migration.py simulate play-padhattan-ridge-2016 --self --jobs 2

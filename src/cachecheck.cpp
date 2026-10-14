@@ -42,7 +42,7 @@ void CheckCaches()
 	/* Check the town caches. */
 	std::vector<TownCache> old_town_caches;
 	for (const Town *t : Town::Iterate()) {
-		old_town_caches.push_back(t->cache);
+		old_town_caches.push_back(t->CopyTownCache());
 	}
 
 	RebuildTownCaches();
