@@ -9,7 +9,7 @@ forward-looking, about 200 lines; completed work is one row, with evidence in PR
 - Twenty-four ownership ports. Whole fork: Rust 56,978 / tooling 29,319 / glue 26,077 / original retired 36,502 of 470,612 `src/` lines (7.76%). Simulation: 28,522 / 102,615 (27.80%); source counts, not behavioral completion.
 - Since the tenth review, six integrations retired 340 original lines (all #216) and added 2,709 tooling and 1,507 glue lines. Both large owners (#212, #213) were deferred after prototype timing failures; #244 grew to 1,644 tooling lines.
 - Speed at tip (eleventh-review audit, median of three): TGP 1.123, Opus 1.250, Grok 1.245, Ridge 1996 1.225, 2000 1.293, 2016 1.344. All are inside their caps.
-- Drafts: #244 CI cache, #245 signals and #248 engine, the last two faithful with listed fixes. #66 is paused.
+- Drafts: #245 signals and #248 engine, both faithful with listed fixes. #244 is not to be worked on (action 1). #66 is paused.
 - Largest original simulation files remaining: station_cmd 4.5k lines, rail_cmd 3.2k, vehicle 3.0k, road_cmd 2.7k, town_cmd 2.5k, tunnelbridge 2.2k, landscape 1.8k, water 1.5k, engine 1.3k.
 
 ## Eleventh steering review (2026-10-14, throughput and enforcement)
@@ -29,7 +29,7 @@ The ports are faithful. Retirement stalled for three reasons, each fixable:
 
 Actions, in order:
 0. **#252 Windows CI on Blacksmith (user-selected, first).** Follow the issue: the first Blacksmith Windows run decides breakpad compatibility; if incompatible, leave Windows on GitHub, close it and continue.
-1. **Finish #244 (#233/#243).** Fix the platform gate failure and the quick-validation ccache fixture (`ccache` missing in the quick job), then bootstrap, full CI and #233 live acceptance. Linux caches now live in Blacksmith's store, not GitHub's 10 GiB.
+1. **Do not work on #244.** Blacksmith moved the Linux caches out of GitHub's 10 GiB, so its cache-peak problem is likely gone. Over the next three code merges, record GitHub's peak cache usage on #233. If it stays under 10 GiB, close #233 as met and #243/#244 unmerged (keep the branch, remove the worktree). If not, report to the user.
 2. **#249 shared-accessor check:** small infrastructure, run in parallel. Do not block ports on it.
 3. **#245 signals:** apply the two fixes in its steering comment, record its gaps (posted on #156), then do final-head validation, timing, a fresh fixing review, full CI and integrate.
 4. **#248 engine:** fix the build break, add `engines.py` witnesses, delete the duplicated accessors and apply the rest of its steering comment. Then review, CI and integrate.
@@ -164,7 +164,7 @@ The user paused root at 334df5ef8c, and a `/start-development` restart resumes f
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #233 / #243 / #244 | `ci-cache-peak-233`, `1288db61b4` | Draft: action 1. |
+| #233 / #243 / #244 | `ci-cache-peak-233`, `1288db61b4` | Not worked on; measure, then close (action 1). |
 | #252 | none | New, first: Windows CI on Blacksmith via `CI_WINDOWS_HEAVY`. |
 | #249 | none | New: shared-accessor check in quick CI. |
 | #219 / #245 | `signal-owner-219`, `df2f77b247` | Draft: apply the steering comment, then final-head validation, timing, review and CI. |
