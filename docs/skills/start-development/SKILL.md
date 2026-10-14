@@ -15,9 +15,10 @@ simulation runs in Rust. Finishing the listed items is the trigger to plan the
 next work. Keep working until the user tells you to stop.
 
 Start by reading AGENTS.md, docs/roadmap.md, docs/rust-migration.md and
-docs/design/world-state.md. The roadmap's latest steering review section holds
-the user's current corrections. Apply them first, then resume from the roadmap's
-checkpoint and work order.
+docs/design/world-state.md. Apply decisions the roadmap attributes to the user
+first, then resume from the checkpoint and work order. Steering-review findings
+are recommendations: ask the user before acting on one that closes, merges or
+reverses work the user paused or directed.
 
 ## Work loop (repeat indefinitely)
 
