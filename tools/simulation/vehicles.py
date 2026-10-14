@@ -11,12 +11,12 @@ def scenarios(soak):
 
 
 def game_environment(scenario):
-    witnessed = scenario["name"] == OPUS and scenario.get("witnesses")
+    witnessed = scenario.get("name") == OPUS and scenario.get("witnesses")
     return core.WITNESS_ENVIRONMENT if witnessed else {}
 
 
 def check(scenario, run, mode, role, result):
-    if scenario["name"] != OPUS:
+    if scenario.get("name") != OPUS:
         return
     counts = core.branch_witnesses(
         scenario,
