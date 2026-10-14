@@ -177,6 +177,28 @@ pub struct Services {
     pub snow_line: extern "C" fn() -> u8,
     /// Current calendar year used by town and industry.
     pub calendar_year: extern "C" fn() -> i32,
+    /// Shared live map log x observation.
+    pub map_log_x: extern "C" fn() -> u32,
+    /// Shared live map max x observation.
+    pub map_max_x: extern "C" fn() -> u32,
+    /// Shared live map max y observation.
+    pub map_max_y: extern "C" fn() -> u32,
+    /// Shared live plane speed observation.
+    pub plane_speed: extern "C" fn() -> u8,
+    /// Shared live no jetcrash observation.
+    pub no_jetcrash: extern "C" fn() -> bool,
+    /// Shared live plane crashes observation.
+    pub plane_crashes: extern "C" fn() -> u8,
+    /// Shared live service at helipad observation.
+    pub service_at_helipad: extern "C" fn() -> bool,
+    /// Shared live disaster sound observation.
+    pub disaster_sound: extern "C" fn() -> bool,
+    /// Shared live economy date observation.
+    pub economy_date: extern "C" fn() -> i32,
+    /// Shared live calendar date observation.
+    pub calendar_date: extern "C" fn() -> i32,
+    /// Shared live slope observation.
+    pub slope: extern "C" fn(i32, i32) -> i32,
 }
 impl Services {
     /// Draw one shared random word.
@@ -225,6 +247,15 @@ pub fn fixture(
         0
     }
     extern "C" fn bits(_: u32, _: u8, _: bool) -> u8 {
+        0
+    }
+    extern "C" fn flag0() -> bool {
+        false
+    }
+    extern "C" fn word0() -> u32 {
+        0
+    }
+    extern "C" fn slope(_: i32, _: i32) -> i32 {
         0
     }
     Services {
@@ -277,6 +308,17 @@ pub fn fixture(
         road_bits: bits,
         snow_line: zero_byte,
         calendar_year: zero_year,
+        map_log_x: word0,
+        map_max_x: word0,
+        map_max_y: word0,
+        plane_speed: zero_byte,
+        no_jetcrash: flag0,
+        plane_crashes: zero_byte,
+        service_at_helipad: flag0,
+        disaster_sound: flag0,
+        economy_date: zero_year,
+        calendar_date: zero_year,
+        slope,
     }
 }
 /// Map dimensions read once per entry.

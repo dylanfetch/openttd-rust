@@ -14,7 +14,13 @@ macro_rules! layout {
         match $item {
             0 => size_of::<$type>(),
             1 => align_of::<$type>(),
-            _ => [$(offset_of!($type, $field)),+]
+
+
+
+
+
+
+        _ => [$(offset_of!($type, $field)),+]
                 .get(usize::from($item) - 2)
                 .copied()
                 .unwrap_or(usize::MAX),
@@ -122,13 +128,13 @@ pub fn layout(type_id: u16, item: u8) -> usize {
             layout!(crate::effect::Leaves, item; observe, write, viewport, sound, animated)
         }
         42 => {
-            layout!(crate::services::Services, item; context, random, industry, tile_type, bridge_above, tropic_zone, tile_z, tile_slope, mark_dirty, set_tropic_zone, tile_owner, station_index, depot_index, is_level_crossing, tunnel_bridge_direction, bridge_speed, is_water_tile, company_valid, next_company, current_company, closest_town, town_owner, tile_valid, distance_from_edge, tile_max_z, tile_height, bridge_axis, has_water_ground, is_sea, is_plain_rail, is_bridge, tunnel_transport, other_tunnel_end, is_road_depot, road_depot_direction, is_normal_road, disallowed_road_directions, is_bay_stop, bay_stop_direction, is_drive_through_stop, drive_through_axis, is_any_road_stop, road_type, has_road_type, road_owner, town_index, road_bits, snow_line, calendar_year)
+            layout!(crate::services::Services, item; context, random, industry, tile_type, bridge_above, tropic_zone, tile_z, tile_slope, mark_dirty, set_tropic_zone, tile_owner, station_index, depot_index, is_level_crossing, tunnel_bridge_direction, bridge_speed, is_water_tile, company_valid, next_company, current_company, closest_town, town_owner, tile_valid, distance_from_edge, tile_max_z, tile_height, bridge_axis, has_water_ground, is_sea, is_plain_rail, is_bridge, tunnel_transport, other_tunnel_end, is_road_depot, road_depot_direction, is_normal_road, disallowed_road_directions, is_bay_stop, bay_stop_direction, is_drive_through_stop, drive_through_axis, is_any_road_stop, road_type, has_road_type, road_owner, town_index, road_bits, snow_line, calendar_year, map_log_x, map_max_x, map_max_y, plane_speed, no_jetcrash, plane_crashes, service_at_helipad, disaster_sound, economy_date, calendar_date, slope)
         }
         // ABI reservations: train 380-385; tree additions 386-389; fleet 390-399; company 400-429; town 430-459; shared vehicle/road 460-499; station 500-559; industry 560-619; shared CommandCost 620-629 (town-owned). Trees retain existing low IDs.
         461 => layout!(crate::vehicle::NewPosition, item; x, y, tile),
         462 => layout!(crate::vehicle::Breakdown, item; broken, status),
         460 => {
-            layout!(crate::vehicle::VehicleServices, item; write_counters, handle_breakdown, waiting_for_unbunching, leave_unbunching_depot, reset_depot_unbunching, service_in_depot, needs_automatic_servicing, enter_depot, pathfinding_result, new_position, move_then_status, base_viewport, property, length_callback, unknown_length_result, length_changed, play_start_sound, play_sound, large_explosion, order_free, order_dummy, start_stop_dirty, destroy, age, economy_age, decrease_value, check_breakdown, check_orders, write_day, write_direction, write_speed, last_station, write_last_station, write_dest, write_progress, write_max_speed, previous_tile, detach_last, next, engine_id, engine_for_length, write_tick, direction, status, tile, progress, dest_tile, order_type, order_destination, order_nonstop)
+            layout!(crate::vehicle::VehicleServices, item; write_counters, handle_breakdown, waiting_for_unbunching, leave_unbunching_depot, reset_depot_unbunching, service_in_depot, needs_automatic_servicing, enter_depot, pathfinding_result, new_position, move_then_status, base_viewport, property, length_callback, unknown_length_result, length_changed, play_start_sound, play_sound, large_explosion, order_free, order_dummy, start_stop_dirty, destroy, age, economy_age, decrease_value, check_breakdown, check_orders, write_day, write_direction, write_speed, last_station, write_last_station, write_dest, write_progress, write_max_speed, previous_tile, detach_last, next, engine_id, engine_for_length, write_tick, direction, status, tile, progress, dest_tile, order_type, order_destination, order_nonstop, subtype, x, y, z, tick, owner, speed, subspeed, running, order_time, vehicle_type, write_x, write_y, write_z, write_tile, write_status, write_subspeed, write_breakdown_counter, write_running, write_order_time, write_profit, write_economy_service, write_calendar_service, write_breakdowns, write_reliability, write_cargo_age, coordinates, xy, speed_inputs, direction_progress, tick_status, day_cost, make_dummy, loading, breakdown, check_orders_only, write_coordinates, altitude_inputs)
         }
         464 => layout!(crate::vehicle::Moved, item; old_z, z, cur_speed, max_track_speed),
         465 => layout!(crate::vehicle::Speed, item; distance, cur_speed),
@@ -420,9 +426,9 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         181 => layout!(crate::aircraft::Vehicle, item; handle, state, id),
         182 => layout!(crate::aircraft::Node, item; next, blocks, position, next_position, heading),
         183 => layout!(crate::aircraft::Moving, item; x, y, flags, direction),
-        184 => layout!(crate::aircraft::Position, item; x, y, tile),
+
         185 => {
-            layout!(crate::aircraft::Leaves, item; subtype, x, set_x, y, set_y, z, set_z, tile, set_tile, direction, set_direction, tick_counter, set_tick_counter, owner, vehicle_status, set_vehicle_status, current_speed, set_current_speed, subspeed, set_subspeed, progress, set_progress, acceleration, maximum_speed, set_maximum_speed, set_breakdown_counter, order_type, order_destination, running_ticks, set_running_ticks, order_time, set_order_time, day_counter, set_day_counter, profit, set_profit, last_station, set_last_station, set_economy_service, set_calendar_service, set_breakdowns, set_reliability, set_cargo_age, next, map_size_x, map_max_x, map_max_y, plane_speed, no_jetcrash, plane_crashes, service_at_helipad, disaster_sound, economy_date, calendar_date, station, airport_tile, station_tile, rotation, airport_width, airport_height, airport_type, station_owner, has_hangar, has_airport, airport_fta, airport_blocks, had_vehicle, dummy_airport, airport_elements, helipads, airport_flags, airport_delta_z, node, fta, moving, engine_speed, engine_subtype, engine_sound, engine_reliability, vehicle_type, slope, tile_height, airport_entry, direction_towards, new_position, hangar_height, terminal_count, hangar_exit, can_use_station, service_interval, needs_service, chain_in_depot, waiting_unbunching, nearest_depot_order, part_of_orders, next_station, next_aircraft, random, update_position, rotor_image, copy_sprite, position_viewport, create_effect, dirty_start_stop, play_sound, truncate_cargo, crash_news, station_rating, landing_rating, free_order, service_in_depot, leave_unbunching, dirty_depot, first_arrival, begin_loading, dirty_details, update_delta, touchdown_animation, destination_too_far, delete_range_news, handle_breakdown, handle_loading, service_order, dummy_order, age_vehicle, economy_age, decrease_value, check_orders, check_breakdown, running_cost, subtract_cost, dirty_lists, next_stopping_station, remove_depot_orders, assert_flying, invalid_movement, invalid_position, invalid_scheme, unreachable, speed_property, cargo_age_property, range_property, start_sound, touchdown_sound, rotor_image_if_changed, update_rotor_image, process_orders, enter_depot, vehicle_crash, delete_aircraft, send_to_depot, sample_count, helicopter_sound, explosion_sound, skid_sound, ticks_per_year, fta_blocks, fta_heading, fta_next_position, fta_next, block_node, route_node, block_choice)
+            layout!(crate::aircraft::Leaves, item; hangar_candidate, geometry, layout_blocks, layout_heading, layout_next_position, layout_next, layout_route, vehicle, shared, next, station, airport_tile, station_tile, rotation, airport_type, station_owner, has_hangar, airport_fta, airport_blocks, had_vehicle, dummy_airport, airport_elements, helipads, airport_flags, airport_delta_z, node, fta, moving, engine_speed, engine_subtype, engine_sound, engine_reliability, airport_entry, direction_towards, hangar_height, terminal_count, hangar_exit, can_use_station, service_interval, chain_in_depot, nearest_depot_order, part_of_orders, next_station, next_aircraft, update_position, rotor_image, copy_sprite, position_viewport, create_effect, truncate_cargo, crash_news, station_rating, landing_rating, dirty_depot, first_arrival, begin_loading, dirty_details, update_delta, touchdown_animation, destination_too_far, delete_range_news, service_order, running_cost, subtract_cost, dirty_lists, next_stopping_station, remove_depot_orders, assert_flying, invalid_movement, invalid_position, invalid_scheme, unreachable, cargo_age_property, range_property, touchdown_sound, rotor_image_if_changed, update_rotor_image, process_orders, vehicle_crash, send_to_depot, fta_next_position, block_node, route_node, block_choice)
         }
         186 => layout!(crate::aircraft::BlockNode, item; blocks, position, next_position),
         187 => layout!(crate::aircraft::RouteNode, item; next, next_position, heading),
@@ -531,6 +537,18 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         396 => {
             layout!(crate::fleet::pending::Services, item; set_current, restart, x, y, z, reserve, subtract, command, animation, length_news, failed_news, cash, limit)
         }
+        670 => layout!(crate::vehicle::Coordinates, item; x, y, z),
+        671 => layout!(crate::vehicle::XY, item; x, y),
+        672 => {
+            layout!(crate::vehicle::SpeedInputs, item; speed, max_speed, acceleration, status, subspeed)
+        }
+        673 => layout!(crate::vehicle::DirectionProgress, item; direction, progress),
+        674 => layout!(crate::vehicle::TickStatus, item; tick, status),
+        675 => layout!(crate::vehicle::DayCost, item; profit, running),
+        676 => layout!(crate::aircraft::Geometry, item; tile, rotation, width, height, airport),
+        677 => layout!(crate::aircraft::LayoutRoute, item; node, next, next_position, heading),
+        678 => layout!(crate::vehicle::AltitudeInputs, item; max_speed, direction),
+        679 => layout!(crate::aircraft::HangarCandidate, item; owner, airport, hangar),
         _ => usize::MAX,
     }
 }

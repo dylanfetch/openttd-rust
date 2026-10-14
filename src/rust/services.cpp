@@ -32,6 +32,10 @@
 #include "../town.h"
 #include "../timer/timer_game_calendar.h"
 #include "../safeguards.h"
+#include "settings_services.h"
+#include "environment_services.h"
+#include "../cheat_type.h"
+#include "../timer/timer_game_economy.h"
 
 static CommandCost *NativeCost(OpenTTDCommandCost *cost) noexcept { return reinterpret_cast<CommandCost *>(cost); }
 static const CommandCost *NativeCost(const OpenTTDCommandCost *cost) noexcept { return reinterpret_cast<const CommandCost *>(cost); }
@@ -119,6 +123,7 @@ static OpenTTDTownState *SharedTownOwner(const OpenTTDTownHandle *town) noexcept
 static bool Shared_tile_valid(uint32_t tile) noexcept { return IsValidTile(TileIndex{tile}); }
 static uint32_t Shared_distance_from_edge(uint32_t tile) noexcept { return DistanceFromEdge(TileIndex{tile}); }
 static int32_t Shared_tile_max_z(uint32_t tile) noexcept { return GetTileMaxZ(TileIndex{tile}); }
+static_assert(TILE_HEIGHT == 8);
 static uint32_t Shared_tile_height(uint32_t tile) noexcept { return TileHeight(TileIndex{tile}); }
 static uint8_t Shared_bridge_axis(uint32_t tile) noexcept { return GetBridgeAxis(TileIndex{tile}); }
 static bool Shared_has_water_ground(uint32_t tile) noexcept { return HasTileWaterGround(TileIndex{tile}); }
@@ -141,6 +146,17 @@ static bool Shared_has_road_type(uint32_t tile) noexcept { return HasTileRoadTyp
 static uint8_t Shared_road_owner(uint32_t tile) noexcept { return GetRoadOwner(TileIndex{tile}, RTT_ROAD).base(); }
 static uint16_t Shared_town_index(uint32_t tile) noexcept { return GetTownIndex(TileIndex{tile}).base(); }
 static uint8_t Shared_road_bits(uint32_t tile, uint8_t type, bool straight) noexcept { return GetAnyRoadBits(TileIndex{tile}, static_cast<RoadTramType>(type), straight); }
+static uint32_t SharedMapMaxX() noexcept { return Map::MaxX(); }
+static uint32_t SharedMapMaxY() noexcept { return Map::MaxY(); }
+static uint8_t SharedPlaneSpeed() noexcept { return RustPlaneSpeed(); }
+static bool SharedNoJetcrash() noexcept { return _cheats.no_jetcrash.value; }
+static uint8_t SharedPlaneCrashes() noexcept { return RustPlaneCrashes(); }
+static bool SharedServiceAtHelipad() noexcept { return RustServiceAtHelipad(); }
+static bool SharedDisasterSound() noexcept { return RustDisasterSound(); }
+static int32_t SharedEconomyDate() noexcept { return TimerGameEconomy::date.base(); }
+static int32_t SharedCalendarDate() noexcept { return TimerGameCalendar::date.base(); }
+static int32_t SharedSlope(int32_t x, int32_t y) noexcept { return GetSlopePixelZ(x, y); }
+
 const OpenTTDSharedServices &GetRustSharedServices() noexcept
 {
 	static const OpenTTDSharedServices services{
@@ -190,6 +206,17 @@ const OpenTTDSharedServices &GetRustSharedServices() noexcept
 		.road_bits = Shared_road_bits,
 		.snow_line = SharedSnowLine,
 		.calendar_year = SharedCalendarYear,
+		.map_log_x = OpenTTDMapLogX,
+		.map_max_x = SharedMapMaxX,
+		.map_max_y = SharedMapMaxY,
+		.plane_speed = SharedPlaneSpeed,
+		.no_jetcrash = SharedNoJetcrash,
+		.plane_crashes = SharedPlaneCrashes,
+		.service_at_helipad = SharedServiceAtHelipad,
+		.disaster_sound = SharedDisasterSound,
+		.economy_date = SharedEconomyDate,
+		.calendar_date = SharedCalendarDate,
+		.slope = SharedSlope,
 	};
 	return services;
 }
