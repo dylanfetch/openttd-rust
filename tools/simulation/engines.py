@@ -2,8 +2,9 @@
 
 import hashlib
 import json
+from pathlib import Path
 
-from . import orders
+from . import orders, rails
 from .core import (
     ROOT,
     RUNTIME_DIRECTORIES,
@@ -75,6 +76,9 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
     from .runtime import prepared_adapter
 
     folder = out / scenario["name"] / "input"
+    normalized, receipt = rails.normalize(Path(scenario["save"]), folder / "source")
+    result["engines_input"] = receipt
+    scenario = dict(scenario, save=str(normalized))
     executables, provenance = {}, {}
     for role in ("reference", "candidate"):
         prepared = prepared_adapter("engines", role, binaries, builds, folder / role)
