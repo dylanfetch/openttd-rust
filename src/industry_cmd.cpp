@@ -57,6 +57,7 @@
 
 #ifdef WITH_RUST
 #include "rust/industry_generation_adapter.hpp"
+#include "rust/landscape_loop_ffi.h"
 #include "rust/company_services.h"
 #include "rust/command_cost_native_services.h"
 #include "rust/sound_services.h"
@@ -893,6 +894,19 @@ static void TileLoopIndustry_BubbleGenerator(TileIndex tile)
 	if (v != nullptr) v->SetAnimationSubstate(dir);
 }
 
+#endif
+
+#ifdef WITH_RUST
+OpenTTDIndustryLoopServices GetRustIndustryLoopServices() noexcept
+{
+	return {
+		.production = &GetIndustryRustServices(),
+		.construction = &GetIndustryConstructionServices(),
+		.lifecycle = &GetIndustryLifecycleRustServices(),
+		.tiles = &GetIndustryTileServices(),
+		.generation = &GetIndustryGenerationServices(),
+	};
+}
 #endif
 
 static void TileLoop_Industry(TileIndex tile)

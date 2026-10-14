@@ -221,8 +221,12 @@ pub const ROAD_VISITORS: usize = 93;
 /// Selected road controller entries, including reentrant helpers.
 pub const ROAD_ENTRIES: usize = 94;
 
+/// First landscape count, compiled into dispatch only for the diagnostic build.
+#[cfg(landscape_loop_count)]
+pub const LANDSCAPE: usize = 95;
+
 /// Counter names, grouped by the prefix the harness selects.
-pub const NAMES: [&str; 95] = [
+pub const NAMES: [&str; 108] = [
     "train.tick_first",
     "train.tick_second",
     "train.reversal",
@@ -318,6 +322,19 @@ pub const NAMES: [&str; 95] = [
     "road.services",
     "road.visitors",
     "road.entries",
+    "landscape.clear_visits",
+    "landscape.rail_visits",
+    "landscape.road_visits",
+    "landscape.house_visits",
+    "landscape.tree_visits",
+    "landscape.station_visits",
+    "landscape.water_visits",
+    "landscape.void_visits",
+    "landscape.industry_visits",
+    "landscape.tunnel_bridge_visits",
+    "landscape.object_visits",
+    "landscape.batches",
+    "landscape.tile_zero",
 ];
 
 static ENABLED: AtomicBool = AtomicBool::new(false);

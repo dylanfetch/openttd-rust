@@ -43,6 +43,7 @@ enum ExtraTreePlacement : uint8_t {
 
 #ifdef WITH_RUST
 #include "rust/trees_ffi.h"
+#include "rust/landscape_loop_ffi.h"
 #include "rust/services_ffi.h"
 #include <exception>
 #include <utility>
@@ -248,16 +249,22 @@ static CommandCost ClearTile_Trees(TileIndex tile, DoCommandFlags flags)
 		flags.Test(DoCommandFlag::Execute), Company::IsValidID(_current_company), &_tree_services)));
 }
 
-static void TileLoop_Trees(TileIndex tile)
+const OpenTTDTreeServices &GetRustTreeServices() noexcept { return _tree_services; }
+
+OpenTTDTreeLoopSettings GetRustTreeLoopSettings() noexcept
 {
-	const OpenTTDTreeLoopSettings settings{
+	return {
 		.tick_counter = TimerGameTick::counter,
 		.size_x = Map::SizeX(),
 		.climate = to_underlying(_settings_game.game_creation.landscape),
 		.extra = _settings_game.construction.extra_tree_placement,
 		.ambient = _settings_client.sound.ambient,
 	};
-	openttd_rust_trees_tile_loop(tile.base(), settings, &_tree_services, &GetRustSharedServices());
+}
+
+static void TileLoop_Trees(TileIndex tile)
+{
+	openttd_rust_trees_tile_loop(tile.base(), GetRustTreeLoopSettings(), &_tree_services, &GetRustSharedServices());
 }
 
 void OnTick_Trees()

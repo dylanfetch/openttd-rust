@@ -10,6 +10,7 @@ license = "GPL-2.0-only"
 [workspace.lints.rust]
 unsafe_code = "deny"
 missing_docs = "warn"
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(landscape_loop_count)"] }
 
 [workspace.lints.clippy]
 all = "warn"

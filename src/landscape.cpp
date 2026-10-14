@@ -48,6 +48,7 @@
 
 #ifdef WITH_RUST
 #include "rust/ffi.h"
+#include "rust/landscape_loop_ffi.h"
 #endif
 
 #include "safeguards.h"
@@ -810,7 +811,9 @@ std::tuple<CommandCost, Money> CmdClearArea(DoCommandFlags flags, TileIndex tile
 }
 
 
+#ifndef WITH_RUST
 TileIndex _cur_tileloop_tile;
+#endif
 
 /**
  * Gradually iterate over all tiles on the map, calling their TileLoopProcs once every TILE_UPDATE_FREQUENCY ticks.
@@ -818,6 +821,25 @@ TileIndex _cur_tileloop_tile;
 void RunTileLoop()
 {
 	PerformanceAccumulator framerate(PFE_GL_LANDSCAPE);
+#ifdef WITH_RUST
+	static_assert(MIN_MAP_SIZE_BITS == 6 && MAX_MAP_SIZE_BITS == 12 && TILE_UPDATE_FREQUENCY_LOG == 8);
+	static_assert(MP_CLEAR == 0 && MP_RAILWAY == 1 && MP_ROAD == 2 && MP_HOUSE == 3 && MP_TREES == 4 && MP_STATION == 5 && MP_WATER == 6 && MP_VOID == 7 && MP_INDUSTRY == 8 && MP_TUNNELBRIDGE == 9 && MP_OBJECT == 10);
+	const OpenTTDLandscapeLoopServices services{
+		.shared = &GetRustSharedServices(),
+		.trees = &GetRustTreeServices(),
+		.industry = GetRustIndustryLoopServices(),
+		.clear_loop = [](uint32_t tile) noexcept { _tile_type_clear_procs.tile_loop_proc(TileIndex{tile}); },
+		.rail_loop = [](uint32_t tile) noexcept { _tile_type_rail_procs.tile_loop_proc(TileIndex{tile}); },
+		.road_loop = [](uint32_t tile) noexcept { _tile_type_road_procs.tile_loop_proc(TileIndex{tile}); },
+		.house_loop = [](uint32_t tile) noexcept { _tile_type_town_procs.tile_loop_proc(TileIndex{tile}); },
+		.station_loop = [](uint32_t tile) noexcept { _tile_type_station_procs.tile_loop_proc(TileIndex{tile}); },
+		.water_loop = [](uint32_t tile) noexcept { _tile_type_water_procs.tile_loop_proc(TileIndex{tile}); },
+		.void_loop = [](uint32_t tile) noexcept { _tile_type_void_procs.tile_loop_proc(TileIndex{tile}); },
+		.tunnel_bridge_loop = [](uint32_t tile) noexcept { _tile_type_tunnelbridge_procs.tile_loop_proc(TileIndex{tile}); },
+		.object_loop = [](uint32_t tile) noexcept { _tile_type_object_procs.tile_loop_proc(TileIndex{tile}); },
+	};
+	openttd_rust_run_tile_loop(Map::LogX(), Map::LogY(), GetRustTreeLoopSettings(), &services);
+#else
 
 	/* The pseudorandom sequence of tiles is generated using a Galois linear feedback
 	 * shift register (LFSR). This allows a deterministic pseudorandom ordering, but
@@ -853,6 +875,7 @@ void RunTileLoop()
 	}
 
 	_cur_tileloop_tile = tile;
+#endif
 }
 
 void InitializeLandscape()
