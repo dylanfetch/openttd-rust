@@ -105,11 +105,12 @@ retirement, with net glue in the PR (#223).
 | #227 (loading context fidelity) | #228 | direct | `9ee89f69ad` | 3 / 47 / 0 / 0 |
 | #231 (OpenGFX cache) | #232 | direct | `21e2c9ea60` | 0 / 0 / 0 / 0; workflow net -6 |
 | #223 (original-retirement metric) | #226 | direct | `86322c8422` | 0 / 274 / 0 / 0; net glue 0 |
-| #233 (CI throughput; met 2026-10-14) | #235 | direct | `21eeb445be` | 0 / 1567 / 0 / 0; net glue 0 |
+| #233 (CI throughput; cache acceptance paused) | #235 | direct | `21eeb445be` | 0 / 1567 / 0 / 0; net glue 0 |
 | #234 (industry water fidelity) | #236 | direct | `b7a1429d38` | 5 / 97 / 32 / 0; net glue +32 |
 | #229 (six calibrated caps) | #230 | direct | `e69df25522` | 0 / 12 / 0 / 0; net glue 0 |
 | #239/#156 (prospect/overlap coverage) | #240 | direct | `62ef446d1e` | 0 / 114 / 0 / 0; net glue 0 |
 | #214/#168 (typed station/loading) | #217 | direct | `3b3b931099` | 1018 / 42 / 1147 / 0; net glue +705 |
+| #250 (CI waiter survives base pushes) | #251 | direct | `409cdb253e` | 0 / 53 / 0 / 0; net glue 0 |
 | #237/#199 (typed aircraft boundary) | #238 | direct | `141e4ce397` | 798 / 420 / 470 / 0; net glue -310 |
 
 Paused, not fallbacks: #64/#66 curve family, #68 SHA-512/Ed25519, #69 tile areas.
@@ -164,7 +165,6 @@ The user paused root at 334df5ef8c, and a `/start-development` restart resumes f
 | --- | --- | --- |
 | #233 / #243 / #244 | `ci-cache-peak-233`, `1288db61b4` | Paused by the user, unmerged; keep branch and worktree. On re-selection: fix the platform gate failure, bootstrap, full CI, #233 live acceptance. |
 | #249 | none | New: shared-accessor check in quick CI. |
-| #250 / #251 | `ci-wait-base-250` | User-directed: `ci.py wait` survives base pushes; review, CI, integrate. |
 | #219 / #245 | `signal-owner-219`, `df2f77b247` | Draft: apply the steering comment, then final-head validation, timing, review and CI. |
 | #220 / #248 | `engine-lifecycle-220`, `9c4b950b56` | Draft, does not build: apply the steering comment, add the harness, then review and CI. |
 | #212 / #241 | `landscape-budget-prototype-212`, `45633ef6d6` | Re-selected: new branch from tip with the action-5 boundary. |
