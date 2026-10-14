@@ -44,7 +44,7 @@ def scheduler_gap():
     subprocess.run([str(binary)], cwd=root, check=True)
 
 
-def replay(report_path, role, mode, output):
+def replay(report_path, role, mode, output, event="cycles:u"):
     """Replay a frozen benchmark command with its source runtime and game lock."""
     import migration
 
@@ -62,7 +62,14 @@ def replay(report_path, role, mode, output):
             "source executable changed since benchmark; restore the frozen runtime"
         )
     build = Path(command[0]).parent
-    core.copy_runtime(source.parent, source, build, candidate=role == "candidate")
+    executable = Path(command[0])
+    if not executable.is_file():
+        core.copy_runtime(source.parent, source, build, candidate=role == "candidate")
+    elif (
+        hashlib.sha256(executable.read_bytes()).hexdigest()
+        != report["binaries"][role]["sha256"]
+    ):
+        raise ValueError("replay runtime executable changed since benchmark")
     run_dir = Path(command[command.index("-c") + 1]).parent
     env = dict(
         migration.environment(),
@@ -87,7 +94,7 @@ def replay(report_path, role, mode, output):
             "perf",
             "record",
             "-e",
-            "cycles:u",
+            event,
             "-g",
             "--call-graph",
             "dwarf",
@@ -134,11 +141,14 @@ def main():
     )
     parser.add_argument("--mode", choices=("stat", "record"), default="stat")
     parser.add_argument("--out", type=Path)
+    parser.add_argument(
+        "--event", choices=("cycles:u", "cpu-clock:u"), default="cycles:u"
+    )
     args = parser.parse_args()
     if args.replay:
         if not args.out:
             parser.error("--replay requires --out")
-        replay(args.replay, args.role, args.mode, args.out.resolve())
+        replay(args.replay, args.role, args.mode, args.out.resolve(), args.event)
     else:
         scheduler_gap()
 
