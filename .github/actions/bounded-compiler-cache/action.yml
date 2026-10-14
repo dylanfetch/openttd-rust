@@ -93,6 +93,7 @@ runs:
         await require(`${process.env.GITHUB_WORKSPACE}/tools/cache_policy.cjs`).run(
           {github, context, core}, 'prepare', process.env.CACHE_FAMILY);
   - name: Pack and measure the entire compiler archive envelope
+    id: pack
     if: inputs.operation == 'publish' && steps.prepare.outputs.publish == 'true'
     shell: bash
     env:
@@ -101,7 +102,7 @@ runs:
       CACHE_PATHS: ${{ inputs.paths }}
     run: ${{ runner.os == 'Windows' && 'python' || 'python3' }} tools/cache_payload.py pack
   - name: Verify SDK compressor routing before any reservation or upload
-    if: inputs.operation == 'publish' && steps.prepare.outputs.publish == 'true'
+    if: inputs.operation == 'publish' && steps.prepare.outputs.publish == 'true' && steps.pack.outcome == 'success'
     uses: actions/github-script@v7
     env:
       CACHE_FAMILY: ${{ inputs.family }}
@@ -120,20 +121,20 @@ runs:
         }
         await exec.exec(process.platform === 'win32' ? 'python' : 'python3', ['tools/cache_payload.py', 'guard']);
   - name: Save the admitted immutable slot
-    if: inputs.operation == 'publish' && steps.prepare.outputs.publish == 'true'
+    if: inputs.operation == 'publish' && steps.prepare.outputs.publish == 'true' && steps.pack.outcome == 'success'
     uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0; SDK 4.1.0
     with:
       path: ${{ steps.identify.outputs.path }}
       key: ${{ steps.prepare.outputs.key }}
       enableCrossOsArchive: true
   - name: Remove local upload copy before confirmation
-    if: inputs.operation == 'publish' && steps.prepare.outputs.publish == 'true'
+    if: inputs.operation == 'publish' && steps.prepare.outputs.publish == 'true' && steps.pack.outcome == 'success'
     shell: bash
     env:
       PAYLOAD: ${{ steps.identify.outputs.path }}
     run: rm "$PAYLOAD"
   - name: Restore the replacement from the cache backend
-    if: inputs.operation == 'publish' && steps.prepare.outputs.publish == 'true'
+    if: inputs.operation == 'publish' && steps.prepare.outputs.publish == 'true' && steps.pack.outcome == 'success'
     uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0; SDK 4.1.0
     with:
       path: ${{ steps.identify.outputs.path }}
@@ -141,7 +142,7 @@ runs:
       enableCrossOsArchive: true
       fail-on-cache-miss: true
   - name: Verify exact protected replacement bytes and manifest
-    if: inputs.operation == 'publish' && steps.prepare.outputs.publish == 'true'
+    if: inputs.operation == 'publish' && steps.prepare.outputs.publish == 'true' && steps.pack.outcome == 'success'
     shell: bash
     env:
       CACHE_FAMILY: ${{ inputs.family }}
@@ -153,7 +154,7 @@ runs:
       ${{ runner.os == 'Windows' && 'python' || 'python3' }} tools/cache_payload.py verify
       ${{ runner.os == 'Windows' && 'python' || 'python3' }} tools/cache_payload.py remember --slot "$SLOT"
   - name: Confirm committed ID and size, then prune the predecessor
-    if: inputs.operation == 'publish' && steps.prepare.outputs.publish == 'true'
+    if: inputs.operation == 'publish' && steps.prepare.outputs.publish == 'true' && steps.pack.outcome == 'success'
     uses: actions/github-script@v7
     env:
       CACHE_FAMILY: ${{ inputs.family }}

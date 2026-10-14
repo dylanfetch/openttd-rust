@@ -430,14 +430,17 @@ build, save, backend restore/hash confirmation and predecessor deletion. Native
 comparisons and simulation shards consume exported inputs outside that lock.
 
 `migration/cache-policy.json` caps actual archive envelopes: native 1100 MiB,
-Linux 320 MiB/flavour, macOS 340 MiB/flavour and MSVC 1024 MiB/architecture.
+Linux 320 MiB/flavour, macOS 540 MiB/flavour and MSVC 1024 MiB/architecture.
 Two fixed immutable slots per family, across all image/compatibility generations,
-plus 1024 MiB for all restore-only caches bound peak to 9960 MiB and settled to
-5492 MiB. The packed compiler payload includes protected commit, compatibility
-and verified content identity. A guard counts the pinned SDK's actual compressed
-tar bytes, including metadata and framing, and fails compression above the cap
+plus 448 MiB for all restore-only caches bound peak to 10184 MiB and settled to
+5316 MiB (56 MiB below the 10 GiB peak limit). The packed compiler payload includes
+protected commit, compatibility and verified content identity. A guard counts the
+pinned SDK's actual compressed tar bytes, including metadata and framing, and fails compression above the cap
 before reservation/upload. Routing probes require SDK executable and tar lookups
-to select that guard. ccache cleanup and the early packing estimate are not the bound.
+to select that guard. An oversized inner estimate allows at most three measured
+local ccache cleanup/repack attempts, scaling current allocations with 5% headroom;
+exhaustion or unrelated errors fail before save and retain the backend fallback.
+ccache cleanup and the early packing estimate are not the bound.
 The cache action uses a fixed relative path, zstd and cross-OS archive version;
 changing these requires a reviewed transition. Publication compares protected
 ancestry, restores/verifies exact replacement bytes, confirms REST ID/version/ref

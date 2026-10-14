@@ -9,6 +9,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import tarfile
 from pathlib import Path
 
@@ -17,6 +18,16 @@ import cache_zstd
 ROOT = Path(__file__).resolve().parents[1]
 POLICY = json.loads((ROOT / "migration/cache-policy.json").read_text())
 MIB = 1024**2
+FIT_RETRIES = 3
+
+
+class PayloadTooLarge(ValueError):
+    def __init__(self, size, limit, family):
+        super().__init__(
+            f"Measured payload envelope {size} exceeds {family} cap {limit}"
+        )
+        self.size = size
+        self.limit = limit
 
 
 def payload_path(family):
@@ -122,13 +133,62 @@ def pack(path, paths, family, compatibility, sha, legacy=None):
                 archive.addfile(header, io.BytesIO(data))
                 for index, root in enumerate(paths):
                     archive.add(root, arcname=f"root{index}", recursive=True)
-    bound = envelope(path.stat().st_size)
+    item = metadata(path)
+    bound = envelope(item["bytes"])
     limit = POLICY["families"][family] * MIB
     if bound > limit:
-        raise ValueError(
-            f"Measured payload envelope {bound} exceeds {family} cap {limit}"
-        )
-    return dict(metadata(path), envelope=bound)
+        raise PayloadTooLarge(bound, limit, family)
+    return dict(item, envelope=bound)
+
+
+def allocated_size(root):
+    size = 0
+    for child in root.rglob("*"):
+        if child.is_file():
+            stat = child.stat()
+            # ccache accounts disk blocks. Windows lacks st_blocks; its rounded
+            # file size is only a trim heuristic, never archive admission.
+            size += (
+                stat.st_blocks * 512
+                if hasattr(stat, "st_blocks")
+                else ((stat.st_size + 4095) // 4096) * 4096
+            )
+    return size
+
+
+def pack_to_fit(path, paths, family, compatibility, sha, legacy=None):
+    for attempt in range(FIT_RETRIES + 1):
+        try:
+            return pack(path, paths, family, compatibility, sha, legacy)
+        except PayloadTooLarge as error:
+            if attempt == FIT_RETRIES:
+                path.unlink(missing_ok=True)
+                raise
+            # Scale current local allocations by the measured inner-envelope
+            # ratio, with 5% headroom. Repack rather than assume cleanup fits;
+            # the SDK's actual compressed-stream guard remains authoritative.
+            for root in paths:
+                target_kib = max(
+                    1,
+                    allocated_size(root)
+                    * max(1, error.limit - MIB)
+                    * 95
+                    // (max(1, error.size - MIB) * 100 * 1024),
+                )
+                print(
+                    f"Local fit attempt {attempt + 1}/{FIT_RETRIES}: "
+                    f"{error.size} > {error.limit}; trim {root} to {target_kib} KiB"
+                )
+                subprocess.run(
+                    [os.environ.get("CCACHE_EXE", "ccache"), "--cleanup"],
+                    env=dict(
+                        os.environ,
+                        CCACHE_DIR=str(root.resolve()),
+                        CCACHE_CONFIGPATH=str(ROOT / "migration/ccache.conf"),
+                        CCACHE_MAXSIZE=f"{target_kib}KiB",
+                    ),
+                    check=True,
+                )
 
 
 def unpack(path, paths, family, compatibility):
@@ -203,7 +263,7 @@ def main():
         output(restored=restored)
     elif args.operation == "pack":
         publication = json.loads((state_dir / "publication.json").read_text())
-        item = pack(
+        item = pack_to_fit(
             payload,
             paths,
             family,

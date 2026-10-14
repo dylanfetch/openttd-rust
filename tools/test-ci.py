@@ -13,7 +13,9 @@ import sys
 import tarfile
 import tempfile
 import unittest
+from contextlib import chdir, nullcontext
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import cache_payload
@@ -280,6 +282,189 @@ class GateTests(unittest.TestCase):
 
 
 class CacheTests(unittest.TestCase):
+    def test_measured_oversize_trims_current_roots_and_repacks_before_admission(self):
+        path_stat = Path.stat
+
+        def windows_stat(path, *args, **kwargs):
+            info = path_stat(path, *args, **kwargs)
+            return SimpleNamespace(st_mode=info.st_mode, st_size=info.st_size)
+
+        for family, executable in (
+            ("native", None),
+            ("macos-debug", "/runner/ccache-bin/ccache"),
+            ("msvc-x64", "C:/runner/ccache-bin/ccache.exe"),
+        ):
+            with (
+                self.subTest(family=family),
+                tempfile.TemporaryDirectory() as temporary,
+            ):
+                root = Path(temporary)
+                sources = [root / "cache0"]
+                if family == "native":
+                    sources.append(root / "cache1")
+                for source in sources:
+                    source.mkdir()
+                    for index in range(16 // len(sources)):
+                        (source / f"{index:02d}").write_bytes(os.urandom(192 * 1024))
+                before = sum(len(list(source.iterdir())) for source in sources)
+                cleanups = []
+
+                def cleanup(
+                    command,
+                    *,
+                    env,
+                    check,
+                    executable=executable,
+                    sources=sources,
+                    cleanups=cleanups,
+                ):
+                    self.assertEqual(command, [executable or "ccache", "--cleanup"])
+                    self.assertTrue(check)
+                    self.assertEqual(
+                        env["CCACHE_CONFIGPATH"],
+                        str(ROOT / "migration/ccache.conf"),
+                    )
+                    source = Path(env["CCACHE_DIR"])
+                    self.assertIn(source, sources)
+                    target = int(env["CCACHE_MAXSIZE"].removesuffix("KiB")) * 1024
+                    self.assertLess(target, cache_payload.allocated_size(source))
+                    cleanups.append(source)
+                    # Deterministic cleanup service; packing and measurement are
+                    # real. Evict only enough old entries to reach the request.
+                    for child in sorted(source.iterdir()):
+                        if cache_payload.allocated_size(source) <= target:
+                            break
+                        child.unlink()
+
+                state = root / f".local/cache-state/{family}"
+                state.mkdir(parents=True)
+                (state / "publication.json").write_text(json.dumps({"legacy": []}))
+                env = {
+                    "CACHE_FAMILY": family,
+                    "CACHE_PREFIX": "compiler/image",
+                    "CACHE_PATHS": "\n".join(map(str, sources)),
+                    "GITHUB_SHA": HEAD,
+                    "GITHUB_OUTPUT": str(root / "output"),
+                }
+                if executable:
+                    env["CCACHE_EXE"] = executable
+                with (
+                    chdir(root),
+                    patch.object(Path, "stat", windows_stat)
+                    if family.startswith("msvc-")
+                    else nullcontext(),
+                    patch.dict(os.environ, env, clear=True),
+                    patch.dict(cache_payload.POLICY["families"], {family: 4}),
+                    patch.object(sys, "argv", ["cache_payload.py", "pack"]),
+                    patch.object(cache_payload.subprocess, "run", side_effect=cleanup),
+                    patch.object(cache_zstd, "install") as install,
+                    patch.object(
+                        cache_payload, "pack", wraps=cache_payload.pack
+                    ) as pack,
+                ):
+                    cache_payload.main()
+                    self.assertGreater(pack.call_count, 1)
+                    install.assert_called_once_with(
+                        4 * 1024**2, state.relative_to(root) / "outer.json"
+                    )
+                self.assertEqual(cleanups, sources)
+                after = sum(len(list(source.iterdir())) for source in sources)
+                self.assertGreaterEqual(after, before * 0.8)
+                self.assertLess(after, before)
+                item = json.loads((state / "upload.json").read_text())
+                self.assertLessEqual(item["envelope"], 4 * 1024**2)
+                self.assertIn(f"hash={item['hash']}", (root / "output").read_text())
+
+    def test_local_fit_exhaustion_never_admits_save_and_preserves_fallback(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "cache"
+            source.mkdir()
+            (source / "object").write_bytes(os.urandom(64 * 1024))
+            family = "macos-debug"
+            state = root / f".local/cache-state/{family}"
+            state.mkdir(parents=True)
+            fallback = state / "0.tgz"
+            cache_payload.pack(fallback, [source], family, "image", BASE)
+            original = fallback.read_bytes()
+            (state / "publication.json").write_text(json.dumps({"legacy": []}))
+            env = {
+                "CACHE_FAMILY": family,
+                "CACHE_PREFIX": "image",
+                "CACHE_PATHS": str(source),
+                "GITHUB_SHA": HEAD,
+                "GITHUB_OUTPUT": str(root / "output"),
+            }
+            with (
+                chdir(root),
+                patch.dict(os.environ, env, clear=True),
+                patch.dict(cache_payload.POLICY["families"], {family: 1}),
+                patch.object(sys, "argv", ["cache_payload.py", "pack"]),
+                patch.object(cache_payload.subprocess, "run") as cleanup,
+                patch.object(cache_zstd, "install") as install,
+                patch.object(cache_payload, "pack", wraps=cache_payload.pack) as pack,
+            ):
+                with self.assertRaises(cache_payload.PayloadTooLarge):
+                    cache_payload.main()
+            self.assertEqual(cleanup.call_count, cache_payload.FIT_RETRIES)
+            self.assertEqual(pack.call_count, cache_payload.FIT_RETRIES + 1)
+            install.assert_not_called()
+            self.assertFalse((state / "upload.json").exists())
+            self.assertFalse((root / "output").exists())
+            self.assertFalse((root / cache_payload.payload_path(family)).exists())
+            self.assertEqual(fallback.read_bytes(), original)
+            action = (
+                ROOT / ".github/actions/bounded-compiler-cache/action.yml"
+            ).read_text()
+            save = action.split("  - name: Save the admitted immutable slot\n", 1)[1]
+            condition = re.search(r"    if: (.+)", save)[1]
+            self.assertEqual(
+                [
+                    evaluate(
+                        condition,
+                        inputs={"operation": "publish"},
+                        steps={
+                            "prepare": {"outputs": {"publish": "true"}},
+                            "pack": {"outcome": outcome},
+                        },
+                    )
+                    for outcome in ("success", "failure")
+                ],
+                [True, False],
+            )
+
+    def test_non_size_pack_and_cleanup_errors_stop_without_size_retries(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "cache"
+            source.mkdir()
+            (source / "object").write_bytes(os.urandom(64 * 1024))
+            with (
+                patch.dict(cache_payload.POLICY["families"], {"macos-debug": 1}),
+                patch.object(cache_payload.subprocess, "run") as cleanup,
+            ):
+                # A bad manifest on an oversized archive is metadata failure,
+                # not permission to trim and silently retry it.
+                with self.assertRaisesRegex(ValueError, "manifest"):
+                    cache_payload.pack_to_fit(
+                        root / "bad.tgz", [source], "macos-debug", "image", "bad-sha"
+                    )
+                cleanup.assert_not_called()
+            failure = subprocess.CalledProcessError(1, ["ccache", "--cleanup"])
+            with (
+                patch.dict(cache_payload.POLICY["families"], {"macos-debug": 1}),
+                patch.object(
+                    cache_payload.subprocess, "run", side_effect=failure
+                ) as cleanup,
+                patch.object(cache_payload, "pack", wraps=cache_payload.pack) as pack,
+            ):
+                with self.assertRaises(subprocess.CalledProcessError):
+                    cache_payload.pack_to_fit(
+                        root / "failed.tgz", [source], "macos-debug", "image", HEAD
+                    )
+                cleanup.assert_called_once()
+                pack.assert_called_once()
+
     def test_installed_compressor_launchers_preserve_shell_line_endings(self):
         path_open = Path.open
 
@@ -817,8 +1002,8 @@ const MiB = 1024 ** 2, families = Object.keys(p.policy.families);
 }})().catch(error => {{ console.error(error); process.exit(1); }});
 """
         result = node(harness)
-        self.assertEqual(result["peak"], 9960 * 1024**2)
-        self.assertEqual(result["settled"], 5492 * 1024**2)
+        self.assertEqual(result["peak"], 10184 * 1024**2)
+        self.assertEqual(result["settled"], 5316 * 1024**2)
         self.assertEqual(result["completed"], 28)
         self.assertLess(result["peak"], 10 * 1024**3)
         self.assertLessEqual(result["settled"], 8 * 1024**3)

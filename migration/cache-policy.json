@@ -1,12 +1,12 @@
 {
   "schema": 1,
-  "other_mib": 1024,
+  "other_mib": 448,
   "families": {
     "native": 1100,
     "linux-sdl2": 320,
     "linux-dedicated": 320,
-    "macos-debug": 340,
-    "macos-release": 340,
+    "macos-debug": 540,
+    "macos-release": 540,
     "msvc-x86": 1024,
     "msvc-x64": 1024
   }
