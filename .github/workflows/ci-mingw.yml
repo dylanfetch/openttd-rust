@@ -1,5 +1,8 @@
 name: CI (MinGW)
 
+# Only the protected cache writer grants cache upload access.
+cache-mode: read
+
 on:
   workflow_call:
     inputs:
@@ -28,6 +31,7 @@ jobs:
       with:
         msystem: ${{ inputs.msystem }}
         release: false
+        cache: false
         install: >-
           git
           make

@@ -1,5 +1,8 @@
 name: Upload (Windows Store)
 
+# Only the protected cache writer grants cache upload access.
+cache-mode: read
+
 on:
   workflow_call:
     inputs:

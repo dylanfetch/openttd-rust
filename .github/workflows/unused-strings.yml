@@ -1,5 +1,8 @@
 name: Unused strings
 
+# Only the protected cache writer grants cache upload access.
+cache-mode: read
+
 on:
   pull_request:
 

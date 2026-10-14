@@ -1,5 +1,8 @@
 name: CI - Nightly
 
+# Only the protected cache writer grants cache upload access.
+cache-mode: read
+
 on:
   schedule:
   - cron: '0 3 * * *'

@@ -1,5 +1,8 @@
 name: CI - Build
 
+# Only the protected cache writer grants cache upload access.
+cache-mode: read
+
 on:
   workflow_call:
     inputs:
@@ -39,6 +42,7 @@ jobs:
     uses: ./.github/workflows/ci-policy.yml
 
   emscripten:
+    cache-mode: read
     needs: policy
     if: ${{ !cancelled() && (inputs.checkout-ref != '' || needs.policy.outputs.heavy == 'true') && inputs.profile != 'native' }}
     name: Emscripten
@@ -48,6 +52,7 @@ jobs:
       checkout-ref: ${{ inputs.checkout-ref }}
 
   linux:
+    cache-mode: read
     needs: policy
     if: ${{ !cancelled() && (inputs.checkout-ref != '' || needs.policy.outputs.heavy == 'true' || needs.policy.outputs.covered == 'true') }}
     strategy:
@@ -82,6 +87,7 @@ jobs:
       cache-only: ${{ inputs.checkout-ref == '' && github.event_name == 'push' && github.ref == 'refs/heads/rust-migration' && needs.policy.outputs.covered == 'true' }}
 
   macos:
+    cache-mode: read
     needs: policy
     if: ${{ !cancelled() && (inputs.checkout-ref != '' || needs.policy.outputs.heavy == 'true' || needs.policy.outputs.covered == 'true') && inputs.profile != 'native' }}
     strategy:
@@ -110,6 +116,7 @@ jobs:
       cache-only: ${{ inputs.checkout-ref == '' && github.event_name == 'push' && github.ref == 'refs/heads/rust-migration' && needs.policy.outputs.covered == 'true' }}
 
   windows:
+    cache-mode: read
     needs: policy
     if: ${{ !cancelled() && (inputs.checkout-ref != '' || needs.policy.outputs.heavy == 'true' || needs.policy.outputs.covered == 'true') && inputs.profile != 'native' }}
     strategy:

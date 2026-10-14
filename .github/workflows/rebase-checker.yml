@@ -1,4 +1,7 @@
 name: "Update 'work: needs rebase' label status"
+# Only the protected cache writer grants cache upload access.
+cache-mode: read
+
 on:
   # So that PRs touching the same files as the push are updated
   push:

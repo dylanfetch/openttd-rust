@@ -1,5 +1,8 @@
 name: Migration baseline validation
 
+# Only the protected cache writer grants cache upload access.
+cache-mode: read
+
 on:
   push:
     branches: [rust-migration]

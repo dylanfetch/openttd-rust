@@ -1,5 +1,8 @@
 name: CI (Emscripten)
 
+# Only the protected cache writer grants cache upload access.
+cache-mode: read
+
 on:
   workflow_call:
     inputs:
@@ -40,7 +43,7 @@ jobs:
         update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 100
 
     - name: Setup cache
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         # If you change this version, change the numbers in the image configuration step,
         # .github/workflows/preview-build.yml (2x) and os/emscripten/Dockerfile too.

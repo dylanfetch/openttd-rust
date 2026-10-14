@@ -1,5 +1,8 @@
 name: CI (Windows)
 
+# Only the protected cache writer grants cache upload access.
+cache-mode: read
+
 on:
   workflow_call:
     inputs:
@@ -166,13 +169,6 @@ jobs:
           cmake --build build
         fi
         echo "::endgroup::"
-
-    - name: Save vcpkg binary cache
-      if: github.event_name == 'push' && steps.vcpkg-binary-cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
-      with:
-        path: ${{ runner.temp }}/vcpkg-binary-cache
-        key: ${{ steps.vcpkg-binary-cache.outputs.cache-primary-key }}
 
     - name: Trim compiler cache
       if: inputs.rust && github.event_name == 'push' && github.ref == 'refs/heads/rust-migration'

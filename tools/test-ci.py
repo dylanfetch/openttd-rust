@@ -272,6 +272,31 @@ class GateTests(unittest.TestCase):
 
 
 class CacheTests(unittest.TestCase):
+    def test_candidate_callers_limit_cache_access_and_dependencies_do_not_save(self):
+        for filename, jobs in (
+            ("ci-request.yml", ("quick", "rust", "native", "platform")),
+            ("ci-build.yml", ("emscripten", "linux", "macos", "windows")),
+        ):
+            text = (ROOT / ".github/workflows" / filename).read_text()
+            for job in jobs:
+                section = text.split(f"  {job}:\n", 1)[1].split("\n  ", 1)[0]
+                self.assertIn("    cache-mode: read", section)
+        for filename in ("ci-emscripten.yml", "preview-build.yml"):
+            text = (ROOT / ".github/workflows" / filename).read_text()
+            self.assertNotIn("uses: actions/cache@", text)
+            self.assertIn("uses: actions/cache/restore@", text)
+        self.assertNotIn(
+            "actions/cache/save@",
+            (ROOT / ".github/actions/install-opengfx/action.yml").read_text(),
+        )
+        self.assertIn(
+            "enable-cache: false",
+            (ROOT / ".github/workflows/ci-quick.yml").read_text(),
+        )
+        self.assertIn(
+            "cache: false", (ROOT / ".github/workflows/ci-mingw.yml").read_text()
+        )
+
     def prune(self, caches):
         script = script_for("ci-cache.yml", "prune")
         return node(f"""

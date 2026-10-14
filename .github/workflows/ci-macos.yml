@@ -1,5 +1,8 @@
 name: CI (MacOS)
 
+# Only the protected cache writer grants cache upload access.
+cache-mode: read
+
 on:
   workflow_call:
     inputs:
@@ -155,13 +158,6 @@ jobs:
           mkdir -p ../.local/macos-evidence
           { "$CCACHE_EXE" --show-config; "$CCACHE_EXE" -sv; } | tee ../.local/macos-evidence/ccache-stats.txt
         fi
-
-    - name: Save vcpkg binary cache
-      if: github.event_name == 'push' && steps.vcpkg-binary-cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
-      with:
-        path: ${{ runner.temp }}/vcpkg-binary-cache
-        key: ${{ steps.vcpkg-binary-cache.outputs.cache-primary-key }}
 
     - name: Trim compiler cache
       if: inputs.rust && github.event_name == 'push' && github.ref == 'refs/heads/rust-migration'

@@ -20,13 +20,6 @@ runs:
           --output "$archive"
         unzip -tq "$archive"
 
-    - name: Save validated OpenGFX archive
-      if: steps.archive.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
-      with:
-        path: ${{ runner.temp }}/opengfx-0.6.0-all.zip
-        key: ${{ steps.archive.outputs.cache-primary-key }}
-
     - name: Validate and install OpenGFX
       shell: bash
       run: |

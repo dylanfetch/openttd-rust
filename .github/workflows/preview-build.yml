@@ -1,5 +1,8 @@
 name: Preview build
 
+# Only the protected cache writer grants cache upload access.
+cache-mode: read
+
 on:
   workflow_call:
     secrets:
@@ -43,7 +46,7 @@ jobs:
         update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 100
 
     - name: Setup cache
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: /emsdk/upstream/emscripten/cache
         # If you change this version, change the numbers in the image configuration step,

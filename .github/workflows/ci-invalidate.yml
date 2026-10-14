@@ -1,5 +1,8 @@
 name: Invalidate previous validation
 
+# Only the protected cache writer grants cache upload access.
+cache-mode: read
+
 on:
   pull_request_target:
     branches: [rust-migration]

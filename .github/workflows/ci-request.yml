@@ -1,6 +1,9 @@
 name: Requested validation
 run-name: CI ${{ inputs.profile || 'full' }} PR ${{ inputs.pr || github.event.pull_request.number }} ${{ inputs.request || format('bootstrap-{0}', github.run_id) }}
 
+# Only the protected cache writer grants cache upload access.
+cache-mode: read
+
 on:
   workflow_dispatch:
     inputs:
@@ -107,6 +110,7 @@ jobs:
           }
 
   quick:
+    cache-mode: read
     needs: plan
     uses: ./.github/workflows/ci-quick.yml
     with:
@@ -114,6 +118,7 @@ jobs:
       base-ref: ${{ needs.plan.outputs.base }}
 
   rust:
+    cache-mode: read
     needs: plan
     if: needs.plan.outputs.profile == 'rust'
     runs-on: ubuntu-24.04
@@ -131,6 +136,7 @@ jobs:
         python3 tools/migration.py rust-checks --jobs 2
 
   native:
+    cache-mode: read
     needs: plan
     if: needs.plan.outputs.profile == 'native' || needs.plan.outputs.profile == 'full'
     uses: ./.github/workflows/rust-migration.yml
@@ -138,6 +144,7 @@ jobs:
       checkout-ref: ${{ needs.plan.outputs.merge }}
 
   platform:
+    cache-mode: read
     needs: plan
     if: needs.plan.outputs.profile != 'rust'
     uses: ./.github/workflows/ci-build.yml

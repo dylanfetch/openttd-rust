@@ -1,5 +1,8 @@
 name: Bound compilation caches
 
+# Only the protected cache writer grants cache upload access.
+cache-mode: read
+
 on:
   workflow_run:
     workflows: [Migration baseline validation, CI - Build]
