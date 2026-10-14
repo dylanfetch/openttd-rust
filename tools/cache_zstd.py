@@ -143,7 +143,9 @@ def probe(limit, receipt):
     with tempfile.TemporaryDirectory() as temporary:
         directory = Path(temporary)
         (directory / "probe").write_text("guard routing\n")
-        (directory / "manifest.txt").write_text("probe\n")
+        # The SDK writes LF-delimited names even on Windows. GNU tar treats a
+        # translated CR as part of the filename, so the probe must do the same.
+        (directory / "manifest.txt").write_text("probe\n", newline="")
         command = [
             sdk_tar(),
             "--posix",

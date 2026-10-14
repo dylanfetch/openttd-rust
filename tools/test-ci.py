@@ -310,6 +310,12 @@ class CacheTests(unittest.TestCase):
             windows = (guard / "zstd.cmd").read_bytes()
             self.assertTrue(windows.endswith(b"\r\n"))
             self.assertEqual(windows.count(b"\r"), 1)
+            env["PATH"] = f"{guard}{os.pathsep}{os.environ['PATH']}"
+            with (
+                patch.dict(os.environ, env),
+                patch.object(Path, "open", windows_text_open),
+            ):
+                cache_zstd.probe(1024, receipt)
 
     def test_actual_sdk_compressor_stream_and_file_outputs_are_capped_before_upload(
         self,
@@ -319,7 +325,7 @@ class CacheTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root / "payload").write_bytes(os.urandom(256 * 1024))
-            (root / "manifest.txt").write_text("payload\n")
+            (root / "manifest.txt").write_text("payload\n", newline="")
             guard = root / "guard"
             guard.mkdir()
             receipt = root / "outer.json"
@@ -353,6 +359,8 @@ class CacheTests(unittest.TestCase):
             ]
             if sys.platform == "win32":
                 command.append("--force-local")
+            elif sys.platform == "darwin" and Path(command[0]).name == "gtar":
+                command.append("--delay-directory-restore")
             subprocess.run(command, cwd=root, env=env, check=True, capture_output=True)
             measured = json.loads(receipt.read_text())["size"]
             self.assertEqual(measured, (root / "cache.tzst").stat().st_size)
