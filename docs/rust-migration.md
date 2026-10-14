@@ -429,13 +429,15 @@ to 8 GiB (below the 10 GiB repository limit).
 
 Runner settings are `CI_LINUX_HEAVY`, `CI_LINUX_COMPARISONS`,
 `CI_LINUX_SIMULATION`, `CI_LINUX_PLATFORM` (default `ubuntu-24.04`), and
-`CI_MACOS_HEAVY` (default `macos-latest`). Heavy native jobs use `nproc` slots.
+`CI_MACOS_HEAVY` (default `macos-latest`) and `CI_WINDOWS_HEAVY` (default
+`windows-2022`). Heavy native jobs use `nproc` slots.
 One full request peaks around 16 jobs; overlapping requests may queue against
 account/runner capacity. Runner size and account plan remain repository settings.
 The repository belongs to the `fetch-laboratories` organization, where Blacksmith
 serves the Linux jobs: `CI_LINUX_HEAVY` is `blacksmith-8vcpu-ubuntu-2404` and the
-other Linux variables are `blacksmith-4vcpu-ubuntu-2404`. macOS, Windows and light
-jobs stay on GitHub-hosted runners (free for this public repository; Blacksmith
+other Linux variables are `blacksmith-4vcpu-ubuntu-2404`. Windows uses
+`blacksmith-8vcpu-windows-2025` after #252 compatibility/warm acceptance; macOS and light jobs stay
+on GitHub-hosted runners (free for this public repository; Blacksmith
 bills macOS at 20x). Blacksmith serves `actions/cache` from its own co-located
 store on its runners, so the GitHub cache budget above covers only GitHub-hosted
 jobs. Unsetting a variable returns that job to GitHub with no workflow change.
@@ -454,6 +456,19 @@ logs it explicitly leaves warnings unchecked. `tools/evidence.py` exports explic
 verification and optional repeated simulation receipts with committed port metrics
 and agent attribution; unsupported, failed or mismatched receipts fail. Narrow
 checks, legacy receipts, dirty source and unknown provenance remain labelled.
+
+`python3 tools/shared-accessors.py --base-ref origin/rust-migration` enforces
+#249 in quick CI. It checks fork-added functions/lambdas outside the named shared
+service files for single shared-world reads or shared-helper forwarding. The
+shared files include the canonical `engine_services.h` and
+`presentation_services.h`; root selected these exact filenames for #248, and its
+independent review verifies their consumer adoption and deletion of port copies.
+Existing definition fingerprints are in `tools/shared-accessor-baseline.txt`: remove retired
+entries, never add exemptions. CI compares that baseline with the PR base or prior
+protected-branch commit. `tools/test-shared-accessors.py` runs CLI category and
+ratchet regressions by default. This small syntactic check covers typed parameters,
+cast/lookup/typed owner aliases, settings, timers, map reads and named helper calls;
+it does not replace review of macros, derived-type fields or compound callbacks.
 
 `python3 tools/port-metrics.py` reports the change in retired pinned-original
 C++ lines separately from fork glue added/removed and signed net glue. Original
