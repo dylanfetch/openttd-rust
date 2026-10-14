@@ -1796,7 +1796,7 @@ static void AircraftPhaseBoundary()
 	leaves.airport_fta = [](const OpenTTDStation *) noexcept -> const void * { return &aircraft_probe; };
 	leaves.moving = [](const void *, uint8_t) noexcept { return OpenTTDAircraftMoving{16, 0, 16, 0}; };
 	v.xy = [](OpenTTDVehicle *) noexcept { return OpenTTDVehicleXY{aircraft_probe.x, aircraft_probe.y}; };
-	s.map_log_x = []() noexcept { return uint8_t{6}; };
+	s.map_log_x = []() noexcept { return uint32_t{6}; };
 	s.map_max_x = s.map_max_y = []() noexcept { return uint32_t{63}; };
 	s.plane_speed = []() noexcept { return uint8_t{1}; };
 	v.speed_inputs = [](OpenTTDVehicle *) noexcept { return OpenTTDVehicleSpeedInputs{0, 100, 8, 0, 0}; };
