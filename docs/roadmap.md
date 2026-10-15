@@ -9,8 +9,8 @@ forward-looking, about 200 lines; completed work is one row, with evidence in PR
 - Twenty-seven ownership ports. Whole fork: Rust 60,520 / tooling 31,190 / glue 27,289 / original retired 38,219 of 470,612 `src/` lines (8.12%). Simulation: 30,248 / 102,615 (29.48%); source counts, not behavioral completion.
 - Since the eleventh review, engine #248, signals #245 and town founding #258 integrated, retiring 1,717 original lines. Landscape #212 and vehicle #213 missed their final gates after profiled fix rounds and stopped as drafts at the pause.
 - Latest calibrated timings (#258): TGP 1.122x, play saves 1.234x-1.345x; all six caps passed. Timing was not repeated for the subsequent fidelity/housekeeping changes.
-- #262 fixes ScriptList overflow; #259 H1-H3 remove stale repository state, compact docs and delete 2,142 workflow/comment lines. These two maintenance integrations retire no additional game C++; this short session prioritizes bounded tasks. Required CI passes; no new coverage gap is closed beyond #262's rank extremes (#156).
-- Two unintegrated component drafts, #255 and #257; both conflict with the town base.
+- #262 fixes ScriptList overflow; #259 H1-H3 remove stale repository state, compact docs and delete 2,142 workflow/comment lines. These two maintenance integrations retire no additional game C++. Post-merge CI is green; #262 adds signed-rank coverage (#156).
+- Two stopped component drafts (#255, #257) and one stopped maintenance draft (#264). #264's native/24-scenario checks pass at 155 tooling lines, but two guard defects fail review under the user's 160-line wind-down gate; full CI was cancelled. No H4 changes integrated.
 - Largest original simulation files remaining: station_cmd 4.5k lines, rail_cmd 3.2k, vehicle 3.0k, road_cmd 2.7k, tunnelbridge 2.2k, town_cmd 1.9k, landscape 1.8k, water 1.5k.
 
 ## Twelfth steering review (2026-10-15, housekeeping)
@@ -165,18 +165,20 @@ that a `SaveLoad` descriptor cannot address through the alias.
 
 ## Resume checkpoint
 
-Resumed for a short session. #259 H1-H3 and #260 are complete; CI_ON_DEMAND is
-restored after #263's passing bootstrap. Keep tasks bounded: H4 dead-code cleanup
-next; larger ownership drafts remain unchanged. H4's read-only plan and budget
-re-selection are on #259.
+Paused at the user's request. #262 and #263 integrated; #259 H1-H3 are done.
+#264 gates: implementation PASS (native and 24 semantic scenarios), review FAIL
+(two unfixed guard defects), tooling PASS (155/160), full validation FAIL
+(cancelled after review failed). No fix commits or further review round.
+All agents stopped; the retained H4 worktree is clean. Requested scratch cleanup
+is complete; CI_ON_DEMAND is true and post-merge CI is green. H5/#261 unstarted.
+Root recorded a 190-line selection before wind-down; the user's 160-line stop
+gate prevented integration. Decide the guard budget/scope before another fix.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #259 H4 / #264 | `cleanup-dead-ffi-259`, `2c65620788` | `/root/review_dead_ffi_264` fixing two orphan-guard findings; 190-line tooling ceiling. Initial full CI superseded; final-head CI required. H5 unstarted. |
-| #261 | unstarted | R1-R4 after #259 H4 merges. |
+| #259 H4 / #264 | `cleanup-dead-ffi-259`, `2c65620788` | Stopped draft: comments hide orphans; indented calls look like declarations. User budget/scope decision, fixes, fresh review and final-head full CI needed. |
 | #212 / #255 | `landscape-owner-212`, `63c67959ee` | Stopped: TGP gate missed (see PR). Conflicts with town base. Next: update, profile, root re-selection. |
 | #213 / #257 | `vehicle-owner-213`, `67611082f7` | Stopped: CPU gate missed (see PR). Conflicts with town base. Next: update, profile, root re-selection. |
-| #256 / #247 | unstarted | House lifecycle precedes town commands/deletion. |
 | #64 / #66 | remote `issue/64-curve-family`, `aab5211801` | #66 closed unmerged; #64 stays paused. Local curve worktrees/branches removed; remote head retained. |
 
 ABI blocks:
