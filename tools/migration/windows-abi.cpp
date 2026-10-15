@@ -114,8 +114,8 @@ static void Layouts()
 	Layout(769, "OpenTTDVehicleMaintenanceWarning", {sizeof(OpenTTDVehicleMaintenanceWarning), alignof(OpenTTDVehicleMaintenanceWarning), offsetof(OpenTTDVehicleMaintenanceWarning, enabled), offsetof(OpenTTDVehicleMaintenanceWarning, has_previous), offsetof(OpenTTDVehicleMaintenanceWarning, local), offsetof(OpenTTDVehicleMaintenanceWarning, status)});
 	Layout(770, "OpenTTDVehicleMaintenanceWarningCompany", {sizeof(OpenTTDVehicleMaintenanceWarningCompany), alignof(OpenTTDVehicleMaintenanceWarningCompany), offsetof(OpenTTDVehicleMaintenanceWarningCompany, company), offsetof(OpenTTDVehicleMaintenanceWarningCompany, renewal)});
 	Layout(771, "OpenTTDVehicleMaintenanceServices", {sizeof(OpenTTDVehicleMaintenanceServices), alignof(OpenTTDVehicleMaintenanceServices), offsetof(OpenTTDVehicleMaintenanceServices, shared), offsetof(OpenTTDVehicleMaintenanceServices, transaction), offsetof(OpenTTDVehicleMaintenanceServices, group), offsetof(OpenTTDVehicleMaintenanceServices, renewal), offsetof(OpenTTDVehicleMaintenanceServices, reset), offsetof(OpenTTDVehicleMaintenanceServices, reset_write), offsetof(OpenTTDVehicleMaintenanceServices, has_engine), offsetof(OpenTTDVehicleMaintenanceServices, interval), offsetof(OpenTTDVehicleMaintenanceServices, engine_reliability), offsetof(OpenTTDVehicleMaintenanceServices, budget), offsetof(OpenTTDVehicleMaintenanceServices, replacement), offsetof(OpenTTDVehicleMaintenanceServices, replacement_available), offsetof(OpenTTDVehicleMaintenanceServices, replacement_cost), offsetof(OpenTTDVehicleMaintenanceServices, automatic), offsetof(OpenTTDVehicleMaintenanceServices, depot_service), offsetof(OpenTTDVehicleMaintenanceServices, check_breakdown), offsetof(OpenTTDVehicleMaintenanceServices, breakdown_guard), offsetof(OpenTTDVehicleMaintenanceServices, breakdown_trigger), offsetof(OpenTTDVehicleMaintenanceServices, chance_write), offsetof(OpenTTDVehicleMaintenanceServices, trigger), offsetof(OpenTTDVehicleMaintenanceServices, breakdown_counter), offsetof(OpenTTDVehicleMaintenanceServices, breakdown_probe), offsetof(OpenTTDVehicleMaintenanceServices, breakdown_start), offsetof(OpenTTDVehicleMaintenanceServices, breakdown_start_write), offsetof(OpenTTDVehicleMaintenanceServices, breakdown_active), offsetof(OpenTTDVehicleMaintenanceServices, breakdown_countdown), offsetof(OpenTTDVehicleMaintenanceServices, breakdown_sound_state), offsetof(OpenTTDVehicleMaintenanceServices, breakdown_delay_write), offsetof(OpenTTDVehicleMaintenanceServices, breakdown_sound), offsetof(OpenTTDVehicleMaintenanceServices, smoke_disabled), offsetof(OpenTTDVehicleMaintenanceServices, smoke), offsetof(OpenTTDVehicleMaintenanceServices, smoke_animation), offsetof(OpenTTDVehicleMaintenanceServices, aircraft_broken), offsetof(OpenTTDVehicleMaintenanceServices, mark_dirty), offsetof(OpenTTDVehicleMaintenanceServices, view_dirty), offsetof(OpenTTDVehicleMaintenanceServices, details_dirty), offsetof(OpenTTDVehicleMaintenanceServices, age), offsetof(OpenTTDVehicleMaintenanceServices, age_write), offsetof(OpenTTDVehicleMaintenanceServices, decay_write), offsetof(OpenTTDVehicleMaintenanceServices, warning), offsetof(OpenTTDVehicleMaintenanceServices, warning_company), offsetof(OpenTTDVehicleMaintenanceServices, engine_available_any), offsetof(OpenTTDVehicleMaintenanceServices, replacement_active), offsetof(OpenTTDVehicleMaintenanceServices, old_news), offsetof(OpenTTDVehicleMaintenanceServices, economy_age), offsetof(OpenTTDVehicleMaintenanceServices, economy_age_write), offsetof(OpenTTDVehicleMaintenanceServices, reached_min_age), offsetof(OpenTTDVehicleMaintenanceServices, value), offsetof(OpenTTDVehicleMaintenanceServices, value_write), offsetof(OpenTTDVehicleMaintenanceServices, max_calendar_date), offsetof(OpenTTDVehicleMaintenanceServices, max_economy_date), offsetof(OpenTTDVehicleMaintenanceServices, profit_min_age), offsetof(OpenTTDVehicleMaintenanceServices, anniversaries), offsetof(OpenTTDVehicleMaintenanceServices, before_zero), offsetof(OpenTTDVehicleMaintenanceServices, news_getting_old), offsetof(OpenTTDVehicleMaintenanceServices, news_very_old), offsetof(OpenTTDVehicleMaintenanceServices, news_very_old_and)});
-	Layout(772, "TimerGameCalendar::Date", {sizeof(TimerGameCalendar::Date), alignof(TimerGameCalendar::Date)});
-	Layout(773, "TimerGameEconomy::Date", {sizeof(TimerGameEconomy::Date), alignof(TimerGameEconomy::Date)});
+	Layout(772, "OpenTTDCalendarDate", {sizeof(OpenTTDCalendarDate), alignof(OpenTTDCalendarDate), offsetof(OpenTTDCalendarDate, value)});
+	Layout(773, "OpenTTDEconomyDate", {sizeof(OpenTTDEconomyDate), alignof(OpenTTDEconomyDate), offsetof(OpenTTDEconomyDate, value)});
 	Layout(774, "OrderType", {sizeof(OrderType), alignof(OrderType)});
 
 	Layout(445, "OpenTTDTownYearlyServices", {sizeof(OpenTTDTownYearlyServices), alignof(OpenTTDTownYearlyServices), offsetof(OpenTTDTownYearlyServices, completed), offsetof(OpenTTDTownYearlyServices, age), offsetof(OpenTTDTownYearlyServices, set_age)});
@@ -1883,7 +1883,7 @@ static void AircraftOwnership()
 	std::printf("aircraft_airport_canonical_scalar_lifetime passed\n");
 }
 
-/* Actual Date/VehicleType carriers and aggregate return/write call ABI. Opaque
+/* Explicit trivial Date and actual VehicleType carriers and aggregate return/write call ABI. Opaque
  * shells are never dereferenced; the game target checks real member stores. */
 static void VehicleMaintenanceBoundary()
 {
@@ -1940,18 +1940,18 @@ static void VehicleMaintenanceBoundary()
 	maintenance.value_write = AircraftUnexpectedService<decltype(maintenance.value_write)>::Call;
 	maintenance.details_dirty = [](OpenTTDVehicle *) noexcept { dirty++; };
 	maintenance.reset = [](OpenTTDVehicle *) noexcept {
-		return OpenTTDVehicleMaintenanceReset{.economy_date = TimerGameEconomy::Date{0x1020304}, .calendar_date = TimerGameCalendar::Date{-0x12345}, .reliability = 0x9876, .chance = 12, .breakdowns = 2};
+		return OpenTTDVehicleMaintenanceReset{.economy_date = OpenTTDEconomyDate{0x1020304}, .calendar_date = OpenTTDCalendarDate{-0x12345}, .reliability = 0x9876, .chance = 12, .breakdowns = 2};
 	};
 	maintenance.reset_write = [](OpenTTDVehicle *, OpenTTDVehicleMaintenanceResetWrite value) noexcept {
-		CHECK(value.economy_date == 0x1020304);
-		CHECK(value.calendar_date == -0x12345);
+		CHECK(value.economy_date.value == 0x1020304);
+		CHECK(value.calendar_date.value == -0x12345);
 		CHECK(value.reliability == 0x9876 && value.chance == 3 && value.since == 0);
 		resets++;
 	};
 	maintenance.value = [](OpenTTDVehicle *) noexcept { return int64_t{-257}; };
 	maintenance.value_write = [](OpenTTDVehicle *, int64_t value) noexcept { CHECK(value == -255); values++; };
 	maintenance.renewal = [](OpenTTDVehicle *, const Company *) noexcept {
-		return OpenTTDVehicleMaintenanceRenewal{.age = TimerGameCalendar::Date{100}, .max_age = TimerGameCalendar::Date{100}, .months = -4, .enabled = false, .kind = static_cast<VehicleType>(254), .subtype = 0};
+		return OpenTTDVehicleMaintenanceRenewal{.age = OpenTTDCalendarDate{100}, .max_age = OpenTTDCalendarDate{100}, .months = -4, .enabled = false, .kind = static_cast<VehicleType>(254), .subtype = 0};
 	};
 	OpenTTDVehicleServices base{};
 	base.maintenance = &maintenance;

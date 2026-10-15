@@ -9,39 +9,38 @@
 #ifndef RUST_VEHICLE_MAINTENANCE_FFI_H
 #define RUST_VEHICLE_MAINTENANCE_FFI_H
 #include "vehicle_ffi.h"
-#include "../timer/timer_game_calendar.h"
-#include "../timer/timer_game_economy.h"
+#include "services_ffi.h"
 enum OrderType : uint8_t;
 struct Company;
 struct OpenTTDSharedServices;
 struct OpenTTDFleetTransactionServices;
 struct OpenTTDFleetGroupServices;
 struct OpenTTDVehicleMaintenanceRenewal {
-	TimerGameCalendar::Date age;
-	TimerGameCalendar::Date max_age;
+	OpenTTDCalendarDate age;
+	OpenTTDCalendarDate max_age;
 	int16_t months;
 	bool enabled;
 	VehicleType kind;
 	uint8_t subtype;
 };
 struct OpenTTDVehicleMaintenanceReset {
-	TimerGameEconomy::Date economy_date;
-	TimerGameCalendar::Date calendar_date;
+	OpenTTDEconomyDate economy_date;
+	OpenTTDCalendarDate calendar_date;
 	uint16_t reliability;
 	uint8_t chance;
 	uint8_t breakdowns;
 };
 struct OpenTTDVehicleMaintenanceResetWrite {
-	TimerGameEconomy::Date economy_date;
-	TimerGameCalendar::Date calendar_date;
+	OpenTTDEconomyDate economy_date;
+	OpenTTDCalendarDate calendar_date;
 	uint16_t reliability;
 	uint8_t chance;
 	uint8_t since;
 };
 struct OpenTTDVehicleMaintenanceInterval {
 	const Company *company;
-	TimerGameEconomy::Date last_service;
-	TimerGameEconomy::Date now;
+	OpenTTDEconomyDate last_service;
+	OpenTTDEconomyDate now;
 	uint16_t interval;
 	uint16_t reliability;
 	bool percent;
@@ -110,8 +109,8 @@ struct OpenTTDVehicleMaintenanceBreakdownSmoke {
 	uint8_t delay;
 };
 struct OpenTTDVehicleMaintenanceAge {
-	TimerGameCalendar::Date age;
-	TimerGameCalendar::Date max_age;
+	OpenTTDCalendarDate age;
+	OpenTTDCalendarDate max_age;
 	uint16_t decay;
 };
 struct OpenTTDVehicleMaintenanceWarning {
@@ -162,23 +161,23 @@ struct OpenTTDVehicleMaintenanceServices {
 	void (OPENTTD_VEHICLE_CALL *view_dirty)(OpenTTDVehicle *) noexcept;
 	void (OPENTTD_VEHICLE_CALL *details_dirty)(OpenTTDVehicle *) noexcept;
 	OpenTTDVehicleMaintenanceAge (OPENTTD_VEHICLE_CALL *age)(OpenTTDVehicle *) noexcept;
-	void (OPENTTD_VEHICLE_CALL *age_write)(OpenTTDVehicle *, TimerGameCalendar::Date) noexcept;
+	void (OPENTTD_VEHICLE_CALL *age_write)(OpenTTDVehicle *, OpenTTDCalendarDate) noexcept;
 	void (OPENTTD_VEHICLE_CALL *decay_write)(OpenTTDVehicle *, uint16_t) noexcept;
 	OpenTTDVehicleMaintenanceWarning (OPENTTD_VEHICLE_CALL *warning)(OpenTTDVehicle *) noexcept;
 	OpenTTDVehicleMaintenanceWarningCompany (OPENTTD_VEHICLE_CALL *warning_company)(OpenTTDVehicle *) noexcept;
 	bool (OPENTTD_VEHICLE_CALL *engine_available_any)(OpenTTDVehicle *) noexcept;
 	bool (OPENTTD_VEHICLE_CALL *replacement_active)(OpenTTDVehicle *, const Company *) noexcept;
 	void (OPENTTD_VEHICLE_CALL *old_news)(OpenTTDVehicle *, uint32_t) noexcept;
-	TimerGameEconomy::Date (OPENTTD_VEHICLE_CALL *economy_age)(OpenTTDVehicle *) noexcept;
-	void (OPENTTD_VEHICLE_CALL *economy_age_write)(OpenTTDVehicle *, TimerGameEconomy::Date) noexcept;
+	OpenTTDEconomyDate (OPENTTD_VEHICLE_CALL *economy_age)(OpenTTDVehicle *) noexcept;
+	void (OPENTTD_VEHICLE_CALL *economy_age_write)(OpenTTDVehicle *, OpenTTDEconomyDate) noexcept;
 	void (OPENTTD_VEHICLE_CALL *reached_min_age)(OpenTTDVehicle *) noexcept;
 	int64_t (OPENTTD_VEHICLE_CALL *value)(OpenTTDVehicle *) noexcept;
 	void (OPENTTD_VEHICLE_CALL *value_write)(OpenTTDVehicle *, int64_t) noexcept;
-	TimerGameCalendar::Date max_calendar_date;
-	TimerGameEconomy::Date max_economy_date;
-	TimerGameEconomy::Date profit_min_age;
-	TimerGameCalendar::Date anniversaries[5];
-	TimerGameCalendar::Date before_zero;
+	OpenTTDCalendarDate max_calendar_date;
+	OpenTTDEconomyDate max_economy_date;
+	OpenTTDEconomyDate profit_min_age;
+	OpenTTDCalendarDate anniversaries[5];
+	OpenTTDCalendarDate before_zero;
 	uint32_t news_getting_old;
 	uint32_t news_very_old;
 	uint32_t news_very_old_and;

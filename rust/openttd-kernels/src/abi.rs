@@ -655,13 +655,15 @@ pub fn layout(type_id: u16, item: u8) -> usize {
             layout!(crate::vehicle::maintenance::Services, item; shared, transaction, group, renewal, reset, reset_write, has_engine, interval, engine_reliability, budget, replacement, replacement_available, replacement_cost, automatic, depot_service, check_breakdown, breakdown_guard, breakdown_trigger, chance_write, trigger, breakdown_counter, breakdown_probe, breakdown_start, breakdown_start_write, breakdown_active, breakdown_countdown, breakdown_sound_state, breakdown_delay_write, breakdown_sound, smoke_disabled, smoke, smoke_animation, aircraft_broken, mark_dirty, view_dirty, details_dirty, age, age_write, decay_write, warning, warning_company, engine_available_any, replacement_active, old_news, economy_age, economy_age_write, reached_min_age, value, value_write, max_calendar_date, max_economy_date, profit_min_age, anniversaries, before_zero, news_getting_old, news_very_old, news_very_old_and)
         }
         772 => match item {
-            0 => std::mem::size_of::<crate::vehicle::maintenance::CalendarDate>(),
-            1 => std::mem::align_of::<crate::vehicle::maintenance::CalendarDate>(),
+            0 => std::mem::size_of::<crate::services::CalendarDate>(),
+            1 => std::mem::align_of::<crate::services::CalendarDate>(),
+            2 => std::mem::offset_of!(crate::services::CalendarDate, 0),
             _ => usize::MAX,
         },
         773 => match item {
-            0 => std::mem::size_of::<crate::vehicle::maintenance::EconomyDate>(),
-            1 => std::mem::align_of::<crate::vehicle::maintenance::EconomyDate>(),
+            0 => std::mem::size_of::<crate::services::EconomyDate>(),
+            1 => std::mem::align_of::<crate::services::EconomyDate>(),
+            2 => std::mem::offset_of!(crate::services::EconomyDate, 0),
             _ => usize::MAX,
         },
         774 => match item {

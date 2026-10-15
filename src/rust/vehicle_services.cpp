@@ -444,22 +444,24 @@ const OpenTTDVehicleSchedulerServices &GetRustVehicleSchedulerServices() noexcep
 
 /* Operation-sized native observations and shared-service adapters. The complete
  * transition, traversal and decision policy lives in vehicle/maintenance.rs. */
+static OpenTTDCalendarDate MaintenanceDate(TimerGameCalendar::Date date) noexcept { return {date.base()}; }
+static OpenTTDEconomyDate MaintenanceDate(TimerGameEconomy::Date date) noexcept { return {date.base()}; }
 static OpenTTDVehicleMaintenanceRenewal OPENTTD_VEHICLE_CALL MaintenanceRenewal(OpenTTDVehicle *handle, const Company *company) noexcept
 {
 	const Vehicle *v = VehicleOf(handle);
 	assert(company == Company::Get(v->owner));
-	return {.age = RustVehicleAge(v), .max_age = RustVehicleMaxAge(v), .months = company->settings.engine_renew_months, .enabled = company->settings.engine_renew, .kind = RustVehicleVehicleType(v), .subtype = RustVehicleSubtype(v)};
+	return {.age = MaintenanceDate(RustVehicleAge(v)), .max_age = MaintenanceDate(RustVehicleMaxAge(v)), .months = company->settings.engine_renew_months, .enabled = company->settings.engine_renew, .kind = RustVehicleVehicleType(v), .subtype = RustVehicleSubtype(v)};
 }
 static OpenTTDVehicleMaintenanceReset OPENTTD_VEHICLE_CALL MaintenanceReset(OpenTTDVehicle *handle) noexcept
 {
 	const Vehicle *v = VehicleOf(handle);
-	return {.economy_date = TimerGameEconomy::date, .calendar_date = TimerGameCalendar::date, .reliability = RustEngineReliability(v->GetEngine()), .chance = RustVehicleBreakdownChance(v), .breakdowns = _settings_game.difficulty.vehicle_breakdowns};
+	return {.economy_date = MaintenanceDate(TimerGameEconomy::date), .calendar_date = MaintenanceDate(TimerGameCalendar::date), .reliability = RustEngineReliability(v->GetEngine()), .chance = RustVehicleBreakdownChance(v), .breakdowns = _settings_game.difficulty.vehicle_breakdowns};
 }
 static void OPENTTD_VEHICLE_CALL MaintenanceResetWrite(OpenTTDVehicle *handle, OpenTTDVehicleMaintenanceResetWrite value) noexcept
 {
 	Vehicle *v = VehicleOf(handle);
-	v->date_of_last_service = value.economy_date;
-	v->date_of_last_service_newgrf = value.calendar_date;
+	v->date_of_last_service = TimerGameEconomy::Date{value.economy_date.value};
+	v->date_of_last_service_newgrf = TimerGameCalendar::Date{value.calendar_date.value};
 	v->breakdowns_since_last_service = value.since;
 	v->reliability = value.reliability;
 	v->breakdown_chance = value.chance;
@@ -469,7 +471,7 @@ static OpenTTDVehicleMaintenanceInterval OPENTTD_VEHICLE_CALL MaintenanceInterva
 {
 	const Vehicle *v = VehicleOf(handle);
 	const Company *company = Company::Get(v->owner);
-	return {.company = company, .last_service = RustVehicleLastService(v), .now = TimerGameEconomy::date, .interval = v->GetServiceInterval(), .reliability = RustVehicleReliability(v), .percent = v->ServiceIntervalIsPercent(), .wallclock = TimerGameEconomy::UsingWallclockUnits(), .no_service = _settings_game.order.no_servicing_if_no_breakdowns, .breakdowns = _settings_game.difficulty.vehicle_breakdowns};
+	return {.company = company, .last_service = MaintenanceDate(RustVehicleLastService(v)), .now = MaintenanceDate(TimerGameEconomy::date), .interval = v->GetServiceInterval(), .reliability = RustVehicleReliability(v), .percent = v->ServiceIntervalIsPercent(), .wallclock = TimerGameEconomy::UsingWallclockUnits(), .no_service = _settings_game.order.no_servicing_if_no_breakdowns, .breakdowns = _settings_game.difficulty.vehicle_breakdowns};
 }
 static uint16_t OPENTTD_VEHICLE_CALL MaintenanceEngineReliability(OpenTTDVehicle *handle) noexcept { return RustEngineReliability(VehicleOf(handle)->GetEngine()); }
 static OpenTTDVehicleMaintenanceBudget OPENTTD_VEHICLE_CALL MaintenanceBudget(const Company *company) noexcept { return {.needed = RustCompanyRenewReserve(company), .available = GetAvailableMoney(company->index).base()}; }
@@ -560,9 +562,9 @@ static void OPENTTD_VEHICLE_CALL MaintenanceDetailsDirty(OpenTTDVehicle *handle)
 static OpenTTDVehicleMaintenanceAge OPENTTD_VEHICLE_CALL MaintenanceAge(OpenTTDVehicle *handle) noexcept
 {
 	const Vehicle *v = VehicleOf(handle);
-	return {.age = RustVehicleAge(v), .max_age = RustVehicleMaxAge(v), .decay = RustVehicleReliabilityDecay(v)};
+	return {.age = MaintenanceDate(RustVehicleAge(v)), .max_age = MaintenanceDate(RustVehicleMaxAge(v)), .decay = RustVehicleReliabilityDecay(v)};
 }
-static void OPENTTD_VEHICLE_CALL MaintenanceAgeWrite(OpenTTDVehicle *handle, TimerGameCalendar::Date age) noexcept { VehicleOf(handle)->age = age; }
+static void OPENTTD_VEHICLE_CALL MaintenanceAgeWrite(OpenTTDVehicle *handle, OpenTTDCalendarDate age) noexcept { VehicleOf(handle)->age = TimerGameCalendar::Date{age.value}; }
 static void OPENTTD_VEHICLE_CALL MaintenanceDecayWrite(OpenTTDVehicle *handle, uint16_t decay) noexcept { VehicleOf(handle)->reliability_spd_dec = decay; }
 static OpenTTDVehicleMaintenanceWarning OPENTTD_VEHICLE_CALL MaintenanceWarning(OpenTTDVehicle *handle) noexcept
 {
@@ -585,15 +587,13 @@ static void OPENTTD_VEHICLE_CALL MaintenanceOldNews(OpenTTDVehicle *handle, Stri
 	VehicleID id = VehicleOf(handle)->index;
 	AddVehicleAdviceNewsItem(AdviceType::VehicleOld, GetEncodedString(message, id), id);
 }
-static TimerGameEconomy::Date OPENTTD_VEHICLE_CALL MaintenanceEconomyAge(OpenTTDVehicle *handle) noexcept { return RustVehicleEconomyAge(VehicleOf(handle)); }
-static void OPENTTD_VEHICLE_CALL MaintenanceEconomyAgeWrite(OpenTTDVehicle *handle, TimerGameEconomy::Date age) noexcept { VehicleOf(handle)->economy_age = age; }
+static OpenTTDEconomyDate OPENTTD_VEHICLE_CALL MaintenanceEconomyAge(OpenTTDVehicle *handle) noexcept { return MaintenanceDate(RustVehicleEconomyAge(VehicleOf(handle))); }
+static void OPENTTD_VEHICLE_CALL MaintenanceEconomyAgeWrite(OpenTTDVehicle *handle, OpenTTDEconomyDate age) noexcept { VehicleOf(handle)->economy_age = TimerGameEconomy::Date{age.value}; }
 static void OPENTTD_VEHICLE_CALL MaintenanceReachedMinAge(OpenTTDVehicle *handle) noexcept { GroupStatistics::VehicleReachedMinAge(VehicleOf(handle)); }
 static int64_t OPENTTD_VEHICLE_CALL MaintenanceValue(OpenTTDVehicle *handle) noexcept { return RustVehicleValue(VehicleOf(handle)); }
 static void OPENTTD_VEHICLE_CALL MaintenanceValueWrite(OpenTTDVehicle *handle, int64_t value) noexcept { VehicleOf(handle)->value = Money(value); }
 static_assert(EconomyTime::DAYS_IN_ECONOMY_MONTH == 30 && CalendarTime::DAYS_IN_LEAP_YEAR == 366 && NUM_CARGO == 64);
 static_assert(SND_0F_BREAKDOWN_ROADVEHICLE == 13 && SND_10_BREAKDOWN_TRAIN_SHIP == 14 && SND_35_BREAKDOWN_ROADVEHICLE_TOYLAND == 53 && SND_3A_BREAKDOWN_TRAIN_SHIP_TOYLAND == 58);
-static_assert(std::is_trivially_copy_constructible_v<TimerGameCalendar::Date> && std::is_trivially_destructible_v<TimerGameCalendar::Date>);
-static_assert(std::is_trivially_copy_constructible_v<TimerGameEconomy::Date> && std::is_trivially_destructible_v<TimerGameEconomy::Date>);
 const OpenTTDVehicleMaintenanceServices _rust_vehicle_maintenance_services{
 	.shared = &GetRustSharedServices(),
 	.transaction = &FleetTransactionServices(),
@@ -644,11 +644,11 @@ const OpenTTDVehicleMaintenanceServices _rust_vehicle_maintenance_services{
 	.reached_min_age = MaintenanceReachedMinAge,
 	.value = MaintenanceValue,
 	.value_write = MaintenanceValueWrite,
-	.max_calendar_date = CalendarTime::MAX_DATE,
-	.max_economy_date = EconomyTime::MAX_DATE,
-	.profit_min_age = VEHICLE_PROFIT_MIN_AGE,
-	.anniversaries = {TimerGameCalendar::DateAtStartOfYear(TimerGameCalendar::Year{0}), TimerGameCalendar::DateAtStartOfYear(TimerGameCalendar::Year{1}), TimerGameCalendar::DateAtStartOfYear(TimerGameCalendar::Year{2}), TimerGameCalendar::DateAtStartOfYear(TimerGameCalendar::Year{3}), TimerGameCalendar::DateAtStartOfYear(TimerGameCalendar::Year{4})},
-	.before_zero = TimerGameCalendar::DateAtStartOfYear(TimerGameCalendar::Year{-1}),
+	.max_calendar_date = MaintenanceDate(CalendarTime::MAX_DATE),
+	.max_economy_date = MaintenanceDate(EconomyTime::MAX_DATE),
+	.profit_min_age = MaintenanceDate(VEHICLE_PROFIT_MIN_AGE),
+	.anniversaries = {MaintenanceDate(TimerGameCalendar::DateAtStartOfYear(TimerGameCalendar::Year{0})), MaintenanceDate(TimerGameCalendar::DateAtStartOfYear(TimerGameCalendar::Year{1})), MaintenanceDate(TimerGameCalendar::DateAtStartOfYear(TimerGameCalendar::Year{2})), MaintenanceDate(TimerGameCalendar::DateAtStartOfYear(TimerGameCalendar::Year{3})), MaintenanceDate(TimerGameCalendar::DateAtStartOfYear(TimerGameCalendar::Year{4}))},
+	.before_zero = MaintenanceDate(TimerGameCalendar::DateAtStartOfYear(TimerGameCalendar::Year{-1})),
 	.news_getting_old = STR_NEWS_VEHICLE_IS_GETTING_OLD,
 	.news_very_old = STR_NEWS_VEHICLE_IS_GETTING_VERY_OLD,
 	.news_very_old_and = STR_NEWS_VEHICLE_IS_GETTING_VERY_OLD_AND,

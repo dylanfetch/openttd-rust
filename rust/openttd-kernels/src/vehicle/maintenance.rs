@@ -18,14 +18,8 @@ use super::{
 };
 use crate::{company::OpenTTDCompany, fleet, services};
 
-/// Actual native calendar date representation, distinct from economy dates.
-#[repr(transparent)]
-#[derive(Clone, Copy)]
-pub struct CalendarDate(pub i32);
-/// Actual native economy date representation.
-#[repr(transparent)]
-#[derive(Clone, Copy)]
-pub struct EconomyDate(pub i32);
+use crate::services::{CalendarDate, EconomyDate};
+
 #[repr(C)]
 pub struct Renewal {
     pub age: CalendarDate,
