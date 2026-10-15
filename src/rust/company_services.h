@@ -13,6 +13,7 @@
 #include "../company_base.h"
 #include "company_ffi.h"
 
+inline bool OpenTTDCompanyIsValid(uint8_t company) noexcept { return Company::IsValidID(CompanyID(company)); }
 inline CompanyID OpenTTDCurrentCompany() noexcept { return _current_company; }
 inline void OpenTTDSetCurrentCompany(CompanyID company) noexcept { _current_company = company; }
 inline uint16_t RustCompanyAircraftServiceInterval(CompanyID owner) noexcept { return Company::Get(owner)->settings.vehicle.servint_aircraft; }

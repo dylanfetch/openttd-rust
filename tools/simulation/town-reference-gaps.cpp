@@ -24,7 +24,8 @@
 
 using TileIndex = uint32_t;
 using TileIndexDiff = int32_t;
-using DiagDirection = uint32_t;
+/* The shared FFI declares native DiagDirection; fixture scalars convert explicitly. */
+static_assert(sizeof(DiagDirection) == sizeof(uint8_t));
 using RoadBits = uint32_t;
 using RoadType = uint32_t;
 using Slope = uint32_t;
@@ -87,7 +88,7 @@ static Tile At(TileIndex tile)
 	return it == world->tiles.end() ? Tile{} : it->second;
 }
 static TileIndexDiff TileOffsByDiagDir(DiagDirection dir) { return std::array<int32_t, 4>{-1, 1024, 1, -1024}[dir]; }
-static DiagDirection ReverseDiagDir(DiagDirection dir) { return (dir + 2) & 3; }
+static DiagDirection ReverseDiagDir(DiagDirection dir) { return static_cast<DiagDirection>((dir + 2) & 3); }
 static uint32_t DiagDirToAxis(DiagDirection dir) { return dir & 1; }
 static RoadBits DiagDirToRoadBits(DiagDirection dir) { return 1 << (3 - dir); }
 static TileIndex TileAddByDiagDir(TileIndex tile, DiagDirection dir) { return tile + TileOffsByDiagDir(dir); }
@@ -100,13 +101,13 @@ static bool IsSteepSlope(Slope slope) { return (slope & 16) != 0; }
 static bool IsSlopeWithOneCornerRaised(Slope slope) { return slope == 1 || slope == 2 || slope == 4 || slope == 8; }
 static RoadBits GetTownRoadBits(TileIndex tile) { return At(tile).roads; }
 static uint32_t GetTunnelBridgeTransportType(TileIndex tile) { return At(tile).transport; }
-static DiagDirection GetTunnelBridgeDirection(TileIndex tile) { return At(tile).facing; }
+static DiagDirection GetTunnelBridgeDirection(TileIndex tile) { return static_cast<DiagDirection>(At(tile).facing); }
 static bool IsDriveThroughStopTile(TileIndex tile) { return At(tile).stop == 1; }
 static uint32_t GetDriveThroughStopAxis(TileIndex tile) { return At(tile).facing; }
 static bool IsBayRoadStopTile(TileIndex tile) { return At(tile).stop == 2; }
-static DiagDirection GetBayRoadStopDir(TileIndex tile) { return At(tile).facing; }
+static DiagDirection GetBayRoadStopDir(TileIndex tile) { return static_cast<DiagDirection>(At(tile).facing); }
 static bool IsRoadDepot(TileIndex tile) { return At(tile).stop == 3; }
-static DiagDirection GetRoadDepotDirection(TileIndex tile) { return At(tile).facing; }
+static DiagDirection GetRoadDepotDirection(TileIndex tile) { return static_cast<DiagDirection>(At(tile).facing); }
 static void RoadMask() { world->trace.push_back({21, 0, 0, 0, 0, 0, 0}); }
 static void RoadInfo(uint32_t type) { world->trace.push_back({24, type, 0, 0, 0, 0, 0}); }
 /* One active town-buildable type is a controlled shared service, not a second
@@ -191,16 +192,16 @@ static bool Candidate()
 	leaves.allow_crossings = []() noexcept { return _settings_game.economy.allow_town_level_crossings; };
 	return openttd_rust_town_tunnel(&leaves, &services, world->town.index, world->start, world->direction);
 }
-static uint32_t Along(const World &w, int distance) { return w.start + distance * TileOffsByDiagDir(w.direction); }
+static uint32_t Along(const World &w, int distance) { return w.start + distance * TileOffsByDiagDir(static_cast<DiagDirection>(w.direction)); }
 static World Fixture(uint32_t dir, uint32_t length, bool mountain)
 {
 	World w;
 	w.direction = dir; w.length = length;
-	w.tiles[Along(w, -1)].roads = DiagDirToRoadBits(dir);
+	w.tiles[Along(w, -1)].roads = DiagDirToRoadBits(static_cast<DiagDirection>(dir));
 	for (uint32_t i = 0; i <= length; i++) {
 		auto &t = w.tiles[Along(w, i)];
 		t.z = i == 0 || i == length ? 4 : 5;
-		t.slope = InclinedSlope(dir);
+		t.slope = InclinedSlope(static_cast<DiagDirection>(dir));
 	}
 	if (!mountain) w.tiles[Along(w, 1)].type = MP_STATION;
 	return w;
@@ -210,7 +211,7 @@ static void Compare(World input, const char *label)
 {
 	World reference = input, candidate = input;
 	world = &reference;
-	bool expected = GrowTownWithTunnel(&world->town, world->start, world->direction);
+	bool expected = GrowTownWithTunnel(&world->town, world->start, static_cast<DiagDirection>(world->direction));
 	world = &candidate;
 	candidate.owner = openttd_rust_town_new();
 	bool actual = Candidate();

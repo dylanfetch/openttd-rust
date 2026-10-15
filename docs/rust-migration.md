@@ -1680,6 +1680,34 @@ A narrow unchanged-source comparison covers variable-length curve/reversal input
 unavailable in the stock fixture. The PR records commands and branch/NewGRF limits; passing these inputs does not prove
 exhaustive train equivalence.
 
+### Rail signal blocks and fixed work sets (#219)
+
+Rust owns complete signal-block exploration, immediate signal update/propagation,
+first-segment classification and all three fixed 64/256/128 work sets, including
+counts, sticky overflow flags, private direction tables and last owner. State has
+process lifetime under the game-state mutex; loading adds no new reset. Duplicate
+Add, first-match/swap-last Remove, LIFO Get, the 64-item forced flush and distinct
+public/private owner invalidation rules retain the original behavior.
+
+C++ keeps public signal constants, shared map/pools/spatial queries, commands and
+rendering. Guarded typed observations read only the consumed branch fields;
+occupancy separates rail geometry from signal reads, and combo/state reads stay
+live. Train and reservation callers enter Rust directly through an immutable,
+call-scoped context. No owner borrow crosses native callbacks; no signal entry
+allocates or draws Random. Native assertion configuration remains authoritative.
+
+`python3 tools/migration.py simulate signals --jobs 2` (also `--self`, `--soak`)
+compares real 1996/2000/2006 train movement, signal commands, return states,
+ordered pending prefixes, PBS/presignal updates, stations/crossings/wormholes,
+reload, command-built signal overflow/reset/follow-up, combo red/multiple exits,
+empty-neighbour continuation and ownership barriers. Default witnesses fail when missing. A bounded unchanged-SmallSet-body probe
+covers otherwise-unreached Add failure, sticky drain/reset and duplicate removal
+at all capacities. ABI checks cover consumed tables/records; counters distinguish
+world services, facade/context calls and actual nested occupancy accessors counted
+only in the relinked scenario adapter; native occupancy signatures stay original.
+Real tbd/global propagation overflow, threaded play and arbitrary mod layouts
+remain #156 limits; the PR records validation and all six timing ratchets.
+
 ### Industry periodic production and builder ownership (#129)
 
 Rust owns the produced/accepted slots, optional accepted histories, production
@@ -1838,5 +1866,5 @@ adapter declares variant and cutoff spec inputs for unchanged reference bodies;
 branch results, command costs and semantic saves must match. Counters record
 native entries, service crossings and returned bytes, disabled for timing.
 External NewGRF programs/retire_early, ENGS and TTO/TTD fixtures, legacy preview
-conversion and threaded GUI/presentation remain #156 gaps. Final independent
-review, coordinated speed budgets and exact-head full CI still gate integration.
+conversion and threaded GUI/presentation remain #156 gaps. #248 records the
+fixing reviews, source comparisons and final-head CI/speed results.

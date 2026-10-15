@@ -6,6 +6,7 @@
  */
 
 #include "services_ffi.h"
+#include "services_rail.h"
 
 /** @file train_services.h Direct shared-world operations; no train policy. */
 #include "sound_services.h"
@@ -267,10 +268,6 @@ static uint64_t TrainCrossingReserved(OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	return HasCrossingReservation(TileIndex(a));
 }
-static uint64_t TrainCrossingRoadAxis(OpenTTDTrainHandle, uint32_t a) noexcept
-{
-	return GetCrossingRoadAxis(TileIndex(a));
-}
 static void TrainCrossingSound(OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	SndPlayTileFx(SND_0E_LEVEL_CROSSING, TileIndex(a));
@@ -298,10 +295,6 @@ static void TrainDeleteVehicle(OpenTTDTrainHandle id) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
 	delete v;
-}
-static uint64_t TrainDepotDir(OpenTTDTrainHandle, uint32_t a) noexcept
-{
-	return GetRailDepotDirection(TileIndex(a));
 }
 static void TrainDepotDirty(OpenTTDTrainHandle id) noexcept
 {
@@ -395,18 +388,6 @@ static uint64_t TrainHasDepotRes(OpenTTDTrainHandle, uint32_t a) noexcept
 static uint64_t TrainHasReserved(OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
 	return HasReservedTracks(TileIndex(a), static_cast<TrackBits>(b));
-}
-static uint64_t TrainHasSignal(OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
-{
-	return HasSignalOnTrack(TileIndex(a), static_cast<Track>(b));
-}
-static uint64_t TrainHasSignals(OpenTTDTrainHandle, uint32_t a) noexcept
-{
-	return HasSignals(TileIndex(a));
-}
-static uint64_t TrainHasSignalTd(OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
-{
-	return HasSignalOnTrackdir(TileIndex(a), static_cast<Trackdir>(b));
 }
 static void TrainHideFill(OpenTTDTrainHandle id) noexcept
 {
@@ -559,10 +540,6 @@ static uint64_t TrainOrderStop(OpenTTDTrainHandle id, uint16_t a) noexcept
 	Train *v = static_cast<Train *>(id.shell);
 	return v->current_order.ShouldStopAtStation(v, StationID(a));
 }
-static uint64_t TrainOtherEnd(OpenTTDTrainHandle, uint32_t a) noexcept
-{
-	return GetOtherTunnelBridgeEnd(TileIndex(a)).base();
-}
 static void TrainPayRunning(OpenTTDTrainHandle id, int64_t a) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
@@ -681,10 +658,6 @@ static void TrainSetPlatformRes(OpenTTDTrainHandle, uint32_t a, uint8_t b, uint8
 {
 	SetRailStationPlatformReservation(TileIndex(a), static_cast<DiagDirection>(b), c != 0);
 }
-static void TrainSetSignalState(OpenTTDTrainHandle, uint32_t a, uint8_t b, uint8_t c) noexcept
-{
-	SetSignalStateByTrackdir(TileIndex(a), static_cast<Trackdir>(b), static_cast<SignalState>(c));
-}
 static void TrainSetTunnelRes(OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
 	SetTunnelBridgeReservation(TileIndex(a), b != 0);
@@ -698,19 +671,6 @@ static uint64_t TrainShowReservation(OpenTTDTrainHandle) noexcept
 {
 	return _settings_client.gui.show_track_reservation;
 }
-static void TrainSignalsBoth(OpenTTDTrainHandle, uint32_t a, uint8_t b, uint8_t c) noexcept
-{
-	SetSignalsOnBothDir(TileIndex(a), static_cast<Track>(b), Owner(c));
-}
-static uint64_t TrainSignalsUpdate(OpenTTDTrainHandle id, uint32_t a, uint8_t b) noexcept
-{
-	Train *v = static_cast<Train *>(id.shell);
-	return UpdateSignalsOnSegment(TileIndex(a), static_cast<DiagDirection>(b), v->owner);
-}
-static uint64_t TrainSignalsUpdateOwner(OpenTTDTrainHandle, uint32_t a, uint8_t b, uint8_t c) noexcept
-{
-	return UpdateSignalsOnSegment(TileIndex(a), static_cast<DiagDirection>(b), Owner(c));
-}
 static uint64_t TrainSignalHasPbs(OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
 	return HasPbsSignalOnTrackdir(TileIndex(a), static_cast<Trackdir>(b));
@@ -718,10 +678,6 @@ static uint64_t TrainSignalHasPbs(OpenTTDTrainHandle, uint32_t a, uint8_t b) noe
 static uint64_t TrainSignalPbs(OpenTTDTrainHandle, uint8_t a) noexcept
 {
 	return IsPbsSignal(static_cast<SignalType>(a));
-}
-static uint64_t TrainSignalType(OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
-{
-	return GetSignalType(TileIndex(a), static_cast<Track>(b));
 }
 static uint64_t TrainSigsegFull(OpenTTDTrainHandle) noexcept
 {
@@ -745,10 +701,6 @@ static void TrainStartStopDirty(OpenTTDTrainHandle id) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
 	SetWindowWidgetDirty(WC_VEHICLE_VIEW, v->index, WID_VV_START_STOP);
-}
-static uint64_t TrainStationAxis(OpenTTDTrainHandle, uint32_t a) noexcept
-{
-	return GetRailStationAxis(TileIndex(a));
 }
 static uint64_t TrainStationCompatible(OpenTTDTrainHandle, uint32_t a, uint32_t b) noexcept
 {
@@ -812,10 +764,6 @@ static uint64_t TrainTrackdirReaches(OpenTTDTrainHandle, uint8_t a) noexcept
 {
 	return DiagdirReachesTrackdirs(static_cast<DiagDirection>(a));
 }
-static uint64_t TrainTrackBits(OpenTTDTrainHandle, uint32_t a) noexcept
-{
-	return GetTrackBits(TileIndex(a));
-}
 static uint64_t TrainTrackCrosses(OpenTTDTrainHandle, uint8_t a) noexcept
 {
 	return TrackCrossesTracks(static_cast<Track>(a));
@@ -823,10 +771,6 @@ static uint64_t TrainTrackCrosses(OpenTTDTrainHandle, uint8_t a) noexcept
 static uint64_t TrainTrackDirection(OpenTTDTrainHandle, uint8_t a, uint8_t b) noexcept
 {
 	return TrackDirectionToTrackdir(static_cast<Track>(a), static_cast<Direction>(b));
-}
-static uint64_t TrainTrackStatus(OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
-{
-	return GetTileTrackStatus(TileIndex(a), TRANSPORT_RAIL, 0, static_cast<DiagDirection>(b));
 }
 static void TrainTrainList(OpenTTDTrainHandle) noexcept
 {

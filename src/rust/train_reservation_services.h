@@ -6,6 +6,7 @@
 	*/
 
 #include "services_ffi.h"
+#include "services_rail.h"
 
 /** @file train_reservation_services.h Direct map/PBS/follower services. */
 
@@ -61,11 +62,6 @@ static uint64_t TrainReservationCrossTracks(void *, OpenTTDTrainHandle, uint8_t 
 {
 	return TrackCrossesTracks(static_cast<Track>(a));
 }
-static uint64_t TrainReservationDepotDir(void *, OpenTTDTrainHandle, uint32_t a) noexcept
-{
-	TileIndex t(static_cast<uint32_t>(a));
-	return GetRailDepotDirection(t);
-}
 static uint64_t TrainReservationDepotReserved(void *, OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
@@ -93,11 +89,6 @@ static uint64_t TrainReservationFree(void *, OpenTTDTrainHandle id, uint32_t a, 
 	TileIndex t(static_cast<uint32_t>(a));
 	return IsWaitingPositionFree(v, t, static_cast<Trackdir>(b), _settings_game.pf.forbid_90_deg);
 }
-static uint64_t TrainReservationGreen(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
-{
-	TileIndex t(static_cast<uint32_t>(a));
-	return GetSignalStateByTrackdir(t, static_cast<Trackdir>(b)) == SIGNAL_STATE_GREEN;
-}
 static uint64_t TrainReservationHasPbs(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
@@ -107,11 +98,6 @@ static uint64_t TrainReservationHasReserved(void *, OpenTTDTrainHandle, uint32_t
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	return HasReservedTracks(t, static_cast<TrackBits>(b));
-}
-static uint64_t TrainReservationHasSignal(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
-{
-	TileIndex t(static_cast<uint32_t>(a));
-	return HasSignalOnTrackdir(t, static_cast<Trackdir>(b));
 }
 static void TrainReservationIncrementOrder(void *, OpenTTDTrainHandle id) noexcept
 {
@@ -130,8 +116,7 @@ static uint64_t TrainReservationIsDepot(void *, OpenTTDTrainHandle, uint32_t a) 
 }
 static uint64_t TrainReservationIsPbs(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
-	TileIndex t(static_cast<uint32_t>(a));
-	return IsPbsSignal(GetSignalType(t, static_cast<Track>(b)));
+	return IsPbsSignal(RustRailSignalType(a, b));
 }
 static uint64_t TrainReservationIsPlain(void *, OpenTTDTrainHandle, uint32_t a) noexcept
 {
@@ -191,11 +176,6 @@ static uint64_t TrainReservationOrderType(void *, OpenTTDTrainHandle id, uint8_t
 {
 	Train *v = static_cast<Train *>(id.shell);
 	return v->GetOrder(static_cast<VehicleOrderID>(a))->GetType();
-}
-static uint64_t TrainReservationOtherEnd(void *, OpenTTDTrainHandle, uint32_t a) noexcept
-{
-	TileIndex t(static_cast<uint32_t>(a));
-	return GetOtherTunnelBridgeEnd(t).base();
 }
 static uint64_t TrainReservationOverlap(void *, OpenTTDTrainHandle, uint8_t a) noexcept
 {
@@ -267,11 +247,6 @@ static void TrainReservationSetPlatform(void *, OpenTTDTrainHandle, uint32_t a, 
 	TileIndex t(static_cast<uint32_t>(a));
 	SetRailStationPlatformReservation(t, static_cast<DiagDirection>(b), c != 0);
 }
-static void TrainReservationSetSignal(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b, uint8_t c) noexcept
-{
-	TileIndex t(static_cast<uint32_t>(a));
-	SetSignalStateByTrackdir(t, static_cast<Trackdir>(b), c != 0 ? SIGNAL_STATE_GREEN : SIGNAL_STATE_RED);
-}
 static void TrainReservationSetTunnel(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
@@ -280,12 +255,6 @@ static void TrainReservationSetTunnel(void *, OpenTTDTrainHandle, uint32_t a, ui
 static uint64_t TrainReservationShowRes(void *, OpenTTDTrainHandle) noexcept
 {
 	return _settings_client.gui.show_track_reservation;
-}
-static void TrainReservationSignalBuffer(void *, OpenTTDTrainHandle id, uint32_t a, uint8_t b) noexcept
-{
-	Train *v = static_cast<Train *>(id.shell);
-	TileIndex t(static_cast<uint32_t>(a));
-	AddSideToSignalBuffer(t, static_cast<DiagDirection>(b), v->owner);
 }
 static void TrainReservationStartStop(void *, OpenTTDTrainHandle id) noexcept
 {
@@ -321,8 +290,7 @@ static uint64_t TrainReservationTrackdir(void *, OpenTTDTrainHandle id) noexcept
 }
 static uint64_t TrainReservationTrackStatus(void *, OpenTTDTrainHandle, uint32_t a) noexcept
 {
-	TileIndex t(static_cast<uint32_t>(a));
-	return TrackStatusToTrackdirBits(GetTileTrackStatus(t, TRANSPORT_RAIL, 0));
+	return TrackStatusToTrackdirBits(RustRailTrackStatus(a, INVALID_DIAGDIR));
 }
 static uint64_t TrainReservationTryTrack(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
@@ -339,10 +307,6 @@ static void TrainReservationUnreserve(void *, OpenTTDTrainHandle, uint32_t a, ui
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	UnreserveRailTrack(t, static_cast<Track>(b));
-}
-static void TrainReservationUpdateBuffer(void *, OpenTTDTrainHandle) noexcept
-{
-	UpdateSignalsInBuffer();
 }
 static void TrainReservationWriteDest(void *, OpenTTDTrainHandle id, uint32_t a) noexcept
 {

@@ -12,6 +12,7 @@
 #include <cstddef>
 #include "train_state_ffi.h"
 #include "services_ffi.h"
+#include "signal_ffi.h"
 /* Each shell owns one canonical Rust state allocation. A resolved handle copies
  * native identity and its owner once per entry or topology read. Narrow records
  * contain only fields consumed by the current policy; no world borrow spans a
@@ -404,9 +405,7 @@ struct OpenTTDTrainServices {
 	void (*set_tunnel_res)(OpenTTDTrainHandle, uint32_t, uint8_t) noexcept;
 	void (*show_effect)(OpenTTDTrainHandle) noexcept;
 	uint64_t (*show_reservation)(OpenTTDTrainHandle) noexcept;
-	void (*signals_both)(OpenTTDTrainHandle, uint32_t, uint8_t, uint8_t) noexcept;
-	uint64_t (*signals_update)(OpenTTDTrainHandle, uint32_t, uint8_t) noexcept;
-	uint64_t (*signals_update_owner)(OpenTTDTrainHandle, uint32_t, uint8_t, uint8_t) noexcept;
+	OpenTTDSignalContext (*signal_context)() noexcept;
 	uint64_t (*signal_has_pbs)(OpenTTDTrainHandle, uint32_t, uint8_t) noexcept;
 	uint64_t (*signal_pbs)(OpenTTDTrainHandle, uint8_t) noexcept;
 	uint64_t (*signal_type)(OpenTTDTrainHandle, uint32_t, uint8_t) noexcept;

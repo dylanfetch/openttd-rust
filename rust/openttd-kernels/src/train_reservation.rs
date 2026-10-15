@@ -200,7 +200,8 @@ pub struct Leaves {
     pub set_signal: extern "C" fn(*mut std::ffi::c_void, Handle, u32, u8, u8),
     pub set_tunnel: extern "C" fn(*mut std::ffi::c_void, Handle, u32, u8),
     pub show_res: extern "C" fn(*mut std::ffi::c_void, Handle) -> u64,
-    pub signal_buffer: extern "C" fn(*mut std::ffi::c_void, Handle, u32, u8),
+    pub signal_context: extern "C" fn() -> crate::signal::Context,
+    pub vehicle: *const crate::vehicle::VehicleServices,
     pub start_stop: extern "C" fn(*mut std::ffi::c_void, Handle),
     pub station: extern "C" fn(*mut std::ffi::c_void, Handle, u32) -> u64,
     pub station_train: extern "C" fn(*mut std::ffi::c_void, Handle, u16) -> u64,
@@ -214,7 +215,6 @@ pub struct Leaves {
     pub tunnel_dir: extern "C" fn(*mut std::ffi::c_void, Handle, u32) -> u64,
     pub tunnel_free: extern "C" fn(*mut std::ffi::c_void, Handle, u32, u32) -> u64,
     pub unreserve: extern "C" fn(*mut std::ffi::c_void, Handle, u32, u8),
-    pub update_buffer: extern "C" fn(*mut std::ffi::c_void, Handle),
     pub write_dest: extern "C" fn(*mut std::ffi::c_void, Handle, u32),
     pub write_last: extern "C" fn(*mut std::ffi::c_void, Handle, u16),
     pub write_suppress: extern "C" fn(*mut std::ffi::c_void, Handle, u8),
@@ -228,6 +228,7 @@ pub struct Leaves {
 }
 #[derive(Clone, Copy)]
 struct Game<'a> {
+    vehicle: *mut crate::vehicle::OpenTTDVehicle,
     leaves: &'a Leaves,
     context: *mut std::ffi::c_void,
 }
@@ -453,8 +454,18 @@ impl Game<'_> {
     fn svc_show_res(&self, id: Handle) -> u64 {
         (self.leaves.show_res)(self.context, id)
     }
-    fn svc_signal_buffer(&self, id: Handle, a: u64, b: u64) -> u64 {
-        (self.leaves.signal_buffer)(self.context, id, a as u32, b as u8);
+    fn svc_signal_buffer(&self, _id: Handle, a: u64, b: u64) -> u64 {
+        // SAFETY: C++ supplies the adjusted Vehicle base of the entry train.
+        // The live shell and immutable table survive this call; no owner borrow
+        // spans the canonical shared callback. free() retains that entry train.
+        let owner = unsafe {
+            let vehicle =
+                crate::vehicle::VehicleRef(std::ptr::NonNull::new_unchecked(self.vehicle));
+            ((*self.leaves.vehicle).owner)(vehicle)
+        };
+        crate::signal::count_context_owner_read();
+        crate::signal::acquire_context(self.leaves.signal_context)
+            .add_side(a as u32, b as u8, owner);
         0
     }
     fn svc_start_stop(&self, id: Handle) -> u64 {
@@ -499,8 +510,8 @@ impl Game<'_> {
         (self.leaves.unreserve)(self.context, id, a as u32, b as u8);
         0
     }
-    fn svc_update_buffer(&self, id: Handle) -> u64 {
-        (self.leaves.update_buffer)(self.context, id);
+    fn svc_update_buffer(&self, _id: Handle) -> u64 {
+        crate::signal::acquire_context(self.leaves.signal_context).flush();
         0
     }
     fn svc_write_dest(&self, id: Handle, a: u64) -> u64 {
@@ -1195,11 +1206,13 @@ fn check_next(g: &Game, id: Handle) {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_train_reservation_check_next(
     id: Handle,
+    vehicle: crate::vehicle::VehicleRef,
     leaves: *const Leaves,
     context: *mut std::ffi::c_void,
 ) {
     // SAFETY: The native stack owns these immutable services throughout the call.
     let g = Game {
+        vehicle: vehicle.0.as_ptr(),
         leaves: unsafe { &*leaves },
         context,
     };
@@ -1212,6 +1225,7 @@ pub unsafe extern "C" fn openttd_rust_train_reservation_check_next(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_train_reservation_clear(
     id: Handle,
+    vehicle: crate::vehicle::VehicleRef,
     tile: u32,
     td: u8,
     leaves: *const Leaves,
@@ -1219,6 +1233,7 @@ pub unsafe extern "C" fn openttd_rust_train_reservation_clear(
 ) {
     // SAFETY: The native stack owns these immutable services throughout the call.
     let g = Game {
+        vehicle: vehicle.0.as_ptr(),
         leaves: unsafe { &*leaves },
         context,
     };
@@ -1231,11 +1246,13 @@ pub unsafe extern "C" fn openttd_rust_train_reservation_clear(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_train_reservation_free(
     id: Handle,
+    vehicle: crate::vehicle::VehicleRef,
     leaves: *const Leaves,
     context: *mut std::ffi::c_void,
 ) {
     // SAFETY: The native stack owns these immutable services throughout the call.
     let g = Game {
+        vehicle: vehicle.0.as_ptr(),
         leaves: unsafe { &*leaves },
         context,
     };
@@ -1248,6 +1265,7 @@ pub unsafe extern "C" fn openttd_rust_train_reservation_free(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_train_reservation_choose(
     id: Handle,
+    vehicle: crate::vehicle::VehicleRef,
     tile: u32,
     dir: u8,
     tracks: u8,
@@ -1258,6 +1276,7 @@ pub unsafe extern "C" fn openttd_rust_train_reservation_choose(
 ) -> Choice {
     // SAFETY: The native stack owns these immutable services throughout the call.
     let g = Game {
+        vehicle: vehicle.0.as_ptr(),
         leaves: unsafe { &*leaves },
         context,
     };
@@ -1274,6 +1293,7 @@ pub unsafe extern "C" fn openttd_rust_train_reservation_choose(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_train_reservation_try_path(
     id: Handle,
+    vehicle: crate::vehicle::VehicleRef,
     mark: u8,
     first_okay: u8,
     leaves: *const Leaves,
@@ -1281,6 +1301,7 @@ pub unsafe extern "C" fn openttd_rust_train_reservation_try_path(
 ) -> u8 {
     // SAFETY: The native stack owns these immutable services throughout the call.
     let g = Game {
+        vehicle: vehicle.0.as_ptr(),
         leaves: unsafe { &*leaves },
         context,
     };
@@ -1293,11 +1314,13 @@ pub unsafe extern "C" fn openttd_rust_train_reservation_try_path(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_train_reservation_check_reverse(
     id: Handle,
+    vehicle: crate::vehicle::VehicleRef,
     leaves: *const Leaves,
     context: *mut std::ffi::c_void,
 ) -> u8 {
     // SAFETY: The native stack owns these immutable services throughout the call.
     let g = Game {
+        vehicle: vehicle.0.as_ptr(),
         leaves: unsafe { &*leaves },
         context,
     };
@@ -1318,12 +1341,14 @@ pub unsafe extern "C" fn openttd_rust_train_reservation_check_reverse(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_train_reservation_station_location(
     id: Handle,
+    vehicle: crate::vehicle::VehicleRef,
     station: u16,
     leaves: *const Leaves,
     context: *mut std::ffi::c_void,
 ) -> u32 {
     // SAFETY: The native stack owns these immutable services throughout the call.
     let g = Game {
+        vehicle: vehicle.0.as_ptr(),
         leaves: unsafe { &*leaves },
         context,
     };
@@ -1344,11 +1369,13 @@ pub unsafe extern "C" fn openttd_rust_train_reservation_station_location(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_train_reservation_reserve_under(
     id: Handle,
+    vehicle: crate::vehicle::VehicleRef,
     leaves: *const Leaves,
     context: *mut std::ffi::c_void,
 ) {
     // SAFETY: The native stack owns these immutable services throughout the call.
     let g = Game {
+        vehicle: vehicle.0.as_ptr(),
         leaves: unsafe { &*leaves },
         context,
     };
@@ -1454,7 +1481,8 @@ mod tests {
             set_signal: unused!((*mut std::ffi::c_void, Handle, u32, u8, u8); ()),
             set_tunnel: unused!((*mut std::ffi::c_void, Handle, u32, u8); ()),
             show_res: unused!((*mut std::ffi::c_void, Handle); u64),
-            signal_buffer: unused!((*mut std::ffi::c_void, Handle, u32, u8); ()),
+            signal_context: unused!(() ; crate::signal::Context),
+            vehicle: std::ptr::null(),
             start_stop: unused!((*mut std::ffi::c_void, Handle); ()),
             station: unused!((*mut std::ffi::c_void, Handle, u32); u64),
             station_train: unused!((*mut std::ffi::c_void, Handle, u16); u64),
@@ -1468,7 +1496,6 @@ mod tests {
             tunnel_dir: unused!((*mut std::ffi::c_void, Handle, u32); u64),
             tunnel_free: unused!((*mut std::ffi::c_void, Handle, u32, u32); u64),
             unreserve: unused!((*mut std::ffi::c_void, Handle, u32, u8); ()),
-            update_buffer: unused!((*mut std::ffi::c_void, Handle); ()),
             write_dest: unused!((*mut std::ffi::c_void, Handle, u32); ()),
             write_last: unused!((*mut std::ffi::c_void, Handle, u16); ()),
             write_suppress: unused!((*mut std::ffi::c_void, Handle, u8); ()),
@@ -1603,6 +1630,7 @@ mod tests {
         let h = m.handle();
         let ls = extension_leaves();
         let g = Game {
+            vehicle: std::ptr::null_mut(),
             leaves: &ls,
             context: std::ptr::null_mut(),
         };
@@ -1633,6 +1661,7 @@ mod tests {
             let h = m.handle();
             let ls = extension_leaves();
             let g = Game {
+                vehicle: std::ptr::null_mut(),
                 leaves: &ls,
                 context: std::ptr::null_mut(),
             };
@@ -1717,6 +1746,7 @@ mod tests {
             let ls = order_leaves();
             let mut outer_context = OrderContext { saved: 0 };
             let g = Game {
+                vehicle: std::ptr::null_mut(),
                 leaves: &ls,
                 context: std::ptr::from_mut(&mut outer_context).cast(),
             };
@@ -1729,6 +1759,7 @@ mod tests {
                 {
                     let mut inner_context = OrderContext { saved: 0 };
                     let inner_game = Game {
+                        vehicle: std::ptr::null_mut(),
                         leaves: &ls,
                         context: std::ptr::from_mut(&mut inner_context).cast(),
                     };
@@ -1763,6 +1794,7 @@ mod tests {
                 unsafe {
                     openttd_rust_train_reservation_check_reverse(
                         h,
+                        crate::vehicle::VehicleRef(std::ptr::NonNull::dangling()),
                         &raw const ls,
                         std::ptr::null_mut(),
                     )
@@ -1782,6 +1814,7 @@ mod tests {
             ..leaves()
         };
         let g = Game {
+            vehicle: std::ptr::null_mut(),
             leaves: &ls,
             context: std::ptr::null_mut(),
         };
