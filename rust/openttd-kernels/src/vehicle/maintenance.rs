@@ -360,9 +360,21 @@ unsafe fn replacement_needed<const C: bool>(
             &raw mut available
         );
     };
+    if C {
+        crate::witness::add(
+            crate::witness::VEHICLE_MAINT_BYTES,
+            (std::mem::size_of_val(&union) + std::mem::size_of_val(&available)) as u64,
+        );
+    }
     if union != 0 {
         let mut cargo_type = 0;
         let cargo = unsafe { svc!(C, t.vehicle_cargo, v.0.as_ptr().cast(), &raw mut cargo_type) };
+        if C {
+            crate::witness::add(
+                crate::witness::VEHICLE_MAINT_BYTES,
+                std::mem::size_of_val(&cargo_type) as u64,
+            );
+        }
         if cargo & cargo.wrapping_sub(1) != 0 {
             let defaults = unsafe { svc!(C, t.default_cargo, replacement.engine) };
             if cargo & defaults != cargo {
