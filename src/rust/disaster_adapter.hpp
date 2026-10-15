@@ -5,6 +5,7 @@
  * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
  */
 /** @file disaster_adapter.hpp Copied canonical observations and returned shared services. */
+#include "services_rail.h"
 #include "disaster_ffi.h"
 #include "disaster_counter.h"
 #include "services_ffi.h"
@@ -56,7 +57,7 @@ static void OPENTTD_DISASTER_CALL DisasterRead(void *, uint32_t kind, uint32_t i
 			TileIndex tile{id}; out[0] = IsValidTile(tile); if (!out[0]) break;
 			out[1] = GetTileType(tile);
 			if (out[1] == MP_RAILWAY) out[2] = GetTileOwner(tile).base();
-			out[4] = IsTileType(tile, MP_RAILWAY) && IsRailDepot(tile); out[5] = IsAirportTile(tile);
+			out[4] = IsTileType(tile, MP_RAILWAY) && RustRailIsDepot(id); out[5] = IsAirportTile(tile);
 			if (out[5]) out[6] = GetStationIndex(tile).base();
 			if (IsTileType(tile, MP_INDUSTRY)) out[7] = GetIndustryIndex(tile).base();
 			out[8] = IsPlainRailTile(tile); break;

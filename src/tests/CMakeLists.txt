@@ -33,6 +33,7 @@ add_test_files(
     string_consumer.cpp
     string_consumer_bytes.cpp
     string_inplace.cpp
+    signal.cpp
     string_func.cpp
     test_main.cpp
     test_network_crypto.cpp

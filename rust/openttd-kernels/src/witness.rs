@@ -250,7 +250,6 @@ pub const AIRCRAFT_CACHE_ENTRIES: usize = 106;
 /// Ownerless flight helper ingress, also included in total entries.
 pub const AIRCRAFT_DISASTER_ENTRIES: usize = 107;
 
-/// Counter names, grouped by the prefix the harness selects.
 /// Engine services witness.
 pub const ENGINE_SERVICES: usize = 108;
 /// Engine bytes witness.
@@ -281,7 +280,80 @@ pub const ENGINE_RENAME: usize = 120;
 /// Engine native entry witness.
 pub const ENGINE_ENTRIES: usize = 121;
 
-pub const NAMES: [&str; 122] = [
+/// Signal `updates` witness.
+pub const SIGNAL_UPDATES: usize = 122;
+/// Signal `tiles` witness.
+pub const SIGNAL_TILES: usize = 123;
+/// Signal `services` witness.
+pub const SIGNAL_SERVICES: usize = 124;
+/// Signal `tbu_overflow` witness.
+pub const SIGNAL_TBU_OVERFLOW: usize = 125;
+/// Signal `tbd_overflow` witness.
+pub const SIGNAL_TBD_OVERFLOW: usize = 126;
+/// Signal `global_overflow` witness.
+pub const SIGNAL_GLOBAL_OVERFLOW: usize = 127;
+/// Signal `train` witness.
+pub const SIGNAL_TRAIN: usize = 128;
+/// Signal `owner_barrier` witness.
+pub const SIGNAL_OWNER_BARRIER: usize = 129;
+/// Signal `depot` witness.
+pub const SIGNAL_DEPOT: usize = 130;
+/// Signal `split` witness.
+pub const SIGNAL_SPLIT: usize = 131;
+/// Signal `pbs` witness.
+pub const SIGNAL_PBS: usize = 132;
+/// Signal `multi_enter` witness.
+pub const SIGNAL_MULTI_ENTER: usize = 133;
+/// Signal `exit` witness.
+pub const SIGNAL_EXIT: usize = 134;
+/// Signal `green_exit` witness.
+pub const SIGNAL_GREEN_EXIT: usize = 135;
+/// Signal `station` witness.
+pub const SIGNAL_STATION: usize = 136;
+/// Signal `crossing` witness.
+pub const SIGNAL_CROSSING: usize = 137;
+/// Signal `wormhole` witness.
+pub const SIGNAL_WORMHOLE: usize = 138;
+/// Signal `reserved_skip` witness.
+pub const SIGNAL_RESERVED_SKIP: usize = 139;
+/// Signal `combo` witness.
+pub const SIGNAL_COMBO: usize = 140;
+/// Signal `propagate` witness.
+pub const SIGNAL_PROPAGATE: usize = 141;
+/// Signal `changed` witness.
+pub const SIGNAL_CHANGED: usize = 142;
+/// Signal `reset` witness.
+pub const SIGNAL_RESET: usize = 143;
+/// Signal `forced_flush` witness.
+pub const SIGNAL_FORCED_FLUSH: usize = 144;
+
+/// Bytes returned by signal-facing typed native services.
+pub const SIGNAL_BYTES: usize = 145;
+
+/// Signal boundary `entries` counter.
+pub const SIGNAL_ENTRIES: usize = 146;
+/// Signal boundary `context_acquisitions` counter.
+pub const SIGNAL_CONTEXT_ACQUISITIONS: usize = 147;
+/// Signal boundary `context_owner_reads` counter.
+pub const SIGNAL_CONTEXT_OWNER_READS: usize = 148;
+/// Signal boundary `occupancy_accessors` counter.
+pub const SIGNAL_OCCUPANCY_ACCESSORS: usize = 149;
+/// Signal boundary `context_bytes` counter.
+pub const SIGNAL_CONTEXT_BYTES: usize = 150;
+/// Signal boundary `classification_bytes` counter.
+pub const SIGNAL_CLASSIFICATION_BYTES: usize = 151;
+
+/// Signal multiple exit detection.
+pub const SIGNAL_MULTI_EXIT: usize = 152;
+/// Signal multiple green exit detection.
+pub const SIGNAL_MULTI_GREEN: usize = 153;
+/// Signal combo red rule with multiple exits.
+pub const SIGNAL_COMBO_RED: usize = 154;
+/// Signal empty neighbour buffer continue.
+pub const SIGNAL_NEIGHBOUR_CONTINUE: usize = 155;
+
+/// Counter names, grouped by the prefix the harness selects.
+pub const NAMES: [&str; 156] = [
     "train.tick_first",
     "train.tick_second",
     "train.reversal",
@@ -404,6 +476,40 @@ pub const NAMES: [&str; 122] = [
     "engine.control",
     "engine.rename",
     "engine.entries",
+    "signal.updates",
+    "signal.tiles",
+    "signal.services",
+    "signal.tbu_overflow",
+    "signal.tbd_overflow",
+    "signal.global_overflow",
+    "signal.train",
+    "signal.owner_barrier",
+    "signal.depot",
+    "signal.split",
+    "signal.pbs",
+    "signal.multi_enter",
+    "signal.exit",
+    "signal.green_exit",
+    "signal.station",
+    "signal.crossing",
+    "signal.wormhole",
+    "signal.reserved_skip",
+    "signal.combo",
+    "signal.propagate",
+    "signal.changed",
+    "signal.reset",
+    "signal.forced_flush",
+    "signal.bytes",
+    "signal.entries",
+    "signal.context_acquisitions",
+    "signal.context_owner_reads",
+    "signal.occupancy_accessors",
+    "signal.context_bytes",
+    "signal.classification_bytes",
+    "signal.multi_exit",
+    "signal.multi_green",
+    "signal.combo_red",
+    "signal.neighbour_continue",
 ];
 
 static ENABLED: AtomicBool = AtomicBool::new(false);

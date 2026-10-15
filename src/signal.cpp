@@ -22,6 +22,76 @@
 #include "safeguards.h"
 
 
+#ifdef WITH_RUST
+#include "rust/signal_ffi.h"
+#include "rust/services_rail.h"
+#include "rust/company_services.h"
+#include "rust/environment_services.h"
+#include "rust/vehicle_services.h"
+
+/** Native spatial query; Rust retains traversal and occupancy branching. */
+static bool SignalTrainOnTile(uint32_t tile) noexcept
+{
+	return HasVehicleOnTile(TileIndex(tile), [](const Vehicle *v) {
+		return RustVehicleVehicleType(v) == VEH_TRAIN && Train::From(v)->GetTrack() != TRACK_BIT_DEPOT;
+	});
+}
+static bool SignalTrainOnTracks(uint32_t tile, uint8_t tracks) noexcept
+{
+	return EnsureNoTrainOnTrackBits(TileIndex(tile), static_cast<TrackBits>(tracks)).Failed();
+}
+static void SignalOverflowTbu() noexcept { Debug(misc, 0, "SignalSegment too complex. Set _tbuset is full (maximum 64)"); }
+static void SignalOverflowTbd() noexcept { Debug(misc, 0, "SignalSegment too complex. Set _tbdset is full (maximum 256)"); }
+static void SignalOverflowGlobal() noexcept { Debug(misc, 0, "SignalSegment too complex. Set _globset is full (maximum 128)"); }
+static void SignalAssertCompany([[maybe_unused]] uint8_t owner) noexcept { assert(OpenTTDCompanyIsValid(owner)); }
+static void SignalAssertCondition([[maybe_unused]] bool condition) noexcept { assert(condition); }
+static void SignalAssertWormholeStart([[maybe_unused]] uint32_t tile, [[maybe_unused]] uint8_t dir) noexcept
+{
+	assert(RustTunnelBridgeTransport(tile) == TRANSPORT_RAIL);
+	assert(dir == INVALID_DIAGDIR || dir == ReverseDiagDir(GetTunnelBridgeDirection(TileIndex(tile))));
+}
+static const OpenTTDSignalServices _signal_services{
+#ifdef WITH_ASSERT
+	.assertions = true,
+#else
+	.assertions = false,
+#endif
+	.assert_condition = SignalAssertCondition,
+	.assert_wormhole_start = SignalAssertWormholeStart,
+	.train_on_tile = SignalTrainOnTile,
+	.train_on_tracks = SignalTrainOnTracks,
+	.overflow_tbu = SignalOverflowTbu,
+	.overflow_tbd = SignalOverflowTbd,
+	.overflow_global = SignalOverflowGlobal,
+	.assert_company = SignalAssertCompany,
+};
+
+OpenTTDSignalContext GetRustSignalContext() noexcept
+{
+	return {&GetRustSharedServices(), &GetRustRailMapServices(), &_signal_services, OpenTTDMapLogX()};
+}
+
+void UpdateSignalsInBuffer()
+{
+	openttd_rust_signal_flush(&GetRustSharedServices(), &GetRustRailMapServices(), &_signal_services, Map::LogX());
+}
+void AddTrackToSignalBuffer(TileIndex tile, Track track, Owner owner)
+{
+	openttd_rust_signal_add_track(&GetRustSharedServices(), &GetRustRailMapServices(), &_signal_services, Map::LogX(), tile.base(), track, owner.base());
+}
+void AddSideToSignalBuffer(TileIndex tile, DiagDirection side, Owner owner)
+{
+	openttd_rust_signal_add_side(&GetRustSharedServices(), &GetRustRailMapServices(), &_signal_services, Map::LogX(), tile.base(), side, owner.base());
+}
+SigSegState UpdateSignalsOnSegment(TileIndex tile, DiagDirection side, Owner owner)
+{
+	return static_cast<SigSegState>(openttd_rust_signal_segment(&GetRustSharedServices(), &GetRustRailMapServices(), &_signal_services, Map::LogX(), tile.base(), side, owner.base()));
+}
+void SetSignalsOnBothDir(TileIndex tile, Track track, Owner owner)
+{
+	openttd_rust_signal_both(&GetRustSharedServices(), &GetRustRailMapServices(), &_signal_services, Map::LogX(), tile.base(), track, owner.base());
+}
+#else
 /** these are the maximums used for updating signal blocks */
 static const uint SIG_TBU_SIZE    =  64; ///< number of signals entering to block
 static const uint SIG_TBD_SIZE    = 256; ///< number of intersections - open nodes in current block
@@ -193,7 +263,7 @@ static SmallSet<DiagDirection, SIG_GLOB_SIZE> _globset("_globset"); ///< set of 
 /** Check whether there is a train on rail, not in a depot */
 static bool IsTrainAndNotInDepot(const Vehicle *v)
 {
-	return v->type == VEH_TRAIN && Train::From(v)->GetTrack() != TRACK_BIT_DEPOT;
+	return v->type == VEH_TRAIN && Train::From(v)->track != TRACK_BIT_DEPOT;
 }
 
 
@@ -669,3 +739,5 @@ void SetSignalsOnBothDir(TileIndex tile, Track track, Owner owner)
 	AddTrackToSignalBuffer(tile, track, owner);
 	UpdateSignalsInBuffer(owner);
 }
+
+#endif /* WITH_RUST */
