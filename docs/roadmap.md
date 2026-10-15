@@ -4,14 +4,14 @@ Root owns selection here; `AGENTS.md` and `docs/rust-migration.md` define proces
 If an issue conflicts, follow this roadmap and report it to root. Keep this
 forward-looking, about 200 lines; completed work is one row, with evidence in PRs.
 
-## Where the fork stands (2026-10-14, `9487f3079f`)
+## Where the fork stands (2026-10-14, `09bb0b4df8`)
 
-- Twenty-six ownership ports. Whole fork: Rust 59,396 / tooling 30,882 / glue 27,149 / original retired 37,727 of 470,612 `src/` lines (8.02%). Simulation: 29,718 / 102,615 (28.96%); source counts, not behavioral completion.
-- The last two integrations, engine #248 and signals #245, retired 1,225 original lines for 1,072 net glue / 1,085 net tooling. Landscape's full gate missed; the attributed fix round takes priority over more evidence. No new CI tooling is selected.
-- Signals final accepted speed: TGP 1.129, Opus 1.235, Grok 1.238, Ridge 1996 1.216, 2000 1.280, 2016 1.330. All six stored caps plus 3% pass; invocation spread and every raw sample remain in #245. Caps are unchanged.
-- Four unintegrated component branches: landscape #255, vehicle #257, town #258 and paused #66. #244 closed unmerged; its branch is retained and worktree removed.
+- Twenty-seven ownership ports. Whole fork: Rust 60,497 / tooling 31,189 / glue 27,289 / original retired 38,219 of 470,612 `src/` lines (8.12%). Simulation: 30,248 / 102,615 (29.48%); source counts, not behavioral completion.
+- The last two integrations, signals #245 and town #258, retired 1,138 original lines for 422 net glue / 1,130 added tooling. Vehicle's final CPU gate and landscape's final TGP gate missed; both drafts stop without further rounds at the user's request. No new CI tooling is selected.
+- Town final accepted speed: TGP 1.122, Opus 1.247, Grok 1.234, Ridge 1996 1.236, 2000 1.298, 2016 1.345. All six stored caps plus 3% pass; invocation spread and every raw sample remain in #258. Caps are unchanged.
+- Three unintegrated component branches: landscape #255, vehicle #257 and paused #66. #258 merged after review, six quiet caps and exact-head full CI; post-merge CI is green. #244 closed unmerged; its branch is retained and worktree removed.
 - #252 acceptance passed; eight Windows vCPUs retained. #249 is enforced in quick CI. #233 acceptance is met after three code-merge/save waves; #243/#244 closed superseded. Cache sampling limits and results remain on #233.
-- Largest original simulation files remaining: station_cmd 4.5k lines, rail_cmd 3.2k, vehicle 3.0k, road_cmd 2.7k, town_cmd 2.5k, tunnelbridge 2.2k, landscape 1.8k, water 1.5k.
+- Largest original simulation files remaining: station_cmd 4.5k lines, rail_cmd 3.2k, vehicle 3.0k, road_cmd 2.7k, town_cmd 1.9k, tunnelbridge 2.2k, landscape 1.8k, water 1.5k.
 
 ## Eleventh steering review (2026-10-14, throughput and enforcement)
 
@@ -93,6 +93,7 @@ Metrics are `tools/port-metrics.py`: Rust / tooling / C++ glue / C++ retired.
 | #148 | Town canonical state and periodic policy (narrow scope) | #216 | `59385bce59` | 1848 / 694 / 1418 / 340 |
 | #220 | Engine lifecycle and canonical design state | #248 | `d2115d1c3d` | 1218 / 369 / 833 / 579 |
 | #219 | Rail signal blocks and fixed work sets | #245 | `9487f3079f` | 1229 / 812 / 445 / 646 |
+| #246 | Town founding, generation and names | #258 | `09bb0b4df8` | 1123 / 321 / 470 / 492 |
 
 Harness and process: #72 harness (#85), #84 play saves (#87), #97 provenance
 freeze (#100), #88 Ruff (#92), #75 partial-pixel fidelity (#91), #90 world-state
@@ -168,22 +169,23 @@ that a `SaveLoad` descriptor cannot address through the alias.
 
 ## Resume checkpoint
 
-Root resumed with `/start-development`. #253/#254/#248/#245 are integrated and
-their worktrees removed. #233 observation and #252 acceptance are complete;
-#243/#244 closed unmerged. Root owns CI/integration; owners and focused fixing/
-planning agents are active. Engine and signal merged trees match full validation.
+Paused at the user's request. #253/#254/#248/#245/#258 are integrated; their
+worktrees and branches are removed. All agent work and timing have finished.
+The two final gate misses below stop their drafts without another profile, fix
+or review round. #256/#247 remain unstarted; the work order above is unchanged.
+Both drafts conflict with the integrated town base; their heads remain unchanged.
+Resolve those conflicts after resume before requesting CI.
+Superseded frozen runtimes/profiles were deleted after public evidence was
+recorded; the current baseline and draft candidates remain. #233 observation and
+#252 acceptance are complete; #243/#244 closed unmerged. Post-merge CI is green.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
 | #233 / #243 / #244 | closed; `ci-cache-peak-233` retained at `1288db61b4` | Acceptance met; controller draft unmerged, clean worktree removed. |
-| #252 / #253 | integrated, worktree removed | Closed: compatibility/full CI and warm-cache/CPU acceptance passed; eight vCPUs retained, scheduling restored. |
-| #249 / #254 | integrated, worktree removed | Fixing review/full CI passed; 206 baseline fingerprints, no additions permitted. |
-| #219 / #245 | integrated, worktree removed | Fixing reviews, semantic/native evidence, all six speed gates and exact-head full CI passed. |
-| #220 / #248 | integrated, worktree removed | Fixing reviews, semantic/native evidence, all six speed gates and exact-head full CI passed. |
-| #212 / #255 | `landscape-owner-212`, `63c67959ee` | Selected second fix passes native/focused checks; clean frozen confirmation precedes the next TGP gate. Prior +64 ms failure retained; tooling 483/500. |
-| #213 / #257 | `vehicle-owner-213`, `c447956b7b` | Final native/pair/self/soak pass; CPU gate misses at 6.04787 ns/visit. Fresh function attribution precedes a fix and another gate; no resample/caps, tooling 375/375. |
-| #246 / #258 | `town-founding-246`, `67a8d1939b` | Full normal corpus and final frozen pair/self/soak pass. Full CI fails only on introduced native warnings; fresh fixing review precedes new CI and speed gates, tooling 321/325. |
-| #256 / #247 | unstarted | Complete house lifecycle, then town commands/deletion, after #246. |
+| #212 / #255 | `landscape-owner-212`, `63c67959ee` | Draft stopped: TGP +29 ms exceeds 11 ms. Native/focused checks pass; full corpus/review/caps/CI were not started. Next: profile this head and root re-selection after resume. |
+| #213 / #257 | `vehicle-owner-213`, `67611082f7` | Draft stopped: CPU 8.123485 ns/visit exceeds 6 ns. Native/pair/soak/fresh review pass; full CI was not requested. Next: profile this head and root re-selection after resume. |
+| #246 / #258 | integrated `09bb0b4df8`, worktree/branch removed | Fixing reviews, semantic/native checks, six quiet caps and exact-head full CI passed; merged tree matches validation and post-merge CI passes. |
+| #256 / #247 | unstarted | Remain unstarted until the user resumes; house lifecycle still precedes town commands/deletion. |
 | #64 / #66 | `issue/64-curve-family`, `aab5211801` | Paused draft/worktree; leave untouched, not a fallback. |
 | Paused integration | `integration/curve-script`, `c19f09cf8b` | Locked worktree preserved; no work. |
 | Disaster evidence | `evidence-disaster-vehicles`, `a775543162` | Locked evidence worktree preserved; no work. |
