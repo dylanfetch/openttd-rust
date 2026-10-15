@@ -1113,7 +1113,7 @@ static OpenTTDTrainApproachingEndRead TrainReadApproachingEnd(OpenTTDTrainHandle
 static OpenTTDTrainLineEndsRead TrainReadLineEnds(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return {RustVehicleTile(v), RustVehicleSpeed(v), v->breakdown_ctr};
+	return {RustVehicleTile(v), RustVehicleSpeed(v), RustVehicleBreakdownCounter(v)};
 }
 static OpenTTDTrainSpeedZRead TrainReadSpeedZ(OpenTTDTrainHandle id) noexcept
 {
@@ -1178,5 +1178,5 @@ static OpenTTDTrainNextForceRead TrainReadNextForce(OpenTTDTrainHandle id) noexc
 static OpenTTDTrainReverseCommandRead TrainReadReverseCommand(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return {RustVehicleStatus(v), v->breakdown_ctr, v->IsFrontEngine()};
+	return {RustVehicleStatus(v), RustVehicleBreakdownCounter(v), v->IsFrontEngine()};
 }

@@ -71,6 +71,7 @@ struct OpenTTDVehicleDayCost {
 	uint8_t running;
 };
 struct OpenTTDVehicleAltitudeInputs { uint16_t max_speed; uint8_t direction; };
+struct OpenTTDVehicleMaintenanceServices;
 struct OpenTTDVehicleServices {
 	void (OPENTTD_VEHICLE_CALL *write_counters)(OpenTTDVehicle *, uint8_t, uint8_t, int32_t) noexcept;
 	OpenTTDVehicleBreakdown (OPENTTD_VEHICLE_CALL *handle_breakdown)(OpenTTDVehicle *) noexcept;
@@ -160,6 +161,7 @@ struct OpenTTDVehicleServices {
 	void (OPENTTD_VEHICLE_CALL *check_orders_only)(OpenTTDVehicle *) noexcept;
 	void (OPENTTD_VEHICLE_CALL *write_coordinates)(OpenTTDVehicle *, int32_t, int32_t, int32_t) noexcept;
 	OpenTTDVehicleAltitudeInputs (OPENTTD_VEHICLE_CALL *altitude_inputs)(OpenTTDVehicle *) noexcept;
+	const OpenTTDVehicleMaintenanceServices *maintenance;
 };
 struct OpenTTDGroundMoved {
 	int32_t old_z;

@@ -9,7 +9,9 @@
 #include "../stdafx.h"
 #include "../3rdparty/catch2/catch.hpp"
 #include "../roadveh.h"
+#include "../vehicle_func.h"
 #include "../rust/vehicle_services.h"
+#include "../rust/vehicle_maintenance_ffi.h"
 #include "../rust/abi_ffi.h"
 #include "../rust/fleet_ffi.h"
 #include "../safeguards.h"
@@ -218,3 +220,127 @@ TEST_CASE("Base vehicle scheduler - Tick growth, timing return and fresh type")
 	_vehicle_pool.CleanPool();
 }
 #endif /* WITH_RUST */
+
+#ifdef WITH_RUST
+TEST_CASE("Vehicle maintenance consumed native ABI")
+{
+	auto Layout = [](uint16_t type, const char *, std::initializer_list<size_t> fields) {
+		uint8_t item = 0;
+		for (size_t expected : fields) CHECK(openttd_rust_abi_layout(type, item++) == expected);
+		CHECK(openttd_rust_abi_layout(type, item) == SIZE_MAX);
+	};
+	Layout(751, "OpenTTDVehicleMaintenanceRenewal", {sizeof(OpenTTDVehicleMaintenanceRenewal), alignof(OpenTTDVehicleMaintenanceRenewal), offsetof(OpenTTDVehicleMaintenanceRenewal, age), offsetof(OpenTTDVehicleMaintenanceRenewal, max_age), offsetof(OpenTTDVehicleMaintenanceRenewal, months), offsetof(OpenTTDVehicleMaintenanceRenewal, enabled), offsetof(OpenTTDVehicleMaintenanceRenewal, kind), offsetof(OpenTTDVehicleMaintenanceRenewal, subtype)});
+	Layout(752, "OpenTTDVehicleMaintenanceReset", {sizeof(OpenTTDVehicleMaintenanceReset), alignof(OpenTTDVehicleMaintenanceReset), offsetof(OpenTTDVehicleMaintenanceReset, economy_date), offsetof(OpenTTDVehicleMaintenanceReset, calendar_date), offsetof(OpenTTDVehicleMaintenanceReset, reliability), offsetof(OpenTTDVehicleMaintenanceReset, chance), offsetof(OpenTTDVehicleMaintenanceReset, breakdowns)});
+	Layout(753, "OpenTTDVehicleMaintenanceResetWrite", {sizeof(OpenTTDVehicleMaintenanceResetWrite), alignof(OpenTTDVehicleMaintenanceResetWrite), offsetof(OpenTTDVehicleMaintenanceResetWrite, economy_date), offsetof(OpenTTDVehicleMaintenanceResetWrite, calendar_date), offsetof(OpenTTDVehicleMaintenanceResetWrite, reliability), offsetof(OpenTTDVehicleMaintenanceResetWrite, chance), offsetof(OpenTTDVehicleMaintenanceResetWrite, since)});
+	Layout(754, "OpenTTDVehicleMaintenanceInterval", {sizeof(OpenTTDVehicleMaintenanceInterval), alignof(OpenTTDVehicleMaintenanceInterval), offsetof(OpenTTDVehicleMaintenanceInterval, company), offsetof(OpenTTDVehicleMaintenanceInterval, last_service), offsetof(OpenTTDVehicleMaintenanceInterval, now), offsetof(OpenTTDVehicleMaintenanceInterval, interval), offsetof(OpenTTDVehicleMaintenanceInterval, reliability), offsetof(OpenTTDVehicleMaintenanceInterval, percent), offsetof(OpenTTDVehicleMaintenanceInterval, wallclock), offsetof(OpenTTDVehicleMaintenanceInterval, no_service), offsetof(OpenTTDVehicleMaintenanceInterval, breakdowns)});
+	Layout(755, "OpenTTDVehicleMaintenanceReplacement", {sizeof(OpenTTDVehicleMaintenanceReplacement), alignof(OpenTTDVehicleMaintenanceReplacement), offsetof(OpenTTDVehicleMaintenanceReplacement, engine), offsetof(OpenTTDVehicleMaintenanceReplacement, when_old)});
+	Layout(756, "OpenTTDVehicleMaintenanceBudget", {sizeof(OpenTTDVehicleMaintenanceBudget), alignof(OpenTTDVehicleMaintenanceBudget), offsetof(OpenTTDVehicleMaintenanceBudget, needed), offsetof(OpenTTDVehicleMaintenanceBudget, available)});
+	Layout(757, "OpenTTDVehicleMaintenanceReplacementCost", {sizeof(OpenTTDVehicleMaintenanceReplacementCost), alignof(OpenTTDVehicleMaintenanceReplacementCost), offsetof(OpenTTDVehicleMaintenanceReplacementCost, cost), offsetof(OpenTTDVehicleMaintenanceReplacementCost, available)});
+	Layout(758, "OpenTTDVehicleMaintenanceAutomatic", {sizeof(OpenTTDVehicleMaintenanceAutomatic), alignof(OpenTTDVehicleMaintenanceAutomatic), offsetof(OpenTTDVehicleMaintenanceAutomatic, has_depot_order), offsetof(OpenTTDVehicleMaintenanceAutomatic, order_type)});
+	Layout(759, "OpenTTDVehicleMaintenanceCheckBreakdown", {sizeof(OpenTTDVehicleMaintenanceCheckBreakdown), alignof(OpenTTDVehicleMaintenanceCheckBreakdown), offsetof(OpenTTDVehicleMaintenanceCheckBreakdown, reliability), offsetof(OpenTTDVehicleMaintenanceCheckBreakdown, decay), offsetof(OpenTTDVehicleMaintenanceCheckBreakdown, no_service), offsetof(OpenTTDVehicleMaintenanceCheckBreakdown, breakdowns)});
+	Layout(760, "OpenTTDVehicleMaintenanceBreakdownGuard", {sizeof(OpenTTDVehicleMaintenanceBreakdownGuard), alignof(OpenTTDVehicleMaintenanceBreakdownGuard), offsetof(OpenTTDVehicleMaintenanceBreakdownGuard, speed), offsetof(OpenTTDVehicleMaintenanceBreakdownGuard, counter), offsetof(OpenTTDVehicleMaintenanceBreakdownGuard, status), offsetof(OpenTTDVehicleMaintenanceBreakdownGuard, breakdowns), offsetof(OpenTTDVehicleMaintenanceBreakdownGuard, menu)});
+	Layout(761, "OpenTTDVehicleMaintenanceBreakdownTrigger", {sizeof(OpenTTDVehicleMaintenanceBreakdownTrigger), alignof(OpenTTDVehicleMaintenanceBreakdownTrigger), offsetof(OpenTTDVehicleMaintenanceBreakdownTrigger, reliability), offsetof(OpenTTDVehicleMaintenanceBreakdownTrigger, chance), offsetof(OpenTTDVehicleMaintenanceBreakdownTrigger, kind), offsetof(OpenTTDVehicleMaintenanceBreakdownTrigger, breakdowns)});
+	Layout(762, "OpenTTDVehicleMaintenanceBreakdownProbe", {sizeof(OpenTTDVehicleMaintenanceBreakdownProbe), alignof(OpenTTDVehicleMaintenanceBreakdownProbe), offsetof(OpenTTDVehicleMaintenanceBreakdownProbe, counter), offsetof(OpenTTDVehicleMaintenanceBreakdownProbe, status)});
+	Layout(763, "OpenTTDVehicleMaintenanceBreakdownStart", {sizeof(OpenTTDVehicleMaintenanceBreakdownStart), alignof(OpenTTDVehicleMaintenanceBreakdownStart), offsetof(OpenTTDVehicleMaintenanceBreakdownStart, since), offsetof(OpenTTDVehicleMaintenanceBreakdownStart, kind)});
+	Layout(764, "OpenTTDVehicleMaintenanceBreakdownActive", {sizeof(OpenTTDVehicleMaintenanceBreakdownActive), alignof(OpenTTDVehicleMaintenanceBreakdownActive), offsetof(OpenTTDVehicleMaintenanceBreakdownActive, kind), offsetof(OpenTTDVehicleMaintenanceBreakdownActive, tick), offsetof(OpenTTDVehicleMaintenanceBreakdownActive, delay)});
+	Layout(765, "OpenTTDVehicleMaintenanceBreakdownCountdown", {sizeof(OpenTTDVehicleMaintenanceBreakdownCountdown), alignof(OpenTTDVehicleMaintenanceBreakdownCountdown), offsetof(OpenTTDVehicleMaintenanceBreakdownCountdown, order_type), offsetof(OpenTTDVehicleMaintenanceBreakdownCountdown, counter)});
+	Layout(766, "OpenTTDVehicleMaintenanceBreakdownSoundState", {sizeof(OpenTTDVehicleMaintenanceBreakdownSoundState), alignof(OpenTTDVehicleMaintenanceBreakdownSoundState), offsetof(OpenTTDVehicleMaintenanceBreakdownSoundState, kind), offsetof(OpenTTDVehicleMaintenanceBreakdownSoundState, landscape)});
+	Layout(767, "OpenTTDVehicleMaintenanceBreakdownSmoke", {sizeof(OpenTTDVehicleMaintenanceBreakdownSmoke), alignof(OpenTTDVehicleMaintenanceBreakdownSmoke), offsetof(OpenTTDVehicleMaintenanceBreakdownSmoke, shell), offsetof(OpenTTDVehicleMaintenanceBreakdownSmoke, delay)});
+	Layout(768, "OpenTTDVehicleMaintenanceAge", {sizeof(OpenTTDVehicleMaintenanceAge), alignof(OpenTTDVehicleMaintenanceAge), offsetof(OpenTTDVehicleMaintenanceAge, age), offsetof(OpenTTDVehicleMaintenanceAge, max_age), offsetof(OpenTTDVehicleMaintenanceAge, decay)});
+	Layout(769, "OpenTTDVehicleMaintenanceWarning", {sizeof(OpenTTDVehicleMaintenanceWarning), alignof(OpenTTDVehicleMaintenanceWarning), offsetof(OpenTTDVehicleMaintenanceWarning, enabled), offsetof(OpenTTDVehicleMaintenanceWarning, has_previous), offsetof(OpenTTDVehicleMaintenanceWarning, local), offsetof(OpenTTDVehicleMaintenanceWarning, status)});
+	Layout(770, "OpenTTDVehicleMaintenanceWarningCompany", {sizeof(OpenTTDVehicleMaintenanceWarningCompany), alignof(OpenTTDVehicleMaintenanceWarningCompany), offsetof(OpenTTDVehicleMaintenanceWarningCompany, company), offsetof(OpenTTDVehicleMaintenanceWarningCompany, renewal)});
+	Layout(771, "OpenTTDVehicleMaintenanceServices", {sizeof(OpenTTDVehicleMaintenanceServices), alignof(OpenTTDVehicleMaintenanceServices), offsetof(OpenTTDVehicleMaintenanceServices, shared), offsetof(OpenTTDVehicleMaintenanceServices, transaction), offsetof(OpenTTDVehicleMaintenanceServices, group), offsetof(OpenTTDVehicleMaintenanceServices, renewal), offsetof(OpenTTDVehicleMaintenanceServices, reset), offsetof(OpenTTDVehicleMaintenanceServices, reset_write), offsetof(OpenTTDVehicleMaintenanceServices, has_engine), offsetof(OpenTTDVehicleMaintenanceServices, interval), offsetof(OpenTTDVehicleMaintenanceServices, engine_reliability), offsetof(OpenTTDVehicleMaintenanceServices, budget), offsetof(OpenTTDVehicleMaintenanceServices, replacement), offsetof(OpenTTDVehicleMaintenanceServices, replacement_available), offsetof(OpenTTDVehicleMaintenanceServices, replacement_cost), offsetof(OpenTTDVehicleMaintenanceServices, automatic), offsetof(OpenTTDVehicleMaintenanceServices, depot_service), offsetof(OpenTTDVehicleMaintenanceServices, check_breakdown), offsetof(OpenTTDVehicleMaintenanceServices, breakdown_guard), offsetof(OpenTTDVehicleMaintenanceServices, breakdown_trigger), offsetof(OpenTTDVehicleMaintenanceServices, chance_write), offsetof(OpenTTDVehicleMaintenanceServices, trigger), offsetof(OpenTTDVehicleMaintenanceServices, breakdown_counter), offsetof(OpenTTDVehicleMaintenanceServices, breakdown_probe), offsetof(OpenTTDVehicleMaintenanceServices, breakdown_start), offsetof(OpenTTDVehicleMaintenanceServices, breakdown_start_write), offsetof(OpenTTDVehicleMaintenanceServices, breakdown_active), offsetof(OpenTTDVehicleMaintenanceServices, breakdown_countdown), offsetof(OpenTTDVehicleMaintenanceServices, breakdown_sound_state), offsetof(OpenTTDVehicleMaintenanceServices, breakdown_delay_write), offsetof(OpenTTDVehicleMaintenanceServices, breakdown_sound), offsetof(OpenTTDVehicleMaintenanceServices, smoke_disabled), offsetof(OpenTTDVehicleMaintenanceServices, smoke), offsetof(OpenTTDVehicleMaintenanceServices, smoke_animation), offsetof(OpenTTDVehicleMaintenanceServices, aircraft_broken), offsetof(OpenTTDVehicleMaintenanceServices, mark_dirty), offsetof(OpenTTDVehicleMaintenanceServices, view_dirty), offsetof(OpenTTDVehicleMaintenanceServices, details_dirty), offsetof(OpenTTDVehicleMaintenanceServices, age), offsetof(OpenTTDVehicleMaintenanceServices, age_write), offsetof(OpenTTDVehicleMaintenanceServices, decay_write), offsetof(OpenTTDVehicleMaintenanceServices, warning), offsetof(OpenTTDVehicleMaintenanceServices, warning_company), offsetof(OpenTTDVehicleMaintenanceServices, engine_available_any), offsetof(OpenTTDVehicleMaintenanceServices, replacement_active), offsetof(OpenTTDVehicleMaintenanceServices, old_news), offsetof(OpenTTDVehicleMaintenanceServices, economy_age), offsetof(OpenTTDVehicleMaintenanceServices, economy_age_write), offsetof(OpenTTDVehicleMaintenanceServices, reached_min_age), offsetof(OpenTTDVehicleMaintenanceServices, value), offsetof(OpenTTDVehicleMaintenanceServices, value_write), offsetof(OpenTTDVehicleMaintenanceServices, max_calendar_date), offsetof(OpenTTDVehicleMaintenanceServices, max_economy_date), offsetof(OpenTTDVehicleMaintenanceServices, profit_min_age), offsetof(OpenTTDVehicleMaintenanceServices, anniversaries), offsetof(OpenTTDVehicleMaintenanceServices, before_zero), offsetof(OpenTTDVehicleMaintenanceServices, news_getting_old), offsetof(OpenTTDVehicleMaintenanceServices, news_very_old), offsetof(OpenTTDVehicleMaintenanceServices, news_very_old_and)});
+	Layout(772, "TimerGameCalendar::Date", {sizeof(TimerGameCalendar::Date), alignof(TimerGameCalendar::Date)});
+	Layout(773, "TimerGameEconomy::Date", {sizeof(TimerGameEconomy::Date), alignof(TimerGameEconomy::Date)});
+	Layout(774, "OrderType", {sizeof(OrderType), alignof(OrderType)});
+
+}
+
+#endif
+
+#ifdef WITH_RUST
+TEST_CASE("Vehicle maintenance native scalar stores and cadence")
+{
+	auto &pool = Vehicle::GetPool();
+	REQUIRE(pool.GetNumItems() == 0);
+	Vehicle *v = new Vehicle(VEH_EFFECT);
+	v->age = CalendarTime::MAX_DATE - 1;
+	AgeVehicle(v);
+	CHECK(v->age == CalendarTime::MAX_DATE);
+	AgeVehicle(v);
+	CHECK(v->age == CalendarTime::MAX_DATE);
+	v->economy_age = EconomyTime::MAX_DATE - 1;
+	EconomyAgeVehicle(v);
+	CHECK(v->economy_age == EconomyTime::MAX_DATE);
+	EconomyAgeVehicle(v);
+	CHECK(v->economy_age == EconomyTime::MAX_DATE);
+	v->value = Money{65535};
+	DecreaseVehicleValue(v);
+	CHECK(v->value == 65280);
+	v->value = Money{-257};
+	DecreaseVehicleValue(v);
+	CHECK(v->value == -255);
+	v->breakdown_ctr = 1;
+	v->breakdown_delay = 3;
+	v->type = VEH_TRAIN;
+	for (uint8_t tick : {1, 2, 3}) {
+		v->tick_counter = tick;
+		CHECK(v->HandleBreakdown());
+		CHECK(v->breakdown_delay == 3);
+	}
+	v->tick_counter = 4;
+	CHECK(v->HandleBreakdown());
+	CHECK(v->breakdown_delay == 2);
+	v->type = VEH_ROAD;
+	v->breakdown_delay = 1;
+	v->tick_counter = 2;
+	CHECK(v->HandleBreakdown());
+	CHECK(v->breakdown_ctr == 0);
+	CHECK(v->breakdown_delay == 0);
+	v->type = VEH_AIRCRAFT;
+	v->breakdown_ctr = 1;
+	v->breakdown_delay = 1;
+	CHECK_FALSE(v->HandleBreakdown());
+	CHECK(v->breakdown_delay == 1);
+	CHECK(v->breakdown_ctr == 1);
+	v->type = VEH_ROAD;
+	v->breakdown_ctr = 1;
+	v->breakdown_delay = 0;
+	CHECK(v->HandleBreakdown());
+	CHECK(v->breakdown_delay == 255); // Native uint8_t pre-decrement wraps.
+	/* A sound/dirty callback may change current state. Rust must reacquire the
+	 * hidden flag before smoke, and current type after the dirty callbacks. */
+	auto maintenance = _rust_vehicle_maintenance_services;
+	auto base = GetRustVehicleServices();
+	base.maintenance = &maintenance;
+	maintenance.breakdown_sound = [](OpenTTDVehicle *handle) noexcept {
+		Vehicle *current = VehicleOf(handle);
+		CHECK(current->cur_speed == 0);
+		CHECK(current->breakdown_ctr == 1);
+		CHECK(current->breakdowns_since_last_service == 255);
+		current->vehstatus.Set(VehState::Hidden);
+		return true;
+	};
+	maintenance.mark_dirty = [](OpenTTDVehicle *handle) noexcept {
+		CHECK(VehicleOf(handle)->vehstatus.Test(VehState::Hidden));
+		VehicleOf(handle)->type = VEH_AIRCRAFT;
+	};
+	v->cur_speed = 10;
+	v->breakdown_ctr = 2;
+	v->breakdown_delay = 5;
+	v->breakdowns_since_last_service = 255;
+	CHECK_FALSE(openttd_rust_vehicle_handle_breakdown(RustVehicle(v), &base));
+	CHECK(v->breakdown_delay == 5);
+	CHECK(v->type == VEH_AIRCRAFT);
+	v->type = VEH_EFFECT;
+	v->breakdown_ctr = 3;
+	v->current_order.MakeLoading(false);
+	CHECK_FALSE(v->HandleBreakdown());
+	CHECK(v->breakdown_ctr == 3);
+	v->current_order.MakeDummy();
+	CHECK_FALSE(v->HandleBreakdown());
+	CHECK(v->breakdown_ctr == 2);
+	pool.CleanPool();
+	CHECK(pool.GetNumItems() == 0);
+}
+#endif

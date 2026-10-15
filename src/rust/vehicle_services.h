@@ -11,6 +11,7 @@
 #include "vehicle_ffi.h"
 #include "../ground_vehicle.hpp"
 #include "../engine_base.h"
+#include "../vehicle_func.h"
 #include "../newgrf.h"
 
 /** The Rust handle of a live vehicle; null stays null. */
@@ -41,6 +42,18 @@ inline uint8_t RustVehicleTick(const Vehicle *v) noexcept { return *RustVehicleT
 inline const uint8_t *RustVehicleStatusAddress(const Vehicle *v) noexcept { return v->vehstatus.base_address(); }
 inline uint8_t RustVehicleStatus(const Vehicle *v) noexcept { return *RustVehicleStatusAddress(v); }
 inline void RustWriteVehicleTick(Vehicle *v, uint8_t tick) noexcept { v->tick_counter = tick; }
+inline uint8_t RustVehicleBreakdownDelay(const Vehicle *v) noexcept { return v->breakdown_delay; }
+inline uint8_t RustVehicleBreakdownChance(const Vehicle *v) noexcept { return v->breakdown_chance; }
+inline uint8_t RustVehicleBreakdownsSinceService(const Vehicle *v) noexcept { return v->breakdowns_since_last_service; }
+inline uint16_t RustVehicleReliability(const Vehicle *v) noexcept { return v->reliability; }
+inline uint16_t RustVehicleReliabilityDecay(const Vehicle *v) noexcept { return v->reliability_spd_dec; }
+inline TimerGameCalendar::Date RustVehicleAge(const Vehicle *v) noexcept { return v->age; }
+inline TimerGameCalendar::Date RustVehicleMaxAge(const Vehicle *v) noexcept { return v->max_age; }
+inline TimerGameEconomy::Date RustVehicleEconomyAge(const Vehicle *v) noexcept { return v->economy_age; }
+inline TimerGameEconomy::Date RustVehicleLastService(const Vehicle *v) noexcept { return v->date_of_last_service; }
+inline uint8_t RustVehicleBreakdownCounter(const Vehicle *v) noexcept { return v->breakdown_ctr; }
+inline int64_t RustVehicleValue(const Vehicle *v) noexcept { return v->value.base(); }
+inline uint16_t RustEngineReliability(const Engine *e) noexcept { return e->reliability; }
 inline uint16_t RustVehicleEngineID(const Vehicle *v) noexcept { return v->engine_type.base(); }
 inline const OpenTTDEngine *RustEngine(const Engine *e) noexcept { return reinterpret_cast<const OpenTTDEngine *>(e); }
 inline const Engine *EngineOf(const OpenTTDEngine *e) noexcept { return reinterpret_cast<const Engine *>(e); }
@@ -68,6 +81,11 @@ inline VehicleType RustVehicleVehicleType(const Vehicle *v) noexcept { return *R
 inline const uint16_t *RustVehicleCargoPeriodAddress(const Vehicle *v) noexcept { return &v->vcache.cached_cargo_age_period; }
 inline uint16_t *RustVehicleCargoCounterAddress(Vehicle *v) noexcept { return &v->cargo_age_counter; }
 inline uint32_t *RustVehicleMotionAddress(Vehicle *v) noexcept { return &v->motion_counter; }
+
+/** Shared legacy opaque-owner adapter; the actual typed read is defined once. */
+template <typename Result, auto Read>
+static Result RustOpaqueVehicleRead(void *shell) noexcept { return Read(static_cast<Vehicle *>(shell)); }
+inline bool RustVehicleOldEnough(const Vehicle *v) noexcept { return RustVehicleEconomyAge(v) > VEHICLE_PROFIT_MIN_AGE; }
 
 /** Legacy indexed callback adapter; canonical read stays shared, owner resolves once. */
 template <typename Result, auto Read>

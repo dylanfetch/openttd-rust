@@ -284,7 +284,7 @@ static void Ship_build_properties(uint32_t id, uint32_t engine) noexcept
 	v->last_station_visited = StationID::Invalid();
 	v->last_loading_station = StationID::Invalid();
 	v->engine_type = e->index;
-	v->reliability = e->reliability;
+	v->reliability = RustEngineReliability(e);
 	v->reliability_spd_dec = e->reliability_spd_dec;
 	v->max_age = e->GetLifeLengthInDays();
 }

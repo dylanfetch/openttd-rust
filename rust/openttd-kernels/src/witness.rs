@@ -320,7 +320,61 @@ pub const VEHICLE_STATIONS: usize = 139;
 /// Scheduler evidence counter.
 pub const VEHICLE_VISITS: usize = 140;
 
-pub const NAMES: [&str; 148] = [
+/// Base vehicle maintenance witness.
+pub const VEHICLE_MAINT_AGE: usize = 148;
+/// Base vehicle maintenance witness.
+pub const VEHICLE_MAINT_AIRCRAFT: usize = 149;
+/// Base vehicle maintenance witness.
+pub const VEHICLE_MAINT_BYTES: usize = 150;
+/// Base vehicle maintenance witness.
+pub const VEHICLE_MAINT_CHECK: usize = 151;
+/// Base vehicle maintenance witness.
+pub const VEHICLE_MAINT_COUNTDOWN: usize = 152;
+/// Base vehicle maintenance witness.
+pub const VEHICLE_MAINT_CROSSINGS: usize = 153;
+/// Base vehicle maintenance witness.
+pub const VEHICLE_MAINT_DAYS: usize = 154;
+/// Base vehicle maintenance witness.
+pub const VEHICLE_MAINT_DECAY: usize = 155;
+/// Base vehicle maintenance witness.
+pub const VEHICLE_MAINT_DELAY: usize = 156;
+/// Base vehicle maintenance witness.
+pub const VEHICLE_MAINT_ENDED: usize = 157;
+/// Base vehicle maintenance witness.
+pub const VEHICLE_MAINT_LOADING: usize = 158;
+/// Base vehicle maintenance witness.
+pub const VEHICLE_MAINT_MAX_AGE: usize = 159;
+/// Base vehicle maintenance witness.
+pub const VEHICLE_MAINT_MINUTES: usize = 160;
+/// Base vehicle maintenance witness.
+pub const VEHICLE_MAINT_OLD_NEWS: usize = 161;
+/// Base vehicle maintenance witness.
+pub const VEHICLE_MAINT_PERCENT: usize = 162;
+/// Base vehicle maintenance witness.
+pub const VEHICLE_MAINT_PROFIT_AGE: usize = 163;
+/// Base vehicle maintenance witness.
+pub const VEHICLE_MAINT_RENEW: usize = 164;
+/// Base vehicle maintenance witness.
+pub const VEHICLE_MAINT_REPLACE: usize = 165;
+/// Base vehicle maintenance witness.
+pub const VEHICLE_MAINT_RESET: usize = 166;
+/// Base vehicle maintenance witness.
+pub const VEHICLE_MAINT_RESET_REDUCED: usize = 167;
+/// Base vehicle maintenance witness.
+pub const VEHICLE_MAINT_SERVICE: usize = 168;
+/// Base vehicle maintenance witness.
+pub const VEHICLE_MAINT_SMOKE: usize = 169;
+/// Base vehicle maintenance witness.
+pub const VEHICLE_MAINT_STARTED: usize = 170;
+/// Base vehicle maintenance witness.
+pub const VEHICLE_MAINT_TRIGGER: usize = 171;
+/// Base vehicle maintenance witness.
+pub const VEHICLE_MAINT_VALUE: usize = 172;
+
+/// Native-to-Rust base maintenance entries (separate from outgoing services).
+pub const VEHICLE_MAINT_ENTRIES: usize = 173;
+
+pub const NAMES: [&str; 174] = [
     "train.tick_first",
     "train.tick_second",
     "train.reversal",
@@ -469,6 +523,32 @@ pub const NAMES: [&str; 148] = [
     "vehicle.visits.disaster",
     "vehicle.visits.end",
     "vehicle.visits.invalid",
+    "vehicle_maintenance.age",
+    "vehicle_maintenance.aircraft",
+    "vehicle_maintenance.bytes",
+    "vehicle_maintenance.check",
+    "vehicle_maintenance.countdown",
+    "vehicle_maintenance.crossings",
+    "vehicle_maintenance.days",
+    "vehicle_maintenance.decay",
+    "vehicle_maintenance.delay",
+    "vehicle_maintenance.ended",
+    "vehicle_maintenance.loading",
+    "vehicle_maintenance.max_age",
+    "vehicle_maintenance.minutes",
+    "vehicle_maintenance.old_news",
+    "vehicle_maintenance.percent",
+    "vehicle_maintenance.profit_age",
+    "vehicle_maintenance.renew",
+    "vehicle_maintenance.replace",
+    "vehicle_maintenance.reset",
+    "vehicle_maintenance.reset_reduced",
+    "vehicle_maintenance.service",
+    "vehicle_maintenance.smoke",
+    "vehicle_maintenance.started",
+    "vehicle_maintenance.trigger",
+    "vehicle_maintenance.value",
+    "vehicle_maintenance.entries",
 ];
 
 static ENABLED: AtomicBool = AtomicBool::new(false);
