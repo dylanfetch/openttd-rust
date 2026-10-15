@@ -12,6 +12,7 @@
 #![allow(unsafe_code, clippy::cast_possible_truncation, clippy::collapsible_if)]
 use crate::services::{Map, RailMapServices, Services};
 use std::cell::UnsafeCell;
+use std::ffi::c_uint;
 
 const INVALID: u8 = 255;
 const ENTER_TRACKS: [u8; 4] = [0x25, 0x2a, 0x19, 0x16];
@@ -546,7 +547,7 @@ unsafe fn world<'a>(
     shared: *const Services,
     rail: *const RailMapServices,
     native: *const SignalServices,
-    log_x: u8,
+    log_x: c_uint,
 ) -> World<'a> {
     // SAFETY: caller supplies valid immutable tables for the invocation.
     unsafe {
@@ -554,7 +555,9 @@ unsafe fn world<'a>(
             shared: &*shared,
             rail: &*rail,
             native: &*native,
-            map: Map { log_x },
+            // Native allocation constrains LogX to 6..=12 (or zero before allocation);
+            // adapt once to the existing shared Map representation without guards.
+            map: Map { log_x: log_x as u8 },
         }
     }
 }
@@ -566,7 +569,7 @@ pub unsafe extern "C" fn openttd_rust_signal_flush(
     shared: *const Services,
     rail: *const RailMapServices,
     native: *const SignalServices,
-    log_x: u8,
+    log_x: c_uint,
 ) {
     crate::witness::hit(crate::witness::SIGNAL_ENTRIES);
     let w = unsafe { world(shared, rail, native, log_x) };
@@ -580,7 +583,7 @@ pub unsafe extern "C" fn openttd_rust_signal_add_track(
     shared: *const Services,
     rail: *const RailMapServices,
     native: *const SignalServices,
-    log_x: u8,
+    log_x: c_uint,
     tile: u32,
     track: u8,
     owner: u8,
@@ -597,7 +600,7 @@ pub unsafe extern "C" fn openttd_rust_signal_add_side(
     shared: *const Services,
     rail: *const RailMapServices,
     native: *const SignalServices,
-    log_x: u8,
+    log_x: c_uint,
     tile: u32,
     side: u8,
     owner: u8,
@@ -614,7 +617,7 @@ pub unsafe extern "C" fn openttd_rust_signal_segment(
     shared: *const Services,
     rail: *const RailMapServices,
     native: *const SignalServices,
-    log_x: u8,
+    log_x: c_uint,
     tile: u32,
     side: u8,
     owner: u8,
@@ -633,7 +636,7 @@ pub unsafe extern "C" fn openttd_rust_signal_both(
     shared: *const Services,
     rail: *const RailMapServices,
     native: *const SignalServices,
-    log_x: u8,
+    log_x: c_uint,
     tile: u32,
     track: u8,
     owner: u8,
@@ -648,11 +651,11 @@ pub unsafe extern "C" fn openttd_rust_signal_both(
 #[repr(C)]
 pub struct Snapshot {
     /// Active to-be-updated signal count.
-    pub tbu_count: u32,
+    pub tbu_count: c_uint,
     /// Active traversal frontier count.
-    pub tbd_count: u32,
+    pub tbd_count: c_uint,
     /// Active global block frontier count.
-    pub global_count: u32,
+    pub global_count: c_uint,
     /// Original overflow flags in tbu/tbd/global order.
     pub overflow: [bool; 3],
     /// Canonical last owner, including its original stale-owner cases.
@@ -681,9 +684,9 @@ pub unsafe extern "C" fn openttd_rust_signal_inspect(output: *mut Snapshot) {
     // SAFETY: caller owns this output, which does not alias STATE.
     let out = unsafe { &mut *output };
     access(|s| {
-        out.tbu_count = s.tbu.count as u32;
-        out.tbd_count = s.tbd.count as u32;
-        out.global_count = s.global.count as u32;
+        out.tbu_count = s.tbu.count as c_uint;
+        out.tbd_count = s.tbd.count as c_uint;
+        out.global_count = s.global.count as c_uint;
         out.overflow = [s.tbu.overflowed, s.tbd.overflowed, s.global.overflowed];
         out.last_owner = s.last_owner;
         for (dest, source) in [
@@ -737,7 +740,7 @@ pub struct Context {
     /// Occupancy, diagnostics and source assertions.
     pub native: *const SignalServices,
     /// Current `Map::LogX`.
-    pub log_x: u8,
+    pub log_x: c_uint,
 }
 impl Context {
     fn world(&self) -> World<'_> {
@@ -784,7 +787,7 @@ pub extern "C" fn openttd_rust_signal_count_occupancy(reads: u64) {
 #[repr(C)]
 pub struct SetTrace {
     /// Duplicates remain after one first-match/swap-last removal.
-    pub duplicate_count: u32,
+    pub duplicate_count: c_uint,
     /// LIFO drain after the duplicate/reverse removal sequence.
     pub duplicate_pop: [SignalItem; 3],
     /// Add on a full fixed array failed.
@@ -798,7 +801,7 @@ pub struct SetTrace {
     /// First LIFO item after refill.
     pub refill_pop: SignalItem,
     /// Drained set is empty.
-    pub drained_count: u32,
+    pub drained_count: c_uint,
     /// Drain keeps the overflow flag.
     pub overflow_drained: bool,
     /// Reset clears the overflow flag.
@@ -827,7 +830,7 @@ fn probe_set<const N: usize>(overflow: extern "C" fn()) -> SetTrace {
         set.add(item);
     }
     set.remove(a);
-    let duplicate_count = set.count as u32;
+    let duplicate_count = set.count as c_uint;
     let duplicate_pop = std::array::from_fn(|_| SignalItem::from(set.get().unwrap()));
     set.reset();
     for tile in 0..N {
@@ -852,7 +855,7 @@ fn probe_set<const N: usize>(overflow: extern "C" fn()) -> SetTrace {
     });
     let refill_pop = set.get().unwrap().into();
     while set.get().is_some() {}
-    let drained_count = set.count as u32;
+    let drained_count = set.count as c_uint;
     let overflow_drained = set.overflowed;
     refill_succeeded &= set.add(Item {
         tile: u32::MAX,

@@ -12,6 +12,8 @@
 #include "../rust/abi_ffi.h"
 #include "../rust/signal_ffi.h"
 
+static_assert(std::is_same_v<decltype(OpenTTDSignalContext::log_x), unsigned int>);
+
 TEST_CASE("Signal - native table layouts")
 {
 	auto layout = [](uint16_t type, std::initializer_list<size_t> fields) {
@@ -29,7 +31,7 @@ TEST_CASE("Signal - native table layouts")
 	layout(827, {sizeof(OpenTTDRailStationAdmission), alignof(OpenTTDRailStationAdmission), offsetof(OpenTTDRailStationAdmission, rail), offsetof(OpenTTDRailStationAdmission, owner), offsetof(OpenTTDRailStationAdmission, axis), offsetof(OpenTTDRailStationAdmission, blocked)});
 	layout(828, {sizeof(OpenTTDRailCrossingAdmission), alignof(OpenTTDRailCrossingAdmission), offsetof(OpenTTDRailCrossingAdmission, crossing), offsetof(OpenTTDRailCrossingAdmission, owner), offsetof(OpenTTDRailCrossingAdmission, axis)});
 	layout(829, {sizeof(OpenTTDRailWormholeAdmission), alignof(OpenTTDRailWormholeAdmission), offsetof(OpenTTDRailWormholeAdmission, owner), offsetof(OpenTTDRailWormholeAdmission, transport), offsetof(OpenTTDRailWormholeAdmission, direction)});
-	layout(830, {sizeof(OpenTTDSignalContext), alignof(OpenTTDSignalContext), offsetof(OpenTTDSignalContext, shared), offsetof(OpenTTDSignalContext, rail), offsetof(OpenTTDSignalContext, native), offsetof(OpenTTDSignalContext, log_x)});
+	layout(830, {sizeof(OpenTTDSignalContext), alignof(OpenTTDSignalContext), offsetof(OpenTTDSignalContext, shared), offsetof(OpenTTDSignalContext, rail), offsetof(OpenTTDSignalContext, native), offsetof(OpenTTDSignalContext, log_x), sizeof(decltype(OpenTTDSignalContext::log_x))});
 	layout(831, {sizeof(OpenTTDSignalSetTrace), alignof(OpenTTDSignalSetTrace), offsetof(OpenTTDSignalSetTrace, duplicate_count), offsetof(OpenTTDSignalSetTrace, duplicate_pop), offsetof(OpenTTDSignalSetTrace, full_failed), offsetof(OpenTTDSignalSetTrace, overflow_full), offsetof(OpenTTDSignalSetTrace, first_after_remove), offsetof(OpenTTDSignalSetTrace, refill_succeeded), offsetof(OpenTTDSignalSetTrace, refill_pop), offsetof(OpenTTDSignalSetTrace, drained_count), offsetof(OpenTTDSignalSetTrace, overflow_drained), offsetof(OpenTTDSignalSetTrace, overflow_reset)});
 }
 #endif /* WITH_RUST */

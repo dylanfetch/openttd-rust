@@ -28,7 +28,7 @@ struct OpenTTDSignalServices {
 
 struct OpenTTDSignalItem { uint32_t tile; uint8_t dir; };
 struct OpenTTDSignalSnapshot {
-	uint32_t tbu_count, tbd_count, global_count;
+	unsigned int tbu_count, tbd_count, global_count;
 	bool overflow[3];
 	uint8_t last_owner;
 	OpenTTDSignalItem tbu[64], tbd[256], global[128];
@@ -38,18 +38,18 @@ struct OpenTTDSignalContext {
 	const OpenTTDSharedServices *shared;
 	const OpenTTDRailMapServices *rail;
 	const OpenTTDSignalServices *native;
-	uint8_t log_x;
+	unsigned int log_x;
 };
 OpenTTDSignalContext GetRustSignalContext() noexcept;
 
 struct OpenTTDSignalSetTrace {
-	uint32_t duplicate_count;
+	unsigned int duplicate_count;
 	OpenTTDSignalItem duplicate_pop[3];
 	bool full_failed, overflow_full;
 	OpenTTDSignalItem first_after_remove;
 	bool refill_succeeded;
 	OpenTTDSignalItem refill_pop;
-	uint32_t drained_count;
+	unsigned int drained_count;
 	bool overflow_drained, overflow_reset;
 };
 
@@ -57,10 +57,10 @@ extern "C" {
 void openttd_rust_signal_count_occupancy(uint64_t);
 void openttd_rust_signal_workset_probe(const OpenTTDSignalServices *, OpenTTDSignalSetTrace *);
 void openttd_rust_signal_inspect(OpenTTDSignalSnapshot *);
-void openttd_rust_signal_flush(const OpenTTDSharedServices *, const OpenTTDRailMapServices *, const OpenTTDSignalServices *, uint8_t);
-void openttd_rust_signal_add_track(const OpenTTDSharedServices *, const OpenTTDRailMapServices *, const OpenTTDSignalServices *, uint8_t, uint32_t, uint8_t, uint8_t);
-void openttd_rust_signal_add_side(const OpenTTDSharedServices *, const OpenTTDRailMapServices *, const OpenTTDSignalServices *, uint8_t, uint32_t, uint8_t, uint8_t);
-uint8_t openttd_rust_signal_segment(const OpenTTDSharedServices *, const OpenTTDRailMapServices *, const OpenTTDSignalServices *, uint8_t, uint32_t, uint8_t, uint8_t);
-void openttd_rust_signal_both(const OpenTTDSharedServices *, const OpenTTDRailMapServices *, const OpenTTDSignalServices *, uint8_t, uint32_t, uint8_t, uint8_t);
+void openttd_rust_signal_flush(const OpenTTDSharedServices *, const OpenTTDRailMapServices *, const OpenTTDSignalServices *, unsigned int);
+void openttd_rust_signal_add_track(const OpenTTDSharedServices *, const OpenTTDRailMapServices *, const OpenTTDSignalServices *, unsigned int, uint32_t, uint8_t, uint8_t);
+void openttd_rust_signal_add_side(const OpenTTDSharedServices *, const OpenTTDRailMapServices *, const OpenTTDSignalServices *, unsigned int, uint32_t, uint8_t, uint8_t);
+uint8_t openttd_rust_signal_segment(const OpenTTDSharedServices *, const OpenTTDRailMapServices *, const OpenTTDSignalServices *, unsigned int, uint32_t, uint8_t, uint8_t);
+void openttd_rust_signal_both(const OpenTTDSharedServices *, const OpenTTDRailMapServices *, const OpenTTDSignalServices *, unsigned int, uint32_t, uint8_t, uint8_t);
 }
 #endif /* RUST_SIGNAL_FFI_H */

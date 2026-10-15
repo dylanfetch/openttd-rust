@@ -26,6 +26,7 @@
 #include "rust/signal_ffi.h"
 #include "rust/services_rail.h"
 #include "rust/company_services.h"
+#include "rust/environment_services.h"
 #include "rust/vehicle_services.h"
 
 /** Native spatial query; Rust retains traversal and occupancy branching. */
@@ -67,7 +68,7 @@ static const OpenTTDSignalServices _signal_services{
 
 OpenTTDSignalContext GetRustSignalContext() noexcept
 {
-	return {&GetRustSharedServices(), &GetRustRailMapServices(), &_signal_services, static_cast<uint8_t>(Map::LogX())};
+	return {&GetRustSharedServices(), &GetRustRailMapServices(), &_signal_services, OpenTTDMapLogX()};
 }
 
 void UpdateSignalsInBuffer()

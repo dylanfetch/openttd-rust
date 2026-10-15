@@ -35,7 +35,13 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         831 => {
             layout!(crate::signal::SetTrace, item; duplicate_count, duplicate_pop, full_failed, overflow_full, first_after_remove, refill_succeeded, refill_pop, drained_count, overflow_drained, overflow_reset)
         }
-        830 => layout!(crate::signal::Context, item; shared, rail, native, log_x),
+        830 => match item {
+            6 => {
+                let _: fn(&crate::signal::Context) -> &std::ffi::c_uint = |context| &context.log_x;
+                std::mem::size_of::<std::ffi::c_uint>()
+            }
+            _ => layout!(crate::signal::Context, item; shared, rail, native, log_x),
+        },
         824 => layout!(crate::services::RailTraversal, item; depot, tracks),
         825 => {
             layout!(crate::services::RailSignalPresence, item; signals, track, kind, forward, reverse)
