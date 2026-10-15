@@ -9,6 +9,7 @@
 #include "../stdafx.h"
 #ifdef WITH_RUST
 #include <cstdio>
+#include "witness.h"
 #include <cstdlib>
 #include "../3rdparty/fmt/format.h"
 #include "../safeguards.h"
@@ -38,4 +39,6 @@ static struct WitnessWriter {
 		std::fclose(file);
 	}
 } _witness_writer;
+
+bool RustWitnessEnabled() noexcept { return _witness_writer.enabled; }
 #endif /* WITH_RUST */

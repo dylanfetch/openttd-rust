@@ -2614,8 +2614,8 @@ const OpenTTDRailServices &GetRustRailGroundServices() noexcept
 	static const OpenTTDRailServices services{
 		.ground = [](uint32_t t) noexcept { return GetRailGroundType(TileIndex{t}); },
 		.set_ground = [](uint32_t t, RailGroundType g) noexcept { SetRailGroundType(TileIndex{t}, g); },
-		.snow = [](uint32_t index) noexcept { TileIndex t{index}; auto [slope, z] = GetTileSlopeZ(t); bool plain = RustPlainRailTile(index); return OpenTTDRailSnowGround{.z = z, .slope = slope, .tracks = plain ? RustRailTrackBits(index) : TRACK_BIT_NONE, .plain = plain}; },
-		.fences = [](uint32_t index) noexcept { bool plain = RustPlainRailTile(index); return OpenTTDRailFenceGround{.tracks = plain ? RustRailTrackBits(index) : TRACK_BIT_NONE, .owner = plain ? RustTileOwnerValue(index) : uint8_t{}, .plain = plain}; },
+		.snow = [](uint32_t index) noexcept { TileIndex t{index}; auto [slope, z] = GetTileSlopeZ(t); bool plain = RustPlainRailTile(index); return OpenTTDRailSnowGround{.z = z, .slope = slope, .tracks = plain ? RustRailTracks(index) : TRACK_BIT_NONE, .plain = plain}; },
+		.fences = [](uint32_t index) noexcept { bool plain = RustPlainRailTile(index); return OpenTTDRailFenceGround{.tracks = plain ? RustRailTracks(index) : TRACK_BIT_NONE, .owner = plain ? RustTileOwnerValue(index) : uint8_t{}, .plain = plain}; },
 		.foundation = [](Slope slope, TrackBits tracks) noexcept { return GetRailFoundation(slope, tracks); },
 		.owned_land = [](uint32_t t) noexcept { return IsObjectType(TileIndex{t}, OBJECT_OWNED_LAND); },
 	};

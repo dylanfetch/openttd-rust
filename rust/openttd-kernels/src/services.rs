@@ -22,10 +22,6 @@ pub struct RailGroundType(pub u8);
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Slope(pub u8);
-/// Native `TrackBits` representation; every byte pattern is retained.
-#[repr(transparent)]
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub struct TrackBits(pub u8);
 /// Native `Track` representation; every byte pattern is retained.
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -58,10 +54,6 @@ pub struct WaterClass(pub u8);
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct FloodingBehaviour(pub u8);
-/// Native `DiagDirection` representation; every byte pattern is retained.
-#[repr(transparent)]
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub struct DiagDirection(pub u8);
 /// Native `LandscapeType` representation; every byte pattern is retained.
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -588,4 +580,140 @@ pub struct RandomServices {
     pub restore: unsafe extern "C" fn(RandomSeeds),
     /// Original `SetRandomSeed` operation.
     pub set_seed: unsafe extern "C" fn(u32),
+}
+
+/// Native byte enums use transparent carriers: every bit pattern remains valid
+/// across FFI, including source sentinels and values outside named variants.
+/// Native `DiagDirection` with its unchanged uint8 representation.
+#[repr(transparent)]
+#[derive(Clone, Copy)]
+pub struct DiagDirection(pub u8);
+/// Native `TrackBits` with its unchanged uint8 representation.
+#[repr(transparent)]
+#[derive(Clone, Copy)]
+pub struct TrackBits(pub u8);
+/// Native `SignalType` with its unchanged uint8 representation.
+#[repr(transparent)]
+#[derive(Clone, Copy)]
+pub struct SignalType(pub u8);
+/// Native `SignalState` with its unchanged uint8 representation.
+#[repr(transparent)]
+#[derive(Clone, Copy)]
+pub struct SignalState(pub u8);
+/// Native `Axis` with its unchanged uint8 representation.
+#[repr(transparent)]
+#[derive(Clone, Copy)]
+pub struct Axis(pub u8);
+/// Native `TransportType` with its unchanged uint8 representation.
+#[repr(transparent)]
+#[derive(Clone, Copy)]
+pub struct TransportType(pub u8);
+/// Fields consumed together at one original rail/signal branch phase.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct RailTraversal {
+    /// Native `depot` observation; later-branch fields are read only after their guards.
+    pub depot: bool,
+    /// Native `tracks` observation; later-branch fields are read only after their guards.
+    pub tracks: TrackBits,
+}
+/// Fields consumed together at one original rail/signal branch phase.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct RailSignalPresence {
+    /// Native `signals` observation; later-branch fields are read only after their guards.
+    pub signals: bool,
+    /// Native `track` observation; later-branch fields are read only after their guards.
+    pub track: bool,
+    /// Native `kind` observation; later-branch fields are read only after their guards.
+    pub kind: SignalType,
+    /// Native `forward` observation; later-branch fields are read only after their guards.
+    pub forward: bool,
+    /// Native `reverse` observation; later-branch fields are read only after their guards.
+    pub reverse: bool,
+}
+/// Fields consumed together at one original rail/signal branch phase.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct RailSignalUpdate {
+    /// Native `kind` observation; later-branch fields are read only after their guards.
+    pub kind: SignalType,
+    /// Native `reservations` observation; later-branch fields are read only after their guards.
+    pub reservations: TrackBits,
+}
+/// Fields consumed together at one original rail/signal branch phase.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct RailStationAdmission {
+    /// Native `rail` observation; later-branch fields are read only after their guards.
+    pub rail: bool,
+    /// Native `owner` observation; later-branch fields are read only after their guards.
+    pub owner: u8,
+    /// Native `axis` observation; later-branch fields are read only after their guards.
+    pub axis: Axis,
+    /// Native `blocked` observation; later-branch fields are read only after their guards.
+    pub blocked: bool,
+}
+/// Fields consumed together at one original rail/signal branch phase.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct RailCrossingAdmission {
+    /// Native `crossing` observation; later-branch fields are read only after their guards.
+    pub crossing: bool,
+    /// Native `owner` observation; later-branch fields are read only after their guards.
+    pub owner: u8,
+    /// Native `axis` observation; later-branch fields are read only after their guards.
+    pub axis: Axis,
+}
+/// Fields consumed together at one original rail/signal branch phase.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct RailWormholeAdmission {
+    /// Native `owner` observation; later-branch fields are read only after their guards.
+    pub owner: u8,
+    /// Native `transport` observation; later-branch fields are read only after their guards.
+    pub transport: TransportType,
+    /// Native `direction` observation; later-branch fields are read only after their guards.
+    pub direction: DiagDirection,
+}
+
+/// Canonical shared rail/signal map operations; pointers remain immutable for the call.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct RailMapServices {
+    /// Consumed source-phase observation; guarded fields are not hoisted.
+    pub traversal: extern "C" fn(u32) -> RailTraversal,
+    /// Consumed source-phase observation; guarded fields are not hoisted.
+    pub signal_presence: extern "C" fn(u32, u8, u8) -> RailSignalPresence,
+    /// Consumed source-phase observation; guarded fields are not hoisted.
+    pub signal_update: extern "C" fn(u32, u8) -> RailSignalUpdate,
+    /// Consumed source-phase observation; guarded fields are not hoisted.
+    pub station_admission: extern "C" fn(u32, u8, u8) -> RailStationAdmission,
+    /// Consumed source-phase observation; guarded fields are not hoisted.
+    pub crossing_admission: extern "C" fn(u32, u8) -> RailCrossingAdmission,
+    /// Consumed source-phase observation; guarded fields are not hoisted.
+    pub wormhole_admission: extern "C" fn(u32, u8) -> RailWormholeAdmission,
+
+    /// Native `is_rail_depot` map operation at the original observation point.
+    pub is_rail_depot: extern "C" fn(u32) -> bool,
+    /// Native `rail_depot_direction` map operation at the original observation point.
+    pub rail_depot_direction: extern "C" fn(u32) -> DiagDirection,
+    /// Native `rail_tracks` map operation at the original observation point.
+    pub rail_tracks: extern "C" fn(u32) -> TrackBits,
+    /// Native `has_signals` map operation at the original observation point.
+    pub has_signals: extern "C" fn(u32) -> bool,
+    /// Native `has_signal_track` map operation at the original observation point.
+    pub has_signal_track: extern "C" fn(u32, u8) -> bool,
+    /// Native `signal_type` map operation at the original observation point.
+    pub signal_type: extern "C" fn(u32, u8) -> SignalType,
+    /// Native `has_signal_trackdir` map operation at the original observation point.
+    pub has_signal_trackdir: extern "C" fn(u32, u8) -> bool,
+    /// Native `signal_state` map operation at the original observation point.
+    pub signal_state: extern "C" fn(u32, u8) -> SignalState,
+    /// Native `set_signal_state` map operation at the original observation point.
+    pub set_signal_state: extern "C" fn(u32, u8, u8) -> (),
+    /// Native `other_tunnel_bridge_end` map operation at the original observation point.
+    pub other_tunnel_bridge_end: extern "C" fn(u32) -> u32,
+    /// Native `rail_track_status` map operation at the original observation point.
+    pub rail_track_status: extern "C" fn(u32, u8) -> u32,
 }

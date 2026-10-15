@@ -58,6 +58,34 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         877 => {
             layout!(crate::engine::Services, item; shared, rng, next, resolve, sync_variant, display_variant, preview_variant, extra_flags, engine_id, reliability, startup, seed_config, base_intro, aging_year, calendar_year, never_expire, start_settings, train_limit, road_limit, ship_limit, aircraft_limit, ai_train_disabled, ai_road_disabled, ai_ship_disabled, ai_aircraft_disabled, date_to_ymd, ymd_to_date, enabled, climate, rail_kind, clear_last_variant, refresh_type, refresh_lists, company_next, company_preview, vehicle_next, vehicle_cargo, can_carry, refit_mask, update_railtypes, update_roadtypes, date_company_types, company_valid, compatible_railtypes, powered_roadtypes, company_railtypes, company_roadtypes, company_engine_count, block_preview, introduces_railtypes, introduces_roadtypes, set_railtypes, set_roadtypes, current_company, local_company, toolbar_enable, toolbar_release, close_preview, invalidate_preview, offer_preview, available_event, available_news, no_engines, screen_dirty, utf8_length)
         }
+        831 => {
+            layout!(crate::signal::SetTrace, item; duplicate_count, duplicate_pop, full_failed, overflow_full, first_after_remove, refill_succeeded, refill_pop, drained_count, overflow_drained, overflow_reset)
+        }
+        830 => match item {
+            6 => {
+                let _: fn(&crate::signal::Context) -> &std::ffi::c_uint = |context| &context.log_x;
+                std::mem::size_of::<std::ffi::c_uint>()
+            }
+            _ => layout!(crate::signal::Context, item; shared, rail, native, log_x),
+        },
+        824 => layout!(crate::services::RailTraversal, item; depot, tracks),
+        825 => {
+            layout!(crate::services::RailSignalPresence, item; signals, track, kind, forward, reverse)
+        }
+        826 => layout!(crate::services::RailSignalUpdate, item; kind, reservations),
+        827 => layout!(crate::services::RailStationAdmission, item; rail, owner, axis, blocked),
+        828 => layout!(crate::services::RailCrossingAdmission, item; crossing, owner, axis),
+        829 => layout!(crate::services::RailWormholeAdmission, item; owner, transport, direction),
+        822 => {
+            layout!(crate::signal::Snapshot, item; tbu_count, tbd_count, global_count, overflow, last_owner, tbu, tbd, global)
+        }
+        823 => layout!(crate::signal::SignalItem, item; tile, dir),
+        820 => {
+            layout!(crate::signal::SignalServices, item; assertions, assert_condition, assert_wormhole_start, train_on_tile, train_on_tracks, overflow_tbu, overflow_tbd, overflow_global, assert_company)
+        }
+        821 => {
+            layout!(crate::services::RailMapServices, item; traversal, signal_presence, signal_update, station_admission, crossing_admission, wormhole_admission, is_rail_depot, rail_depot_direction, rail_tracks, has_signals, has_signal_track, signal_type, has_signal_trackdir, signal_state, set_signal_state, other_tunnel_bridge_end, rail_track_status)
+        }
         445 => layout!(crate::town::YearlyServices, item; completed, age, set_age),
         444 => layout!(crate::town::SuppliedEntry, item; entry, created),
         443 => {
@@ -556,11 +584,11 @@ pub fn layout(type_id: u16, item: u8) -> usize {
             layout!(crate::train_reservation::Search, item; track,tile,final_dest,td,found,okay)
         }
         382 => {
-            layout!(crate::train_reservation::Leaves, item; read_tile,read_next,read_last_station,read_direction,read_order,read_num_orders,read_order_index,read_free,read_free_1,read_new,read_choose,read_choose_4,read_check_next,all_compat,backoff,bits_track,blocking,check_reverse,compat_station,conditional,copy_order,cross_dirs,cross_tracks,depot_dir,depot_reserved,diag_reach_dirs,diag_track,enter_td,exit_dir,free,green,has_pbs,has_reserved,has_signal,increment_order,is_bridge,is_depot,is_pbs,is_plain,is_railway,is_station,is_tunnel,is_waypoint,line_reverse,mark_bridge,mark_tile,needs_service,oneway,order_service,order_stop,order_type,other_end,overlap,path_result,rail90,reach_dirs,reach_tracks,reserved,reserve_paths,restore_order,safe,save_order,service,set_depot,set_depot_dest,set_platform,set_signal,set_tunnel,show_res,signal_buffer,start_stop,station,station_train,station_xy,stuck,tile_add,tile_offset,trackdir,track_status,try_track,tunnel_dir,tunnel_free,unreserve,update_buffer,write_dest,write_last,write_suppress,follow,origin,pathfind,safe_track,process_orders,update_order_dest)
+            layout!(crate::train_reservation::Leaves, item; read_tile,read_next,read_last_station,read_direction,read_order,read_num_orders,read_order_index,read_free,read_free_1,read_new,read_choose,read_choose_4,read_check_next,all_compat,backoff,bits_track,blocking,check_reverse,compat_station,conditional,copy_order,cross_dirs,cross_tracks,depot_dir,depot_reserved,diag_reach_dirs,diag_track,enter_td,exit_dir,free,green,has_pbs,has_reserved,has_signal,increment_order,is_bridge,is_depot,is_pbs,is_plain,is_railway,is_station,is_tunnel,is_waypoint,line_reverse,mark_bridge,mark_tile,needs_service,oneway,order_service,order_stop,order_type,other_end,overlap,path_result,rail90,reach_dirs,reach_tracks,reserved,reserve_paths,restore_order,safe,save_order,service,set_depot,set_depot_dest,set_platform,set_signal,set_tunnel,show_res,signal_context,vehicle,start_stop,station,station_train,station_xy,stuck,tile_add,tile_offset,trackdir,track_status,try_track,tunnel_dir,tunnel_free,unreserve,write_dest,write_last,write_suppress,follow,origin,pathfind,safe_track,process_orders,update_order_dest)
         }
         383 => layout!(crate::train::Depot, item; tile,length),
         384 => {
-            layout!(crate::train::Leaves, item; price,process_orders,property,railveh_wagon,rail_tilt,rail_type,rail_types,reserve_paths,reserve_under,reset_unbunch,reverse_at_signals,reverse_single_blocked,reverse_windows,running_windows,service,servint,set_depot_res,set_next,set_platform_res,set_signal_state,set_tunnel_res,show_effect,show_reservation,signals_both,signals_update,signals_update_owner,signal_has_pbs,signal_pbs,signal_type,sigseg_full,sigseg_pbs,small_explosion,speed_default,start_stop_dirty,station,station_axis,station_compatible,station_dest,stopped_in_depot,stop_location,stuck_news,suppress_implicit,ticks_leave_depot,tile_add_diag,tile_offset_axis,tile_offset_diag,tile_owner,tile_rail_type,tile_virt,trackdir_exit,trackdir_reaches,track_bits,track_crosses,track_direction,track_status,train_list,train_visit,truncate_cargo,try_path,try_reserve,tunnel_dir,unreserve,update_delta,update_speed,user_default,veh_exit_dir,viewport,view_window,visit_type,vis_effect,wagon_override,wagon_speed_limits,wait_oneway,wait_pbs,wait_twoway,wait_unbunch,write_crossing_bar,write_crossing_res,write_visit_type,visit_tile,visit_near)
+            layout!(crate::train::Leaves, item; price,process_orders,property,railveh_wagon,rail_tilt,rail_type,rail_types,reserve_paths,reserve_under,reset_unbunch,reverse_at_signals,reverse_single_blocked,reverse_windows,running_windows,service,servint,set_depot_res,set_next,set_platform_res,set_signal_state,set_tunnel_res,show_effect,show_reservation,signal_context,signal_has_pbs,signal_pbs,signal_type,sigseg_full,sigseg_pbs,small_explosion,speed_default,start_stop_dirty,station,station_axis,station_compatible,station_dest,stopped_in_depot,stop_location,stuck_news,suppress_implicit,ticks_leave_depot,tile_add_diag,tile_offset_axis,tile_offset_diag,tile_owner,tile_rail_type,tile_virt,trackdir_exit,trackdir_reaches,track_bits,track_crosses,track_direction,track_status,train_list,train_visit,truncate_cargo,try_path,try_reserve,tunnel_dir,unreserve,update_delta,update_speed,user_default,veh_exit_dir,viewport,view_window,visit_type,vis_effect,wagon_override,wagon_speed_limits,wait_oneway,wait_pbs,wait_twoway,wait_unbunch,write_crossing_bar,write_crossing_res,write_visit_type,visit_tile,visit_near)
         }
         385 => layout!(crate::train_reservation::Choice, item; track,reserved),
         280 => {

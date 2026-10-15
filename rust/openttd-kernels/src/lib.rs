@@ -32,6 +32,7 @@ mod road_yapf;
 mod script_list;
 pub mod services;
 mod ship_control;
+mod signal;
 mod station;
 mod station_cargo;
 mod station_service;
