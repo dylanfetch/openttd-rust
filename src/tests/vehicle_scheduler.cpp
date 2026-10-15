@@ -83,7 +83,7 @@ TEST_CASE("Base vehicle scheduler - scalar member identity and lifetime")
 }
 /* Mutate the actual pool after each visit, identically for Rust and unchanged
  * PoolIterator. No copied IDs or test replica of native indexing metadata. */
-static std::vector<uint32_t> VehicleCursorTrace(bool rust)
+static std::vector<uint32_t> VehicleCursorTrace(bool rust, bool indexing_growth = true)
 {
 	_vehicle_pool.CleanPool();
 	REQUIRE(Vehicle::CanAllocateItem(3));
@@ -103,17 +103,21 @@ static std::vector<uint32_t> VehicleCursorTrace(bool rust)
 		trace.push_back(id);
 		if (id == 0) {
 			delete v; // Deleted-current and reuse behind the advancing cursor.
-			REQUIRE(Vehicle::CanAllocateItem(3));
+			REQUIRE(Vehicle::CanAllocateItem(4));
 			new (VehicleID(0)) Vehicle(VEH_EFFECT);
 			delete Vehicle::Get(VehicleID(2));
 			new (VehicleID(2)) Vehicle(VEH_EFFECT); // Reuse ahead must still be visited.
-			new (VehicleID(3)) Vehicle(VEH_EFFECT); // Raise extent without indexing growth.
+			new (VehicleID(3)) Vehicle(VEH_EFFECT);
+			new (VehicleID(6)) Vehicle(VEH_EFFECT); // Raise extent without indexing growth.
+			CHECK(*cursor.first_unused == 7);
 		} else if (id == 2) {
 			delete Vehicle::Get(VehicleID(4)); // Hole ahead.
-			const auto growth = static_cast<uint32_t>(_vehicle_pool.data.size());
-			REQUIRE(Vehicle::CanAllocateItem(2));
-			new (VehicleID(growth)) Vehicle(VEH_EFFECT); // Growth invalidates captured slots.
-			new (VehicleID(growth + 1)) Vehicle(VEH_EFFECT);
+			if (indexing_growth) {
+				const auto growth = static_cast<uint32_t>(_vehicle_pool.data.size());
+				REQUIRE(Vehicle::CanAllocateItem(2));
+				new (VehicleID(growth)) Vehicle(VEH_EFFECT); // Growth invalidates captured slots.
+				new (VehicleID(growth + 1)) Vehicle(VEH_EFFECT);
+			}
 			CHECK(*cursor.first_unused == _vehicle_pool.first_unused); // Stable canonical address.
 		}
 	};
@@ -135,10 +139,14 @@ TEST_CASE("Base vehicle scheduler - live cursor equals unchanged PoolIterator")
 {
 	const auto source = VehicleCursorTrace(false);
 	CHECK(VehicleCursorTrace(true) == source);
-	REQUIRE(source.size() == 5);
+	REQUIRE(source.size() == 6);
 	CHECK(source[0] == 0);
 	CHECK(source[1] == 2);
 	CHECK(source[2] == 3);
+	CHECK(source[3] == 6);
+	const auto within_size = VehicleCursorTrace(false, false);
+	CHECK(VehicleCursorTrace(true, false) == within_size);
+	CHECK(within_size == std::vector<uint32_t>{0, 2, 3, 6});
 }
 /* Synthetic virtual Tick on actual pool shells checks the transient ordering
  * saves cannot show: growth before assertion, timing scope return before post,
@@ -169,13 +177,20 @@ TEST_CASE("Base vehicle scheduler - Tick growth, timing return and fresh type")
 	new (VehicleID(0)) SchedulerProbeVehicle();
 	_scheduler_post_visits = _scheduler_pool_reads = 0;
 	auto services = GetRustVehicleSchedulerServices();
+#if !defined(NDEBUG) || defined(WITH_ASSERT)
+	CHECK(services.assertions);
+#else
+	CHECK(!services.assertions);
+#endif
 	services.pool = []() noexcept {
 		++_scheduler_pool_reads;
 		return GetRustVehicleSchedulerServices().pool();
 	};
 	services.post_tick = [](OpenTTDVehicle *shell) noexcept {
 		CHECK(_scheduler_tick_scope_ended);
-		CHECK(_scheduler_pool_reads == 2); // Initial acquisition, then growth before assert/post.
+		/* Assertions require refresh before post; otherwise the next traversal
+		 * refreshes after post, at the first cached slot access. */
+		CHECK(_scheduler_pool_reads == (GetRustVehicleSchedulerServices().assertions ? 2u : 1u));
 		++_scheduler_post_visits;
 		const auto post = GetRustVehicleSchedulerServices().post_tick(shell);
 		CHECK(post.type == VEH_DISASTER); // Mutable pre-Tick Effect tag must not be reused.
@@ -197,6 +212,7 @@ TEST_CASE("Base vehicle scheduler - Tick growth, timing return and fresh type")
 	tables.group = &group;
 	openttd_rust_vehicle_ticks(&tables, false, 0, nullptr);
 	CHECK(_scheduler_tick_scope_ended);
+	CHECK(_scheduler_pool_reads == 2);
 	CHECK(_scheduler_post_visits == 1); // Deleted higher shell must never be dereferenced.
 	CHECK(_vehicle_pool.items == 1);
 	_vehicle_pool.CleanPool();
