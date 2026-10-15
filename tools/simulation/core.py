@@ -670,11 +670,10 @@ def run_scenario(
                 )
         result["requested_ticks"] = scenario["ticks"]
         # Only a distinct candidate counts branches; timed runs keep counters off.
-        executables = scenario.get("executables", binaries)
         scenario = dict(
             scenario,
             witnesses=not benchmark_repetitions
-            and executables["candidate"] != executables["reference"],
+            and binaries["candidate"] != binaries["reference"],
         )
         modes = (
             (("plain", False),) * benchmark_repetitions
