@@ -1253,7 +1253,7 @@ resource exhaustion timing differs with the allocation strategy.
 
 Issue #96 moves all 21 built-in generators, seed selection, English replacements,
 Finnish vowel handling, Czech grammatical matching and private constants into Rust.
-C++ keeps NewGRF routing, town-name retries/uniqueness, settings and save/load.
+C++ keeps NewGRF routing, settings and save/load; #246 owns retries/uniqueness.
 Original bodies and unshared tables compile only in portable builds; four
 French/Spanish/Silly tables remain in C++ for unchanged legacy save remapping and
 are duplicated privately in Rust. This does not migrate town growth or storage.
@@ -1446,10 +1446,10 @@ bridge/tunnel/terraform retries, house selection/layout/placement and expansion.
 The partial #148 extension owns metadata, population/house counts, radii, ratings,
 masks, goals, received/supplied histories, rebuild counters and building counts.
 Population/radius, monthly histories, yearly aging, authority and rating policy
-run in Rust. Founding/generation, house tile loops and commands remain in C++.
+run in Rust. House tile loops and remaining authority/deletion commands stay native.
 Original globals are process-wide under the game-state mutex, including GUI commands.
-C++ shells expose native field aliases to the single Rust owner; scoped save
-staging preserves modern/legacy formats, nested loads and partial load commits.
+C++ shells expose native field aliases to the single Rust owner; descriptors
+address scalar aliases directly. Only the opaque name needs string staging.
 Growth entries call named synchronous `noexcept` services; fixed probability
 scratch preserves original candidate order without per-attempt heap allocation.
 Native stack CommandCost services preserve full errors/params/expense/move state;
@@ -1461,12 +1461,38 @@ bridge/terrain, growth state, funding expiry, cargo goals, layouts/climates and
 modern reload; the default buildings case requires a saved yearly-age witness.
 `--self`/`--soak` extend these scenarios. Native and Cargo tests
 cover expansion modes, first-road failures, reentry, multi-tile writes, canonical
-aliases, count reuse, cross-thread globals and partial staging. Default CI rejects
+aliases, count reuse and cross-thread globals. Default CI rejects
 production thread-local state except per-call depot scratch. Mandatory reference
 probes compare unchanged tunnels, full-width histories/radii and nested rating
 scratch/authority thresholds and transported-percent overflow.
 Natural tunnel construction, real custom NewGRF callbacks and complete historical
 saves remain evidence limits; #148 is not yet a complete lifecycle ownership port.
+
+### Town founding, generation and names
+
+#246 extends the sole town owner with canonical custom-name bytes and owns founding,
+placement/coastal/grid search, initial growth, generation counts/retries, layout,
+rename and automatic/custom-name uniqueness. C++ keeps map/pool shells, house specs,
+rendering/NewGRF resolvers, spatial/noise/news services and native save decoding.
+A separate native custom-name presentation string retains the original
+`GetCachedName()` reference identity through rename/reset/re-rename; commands,
+validation and save authority read Rust bytes. Generated-name cache stays separate.
+All descriptor-addressable town scalars/growth fields load directly through their
+aliases. Only the opaque Rust name uses scoped native string staging, committing
+partial decoded state on unwind. Legacy compatibility scratch remains native.
+Named typed services return native enum/scalar widths; allocation resolves the
+canonical owner once. Borrows end before growth, rendering, deletion and reentry.
+Only `SetGeneratingWorldProgress`/`IncreaseGeneratingWorldProgress` return
+cancellation to a native frame; Rust drops uniqueness scratch before native rethrow.
+Portable original bodies remain unchanged in non-Rust branches.
+`python3 tools/migration.py simulate town-founding- --jobs 2` compares climate/layout,
+coastal generation, manual/deity/editor commands, exact cost/error/extra-money/ID,
+zero-growth deletion/reuse, rename/cache lifetime, name exhaustion and reload.
+Default module-owned adapters also compare cancellation against unchanged source,
+full-width count clamps/RNG and otherwise unreachable name bytes; missing markers
+fail. `--self`/`--soak`, the existing name/growth corpus and Cargo/native tests extend
+these checks. Real NewGRF, historical saves, GUI threading and final 10,000-attempt
+fallback remain coverage limits tracked in #156; house lifecycle belongs to #256.
 
 ### Road vehicle control and private state
 

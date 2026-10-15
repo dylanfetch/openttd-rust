@@ -11,6 +11,20 @@
 #include "town_ffi.h"
 #include <memory>
 
+/** Native facade over canonical arbitrary name bytes. The view lasts until its
+ * owner is renamed or destroyed; the game-state mutex serializes every access. */
+struct RustTownName {
+	OpenTTDTownState *owner;
+	std::string &presentation;
+	RustTownName(OpenTTDTownState *owner, std::string &presentation) : owner(owner), presentation(presentation) {}
+	std::string_view View() const { auto b = openttd_rust_town_name(this->owner); return {reinterpret_cast<const char *>(b.data), b.size}; }
+	bool empty() const { return this->View().empty(); }
+	void clear() { openttd_rust_town_set_name(this->owner, {nullptr, 0}); this->presentation.clear(); }
+	RustTownName &operator=(std::string_view text) { openttd_rust_town_set_name(this->owner, {reinterpret_cast<const uint8_t *>(text.data()), text.size()}); this->presentation = this->View(); return *this; }
+	RustTownName &operator=(const RustTownName &other) { return *this = other.View(); }
+	bool operator==(std::string_view text) const { return this->View() == text; }
+};
+
 struct RustTownDelete {
 	void operator()(OpenTTDTownState *state) const { openttd_rust_town_destroy(state); }
 };

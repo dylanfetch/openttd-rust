@@ -159,7 +159,7 @@ static Town *ClosestTownFromTile(TileIndex tile, uint32_t threshold)
 
 static uint64_t Leaf(uint32_t op, uint32_t, uint32_t, uint32_t, uint32_t) noexcept { assert(op == 21); RoadMask(); return 1; }
 static OpenTTDTownState *State(uint32_t id) noexcept { assert(id == world->town.index); return world->owner; }
-static void Stations(uint32_t, uint32_t, void *, void (*)(void *, const void *, uint32_t)) noexcept {}
+static void Stations(uint32_t, uint32_t, void *, void (*)(void *, const OpenTTDStation *, uint32_t)) noexcept {}
 static uint32_t Random(void *) noexcept { world->draws++; return 0; }
 static uint32_t Industry(int32_t, int32_t, uint32_t *) noexcept { return 0; }
 static uint32_t Read_map_log_x() noexcept { return 10; }

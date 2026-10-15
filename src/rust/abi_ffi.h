@@ -43,6 +43,7 @@ extern "C" {
  * 393 fleet group services, 394 transaction services, 395 native costs,
  * 396 pending services; 397-399 reserved for fleet additions.
  * Existing train allocation spans 248-385; other existing low IDs remain.
+ * 630-633 town founding references, name/render services, metadata and direct services.
  * Reserved component blocks: company 400-429, town 430-459,
  * shared vehicle/road services 460-499. Allocate within the component's block.
  * 820 signal services, 821 canonical rail-map services; 822 diagnostic snapshot, 823 tile/direction; 824-829 phase observations, 830 direct context; 831 fixed-set probe trace; 832-859 reserved.
