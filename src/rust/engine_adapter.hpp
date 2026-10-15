@@ -54,17 +54,17 @@ static OpenTTDEngineReliability Engine_reliability(const OpenTTDEngine *shell) n
 static OpenTTDEngineStartup Engine_startup(const OpenTTDEngine *shell) noexcept
 {
 	const Engine *e = EngineOf(shell); const auto &info = e->info;
-	return {.base_intro = info.base_intro.base(), .grfid = e->GetGRFID(), .base_life = info.base_life.base(), .decay_speed = info.decay_speed, .climate = info.climates.Test(OpenTTDLandscape())};
+	return {.base_intro = RustEngineBaseIntro(shell), .grfid = e->GetGRFID(), .base_life = info.base_life.base(), .decay_speed = info.decay_speed, .climate = RustEngineClimate(shell)};
 }
 static OpenTTDEngineSeed Engine_seed_config(const OpenTTDEngine *e) noexcept
 {
 	const auto &info = EngineOf(e)->info;
-	return {.base_intro = info.base_intro.base(), .lifelength = info.lifelength.base(), .decay_speed = info.decay_speed, .retire_early = info.retire_early};
+	return {.base_intro = RustEngineBaseIntro(e), .lifelength = info.lifelength.base(), .decay_speed = info.decay_speed, .retire_early = info.retire_early};
 }
 static OpenTTDEngineYear Engine_aging_year(const OpenTTDEngine *shell) noexcept
 {
 	const Engine *e = EngineOf(shell);
-	return {.base_intro = e->info.base_intro.base(), .lifelength = e->info.lifelength.base()};
+	return {.base_intro = RustEngineBaseIntro(shell), .lifelength = e->info.lifelength.base()};
 }
 
 static OpenTTDEngineStartSettings Engine_start_settings() noexcept { return {.generation_seed = _settings_game.game_creation.generation_seed, .starting_year = _settings_game.game_creation.starting_year.base(), .date = TimerGameCalendar::date.base()}; }
