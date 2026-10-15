@@ -28,20 +28,24 @@ enum class LandscapeType : uint8_t;
 enum VehicleType : uint8_t;
 #include "command_services_ffi.h"
 #include "command_cost_ffi.h"
-struct OpenTTDClearGround { ClearGround ground; uint32_t density; uint32_t counter; bool snow; };
+struct OpenTTDFieldFences { uint32_t ne; uint32_t se; uint32_t sw; uint32_t nw; };
 /* Strong IDs (IndustryID16, Owner/CompanyID8) and VehStates8 retain their
  * established underlying wire values;
  * nontrivial native ID classes are never passed by value across this ABI. */
 struct OpenTTDFieldGround { uint16_t industry; uint32_t type; };
 struct OpenTTDClearServices {
-	OpenTTDClearGround (*observe)(uint32_t) noexcept;
+	ClearGround (*ground)(uint32_t) noexcept;
+	bool (*field_tile)(uint32_t) noexcept;
+	uint32_t (*density)(uint32_t) noexcept;
+	uint32_t (*counter)(uint32_t) noexcept;
+	bool (*snow)(uint32_t) noexcept;
 	void (*set_ground)(uint32_t, ClearGround, uint32_t) noexcept;
 	void (*set_density)(uint32_t, uint32_t) noexcept;
 	void (*set_counter)(uint32_t, uint32_t) noexcept;
 	void (*clear_snow)(uint32_t) noexcept;
 	void (*make_snow)(uint32_t, uint32_t) noexcept;
 	void (*make_clear)(uint32_t, ClearGround, uint32_t) noexcept;
-	uint32_t (*fence)(uint32_t, DiagDirection) noexcept;
+	OpenTTDFieldFences (*fences)(uint32_t) noexcept;
 	void (*set_fence)(uint32_t, DiagDirection, uint32_t) noexcept;
 	OpenTTDFieldGround (*field)(uint32_t) noexcept;
 	void (*set_field)(uint32_t, uint32_t) noexcept;
@@ -166,7 +170,7 @@ void openttd_rust_dirty_water_neighbours(uint32_t, uint32_t, const OpenTTDWaterG
 /* Default native and Windows ABI call fixture: actual record returns and enum
  * parameters, including all-byte values, not just size/offset metadata. */
 struct OpenTTDGroundABICalls {
-	OpenTTDClearGround (*clear)() noexcept;
+	OpenTTDFieldFences (*fences)() noexcept;
 	OpenTTDFieldGround (*field)() noexcept;
 	OpenTTDRailSnowGround (*rail_snow)() noexcept;
 	OpenTTDRailFenceGround (*rail_fence)() noexcept;

@@ -137,8 +137,9 @@ fn offset(tile: u32, direction: usize, size_x: u32) -> u32 {
 }
 fn wrap(tile: u32, direction: usize, size_x: u32, size_y: u32) -> u32 {
     let (dx, dy) = OFFSETS[direction];
-    let x = (tile % size_x).wrapping_add_signed(dx);
-    let y = (tile / size_x).wrapping_add_signed(dy);
+    // Native map dimensions are powers of two (TileX/TileY use mask/shift).
+    let x = (tile & (size_x - 1)).wrapping_add_signed(dx);
+    let y = (tile >> size_x.trailing_zeros()).wrapping_add_signed(dy);
     if x >= size_x || y >= size_y {
         u32::MAX
     } else {
@@ -450,12 +451,6 @@ impl World<'_> {
         (self.w.set_company)(company);
     }
     fn tile_loop(&self, tile: u32, size_x: u32, size_y: u32, call: *mut Call) {
-        if (self.s.tile_type)(tile) == 6 {
-            (self.w.ambient)(tile);
-            if (self.w.non_flooding)(tile) {
-                return;
-            }
-        }
         match self.behaviour(tile) {
             1 => {
                 let mut continue_flooding = false;
@@ -520,7 +515,28 @@ pub unsafe extern "C" fn openttd_rust_water_tile_loop(
     w: *const WaterServices,
     s: *const Services,
 ) {
-    // SAFETY: Serialized native entry; copied observations end before callbacks.
+    // SAFETY: Same synchronous table contract as the in-crate scheduler entry.
+    unsafe { water_tile_loop(tile, size_x, size_y, call, w, s) };
+}
+#[allow(clippy::inline_always)]
+#[inline(always)]
+pub(crate) unsafe fn water_tile_loop(
+    tile: u32,
+    size_x: u32,
+    size_y: u32,
+    call: *mut Call,
+    w: *const WaterServices,
+    s: *const Services,
+) {
+    // SAFETY: Live immutable tables; no owner access spans ambient sound.
+    let (water, shared) = unsafe { (&*w, &*s) };
+    if (shared.tile_type)(tile) == 6 {
+        (water.ambient)(tile);
+        if (water.non_flooding)(tile) {
+            return;
+        }
+    }
+    // SAFETY: Resolve only the tables reached after the original early return.
     unsafe { World::new(w, s) }.tile_loop(tile, size_x, size_y, call);
 }
 /// # Safety

@@ -173,8 +173,11 @@ pub(crate) unsafe fn road_context(state: *const State, tile: u32, size_x: u32) -
     // SAFETY: Immediate reads only, caller establishes owner lifetime.
     let state = unsafe { &*state };
     let xy = state.simulation.xy;
-    let dx = (tile % size_x).abs_diff(xy % size_x);
-    let dy = (tile / size_x).abs_diff(xy / size_x);
+    // Native TileX/TileY operate on the power-of-two map dimensions.
+    let mask = size_x - 1;
+    let shift = size_x.trailing_zeros();
+    let dx = (tile & mask).abs_diff(xy & mask);
+    let dy = (tile >> shift).abs_diff(xy >> shift);
     let distance = dx * dx + dy * dy;
     let zone = radius_group(
         state.growth.funding != 0,

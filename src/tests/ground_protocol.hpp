@@ -15,7 +15,7 @@ static inline uint32_t marker;
 inline bool Run()
 {
 	const OpenTTDGroundABICalls calls{
-		.clear = []() noexcept { return OpenTTDClearGround{.ground = static_cast<ClearGround>(240), .density = 0x89ABCDEF, .counter = 0x76543210, .snow = true}; },
+		.fences = []() noexcept { return OpenTTDFieldFences{.ne = 0xFEDCBA98, .se = 0x89ABCDEF, .sw = 0x76543210, .nw = 0x12345678}; },
 		.field = []() noexcept { return OpenTTDFieldGround{.industry = 0xFEDC, .type = 0x98765432}; },
 		.rail_snow = []() noexcept { return OpenTTDRailSnowGround{.z = -42, .slope = static_cast<Slope>(238), .tracks = static_cast<TrackBits>(237), .plain = true}; },
 		.rail_fence = []() noexcept { return OpenTTDRailFenceGround{.tracks = static_cast<TrackBits>(236), .owner = 235, .plain = false}; },

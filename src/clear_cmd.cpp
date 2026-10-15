@@ -177,13 +177,13 @@ static Foundation GetFoundation_Clear(TileIndex, Slope)
 const OpenTTDClearServices &GetRustClearServices() noexcept
 {
 	static const OpenTTDClearServices services{
-		.observe = [](uint32_t index) noexcept { TileIndex t{index}; return OpenTTDClearGround{.ground = RustClearGround(index), .density = RustClearDensity(index), .counter = GetClearCounter(t), .snow = RustSnowTile(index)}; },
+		.ground = RustClearGround, .field_tile = RustClearFieldTile, .density = RustClearDensity, .counter = RustClearCounter, .snow = RustSnowTile,
 		.set_ground = [](uint32_t t, ClearGround g, uint32_t d) noexcept { SetClearGroundDensity(TileIndex{t}, g, d); },
 		.set_density = [](uint32_t t, uint32_t d) noexcept { SetClearDensity(TileIndex{t}, d); },
 		.set_counter = [](uint32_t t, uint32_t c) noexcept { SetClearCounter(TileIndex{t}, c); },
 		.clear_snow = [](uint32_t t) noexcept { ClearSnow(TileIndex{t}); },
 		.make_snow = RustMakeSnow, .make_clear = RustMakeClear,
-		.fence = [](uint32_t t, DiagDirection d) noexcept { return GetFence(TileIndex{t}, d); },
+		.fences = [](uint32_t index) noexcept { Tile t{TileIndex{index}}; return OpenTTDFieldFences{.ne = GetFence(t, DIAGDIR_NE), .se = GetFence(t, DIAGDIR_SE), .sw = GetFence(t, DIAGDIR_SW), .nw = GetFence(t, DIAGDIR_NW)}; },
 		.set_fence = [](uint32_t t, DiagDirection d, uint32_t f) noexcept { SetFence(TileIndex{t}, d, f); },
 		.field = [](uint32_t t) noexcept { return OpenTTDFieldGround{.industry = RustFieldIndustryValue(t), .type = GetFieldType(TileIndex{t})}; },
 		.set_field = [](uint32_t t, uint32_t f) noexcept { SetFieldType(TileIndex{t}, f); },

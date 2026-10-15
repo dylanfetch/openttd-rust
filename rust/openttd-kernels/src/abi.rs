@@ -109,10 +109,10 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         799 => layout!(crate::water::FloodVictim, item; status, kind),
         800 => layout!(crate::water::AircraftFloodPose, item; tile, z, subtype),
         801 => layout!(crate::water::GroundFloodPose, item; z, first),
-        784 => layout!(crate::ground::ClearGround, item; ground, density, counter, snow),
+        784 => layout!(crate::ground::FieldFences, item; ne, se, sw, nw),
         785 => layout!(crate::ground::FieldGround, item; industry, field_type),
         786 => {
-            layout!(crate::ground::ClearServices, item; observe, set_ground, set_density, set_counter, clear_snow, make_snow, make_clear, fence, set_fence, field, set_field, has_water_class, water_class, ambient)
+            layout!(crate::ground::ClearServices, item; ground, field_tile, density, counter, snow, set_ground, set_density, set_counter, clear_snow, make_snow, make_clear, fences, set_fence, field, set_field, has_water_class, water_class, ambient)
         }
         787 => layout!(crate::ground::RailSnowGround, item; z, slope, tracks, plain),
         788 => layout!(crate::ground::RailFenceGround, item; tracks, owner, plain),

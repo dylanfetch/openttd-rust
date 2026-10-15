@@ -3655,9 +3655,9 @@ static const OpenTTDIndustryServices _industry_services = {
 	.fence_wanted = [](uint32_t index, uint8_t side) noexcept -> bool {
 		TileIndex tile(index);
 		auto dir = static_cast<DiagDirection>(side);
-		if (!IsTileType(tile, MP_CLEAR) || !IsClearGround(tile, CLEAR_FIELDS)) return false;
+		if (!RustClearFieldTile(index)) return false;
 		TileIndex neighbour = tile + TileOffsByDiagDir(dir);
-		return !IsTileType(neighbour, MP_CLEAR) || !IsClearGround(neighbour, CLEAR_FIELDS) || GetFence(neighbour, ReverseDiagDir(dir)) == 0;
+		return !RustClearFieldTile(neighbour.base()) || GetFence(neighbour, ReverseDiagDir(dir)) == 0;
 	},
 	.set_fence = [](uint32_t tile, uint8_t side, uint8_t type) noexcept { SetFence(TileIndex(tile), static_cast<DiagDirection>(side), type); },
 	.tile_completed = [](void *i, uint32_t tile) noexcept -> bool { return !RustIndustry(i)->TileBelongsToIndustry(TileIndex(tile)) || IsIndustryCompleted(TileIndex(tile)); },
@@ -3738,7 +3738,7 @@ static const OpenTTDIndustryLifecycleServices _industry_lifecycle_services = {
 	.make_water = [](uint32_t tile) noexcept { MakeWaterKeepingClass(TileIndex(tile), OWNER_NONE); },
 	.delete_oilrig = [](uint32_t tile) noexcept { DeleteOilRig(TileIndex(tile)); },
 	.clear_docking = [](uint32_t tile) noexcept { ClearDockingTilesCheckingNeighbours(TileIndex(tile)); },
-	.industry_field = [](uint32_t index, uint16_t industry) noexcept -> bool { TileIndex tile(index); return IsTileType(tile, MP_CLEAR) && IsClearGround(tile, CLEAR_FIELDS) && RustFieldIndustryValue(index) == industry; },
+	.industry_field = RustFieldOfIndustryValue,
 	.disassociate_field = [](uint32_t tile) noexcept { SetIndustryIndexOfField(TileIndex(tile), IndustryID::Invalid()); },
 	.release_disasters = [](uint16_t industry) noexcept { ReleaseDisastersTargetingIndustry(IndustryID(industry)); },
 	.delete_storage = [](void *shell) noexcept { delete static_cast<Industry *>(shell)->psa; },

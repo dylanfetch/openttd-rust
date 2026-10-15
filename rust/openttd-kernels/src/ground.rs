@@ -59,11 +59,11 @@ pub(crate) fn hit(branch: Witness) {
 
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct ClearGround {
-    pub ground: ClearGroundType,
-    pub density: u32,
-    pub counter: u32,
-    pub snow: bool,
+pub struct FieldFences {
+    pub ne: u32,
+    pub se: u32,
+    pub sw: u32,
+    pub nw: u32,
 }
 #[repr(C)]
 pub struct FieldGround {
@@ -72,14 +72,18 @@ pub struct FieldGround {
 }
 #[repr(C)]
 pub struct ClearServices {
-    pub observe: extern "C" fn(u32) -> ClearGround,
+    pub ground: extern "C" fn(u32) -> ClearGroundType,
+    pub field_tile: extern "C" fn(u32) -> bool,
+    pub density: extern "C" fn(u32) -> u32,
+    pub counter: extern "C" fn(u32) -> u32,
+    pub snow: extern "C" fn(u32) -> bool,
     pub set_ground: extern "C" fn(u32, ClearGroundType, u32),
     pub set_density: extern "C" fn(u32, u32),
     pub set_counter: extern "C" fn(u32, u32),
     pub clear_snow: extern "C" fn(u32),
     pub make_snow: extern "C" fn(u32, u32),
     pub make_clear: extern "C" fn(u32, ClearGroundType, u32),
-    pub fence: extern "C" fn(u32, DiagDirection) -> u32,
+    pub fences: extern "C" fn(u32) -> FieldFences,
     pub set_fence: extern "C" fn(u32, DiagDirection, u32),
     pub field: extern "C" fn(u32) -> FieldGround,
     pub set_field: extern "C" fn(u32, u32),
@@ -146,48 +150,56 @@ pub unsafe extern "C" fn openttd_rust_clear_tile_loop(
     clear: *const ClearServices,
     shared: *const Services,
 ) {
+    // SAFETY: Same synchronous table contract as the in-crate scheduler entry.
+    unsafe { clear_tile_loop(tile, climate, editor, size_x, clear, shared) };
+}
+#[allow(clippy::inline_always)]
+#[inline(always)]
+pub(crate) unsafe fn clear_tile_loop(
+    tile: u32,
+    climate: LandscapeType,
+    editor: bool,
+    size_x: u32,
+    clear: *const ClearServices,
+    shared: *const Services,
+) {
     let climate = climate.0;
     // SAFETY: Caller supplies immutable live tables. No state borrow crosses a call.
     let (c, s) = unsafe { (&*clear, &*shared) };
     (c.ambient)(tile);
-    let mut ground = (c.observe)(tile);
     if climate == 1 {
         let k = (s.tile_z)(tile) - i32::from((s.snow_line)()) + 1;
-        let mut changed = false;
-        if !ground.snow {
+        if !(c.snow)(tile) {
             if k >= 0 {
                 (c.make_snow)(tile, 0);
                 hit(Witness::SnowStart);
-                changed = true;
+                (s.mark_dirty)(tile);
             }
         } else {
+            let density = (c.density)(tile);
             let required = k.clamp(0, 3) as u32;
-            if ground.density == required {
+            if density == required {
                 if k < 0 {
                     (c.clear_snow)(tile);
                     hit(Witness::SnowClear);
-                    changed = true;
+                    (s.mark_dirty)(tile);
                 }
             } else {
                 (c.set_density)(
                     tile,
-                    if ground.density < required {
-                        ground.density + 1
+                    if density < required {
+                        density + 1
                     } else {
-                        ground.density - 1
+                        density - 1
                     },
                 );
                 hit(Witness::SnowChange);
-                changed = true;
+                (s.mark_dirty)(tile);
             }
         }
-        if changed {
-            (s.mark_dirty)(tile);
-            ground = (c.observe)(tile);
-        }
     } else if climate == 2 {
-        let current = if ground.ground.0 == 5 {
-            ground.density
+        let current = if (c.ground)(tile).0 == 5 {
+            (c.density)(tile)
         } else {
             0
         };
@@ -209,15 +221,15 @@ pub unsafe extern "C" fn openttd_rust_clear_tile_loop(
             );
             (s.mark_dirty)(tile);
             hit(Witness::Desert);
-            ground = (c.observe)(tile);
         }
     }
-    if ground.snow {
+    if (c.snow)(tile) {
         return;
     }
-    match ground.ground.0 {
+    match (c.ground)(tile).0 {
         0 => {
-            if ground.density == 3 {
+            let density = (c.density)(tile);
+            if density == 3 {
                 return;
             }
             if editor {
@@ -226,22 +238,31 @@ pub unsafe extern "C" fn openttd_rust_clear_tile_loop(
                     ClearGroundType(u8::from((s.random)(s.context) & 255 <= 21)),
                     3,
                 );
-            } else if ground.counter < 7 {
-                (c.set_counter)(tile, ground.counter + 1);
-                return;
             } else {
+                let counter = (c.counter)(tile);
+                if counter < 7 {
+                    (c.set_counter)(tile, counter + 1);
+                    return;
+                }
                 (c.set_counter)(tile, 0);
-                (c.set_density)(tile, ground.density + 1);
+                (c.set_density)(tile, density + 1);
             }
         }
         3 => {
+            // All directions are consumed. SetFence writes disjoint bits; the
+            // intervening neighbour getters are pure and dirtying follows the loop.
+            let fences = (c.fences)(tile);
             let mut dirty = false;
-            for direction in 0..4 {
-                if (c.fence)(tile, DiagDirection(direction)) != 0 {
+            for (direction, fence) in [fences.ne, fences.se, fences.sw, fences.nw]
+                .into_iter()
+                .enumerate()
+            {
+                if fence != 0 {
                     continue;
                 }
+                let direction = direction as u8;
                 let neighbour = diagonal(tile, direction, size_x);
-                if (s.tile_type)(neighbour) == 0 && (c.observe)(neighbour).ground.0 == 3 {
+                if (c.field_tile)(neighbour) {
                     continue;
                 }
                 (c.set_fence)(tile, DiagDirection(direction), 3);
@@ -254,8 +275,9 @@ pub unsafe extern "C" fn openttd_rust_clear_tile_loop(
             if editor {
                 return;
             }
-            if ground.counter < 7 {
-                (c.set_counter)(tile, ground.counter + 1);
+            let counter = (c.counter)(tile);
+            if counter < 7 {
+                (c.set_counter)(tile, counter + 1);
                 return;
             }
             (c.set_counter)(tile, 0);
@@ -301,7 +323,7 @@ pub unsafe extern "C" fn openttd_rust_rail_tile_loop(
         // SAFETY: The same serialized facade/batch owns this independent native
         // result context; no result is live before this source early return.
         unsafe {
-            crate::water::openttd_rust_water_tile_loop(tile, size_x, size_y, call, water, shared);
+            crate::water::water_tile_loop(tile, size_x, size_y, call, water, shared);
         };
         return;
     }
@@ -587,7 +609,7 @@ pub unsafe extern "C" fn openttd_rust_road_tile_loop(
 /// Actual record-return and enum-argument calls for every default native ABI.
 #[repr(C)]
 pub struct ABICalls {
-    pub clear: extern "C" fn() -> ClearGround,
+    pub fences: extern "C" fn() -> FieldFences,
     pub field: extern "C" fn() -> FieldGround,
     pub rail_snow: extern "C" fn() -> RailSnowGround,
     pub rail_fence: extern "C" fn() -> RailFenceGround,
@@ -623,7 +645,7 @@ pub struct ABICalls {
 pub unsafe extern "C" fn openttd_rust_ground_abi_calls(calls: *const ABICalls) -> bool {
     // SAFETY: Caller provides actual typed native functions for this fixture.
     let c = unsafe { &*calls };
-    let clear = (c.clear)();
+    let fences = (c.fences)();
     let field = (c.field)();
     let snow = (c.rail_snow)();
     let fence = (c.rail_fence)();
@@ -634,10 +656,10 @@ pub unsafe extern "C" fn openttd_rust_ground_abi_calls(calls: *const ABICalls) -
     let victim = (c.victim)();
     let aircraft = (c.aircraft)();
     let ground = (c.ground)();
-    clear.ground.0 == 240
-        && clear.density == 0x89ab_cdef
-        && clear.counter == 0x7654_3210
-        && clear.snow
+    fences.ne == 0xfedc_ba98
+        && fences.se == 0x89ab_cdef
+        && fences.sw == 0x7654_3210
+        && fences.nw == 0x1234_5678
         && field.industry == 0xfedc
         && field.field_type == 0x9876_5432
         && snow.z == -42
@@ -665,7 +687,7 @@ pub unsafe extern "C" fn openttd_rust_ground_abi_calls(calls: *const ABICalls) -
         && ground.z == 777
         && ground.first.addr() != 0
         && (c.enums)(
-            clear.ground,
+            ClearGroundType(240),
             RailGroundType(239),
             snow.slope,
             snow.tracks,

@@ -117,7 +117,7 @@ unsafe fn dispatch(
     let g = &s.ground;
     match tile_type {
         0 => unsafe {
-            ground::openttd_rust_clear_tile_loop(
+            ground::clear_tile_loop(
                 tile,
                 g.climate,
                 g.editor,
@@ -155,14 +155,7 @@ unsafe fn dispatch(
         4 => unsafe { trees::openttd_rust_trees_tile_loop(tile, settings, s.trees, s.shared) },
         5 => (s.station_loop)(tile),
         6 => unsafe {
-            water::openttd_rust_water_tile_loop(
-                tile,
-                settings.size_x,
-                size_y,
-                g.call,
-                g.water,
-                s.shared,
-            );
+            water::water_tile_loop(tile, settings.size_x, size_y, g.call, g.water, s.shared);
         },
         7 => (s.void_loop)(tile),
         8 => unsafe {
