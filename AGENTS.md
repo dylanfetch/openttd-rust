@@ -34,7 +34,7 @@ fork; the remaining upstream documentation explains behavior and architecture.
   the C++ wraps or truncates, use explicit `wrapping_*` operations or `as`
   casts; Rust overflow checks (enabled in release, with `panic = "abort"`) may
   only back up operations that cannot overflow in the original. This applies to
-  new work; known divergences in existing ports are tracked as issues (#75).
+  new work; known divergences in existing ports are tracked as issues.
 - Keep state at the original's scope. A C++ global or static becomes a
   process-wide Rust static, never `thread_local!`: GUI builds run input and
   single-player commands on the main thread and the game loop on `ottd:game`,
@@ -56,12 +56,16 @@ fork; the remaining upstream documentation explains behavior and architecture.
   positional array. Each entry resolves its owner once and reads, once, only
   the fields it uses: neither a whole-record view nor a call per field. A
   shared accessor (vehicle field, map predicate, setting, constant) has one
-  typed definition used by every port, not a per-port copy. Until the default-CI
-  check (#249) lands, reviewers search for copies themselves. A PR that adds a
-  shared accessor deletes the integrated copies. Services return their real
-  types on both sides and tables use designated initializers. Existing ports
-  convert under #168 and #199. Root grants no exceptions at integration: a port whose hot path allocates per call,
-  dispatches by opcode or copies whole records is fixed before it integrates.
+  typed definition used by every port, not a per-port copy.
+  `tools/shared-accessors.py` rejects new copies in quick CI (#249); reviewers
+  still search for what it cannot see, such as Rust service-table fields,
+  macros and compound callbacks. A PR that adds a shared accessor deletes the
+  integrated copies, and a PR that removes a caller deletes the export,
+  declaration or callback field it orphans. Services return their real types on
+  both sides and tables use designated initializers. Existing ports convert
+  under #168 and #199. Root grants no exceptions at integration: a port whose
+  hot path allocates per call, dispatches by opcode or copies whole records is
+  fixed before it integrates.
 - A port that misses a speed budget gets a profile-guided fix round before it
   is deferred. Attribute the cost per function (callgrind instruction counts
   work on this host, where hardware counters do not) and fix the attributed
@@ -113,8 +117,8 @@ checks that run; do not restate them in paragraphs.
   went to root), plus one line naming the functions or files compared against
   the original body and one line naming any new callback that duplicates a
   shared accessor (each one is a finding). Do not narrate further when there
-  are no findings. Branches the harness does not
-  reach go in the coverage tracker (#156), not only in the disposition.
+  are no findings. Branches the harness does not reach go in the coverage
+  tracker (#156), not only in the disposition.
 - One PR per component, targeting `rust-migration` directly. Use an integration
   branch only when CI capacity forces batching. Updating a PR branch from its
   base (merge or rebase) is fine; do not add merges whose only purpose is to
@@ -252,12 +256,17 @@ the inherited commit checker. Check receipts with `tools/evidence.py` rather tha
 a hand-written script. Compare preflight's warnings against the reference build
 log instead of cleaning them up.
 
-A worktree exists only while its branch is unmerged. Once the PR merges, remove
-it with `git worktree remove PATH` and `git branch -d BRANCH`, both of which
-refuse dirty, locked or unmerged state. Do not archive or copy anything out of
-it first: evidence belongs in the PR or issue, and `.local/` holds only caches
-and rebuildable output. Delete ad hoc `.local/` output (downloaded CI artifacts,
-probe runs, logs) once the PR or issue records what it showed.
+A worktree and its local branch exist only while their PR is open, or before
+the PR while the roadmap's work order holds the issue. Once the PR merges,
+remove them with `git worktree remove PATH` and `git branch -d BRANCH`, both of
+which refuse dirty, locked or unmerged state; GitHub deletes the merged head
+branch. When work stops for good (closed, superseded, or paused with no next
+step), close its draft PR, keep the branch on origin, record its head on the
+issue, and remove the worktree and local branch. Do not archive or copy
+anything out of it first: evidence belongs in the PR or issue, and `.local/`
+holds only caches and rebuildable output. Delete ad hoc `.local/` output
+(downloaded CI artifacts, probe runs, logs, superseded frozen runtimes) once the
+PR or issue records what it showed.
 
 Docs-only changes (only `docs/` or `*.md` files, such as roadmap updates) are
 committed directly to `rust-migration` as a single commit, without a PR.

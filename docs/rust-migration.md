@@ -342,10 +342,11 @@ spawned agents to `gpt-6.1-sol` high by default, with at most five spawned threa
 explicit spawn settings select the required role, and a running host may impose a
 lower limit.
 
-`docs/skills/` holds two user-invoked skills: `/steer`, the user's Claude Code
-steering review, and `/start-development`, root's restart prompt. Steering reviews
-put their corrections in the roadmap and edit `/start-development` only to improve
-it; root follows it and leaves both skills unedited.
+`docs/skills/` holds three user-invoked skills: `/steer`, the user's Claude Code
+steering review; `/start-development`, root's restart prompt; and `/wind-down`,
+which writes the user's message pausing root. Steering reviews put their
+corrections in the roadmap and edit `/start-development` only to improve it;
+root follows these skills and leaves them unedited.
 
 The driver and CI enforce native build/tests, nonempty test inventories, reference
 test-name preservation, and these Cargo checks:
