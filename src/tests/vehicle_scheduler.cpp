@@ -11,6 +11,7 @@
 #include "../roadveh.h"
 #include "../rust/vehicle_services.h"
 #include "../rust/abi_ffi.h"
+#include "../rust/fleet_ffi.h"
 #include "../safeguards.h"
 #ifdef WITH_RUST
 TEST_CASE("Base vehicle scheduler - consumed boundary layouts")
@@ -86,9 +87,9 @@ static std::vector<uint32_t> VehicleCursorTrace(bool rust)
 {
 	_vehicle_pool.CleanPool();
 	REQUIRE(Vehicle::CanAllocateItem(3));
-	new (VehicleID(0)) RoadVehicle();
-	new (VehicleID(2)) RoadVehicle();
-	new (VehicleID(4)) RoadVehicle();
+	new (VehicleID(0)) Vehicle(VEH_EFFECT);
+	new (VehicleID(2)) Vehicle(VEH_EFFECT);
+	new (VehicleID(4)) Vehicle(VEH_EFFECT);
 	const auto &services = GetRustVehicleSchedulerServices();
 	auto cursor = services.pool();
 	static_assert(std::is_same_v<decltype(cursor.slots), Vehicle *const *>);
@@ -103,16 +104,16 @@ static std::vector<uint32_t> VehicleCursorTrace(bool rust)
 		if (id == 0) {
 			delete v; // Deleted-current and reuse behind the advancing cursor.
 			REQUIRE(Vehicle::CanAllocateItem(3));
-			new (VehicleID(0)) RoadVehicle();
+			new (VehicleID(0)) Vehicle(VEH_EFFECT);
 			delete Vehicle::Get(VehicleID(2));
-			new (VehicleID(2)) RoadVehicle(); // Reuse ahead must still be visited.
-			new (VehicleID(3)) RoadVehicle(); // Raise extent without indexing growth.
+			new (VehicleID(2)) Vehicle(VEH_EFFECT); // Reuse ahead must still be visited.
+			new (VehicleID(3)) Vehicle(VEH_EFFECT); // Raise extent without indexing growth.
 		} else if (id == 2) {
 			delete Vehicle::Get(VehicleID(4)); // Hole ahead.
 			const auto growth = static_cast<uint32_t>(_vehicle_pool.data.size());
 			REQUIRE(Vehicle::CanAllocateItem(2));
-			new (VehicleID(growth)) RoadVehicle(); // Growth invalidates captured slots.
-			new (VehicleID(growth + 1)) RoadVehicle();
+			new (VehicleID(growth)) Vehicle(VEH_EFFECT); // Growth invalidates captured slots.
+			new (VehicleID(growth + 1)) Vehicle(VEH_EFFECT);
 			CHECK(*cursor.first_unused == _vehicle_pool.first_unused); // Stable canonical address.
 		}
 	};
@@ -138,5 +139,66 @@ TEST_CASE("Base vehicle scheduler - live cursor equals unchanged PoolIterator")
 	CHECK(source[0] == 0);
 	CHECK(source[1] == 2);
 	CHECK(source[2] == 3);
+}
+/* Synthetic virtual Tick on actual pool shells checks the transient ordering
+ * saves cannot show: growth before assertion, timing scope return before post,
+ * post-Tick type mutation, then deletion with no post access. */
+static bool _scheduler_tick_scope_ended;
+static uint32_t _scheduler_post_visits;
+static uint32_t _scheduler_pool_reads;
+struct SchedulerProbeVehicle final : Vehicle {
+	SchedulerProbeVehicle() : Vehicle(VEH_EFFECT) {}
+	bool Tick() override
+	{
+		struct EndScope { ~EndScope() { _scheduler_tick_scope_ended = true; } } scope;
+		_scheduler_tick_scope_ended = false;
+		if (this->index.base() == 0) {
+			CHECK(Vehicle::CanAllocateItem());
+			new (VehicleID(static_cast<uint32_t>(_vehicle_pool.data.size()))) SchedulerProbeVehicle();
+			this->type = VEH_DISASTER;
+			return true;
+		}
+		delete this;
+		return false;
+	}
+};
+TEST_CASE("Base vehicle scheduler - Tick growth, timing return and fresh type")
+{
+	_vehicle_pool.CleanPool();
+	REQUIRE(Vehicle::CanAllocateItem());
+	new (VehicleID(0)) SchedulerProbeVehicle();
+	_scheduler_post_visits = _scheduler_pool_reads = 0;
+	auto services = GetRustVehicleSchedulerServices();
+	services.pool = []() noexcept {
+		++_scheduler_pool_reads;
+		return GetRustVehicleSchedulerServices().pool();
+	};
+	services.post_tick = [](OpenTTDVehicle *shell) noexcept {
+		CHECK(_scheduler_tick_scope_ended);
+		CHECK(_scheduler_pool_reads == 2); // Initial acquisition, then growth before assert/post.
+		++_scheduler_post_visits;
+		const auto post = GetRustVehicleSchedulerServices().post_tick(shell);
+		CHECK(post.type == VEH_DISASTER); // Mutable pre-Tick Effect tag must not be reused.
+		CHECK(post.front == nullptr);
+		CHECK(post.period == nullptr);
+		CHECK(post.status == nullptr);
+		return post;
+	};
+	services.next_station = [](uint32_t) noexcept { return OpenTTDVehicleStationLookup{}; };
+	OpenTTDFleetGroupServices group{};
+	group.current_company = []() noexcept -> uint8_t { return 0; };
+	OpenTTDFleetPendingServices pending{};
+	pending.set_current = [](uint8_t) noexcept {};
+	OpenTTDFleetTransactionServices transaction{};
+	OpenTTDVehicleSchedulerTables tables{};
+	tables.scheduler = &services;
+	tables.pending = &pending;
+	tables.transaction = &transaction;
+	tables.group = &group;
+	openttd_rust_vehicle_ticks(&tables, false, 0, nullptr);
+	CHECK(_scheduler_tick_scope_ended);
+	CHECK(_scheduler_post_visits == 1); // Deleted higher shell must never be dereferenced.
+	CHECK(_vehicle_pool.items == 1);
+	_vehicle_pool.CleanPool();
 }
 #endif /* WITH_RUST */

@@ -347,7 +347,7 @@ static OpenTTDVehiclePostTick OPENTTD_VEHICLE_CALL VehicleSchedulerPostTick(Open
 {
 	Vehicle *v = VehicleOf(shell);
 	const VehicleType type = v->type; // Fresh after Tick survives and its assertion.
-	if (type > VEH_AIRCRAFT) return {.type = type};
+	if (type > VEH_AIRCRAFT) return {.type = type, .front = nullptr, .period = nullptr, .counter = nullptr, .motion = nullptr, .speed = nullptr, .front_type = nullptr, .subtype = nullptr, .tick = nullptr, .front_status = nullptr, .status = nullptr};
 	Vehicle *front = v->First();
 	return {.type = type, .front = RustVehicle(front), .period = RustVehicleCargoPeriodAddress(v), .counter = RustVehicleCargoCounterAddress(v), .motion = RustVehicleMotionAddress(v), .speed = RustVehicleSpeedAddress(front), .front_type = RustVehicleVehicleTypeAddress(front), .subtype = RustVehicleSubtypeAddress(v), .tick = RustVehicleTickAddress(v), .front_status = RustVehicleStatusAddress(front), .status = RustVehicleStatusAddress(v)};
 }

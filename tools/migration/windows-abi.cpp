@@ -6,6 +6,8 @@
  */
 
 /** @file windows-abi.cpp Bounded first-32-bit layout and real C ABI call checks. */
+#include "stdafx.h"
+#include "rust/vehicle_services.h"
 #include "rust/abi_ffi.h"
 #include "rust/vehicle_ffi.h"
 #include "rust/command_cost_ffi.h"
@@ -1844,9 +1846,68 @@ static void AircraftOwnership()
 	std::printf("aircraft_airport_canonical_scalar_lifetime passed\n");
 }
 
+/* Actual native storage type is checked by the game-side shell probe; this
+ * standalone ABI target also exercises const BaseBitSet member identity and
+ * native size_t/pointer cursor calls on every platform. */
+static void VehicleSchedulerBoundary()
+{
+	using Status = decltype(std::declval<Vehicle>().vehstatus);
+	static_assert(std::is_same_v<Status::BaseType, uint8_t>);
+	static_assert(std::is_same_v<decltype(RustVehicleStatusAddress(nullptr)), const uint8_t *>);
+	Status status;
+	const uint8_t *address = status.base_address();
+	static_assert(std::is_same_v<decltype(status.base_address()), const uint8_t *>);
+	CHECK(address == status.base_address());
+	status.Set(VehState::Hidden);
+	CHECK(*address == status.base());
+	status.Set(VehState::Crashed);
+	CHECK(*address == 129);
+	status.Reset(VehState::Hidden);
+	CHECK(*address == 128);
+	/* Opaque shells are never dereferenced: this target tests the pointer/size_t
+	 * call ABI; the game target compares real pool mutations to PoolIterator. */
+	static Vehicle *slots[5];
+	static size_t live;
+	static size_t size;
+	std::array<uint8_t, 2> opaque{};
+	slots[0] = reinterpret_cast<Vehicle *>(&opaque[0]);
+	slots[1] = nullptr;
+	slots[2] = reinterpret_cast<Vehicle *>(&opaque[1]);
+	slots[3] = slots[4] = nullptr;
+	live = size = 2;
+	OpenTTDVehicleSchedulerServices services{};
+	services.tick = AircraftUnexpectedService<decltype(services.tick)>::Call;
+	services.post_tick = AircraftUnexpectedService<decltype(services.post_tick)>::Call;
+	services.calendar_day = AircraftUnexpectedService<decltype(services.calendar_day)>::Call;
+	services.economy_day = AircraftUnexpectedService<decltype(services.economy_day)>::Call;
+	services.day_callback_read = AircraftUnexpectedService<decltype(services.day_callback_read)>::Call;
+	services.day_callback = AircraftUnexpectedService<decltype(services.day_callback)>::Call;
+	services.randomise_callback = AircraftUnexpectedService<decltype(services.randomise_callback)>::Call;
+	services.first_dirty = AircraftUnexpectedService<decltype(services.first_dirty)>::Call;
+	services.unknown_day_callback = AircraftUnexpectedService<decltype(services.unknown_day_callback)>::Call;
+	services.cargo_owner = AircraftUnexpectedService<decltype(services.cargo_owner)>::Call;
+	services.running_sound = AircraftUnexpectedService<decltype(services.running_sound)>::Call;
+	services.periodic_sound = AircraftUnexpectedService<decltype(services.periodic_sound)>::Call;
+	services.next_station = AircraftUnexpectedService<decltype(services.next_station)>::Call;
+	services.with_loading_timer = AircraftUnexpectedService<decltype(services.with_loading_timer)>::Call;
+	services.reset_accumulators = AircraftUnexpectedService<decltype(services.reset_accumulators)>::Call;
+	services.pool = []() noexcept { return OpenTTDVehiclePoolCursor{.slots = slots, .slots_len = size, .first_unused = &live}; };
+	auto cursor = services.pool();
+	size_t from = 0;
+	CHECK(openttd_rust_vehicle_cursor_next(&services, &cursor, &from) == reinterpret_cast<OpenTTDVehicle *>(slots[0]));
+	CHECK(from == 1);
+	live = 3;
+	size = 5;
+	CHECK(openttd_rust_vehicle_cursor_next(&services, &cursor, &from) == reinterpret_cast<OpenTTDVehicle *>(slots[2]));
+	CHECK(cursor.slots_len == 5);
+	CHECK(cursor.first_unused == &live);
+	CHECK(from == 3);
+	CHECK(openttd_rust_vehicle_cursor_next(&services, &cursor, &from) == nullptr);
+}
 int main()
 {
 	Layouts();
+	VehicleSchedulerBoundary();
 	ShipBoundary();
 	RoadBoundary();
 	RoadServiceBoundary();

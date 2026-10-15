@@ -57,7 +57,16 @@ def check(scenario, run, mode, role, result):
     # the actual outer denominator without dereferencing a destroyed shell.
     surviving = sum(
         counts[f"visits.{kind}"]
-        for kind in ("train", "road", "ship", "aircraft", "effect", "disaster", "end")
+        for kind in (
+            "train",
+            "road",
+            "ship",
+            "aircraft",
+            "effect",
+            "disaster",
+            "end",
+            "invalid",
+        )
     )
     if surviving + counts["deleted"] != visits:
         raise RuntimeError("scheduler survival accounting")
