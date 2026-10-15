@@ -1813,3 +1813,30 @@ transports, free-unit and different-engine wagon-removal replacement, cash and
 length rollback, reload, and the tick-end drain in play (renewal with restart;
 money-limit failure with reserve and news). Native tests cover layouts, slots, CommandCost and
 drain reentry. NewGRF refit/attach callbacks and articulated parts remain #156.
+
+### Engine lifecycle and availability (#220)
+
+Rust owns each engine's lifecycle scalars and name, the process-wide aging-stop
+state, startup/reliability, daily/monthly preview and availability policy,
+variant synchronization and control/name/visibility commands. Native Engine
+shells expose canonical scalar aliases; temporary owners survive relocation and
+TTO replacement. Original bodies compile only portably. Pool/configuration/spec,
+NewGRF/articulated, company/type availability and presentation remain native
+through typed synchronous noexcept services shared with fleet/company consumers.
+No owner borrow spans a callback; script events enqueue without running a VM.
+RNG draws, narrowing and command/effect order retain the original behavior.
+
+Modern ENGN scalar descriptors address aliases directly; only opaque names use a
+native string scope, preserving partial decoding on failure. Historical loaders
+address canonical prefixes without live mirrors. Panics/environmental exceptions
+abort; native save/load errors remain outside Rust.
+`python3 tools/migration.py verify --jobs 2` checks Cargo and native ABI/lifetimes.
+`python3 tools/migration.py simulate engines- --jobs 2` (also `--self`, `--soak`)
+requires default preview/acceptance/join/no-build, commands, retirement/sync,
+never-expire and 2050-cutoff witnesses and compares modern reload. The identical
+adapter declares variant and cutoff spec inputs for unchanged reference bodies;
+branch results, command costs and semantic saves must match. Counters record
+native entries, service crossings and returned bytes, disabled for timing.
+External NewGRF programs/retire_early, ENGS and TTO/TTD fixtures, legacy preview
+conversion and threaded GUI/presentation remain #156 gaps. Final independent
+review, coordinated speed budgets and exact-head full CI still gate integration.

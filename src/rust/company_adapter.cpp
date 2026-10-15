@@ -9,6 +9,8 @@
 #ifdef WITH_RUST
 #include "company_adapter.h"
 #include "company_services.h"
+#include "presentation_services.h"
+#include "settings_services.h"
 #include "../company_base.h"
 #include "../company_func.h"
 #include "../company_cmd.h"
@@ -110,15 +112,9 @@ static void Fin_money_animation(uint32_t t, int64_t amount) noexcept
 }
 
 /* Company identity and lifecycle services. */
-static OpenTTDCompanyRef Co_company_next(uint32_t from) noexcept
-{
-	for (Company *c : Company::Iterate(from)) return {&c->Finances(), c->index.base()};
-	return {nullptr, UINT32_MAX};
-}
 static bool Co_company_is_ai(uint8_t id) noexcept { return Company::Get(id)->is_ai; }
 static size_t Co_company_count() noexcept { return Company::GetNumItems(); }
 static bool Co_can_allocate_company() noexcept { return Company::CanAllocateItem(); }
-static uint8_t Co_local_company() noexcept { return _local_company.base(); }
 static bool Co_network_server() noexcept { return _network_server; }
 static OpenTTDCompanyVehicleCounts Co_company_vehicle_counts(uint8_t id) noexcept
 {
@@ -129,8 +125,7 @@ static OpenTTDCompanyVehicleCounts Co_company_vehicle_counts(uint8_t id) noexcep
 }
 static OpenTTDCompanyVehicleCounts Co_vehicle_limits() noexcept
 {
-	const auto &v = _settings_game.vehicle;
-	return {v.max_trains, v.max_roadveh, v.max_ships, v.max_aircraft};
+	return {RustTrainLimit(), RustRoadVehicleLimit(), RustShipLimit(), RustAircraftLimit()};
 }
 static void Co_company_admin_update(uint8_t id) noexcept { CompanyAdminUpdate(Company::Get(id)); }
 static void Co_company_in_trouble(uint8_t id) noexcept
@@ -210,7 +205,6 @@ static void Co_clear_all_cargo_monitors() noexcept
 	ClearCargoDeliveryMonitoring();
 }
 static void Co_ask_merger(uint8_t best, uint8_t id, int64_t value) noexcept { AI::NewEvent(CompanyID(best), new ScriptEventCompanyAskMerger(CompanyID(id), value)); }
-static bool Co_is_interactive_company(uint8_t id) noexcept { return IsInteractiveCompany(CompanyID(id)); }
 static void Co_show_buy_company(uint8_t id) noexcept { ShowBuyCompanyDialog(CompanyID(id), false); }
 static uint32_t Co_script_random_next(uint32_t max) noexcept { return ScriptObject::GetRandomizer(OWNER_NONE).Next(max); }
 static void Co_reset_competitor_timeout(uint32_t ticks) noexcept { _new_competitor_timeout.Reset({TimerGameTick::Priority::COMPETITOR_TIMEOUT, ticks}); }
@@ -415,7 +409,6 @@ static void Co_delete_goal(uint32_t id) noexcept { delete Goal::Get(id); }
 static uint32_t Co_story_page_next_owned(uint8_t owner, uint32_t from) noexcept { return NextOwned<StoryPage>(owner, from, [](const StoryPage *sp) { return sp->company; }); }
 static void Co_delete_story_page(uint32_t id) noexcept { delete StoryPage::Get(id); }
 static void Co_change_window_owner(uint8_t old_owner, uint8_t new_owner) noexcept { ChangeWindowOwner(CompanyID(old_owner), CompanyID(new_owner)); }
-static void Co_mark_whole_screen_dirty() noexcept { MarkWholeScreenDirty(); }
 
 const OpenTTDCompanyFinanceServices &GetRustCompanyFinanceServices() noexcept
 {
@@ -434,9 +427,9 @@ const OpenTTDCompanyServices &GetRustCompanyServices() noexcept
 	(void)GetRustEconomy(); (void)GetRustPrices(); (void)GetRustCompanyScores();
 	static const OpenTTDCompanyServices services{
 		.finance = &GetRustCompanyFinanceServices(), .shared = &GetRustSharedServices(),
-		.company_next = Co_company_next, .company_is_ai = Co_company_is_ai,
+		.company_next = RustCompanyRefNext, .company_is_ai = Co_company_is_ai,
 		.company_count = Co_company_count, .can_allocate_company = Co_can_allocate_company,
-		.local_company = Co_local_company, .network_server = Co_network_server,
+		.local_company = RustLocalCompanyID, .network_server = Co_network_server,
 		.company_vehicle_counts = Co_company_vehicle_counts, .vehicle_limits = Co_vehicle_limits,
 		.company_admin_update = Co_company_admin_update, .company_in_trouble = Co_company_in_trouble,
 		.post_company_delete = Co_post_company_delete, .update_company_hq = Co_update_company_hq,
@@ -450,7 +443,7 @@ const OpenTTDCompanyServices &GetRustCompanyServices() noexcept
 		.price_windows_dirty = Co_price_windows_dirty, .industry_daily_changes = Co_industry_daily_changes,
 		.clear_cargo_monitors = Co_clear_cargo_monitors, .clear_all_cargo_monitors = Co_clear_all_cargo_monitors,
 		.generate_company_name = RustCompanyGenerateName, .ask_merger = Co_ask_merger,
-		.is_interactive_company = Co_is_interactive_company, .show_buy_company = Co_show_buy_company,
+		.is_interactive_company = RustIsInteractiveCompany, .show_buy_company = Co_show_buy_company,
 		.script_random_next = Co_script_random_next, .reset_competitor_timeout = Co_reset_competitor_timeout,
 		.finances_dirty = Co_finances_dirty, .show_company_finances = Co_show_company_finances,
 		.new_year_sound = Co_new_year_sound, .generate_company_colour = RustCompanyGenerateColour,
@@ -487,7 +480,7 @@ const OpenTTDCompanyServices &GetRustCompanyServices() noexcept
 		.sign_next_owned = Co_sign_next_owned, .set_sign_owner = Co_set_sign_owner,
 		.goal_next_owned = Co_goal_next_owned, .delete_goal = Co_delete_goal,
 		.story_page_next_owned = Co_story_page_next_owned, .delete_story_page = Co_delete_story_page,
-		.change_window_owner = Co_change_window_owner, .mark_whole_screen_dirty = Co_mark_whole_screen_dirty,
+		.change_window_owner = Co_change_window_owner, .mark_whole_screen_dirty = RustScreenDirty,
 	};
 	return services;
 }

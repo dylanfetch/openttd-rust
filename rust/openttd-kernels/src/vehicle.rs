@@ -21,6 +21,33 @@ pub struct OpenTTDVehicle {
     _private: [u8; 0],
 }
 
+/// Native `VehicleType : uint8_t`. A transparent carrier preserves every byte,
+/// including sentinels and unnamed values, without Rust enum validity constraints.
+#[repr(transparent)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct VehicleType(pub u8);
+
+impl VehicleType {
+    /// Native `VEH_TRAIN`.
+    pub const TRAIN: Self = Self(0);
+    /// Native `VEH_ROAD`.
+    pub const ROAD: Self = Self(1);
+    /// Native `VEH_SHIP`.
+    pub const SHIP: Self = Self(2);
+    /// Native `VEH_AIRCRAFT`.
+    pub const AIRCRAFT: Self = Self(3);
+}
+
+/// Native `RailVehicleTypes : uint8_t`, with the same unrestricted byte domain.
+#[repr(transparent)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct RailVehicleTypes(pub u8);
+
+impl RailVehicleTypes {
+    /// Native `RAILVEH_WAGON`.
+    pub const WAGON: Self = Self(2);
+}
+
 /// Non-null live vehicle handle; `Option<VehicleRef>` crosses as a nullable pointer.
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq)]

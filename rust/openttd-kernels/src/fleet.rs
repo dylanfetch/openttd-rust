@@ -16,6 +16,7 @@
     clippy::many_single_char_names,
     clippy::struct_field_names
 )]
+use crate::vehicle::OpenTTDVehicle;
 use std::collections::{BTreeMap, BTreeSet};
 const NONE: u32 = u32::MAX;
 /// `VehicleID::Invalid()` (`vehicle_type.h`), the list-selection sentinel.
@@ -254,7 +255,7 @@ pub struct GroupServices {
     pub(crate) group: unsafe extern "C" fn(u16) -> *mut (),
     pub(crate) next_group: unsafe extern "C" fn(u32) -> u32,
     pub(crate) next_company: unsafe extern "C" fn(u32) -> u32,
-    pub(crate) next_vehicle: unsafe extern "C" fn(u32) -> *mut (),
+    pub(crate) next_vehicle: unsafe extern "C" fn(u32) -> *mut OpenTTDVehicle,
     pub(crate) vehicle: unsafe extern "C" fn(u32) -> *mut (),
     pub(crate) vehicle_id: unsafe extern "C" fn(*mut ()) -> u32,
     pub(crate) vehicle_type: unsafe extern "C" fn(*mut ()) -> u8,
@@ -599,7 +600,7 @@ unsafe fn propagate_livery(w: &GroupServices, id: u16, reset: bool) {
     if reset {
         let mut from = 0;
         loop {
-            let v = unsafe { (w.next_vehicle)(from) };
+            let v = unsafe { (w.next_vehicle)(from) }.cast::<()>();
             if v.is_null() {
                 break;
             }
@@ -879,7 +880,7 @@ unsafe fn update_afterload(w: &GroupServices) {
     }
     from = 0;
     loop {
-        let v = unsafe { (w.next_vehicle)(from) };
+        let v = unsafe { (w.next_vehicle)(from) }.cast::<()>();
         if v.is_null() {
             break;
         }
@@ -932,7 +933,7 @@ unsafe fn update_profits(w: &GroupServices) {
     }
     from = 0;
     loop {
-        let v = unsafe { (w.next_vehicle)(from) };
+        let v = unsafe { (w.next_vehicle)(from) }.cast::<()>();
         if v.is_null() {
             break;
         }
@@ -1052,7 +1053,7 @@ unsafe fn add_shared_group(w: &GroupServices, flags: u32, id: u16, kind: u8) -> 
     if flags & 1 != 0 {
         let mut from = 0;
         loop {
-            let v = unsafe { (w.next_vehicle)(from) };
+            let v = unsafe { (w.next_vehicle)(from) }.cast::<()>();
             if v.is_null() {
                 break;
             }
@@ -1086,7 +1087,7 @@ unsafe fn remove_vehicles_group(w: &GroupServices, flags: u32, id: u16) -> u32 {
     if flags & 1 != 0 {
         let mut from = 0;
         loop {
-            let v = unsafe { (w.next_vehicle)(from) };
+            let v = unsafe { (w.next_vehicle)(from) }.cast::<()>();
             if v.is_null() {
                 break;
             }

@@ -18,4 +18,13 @@ inline uint8_t RustPlaneSpeed() noexcept { return _settings_game.vehicle.plane_s
 inline uint8_t RustPlaneCrashes() noexcept { return _settings_game.vehicle.plane_crashes; }
 inline bool RustServiceAtHelipad() noexcept { return _settings_game.order.serviceathelipad; }
 inline bool RustDisasterSound() noexcept { return _settings_client.sound.disaster; }
+inline bool RustNeverExpireVehicles() noexcept { return _settings_game.vehicle.never_expire_vehicles; }
+inline uint16_t RustTrainLimit() noexcept { return _settings_game.vehicle.max_trains; }
+inline uint16_t RustRoadVehicleLimit() noexcept { return _settings_game.vehicle.max_roadveh; }
+inline uint16_t RustShipLimit() noexcept { return _settings_game.vehicle.max_ships; }
+inline uint16_t RustAircraftLimit() noexcept { return _settings_game.vehicle.max_aircraft; }
+inline bool RustAITrainDisabled() noexcept { return _settings_game.ai.ai_disable_veh_train; }
+inline bool RustAIRoadDisabled() noexcept { return _settings_game.ai.ai_disable_veh_roadveh; }
+inline bool RustAIShipDisabled() noexcept { return _settings_game.ai.ai_disable_veh_ship; }
+inline bool RustAIAircraftDisabled() noexcept { return _settings_game.ai.ai_disable_veh_aircraft; }
 #endif /* RUST_SETTINGS_SERVICES_H */

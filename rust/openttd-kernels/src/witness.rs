@@ -251,7 +251,37 @@ pub const AIRCRAFT_CACHE_ENTRIES: usize = 106;
 pub const AIRCRAFT_DISASTER_ENTRIES: usize = 107;
 
 /// Counter names, grouped by the prefix the harness selects.
-pub const NAMES: [&str; 108] = [
+/// Engine services witness.
+pub const ENGINE_SERVICES: usize = 108;
+/// Engine bytes witness.
+pub const ENGINE_BYTES: usize = 109;
+/// Engine sync witness.
+pub const ENGINE_SYNC: usize = 110;
+/// Engine retire witness.
+pub const ENGINE_RETIRE: usize = 111;
+/// Engine `never_expire` witness.
+pub const ENGINE_NEVER_EXPIRE: usize = 112;
+/// Engine accept witness.
+pub const ENGINE_ACCEPT: usize = 113;
+/// Engine join witness.
+pub const ENGINE_JOIN: usize = 114;
+/// Engine offer witness.
+pub const ENGINE_OFFER: usize = 115;
+/// Engine penalty witness.
+pub const ENGINE_PENALTY: usize = 116;
+/// Engine cutoff witness.
+pub const ENGINE_CUTOFF: usize = 117;
+/// Engine visibility witness.
+pub const ENGINE_VISIBILITY: usize = 118;
+/// Engine control witness.
+pub const ENGINE_CONTROL: usize = 119;
+/// Engine rename witness.
+pub const ENGINE_RENAME: usize = 120;
+
+/// Engine native entry witness.
+pub const ENGINE_ENTRIES: usize = 121;
+
+pub const NAMES: [&str; 122] = [
     "train.tick_first",
     "train.tick_second",
     "train.reversal",
@@ -360,6 +390,20 @@ pub const NAMES: [&str; 108] = [
     "aircraft.observation_bytes",
     "aircraft.cache_entries",
     "aircraft.disaster_entries",
+    "engine.services",
+    "engine.bytes",
+    "engine.sync",
+    "engine.retire",
+    "engine.never_expire",
+    "engine.accept",
+    "engine.join",
+    "engine.offer",
+    "engine.penalty",
+    "engine.cutoff",
+    "engine.visibility",
+    "engine.control",
+    "engine.rename",
+    "engine.entries",
 ];
 
 static ENABLED: AtomicBool = AtomicBool::new(false);
