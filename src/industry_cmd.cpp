@@ -3653,11 +3653,12 @@ static const OpenTTDIndustryServices _industry_services = {
 		MarkTileDirtyByTile(tile);
 	},
 	.fence_wanted = [](uint32_t index, uint8_t side) noexcept -> bool {
-		TileIndex tile(index);
+		TileIndex index_tile{index};
+		Tile tile{index_tile};
 		auto dir = static_cast<DiagDirection>(side);
-		if (!RustClearFieldTile(index)) return false;
-		TileIndex neighbour = tile + TileOffsByDiagDir(dir);
-		return !RustClearFieldTile(neighbour.base()) || GetFence(neighbour, ReverseDiagDir(dir)) == 0;
+		if (!RustClearFieldTile(tile)) return false;
+		Tile neighbour{index_tile + TileOffsByDiagDir(dir)};
+		return !RustClearFieldTile(neighbour) || GetFence(neighbour, ReverseDiagDir(dir)) == 0;
 	},
 	.set_fence = [](uint32_t tile, uint8_t side, uint8_t type) noexcept { SetFence(TileIndex(tile), static_cast<DiagDirection>(side), type); },
 	.tile_completed = [](void *i, uint32_t tile) noexcept -> bool { return !RustIndustry(i)->TileBelongsToIndustry(TileIndex(tile)) || IsIndustryCompleted(TileIndex(tile)); },

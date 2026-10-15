@@ -168,7 +168,7 @@ static const OpenTTDTreeServices _tree_services{
 	.make_snow = RustMakeSnow,
 	.clear_neighbour_flooding = RustClearNeighbourFlooding,
 	.tile_loop_water = RustTileLoopWater,
-	.ambient = RustAmbientSound,
+	.ambient = RustAmbientSoundLegacy,
 	.play_sound = RustPlayTileSound,
 	.progress = []() noexcept { return TreeProgress([] { IncreaseGeneratingWorldProgress(GWP_TREE); }); },
 	.progress_total = [](uint32_t total) noexcept { return TreeProgress([total] { SetGeneratingWorldProgress(GWP_TREE, total); }); },

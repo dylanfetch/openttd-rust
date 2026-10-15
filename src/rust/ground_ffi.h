@@ -51,7 +51,7 @@ struct OpenTTDClearServices {
 	void (*set_field)(uint32_t, uint32_t) noexcept;
 	bool (*has_water_class)(uint32_t) noexcept;
 	WaterClass (*water_class)(uint32_t) noexcept;
-	bool (*ambient)(uint32_t) noexcept;
+	void (*ambient)(uint32_t) noexcept;
 };
 struct OpenTTDRailSnowGround { int32_t z; Slope slope; TrackBits tracks; bool plain; };
 struct OpenTTDRailFenceGround { TrackBits tracks; uint8_t owner; bool plain; };
@@ -122,7 +122,7 @@ struct OpenTTDWaterGroundServices {
 	const OpenTTDClearServices *clear;
 	const OpenTTDVehicleServices *vehicles;
 	const OpenTTDGroundCostServices *costs;
-	bool (*ambient)(uint32_t) noexcept;
+	void (*ambient)(uint32_t) noexcept;
 	bool (*non_flooding)(uint32_t) noexcept;
 	void (*set_non_flooding)(uint32_t, bool) noexcept;
 	bool (*coast)(uint32_t) noexcept;

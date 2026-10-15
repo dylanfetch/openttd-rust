@@ -60,7 +60,7 @@ pub struct WaterServices {
     pub clear: *const ClearServices,
     pub vehicles: *const VehicleServices,
     pub costs: *const CostServices,
-    pub ambient: extern "C" fn(u32) -> bool,
+    pub ambient: extern "C" fn(u32),
     pub non_flooding: extern "C" fn(u32) -> bool,
     pub set_non_flooding: extern "C" fn(u32, bool),
     pub coast: extern "C" fn(u32) -> bool,

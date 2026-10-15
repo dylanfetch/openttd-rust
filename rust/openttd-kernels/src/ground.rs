@@ -89,7 +89,7 @@ pub struct ClearServices {
     pub set_field: extern "C" fn(u32, u32),
     pub has_water_class: extern "C" fn(u32) -> bool,
     pub water_class: extern "C" fn(u32) -> WaterClass,
-    pub ambient: extern "C" fn(u32) -> bool,
+    pub ambient: extern "C" fn(u32),
 }
 #[repr(C)]
 pub struct RailSnowGround {

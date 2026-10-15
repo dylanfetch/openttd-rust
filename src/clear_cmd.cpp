@@ -185,7 +185,7 @@ const OpenTTDClearServices &GetRustClearServices() noexcept
 		.make_snow = RustMakeSnow, .make_clear = RustMakeClear,
 		.fences = [](uint32_t index) noexcept { Tile t{TileIndex{index}}; return OpenTTDFieldFences{.ne = GetFence(t, DIAGDIR_NE), .se = GetFence(t, DIAGDIR_SE), .sw = GetFence(t, DIAGDIR_SW), .nw = GetFence(t, DIAGDIR_NW)}; },
 		.set_fence = [](uint32_t t, DiagDirection d, uint32_t f) noexcept { SetFence(TileIndex{t}, d, f); },
-		.field = [](uint32_t t) noexcept { return OpenTTDFieldGround{.industry = RustFieldIndustryValue(t), .type = GetFieldType(TileIndex{t})}; },
+		.field = [](uint32_t index) noexcept { Tile t{TileIndex{index}}; return OpenTTDFieldGround{.industry = RustFieldIndustry(t).base(), .type = GetFieldType(t)}; },
 		.set_field = [](uint32_t t, uint32_t f) noexcept { SetFieldType(TileIndex{t}, f); },
 		.has_water_class = RustHasWaterClass,
 		.water_class = RustWaterClass,
