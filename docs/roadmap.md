@@ -38,7 +38,7 @@ Actions, in order:
    - Boundary: R0's scheduler with an inlined dispatch on the raw type byte and direct native handler pointers. Declare `TileLoop_*` `noexcept` under `WITH_RUST`; no lambda trampolines and no pointer cast.
    - Then the full ground/flood scope.
    - Gate: interleaved A/B against tip within 11 ms on TGP; attribute any miss with callgrind (AGENTS.md).
-   - Full b2b gate failed at +81 ms. The profile attributes clear observations, water setup and dispatch; fix those before another gate or full corpus.
+   - Full b2b gate failed at +81 ms; the first attributed fix still misses at +64 ms (194cee). Select the next bounded round from its clear/fence/scheduler profile before another gate or full corpus.
 6. **Re-select #213 from integrated tip.**
    - Boundary: a pool-cursor descriptor instead of a `next()` call per vehicle, one slim dispatch record and one post-tick bundle, the assert check in Rust, and about three C++ calls per vehicle at most.
    - The selected growth-checked cursor and read-only actual status-member addresses are bounded by `docs/design/world-state.md`; count all semantic callbacks too.
@@ -167,8 +167,8 @@ that a `SaveLoad` descriptor cannot address through the alias.
 
 Root resumed with `/start-development`. #253/#254/#248/#245 are integrated and
 their worktrees removed. #233 observation and #252 acceptance are complete;
-#243/#244 closed unmerged. Root owns CI/integration; landscape, vehicle and town
-owners are active. Engine and signal merged trees match their full validations.
+#243/#244 closed unmerged. Root owns CI/integration; owners and focused fixing/
+planning agents are active. Engine and signal merged trees match full validation.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
@@ -177,9 +177,9 @@ owners are active. Engine and signal merged trees match their full validations.
 | #249 / #254 | integrated, worktree removed | Fixing review/full CI passed; 206 baseline fingerprints, no additions permitted. |
 | #219 / #245 | integrated, worktree removed | Fixing reviews, semantic/native evidence, all six speed gates and exact-head full CI passed. |
 | #220 / #248 | integrated, worktree removed | Fixing reviews, semantic/native evidence, all six speed gates and exact-head full CI passed. |
-| #212 / #255 | `landscape-owner-212`, `f8c1df5063` | Attributed clear/water/dispatch fix passes native/focused semantics. Finish single-resolution/void-service corrections, then repeat full gate; tooling ceiling 500. |
-| #213 / #257 | `vehicle-owner-213`, `3de2275c5a` | Full maintenance, trivial date wires and canonical enum fixed; native/focused checks run after two fixture fixes. Initial a110 gate covers scheduler only; tooling ceiling 375. |
-| #246 / #258 | `town-founding-246`, `425710778d` milestone | Full founding/name fixtures pass; correct strong-ID wires and verify real Windows calls before final freeze/review. Tooling ceiling 320, bounded ABI addition selected on #246. |
+| #212 / #255 | `landscape-owner-212`, `194cee14d4` | Native/focused semantics pass; full gate still fails at +64 ms. Exact profile and fresh planning guide the second fix selection; tooling ceiling 500. |
+| #213 / #257 | `vehicle-owner-213`, `c447956b7b` | Fixing review corrects copied-output byte accounting; native/six maintenance cases pass. Full focused/self/soak and performance remain; initial a110 gate covers scheduler only, tooling ceiling 375. |
+| #246 / #258 | `town-founding-246`, `496011d22a` | Default generation found a wrong initial growth unit conversion; fresh fixing review corrects it. Affected generators pass; full corpus/exact-head CI run, speed gates pending. Tooling ceiling 320. |
 | #256 / #247 | unstarted | Complete house lifecycle, then town commands/deletion, after #246. |
 | #64 / #66 | `issue/64-curve-family`, `aab5211801` | Paused draft/worktree; leave untouched, not a fallback. |
 | Paused integration | `integration/curve-script`, `c19f09cf8b` | Locked worktree preserved; no work. |
