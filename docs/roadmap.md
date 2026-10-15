@@ -9,7 +9,7 @@ forward-looking, about 200 lines; completed work is one row, with evidence in PR
 - Twenty-seven ownership ports. Whole fork: Rust 60,520 / tooling 31,190 / glue 27,289 / original retired 38,219 of 470,612 `src/` lines (8.12%). Simulation: 30,248 / 102,615 (29.48%); source counts, not behavioral completion.
 - Since the eleventh review, engine #248, signals #245 and town founding #258 integrated, retiring 1,717 original lines. Landscape #212 and vehicle #213 missed their final gates after profiled fix rounds and stopped as drafts at the pause.
 - Latest calibrated timings (#258): TGP 1.122x, play saves 1.234x-1.345x; all six caps passed. Timing was not repeated for the subsequent fidelity/housekeeping changes.
-- #262 fixes ScriptList overflow; #259 H1-H3 remove stale repository state, compact docs and delete 2,142 workflow/comment lines. These two maintenance integrations retire no additional game C++; ownership resumes after the selected cleanup. Required CI passes; no new coverage gap is closed beyond #262's rank extremes (#156).
+- #262 fixes ScriptList overflow; #259 H1-H3 remove stale repository state, compact docs and delete 2,142 workflow/comment lines. These two maintenance integrations retire no additional game C++; this short session prioritizes bounded tasks. Required CI passes; no new coverage gap is closed beyond #262's rank extremes (#156).
 - Two unintegrated component drafts, #255 and #257; both conflict with the town base.
 - Largest original simulation files remaining: station_cmd 4.5k lines, rail_cmd 3.2k, vehicle 3.0k, road_cmd 2.7k, tunnelbridge 2.2k, town_cmd 1.9k, landscape 1.8k, water 1.5k.
 
@@ -172,7 +172,7 @@ re-selection are on #259.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #259 | H1-H3 complete; H4 selected | Dead FFI, shared founding services and three lexical guards; 160-line tooling ceiling. H5 unstarted. |
+| #259 H4 | `cleanup-dead-ffi-259`, base `ec512af31e` | `/root/cleanup_dead_ffi_h4` implementing dead FFI, shared founding services and lexical guards; 160-line tooling ceiling. H5 unstarted. |
 | #261 | unstarted | R1-R4 after #259 H4 merges. |
 | #212 / #255 | `landscape-owner-212`, `63c67959ee` | Stopped: TGP gate missed (see PR). Conflicts with town base. Next: update, profile, root re-selection. |
 | #213 / #257 | `vehicle-owner-213`, `67611082f7` | Stopped: CPU gate missed (see PR). Conflicts with town base. Next: update, profile, root re-selection. |
