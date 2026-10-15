@@ -92,6 +92,7 @@ pub unsafe extern "C" fn openttd_rust_engine_set_name(state: *mut Lifecycle, tex
 use crate::company::OpenTTDCompany;
 use crate::services::{RandomServices, Services as SharedServices};
 use crate::vehicle::{OpenTTDEngine, OpenTTDVehicle, RailVehicleTypes, VehicleType};
+use std::ffi::c_uint;
 use std::ptr::{addr_of, addr_of_mut};
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -225,7 +226,7 @@ pub struct Services {
     pub powered_roadtypes: unsafe extern "C" fn(*const OpenTTDEngine) -> u64,
     pub company_railtypes: unsafe extern "C" fn(u8) -> u64,
     pub company_roadtypes: unsafe extern "C" fn(u8) -> u64,
-    pub company_engine_count: unsafe extern "C" fn(u8, u16) -> u16,
+    pub company_engine_count: unsafe extern "C" fn(u8, u16) -> c_uint,
     pub block_preview: unsafe extern "C" fn(u8),
     pub introduces_railtypes: unsafe extern "C" fn(*const OpenTTDEngine) -> u64,
     pub introduces_roadtypes: unsafe extern "C" fn(*const OpenTTDEngine) -> u64,

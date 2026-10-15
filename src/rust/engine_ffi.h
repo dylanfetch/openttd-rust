@@ -81,7 +81,7 @@ struct OpenTTDEngineServices {
 	uint64_t (*powered_roadtypes)(const OpenTTDEngine *) noexcept;
 	uint64_t (*company_railtypes)(uint8_t) noexcept;
 	uint64_t (*company_roadtypes)(uint8_t) noexcept;
-	uint16_t (*company_engine_count)(uint8_t, uint16_t) noexcept;
+	uint (*company_engine_count)(uint8_t, uint16_t) noexcept;
 	void (*block_preview)(uint8_t) noexcept;
 	uint64_t (*introduces_railtypes)(const OpenTTDEngine *) noexcept;
 	uint64_t (*introduces_roadtypes)(const OpenTTDEngine *) noexcept;
