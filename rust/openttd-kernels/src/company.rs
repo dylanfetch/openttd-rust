@@ -69,6 +69,13 @@ pub struct Economy {
     pub old_loan: i64,
     pub old_fraction: u16,
 }
+/// Opaque native `Company`. Pool services lend its address while the shell is
+/// live; Rust never dereferences it or retains an owner borrow across callbacks.
+#[repr(C)]
+pub struct OpenTTDCompany {
+    _private: [u8; 0],
+}
+
 /// A live pool company and its canonical finance storage; `id == u32::MAX` ends.
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -410,7 +417,7 @@ pub extern "C" fn openttd_rust_company_tick() -> *mut u32 {
 const INVALID: u32 = u32::MAX;
 const INVALID_OWNER: u8 = 255;
 const OWNER_NONE: u8 = 16;
-const OWNER_DEITY: u8 = 18;
+pub const OWNER_DEITY: u8 = 18;
 const COMPANIES: u32 = 15;
 const PRICE_COUNT: usize = 71;
 const INITIAL_LOAN: i64 = 100_000;

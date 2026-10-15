@@ -251,46 +251,76 @@ pub const AIRCRAFT_CACHE_ENTRIES: usize = 106;
 pub const AIRCRAFT_DISASTER_ENTRIES: usize = 107;
 
 /// Counter names, grouped by the prefix the harness selects.
-/// Scheduler evidence counter.
-pub const VEHICLE_CALLBACK32: usize = 108;
-/// Scheduler evidence counter.
-pub const VEHICLE_CARGO_AGES: usize = 109;
-/// Scheduler evidence counter.
-pub const VEHICLE_CARGO_OWNER: usize = 110;
-/// Scheduler evidence counter.
-pub const VEHICLE_CROSSINGS: usize = 111;
-/// Scheduler evidence counter.
-pub const VEHICLE_DAYS: usize = 112;
-/// Scheduler evidence counter.
-pub const VEHICLE_DELETED: usize = 113;
-/// Scheduler evidence counter.
-pub const VEHICLE_DESCRIPTOR_BYTES: usize = 114;
-/// Scheduler evidence counter.
-pub const VEHICLE_MOTION: usize = 115;
-/// Scheduler evidence counter.
-pub const VEHICLE_OBSERVED_BYTES: usize = 116;
-/// Scheduler evidence counter.
-pub const VEHICLE_OUTER_VISITS: usize = 117;
-/// Scheduler evidence counter.
-pub const VEHICLE_PACKET_LOOKUPS: usize = 118;
-/// Scheduler evidence counter.
-pub const VEHICLE_PERIODIC_SOUND: usize = 119;
-/// Scheduler evidence counter.
-pub const VEHICLE_POOL_GROWTH: usize = 120;
-/// Scheduler evidence counter.
-pub const VEHICLE_POST_TICK: usize = 121;
-/// Scheduler evidence counter.
-pub const VEHICLE_RUNNING_SOUND: usize = 122;
-/// Scheduler evidence counter.
-pub const VEHICLE_SCALAR_READ_BYTES: usize = 123;
-/// Scheduler evidence counter.
-pub const VEHICLE_SCALAR_WRITE_BYTES: usize = 124;
-/// Scheduler evidence counter.
-pub const VEHICLE_STATIONS: usize = 125;
-/// Scheduler evidence counter.
-pub const VEHICLE_VISITS: usize = 126;
+/// Engine services witness.
+pub const ENGINE_SERVICES: usize = 108;
+/// Engine bytes witness.
+pub const ENGINE_BYTES: usize = 109;
+/// Engine sync witness.
+pub const ENGINE_SYNC: usize = 110;
+/// Engine retire witness.
+pub const ENGINE_RETIRE: usize = 111;
+/// Engine `never_expire` witness.
+pub const ENGINE_NEVER_EXPIRE: usize = 112;
+/// Engine accept witness.
+pub const ENGINE_ACCEPT: usize = 113;
+/// Engine join witness.
+pub const ENGINE_JOIN: usize = 114;
+/// Engine offer witness.
+pub const ENGINE_OFFER: usize = 115;
+/// Engine penalty witness.
+pub const ENGINE_PENALTY: usize = 116;
+/// Engine cutoff witness.
+pub const ENGINE_CUTOFF: usize = 117;
+/// Engine visibility witness.
+pub const ENGINE_VISIBILITY: usize = 118;
+/// Engine control witness.
+pub const ENGINE_CONTROL: usize = 119;
+/// Engine rename witness.
+pub const ENGINE_RENAME: usize = 120;
 
-pub const NAMES: [&str; 134] = [
+/// Engine native entry witness.
+pub const ENGINE_ENTRIES: usize = 121;
+
+/// Scheduler evidence counter.
+pub const VEHICLE_CALLBACK32: usize = 122;
+/// Scheduler evidence counter.
+pub const VEHICLE_CARGO_AGES: usize = 123;
+/// Scheduler evidence counter.
+pub const VEHICLE_CARGO_OWNER: usize = 124;
+/// Scheduler evidence counter.
+pub const VEHICLE_CROSSINGS: usize = 125;
+/// Scheduler evidence counter.
+pub const VEHICLE_DAYS: usize = 126;
+/// Scheduler evidence counter.
+pub const VEHICLE_DELETED: usize = 127;
+/// Scheduler evidence counter.
+pub const VEHICLE_DESCRIPTOR_BYTES: usize = 128;
+/// Scheduler evidence counter.
+pub const VEHICLE_MOTION: usize = 129;
+/// Scheduler evidence counter.
+pub const VEHICLE_OBSERVED_BYTES: usize = 130;
+/// Scheduler evidence counter.
+pub const VEHICLE_OUTER_VISITS: usize = 131;
+/// Scheduler evidence counter.
+pub const VEHICLE_PACKET_LOOKUPS: usize = 132;
+/// Scheduler evidence counter.
+pub const VEHICLE_PERIODIC_SOUND: usize = 133;
+/// Scheduler evidence counter.
+pub const VEHICLE_POOL_GROWTH: usize = 134;
+/// Scheduler evidence counter.
+pub const VEHICLE_POST_TICK: usize = 135;
+/// Scheduler evidence counter.
+pub const VEHICLE_RUNNING_SOUND: usize = 136;
+/// Scheduler evidence counter.
+pub const VEHICLE_SCALAR_READ_BYTES: usize = 137;
+/// Scheduler evidence counter.
+pub const VEHICLE_SCALAR_WRITE_BYTES: usize = 138;
+/// Scheduler evidence counter.
+pub const VEHICLE_STATIONS: usize = 139;
+/// Scheduler evidence counter.
+pub const VEHICLE_VISITS: usize = 140;
+
+pub const NAMES: [&str; 148] = [
     "train.tick_first",
     "train.tick_second",
     "train.reversal",
@@ -399,6 +429,20 @@ pub const NAMES: [&str; 134] = [
     "aircraft.observation_bytes",
     "aircraft.cache_entries",
     "aircraft.disaster_entries",
+    "engine.services",
+    "engine.bytes",
+    "engine.sync",
+    "engine.retire",
+    "engine.never_expire",
+    "engine.accept",
+    "engine.join",
+    "engine.offer",
+    "engine.penalty",
+    "engine.cutoff",
+    "engine.visibility",
+    "engine.control",
+    "engine.rename",
+    "engine.entries",
     "vehicle.callback32",
     "vehicle.cargo_ages",
     "vehicle.cargo_owner",

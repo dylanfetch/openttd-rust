@@ -11,23 +11,10 @@
 use super::{CALLBACK_FAILED, VS_CRASHED, VS_HIDDEN, VS_STOPPED, VehicleRef};
 use crate::{cargo_storage, fleet, station_service};
 
-/// The native `VehicleType` representation, including its non-pool sentinels.
-#[allow(dead_code)] // These variants are also constructed by the native pool leaf.
-#[repr(u8)]
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum VehicleType {
-    Train = 0,
-    Road = 1,
-    Ship = 2,
-    Aircraft = 3,
-    Effect = 4,
-    Disaster = 5,
-    End = 6,
-    Invalid = 255,
-}
-const TRAIN: VehicleType = VehicleType::Train;
-const ROAD: VehicleType = VehicleType::Road;
-const AIRCRAFT: VehicleType = VehicleType::Aircraft;
+use super::VehicleType;
+const TRAIN: VehicleType = VehicleType::TRAIN;
+const ROAD: VehicleType = VehicleType::ROAD;
+const AIRCRAFT: VehicleType = VehicleType::AIRCRAFT;
 const FRONT: u8 = 1;
 const ENGINE: u8 = 1 << 3;
 const NORMAL_AIRCRAFT: u8 = 2;
@@ -244,14 +231,13 @@ unsafe fn post_tick<const COUNTED: bool>(schedule: &PostTickServices, vehicle: V
     if COUNTED {
         crate::witness::hit(
             crate::witness::VEHICLE_VISITS
-                + if vehicle_type == VehicleType::Invalid {
-                    7
-                } else {
-                    vehicle_type as usize
+                + match vehicle_type.0 {
+                    0..=6 => usize::from(vehicle_type.0),
+                    _ => 7,
                 },
         );
     }
-    if vehicle_type > AIRCRAFT {
+    if vehicle_type.0 > AIRCRAFT.0 {
         return;
     }
     if COUNTED {
@@ -459,7 +445,7 @@ unsafe fn run_ticks<const COUNTED: bool>(
 mod tests {
     use super::*;
     use std::ffi::c_void;
-    const SHIP: VehicleType = VehicleType::Ship;
+    const SHIP: VehicleType = VehicleType::SHIP;
     use std::ptr::{NonNull, null, null_mut};
 
     // Only test-owned scalar cells, never a replica of the native Vehicle layout.
@@ -716,6 +702,27 @@ mod tests {
         unsafe {
             cargo_storage::openttd_rust_cargo_list_destroy(c.cargo, &raw const CARGO_SERVICES);
         };
+    }
+
+    #[test]
+    fn non_transport_type_bytes_skip_all_transport_state() {
+        for byte in 4..=u8::MAX {
+            let mut c = Cells::new();
+            c.period = 7;
+            c.counter = 3;
+            c.speed = 10;
+            c.motion = u32::MAX;
+            c.hide_counter = true;
+            c.hide_motion = true;
+            c.hide_speed = true;
+            c.hide_kind = true;
+            c.hide_subtype = true;
+            c.hide_tick = true;
+            c.run(VehicleType(byte));
+            assert_eq!(c.counter, 3);
+            assert_eq!(c.motion, u32::MAX);
+            assert_eq!(c.events, ["post"]);
+        }
     }
 
     #[test]

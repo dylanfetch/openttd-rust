@@ -18,6 +18,13 @@ inline OpenTTDVehicle *RustVehicle(const Vehicle *v) noexcept { return reinterpr
 /** The vehicle behind a Rust handle. */
 inline Vehicle *VehicleOf(OpenTTDVehicle *v) noexcept { return reinterpret_cast<Vehicle *>(v); }
 
+/** Shared ascending vehicle pool traversal for lifecycle and fleet ports. */
+inline OpenTTDVehicle *RustNextVehicle(uint32_t from) noexcept
+{
+	for (Vehicle *v : Vehicle::Iterate(from)) return RustVehicle(v);
+	return nullptr;
+}
+
 /** Shared native field definitions, also used by bundled observations. */
 inline Vehicle *RustVehicleNext(const Vehicle *v) noexcept { return v->Next(); }
 inline uint32_t RustVehicleTile(const Vehicle *v) noexcept { return v->tile.base(); }
@@ -56,7 +63,7 @@ inline uint8_t RustVehicleRunning(const Vehicle *v) noexcept { return v->running
 inline int32_t RustVehicleOrderTime(const Vehicle *v) noexcept { return v->current_order_time; }
 inline int64_t RustVehicleProfit(const Vehicle *v) noexcept { return v->profit_this_year; }
 inline const VehicleType *RustVehicleVehicleTypeAddress(const Vehicle *v) noexcept { return &v->type; }
-inline uint8_t RustVehicleVehicleType(const Vehicle *v) noexcept { return *RustVehicleVehicleTypeAddress(v); }
+inline VehicleType RustVehicleVehicleType(const Vehicle *v) noexcept { return *RustVehicleVehicleTypeAddress(v); }
 
 inline const uint16_t *RustVehicleCargoPeriodAddress(const Vehicle *v) noexcept { return &v->vcache.cached_cargo_age_period; }
 inline uint16_t *RustVehicleCargoCounterAddress(Vehicle *v) noexcept { return &v->cargo_age_counter; }

@@ -1671,7 +1671,13 @@ static void FormatString(StringBuilder &builder, std::string_view str_arg, Strin
 					if (e == nullptr) break;
 
 					if (!e->name.empty() && e->IsEnabled()) {
-						auto tmp_params = MakeParameters(e->name);
+						auto tmp_params = MakeParameters(
+#ifdef WITH_RUST
+							e->name.View()
+#else
+							e->name
+#endif
+						);
 						GetStringWithArgs(builder, STR_JUST_RAW_STRING, tmp_params);
 						break;
 					}

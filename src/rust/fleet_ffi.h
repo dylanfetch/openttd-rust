@@ -22,11 +22,12 @@
  * original move/AddCost behavior. No owner borrow spans reentry/destruction.
  * Panics and escaping environmental exceptions abort. ABI 390-396 pin the owner
  * prefixes, the three service tables and the native cost slots. */
+struct OpenTTDVehicle;
 struct OpenTTDFleetGroupServices {
 	void * (*group)(uint16_t id) noexcept;
 	uint32_t (*next_group)(uint32_t from) noexcept;
 	uint32_t (*next_company)(uint32_t from) noexcept;
-	void * (*next_vehicle)(uint32_t from) noexcept;
+	OpenTTDVehicle * (*next_vehicle)(uint32_t from) noexcept;
 	void * (*vehicle)(uint32_t id) noexcept;
 	uint32_t (*vehicle_id)(void *shell) noexcept;
 	uint8_t (*vehicle_type)(void *shell) noexcept;

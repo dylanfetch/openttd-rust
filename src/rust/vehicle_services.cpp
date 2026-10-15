@@ -184,7 +184,7 @@ static uint16_t OPENTTD_VEHICLE_CALL VehicleSvcSpeed(OpenTTDVehicle *v) noexcept
 static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcSubspeed(OpenTTDVehicle *v) noexcept { return RustVehicleSubspeed(VehicleOf(v)); }
 static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcRunning(OpenTTDVehicle *v) noexcept { return RustVehicleRunning(VehicleOf(v)); }
 static int32_t OPENTTD_VEHICLE_CALL VehicleSvcOrderTime(OpenTTDVehicle *v) noexcept { return RustVehicleOrderTime(VehicleOf(v)); }
-static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcVehicleType(OpenTTDVehicle *v) noexcept { return RustVehicleVehicleType(VehicleOf(v)); }
+static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcVehicleType(OpenTTDVehicle *v) noexcept { return static_cast<uint8_t>(RustVehicleVehicleType(VehicleOf(v))); }
 static void OPENTTD_VEHICLE_CALL VehicleSvcWriteX(OpenTTDVehicle *v, int32_t value) noexcept { VehicleOf(v)->x_pos = value; }
 static void OPENTTD_VEHICLE_CALL VehicleSvcWriteY(OpenTTDVehicle *v, int32_t value) noexcept { VehicleOf(v)->y_pos = value; }
 static void OPENTTD_VEHICLE_CALL VehicleSvcWriteZ(OpenTTDVehicle *v, int32_t value) noexcept { VehicleOf(v)->z_pos = value; }
