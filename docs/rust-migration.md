@@ -1706,7 +1706,8 @@ at all capacities. ABI checks cover consumed tables/records; counters distinguis
 world services, facade/context calls and actual nested occupancy accessors counted
 only in the relinked scenario adapter; native occupancy signatures stay original.
 Real tbd/global propagation overflow, threaded play and arbitrary mod layouts
-remain #156 limits; the PR records validation and all six timing ratchets.
+remain #156 limits. #245 records fixing reviews, source comparisons and passing
+final-head full CI and all six timing ratchets.
 
 ### Industry periodic production and builder ownership (#129)
 
