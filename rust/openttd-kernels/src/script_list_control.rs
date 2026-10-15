@@ -108,10 +108,10 @@ impl Control {
         };
         entry.map(|(&key, &value)| (key, value))
     }
-    // Original SQInteger-to-int narrowing (C++20 modulo conversion). Subsequent
-    // signed int additions/subtractions must remain in the original defined domain.
+    // Original SQInteger-to-int narrowing (C++20 modulo conversion).
     #[allow(clippy::cast_possible_truncation)]
     fn parameters(top: i64) -> i32 {
+        // sq_gettop returns a nonnegative stack size, so subtracting one cannot overflow.
         top.checked_sub(1).expect("defined VM top") as i32
     }
     #[allow(clippy::cast_possible_truncation)]
@@ -120,6 +120,7 @@ impl Control {
     }
     fn arguments(&mut self) -> Action {
         if self.argument < self.nparam - 1 {
+            // VM slots use >=8 bytes; the 8 GiB script cap keeps argument + 3 below i32::MAX.
             let index = self
                 .argument
                 .checked_add(3)
@@ -127,6 +128,7 @@ impl Control {
             self.argument += 1;
             action(PUSH, index)
         } else {
+            // VM slots use >=8 bytes; the 8 GiB script cap keeps nparam + 1 below i32::MAX.
             self.yield_at(
                 10,
                 CALL,
@@ -200,6 +202,7 @@ impl Control {
                         }
                     }
                     let Some((key, _)) = self.entry(list) else {
+                        // VM slots use >=8 bytes; the 8 GiB script cap keeps nparam + 3 below i32::MAX.
                         return self.yield_at(
                             18,
                             POP,
@@ -233,6 +236,7 @@ impl Control {
                     if filter {
                         return action(THROW_ERROR, 5);
                     }
+                    // VM slots use >=8 bytes; the 8 GiB script cap keeps nparam + 4 below i32::MAX.
                     return self.yield_at(
                         19,
                         POP,
@@ -247,6 +251,7 @@ impl Control {
                     };
                     if !filter {
                         if self.token != list.modifications {
+                            // VM slots use >=8 bytes; the 8 GiB script cap keeps nparam + 4 below i32::MAX.
                             return self.yield_at(
                                 20,
                                 POP,
