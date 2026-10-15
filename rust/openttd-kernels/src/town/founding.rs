@@ -109,7 +109,7 @@ pub struct FoundingServices {
     pub set_progress: extern "C" fn(*mut Frame, u32) -> bool,
     pub increase_progress: extern "C" fn(*mut Frame) -> bool,
     pub no_town_error: extern "C" fn(),
-    pub town_count: extern "C" fn() -> u32,
+    pub town_count: extern "C" fn() -> usize,
     pub random: *mut names::Randomizer,
     pub edge_error: u32,
     pub close_error: u32,

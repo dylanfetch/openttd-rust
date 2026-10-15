@@ -1148,13 +1148,13 @@ static const OpenTTDTownLeaves &GetRustTownServices() noexcept
 }
 #endif /* WITH_RUST */
 
+#ifndef WITH_RUST
 static bool GrowTown(Town *t, TownExpandModes modes);
 
 /**
  * Handle the town tick for a single town, by growing the town if desired.
  * @param t The town to try growing.
  */
-#ifndef WITH_RUST
 static void TownTickHandler(Town *t)
 {
 	if (t->flags.Test(TownFlag::IsGrowing)) {
@@ -1288,9 +1288,7 @@ bool CheckTownRoadTypes()
  * @param dist_multi The distance multiplier.
  * @return true if there is a parallel road.
  */
-#ifdef WITH_RUST
-static bool GrowTown(Town *t, TownExpandModes modes) { return openttd_rust_town_grow(&GetRustTownServices(), &GetRustSharedServices(), t->index.base(), modes.base()); }
-#else
+#ifndef WITH_RUST
 static bool IsNeighbourRoadTile(TileIndex tile, const DiagDirection dir, uint dist_multi)
 {
 	if (!IsValidTile(tile)) return false;
@@ -2276,7 +2274,9 @@ void UpdateTownMaxPass(Town *t)
 	}
 }
 
+#ifndef WITH_RUST
 static void UpdateTownGrowthRate(Town *t);
+#endif
 static void UpdateTownGrowth(Town *t);
 
 /**
@@ -2357,7 +2357,7 @@ const OpenTTDTownFoundingServices &GetRustTownFoundingServices() noexcept
 		.set_progress = [](OpenTTDTownFoundingFrame *frame, uint total) noexcept { return RunGenerationProgress(frame, [total] { SetGeneratingWorldProgress(GWP_TOWN, total); }); },
 		.increase_progress = [](OpenTTDTownFoundingFrame *frame) noexcept { return RunGenerationProgress(frame, [] { IncreaseGeneratingWorldProgress(GWP_TOWN); }); },
 		.no_town_error = []() noexcept { ShowErrorMessage(GetEncodedString(STR_ERROR_COULD_NOT_CREATE_TOWN), {}, WL_CRITICAL); },
-		.town_count = []() noexcept -> uint { return Town::GetNumItems(); },
+		.town_count = []() noexcept -> size_t { return Town::GetNumItems(); },
 		.random = &_random,
 		.edge_error = STR_ERROR_TOO_CLOSE_TO_EDGE_OF_MAP_SUB,
 		.close_error = STR_ERROR_TOO_CLOSE_TO_ANOTHER_TOWN,
@@ -4196,7 +4196,6 @@ static void UpdateTownRating(Town *t)
  * @param prev_growth_rate Town growth rate before it changed (one that was used with grow counter to be updated)
  */
 #ifdef WITH_RUST
-static void UpdateTownGrowthRate(Town *t) { openttd_rust_town_update_rate(&GetRustTownServices(), &GetRustSharedServices(), t->index.base()); }
 static void UpdateTownGrowth(Town *t) { openttd_rust_town_update_growth(&GetRustTownServices(), &GetRustSharedServices(), t->index.base()); }
 #else
 static void UpdateTownGrowCounter(Town *t, uint16_t prev_growth_rate)
