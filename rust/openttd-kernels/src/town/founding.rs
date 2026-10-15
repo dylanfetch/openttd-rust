@@ -7,7 +7,9 @@
 
 //! Complete town founding, placement and generation; owners are never borrowed
 //! across native callbacks. Cancellation returns to its native exception frame.
-use super::{Engine, Leaves, State, TownId, TownRef, names, update_radius};
+use super::{
+    Engine, Leaves, State, TownId, TownRef, names, town_ticks_to_game_ticks, update_radius,
+};
 use crate::services::{ByteSpan, CommandCost, CommandCostServices, Services, TownHandle};
 use crate::witness as w;
 use std::cell::OnceCell;
@@ -302,7 +304,7 @@ impl<'a> Founding<'a> {
         observed!((self.s.initialize_counts)(town.shell));
         unsafe {
             (*town.state).growth.counter = town.id.0 % 70;
-            (*town.state).growth.rate = 17_500;
+            (*town.state).growth.rate = town_ticks_to_game_ticks(250);
         }
         observed!((self.s.insert_town)(town.shell));
         match observed!((self.leaves.climate)()) {

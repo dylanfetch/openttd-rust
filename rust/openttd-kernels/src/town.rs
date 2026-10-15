@@ -178,6 +178,11 @@ pub extern "C" fn openttd_rust_town_generating_exchange(generating: bool) -> boo
         unsafe { std::ptr::replace(flag.get(), generating) }
     })
 }
+/// Convert original town tick counters, including tick zero, to game ticks.
+fn town_ticks_to_game_ticks(ticks: u16) -> u16 {
+    ((u32::from(ticks.min(930)) + 1) * 70 - 1) as u16
+}
+
 unsafe fn update_radius(state: *mut State) {
     const RADII: [[u32; 5]; 23] = [
         [4, 0, 0, 0, 0],
@@ -917,9 +922,7 @@ impl Engine<'_> {
         if self.is_city() {
             m /= 2;
         }
-        let rate = ((m / (self.num_houses() / 50 + 1)).min(930) + 1)
-            .wrapping_mul(70)
-            .wrapping_sub(1) as u16;
+        let rate = town_ticks_to_game_ticks((m / (self.num_houses() / 50 + 1)) as u16);
         self.set_rate(rate);
         if rate != u16::MAX {
             let counter = self.counter();
