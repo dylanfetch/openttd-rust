@@ -108,7 +108,6 @@ pub struct RailServices {
     pub fences: extern "C" fn(u32) -> RailFenceGround,
     pub foundation: extern "C" fn(Slope, TrackBits) -> Foundation,
     pub owned_land: extern "C" fn(u32) -> bool,
-    pub water_loop: extern "C" fn(u32),
 }
 #[repr(C)]
 pub struct TunnelGround {
@@ -288,6 +287,9 @@ pub unsafe extern "C" fn openttd_rust_rail_tile_loop(
     tile: u32,
     climate: LandscapeType,
     size_x: u32,
+    size_y: u32,
+    call: *mut Call,
+    water: *const crate::water::WaterServices,
     rail: *const RailServices,
     shared: *const Services,
 ) {
@@ -296,7 +298,11 @@ pub unsafe extern "C" fn openttd_rust_rail_tile_loop(
     let (r, s) = unsafe { (&*rail, &*shared) };
     let old = (r.ground)(tile).0;
     if old == 13 {
-        (r.water_loop)(tile);
+        // SAFETY: The same serialized facade/batch owns this independent native
+        // result context; no result is live before this source early return.
+        unsafe {
+            crate::water::openttd_rust_water_tile_loop(tile, size_x, size_y, call, water, shared);
+        };
         return;
     }
     let mut new = None;

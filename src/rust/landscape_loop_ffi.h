@@ -10,6 +10,7 @@
 #define RUST_LANDSCAPE_LOOP_FFI_H
 #include "trees_ffi.h"
 #include "industry_ffi.h"
+#include "ground_ffi.h"
 
 /* Only existing tables consumed by the industry tile loop; borrowed for a batch. */
 struct OpenTTDIndustryLoopServices {
@@ -19,6 +20,20 @@ struct OpenTTDIndustryLoopServices {
 	const OpenTTDIndustryTileServices *tiles;
 	const OpenTTDIndustryGenerationServices *generation;
 };
+/* Configuration is invariant under the same serialized callback proof as the
+ * existing tree settings. The native result context is independent on reentry. */
+struct OpenTTDGroundLoopServices {
+	const OpenTTDClearServices *clear;
+	const OpenTTDRailServices *rail;
+	const OpenTTDRoadGroundServices *road;
+	const OpenTTDTunnelServices *tunnel;
+	const OpenTTDWaterGroundServices *water;
+	const OpenTTDGroundCostServices *costs;
+	OpenTTDGroundCall *call;
+	LandscapeType climate;
+	bool editor;
+	bool rebuild;
+};
 /* Native handlers retain their complete original bodies. No generic dispatch slot.
  * World callbacks may mutate/reenter; no cursor borrow spans a callback. Tables are
  * immutable and live for the synchronous invocation. All wrappers are noexcept. */
@@ -27,14 +42,10 @@ struct OpenTTDLandscapeLoopServices {
 	OpenTTDTileTypeAllocation tile_types;
 	const OpenTTDTreeServices *trees;
 	OpenTTDIndustryLoopServices industry;
-	void (*clear_loop)(uint32_t) noexcept;
-	void (*rail_loop)(uint32_t) noexcept;
-	void (*road_loop)(uint32_t) noexcept;
+	OpenTTDGroundLoopServices ground;
 	void (*house_loop)(uint32_t) noexcept;
 	void (*station_loop)(uint32_t) noexcept;
-	void (*water_loop)(uint32_t) noexcept;
 	void (*void_loop)(uint32_t) noexcept;
-	void (*tunnel_bridge_loop)(uint32_t) noexcept;
 	void (*object_loop)(uint32_t) noexcept;
 };
 const OpenTTDTreeServices &GetRustTreeServices() noexcept;
@@ -44,6 +55,6 @@ extern "C" {
 /* Process-global raw u32; unchanged DATE/legacy descriptors access only at serial
  * save/load/reset boundaries. No C++ or Rust reference survives a scheduler call. */
 uint32_t *openttd_rust_tile_loop_cursor();
-void openttd_rust_run_tile_loop(uint8_t log_x, uint8_t log_y, OpenTTDTreeLoopSettings, const OpenTTDLandscapeLoopServices *);
+void openttd_rust_run_tile_loop(unsigned int log_x, unsigned int log_y, OpenTTDTreeLoopSettings, const OpenTTDLandscapeLoopServices *);
 }
 #endif /* RUST_LANDSCAPE_LOOP_FFI_H */

@@ -49,6 +49,8 @@
 #ifdef WITH_RUST
 #include "rust/ffi.h"
 #include "rust/landscape_loop_ffi.h"
+#include "rust/ground_services.h"
+#include "rust/environment_services.h"
 #endif
 
 #include "safeguards.h"
@@ -824,19 +826,16 @@ void RunTileLoop()
 #ifdef WITH_RUST
 	static_assert(MIN_MAP_SIZE_BITS == 6 && MAX_MAP_SIZE_BITS == 12 && TILE_UPDATE_FREQUENCY_LOG == 8);
 	static_assert(MP_CLEAR == 0 && MP_RAILWAY == 1 && MP_ROAD == 2 && MP_HOUSE == 3 && MP_TREES == 4 && MP_STATION == 5 && MP_WATER == 6 && MP_VOID == 7 && MP_INDUSTRY == 8 && MP_TUNNELBRIDGE == 9 && MP_OBJECT == 10);
+	OpenTTDGroundCall call;
 	const OpenTTDLandscapeLoopServices services{
 		.shared = &GetRustSharedServices(),
 		.tile_types = GetRustTileTypeAllocation(),
 		.trees = &GetRustTreeServices(),
 		.industry = GetRustIndustryLoopServices(),
-		.clear_loop = _tile_type_clear_procs.tile_loop_proc,
-		.rail_loop = _tile_type_rail_procs.tile_loop_proc,
-		.road_loop = _tile_type_road_procs.tile_loop_proc,
+		.ground = {.clear = &GetRustClearServices(), .rail = &GetRustRailGroundServices(), .road = &GetRustRoadGroundServices(), .tunnel = &GetRustTunnelGroundServices(), .water = &GetRustWaterGroundServices(), .costs = &GetRustGroundCostServices(), .call = &call, .climate = OpenTTDLandscape(), .editor = OpenTTDEditor(), .rebuild = _settings_game.economy.mod_road_rebuild},
 		.house_loop = _tile_type_town_procs.tile_loop_proc,
 		.station_loop = _tile_type_station_procs.tile_loop_proc,
-		.water_loop = _tile_type_water_procs.tile_loop_proc,
 		.void_loop = _tile_type_void_procs.tile_loop_proc,
-		.tunnel_bridge_loop = _tile_type_tunnelbridge_procs.tile_loop_proc,
 		.object_loop = _tile_type_object_procs.tile_loop_proc,
 	};
 	/* Preserve the original assertion under the native build assertion policy. */

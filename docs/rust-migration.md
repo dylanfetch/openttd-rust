@@ -550,28 +550,28 @@ progress cancellation and Windows/macOS runtime parity are not exercised locally
 
 The #212 owner ([PR #255](https://github.com/fetch-laboratories/openttd-rust/pull/255))
 controls `RunTileLoop`, clear/rail/road/tunnel ground evolution, flooding behaviour,
-half-tile rail removal, dry-up, neighbour wakeups and flood-victim traversal.
-The process-global Rust cursor commits only after the complete source batch;
-DATE, legacy loading, reset and zero repair retain their original widths/order.
-Native map/pool storage, shared commands, event insertion and effects remain typed
-`noexcept` services. Original selected bodies compile only without `WITH_RUST`.
+half-tile rail removal, dry-up, neighbour wakeups and live flood-victim traversal.
+The process-global saved cursor commits after the complete source batch; DATE,
+legacy loading, reset and zero repair retain their widths/order. Original selected
+bodies compile only without `WITH_RUST`; packed map/pool storage remains native.
 
-The in-entry LFSR reads each live type byte from audited native allocation metadata.
-Native handlers use scalar signatures and local strong-index construction. Ground
-interfaces use actual native enums, transparent Rust carriers retaining all byte
-patterns, exact uint counters and typed station handles. Legacy shared protocols
-adapt explicitly. Native command results are lazy stack storage; no hot call
-allocates a protocol object or copies a complete native tile/vehicle record.
-Vehicle hash iterators advance after crash/events/news/effects; airport rectangle
-membership, bridge start/end order and nested company restoration follow source.
-No ordinary-play callback unwinds; generation-progress cancellation is outside tick.
+The in-entry LFSR keeps native unsigned map-log widths and reads each live type
+byte from audited allocation metadata. All seven Rust tile owners dispatch directly;
+only house/station/void/object have native scalar handlers with local strong-index
+construction. Ground boundaries use actual native enums, unrestricted transparent
+Rust carriers, exact counters and typed station handles. Legacy protocols adapt
+explicitly. Each native entry owns independent lazy stack command-result storage.
+No hot call allocates a protocol object or copies a complete native tile/vehicle.
+Vehicle iterators advance after crash/events/news/effects; airport membership,
+bridge endpoint order and company restoration follow source. No ordinary tick
+callback unwinds; generation-progress cancellation stays outside tick.
 
-`verify`, the default landscape comparison and `simulate landscape roads-flooding`
-exercise ABI calls, scheduler gaps, declared ground endpoints and flood branches;
-`--self` and `--soak` extend semantic evidence. Required named witnesses fail when
-missing. The comparison imports the unchanged scheduler for unreachable dimensions
-and cursor/reentry phases. Remaining matrix/editor/NewGRF/threaded gaps are in #156.
-`TreeObservation` remains; the scheduler gate does not remove its full facade cost.
+`verify`, the default scheduler comparison and `simulate landscape roads-flooding`
+exercise real ABI calls, declared endpoints and required named branch witnesses;
+`--self`/`--soak` extend evidence. Missing witnesses fail. The unchanged scheduler
+probe covers dimensions/cursor/reentry phases unreachable through ordinary saves.
+Remaining matrix/editor/NewGRF/threaded gaps are in #156. `TreeObservation` remains;
+the scheduler gate does not remove its full facade cost.
 
 ### Landscape partial-pixel height
 

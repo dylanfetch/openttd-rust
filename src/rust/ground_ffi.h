@@ -59,7 +59,6 @@ struct OpenTTDRailServices {
 	OpenTTDRailFenceGround (*fences)(uint32_t) noexcept;
 	Foundation (*foundation)(Slope, TrackBits) noexcept;
 	bool (*owned_land)(uint32_t) noexcept;
-	void (*water_loop)(uint32_t) noexcept;
 };
 struct OpenTTDTunnelGround { int32_t z; bool snow; };
 struct OpenTTDTunnelServices {
@@ -98,10 +97,11 @@ const OpenTTDRoadGroundServices &GetRustRoadGroundServices() noexcept;
 const OpenTTDClearServices &GetRustClearServices() noexcept;
 const OpenTTDRailServices &GetRustRailGroundServices() noexcept;
 const OpenTTDTunnelServices &GetRustTunnelGroundServices() noexcept;
+struct OpenTTDWaterGroundServices;
 extern "C" {
 void openttd_rust_road_tile_loop(uint32_t, LandscapeType, bool, bool, uint32_t, OpenTTDGroundCall *, const OpenTTDGroundCostServices *, const OpenTTDRoadGroundServices *, const OpenTTDSharedServices *);
 void openttd_rust_clear_tile_loop(uint32_t, LandscapeType, bool, uint32_t, const OpenTTDClearServices *, const OpenTTDSharedServices *);
-void openttd_rust_rail_tile_loop(uint32_t, LandscapeType, uint32_t, const OpenTTDRailServices *, const OpenTTDSharedServices *);
+void openttd_rust_rail_tile_loop(uint32_t, LandscapeType, uint32_t, uint32_t, OpenTTDGroundCall *, const OpenTTDWaterGroundServices *, const OpenTTDRailServices *, const OpenTTDSharedServices *);
 void openttd_rust_tunnel_tile_loop(uint32_t, LandscapeType, const OpenTTDTunnelServices *, const OpenTTDSharedServices *);
 }
 struct OpenTTDVehicle;

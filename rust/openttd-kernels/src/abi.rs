@@ -89,7 +89,7 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         787 => layout!(crate::ground::RailSnowGround, item; z, slope, tracks, plain),
         788 => layout!(crate::ground::RailFenceGround, item; tracks, owner, plain),
         789 => {
-            layout!(crate::ground::RailServices, item; ground, set_ground, snow, fences, foundation, owned_land, water_loop)
+            layout!(crate::ground::RailServices, item; ground, set_ground, snow, fences, foundation, owned_land)
         }
         790 => layout!(crate::ground::TunnelGround, item; z, snow),
         791 => {
@@ -97,11 +97,14 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         }
         782 => layout!(crate::services::TileTypeAllocation, item; base, count),
         783 => layout!(crate::services::BaseTileLayout, item; kind, height, m2, m1, m3, m4, m5),
+        802 => {
+            layout!(crate::tile_loop::GroundServices, item; clear, rail, road, tunnel, water, costs, call, climate, editor, rebuild)
+        }
         780 => {
             layout!(crate::tile_loop::IndustryServices, item; production, construction, lifecycle, tiles, generation)
         }
         781 => {
-            layout!(crate::tile_loop::Services, item; shared, tile_types, trees, industry, clear_loop, rail_loop, road_loop, house_loop, station_loop, water_loop, void_loop, tunnel_bridge_loop, object_loop)
+            layout!(crate::tile_loop::Services, item; shared, tile_types, trees, industry, ground, house_loop, station_loop, void_loop, object_loop)
         }
         210..=214 | 400..=417 => crate::company::abi_layout(type_id, item),
         320 => layout!(crate::ship_control::Position, item; x, y, old_tile, new_tile),

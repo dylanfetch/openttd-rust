@@ -10,15 +10,17 @@
 #define TESTS_LANDSCAPE_PROTOCOL_HPP
 #include "../tile_cmd.h"
 #include "../rust/landscape_loop_ffi.h"
+#include "../rust/abi_ffi.h"
 #include <array>
 #include <type_traits>
 
 namespace LandscapeProbe {
 static_assert(std::is_same_v<TileLoopProc, void(uint32_t) noexcept>);
-static_assert(std::is_same_v<decltype(OpenTTDLandscapeLoopServices::clear_loop), TileLoopProc *>);
+static_assert(std::is_same_v<decltype(&openttd_rust_run_tile_loop), void (*)(unsigned int, unsigned int, OpenTTDTreeLoopSettings, const OpenTTDLandscapeLoopServices *)>);
+static_assert(std::is_same_v<decltype(OpenTTDLandscapeLoopServices::house_loop), TileLoopProc *>);
 static inline uint32_t calls, reads, seen, expected_tile;
 static inline bool passed;
-static constexpr std::array<uint8_t, 9> NATIVE_TYPES{0, 1, 2, 3, 5, 6, 7, 9, 10};
+static constexpr std::array<uint8_t, 4> NATIVE_TYPES{3, 5, 7, 10};
 static uint8_t Type(uint32_t tile) noexcept
 {
 	passed &= tile == expected_tile;
@@ -35,6 +37,9 @@ template<uint8_t Kind> static void Visit(uint32_t tile_index) noexcept
 }
 template<typename Check> void Run(Check check)
 {
+	const std::array<size_t, 12> layout{sizeof(OpenTTDGroundLoopServices), alignof(OpenTTDGroundLoopServices), offsetof(OpenTTDGroundLoopServices, clear), offsetof(OpenTTDGroundLoopServices, rail), offsetof(OpenTTDGroundLoopServices, road), offsetof(OpenTTDGroundLoopServices, tunnel), offsetof(OpenTTDGroundLoopServices, water), offsetof(OpenTTDGroundLoopServices, costs), offsetof(OpenTTDGroundLoopServices, call), offsetof(OpenTTDGroundLoopServices, climate), offsetof(OpenTTDGroundLoopServices, editor), offsetof(OpenTTDGroundLoopServices, rebuild)};
+	for (uint8_t item = 0; item < layout.size(); item++) check(openttd_rust_abi_layout(802, item) == layout[item]);
+	check(openttd_rust_abi_layout(802, layout.size()) == SIZE_MAX);
 	calls = reads = seen = 0;
 	expected_tile = 1;
 	passed = true;
@@ -45,21 +50,17 @@ template<typename Check> void Run(Check check)
 		.tile_types = {nullptr, 0},
 		.trees = nullptr,
 		.industry = {},
-		.clear_loop = Visit<0>,
-		.rail_loop = Visit<1>,
-		.road_loop = Visit<2>,
+		.ground = {},
 		.house_loop = Visit<3>,
 		.station_loop = Visit<5>,
-		.water_loop = Visit<6>,
 		.void_loop = Visit<7>,
-		.tunnel_bridge_loop = Visit<9>,
 		.object_loop = Visit<10>,
 	};
 	const OpenTTDTreeLoopSettings settings{.tick_counter = 1, .size_x = 64, .climate = 0, .extra = 0, .ambient = false};
 	const auto saved_cursor = *openttd_rust_tile_loop_cursor();
 	*openttd_rust_tile_loop_cursor() = 1;
 	openttd_rust_run_tile_loop(6, 6, settings, &services);
-	check(passed && calls == 16 && reads == calls && seen == 0x6EF && *openttd_rust_tile_loop_cursor() == expected_tile);
+	check(passed && calls == 16 && reads == calls && seen == 0x4A8 && *openttd_rust_tile_loop_cursor() == expected_tile);
 	*openttd_rust_tile_loop_cursor() = saved_cursor;
 }
 } // namespace LandscapeProbe

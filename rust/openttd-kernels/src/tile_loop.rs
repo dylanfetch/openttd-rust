@@ -13,7 +13,7 @@
 //! run outside `RunTileLoop`. Ambient callbacks run only the `NewGRF` sound resolver;
 //! tile handlers may mutate tiles/pools, run landscape/road/crash commands or queue
 //! script events, but none changes map dimensions, climate, tree placement, tick
-//! counter or client ambient settings. Generation progress also runs outside this
+//! counter, editor mode, road-rebuild or client ambient settings. Generation progress also runs outside this
 //! entry. Thus the existing tree settings can be captured once per source batch;
 //! tree/map observations still occur inside each owner at original callback sites.
 //!
@@ -32,7 +32,8 @@
 //! and arbitrary `NewGRF` corpus limits remain source-review obligations in #156.
 #![allow(unsafe_code)]
 
-use crate::{industry, services, trees};
+use crate::{ground, industry, services, trees, water};
+use std::ffi::c_uint;
 
 const FEEDBACKS: [u32; 13] = [
     0xD8F,
@@ -69,6 +70,21 @@ pub struct IndustryServices {
     pub generation: *const industry::GenerationServices,
 }
 
+/// Direct ground owners and one independent native lazy-result context per batch.
+#[repr(C)]
+pub struct GroundServices {
+    pub clear: *const ground::ClearServices,
+    pub rail: *const ground::RailServices,
+    pub road: *const ground::RoadServices,
+    pub tunnel: *const ground::TunnelServices,
+    pub water: *const water::WaterServices,
+    pub costs: *const ground::CostServices,
+    pub call: *mut ground::Call,
+    pub climate: services::LandscapeType,
+    pub editor: bool,
+    pub rebuild: bool,
+}
+
 /// Each native handler remains separately typed; map reads use the shared table.
 #[repr(C)]
 pub struct Services {
@@ -76,44 +92,84 @@ pub struct Services {
     pub tile_types: services::TileTypeAllocation,
     pub trees: *const trees::TreeServices,
     pub industry: IndustryServices,
-    pub clear_loop: extern "C" fn(u32),
-    pub rail_loop: extern "C" fn(u32),
-    pub road_loop: extern "C" fn(u32),
+    pub ground: GroundServices,
     pub house_loop: extern "C" fn(u32),
     pub station_loop: extern "C" fn(u32),
-    pub water_loop: extern "C" fn(u32),
     pub void_loop: extern "C" fn(u32),
-    pub tunnel_bridge_loop: extern "C" fn(u32),
     pub object_loop: extern "C" fn(u32),
 }
 
 // The measured scheduler budget requires dispatch inside the LFSR loop; an
 // uninlined closure cost 47 instructions/visit versus the native 18 (#212).
-#[allow(clippy::inline_always)]
+#[allow(clippy::inline_always, clippy::cast_possible_truncation)]
 #[inline(always)]
 unsafe fn dispatch(
     tile: u32,
-    log_x: u8,
+    log_x: c_uint,
+    size_y: c_uint,
     settings: trees::LoopSettings,
     s: &Services,
     types: &services::TileTypeAccess,
 ) {
-    // SAFETY: All tables are immutable and live for the synchronous batch. Owner
+    // SAFETY: Reached tables are immutable and live for the synchronous batch. Owner
     // entries end their accesses before callbacks; only scalar cursor is local.
     let tile_type = types.read(tile);
+    let g = &s.ground;
     match tile_type {
-        0 => (s.clear_loop)(tile),
-        1 => (s.rail_loop)(tile),
-        2 => (s.road_loop)(tile),
+        0 => unsafe {
+            ground::openttd_rust_clear_tile_loop(
+                tile,
+                g.climate,
+                g.editor,
+                settings.size_x,
+                g.clear,
+                s.shared,
+            );
+        },
+        1 => unsafe {
+            ground::openttd_rust_rail_tile_loop(
+                tile,
+                g.climate,
+                settings.size_x,
+                size_y,
+                g.call,
+                g.water,
+                g.rail,
+                s.shared,
+            );
+        },
+        2 => unsafe {
+            ground::openttd_rust_road_tile_loop(
+                tile,
+                g.climate,
+                settings.ambient,
+                g.rebuild,
+                settings.size_x,
+                g.call,
+                g.costs,
+                g.road,
+                s.shared,
+            );
+        },
         3 => (s.house_loop)(tile),
         4 => unsafe { trees::openttd_rust_trees_tile_loop(tile, settings, s.trees, s.shared) },
         5 => (s.station_loop)(tile),
-        6 => (s.water_loop)(tile),
+        6 => unsafe {
+            water::openttd_rust_water_tile_loop(
+                tile,
+                settings.size_x,
+                size_y,
+                g.call,
+                g.water,
+                s.shared,
+            );
+        },
         7 => (s.void_loop)(tile),
         8 => unsafe {
             industry::openttd_rust_industry_tile_loop(
                 tile,
-                log_x,
+                // Existing industry ABI stores legal map logarithms in a byte.
+                log_x as u8,
                 s.industry.production,
                 s.industry.construction,
                 s.industry.lifecycle,
@@ -121,7 +177,7 @@ unsafe fn dispatch(
                 s.industry.generation,
             );
         },
-        9 => (s.tunnel_bridge_loop)(tile),
+        9 => unsafe { ground::openttd_rust_tunnel_tile_loop(tile, g.climate, g.tunnel, s.shared) },
         10 => (s.object_loop)(tile),
         // The source dispatch table has handlers only for original live tile types.
         _ => unsafe { std::hint::unreachable_unchecked() },
@@ -131,12 +187,13 @@ unsafe fn dispatch(
 /// Own the source's complete batch, including tile-zero phase and final commit.
 /// # Safety
 /// Dimensions are legal original map dimensions; cursor is nonzero. All service
-/// pointers/tables are immutable and live. Calls are serialized with reset and
+/// reached pointers/tables are immutable and live; each native entry owns its lazy
+/// result context independently. Calls are serialized with reset and
 /// save/load. Callbacks are noexcept; reentry sees the cursor before this batch.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_run_tile_loop(
-    log_x: u8,
-    log_y: u8,
+    log_x: c_uint,
+    log_y: c_uint,
     settings: trees::LoopSettings,
     services: *const Services,
 ) {
@@ -149,14 +206,15 @@ pub unsafe extern "C" fn openttd_rust_run_tile_loop(
     let types = unsafe { services::TileTypeAccess::raw(s.tile_types, (*s.shared).tile_type) };
     let mut tile = unsafe { CURSOR };
     let log_sum = log_x + log_y;
-    let feedback = FEEDBACKS[usize::from(log_sum - 12)];
-    let mut count = 1_u32 << (log_sum - 8);
+    let feedback = FEEDBACKS[(log_sum - 12) as usize];
+    let mut count: c_uint = 1 << (log_sum - 8);
+    let size_y: c_uint = 1 << log_y;
     if settings.tick_counter.is_multiple_of(256) {
-        unsafe { dispatch(0, log_x, settings, s, &types) };
+        unsafe { dispatch(0, log_x, size_y, settings, s, &types) };
         count -= 1;
     }
     for _ in 0..count {
-        unsafe { dispatch(tile, log_x, settings, s, &types) };
+        unsafe { dispatch(tile, log_x, size_y, settings, s, &types) };
         tile = (tile >> 1) ^ (0_u32.wrapping_sub(tile & 1) & feedback);
     }
     unsafe { CURSOR = tile };

@@ -2618,14 +2618,14 @@ const OpenTTDRailServices &GetRustRailGroundServices() noexcept
 		.fences = [](uint32_t index) noexcept { bool plain = RustPlainRailTile(index); return OpenTTDRailFenceGround{.tracks = plain ? RustRailTrackBits(index) : TRACK_BIT_NONE, .owner = plain ? RustTileOwnerValue(index) : uint8_t{}, .plain = plain}; },
 		.foundation = [](Slope slope, TrackBits tracks) noexcept { return GetRailFoundation(slope, tracks); },
 		.owned_land = [](uint32_t t) noexcept { return IsObjectType(TileIndex{t}, OBJECT_OWNED_LAND); },
-		.water_loop = RustTileLoopWater,
 	};
 	return services;
 }
 static void TileLoop_Track(uint32_t tile) noexcept
 {
 	const uint32_t size_x = Map::SizeX();
-	openttd_rust_rail_tile_loop(tile, OpenTTDLandscape(), size_x, &GetRustRailGroundServices(), &GetRustSharedServices());
+	OpenTTDGroundCall call;
+	openttd_rust_rail_tile_loop(tile, OpenTTDLandscape(), size_x, Map::SizeY(), &call, &GetRustWaterGroundServices(), &GetRustRailGroundServices(), &GetRustSharedServices());
 }
 #else
 static void TileLoop_Track(TileIndex tile)
