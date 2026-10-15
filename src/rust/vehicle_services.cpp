@@ -590,9 +590,10 @@ static void OPENTTD_VEHICLE_CALL MaintenanceEconomyAgeWrite(OpenTTDVehicle *hand
 static void OPENTTD_VEHICLE_CALL MaintenanceReachedMinAge(OpenTTDVehicle *handle) noexcept { GroupStatistics::VehicleReachedMinAge(VehicleOf(handle)); }
 static int64_t OPENTTD_VEHICLE_CALL MaintenanceValue(OpenTTDVehicle *handle) noexcept { return RustVehicleValue(VehicleOf(handle)); }
 static void OPENTTD_VEHICLE_CALL MaintenanceValueWrite(OpenTTDVehicle *handle, int64_t value) noexcept { VehicleOf(handle)->value = Money(value); }
-static_assert(EconomyTime::DAYS_IN_ECONOMY_MONTH == 30 && CalendarTime::DAYS_IN_LEAP_YEAR == 366 && CARGOTYPE_MAX == 64);
+static_assert(EconomyTime::DAYS_IN_ECONOMY_MONTH == 30 && CalendarTime::DAYS_IN_LEAP_YEAR == 366 && NUM_CARGO == 64);
 static_assert(SND_0F_BREAKDOWN_ROADVEHICLE == 13 && SND_10_BREAKDOWN_TRAIN_SHIP == 14 && SND_35_BREAKDOWN_ROADVEHICLE_TOYLAND == 53 && SND_3A_BREAKDOWN_TRAIN_SHIP_TOYLAND == 58);
-static_assert(std::is_trivially_copyable_v<TimerGameCalendar::Date> && std::is_trivially_copyable_v<TimerGameEconomy::Date>);
+static_assert(std::is_trivially_copy_constructible_v<TimerGameCalendar::Date> && std::is_trivially_destructible_v<TimerGameCalendar::Date>);
+static_assert(std::is_trivially_copy_constructible_v<TimerGameEconomy::Date> && std::is_trivially_destructible_v<TimerGameEconomy::Date>);
 const OpenTTDVehicleMaintenanceServices _rust_vehicle_maintenance_services{
 	.shared = &GetRustSharedServices(),
 	.transaction = &FleetTransactionServices(),
