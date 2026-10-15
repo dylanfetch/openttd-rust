@@ -298,9 +298,8 @@ unsafe fn post_tick<const COUNTED: bool>(schedule: &PostTickServices, vehicle: V
         }
         _ => {}
     }
-    if unsafe { scalar_read::<_, COUNTED>(motion.motion) } & 0xff
-        < u32::from(unsafe { scalar_read::<_, COUNTED>(motion.speed) })
-    {
+    // Only the motion counter was stored; no callback has changed this speed.
+    if unsafe { scalar_read::<_, COUNTED>(motion.motion) } & 0xff < u32::from(speed) {
         post_svc!(
             COUNTED,
             crate::witness::VEHICLE_RUNNING_SOUND,
