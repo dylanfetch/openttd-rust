@@ -102,13 +102,11 @@ static uint8_t MapSvcTunnelBridgeDirection(uint32_t tile) noexcept { return GetT
 static uint16_t MapSvcBridgeSpeed(uint32_t tile) noexcept { return GetBridgeSpec(GetBridgeType(TileIndex(tile)))->speed; }
 static bool MapSvcIsWaterTile(uint32_t tile) noexcept { return IsWaterTile(TileIndex(tile)); }
 
-static uint8_t SharedCurrentCompany() noexcept { return OpenTTDCurrentCompany().base(); }
 static bool SharedCompanyValid(uint8_t company) noexcept { return Company::IsValidID(CompanyID(company)); }
 static uint8_t SharedNextCompany(uint8_t from) noexcept
 {
-	auto range = Company::Iterate(from);
-	auto it = range.begin();
-	return it == range.end() ? CompanyID::Invalid().base() : (*it)->index.base();
+	/* The canonical iterator's UINT32_MAX sentinel narrows to this ABI's UINT8_MAX. */
+	return static_cast<uint8_t>(RustNextCompanyID(from));
 }
 
 static const OpenTTDTownHandle *SharedClosestTown(uint32_t tile, uint32_t threshold) noexcept
@@ -177,7 +175,7 @@ const OpenTTDSharedServices &GetRustSharedServices() noexcept
 		.tunnel_bridge_direction = MapSvcTunnelBridgeDirection,
 		.bridge_speed = MapSvcBridgeSpeed,
 		.is_water_tile = MapSvcIsWaterTile,
-		.company_valid = SharedCompanyValid, .next_company = SharedNextCompany, .current_company = SharedCurrentCompany,
+		.company_valid = SharedCompanyValid, .next_company = SharedNextCompany, .current_company = RustCurrentCompanyID,
 		.closest_town = SharedClosestTown, .town_owner = SharedTownOwner,
 		.tile_valid = Shared_tile_valid,
 		.distance_from_edge = Shared_distance_from_edge,

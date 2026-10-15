@@ -985,7 +985,7 @@ pub unsafe extern "C" fn openttd_rust_engine_control(
 ) -> u8 {
     crate::witness::hit(crate::witness::ENGINE_ENTRIES);
     let s = unsafe { &*s };
-    if unsafe { call!(s, current_company) } != 18
+    if unsafe { call!(s, current_company) } != OWNER_DEITY
         || e.shell.is_null()
         || !unsafe { call!(s, company_valid, company) }
     {
