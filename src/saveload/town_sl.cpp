@@ -15,8 +15,6 @@
 #include "newgrf_sl.h"
 #include "../newgrf_house.h"
 #include "../town.h"
-#ifdef WITH_RUST
-#endif
 #include "../landscape.h"
 #include "../subsidy_func.h"
 #include "../strings_func.h"
@@ -253,6 +251,17 @@ public:
 static std::array<Town::SuppliedHistory, 2> _old_pass_supplied{};
 static std::array<Town::SuppliedHistory, 2> _old_mail_supplied{};
 
+#ifdef WITH_RUST
+struct TownNameSaveScope {
+	static inline std::string current;
+	std::string previous;
+	Town *town;
+	bool loading;
+	TownNameSaveScope(Town *town, bool loading) : previous(std::move(current)), town(town), loading(loading) { current = town->name.View(); }
+	~TownNameSaveScope() { if (this->loading) this->town->name = current; current = std::move(this->previous); }
+};
+#endif
+
 static const SaveLoad _town_desc[] = {
 	SLE_CONDVAR(Town, xy,                    SLE_FILE_U16 | SLE_VAR_U32, SL_MIN_VERSION, SLV_6),
 	SLE_CONDVAR(Town, xy,                    SLE_UINT32,                 SLV_6, SL_MAX_VERSION),
@@ -260,7 +269,11 @@ static const SaveLoad _town_desc[] = {
 	SLE_CONDVAR(Town, townnamegrfid,         SLE_UINT32, SLV_66, SL_MAX_VERSION),
 	    SLE_VAR(Town, townnametype,          SLE_UINT16),
 	    SLE_VAR(Town, townnameparts,         SLE_UINT32),
+#ifdef WITH_RUST
+	SLEG_CONDSSTR("name", TownNameSaveScope::current, SLE_STR | SLF_ALLOW_CONTROL, SLV_84, SL_MAX_VERSION),
+#else
 	SLE_CONDSSTR(Town, name,                 SLE_STR | SLF_ALLOW_CONTROL, SLV_84, SL_MAX_VERSION),
+#endif
 
 	    SLE_VAR(Town, flags,                 SLE_UINT8),
 	SLE_CONDVAR(Town, statues,               SLE_FILE_U8  | SLE_VAR_U16, SL_MIN_VERSION, SLV_104),
@@ -339,6 +352,9 @@ struct CITYChunkHandler : ChunkHandler {
 
 		for (Town *t : Town::Iterate()) {
 			SlSetArrayIndex(t->index);
+#ifdef WITH_RUST
+			TownNameSaveScope name_scope(t, false);
+#endif
 			SlObject(t, _town_desc);
 		}
 	}
@@ -352,6 +368,9 @@ struct CITYChunkHandler : ChunkHandler {
 		while ((index = SlIterateArray()) != -1) {
 			Town *t = new (TownID(index)) Town();
 			{
+#ifdef WITH_RUST
+				TownNameSaveScope name_scope(t, true);
+#endif
 				SlObject(t, slt);
 			}
 
@@ -380,6 +399,9 @@ struct CITYChunkHandler : ChunkHandler {
 		if (IsSavegameVersionBefore(SLV_161)) return;
 
 		for (Town *t : Town::Iterate()) {
+#ifdef WITH_RUST
+			TownNameSaveScope name_scope(t, false);
+#endif
 			SlObject(t, _town_desc);
 		}
 	}

@@ -9,8 +9,6 @@
 
 #include "../stdafx.h"
 #include "../town.h"
-#ifdef WITH_RUST
-#endif
 #include "../industry.h"
 #include "../company_func.h"
 #include "../aircraft.h"

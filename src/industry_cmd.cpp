@@ -3677,7 +3677,7 @@ static const OpenTTDIndustryServices _industry_services = {
 		return {spec->behaviour.base(), spec->enabled, !spec->layouts.empty(), spec->appear_ingame[to_underlying(_settings_game.game_creation.landscape)]};
 	},
 	.probability_callback = [](uint8_t type, uint8_t creation, uint32_t chance) noexcept -> uint32_t { return GetIndustryProbabilityCallback(type, static_cast<IndustryAvailabilityCallType>(creation), chance); },
-	.scale_by_map_size = [](uint32_t n) noexcept -> uint32_t { return Map::ScaleBySize(n); },
+	.scale_by_map_size = OpenTTDMapScaleSize,
 	.company_none = []() noexcept -> uint8_t {
 		CompanyID old = OpenTTDCurrentCompany();
 		OpenTTDSetCurrentCompany(OWNER_NONE);
@@ -3760,14 +3760,14 @@ static const OpenTTDIndustryGenerationServices &GetIndustryGenerationServices()
 		.density = []() noexcept -> uint8_t { return _settings_game.difficulty.industry_density; },
 		.custom_number = []() noexcept -> uint32_t { return _settings_game.game_creation.custom_industry_number; },
 		.scale_by_size_1d = [](uint32_t n) noexcept -> uint32_t { return Map::ScaleBySize1D(n); },
-		.scale_by_land_proportion = [](uint32_t n) noexcept -> uint32_t { return Map::ScaleByLandProportion(n); },
+		.scale_by_land_proportion = OpenTTDMapScaleLandProportion,
 		/* Only AbortGenerateWorldSignal is ordinary here. Retain the native
 		 * exception on this stack frame and rethrow after the Rust entry returns. */
 		.set_progress = [](OpenTTDIndustryGenerationContext *context, bool water, uint32_t total) noexcept -> bool {
-			return RunIndustryGenerationProgress(context, [&] { SetGeneratingWorldProgress(water ? GWP_WATER_INDUSTRY : GWP_LAND_INDUSTRY, total); });
+			return RunGenerationProgress(context, [&] { SetGeneratingWorldProgress(water ? GWP_WATER_INDUSTRY : GWP_LAND_INDUSTRY, total); });
 		},
 		.increase_progress = [](OpenTTDIndustryGenerationContext *context, bool water) noexcept -> bool {
-			return RunIndustryGenerationProgress(context, [&] { IncreaseGeneratingWorldProgress(water ? GWP_WATER_INDUSTRY : GWP_LAND_INDUSTRY); });
+			return RunGenerationProgress(context, [&] { IncreaseGeneratingWorldProgress(water ? GWP_WATER_INDUSTRY : GWP_LAND_INDUSTRY); });
 		},
 		.missing_warning = [](const OpenTTDIndustrySpecHandle *handle) noexcept {
 			const auto *spec = reinterpret_cast<const IndustrySpec *>(handle);

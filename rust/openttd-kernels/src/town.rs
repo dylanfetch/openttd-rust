@@ -22,7 +22,21 @@
     clippy::collapsible_match,
     clippy::decimal_bitwise_operands
 )]
+pub mod founding;
+pub mod names;
+
 use crate::services::{Map, Services, chance16_i};
+
+#[repr(transparent)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct TownId(pub u16);
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct TownRef {
+    pub shell: *mut crate::services::TownHandle,
+    pub state: *mut State,
+    pub id: TownId,
+}
 use std::{
     cell::{OnceCell, UnsafeCell},
     ffi::c_void,
@@ -137,6 +151,7 @@ pub struct GrowthFields {
 }
 #[derive(Default)]
 pub struct State {
+    name: Vec<u8>,
     simulation: SimulationFields,
     supplied: Vec<Supplied>,
     id_counts: Vec<u16>,

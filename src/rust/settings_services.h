@@ -27,4 +27,11 @@ inline bool RustAITrainDisabled() noexcept { return _settings_game.ai.ai_disable
 inline bool RustAIRoadDisabled() noexcept { return _settings_game.ai.ai_disable_veh_roadveh; }
 inline bool RustAIShipDisabled() noexcept { return _settings_game.ai.ai_disable_veh_ship; }
 inline bool RustAIAircraftDisabled() noexcept { return _settings_game.ai.ai_disable_veh_aircraft; }
+inline TownFounding OpenTTDTownFoundingSetting() noexcept { return _settings_game.economy.found_town; }
+inline TownLayout OpenTTDTownLayoutSetting() noexcept { return _settings_game.economy.town_layout; }
+inline uint8_t OpenTTDInitialCitySize() noexcept { return _settings_game.economy.initial_city_size; }
+inline uint8_t OpenTTDTownDensity() noexcept { return _settings_game.difficulty.number_towns; }
+inline uint16_t OpenTTDCustomTownNumber() noexcept { return _settings_newgame.game_creation.custom_town_number; }
+inline uint8_t OpenTTDLargerTowns() noexcept { return _settings_game.economy.larger_towns; }
+inline uint8_t OpenTTDTownNameStyle() noexcept { return _settings_game.game_creation.town_name; }
 #endif /* RUST_SETTINGS_SERVICES_H */

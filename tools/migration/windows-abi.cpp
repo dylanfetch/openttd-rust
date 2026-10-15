@@ -6,6 +6,7 @@
  */
 
 /** @file windows-abi.cpp Bounded first-32-bit layout and real C ABI call checks. */
+#include "stdafx.h"
 #include "rust/abi_ffi.h"
 #include "rust/command_cost_ffi.h"
 #include "rust/command_services_ffi.h"
@@ -23,6 +24,7 @@
 #include "rust/aircraft_ffi.h"
 #include "aircraft-boundary.hpp"
 #include "rust/townname_ffi.h"
+#include "rust/town_founding_ffi.h"
 #include "rust/effect_ffi.h"
 #include "rust/road_ffi.h"
 #include "rust/ship_control_ffi.h"
@@ -83,6 +85,10 @@ static void Layout(uint16_t type, const char *name, std::initializer_list<size_t
 
 static void Layouts()
 {
+	Layout(630, "OpenTTDTownRef", {sizeof(OpenTTDTownRef), alignof(OpenTTDTownRef), offsetof(OpenTTDTownRef, shell), offsetof(OpenTTDTownRef, state), offsetof(OpenTTDTownRef, id)});
+	Layout(631, "OpenTTDTownNameServices", {sizeof(OpenTTDTownNameServices), alignof(OpenTTDTownNameServices), offsetof(OpenTTDTownNameServices, next), offsetof(OpenTTDTownNameServices, render), offsetof(OpenTTDTownNameServices, render_other), offsetof(OpenTTDTownNameServices, utf8_length), offsetof(OpenTTDTownNameServices, random_next)});
+	Layout(632, "OpenTTDTownNameMetadata", {sizeof(OpenTTDTownNameMetadata), alignof(OpenTTDTownNameMetadata), offsetof(OpenTTDTownNameMetadata, grfid), offsetof(OpenTTDTownNameMetadata, type)});
+	Layout(633, "OpenTTDTownFoundingServices", {sizeof(OpenTTDTownFoundingServices), alignof(OpenTTDTownFoundingServices), offsetof(OpenTTDTownFoundingServices, shared), offsetof(OpenTTDTownFoundingServices, growth), offsetof(OpenTTDTownFoundingServices, names), offsetof(OpenTTDTownFoundingServices, cost), offsetof(OpenTTDTownFoundingServices, allocate), offsetof(OpenTTDTownFoundingServices, resolve), offsetof(OpenTTDTownFoundingServices, can_allocate), offsetof(OpenTTDTownFoundingServices, close_to_town), offsetof(OpenTTDTownFoundingServices, flat), offsetof(OpenTTDTownFoundingServices, clear_ground), offsetof(OpenTTDTownFoundingServices, tree_ground), offsetof(OpenTTDTownFoundingServices, water_distance), offsetof(OpenTTDTownFoundingServices, scale_size), offsetof(OpenTTDTownFoundingServices, scale_land), offsetof(OpenTTDTownFoundingServices, current_company), offsetof(OpenTTDTownFoundingServices, set_company), offsetof(OpenTTDTownFoundingServices, found_setting), offsetof(OpenTTDTownFoundingServices, layout_setting), offsetof(OpenTTDTownFoundingServices, initial_city_size), offsetof(OpenTTDTownFoundingServices, town_density), offsetof(OpenTTDTownFoundingServices, custom_number), offsetof(OpenTTDTownFoundingServices, larger_towns), offsetof(OpenTTDTownFoundingServices, parameters), offsetof(OpenTTDTownFoundingServices, metadata), offsetof(OpenTTDTownFoundingServices, initialize_counts), offsetof(OpenTTDTownFoundingServices, insert_town), offsetof(OpenTTDTownFoundingServices, cargo_effect_exists), offsetof(OpenTTDTownFoundingServices, prepare_rename), offsetof(OpenTTDTownFoundingServices, name_changed), offsetof(OpenTTDTownFoundingServices, update_virt), offsetof(OpenTTDTownFoundingServices, directory_rebuild), offsetof(OpenTTDTownFoundingServices, directory_resort), offsetof(OpenTTDTownFoundingServices, update_noise), offsetof(OpenTTDTownFoundingServices, rebuild_tree), offsetof(OpenTTDTownFoundingServices, delete_town), offsetof(OpenTTDTownFoundingServices, assert_random_context), offsetof(OpenTTDTownFoundingServices, assert_allocation), offsetof(OpenTTDTownFoundingServices, initialize_cost), offsetof(OpenTTDTownFoundingServices, sufficient_money), offsetof(OpenTTDTownFoundingServices, money_deficit), offsetof(OpenTTDTownFoundingServices, set_result), offsetof(OpenTTDTownFoundingServices, exchange_generating), offsetof(OpenTTDTownFoundingServices, nearest_town_roads), offsetof(OpenTTDTownFoundingServices, founded_news), offsetof(OpenTTDTownFoundingServices, founded_events), offsetof(OpenTTDTownFoundingServices, clear_station_names), offsetof(OpenTTDTownFoundingServices, clear_industry_names), offsetof(OpenTTDTownFoundingServices, update_station_coords), offsetof(OpenTTDTownFoundingServices, cached_name), offsetof(OpenTTDTownFoundingServices, set_progress), offsetof(OpenTTDTownFoundingServices, increase_progress), offsetof(OpenTTDTownFoundingServices, no_town_error), offsetof(OpenTTDTownFoundingServices, town_count), offsetof(OpenTTDTownFoundingServices, random), offsetof(OpenTTDTownFoundingServices, edge_error), offsetof(OpenTTDTownFoundingServices, close_error), offsetof(OpenTTDTownFoundingServices, unsuitable_error), offsetof(OpenTTDTownFoundingServices, unique_error), offsetof(OpenTTDTownFoundingServices, too_many_error), offsetof(OpenTTDTownFoundingServices, no_space_error)});
 	Layout(445, "OpenTTDTownYearlyServices", {sizeof(OpenTTDTownYearlyServices), alignof(OpenTTDTownYearlyServices), offsetof(OpenTTDTownYearlyServices, completed), offsetof(OpenTTDTownYearlyServices, age), offsetof(OpenTTDTownYearlyServices, set_age)});
 	Layout(444, "OpenTTDTownSuppliedEntry", {sizeof(OpenTTDTownSuppliedEntry), alignof(OpenTTDTownSuppliedEntry), offsetof(OpenTTDTownSuppliedEntry, entry), offsetof(OpenTTDTownSuppliedEntry, created)});
 	Layout(443, "OpenTTDTownAuthorityServices", {sizeof(OpenTTDTownAuthorityServices), alignof(OpenTTDTownAuthorityServices), offsetof(OpenTTDTownAuthorityServices, council_tolerance), offsetof(OpenTTDTownAuthorityServices, bulldozer), offsetof(OpenTTDTownAuthorityServices, authority_distance), offsetof(OpenTTDTownAuthorityServices, town_index), offsetof(OpenTTDTownAuthorityServices, refusal)});
@@ -341,6 +347,26 @@ static void Layouts()
 static void Calls()
 {
 	CheckTownProtocol([](bool condition) { CHECK(condition); });
+	{
+		static OpenTTDTownState *owner = openttd_rust_town_new();
+		OpenTTDSharedServices shared{}; OpenTTDTownLeaves leaves{}; OpenTTDTownNameServices names{}; OpenTTDCommandCostServices costs{}; OpenTTDTownFoundingServices founding{};
+		founding.shared = &shared; founding.growth = &leaves; founding.names = &names; founding.cost = &costs; founding.close_error = 0x87654321;
+		costs.error = [](OpenTTDCommandCost *cost, uint32_t error) noexcept { *reinterpret_cast<uint32_t *>(cost) = error; };
+		leaves.editor = []() noexcept { return false; };
+		names.next = [](uint from) noexcept -> OpenTTDTownRef { CHECK(from == 0 || from == UINT16_MAX); return from == 0 ? OpenTTDTownRef{reinterpret_cast<Town *>(uintptr_t{1}), owner, UINT16_MAX - 1} : OpenTTDTownRef{nullptr, nullptr, UINT16_MAX}; };
+		names.utf8_length = [](const uint8_t *data, size_t size) noexcept -> size_t { CHECK(size == 1 && *data == 'x'); return size; };
+		founding.parameters = [](OpenTTDTownFoundingFrame *) noexcept -> const TownNameParams * { return nullptr; };
+		founding.current_company = []() noexcept -> uint8_t { return UINT8_MAX; };
+		founding.found_setting = []() noexcept { return TF_CUSTOM_LAYOUT; };
+		founding.can_allocate = []() noexcept { return true; };
+		shared.distance_from_edge = [](uint32_t tile) noexcept -> uint32_t { CHECK(tile == UINT32_MAX); return 13; };
+		founding.close_to_town = [](uint32_t tile, uint distance) noexcept { CHECK(tile == UINT32_MAX && distance == 20); return true; };
+		founding.resolve = [](uint16_t id) noexcept -> OpenTTDTownRef { CHECK(id == UINT16_MAX); return {nullptr, nullptr, id}; };
+		uint32_t error = 0; auto *cost = reinterpret_cast<OpenTTDCommandCost *>(&error); OpenTTDTownFoundingFrame frame; const uint8_t text = 'x';
+		openttd_rust_town_found(&founding, &frame, &frame.names, cost, UINT32_MAX, TSZ_SMALL, false, TL_ORIGINAL, false, 0, {&text, 1}, false);
+		CHECK(error == 0x87654321); openttd_rust_town_rename(&founding, cost, UINT16_MAX, {nullptr, 0}, false);
+		CHECK(error == UINT16_MAX); openttd_rust_town_destroy(owner);
+	}
 	std::unique_ptr<OpenTTDRoadState, decltype(&openttd_rust_road_destroy)> road(openttd_rust_road_new(), openttd_rust_road_destroy);
 	for (uint8_t field = 0; field < 7; ++field) {
 		CHECK(openttd_rust_road_get(road.get(), field) == 0);

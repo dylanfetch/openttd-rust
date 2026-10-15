@@ -267,6 +267,14 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         54 => layout!(crate::ship_yapf::Follow, item; tile, skipped, dirs, followed),
         55 => layout!(crate::ship_yapf::Tile, item; ships, docking, sea, lock_middle, destination),
         56 => layout!(crate::ship_yapf::Result, item; direction, found, origin, stats),
+        630 => layout!(crate::town::TownRef, item; shell, state, id),
+        631 => {
+            layout!(crate::town::names::NameServices, item; next, render, render_other, utf8_length, random_next)
+        }
+        632 => layout!(crate::town::founding::Metadata, item; grfid, kind),
+        633 => {
+            layout!(crate::town::founding::FoundingServices, item; shared, growth, names, cost, allocate, resolve, can_allocate, close_to_town, flat, clear_ground, tree_ground, water_distance, scale_size, scale_land, current_company, set_company, found_setting, layout_setting, initial_city_size, town_density, custom_number, larger_towns, parameters, metadata, initialize_counts, insert_town, cargo_effect_exists, prepare_rename, name_changed, update_virt, directory_rebuild, directory_resort, update_noise, rebuild_tree, delete_town, assert_random_context, assert_allocation, initialize_cost, sufficient_money, money_deficit, set_result, exchange_generating, nearest_town_roads, founded_news, founded_events, clear_station_names, clear_industry_names, update_station_coords, cached_name, set_progress, increase_progress, no_town_error, town_count, random, edge_error, close_error, unsuitable_error, unique_error, too_many_error, no_space_error)
+        }
         432 => {
             layout!(crate::town::SimulationFields, item; valid_history, xy, num_houses, population, radius, goal, ratings, received, noise_reached, time_until_rebuild, statues, have_ratings, unwanted, exclusivity, exclusive_counter, larger_town, layout, townnamegrfid, townnametype, townnameparts)
         }

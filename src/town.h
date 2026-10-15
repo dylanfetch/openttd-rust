@@ -154,7 +154,12 @@ struct Town : TownPool::PoolItem<&_town_pool> {
 	uint16_t townnametype = 0;
 	uint32_t townnameparts = 0;
 #endif
+#ifdef WITH_RUST
+	mutable std::string custom_name_cache{}; ///< Presentation only: preserves custom-name reference identity.
+	RustTownName name{growth_owner.get(), custom_name_cache};
+#else
 	std::string name{}; ///< Custom town name. If empty, the town was not renamed and uses the generated name.
+#endif
 	mutable std::string cached_name{}; ///< NOSAVE: Cache of the resolved name of the town, if not using a custom town name
 
 #ifdef WITH_RUST
@@ -379,7 +384,14 @@ struct Town : TownPool::PoolItem<&_town_pool> {
 
 	inline const std::string &GetCachedName() const
 	{
+#ifdef WITH_RUST
+		const auto custom_name = this->name.View();
+		if (!custom_name.empty()) {
+			return this->custom_name_cache;
+		}
+#else
 		if (!this->name.empty()) return this->name;
+#endif
 		if (this->cached_name.empty()) this->FillCachedName();
 		return this->cached_name;
 	}

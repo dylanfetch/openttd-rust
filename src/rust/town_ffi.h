@@ -9,6 +9,7 @@
 #ifndef RUST_TOWN_FFI_H
 #define RUST_TOWN_FFI_H
 #include "services_ffi.h"
+#include "byte_span_ffi.h"
 #include "station_activity_ffi.h"
 #include <cstdint>
 #include "command_cost_ffi.h"
@@ -104,6 +105,8 @@ struct OpenTTDTownLeaves {
  * and bounded NewGRF resolution may reenter; ordinary gameplay does not throw.
  * Environmental failures and Rust panics abort. Save/load staging stays native. */
 extern "C" {
+OpenTTDByteSpan openttd_rust_town_name(const OpenTTDTownState *);
+void openttd_rust_town_set_name(OpenTTDTownState *, OpenTTDByteSpan);
 void openttd_rust_town_yearly(const OpenTTDSharedServices *, const OpenTTDTownYearlyServices *, uint32_t);
 void openttd_rust_town_authority_station(const OpenTTDTownAuthorityServices *, const OpenTTDSharedServices *, const OpenTTDCommandCostServices *, OpenTTDCommandCost *, uint32_t, bool);
 void openttd_rust_town_authority_remove(const OpenTTDTownAuthorityServices *, const OpenTTDSharedServices *, const OpenTTDCommandCostServices *, OpenTTDCommandCost *, const OpenTTDTownHandle *, bool, uint8_t);

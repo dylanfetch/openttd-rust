@@ -9,6 +9,7 @@
 #ifndef RUST_ENVIRONMENT_SERVICES_H
 #define RUST_ENVIRONMENT_SERVICES_H
 #include "../genworld.h"
+#include <utility>
 #include "../map_func.h"
 #include "../openttd.h"
 #include "../settings_type.h"
@@ -23,4 +24,13 @@ inline uint8_t OpenTTDLandscapeValue() noexcept { return to_underlying(OpenTTDLa
 inline uint8_t OpenTTDHighestSnowLine() noexcept { return HighestSnowLine(); }
 struct OpenTTDTownState;
 OpenTTDTownState *OpenTTDTownOwnerByID(uint32_t id) noexcept;
+inline uint OpenTTDMapScaleSize(uint n) noexcept { return Map::ScaleBySize(n); }
+inline uint OpenTTDMapScaleLandProportion(uint n) noexcept { return Map::ScaleByLandProportion(n); }
+enum ClearGround : uint8_t;
+enum TreeGround : uint8_t;
+bool OpenTTDIsTileFlat(uint32_t tile) noexcept;
+ClearGround OpenTTDClearGround(uint32_t tile) noexcept;
+TreeGround OpenTTDTreeGround(uint32_t tile) noexcept;
+inline bool OpenTTDExchangeGeneratingWorld(bool value) noexcept { return std::exchange(_generating_world, value); }
+void OpenTTDAssertTownGenerationContext() noexcept;
 #endif /* RUST_ENVIRONMENT_SERVICES_H */
