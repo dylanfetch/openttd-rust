@@ -1331,7 +1331,6 @@ static void RoadBoundary()
 	openttd_rust_road_set(probe.state, 6, 0);
 
 	/* A front tick reenters the setter from ProcessOrders and the speed getter from ShowVisualEffect. */
-	_vehicle_maintenance_probe.breakdown_probe = [](OpenTTDVehicle *) noexcept -> OpenTTDVehicleMaintenanceBreakdownProbe { return {.counter = 0, .status = 0}; };
 	t.leaves.process_orders_then_loading = [](OpenTTDVehicle *u) noexcept -> uint8_t {
 		auto &p = *road_abi_probe;
 		openttd_rust_road_set_dest(u, p.state, 100, p.dest, p.leaves);
@@ -1913,7 +1912,7 @@ static void VehicleMaintenanceBoundary()
 	maintenance.chance_write = AircraftUnexpectedService<decltype(maintenance.chance_write)>::Call;
 	maintenance.trigger = AircraftUnexpectedService<decltype(maintenance.trigger)>::Call;
 	maintenance.breakdown_counter = AircraftUnexpectedService<decltype(maintenance.breakdown_counter)>::Call;
-	maintenance.breakdown_probe = AircraftUnexpectedService<decltype(maintenance.breakdown_probe)>::Call;
+	maintenance.breakdown_probe = [](OpenTTDVehicle *) noexcept -> OpenTTDVehicleMaintenanceBreakdownProbe { return {.counter = 0, .status = 0}; };
 	maintenance.breakdown_start = AircraftUnexpectedService<decltype(maintenance.breakdown_start)>::Call;
 	maintenance.breakdown_start_write = AircraftUnexpectedService<decltype(maintenance.breakdown_start_write)>::Call;
 	maintenance.breakdown_active = AircraftUnexpectedService<decltype(maintenance.breakdown_active)>::Call;
