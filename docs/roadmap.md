@@ -111,6 +111,7 @@ later rows use original retirement with net glue in the PR (#223).
 | #237/#199 (typed aircraft boundary) | #238 | direct | `141e4ce397` | 798 / 420 / 470 / 0; net glue -310 |
 | #252 (Windows runner) | #253 | direct | `cfc98a16a7` | 0 / 0 / 0 / 0 |
 | #249 (shared-accessor enforcement) | #254 | direct | `8f9d4fc906` | 0 / 431 / 0 / 0 |
+| #260 (ScriptList overflow fidelity) | #262 | direct | `c54129895b` | 33 / 3 / 0 / 0; net glue 0 |
 
 Paused, not fallbacks: #64 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -161,18 +162,19 @@ that a `SaveLoad` descriptor cannot address through the alias.
 
 ## Resume checkpoint
 
-Paused at the user's request. On resume, apply the twelfth steering review: #259
-H1 first. Post-merge CI is green; no agent work is running.
+Resumed for a short session. #259 H1 is complete (receipt on the issue): merged
+branches and obsolete worktrees removed, auto-deletion enabled, main `.local/`
+down to 8.5 GiB. #260 is integrated after review and full CI. Keep tasks bounded:
+finish workflow cleanup next; larger ownership drafts remain unchanged.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #259 | unstarted | H1 by root first, then H2-H5 (at most three housekeeping PRs in flight). |
-| #260 | unstarted | ScriptList fatal paths; the first code PR after H1. |
+| #259 / #263 | `remove-inert-workflows-259`, `92d04db254` | H1-H2 complete. H3 review passes; update from base, then bootstrap full CI. H4-H5 unstarted. |
 | #261 | unstarted | R1-R4 after #259 H4 merges. |
 | #212 / #255 | `landscape-owner-212`, `63c67959ee` | Stopped: TGP gate missed (see PR). Conflicts with town base. Next: update, profile, root re-selection. |
 | #213 / #257 | `vehicle-owner-213`, `67611082f7` | Stopped: CPU gate missed (see PR). Conflicts with town base. Next: update, profile, root re-selection. |
 | #256 / #247 | unstarted | House lifecycle precedes town commands/deletion. |
-| #64 / #66 | `issue/64-curve-family`, `aab5211801` | Paused vendored-crypto draft; H1 closes the PR and removes its worktrees; the branch stays on origin. |
+| #64 / #66 | remote `issue/64-curve-family`, `aab5211801` | #66 closed unmerged; #64 stays paused. Local curve worktrees/branches removed; remote head retained. |
 
 ABI blocks:
 - train through 385, tree additions 386-389, fleet 390-399
