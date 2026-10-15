@@ -1461,7 +1461,7 @@ bridge/terrain, growth state, funding expiry, cargo goals, layouts/climates and
 modern reload; the default buildings case requires a saved yearly-age witness.
 `--self`/`--soak` extend these scenarios. Native and Cargo tests
 cover expansion modes, first-road failures, reentry, multi-tile writes, canonical
-aliases, count reuse, cross-thread globals and partial loads. Default CI rejects
+aliases, count reuse and cross-thread globals. Default CI rejects
 production thread-local state except per-call depot scratch. Mandatory reference
 probes compare unchanged tunnels, full-width histories/radii and nested rating
 scratch/authority thresholds and transported-percent overflow.
