@@ -180,9 +180,9 @@ planning agents are active. Engine and signal merged trees match full validation
 | #249 / #254 | integrated, worktree removed | Fixing review/full CI passed; 206 baseline fingerprints, no additions permitted. |
 | #219 / #245 | integrated, worktree removed | Fixing reviews, semantic/native evidence, all six speed gates and exact-head full CI passed. |
 | #220 / #248 | integrated, worktree removed | Fixing reviews, semantic/native evidence, all six speed gates and exact-head full CI passed. |
-| #212 / #255 | `landscape-owner-212`, `194cee14d4` | Native/focused semantics pass; full gate still fails at +64 ms. Exact profile/fresh planning select the bounded second round above; tooling ceiling 500. |
-| #213 / #257 | `vehicle-owner-213`, `c447956b7b` | Fixing review corrects copied-output bytes; native/focused pair/self/soak pass. Final review/performance/CI remain; initial a110 gate covers scheduler only, tooling ceiling 375. |
-| #246 / #258 | `town-founding-246`, `67a8d1939b` | Growth-unit fix passes affected generators; normal full corpus runs at `496011d22a`. Fresh wiring review adds missing towns frozen-copy entry. Final frozen smoke precedes new CI; speed gates pending, tooling ceiling 325. |
+| #212 / #255 | `landscape-owner-212`, `63c67959ee` | Selected second fix passes native/focused checks; clean frozen confirmation precedes the next TGP gate. Prior +64 ms failure retained; tooling 483/500. |
+| #213 / #257 | `vehicle-owner-213`, `c447956b7b` | Final native/pair/self/soak pass; CPU gate misses at 6.04787 ns/visit. Fresh function attribution precedes a fix and another gate; no resample/caps, tooling 375/375. |
+| #246 / #258 | `town-founding-246`, `67a8d1939b` | Full normal corpus and final frozen pair/self/soak pass. Full CI fails only on introduced native warnings; fresh fixing review precedes new CI and speed gates, tooling 321/325. |
 | #256 / #247 | unstarted | Complete house lifecycle, then town commands/deletion, after #246. |
 | #64 / #66 | `issue/64-curve-family`, `aab5211801` | Paused draft/worktree; leave untouched, not a fallback. |
 | Paused integration | `integration/curve-script`, `c19f09cf8b` | Locked worktree preserved; no work. |
