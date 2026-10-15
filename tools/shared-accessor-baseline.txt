@@ -33,7 +33,6 @@ src/industry_cmd.cpp | []() noexcept -> bool | 04692d80b1b4e782 | 1
 src/industry_cmd.cpp | []() noexcept -> bool | 076c7d2608a7c129 | 1
 src/industry_cmd.cpp | []() noexcept -> bool | 62f14eafd13bb8e2 | 1
 src/industry_cmd.cpp | []() noexcept -> bool | d1bc23e0230f0b75 | 1
-src/industry_cmd.cpp | []() noexcept -> int32_t | 198b110611b529f9 | 1
 src/industry_cmd.cpp | []() noexcept -> int32_t | 93a33073ca76ba44 | 1
 src/industry_cmd.cpp | []() noexcept -> uint32_t | aa6c27bca6e249bf | 1
 src/industry_cmd.cpp | []() noexcept -> uint32_t | df1b3562808460ab | 1
@@ -199,7 +198,4 @@ src/town_cmd.cpp | RustTownCouncilTolerance() noexcept | cddd8d4718f9a2cd | 1
 src/town_cmd.cpp | RustTown_allow_crossings() noexcept | 1f8c8aa2e0af5a02 | 1
 src/town_cmd.cpp | RustTown_allow_roads() noexcept | faaf2796b712d57e | 1
 src/town_cmd.cpp | RustTown_build_on_slopes() noexcept | 5ca1f276b3919e81 | 1
-src/town_cmd.cpp | RustTown_calendar_date() noexcept | 198b110611b529f9 | 1
 src/town_cmd.cpp | RustTown_growth_rate() noexcept | 6c32e2c93ccbb6f1 | 1
-src/town_cmd.cpp | RustTown_map_size_y() noexcept | fdbaccfab3d2fc23 | 1
-src/town_cmd.cpp | [context, visit](const Station *st) | 34a9614338f62fb4 | 1

@@ -45,6 +45,7 @@
 #include "rust/command_services.h"
 #include "rust/company_services.h"
 #include "rust/environment_services.h"
+#include "rust/tile_animation_services.h"
 #include "rust/station_services.h"
 #endif
 #include "town_kdtree.h"
@@ -937,13 +938,10 @@ static void ChangeTileOwner_Town(TileIndex, Owner, Owner)
 static_assert(Ticks::TOWN_GROWTH_TICKS == 70 && MAX_BRIDGES == 13);
 static_assert(OWNER_TOWN.base() == 15 && OWNER_NONE.base() == 16);
 static_assert(CalendarTime::MAX_DATE.base() == 1826212865);
-static uint32_t RustTown_map_size_y() noexcept { return Map::SizeY(); }
 static bool RustTown_build_on_slopes() noexcept { return _settings_game.construction.build_on_slopes; }
 static uint8_t RustTown_growth_rate() noexcept { return _settings_game.economy.town_growth_rate; }
 static bool RustTown_allow_crossings() noexcept { return _settings_game.economy.allow_town_level_crossings; }
-static uint8_t RustTown_highest_snow_line() noexcept { return HighestSnowLine(); }
 static bool RustTown_allow_roads() noexcept { return _settings_game.economy.allow_town_roads; }
-static int32_t RustTown_calendar_date() noexcept { return TimerGameCalendar::date.base(); }
 static uint8_t RustTownRoadFlags(uint8_t id) noexcept { return GetRoadTypeInfo(static_cast<RoadType>(id))->flags.base(); }
 static OpenTTDTownHouseAvailability RustTownHouseAvailability(uint16_t id) noexcept
 {
@@ -998,10 +996,6 @@ static uint16_t RustTownHouseClass(uint16_t house) noexcept { return HouseSpec::
 static void RustTown_make_house(uint32_t tile, uint32_t town, uint32_t house, uint32_t construction) noexcept
 {
 	MakeHouseTile(TileIndex{tile}, TownID(town), construction & 0xFF, (construction >> 8) & 0xFF, house, (construction >> 16) & 0xFF, construction >> 24);
-}
-static void RustTown_add_animation(uint32_t tile) noexcept
-{
-	AddAnimatedTile(TileIndex{tile}, false);
 }
 static void RustTown_population_changed(uint32_t town) noexcept
 {
@@ -1082,25 +1076,18 @@ static bool RustTown_allow_construction(uint32_t town, uint32_t tile, uint32_t h
 	return cb == CALLBACK_FAILED || Convert8bitBooleanCallback(hs->grf_prop.grffile, CBID_HOUSE_ALLOW_CONSTRUCTION, cb);
 }
 static void RustTown_construction_animation(uint32_t tile) noexcept { TriggerHouseAnimation_ConstructionStageChanged(TileIndex{tile}, true); }
-static OpenTTDTownState *RustTownState(uint32_t id) noexcept { return GetRustSharedServices().town_owner(reinterpret_cast<const OpenTTDTownHandle *>(Town::Get(TownID(id)))); }
-static void RustTownStations(uint32_t tile, uint32_t radius, void *context, void (*visit)(void *, const void *, uint32_t)) noexcept
+static void RustTownStations(uint32_t tile, uint32_t radius, void *context, void (*visit)(void *, const OpenTTDStation *, uint32_t)) noexcept
 {
-	ForAllStationsRadius(TileIndex{tile}, radius, [context, visit](const Station *st) { visit(context, st, st->xy.base()); });
+	ForAllStationsRadius(TileIndex{tile}, radius, [context, visit](const Station *st) { visit(context, RustStation(st), RustStationLocation(st)); });
 }
 /* Thin FFI conversion facades over the shared station observations. */
-static OpenTTDTownStationActivity RustTownStationActivity(const void *station) noexcept
-{
-	const auto *st = static_cast<const Station *>(station);
-	return OpenTTDStationActivityOf(st);
-}
-static uint8_t RustTownStationOwner(const void *station) noexcept { return OpenTTDStationOwner(static_cast<const Station *>(station)).base(); }
+static uint8_t RustTownStationOwner(const OpenTTDStation *station) noexcept { return OpenTTDStationOwner(StationOf(station)).base(); }
 static void RustTownDirtyAuthority(uint32_t town) noexcept { SetWindowDirty(WC_TOWN_AUTHORITY, TownID(town)); }
 
 static const OpenTTDTownLeaves &GetRustTownServices() noexcept
 {
 	static const OpenTTDTownLeaves services{
 		.map_log_x = OpenTTDMapLogX,
-		.map_size_y = RustTown_map_size_y,
 		.build_on_slopes = RustTown_build_on_slopes,
 		.growth_rate = RustTown_growth_rate,
 		.snow_line = GetRustSharedServices().snow_line,
@@ -1108,10 +1095,9 @@ static const OpenTTDTownLeaves &GetRustTownServices() noexcept
 		.generating_world = OpenTTDGeneratingWorld,
 		.allow_crossings = RustTown_allow_crossings,
 		.climate = OpenTTDLandscapeValue,
-		.highest_snow_line = RustTown_highest_snow_line,
+		.highest_snow_line = OpenTTDHighestSnowLine,
 		.calendar_year = GetRustSharedServices().calendar_year,
 		.allow_roads = RustTown_allow_roads,
-		.calendar_date = RustTown_calendar_date,
 		.road_flags = RustTownRoadFlags,
 		.house_availability = RustTownHouseAvailability,
 		.house_placement = RustTownHousePlacement,
@@ -1120,9 +1106,9 @@ static const OpenTTDTownLeaves &GetRustTownServices() noexcept
 		.house_extra_flags = RustTownHouseExtraFlags,
 		.house_allows_callback = RustTownHouseAllowsCallback,
 		.road_info = RustTownRoadInfo,
-		.state = RustTownState,
+		.state = OpenTTDTownOwnerByID,
 		.stations = RustTownStations,
-		.station_activity = RustTownStationActivity,
+		.station_activity_owner = OpenTTDStationActivityOwner,
 		.station_owner = RustTownStationOwner,
 		.dirty_authority = RustTownDirtyAuthority,
 		.dirty_town = RustTown_dirty_town,
@@ -1133,7 +1119,7 @@ static const OpenTTDTownLeaves &GetRustTownServices() noexcept
 		.exchange_company = RustTown_exchange_company,
 		.house_class = RustTownHouseClass,
 		.make_house = RustTown_make_house,
-		.add_animation = RustTown_add_animation,
+		.add_animation = OpenTTDAddAnimatedTile,
 		.population_changed = RustTown_population_changed,
 		.nearby_stations = RustTown_nearby_stations,
 		.house_count = RustTown_house_count,

@@ -53,7 +53,6 @@ struct OpenTTDTownAuthorityServices {
 };
 struct OpenTTDTownLeaves {
 	uint32_t (*map_log_x)() noexcept;
-	uint32_t (*map_size_y)() noexcept;
 	bool (*build_on_slopes)() noexcept;
 	uint8_t (*growth_rate)() noexcept;
 	uint8_t (*snow_line)() noexcept;
@@ -64,7 +63,6 @@ struct OpenTTDTownLeaves {
 	uint8_t (*highest_snow_line)() noexcept;
 	int32_t (*calendar_year)() noexcept;
 	bool (*allow_roads)() noexcept;
-	int32_t (*calendar_date)() noexcept;
 	uint8_t (*road_flags)(uint8_t) noexcept;
 	OpenTTDTownHouseAvailability (*house_availability)(uint16_t) noexcept;
 	OpenTTDTownHousePlacement (*house_placement)(uint16_t) noexcept;
@@ -74,9 +72,9 @@ struct OpenTTDTownLeaves {
 	bool (*house_allows_callback)(uint16_t) noexcept;
 	OpenTTDTownRoadChoice (*road_info)(uint8_t) noexcept;
 	OpenTTDTownState *(*state)(uint32_t) noexcept;
-	void (*stations)(uint32_t, uint32_t, void *, void (*)(void *, const void *, uint32_t)) noexcept;
-	OpenTTDTownStationActivity (*station_activity)(const void *) noexcept;
-	uint8_t (*station_owner)(const void *) noexcept;
+	void (*stations)(uint32_t, uint32_t, void *, void (*)(void *, const OpenTTDStation *, uint32_t)) noexcept;
+	const OpenTTDStationService *(*station_activity_owner)(const OpenTTDStation *) noexcept;
+	uint8_t (*station_owner)(const OpenTTDStation *) noexcept;
 	void (*dirty_authority)(uint32_t) noexcept;
 	void (*dirty_town)(uint32_t town) noexcept;
 	uint32_t (*foundation_slope)(uint32_t tile) noexcept;
@@ -86,7 +84,7 @@ struct OpenTTDTownLeaves {
 	uint32_t (*exchange_company)(uint32_t company) noexcept;
 	uint16_t (*house_class)(uint16_t house) noexcept;
 	void (*make_house)(uint32_t tile, uint32_t town, uint32_t house, uint32_t construction) noexcept;
-	void (*add_animation)(uint32_t tile) noexcept;
+	void (*add_animation)(uint32_t tile, bool) noexcept;
 	void (*population_changed)(uint32_t town) noexcept;
 	void (*nearby_stations)(uint32_t town, uint32_t tile, uint32_t size) noexcept;
 	uint32_t (*house_count)() noexcept;

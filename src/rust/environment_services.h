@@ -12,6 +12,7 @@
 #include "../map_func.h"
 #include "../openttd.h"
 #include "../settings_type.h"
+#include "../landscape.h"
 
 inline uint32_t OpenTTDMapLogX() noexcept { return Map::LogX(); }
 inline bool OpenTTDEditor() noexcept { return _game_mode == GM_EDITOR; }
@@ -19,4 +20,7 @@ inline bool OpenTTDGeneratingWorld() noexcept { return _generating_world; }
 inline LandscapeType OpenTTDLandscape() noexcept { return _settings_game.game_creation.landscape; }
 /* One byte conversion at the FFI boundary; the native service keeps its enum. */
 inline uint8_t OpenTTDLandscapeValue() noexcept { return to_underlying(OpenTTDLandscape()); }
+inline uint8_t OpenTTDHighestSnowLine() noexcept { return HighestSnowLine(); }
+struct OpenTTDTownState;
+OpenTTDTownState *OpenTTDTownOwnerByID(uint32_t id) noexcept;
 #endif /* RUST_ENVIRONMENT_SERVICES_H */
