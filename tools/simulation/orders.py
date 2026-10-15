@@ -45,11 +45,11 @@ def game_environment(scenario):
     return {"OPENTTD_ORDERS_CLIENT": "1"} if scenario.get("orders_client") else {}
 
 
-def adapter(build, folder, env):
+def adapter(build, folder, env, *, source=ADAPTER, name="orders", afterload=True):
     from .console_adapter import console_adapter
 
     return console_adapter(
-        build, folder, env, ADAPTER, "orders", ("_Z13AfterLoadGamev",)
+        build, folder, env, source, name, ("_Z13AfterLoadGamev",) if afterload else ()
     )
 
 

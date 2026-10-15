@@ -385,10 +385,30 @@ static bool FixTTOEngines()
 	/* Load the default engine set. Many of them will be overridden later */
 	{
 		EngineID j = EngineID::Begin();
-		for (uint16_t i = 0; i < lengthof(_orig_rail_vehicle_info); ++i, ++j) new (GetTempDataEngine(j)) Engine(VEH_TRAIN, i);
-		for (uint16_t i = 0; i < lengthof(_orig_road_vehicle_info); ++i, ++j) new (GetTempDataEngine(j)) Engine(VEH_ROAD, i);
-		for (uint16_t i = 0; i < lengthof(_orig_ship_vehicle_info); ++i, ++j) new (GetTempDataEngine(j)) Engine(VEH_SHIP, i);
-		for (uint16_t i = 0; i < lengthof(_orig_aircraft_vehicle_info); ++i, ++j) new (GetTempDataEngine(j)) Engine(VEH_AIRCRAFT, i);
+		for (uint16_t i = 0; i < lengthof(_orig_rail_vehicle_info); ++i, ++j) {
+#ifdef WITH_RUST
+			GetTempDataEngine(j)->~Engine();
+#endif
+			new (GetTempDataEngine(j)) Engine(VEH_TRAIN, i);
+		}
+		for (uint16_t i = 0; i < lengthof(_orig_road_vehicle_info); ++i, ++j) {
+#ifdef WITH_RUST
+			GetTempDataEngine(j)->~Engine();
+#endif
+			new (GetTempDataEngine(j)) Engine(VEH_ROAD, i);
+		}
+		for (uint16_t i = 0; i < lengthof(_orig_ship_vehicle_info); ++i, ++j) {
+#ifdef WITH_RUST
+			GetTempDataEngine(j)->~Engine();
+#endif
+			new (GetTempDataEngine(j)) Engine(VEH_SHIP, i);
+		}
+		for (uint16_t i = 0; i < lengthof(_orig_aircraft_vehicle_info); ++i, ++j) {
+#ifdef WITH_RUST
+			GetTempDataEngine(j)->~Engine();
+#endif
+			new (GetTempDataEngine(j)) Engine(VEH_AIRCRAFT, i);
+		}
 	}
 
 	TimerGameCalendar::Date aging_date = std::min(TimerGameCalendar::date + CalendarTime::DAYS_TILL_ORIGINAL_BASE_YEAR, TimerGameCalendar::ConvertYMDToDate(TimerGameCalendar::Year{2050}, 0, 1));
@@ -628,7 +648,6 @@ static const OldChunks town_chunk[] = {
 	OCL_SVAR( OC_TTD | OC_UINT16, Town, received[TAE_WATER].new_act ),
 	OCL_SVAR( OC_TTD | OC_UINT16, Town, received[TAE_FOOD].old_act ),
 	OCL_SVAR( OC_TTD | OC_UINT16, Town, received[TAE_WATER].old_act ),
-
 #ifdef WITH_RUST
 	{ OC_UINT8, 1, nullptr, [] (void *) -> void * { return &TownGrowthSaveScope::current.road; }, nullptr },
 #else
@@ -847,7 +866,6 @@ static bool LoadOldStation(LoadgameState &ls, int num)
 /* Old save games always have 3 input and 2 output slots per industry. */
 static std::array<Industry::AcceptedCargo, INDUSTRY_ORIGINAL_NUM_INPUTS> _old_accepted{};
 static std::array<Industry::ProducedCargo, INDUSTRY_ORIGINAL_NUM_OUTPUTS> _old_produced{};
-
 #ifdef WITH_RUST
 static OpenTTDIndustryFields _old_industry_fields;
 static OpenTTDIndustryMetadata _old_industry_metadata;
@@ -880,7 +898,6 @@ static const OldChunks industry_chunk[] = {
 	OCL_VAR(  OC_UINT8, 1, &_old_produced[1].rate ),
 
 	OCL_NULL( 3 ),  ///< used to be industry's accepts_cargo
-
 #ifdef WITH_RUST
 	OCL_VAR( OC_UINT8, 1, &_old_industry_fields.prod_level ),
 #else
@@ -898,7 +915,6 @@ static const OldChunks industry_chunk[] = {
 	OCL_VAR( OC_UINT16, 1, &_old_produced[1].history[LAST_MONTH].production ),
 	OCL_VAR( OC_UINT16, 1, &_old_produced[0].history[LAST_MONTH].transported ),
 	OCL_VAR( OC_UINT16, 1, &_old_produced[1].history[LAST_MONTH].transported ),
-
 #ifdef WITH_RUST
 	OCL_VAR( OC_UINT8, 1, &_old_industry_metadata.type ),
 #else
@@ -1575,24 +1591,29 @@ static bool LoadOldSign(LoadgameState &ls, int num)
 
 	return true;
 }
+#ifdef WITH_RUST
+using OldEngineObject = OpenTTDEngineLifecycle;
+#else
+using OldEngineObject = Engine;
+#endif
 
 static const OldChunks engine_chunk[] = {
-	OCL_SVAR( OC_UINT16, Engine, company_avail ),
-	OCL_SVAR( OC_FILE_U16 | OC_VAR_U32, Engine, intro_date ),
-	OCL_SVAR( OC_FILE_U16 | OC_VAR_U32, Engine, age ),
-	OCL_SVAR( OC_UINT16, Engine, reliability ),
-	OCL_SVAR( OC_UINT16, Engine, reliability_spd_dec ),
-	OCL_SVAR( OC_UINT16, Engine, reliability_start ),
-	OCL_SVAR( OC_UINT16, Engine, reliability_max ),
-	OCL_SVAR( OC_UINT16, Engine, reliability_final ),
-	OCL_SVAR( OC_UINT16, Engine, duration_phase_1 ),
-	OCL_SVAR( OC_UINT16, Engine, duration_phase_2 ),
-	OCL_SVAR( OC_UINT16, Engine, duration_phase_3 ),
+	OCL_SVAR( OC_UINT16, OldEngineObject, company_avail ),
+	OCL_SVAR( OC_FILE_U16 | OC_VAR_U32, OldEngineObject, intro_date ),
+	OCL_SVAR( OC_FILE_U16 | OC_VAR_U32, OldEngineObject, age ),
+	OCL_SVAR( OC_UINT16, OldEngineObject, reliability ),
+	OCL_SVAR( OC_UINT16, OldEngineObject, reliability_spd_dec ),
+	OCL_SVAR( OC_UINT16, OldEngineObject, reliability_start ),
+	OCL_SVAR( OC_UINT16, OldEngineObject, reliability_max ),
+	OCL_SVAR( OC_UINT16, OldEngineObject, reliability_final ),
+	OCL_SVAR( OC_UINT16, OldEngineObject, duration_phase_1 ),
+	OCL_SVAR( OC_UINT16, OldEngineObject, duration_phase_2 ),
+	OCL_SVAR( OC_UINT16, OldEngineObject, duration_phase_3 ),
 
 	OCL_NULL( 1 ), // lifelength
-	OCL_SVAR(  OC_UINT8, Engine, flags ),
+	OCL_SVAR(  OC_UINT8, OldEngineObject, flags ),
 	OCL_NULL( 1 ), // preview_company_rank
-	OCL_SVAR(  OC_UINT8, Engine, preview_wait ),
+	OCL_SVAR(  OC_UINT8, OldEngineObject, preview_wait ),
 
 	OCL_CNULL( OC_TTD, 2 ), ///< railtype + junk
 
@@ -1602,7 +1623,11 @@ static const OldChunks engine_chunk[] = {
 static bool LoadOldEngine(LoadgameState &ls, int num)
 {
 	Engine *e = _savegame_type == SGT_TTO ? &_old_engines[num] : GetTempDataEngine(static_cast<EngineID>(num));
+#ifdef WITH_RUST
+	return LoadChunk(ls, e->rust_lifecycle.state, engine_chunk);
+#else
 	return LoadChunk(ls, e, engine_chunk);
+#endif
 }
 
 static bool LoadOldEngineName(LoadgameState &ls, int num)
@@ -1967,9 +1992,15 @@ bool LoadTTOMain(LoadgameState &ls)
 	Debug(oldloader, 3, "Reading main chunk...");
 
 	_read_ttdpatch_flags = false;
-
+#ifdef WITH_RUST
+	/* The original raw prototypes have no native resources. Rust owners require
+	 * construction and one destruction path on success and every failed load. */
+	std::array<Engine, 103> engines;
+	_old_engines = engines.data();
+#else
 	std::array<uint8_t, 103 * sizeof(Engine)> engines; // we don't want to call Engine constructor here
 	_old_engines = (Engine *)engines.data();
+#endif
 
 	/* Load the biggest chunk */
 	if (!LoadChunk(ls, nullptr, main_chunk)) {

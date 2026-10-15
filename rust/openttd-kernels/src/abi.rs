@@ -32,6 +32,32 @@ macro_rules! layout {
 #[allow(clippy::too_many_lines)]
 pub fn layout(type_id: u16, item: u8) -> usize {
     match type_id {
+        860 => {
+            layout!(crate::engine::Lifecycle, item; company_avail, company_hidden, preview_asked, intro_date, age, reliability, reliability_spd_dec, reliability_start, reliability_max, reliability_final, duration_phase_1, duration_phase_2, duration_phase_3, flags, preview_company, preview_wait)
+        }
+        861 => layout!(crate::engine::EngineRef, item; shell, state, id, kind),
+        862 => layout!(crate::engine::SyncVariant, item; parent, sync),
+        863 => layout!(crate::engine::DisplayVariant, item; parent, display),
+        864 => layout!(crate::engine::PreviewVariant, item; parent, join),
+        865 => layout!(crate::engine::Reliability, item; base_life, retire_early),
+        866 => {
+            layout!(crate::engine::Startup, item; base_intro, grfid, decay_speed, base_life, climate)
+        }
+        867 => {
+            layout!(crate::engine::SeedConfig, item; base_intro, lifelength, decay_speed, retire_early)
+        }
+        868 => layout!(crate::engine::AgingYear, item; base_intro, lifelength),
+        869 => layout!(crate::engine::Ymd, item; year, month, day),
+        870 => layout!(crate::engine::StartSettings, item; generation_seed, starting_year, date),
+        871 => layout!(crate::engine::Company, item; shell, id),
+        872 => layout!(crate::engine::CompanyPreview, item; blocked, performance),
+        873 => layout!(crate::engine::Vehicle, item; shell, id, owner, kind),
+        874 => layout!(crate::engine::VehicleCargo, item; engine, cargo),
+        875 => layout!(crate::services::RandomSeeds, item; random, interactive),
+        876 => layout!(crate::services::RandomServices, item; save, restore, set_seed),
+        877 => {
+            layout!(crate::engine::Services, item; shared, rng, next, resolve, sync_variant, display_variant, preview_variant, extra_flags, engine_id, reliability, startup, seed_config, base_intro, aging_year, calendar_year, never_expire, start_settings, train_limit, road_limit, ship_limit, aircraft_limit, ai_train_disabled, ai_road_disabled, ai_ship_disabled, ai_aircraft_disabled, date_to_ymd, ymd_to_date, enabled, climate, rail_kind, clear_last_variant, refresh_type, refresh_lists, company_next, company_preview, vehicle_next, vehicle_cargo, can_carry, refit_mask, update_railtypes, update_roadtypes, date_company_types, company_valid, compatible_railtypes, powered_roadtypes, company_railtypes, company_roadtypes, company_engine_count, block_preview, introduces_railtypes, introduces_roadtypes, set_railtypes, set_roadtypes, current_company, local_company, toolbar_enable, toolbar_release, close_preview, invalidate_preview, offer_preview, available_event, available_news, no_engines, screen_dirty, utf8_length)
+        }
         831 => {
             layout!(crate::signal::SetTrace, item; duplicate_count, duplicate_pop, full_failed, overflow_full, first_after_remove, refill_succeeded, refill_pop, drained_count, overflow_drained, overflow_reset)
         }

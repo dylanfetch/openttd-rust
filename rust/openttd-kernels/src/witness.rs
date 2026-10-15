@@ -250,80 +250,110 @@ pub const AIRCRAFT_CACHE_ENTRIES: usize = 106;
 /// Ownerless flight helper ingress, also included in total entries.
 pub const AIRCRAFT_DISASTER_ENTRIES: usize = 107;
 
-/// Signal `updates` witness.
-pub const SIGNAL_UPDATES: usize = 108;
-/// Signal `tiles` witness.
-pub const SIGNAL_TILES: usize = 109;
-/// Signal `services` witness.
-pub const SIGNAL_SERVICES: usize = 110;
-/// Signal `tbu_overflow` witness.
-pub const SIGNAL_TBU_OVERFLOW: usize = 111;
-/// Signal `tbd_overflow` witness.
-pub const SIGNAL_TBD_OVERFLOW: usize = 112;
-/// Signal `global_overflow` witness.
-pub const SIGNAL_GLOBAL_OVERFLOW: usize = 113;
-/// Signal `train` witness.
-pub const SIGNAL_TRAIN: usize = 114;
-/// Signal `owner_barrier` witness.
-pub const SIGNAL_OWNER_BARRIER: usize = 115;
-/// Signal `depot` witness.
-pub const SIGNAL_DEPOT: usize = 116;
-/// Signal `split` witness.
-pub const SIGNAL_SPLIT: usize = 117;
-/// Signal `pbs` witness.
-pub const SIGNAL_PBS: usize = 118;
-/// Signal `multi_enter` witness.
-pub const SIGNAL_MULTI_ENTER: usize = 119;
-/// Signal `exit` witness.
-pub const SIGNAL_EXIT: usize = 120;
-/// Signal `green_exit` witness.
-pub const SIGNAL_GREEN_EXIT: usize = 121;
-/// Signal `station` witness.
-pub const SIGNAL_STATION: usize = 122;
-/// Signal `crossing` witness.
-pub const SIGNAL_CROSSING: usize = 123;
-/// Signal `wormhole` witness.
-pub const SIGNAL_WORMHOLE: usize = 124;
-/// Signal `reserved_skip` witness.
-pub const SIGNAL_RESERVED_SKIP: usize = 125;
-/// Signal `combo` witness.
-pub const SIGNAL_COMBO: usize = 126;
-/// Signal `propagate` witness.
-pub const SIGNAL_PROPAGATE: usize = 127;
-/// Signal `changed` witness.
-pub const SIGNAL_CHANGED: usize = 128;
-/// Signal `reset` witness.
-pub const SIGNAL_RESET: usize = 129;
-/// Signal `forced_flush` witness.
-pub const SIGNAL_FORCED_FLUSH: usize = 130;
+/// Engine services witness.
+pub const ENGINE_SERVICES: usize = 108;
+/// Engine bytes witness.
+pub const ENGINE_BYTES: usize = 109;
+/// Engine sync witness.
+pub const ENGINE_SYNC: usize = 110;
+/// Engine retire witness.
+pub const ENGINE_RETIRE: usize = 111;
+/// Engine `never_expire` witness.
+pub const ENGINE_NEVER_EXPIRE: usize = 112;
+/// Engine accept witness.
+pub const ENGINE_ACCEPT: usize = 113;
+/// Engine join witness.
+pub const ENGINE_JOIN: usize = 114;
+/// Engine offer witness.
+pub const ENGINE_OFFER: usize = 115;
+/// Engine penalty witness.
+pub const ENGINE_PENALTY: usize = 116;
+/// Engine cutoff witness.
+pub const ENGINE_CUTOFF: usize = 117;
+/// Engine visibility witness.
+pub const ENGINE_VISIBILITY: usize = 118;
+/// Engine control witness.
+pub const ENGINE_CONTROL: usize = 119;
+/// Engine rename witness.
+pub const ENGINE_RENAME: usize = 120;
 
-/// Counter names, grouped by the prefix the harness selects.
+/// Engine native entry witness.
+pub const ENGINE_ENTRIES: usize = 121;
+
+/// Signal `updates` witness.
+pub const SIGNAL_UPDATES: usize = 122;
+/// Signal `tiles` witness.
+pub const SIGNAL_TILES: usize = 123;
+/// Signal `services` witness.
+pub const SIGNAL_SERVICES: usize = 124;
+/// Signal `tbu_overflow` witness.
+pub const SIGNAL_TBU_OVERFLOW: usize = 125;
+/// Signal `tbd_overflow` witness.
+pub const SIGNAL_TBD_OVERFLOW: usize = 126;
+/// Signal `global_overflow` witness.
+pub const SIGNAL_GLOBAL_OVERFLOW: usize = 127;
+/// Signal `train` witness.
+pub const SIGNAL_TRAIN: usize = 128;
+/// Signal `owner_barrier` witness.
+pub const SIGNAL_OWNER_BARRIER: usize = 129;
+/// Signal `depot` witness.
+pub const SIGNAL_DEPOT: usize = 130;
+/// Signal `split` witness.
+pub const SIGNAL_SPLIT: usize = 131;
+/// Signal `pbs` witness.
+pub const SIGNAL_PBS: usize = 132;
+/// Signal `multi_enter` witness.
+pub const SIGNAL_MULTI_ENTER: usize = 133;
+/// Signal `exit` witness.
+pub const SIGNAL_EXIT: usize = 134;
+/// Signal `green_exit` witness.
+pub const SIGNAL_GREEN_EXIT: usize = 135;
+/// Signal `station` witness.
+pub const SIGNAL_STATION: usize = 136;
+/// Signal `crossing` witness.
+pub const SIGNAL_CROSSING: usize = 137;
+/// Signal `wormhole` witness.
+pub const SIGNAL_WORMHOLE: usize = 138;
+/// Signal `reserved_skip` witness.
+pub const SIGNAL_RESERVED_SKIP: usize = 139;
+/// Signal `combo` witness.
+pub const SIGNAL_COMBO: usize = 140;
+/// Signal `propagate` witness.
+pub const SIGNAL_PROPAGATE: usize = 141;
+/// Signal `changed` witness.
+pub const SIGNAL_CHANGED: usize = 142;
+/// Signal `reset` witness.
+pub const SIGNAL_RESET: usize = 143;
+/// Signal `forced_flush` witness.
+pub const SIGNAL_FORCED_FLUSH: usize = 144;
+
 /// Bytes returned by signal-facing typed native services.
-pub const SIGNAL_BYTES: usize = 131;
+pub const SIGNAL_BYTES: usize = 145;
 
 /// Signal boundary `entries` counter.
-pub const SIGNAL_ENTRIES: usize = 132;
+pub const SIGNAL_ENTRIES: usize = 146;
 /// Signal boundary `context_acquisitions` counter.
-pub const SIGNAL_CONTEXT_ACQUISITIONS: usize = 133;
+pub const SIGNAL_CONTEXT_ACQUISITIONS: usize = 147;
 /// Signal boundary `context_owner_reads` counter.
-pub const SIGNAL_CONTEXT_OWNER_READS: usize = 134;
+pub const SIGNAL_CONTEXT_OWNER_READS: usize = 148;
 /// Signal boundary `occupancy_accessors` counter.
-pub const SIGNAL_OCCUPANCY_ACCESSORS: usize = 135;
+pub const SIGNAL_OCCUPANCY_ACCESSORS: usize = 149;
 /// Signal boundary `context_bytes` counter.
-pub const SIGNAL_CONTEXT_BYTES: usize = 136;
+pub const SIGNAL_CONTEXT_BYTES: usize = 150;
 /// Signal boundary `classification_bytes` counter.
-pub const SIGNAL_CLASSIFICATION_BYTES: usize = 137;
+pub const SIGNAL_CLASSIFICATION_BYTES: usize = 151;
 
 /// Signal multiple exit detection.
-pub const SIGNAL_MULTI_EXIT: usize = 138;
+pub const SIGNAL_MULTI_EXIT: usize = 152;
 /// Signal multiple green exit detection.
-pub const SIGNAL_MULTI_GREEN: usize = 139;
+pub const SIGNAL_MULTI_GREEN: usize = 153;
 /// Signal combo red rule with multiple exits.
-pub const SIGNAL_COMBO_RED: usize = 140;
+pub const SIGNAL_COMBO_RED: usize = 154;
 /// Signal empty neighbour buffer continue.
-pub const SIGNAL_NEIGHBOUR_CONTINUE: usize = 141;
+pub const SIGNAL_NEIGHBOUR_CONTINUE: usize = 155;
 
-pub const NAMES: [&str; 142] = [
+/// Counter names, grouped by the prefix the harness selects.
+pub const NAMES: [&str; 156] = [
     "train.tick_first",
     "train.tick_second",
     "train.reversal",
@@ -432,6 +462,20 @@ pub const NAMES: [&str; 142] = [
     "aircraft.observation_bytes",
     "aircraft.cache_entries",
     "aircraft.disaster_entries",
+    "engine.services",
+    "engine.bytes",
+    "engine.sync",
+    "engine.retire",
+    "engine.never_expire",
+    "engine.accept",
+    "engine.join",
+    "engine.offer",
+    "engine.penalty",
+    "engine.cutoff",
+    "engine.visibility",
+    "engine.control",
+    "engine.rename",
+    "engine.entries",
     "signal.updates",
     "signal.tiles",
     "signal.services",
