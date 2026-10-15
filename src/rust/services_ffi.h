@@ -12,6 +12,8 @@
 #include <type_traits>
 #include "station_ffi.h"
 
+enum class LandscapeType : uint8_t;
+
 /* Distinct trivial date carriers. Strong native Date classes stay inside C++;
  * wrappers convert explicitly so MSVC class-return rules cannot alter this ABI. */
 struct OpenTTDCalendarDate { int32_t value; };

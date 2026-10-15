@@ -117,6 +117,7 @@ static void Layouts()
 	Layout(772, "OpenTTDCalendarDate", {sizeof(OpenTTDCalendarDate), alignof(OpenTTDCalendarDate), offsetof(OpenTTDCalendarDate, value)});
 	Layout(773, "OpenTTDEconomyDate", {sizeof(OpenTTDEconomyDate), alignof(OpenTTDEconomyDate), offsetof(OpenTTDEconomyDate, value)});
 	Layout(774, "OrderType", {sizeof(OrderType), alignof(OrderType)});
+	Layout(775, "LandscapeType", {sizeof(LandscapeType), alignof(LandscapeType)});
 
 	Layout(445, "OpenTTDTownYearlyServices", {sizeof(OpenTTDTownYearlyServices), alignof(OpenTTDTownYearlyServices), offsetof(OpenTTDTownYearlyServices, completed), offsetof(OpenTTDTownYearlyServices, age), offsetof(OpenTTDTownYearlyServices, set_age)});
 	Layout(444, "OpenTTDTownSuppliedEntry", {sizeof(OpenTTDTownSuppliedEntry), alignof(OpenTTDTownSuppliedEntry), offsetof(OpenTTDTownSuppliedEntry, entry), offsetof(OpenTTDTownSuppliedEntry, created)});
@@ -978,6 +979,7 @@ struct VehicleUnused<Result (OPENTTD_VEHICLE_CALL *)(Args...) noexcept> {
 	}
 };
 #define VEHICLE_UNUSED(table, field) table.field = VehicleUnused<decltype(table.field)>::Call
+static OpenTTDVehicleMaintenanceServices _vehicle_maintenance_probe;
 struct RoadTestTables {
 	OpenTTDVehicleServices vehicle;
 	OpenTTDGroundServices ground;
@@ -985,6 +987,7 @@ struct RoadTestTables {
 	OpenTTDRoadLeaves leaves;
 	explicit RoadTestTables(const OpenTTDSharedServices *world) : shared(*world)
 	{
+		vehicle.maintenance = &_vehicle_maintenance_probe;
 		VEHICLE_UNUSED(vehicle, write_counters);
 
 
@@ -1328,7 +1331,7 @@ static void RoadBoundary()
 	openttd_rust_road_set(probe.state, 6, 0);
 
 	/* A front tick reenters the setter from ProcessOrders and the speed getter from ShowVisualEffect. */
-	t.vehicle.handle_breakdown = [](OpenTTDVehicle *) noexcept -> OpenTTDVehicleBreakdown { return {.broken = false, .status = 0}; };
+	_vehicle_maintenance_probe.breakdown_probe = [](OpenTTDVehicle *) noexcept -> OpenTTDVehicleMaintenanceBreakdownProbe { return {.counter = 0, .status = 0}; };
 	t.leaves.process_orders_then_loading = [](OpenTTDVehicle *u) noexcept -> uint8_t {
 		auto &p = *road_abi_probe;
 		openttd_rust_road_set_dest(u, p.state, 100, p.dest, p.leaves);
@@ -1891,7 +1894,7 @@ static void VehicleMaintenanceBoundary()
 	static size_t resets;
 	static size_t values;
 	dirty = resets = values = 0;
-	OpenTTDVehicleMaintenanceServices maintenance{};
+	auto &maintenance = _vehicle_maintenance_probe;
 	maintenance.renewal = AircraftUnexpectedService<decltype(maintenance.renewal)>::Call;
 	maintenance.reset = AircraftUnexpectedService<decltype(maintenance.reset)>::Call;
 	maintenance.reset_write = AircraftUnexpectedService<decltype(maintenance.reset_write)>::Call;

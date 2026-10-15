@@ -672,6 +672,12 @@ pub fn layout(type_id: u16, item: u8) -> usize {
             _ => usize::MAX,
         },
 
+        775 => match item {
+            0 => std::mem::size_of::<crate::services::LandscapeType>(),
+            1 => std::mem::align_of::<crate::services::LandscapeType>(),
+            _ => usize::MAX,
+        },
+
         _ => usize::MAX,
     }
 }

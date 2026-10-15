@@ -10,6 +10,15 @@
 #![allow(unsafe_code, clippy::cast_possible_truncation)]
 use std::ffi::c_void;
 
+/// Native `LandscapeType : uint8_t`; every underlying byte remains valid.
+#[repr(transparent)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct LandscapeType(pub u8);
+impl LandscapeType {
+    /// Native `LandscapeType::Toyland`.
+    pub const TOYLAND: Self = Self(3);
+}
+
 /// Explicit C ABI carrier for a native calendar Date, converted in C++.
 #[repr(transparent)]
 #[derive(Clone, Copy)]

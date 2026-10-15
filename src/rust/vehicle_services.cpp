@@ -543,7 +543,7 @@ static OpenTTDVehicleMaintenanceBreakdownCountdown OPENTTD_VEHICLE_CALL Maintena
 static OpenTTDVehicleMaintenanceBreakdownSoundState OPENTTD_VEHICLE_CALL MaintenanceBreakdownSoundState(OpenTTDVehicle *handle) noexcept
 {
 	const Vehicle *v = VehicleOf(handle);
-	return {.kind = RustVehicleVehicleType(v), .landscape = OpenTTDLandscapeValue()};
+	return {.kind = RustVehicleVehicleType(v), .landscape = OpenTTDLandscape()};
 }
 static void OPENTTD_VEHICLE_CALL MaintenanceBreakdownDelayWrite(OpenTTDVehicle *handle, uint8_t delay) noexcept { VehicleOf(handle)->breakdown_delay = delay; }
 static bool OPENTTD_VEHICLE_CALL MaintenanceBreakdownSound(OpenTTDVehicle *handle) noexcept { return PlayVehicleSound(VehicleOf(handle), VSE_BREAKDOWN); }
@@ -592,6 +592,7 @@ static void OPENTTD_VEHICLE_CALL MaintenanceEconomyAgeWrite(OpenTTDVehicle *hand
 static void OPENTTD_VEHICLE_CALL MaintenanceReachedMinAge(OpenTTDVehicle *handle) noexcept { GroupStatistics::VehicleReachedMinAge(VehicleOf(handle)); }
 static int64_t OPENTTD_VEHICLE_CALL MaintenanceValue(OpenTTDVehicle *handle) noexcept { return RustVehicleValue(VehicleOf(handle)); }
 static void OPENTTD_VEHICLE_CALL MaintenanceValueWrite(OpenTTDVehicle *handle, int64_t value) noexcept { VehicleOf(handle)->value = Money(value); }
+static_assert(to_underlying(LandscapeType::Toyland) == 3);
 static_assert(EconomyTime::DAYS_IN_ECONOMY_MONTH == 30 && CalendarTime::DAYS_IN_LEAP_YEAR == 366 && NUM_CARGO == 64);
 static_assert(SND_0F_BREAKDOWN_ROADVEHICLE == 13 && SND_10_BREAKDOWN_TRAIN_SHIP == 14 && SND_35_BREAKDOWN_ROADVEHICLE_TOYLAND == 53 && SND_3A_BREAKDOWN_TRAIN_SHIP_TOYLAND == 58);
 const OpenTTDVehicleMaintenanceServices _rust_vehicle_maintenance_services{

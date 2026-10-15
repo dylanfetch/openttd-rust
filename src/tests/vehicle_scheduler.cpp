@@ -253,6 +253,7 @@ TEST_CASE("Vehicle maintenance consumed native ABI")
 	Layout(772, "OpenTTDCalendarDate", {sizeof(OpenTTDCalendarDate), alignof(OpenTTDCalendarDate), offsetof(OpenTTDCalendarDate, value)});
 	Layout(773, "OpenTTDEconomyDate", {sizeof(OpenTTDEconomyDate), alignof(OpenTTDEconomyDate), offsetof(OpenTTDEconomyDate, value)});
 	Layout(774, "OrderType", {sizeof(OrderType), alignof(OrderType)});
+	Layout(775, "LandscapeType", {sizeof(LandscapeType), alignof(LandscapeType)});
 
 }
 
@@ -263,6 +264,7 @@ TEST_CASE("Vehicle maintenance native scalar stores and cadence")
 {
 	auto &pool = _vehicle_pool;
 	REQUIRE(Vehicle::GetNumItems() == 0);
+	REQUIRE(Vehicle::CanAllocateItem());
 	Vehicle *v = new Vehicle(VEH_EFFECT);
 	v->age = CalendarTime::MAX_DATE - 1;
 	AgeVehicle(v);

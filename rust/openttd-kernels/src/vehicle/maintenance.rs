@@ -123,7 +123,7 @@ pub struct BreakdownCountdown {
 #[repr(C)]
 pub struct BreakdownSoundState {
     pub kind: VehicleType,
-    pub landscape: u8,
+    pub landscape: services::LandscapeType,
 }
 #[repr(C)]
 pub struct BreakdownSmoke {
@@ -475,7 +475,7 @@ unsafe fn breakdown_state<const C: bool>(
                     let sound = svc!(C, s.breakdown_sound_state, v);
                     let train_ship =
                         sound.kind == VehicleType::TRAIN || sound.kind == VehicleType::SHIP;
-                    let toyland = sound.landscape == 3;
+                    let toyland = sound.landscape == services::LandscapeType::TOYLAND;
                     let sound = if toyland {
                         if train_ship { 58 } else { 53 }
                     } else if train_ship {

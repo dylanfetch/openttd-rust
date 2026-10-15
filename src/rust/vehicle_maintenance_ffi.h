@@ -102,7 +102,7 @@ struct OpenTTDVehicleMaintenanceBreakdownCountdown {
 };
 struct OpenTTDVehicleMaintenanceBreakdownSoundState {
 	VehicleType kind;
-	uint8_t landscape;
+	LandscapeType landscape;
 };
 struct OpenTTDVehicleMaintenanceBreakdownSmoke {
 	OpenTTDVehicle *shell;
