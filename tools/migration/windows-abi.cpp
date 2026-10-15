@@ -356,7 +356,7 @@ static void Calls()
 		names.next = [](uint from) noexcept -> OpenTTDTownRef { CHECK(from == 0 || from == UINT16_MAX); return from == 0 ? OpenTTDTownRef{reinterpret_cast<Town *>(uintptr_t{1}), owner, UINT16_MAX - 1} : OpenTTDTownRef{nullptr, nullptr, UINT16_MAX}; };
 		names.utf8_length = [](const uint8_t *data, size_t size) noexcept -> size_t { CHECK(size == 1 && *data == 'x'); return size; };
 		founding.parameters = [](OpenTTDTownFoundingFrame *) noexcept -> const TownNameParams * { return nullptr; };
-		founding.current_company = []() noexcept -> uint8_t { return UINT8_MAX; };
+		shared.current_company = []() noexcept -> uint8_t { return UINT8_MAX; };
 		founding.found_setting = []() noexcept { return TF_CUSTOM_LAYOUT; };
 		founding.can_allocate = []() noexcept { return true; };
 		shared.distance_from_edge = [](uint32_t tile) noexcept -> uint32_t { CHECK(tile == UINT32_MAX); return 13; };
