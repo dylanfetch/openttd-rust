@@ -195,3 +195,30 @@ src/town_cmd.cpp | RustTown_allow_crossings() noexcept | 1f8c8aa2e0af5a02 | 1
 src/town_cmd.cpp | RustTown_allow_roads() noexcept | faaf2796b712d57e | 1
 src/town_cmd.cpp | RustTown_build_on_slopes() noexcept | 5ca1f276b3919e81 | 1
 src/town_cmd.cpp | RustTown_growth_rate() noexcept | 6c32e2c93ccbb6f1 | 1
+binding | GetRustSignalContext | 2
+binding | IndustryCommandDeity | 2
+binding | OpenTTDAddAnimatedTile | 2
+binding | OpenTTDEditor | 2
+binding | OpenTTDGeneratingWorld | 2
+binding | OpenTTDHighestSnowLine | 2
+binding | OpenTTDLandscapeValue | 2
+binding | OpenTTDMapLogX | 2
+binding | OpenTTDMapScaleLandProportion | 2
+binding | OpenTTDMapScaleSize | 2
+binding | RustCurrentCompanyID | 4
+binding | RustLocalCompanyID | 2
+binding | RustOtherTunnelBridgeEnd | 2
+binding | RustScreenDirty | 3
+binding | RustSetCurrentCompanyID | 2
+binding | RustUtf8Length | 3
+binding | TrainReadLastStation | 2
+binding | TrainReadNext | 2
+write | src/economy.cpp | [](OpenTTDVehicle *handle, int64_t value) noexcept -> void | e49661d6b53b5cb0 | 1
+write | src/economy.cpp | [](OpenTTDVehicle *handle, uint16_t value) noexcept -> void | cebe9268db3802a2 | 1
+write | src/order_cmd.cpp | openttd_orders_last_station_write(void *ctx, uint16_t station) noexcept | 5b7a6c4866ddd3da | 1
+write | src/rust/company_adapter.cpp | Co_add_airport_infrastructure(uint8_t new_owner, uint8_t old_owner) noexcept | d8f0ad7c93f2f046 | 1
+write | src/rust/company_adapter.cpp | Co_assign_unit_number(uint32_t id, uint8_t company) noexcept | 828c84656df232ed | 1
+write | src/rust/company_adapter.cpp | Co_set_station_owner(uint32_t id, uint8_t owner) noexcept | b1bc0135df3a7a84 | 1
+write | src/rust/fleet_group_services.hpp | FleetGroup_set_membership(void *shell, uint16_t id) noexcept | 1b6edd36dbec0c7a | 1
+write | src/rust/ship_control_services.h | Ship_visit_set(uint32_t station, uint32_t vehicle_type) noexcept | 680b8e84edac38d1 | 1
+write | src/rust/train_services.h | TrainWriteVisitType(OpenTTDTrainHandle, uint16_t a) noexcept | aebb225d48856496 | 1
