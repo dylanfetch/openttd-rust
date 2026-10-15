@@ -47,13 +47,6 @@ jobs:
     - name: Install MSVC problem matcher
       uses: ammaraskar/msvc-problem-matcher@master
 
-    - name: Inventory Visual Studio and MSVC toolsets
-      shell: pwsh
-      run: |
-        $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-        & $vswhere -all -products '*' -format json | ConvertFrom-Json | Select-Object displayName, installationVersion, installationPath | Format-List
-        & $vswhere -all -products '*' -property installationPath | ForEach-Object { Get-ChildItem "$_\VC\Tools\MSVC" -Name }
-
     - name: Configure developer command prompt for ${{ inputs.arch }}
       uses: ilammy/msvc-dev-cmd@v1
       with:
