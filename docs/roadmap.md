@@ -164,18 +164,19 @@ that a `SaveLoad` descriptor cannot address through the alias.
 ## Resume checkpoint
 
 Root resumed from `fe337e4e40` with `/start-development`. The last code revision
-is green. #253/#254 are integrated and their worktrees removed. Root owns CI/integration and #233 observation. #252 acceptance is complete; four
-owner agents and the fresh signal reviewer are active.
+is green. #253/#254 are integrated and their worktrees removed; #252 acceptance is
+complete. Root owns CI/integration and #233 observation. Two ownership agents,
+two fixing reviewers and a bounded landscape evidence planner are active.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
 | #233 / #243 / #244 | `ci-cache-peak-233`, `1288db61b4` | Root sampling; two of three code merges observed. Leave #244 idle (action 1). |
 | #252 / #253 | integrated, worktree removed | Closed: compatibility/full CI and warm-cache/CPU acceptance passed; eight vCPUs retained, scheduling restored. |
 | #249 / #254 | integrated, worktree removed | Fixing review/full CI passed; 206 baseline fingerprints, no additions permitted. |
-| #219 / #245 | `signal-owner-219`, `6fdb1fd18f` | `signals_final_245`: focused pair/self/soak and portable source checks passed; frozen default, then tooling adoption/affected reruns, fixing review and timing. |
-| #220 / #248 | `engine-lifecycle-220`, `3c4f63a512` | `engine_final_248`: native/focused pair/self/soak passed; finish default and narrow adapter-provenance reruns before timing/review. |
-| #212 / #255 | `landscape-owner-212`, `87cd4cb673` | `landscape_owner_212`: native/focused pass; recorded interrupted timing prefix, fresh quiet gate before full scope. |
-| #213 / #257 | `vehicle-owner-213`, `61f2f93370` | `vehicle_owner_213`: cursor/post-tick boundary pushed; fix native loading-timer scope, then verify/quiet Opus gate. |
+| #219 / #245 | `signal-owner-219`, `f358184498` | `signals_review_245`: affected 25/25 pass; fixing shared meanings/new enum service types, then native/focused checks and quiet timing. |
+| #220 / #248 | `engine-lifecycle-220`, `8d66856d6a` | `engine_review_248`: typed-year/copy fixes and native/focused pass; finish canonical bundle reads, then quiet timing/full CI. |
+| #212 / #255 | `landscape-owner-212`, `87cd4cb673` | `landscape_owner_212`: initial gate accepted on PR; implementing full ground/flood scope. Bounded evidence planning in parallel. |
+| #213 / #257 | `vehicle-owner-213`, `b380d4c8ff` | `vehicle_owner_213`: all 166 native tests pass; focused semantics, unused bundle-field cleanup, then initial quiet Opus gate. |
 | #246 / #256 / #247 | unstarted | Founding/names, then complete house lifecycle, then town commands/deletion. |
 | #64 / #66 | `issue/64-curve-family`, `aab5211801` | Paused draft/worktree; leave untouched, not a fallback. |
 | Paused integration | `integration/curve-script`, `c19f09cf8b` | Locked worktree preserved; no work. |
