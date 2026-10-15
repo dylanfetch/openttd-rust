@@ -9,8 +9,8 @@ forward-looking, about 200 lines; completed work is one row, with evidence in PR
 - Twenty-five ownership ports. Whole fork: Rust 58,188 / tooling 30,152 / glue 26,867 / original retired 37,081 of 470,612 `src/` lines (7.88%). Simulation: 29,072 / 102,615 (28.33%); source counts, not behavioral completion.
 - This restart integrated #253/#254 and engine #248: 579 original lines retired; engine's retained native services and default witnesses cost 790 net glue / 369 added tooling. Signals is next; no new CI tooling is selected.
 - Engine final accepted speed: TGP 1.128, Opus 1.229, Grok 1.227, Ridge 1996 1.234, 2000 1.297, 2016 1.309. All six stored caps plus 3% pass; invocation spread and every raw sample remain in #248. Caps are unchanged.
-- Six unintegrated branches: signals #245, landscape #255, vehicle #257, town #246, idle #244 and paused #66. No new component branch until a slot frees.
-- #252 acceptance passed; eight Windows vCPUs retained. #249 is enforced in quick CI. #233 has observed the third code merge; finish its cache-save wave before deciding #244.
+- Five unintegrated component branches: signals #245, landscape #255, vehicle #257, town #258 and paused #66. #244 closed unmerged; its branch is retained and worktree removed.
+- #252 acceptance passed; eight Windows vCPUs retained. #249 is enforced in quick CI. #233 acceptance is met after three code-merge/save waves; #243/#244 closed superseded. Cache sampling limits and results remain on #233.
 - Largest original simulation files remaining: station_cmd 4.5k lines, rail_cmd 3.2k, vehicle 3.0k, road_cmd 2.7k, town_cmd 2.5k, tunnelbridge 2.2k, landscape 1.8k, water 1.5k.
 
 ## Eleventh steering review (2026-10-14, throughput and enforcement)
@@ -30,7 +30,7 @@ The ports are faithful. Retirement stalled for three reasons, each fixable:
 
 Actions, in order:
 0. **#252 Windows CI on Blacksmith (user-selected, first).** #253 integrated; compatibility, warm-cache/CPU acceptance passed and eight vCPUs retained (#252). macOS stays on GitHub.
-1. **Do not work on #244.** Blacksmith moved the Linux caches out of GitHub's 10 GiB, so its cache-peak problem is likely gone. Over the next three code merges, record GitHub's peak cache usage on #233. If it stays under 10 GiB, close #233 as met and #243/#244 unmerged (keep the branch, remove the worktree). If it goes over, resume #244: fix the platform gate failure and the quick-job ccache fixture, then bootstrap, full CI and #233 live acceptance.
+1. **#233 cache observation completed.** Three code merges/save waves stayed below 10 GiB in the selected sampling. #243/#244 closed unmerged as directed; keep the branch, worktree removed. No controller work is selected.
 2. **#249 shared-accessor check:** integrated in #254. Keep its baseline shrinking; do not block ownership on tooling-only base adoption.
 3. **#245 signals:** apply the two fixes in its steering comment, record its gaps (posted on #156), then do final-head validation, timing, a fresh fixing review, full CI and integrate.
 4. **#248 engine:** integrated after fixing reviews, default witnesses, six speed gates and exact-head full CI. Evidence remains on #248.
@@ -109,7 +109,7 @@ retirement, with net glue in the PR (#223).
 | #227 (loading context fidelity) | #228 | direct | `9ee89f69ad` | 3 / 47 / 0 / 0 |
 | #231 (OpenGFX cache) | #232 | direct | `21e2c9ea60` | 0 / 0 / 0 / 0; workflow net -6 |
 | #223 (original-retirement metric) | #226 | direct | `86322c8422` | 0 / 274 / 0 / 0; net glue 0 |
-| #233 (CI throughput; cache acceptance pending) | #235 | direct | `21eeb445be` | 0 / 1567 / 0 / 0; net glue 0 |
+| #233 (CI throughput and cache acceptance complete) | #235 | direct | `21eeb445be` | 0 / 1567 / 0 / 0; net glue 0 |
 | #234 (industry water fidelity) | #236 | direct | `b7a1429d38` | 5 / 97 / 32 / 0; net glue +32 |
 | #229 (six calibrated caps) | #230 | direct | `e69df25522` | 0 / 12 / 0 / 0; net glue 0 |
 | #239/#156 (prospect/overlap coverage) | #240 | direct | `62ef446d1e` | 0 / 114 / 0 / 0; net glue 0 |
@@ -166,19 +166,20 @@ that a `SaveLoad` descriptor cannot address through the alias.
 
 Root resumed with `/start-development`. #253/#254/#248 are integrated and their
 worktrees removed; #252 acceptance is complete. Engine's merged tree matches its
-full validation. Root owns CI/integration and #233 observation. Landscape, vehicle
-and town owners plus the signal fixing reviewer are active.
+full validation. #233 observation is complete, #243/#244 closed and the idle
+worktree removed. Root owns CI/integration. Landscape, vehicle and town owners
+plus the fresh signal conflict-resolution reviewer are active.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #233 / #243 / #244 | `ci-cache-peak-233`, `1288db61b4` | Third code merge observed; finish its cache-save wave, then action 1. Leave #244 idle. |
+| #233 / #243 / #244 | closed; `ci-cache-peak-233` retained at `1288db61b4` | Acceptance met; controller draft unmerged, clean worktree removed. |
 | #252 / #253 | integrated, worktree removed | Closed: compatibility/full CI and warm-cache/CPU acceptance passed; eight vCPUs retained, scheduling restored. |
 | #249 / #254 | integrated, worktree removed | Fixing review/full CI passed; 206 baseline fingerprints, no additions permitted. |
-| #219 / #245 | `signal-owner-219`, `05890fd2da` | Native/width fixes pass; finish review disposition, resolve #248 base conflict, fresh resolution review, then timing/full CI. |
+| #219 / #245 | `signal-owner-219`, `c3f021034d` | Root resolved engine conflict; fresh review has no source findings. Combined native/semantic checks and exact-head CI run; quiet timing next. |
 | #220 / #248 | integrated, worktree removed | Fixing reviews, semantic/native evidence, all six speed gates and exact-head full CI passed. |
-| #212 / #255 | `landscape-owner-212`, full milestone | Initial TGP gate accepted; full ground/flood and default witnesses pass locally. Adopt #248 types, final checks and fresh review next. |
+| #212 / #255 | `landscape-owner-212`, `40e483e685` | Full ground/flood/default witnesses pass; engine types adopted. Correct scheduler log widths and finish direct Rust dispatch, then performance gates before full corpus/review. |
 | #213 / #257 | `vehicle-owner-213`, `8b0b676307` | Initial a110 gate accepted narrowly; #248 adopted. Implement remaining maintenance scope, then fresh review/final gates. |
-| #246 | `town-founding-246`, `d2115d1c3d` | `town_founding_246`: remove descriptor-addressable save staging, then founding/generation/name ownership. |
+| #246 / #258 | `town-founding-246`, `8b127bbc8f` | Descriptor-addressable save staging removed and verified; founding/generation/name ownership in progress. |
 | #256 / #247 | unstarted | Complete house lifecycle, then town commands/deletion, after #246. |
 | #64 / #66 | `issue/64-curve-family`, `aab5211801` | Paused draft/worktree; leave untouched, not a fallback. |
 | Paused integration | `integration/curve-script`, `c19f09cf8b` | Locked worktree preserved; no work. |
