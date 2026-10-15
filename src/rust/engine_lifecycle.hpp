@@ -53,6 +53,8 @@ struct EngineLifecycleOwner {
 };
 struct EngineName {
 	OpenTTDEngineLifecycle *state;
+	explicit EngineName(OpenTTDEngineLifecycle *state) noexcept : state(state) {}
+	EngineName(const EngineName &) noexcept = default;
 	std::string_view View() const
 	{
 		auto bytes = openttd_rust_engine_name(this->state);
