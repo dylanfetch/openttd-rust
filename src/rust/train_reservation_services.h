@@ -6,6 +6,7 @@
 	*/
 
 #include "services_ffi.h"
+#include "services_rail.h"
 
 /** @file train_reservation_services.h Direct map/PBS/follower services. */
 
@@ -61,10 +62,6 @@ static uint64_t TrainReservationCrossTracks(void *, OpenTTDTrainHandle, uint8_t 
 {
 	return TrackCrossesTracks(static_cast<Track>(a));
 }
-static uint64_t TrainReservationDepotDir(void *, OpenTTDTrainHandle, uint32_t a) noexcept
-{
-	return GetRustRailMapServices().rail_depot_direction(a);
-}
 static uint64_t TrainReservationDepotReserved(void *, OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
@@ -94,7 +91,7 @@ static uint64_t TrainReservationFree(void *, OpenTTDTrainHandle id, uint32_t a, 
 }
 static uint64_t TrainReservationGreen(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
-	return GetRustRailMapServices().signal_state(a, b) == SIGNAL_STATE_GREEN;
+	return RustRailSignalState(a, b) == SIGNAL_STATE_GREEN;
 }
 static uint64_t TrainReservationHasPbs(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
@@ -105,10 +102,6 @@ static uint64_t TrainReservationHasReserved(void *, OpenTTDTrainHandle, uint32_t
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	return HasReservedTracks(t, static_cast<TrackBits>(b));
-}
-static uint64_t TrainReservationHasSignal(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
-{
-	return GetRustRailMapServices().has_signal_trackdir(a, b);
 }
 static void TrainReservationIncrementOrder(void *, OpenTTDTrainHandle id) noexcept
 {
@@ -127,7 +120,7 @@ static uint64_t TrainReservationIsDepot(void *, OpenTTDTrainHandle, uint32_t a) 
 }
 static uint64_t TrainReservationIsPbs(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
-	return IsPbsSignal(static_cast<SignalType>(GetRustRailMapServices().signal_type(a, b)));
+	return IsPbsSignal(RustRailSignalType(a, b));
 }
 static uint64_t TrainReservationIsPlain(void *, OpenTTDTrainHandle, uint32_t a) noexcept
 {
@@ -187,10 +180,6 @@ static uint64_t TrainReservationOrderType(void *, OpenTTDTrainHandle id, uint8_t
 {
 	Train *v = static_cast<Train *>(id.shell);
 	return v->GetOrder(static_cast<VehicleOrderID>(a))->GetType();
-}
-static uint64_t TrainReservationOtherEnd(void *, OpenTTDTrainHandle, uint32_t a) noexcept
-{
-	return GetRustRailMapServices().other_tunnel_bridge_end(a);
 }
 static uint64_t TrainReservationOverlap(void *, OpenTTDTrainHandle, uint8_t a) noexcept
 {
@@ -264,7 +253,7 @@ static void TrainReservationSetPlatform(void *, OpenTTDTrainHandle, uint32_t a, 
 }
 static void TrainReservationSetSignal(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b, uint8_t c) noexcept
 {
-	GetRustRailMapServices().set_signal_state(a, b, c != 0 ? SIGNAL_STATE_GREEN : SIGNAL_STATE_RED);
+	RustRailSetSignalState(a, b, c != 0 ? SIGNAL_STATE_GREEN : SIGNAL_STATE_RED);
 }
 static void TrainReservationSetTunnel(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
@@ -309,7 +298,7 @@ static uint64_t TrainReservationTrackdir(void *, OpenTTDTrainHandle id) noexcept
 }
 static uint64_t TrainReservationTrackStatus(void *, OpenTTDTrainHandle, uint32_t a) noexcept
 {
-	return TrackStatusToTrackdirBits(GetRustRailMapServices().rail_track_status(a, INVALID_DIAGDIR));
+	return TrackStatusToTrackdirBits(RustRailTrackStatus(a, INVALID_DIAGDIR));
 }
 static uint64_t TrainReservationTryTrack(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {

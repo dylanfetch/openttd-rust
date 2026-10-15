@@ -8,6 +8,7 @@
 #include "../stdafx.h"
 #ifdef WITH_RUST
 #include "company_adapter.h"
+#include "services_rail.h"
 #include "company_services.h"
 #include "../company_base.h"
 #include "../company_func.h"
@@ -389,11 +390,10 @@ static OpenTTDCompanySignalTile Co_signal_tile(uint32_t t) noexcept
 	r.crossing = !r.railway && IsLevelCrossingTile(tile);
 	/* House and industry tiles have no owner; only the two tested kinds are read. */
 	if (r.railway || r.crossing) r.owner = GetTileOwner(tile).base();
-	r.has_signals = r.railway && GetRustRailMapServices().has_signals(t);
-	if (r.has_signals) r.tracks = GetRustRailMapServices().rail_tracks(t);
+	r.has_signals = r.railway && RustRailHasSignals(t);
+	if (r.has_signals) r.tracks = RustRailTracks(t);
 	return r;
 }
-static bool Co_has_signal_on_track(uint32_t tile, uint8_t track) noexcept { return GetRustRailMapServices().has_signal_track(tile, track); }
 static void Co_add_track_to_signal_buffer(uint32_t tile, uint8_t track, uint8_t owner) noexcept { AddTrackToSignalBuffer(TileIndex(tile), static_cast<Track>(track), CompanyID(owner)); }
 static void Co_update_level_crossing(uint32_t tile) noexcept { UpdateLevelCrossing(TileIndex(tile)); }
 static void Co_update_signals_in_buffer() noexcept { UpdateSignalsInBuffer(); }
@@ -478,7 +478,7 @@ const OpenTTDCompanyServices &GetRustCompanyServices() noexcept
 		.delete_group = Co_delete_group, .transfer_group = Co_transfer_group,
 		.copy_service_interval_defaults = Co_copy_service_interval_defaults, .update_autoreplace = Co_update_autoreplace,
 		.map_size = Co_map_size, .change_tile_owner = Co_change_tile_owner,
-		.signal_tile = Co_signal_tile, .has_signal_on_track = Co_has_signal_on_track,
+		.signal_tile = Co_signal_tile, .has_signal_on_track = RustRailHasSignalTrack,
 		.add_track_to_signal_buffer = Co_add_track_to_signal_buffer, .update_level_crossing = Co_update_level_crossing,
 		.update_signals_in_buffer = Co_update_signals_in_buffer, .add_airport_infrastructure = Co_add_airport_infrastructure,
 		.station_next_owned = Co_station_next_owned, .station_facility_count = Co_station_facility_count,

@@ -24,6 +24,8 @@
 
 #ifdef WITH_RUST
 #include "rust/signal_ffi.h"
+#include "rust/services_rail.h"
+#include "rust/company_services.h"
 #include "rust/vehicle_services.h"
 
 /** Native spatial query; Rust retains traversal and occupancy branching. */
@@ -40,11 +42,11 @@ static bool SignalTrainOnTracks(uint32_t tile, uint8_t tracks) noexcept
 static void SignalOverflowTbu() noexcept { Debug(misc, 0, "SignalSegment too complex. Set _tbuset is full (maximum 64)"); }
 static void SignalOverflowTbd() noexcept { Debug(misc, 0, "SignalSegment too complex. Set _tbdset is full (maximum 256)"); }
 static void SignalOverflowGlobal() noexcept { Debug(misc, 0, "SignalSegment too complex. Set _globset is full (maximum 128)"); }
-static void SignalAssertCompany([[maybe_unused]] uint8_t owner) noexcept { assert(Company::IsValidID(CompanyID(owner))); }
+static void SignalAssertCompany([[maybe_unused]] uint8_t owner) noexcept { assert(OpenTTDCompanyIsValid(owner)); }
 static void SignalAssertCondition([[maybe_unused]] bool condition) noexcept { assert(condition); }
 static void SignalAssertWormholeStart([[maybe_unused]] uint32_t tile, [[maybe_unused]] uint8_t dir) noexcept
 {
-	assert(GetTunnelBridgeTransportType(TileIndex(tile)) == TRANSPORT_RAIL);
+	assert(RustTunnelBridgeTransport(tile) == TRANSPORT_RAIL);
 	assert(dir == INVALID_DIAGDIR || dir == ReverseDiagDir(GetTunnelBridgeDirection(TileIndex(tile))));
 }
 static const OpenTTDSignalServices _signal_services{

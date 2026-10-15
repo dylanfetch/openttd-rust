@@ -216,10 +216,10 @@ fn explore(w: &World<'_>, owner: u8) -> u16 {
                     if dir == INVALID {
                         crate::witness::hit(crate::witness::SIGNAL_DEPOT);
                         train_on_tile(w, tile, &mut flags);
-                        exitdir = read!(w, rail, rail_depot_direction, tile);
+                        exitdir = read!(w, rail, rail_depot_direction, tile).0;
                         tile = w.map.add_diag(tile, exitdir);
                         dir = reverse(exitdir);
-                    } else if dir == read!(w, rail, rail_depot_direction, tile) {
+                    } else if dir == read!(w, rail, rail_depot_direction, tile).0 {
                         train_on_tile(w, tile, &mut flags);
                         continue;
                     } else {
@@ -227,7 +227,7 @@ fn explore(w: &World<'_>, owner: u8) -> u16 {
                     }
                 } else {
                     source_assert(w, dir < 4);
-                    let mut tracks = geometry.tracks;
+                    let mut tracks = geometry.tracks.0;
                     let masked = tracks & ENTER_TRACKS[usize::from(dir)];
                     if tracks == 0x0c || tracks == 0x30 {
                         tracks = masked;
@@ -251,7 +251,7 @@ fn explore(w: &World<'_>, owner: u8) -> u16 {
                     let signal = read!(w, rail, signal_presence, tile, masked, td);
                     if signal.signals {
                         if signal.track {
-                            let kind = signal.kind;
+                            let kind = signal.kind.0;
                             let back = td ^ 8;
                             if signal.reverse {
                                 if pbs(kind) {
@@ -277,7 +277,7 @@ fn explore(w: &World<'_>, owner: u8) -> u16 {
                                 }
                                 flags |= EXIT;
                                 crate::witness::hit(crate::witness::SIGNAL_EXIT);
-                                if read!(w, rail, signal_state, tile, td) == 1 {
+                                if read!(w, rail, signal_state, tile, td).0 == 1 {
                                     if flags & GREEN != 0 {
                                         flags |= MULTI_GREEN;
                                         crate::witness::hit(crate::witness::SIGNAL_MULTI_GREEN);
@@ -307,7 +307,7 @@ fn explore(w: &World<'_>, owner: u8) -> u16 {
                 let station = read!(w, rail, station_admission, tile, owner, dir);
                 if !station.rail
                     || station.owner != owner
-                    || (dir & 1) != station.axis
+                    || (dir & 1) != station.axis.0
                     || station.blocked
                 {
                     continue;
@@ -318,7 +318,7 @@ fn explore(w: &World<'_>, owner: u8) -> u16 {
             }
             2 => {
                 let crossing = read!(w, rail, crossing_admission, tile, owner);
-                if !crossing.crossing || crossing.owner != owner || (dir & 1) == crossing.axis {
+                if !crossing.crossing || crossing.owner != owner || (dir & 1) == crossing.axis.0 {
                     continue;
                 }
                 crate::witness::hit(crate::witness::SIGNAL_CROSSING);
@@ -327,11 +327,11 @@ fn explore(w: &World<'_>, owner: u8) -> u16 {
             }
             9 => {
                 let wormhole = read!(w, rail, wormhole_admission, tile, owner);
-                if wormhole.owner != owner || wormhole.transport != 0 {
+                if wormhole.owner != owner || wormhole.transport.0 != 0 {
                     continue;
                 }
                 crate::witness::hit(crate::witness::SIGNAL_WORMHOLE);
-                let direction = wormhole.direction;
+                let direction = wormhole.direction.0;
                 if dir == INVALID {
                     train_on_tile(w, tile, &mut flags);
                     dir = direction;
@@ -366,9 +366,9 @@ fn update_around(w: &World<'_>, flags: u16) {
     while let Some(Item { tile, dir: td }) = access(|s| s.tbu.get()) {
         let track = td & 7;
         let observation = read!(w, rail, signal_update, tile, td);
-        let kind = observation.kind;
+        let kind = observation.kind.0;
         let mut new_state = 1;
-        if pbs(kind) && observation.reservations & (1 << track) != 0 {
+        if pbs(kind) && observation.reservations.0 & (1 << track) != 0 {
             crate::witness::hit(crate::witness::SIGNAL_RESERVED_SKIP);
             continue;
         }
@@ -379,7 +379,7 @@ fn update_around(w: &World<'_>, flags: u16) {
             if flags & MULTI_EXIT != 0
                 && (flags & GREEN == 0
                     || (flags & MULTI_GREEN == 0
-                        && read!(w, rail, signal_state, tile, td ^ 8) == 1))
+                        && read!(w, rail, signal_state, tile, td ^ 8).0 == 1))
             {
                 new_state = 0;
                 crate::witness::hit(crate::witness::SIGNAL_COMBO_RED);
@@ -387,7 +387,7 @@ fn update_around(w: &World<'_>, flags: u16) {
         } else if (kind == 1 || kind == 3) && flags & EXIT != 0 && flags & GREEN == 0 {
             new_state = 0;
         }
-        if new_state != read!(w, rail, signal_state, tile, td) {
+        if new_state != read!(w, rail, signal_state, tile, td).0 {
             if presignal_exit(kind) {
                 add_global(
                     w,
@@ -437,7 +437,7 @@ fn update_buffer(w: &World<'_>, owner: u8) -> u8 {
             if w.native.assertions {
                 source_assert(
                     w,
-                    dir == INVALID || dir == read!(w, rail, rail_depot_direction, tile),
+                    dir == INVALID || dir == read!(w, rail, rail_depot_direction, tile).0,
                 );
             }
             add_tbd(w, Item { tile, dir: INVALID });

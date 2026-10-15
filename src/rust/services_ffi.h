@@ -88,12 +88,20 @@ struct OpenTTDSharedServices {
 };
 const OpenTTDSharedServices &GetRustSharedServices() noexcept;
 
-struct OpenTTDRailTraversal { bool depot; uint8_t tracks; };
-struct OpenTTDRailSignalPresence { bool signals; bool track; uint8_t kind; bool forward; bool reverse; };
-struct OpenTTDRailSignalUpdate { uint8_t kind; uint8_t reservations; };
-struct OpenTTDRailStationAdmission { bool rail; uint8_t owner; uint8_t axis; bool blocked; };
-struct OpenTTDRailCrossingAdmission { bool crossing; uint8_t owner; uint8_t axis; };
-struct OpenTTDRailWormholeAdmission { uint8_t owner; uint8_t transport; uint8_t direction; };
+/* Fixed-underlying native enum declarations keep standalone ABI consumers lean. */
+enum DiagDirection : uint8_t;
+enum TrackBits : uint8_t;
+enum SignalType : uint8_t;
+enum SignalState : uint8_t;
+enum Axis : uint8_t;
+enum TransportType : uint8_t;
+
+struct OpenTTDRailTraversal { bool depot; TrackBits tracks; };
+struct OpenTTDRailSignalPresence { bool signals; bool track; SignalType kind; bool forward; bool reverse; };
+struct OpenTTDRailSignalUpdate { SignalType kind; TrackBits reservations; };
+struct OpenTTDRailStationAdmission { bool rail; uint8_t owner; Axis axis; bool blocked; };
+struct OpenTTDRailCrossingAdmission { bool crossing; uint8_t owner; Axis axis; };
+struct OpenTTDRailWormholeAdmission { uint8_t owner; TransportType transport; DiagDirection direction; };
 
 /* Canonical rail/signal map leaves. A consuming owner calls each phase only at
  * the source observation point; signal writes are immediate. No map pointer,
@@ -107,13 +115,13 @@ struct OpenTTDRailMapServices {
 	OpenTTDRailWormholeAdmission (*wormhole_admission)(uint32_t, uint8_t) noexcept;
 
 	bool (*is_rail_depot)(uint32_t) noexcept;
-	uint8_t (*rail_depot_direction)(uint32_t) noexcept;
-	uint8_t (*rail_tracks)(uint32_t) noexcept;
+	DiagDirection (*rail_depot_direction)(uint32_t) noexcept;
+	TrackBits (*rail_tracks)(uint32_t) noexcept;
 	bool (*has_signals)(uint32_t) noexcept;
 	bool (*has_signal_track)(uint32_t, uint8_t) noexcept;
-	uint8_t (*signal_type)(uint32_t, uint8_t) noexcept;
+	SignalType (*signal_type)(uint32_t, uint8_t) noexcept;
 	bool (*has_signal_trackdir)(uint32_t, uint8_t) noexcept;
-	uint8_t (*signal_state)(uint32_t, uint8_t) noexcept;
+	SignalState (*signal_state)(uint32_t, uint8_t) noexcept;
 	void (*set_signal_state)(uint32_t, uint8_t, uint8_t) noexcept;
 	uint32_t (*other_tunnel_bridge_end)(uint32_t) noexcept;
 	uint32_t (*rail_track_status)(uint32_t, uint8_t) noexcept;

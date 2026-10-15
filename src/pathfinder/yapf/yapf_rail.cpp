@@ -21,6 +21,7 @@
 
 #ifdef WITH_RUST
 #include "../../rust/rail_yapf_ffi.h"
+#include "../../rust/services_rail.h"
 #include <cstdio>
 
 struct RailYapfContext {
@@ -53,7 +54,7 @@ static OpenTTDRailTile RailTile(uint32_t tile, uint8_t direction) noexcept
 		| (IsBridgeTile(t) ? 256U : 0U) | (IsTunnelTile(t) ? 512U : 0U);
 	result.railtype = GetTileRailType(t);
 	result.reserved = GetReservedTrackbits(t);
-	if (IsPlainRailTile(t)) result.tracks = GetTrackBits(t);
+	if (IsPlainRailTile(t)) result.tracks = RustRailTracks(tile);
 	if (HasStationTileRail(t)) {
 		result.station = GetStationIndex(t).base();
 		result.station_track = GetRailStationTrack(t);
@@ -61,18 +62,18 @@ static OpenTTDRailTile RailTile(uint32_t tile, uint8_t direction) noexcept
 	}
 	if (IsTileType(t, MP_TUNNELBRIDGE)) {
 		result.tunnel_dir = GetTunnelBridgeDirection(t);
-		result.other_end = GetOtherTunnelBridgeEnd(t).base();
+		result.other_end = RustOtherTunnelBridgeEnd(tile);
 	}
 	result.uphill = IsUphillTrackdir(GetTileSlope(t), td);
 	if (IsBridgeTile(t)) result.flat_ramp = HasBridgeFlatRamp(GetTileSlope(t), DiagDirToAxis(GetTunnelBridgeDirection(t)));
 	if (IsTileType(t, MP_RAILWAY)) {
-		result.signal_along = HasSignalOnTrackdir(t, td);
-		result.signal_against = HasSignalOnTrackdir(t, ReverseTrackdir(td));
+		result.signal_along = RustRailHasSignalTrackdir(tile, td);
+		result.signal_against = RustRailHasSignalTrackdir(tile, ReverseTrackdir(td));
 		if (result.signal_along || result.signal_against) {
-			result.signal_type = GetSignalType(t, TrackdirToTrack(td));
+			result.signal_type = RustRailSignalType(tile, TrackdirToTrack(td));
 			result.oneway = IsOnewaySignal(t, TrackdirToTrack(td));
 		}
-		if (result.signal_along) result.signal_green = GetSignalStateByTrackdir(t, td) == SIGNAL_STATE_GREEN;
+		if (result.signal_along) result.signal_green = RustRailSignalState(tile, td) == SIGNAL_STATE_GREEN;
 	}
 	if (HasOnewaySignalBlockingTrackdir(t, td)) result.flags |= 2048U;
 	return result;
@@ -116,7 +117,7 @@ static uint32_t RailClosestStation(void *context, uint8_t station) noexcept
 }
 static uint16_t RailDestinationDirs(uint32_t tile) noexcept
 {
-	return TrackStatusToTrackdirBits(GetTileTrackStatus(TileIndex{tile}, TRANSPORT_RAIL, 0));
+	return TrackStatusToTrackdirBits(RustRailTrackStatus(tile, INVALID_DIAGDIR));
 }
 static void RailOrigin(void *context, uint32_t *tile, uint8_t *td) noexcept
 {
@@ -134,8 +135,8 @@ static uint8_t RailWrite(uint32_t tile, uint8_t direction, uint8_t operation) no
 		case 2: UnreserveRailTrack(t, TrackdirToTrack(td)); break;
 		case 3: SetRailStationReservation(t, true); MarkTileDirtyByTile(t); break;
 		case 4: SetRailStationReservation(t, false); break;
-		case 5: SetSignalStateByTrackdir(t, td, SIGNAL_STATE_RED); MarkTileDirtyByTile(t); break;
-		case 6: SetSignalStateByTrackdir(t, td, SIGNAL_STATE_GREEN); break;
+		case 5: RustRailSetSignalState(tile, td, SIGNAL_STATE_RED); MarkTileDirtyByTile(t); break;
+		case 6: RustRailSetSignalState(tile, td, SIGNAL_STATE_GREEN); break;
 		default: NOT_REACHED();
 	}
 	return true;
