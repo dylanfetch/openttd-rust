@@ -14,9 +14,8 @@ forward-looking, about 200 lines; completed work is one row, with evidence in PR
 
 ## Twelfth steering review (2026-10-15, housekeeping)
 
-Independent audits covered #258, dead code and tooling, docs, and GitHub and
-local state. The #258 audit found no reachable divergence. Housekeeping debt has
-built up; #259 measures it and lists each item:
+Audits of #258, tooling, docs, tests, glue, Rust and repository state found no
+reachable divergence in #258. Debt has built up; #259 and #261 list each item:
 
 - **#258 leftovers.** The Rust branch of `InitializeLayout` and the exports `town_update_rate` and `town_grow` are orphaned. The founding services table re-creates the shared company accessors, and both reviews and #249 missed it because the copy is a Rust table field. Coverage gaps went to #156.
 - **Dead FFI.** About 250 lines across ports: ten exports with no caller, uncalled C++ wrappers, and callback fields Rust never calls. The "call services directly" conversions left them behind.
@@ -25,17 +24,24 @@ built up; #259 measures it and lists each item:
   - 2,130 lines of workflows that guard nothing the fork relies on, including a nightly run.
   - 3,337 lines of duplicated comparison scaffolding, which set the native critical path.
   - 32 of 48 component entries over budget, and about 20 doc citations of opt-in `--soak`/`--self` runs.
+- **Tests and refactoring.** A second round of audits sized cleanup that changes no behaviour, now #261:
+  - 34 s of serial Python tests on every push;
+  - about 330 lines of protocol tests the harness already covers, and duplicated ABI layout lists;
+  - about 600 glue lines of block and header boilerplate;
+  - about 1,165 lines of Rust forwarding functions, and 660 callback fields declared `unsafe` without need;
+  - save staging that the aliases make redundant.
+- **Fidelity.** `ScriptList` rank and modification counts abort on overflow where the compiled original wraps, and a script can reach it (#260).
 
 Actions, in order:
 1. **#259 H1 first, by root, without a PR.** Change the repository setting, then delete branches, remove worktrees, close #66 and clean `.local/`, exactly as #259 lists. This takes minutes, not a session.
-2. **#259 H2-H5 in parallel slots alongside the work order:**
-   - H2: a docs-only commit by gpt-6-luna at medium effort;
-   - H3: a workflow PR;
-   - H4: a dead-code PR with its two checks;
-   - H5: the comparison driver, within its budget.
+2. **#260 next.** It is a small fidelity fix.
+3. **Housekeeping PRs, at most three in flight alongside the work order:**
+   - #259 H2 (a docs-only commit by gpt-6-luna at medium effort), H3 (workflows) and H4 (dead code with its checks);
+   - then #261 R1-R4; R1-R3 wait for H4, because they touch the same files;
+   - #259 H5 last.
 
    These are maintenance PRs. They do not count against the component WIP cap and never block an ownership port.
-3. **Then the Phase 2 work order:** update #255 and #257 from base, profile, re-select; then town.
+4. **Then the Phase 2 work order:** update #255 and #257 from base, profile, re-select; then town.
 
 ## Earlier steering, still in force
 
@@ -134,7 +140,7 @@ go in `KNOWN_FAILURES` with an issue, never in masks (`docs/rust-migration.md`).
 Integrate reviewed work first, in order of readiness, with at most six
 unintegrated component branches. Housekeeping (#259) and #156 run in parallel.
 
-1. **#259 housekeeping:** H1 first; then H2-H5 alongside the items below.
+1. **Housekeeping:** #259 H1, then #260, then up to three of #259 H2-H5 and #261 R1-R4 at a time, alongside the items below.
 2. **#212 landscape (#255) and #213 vehicle (#257).** Update each from base and resolve the town conflicts; a fresh reviewer checks the resolution. Re-freeze against the new tip, profile the head with callgrind, then root re-selects a bounded fix with its gate, or re-scopes the owner. The selected boundaries stand:
    - landscape: an inlined dispatch on the raw type byte, `noexcept` `TileLoop_*` handlers called directly, Rust transition control and no raw-map extension; gate within 11 ms on TGP, interleaved A/B against tip;
    - vehicle: a pool-cursor descriptor, one slim dispatch record and one post-tick bundle, at most about three C++ calls per vehicle (`docs/design/world-state.md`); gate at most 6 ns per vehicle-tick visit on Opus.
@@ -145,7 +151,8 @@ unintegrated component branches. Housekeeping (#259) and #156 run in parallel.
    - road vehicles (12.6 per tick);
    - industry `next_tick` (13.2 ms on TGP);
    - town `next_town` and state;
-   - the #168 tail, largest first: `order_cmd.cpp` and `economy.cpp` hold 65 of the 198 baseline copies.
+   - the #168 tail, largest first: `order_cmd.cpp` and `economy.cpp` hold 65 of the 198 baseline copies;
+   - the opaque train, road, ship, effect and cargo-packet owners. Convert them to C-layout blocks with aliases (#168 comment): about -850 glue lines, no field selectors, and inline loads. Do train with or after #213.
 
 #108 retains C++ map arrays and integrated typed services. New owners reuse
 integrated services, never draft copies. A Rust-allocated state block with C++
@@ -159,7 +166,9 @@ H1 first. Post-merge CI is green; no agent work is running.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #259 | unstarted | H1 by root first, then H2-H5 in parallel slots. |
+| #259 | unstarted | H1 by root first, then H2-H5 (at most three housekeeping PRs in flight). |
+| #260 | unstarted | ScriptList fatal paths; the first code PR after H1. |
+| #261 | unstarted | R1-R4 after #259 H4 merges. |
 | #212 / #255 | `landscape-owner-212`, `63c67959ee` | Stopped: TGP gate missed (see PR). Conflicts with town base. Next: update, profile, root re-selection. |
 | #213 / #257 | `vehicle-owner-213`, `67611082f7` | Stopped: CPU gate missed (see PR). Conflicts with town base. Next: update, profile, root re-selection. |
 | #256 / #247 | unstarted | House lifecycle precedes town commands/deletion. |
