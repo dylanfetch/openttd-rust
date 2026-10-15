@@ -31,6 +31,10 @@
 #include "table/tree_land.h"
 #include "table/clear_land.h"
 
+#ifdef WITH_RUST
+#include "rust/landscape_services.h"
+#endif
+
 #include "safeguards.h"
 
 /** Where to place trees while in-game? */
@@ -155,23 +159,20 @@ static const OpenTTDTreeServices _tree_services{
 	.make_tree = [](uint32_t tile, uint8_t type, uint32_t count, uint8_t growth, uint8_t ground, uint32_t density) noexcept {
 		MakeTree(TileIndex{tile}, static_cast<TreeType>(type), count, static_cast<TreeGrowthStage>(growth), static_cast<TreeGround>(ground), density);
 	},
-	.set_ground_density = [](uint32_t tile, uint8_t ground, uint32_t density) noexcept { SetTreeGroundDensity(TileIndex{tile}, static_cast<TreeGround>(ground), density); },
+	.set_ground_density = RustSetTreeGroundDensity,
 	.add_count = [](uint32_t tile, int32_t count) noexcept { AddTreeCount(TileIndex{tile}, count); },
 	.add_growth = [](uint32_t tile, int32_t growth) noexcept { AddTreeGrowth(TileIndex{tile}, growth); },
 	.set_growth = [](uint32_t tile, uint8_t growth) noexcept { SetTreeGrowth(TileIndex{tile}, static_cast<TreeGrowthStage>(growth)); },
-	.make_clear = [](uint32_t tile, uint8_t ground, uint32_t density) noexcept { MakeClear(TileIndex{tile}, static_cast<ClearGround>(ground), density); },
-	.make_shore = [](uint32_t tile) noexcept { MakeShore(TileIndex{tile}); },
-	.make_snow = [](uint32_t tile, uint32_t density) noexcept { MakeSnow(TileIndex{tile}, density); },
-	.clear_neighbour_flooding = [](uint32_t tile) noexcept { ClearNeighbourNonFloodingStates(TileIndex{tile}); },
-	.tile_loop_water = [](uint32_t tile) noexcept { TileLoop_Water(TileIndex{tile}); },
-	.ambient = [](uint32_t tile) noexcept {
-		AmbientSoundEffect(TileIndex{tile});
-		return HasGrfMiscBit(GrfMiscBit::AmbientSoundCallback);
-	},
-	.play_sound = [](uint32_t tile, uint16_t sound) noexcept { SndPlayTileFx(sound, TileIndex{tile}); },
+	.make_clear = RustMakeClear,
+	.make_shore = RustMakeShore,
+	.make_snow = RustMakeSnow,
+	.clear_neighbour_flooding = RustClearNeighbourFlooding,
+	.tile_loop_water = RustTileLoopWater,
+	.ambient = RustAmbientSound,
+	.play_sound = RustPlayTileSound,
 	.progress = []() noexcept { return TreeProgress([] { IncreaseGeneratingWorldProgress(GWP_TREE); }); },
 	.progress_total = [](uint32_t total) noexcept { return TreeProgress([total] { SetGeneratingWorldProgress(GWP_TREE, total); }); },
-	.clear_square = [](uint32_t tile) noexcept { DoClearSquare(TileIndex{tile}); },
+	.clear_square = RustClearSquare,
 	.town_rating = TreeTownRating,
 	.command_begin = TreeCommandBegin,
 	.command_tile = [](OpenTTDTreeCommand *ctx) noexcept { return static_cast<TileIndex>(*ctx->iter).base(); },

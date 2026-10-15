@@ -44,6 +44,11 @@
 #include "table/strings.h"
 #include "table/bridge_land.h"
 
+#ifdef WITH_RUST
+#include "rust/ground_ffi.h"
+#include "rust/environment_services.h"
+#endif
+
 #include "safeguards.h"
 
 BridgeSpec _bridge[MAX_BRIDGES]; ///< The specification of all bridges.
@@ -1829,14 +1834,22 @@ static void GetTileDesc_TunnelBridge(TileIndex tile, TileDesc &td)
 
 
 #ifdef WITH_RUST
-static void TileLoop_TunnelBridge(uint32_t tile_index) noexcept
+const OpenTTDTunnelServices &GetRustTunnelGroundServices() noexcept
+{
+	static const OpenTTDTunnelServices services{
+		.snow = [](uint32_t index) noexcept { TileIndex t{index}; return OpenTTDTunnelGround{.z = IsBridge(t) ? GetTileMaxZ(t) : GetTileZ(t), .snow = HasTunnelBridgeSnowOrDesert(t)}; },
+		.snow_or_desert = [](uint32_t t) noexcept { return HasTunnelBridgeSnowOrDesert(TileIndex{t}); },
+		.set_snow_or_desert = [](uint32_t t, bool value) noexcept { SetTunnelBridgeSnowOrDesert(TileIndex{t}, value); },
+	};
+	return services;
+}
+static void TileLoop_TunnelBridge(uint32_t tile) noexcept
+{
+	openttd_rust_tunnel_tile_loop(tile, OpenTTDLandscapeValue(), &GetRustTunnelGroundServices(), &GetRustSharedServices());
+}
 #else
 static void TileLoop_TunnelBridge(TileIndex tile)
-#endif
 {
-#ifdef WITH_RUST
-	const TileIndex tile{tile_index};
-#endif
 	bool snow_or_desert = HasTunnelBridgeSnowOrDesert(tile);
 	switch (_settings_game.game_creation.landscape) {
 		case LandscapeType::Arctic: {
@@ -1862,6 +1875,8 @@ static void TileLoop_TunnelBridge(TileIndex tile)
 			break;
 	}
 }
+
+#endif
 
 static TrackStatus GetTileTrackStatus_TunnelBridge(TileIndex tile, TransportType mode, uint sub_mode, DiagDirection side)
 {

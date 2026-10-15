@@ -41,6 +41,20 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         620 => {
             layout!(crate::services::CommandCostServices, item; zero, error, expense_money, error_param, add, move_cost, amount, success, error_message, money)
         }
+        784 => layout!(crate::ground::ClearGround, item; ground, density, counter, snow),
+        785 => layout!(crate::ground::FieldGround, item; industry, field_type),
+        786 => {
+            layout!(crate::ground::ClearServices, item; observe, set_ground, set_density, set_counter, clear_snow, make_snow, make_clear, fence, set_fence, field, set_field, has_water_class, water_class, ambient)
+        }
+        787 => layout!(crate::ground::RailSnowGround, item; z, slope, tracks, plain),
+        788 => layout!(crate::ground::RailFenceGround, item; tracks, owner, plain),
+        789 => {
+            layout!(crate::ground::RailServices, item; ground, set_ground, snow, fences, foundation, owned_land, water_loop)
+        }
+        790 => layout!(crate::ground::TunnelGround, item; z, snow),
+        791 => {
+            layout!(crate::ground::TunnelServices, item; snow, snow_or_desert, set_snow_or_desert)
+        }
         782 => layout!(crate::services::TileTypeAllocation, item; base, count),
         783 => layout!(crate::services::BaseTileLayout, item; kind, height, m2, m1, m3, m4, m5),
         780 => {

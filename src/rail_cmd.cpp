@@ -38,6 +38,12 @@
 #include "table/railtypes.h"
 #include "table/track_land.h"
 
+#ifdef WITH_RUST
+#include "rust/ground_ffi.h"
+#include "rust/landscape_services.h"
+#include "rust/environment_services.h"
+#endif
+
 #include "safeguards.h"
 
 /** Helper type for lists/vectors of trains */
@@ -2593,14 +2599,26 @@ static Foundation GetFoundation_Track(TileIndex tile, Slope tileh)
 }
 
 #ifdef WITH_RUST
-static void TileLoop_Track(uint32_t tile_index) noexcept
+const OpenTTDRailServices &GetRustRailGroundServices() noexcept
+{
+	static const OpenTTDRailServices services{
+		.ground = [](uint32_t t) noexcept { return to_underlying(GetRailGroundType(TileIndex{t})); },
+		.set_ground = [](uint32_t t, uint8_t g) noexcept { SetRailGroundType(TileIndex{t}, static_cast<RailGroundType>(g)); },
+		.snow = [](uint32_t index) noexcept { TileIndex t{index}; auto [slope, z] = GetTileSlopeZ(t); bool plain = IsPlainRail(t); return OpenTTDRailSnowGround{.z = z, .slope = slope, .tracks = static_cast<uint8_t>(plain ? GetTrackBits(t) : TRACK_BIT_NONE), .plain = plain}; },
+		.fences = [](uint32_t index) noexcept { TileIndex t{index}; bool plain = IsPlainRail(t); return OpenTTDRailFenceGround{.tracks = static_cast<uint8_t>(plain ? GetTrackBits(t) : TRACK_BIT_NONE), .owner = plain ? GetTileOwner(t).base() : uint8_t{}, .plain = plain}; },
+		.foundation = [](uint8_t slope, uint8_t tracks) noexcept { return static_cast<uint8_t>(GetRailFoundation(static_cast<Slope>(slope), static_cast<TrackBits>(tracks))); },
+		.owned_land = [](uint32_t t) noexcept { return IsObjectType(TileIndex{t}, OBJECT_OWNED_LAND); },
+		.water_loop = RustTileLoopWater,
+	};
+	return services;
+}
+static void TileLoop_Track(uint32_t tile) noexcept
+{
+	openttd_rust_rail_tile_loop(tile, OpenTTDLandscapeValue(), Map::SizeX(), &GetRustRailGroundServices(), &GetRustSharedServices());
+}
 #else
 static void TileLoop_Track(TileIndex tile)
-#endif
 {
-#ifdef WITH_RUST
-	const TileIndex tile{tile_index};
-#endif
 	RailGroundType old_ground = GetRailGroundType(tile);
 	RailGroundType new_ground;
 
@@ -2723,6 +2741,8 @@ set_ground:
 		MarkTileDirtyByTile(tile);
 	}
 }
+
+#endif
 
 
 static TrackStatus GetTileTrackStatus_Track(TileIndex tile, TransportType mode, uint, DiagDirection side)
