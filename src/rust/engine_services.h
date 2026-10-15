@@ -21,7 +21,7 @@ inline int32_t RustEngineBaseIntro(const OpenTTDEngine *e) noexcept { return Eng
 inline bool RustEngineClimate(const OpenTTDEngine *e) noexcept { return EngineOf(e)->info.climates.Test(OpenTTDLandscape()); }
 inline bool RustEngineCanCarry(const Engine *e) noexcept { return e->CanCarryCargo(); }
 inline uint64_t RustEngineRefitMask(EngineID id, bool initial) noexcept { return GetUnionOfArticulatedRefitMasks(id, initial); }
-inline uint8_t RustEngineRailKind(const Engine *e) noexcept { return e->VehInfo<RailVehicleInfo>().railveh_type; }
+inline RailVehicleTypes RustEngineRailKind(const Engine *e) noexcept { return e->VehInfo<RailVehicleInfo>().railveh_type; }
 inline uint64_t RustEngineCompatibleRailTypes(const Engine *e) noexcept { return GetAllCompatibleRailTypes(e->VehInfo<RailVehicleInfo>().railtypes).base(); }
 inline uint64_t RustEnginePoweredRoadTypes(const Engine *e) noexcept { return GetRoadTypeInfo(e->VehInfo<RoadVehicleInfo>().roadtype)->powered_roadtypes.base(); }
 inline bool FleetTransaction_can_carry(void *shell) noexcept { return RustEngineCanCarry(static_cast<Vehicle *>(shell)->GetEngine()); }
@@ -31,7 +31,7 @@ inline bool FleetTransaction_wagon(uint16_t id) noexcept { return RustEngineRail
 inline uint64_t FleetTransaction_refit_mask(uint16_t id, bool initial) noexcept { return RustEngineRefitMask(EngineID{id}, initial); }
 inline bool Engine_can_carry(const OpenTTDEngine *e) noexcept { return RustEngineCanCarry(EngineOf(e)); }
 inline uint64_t Engine_refit_mask(const OpenTTDEngine *e) noexcept { return RustEngineRefitMask(EngineOf(e)->index, true); }
-inline uint8_t Engine_rail_kind(const OpenTTDEngine *e) noexcept { return RustEngineRailKind(EngineOf(e)); }
+inline RailVehicleTypes Engine_rail_kind(const OpenTTDEngine *e) noexcept { return RustEngineRailKind(EngineOf(e)); }
 inline uint64_t Engine_compatible_railtypes(const OpenTTDEngine *e) noexcept { return RustEngineCompatibleRailTypes(EngineOf(e)); }
 inline uint64_t Engine_powered_roadtypes(const OpenTTDEngine *e) noexcept { return RustEnginePoweredRoadTypes(EngineOf(e)); }
 inline OpenTTDEngineCompany Engine_company_next(uint32_t from) noexcept

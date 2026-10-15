@@ -89,9 +89,9 @@ pub unsafe extern "C" fn openttd_rust_engine_set_name(state: *mut Lifecycle, tex
     }
 }
 
+use crate::company::OpenTTDCompany;
 use crate::services::{RandomServices, Services as SharedServices};
-use crate::vehicle::{OpenTTDEngine, OpenTTDVehicle};
-use std::ffi::c_void;
+use crate::vehicle::{OpenTTDEngine, OpenTTDVehicle, RailVehicleTypes, VehicleType};
 use std::ptr::{addr_of, addr_of_mut};
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -99,7 +99,7 @@ pub struct EngineRef {
     pub shell: *const OpenTTDEngine,
     pub state: *mut Lifecycle,
     pub id: u16,
-    pub kind: u8,
+    pub kind: VehicleType,
 }
 #[repr(C)]
 pub struct SyncVariant {
@@ -156,7 +156,7 @@ pub struct StartSettings {
 }
 #[repr(C)]
 pub struct Company {
-    pub shell: *const c_void,
+    pub shell: *const OpenTTDCompany,
     pub id: u8,
 }
 #[repr(C)]
@@ -169,7 +169,7 @@ pub struct Vehicle {
     pub shell: *mut OpenTTDVehicle,
     pub id: u32,
     pub owner: u8,
-    pub kind: u8,
+    pub kind: VehicleType,
 }
 #[repr(C)]
 pub struct VehicleCargo {
@@ -207,12 +207,12 @@ pub struct Services {
     pub ymd_to_date: unsafe extern "C" fn(i32, u8, u8) -> i32,
     pub enabled: unsafe extern "C" fn(*const OpenTTDEngine) -> bool,
     pub climate: unsafe extern "C" fn(*const OpenTTDEngine) -> bool,
-    pub rail_kind: unsafe extern "C" fn(*const OpenTTDEngine) -> u8,
+    pub rail_kind: unsafe extern "C" fn(*const OpenTTDEngine) -> RailVehicleTypes,
     pub clear_last_variant: unsafe extern "C" fn(*const OpenTTDEngine),
-    pub refresh_type: unsafe extern "C" fn(u8),
+    pub refresh_type: unsafe extern "C" fn(VehicleType),
     pub refresh_lists: unsafe extern "C" fn(bool),
     pub company_next: unsafe extern "C" fn(u32) -> Company,
-    pub company_preview: unsafe extern "C" fn(*const c_void) -> CompanyPreview,
+    pub company_preview: unsafe extern "C" fn(*const OpenTTDCompany) -> CompanyPreview,
     pub vehicle_next: unsafe extern "C" fn(u32) -> Vehicle,
     pub vehicle_cargo: unsafe extern "C" fn(*mut OpenTTDVehicle) -> VehicleCargo,
     pub can_carry: unsafe extern "C" fn(*const OpenTTDEngine) -> bool,
@@ -233,8 +233,8 @@ pub struct Services {
     pub set_roadtypes: unsafe extern "C" fn(u8, u64, i32),
     pub current_company: unsafe extern "C" fn() -> u8,
     pub local_company: unsafe extern "C" fn() -> u8,
-    pub toolbar_enable: unsafe extern "C" fn(u8),
-    pub toolbar_release: unsafe extern "C" fn(u8),
+    pub toolbar_enable: unsafe extern "C" fn(VehicleType),
+    pub toolbar_release: unsafe extern "C" fn(VehicleType),
     pub close_preview: unsafe extern "C" fn(u16),
     pub invalidate_preview: unsafe extern "C" fn(u16),
     pub offer_preview: unsafe extern "C" fn(u16, u8, bool),
@@ -374,7 +374,11 @@ unsafe fn start_one(s: &Services, e: EngineRef, aging: Ymd, seed: u32) {
         call!(
             rng,
             set_seed,
-            settings.generation_seed ^ seed ^ cfg.base_intro as u32 ^ u32::from(e.kind) ^ cfg.grfid,
+            settings.generation_seed
+                ^ seed
+                ^ cfg.base_intro as u32
+                ^ u32::from(e.kind.0)
+                ^ cfg.grfid,
         );
     }
     let r = call!(shared, random, shared.context);
@@ -413,7 +417,7 @@ unsafe fn start_one(s: &Services, e: EngineRef, aging: Ymd, seed: u32) {
                 ^ (u32::from(re_cfg.decay_speed) << 8)
                 ^ (re_cfg.lifelength as u32).wrapping_shl(4)
                 ^ (i32::from(re_cfg.retire_early) as u32)
-                ^ u32::from(e.kind)
+                ^ u32::from(e.kind.0)
                 ^ cfg.grfid,
         );
     }
@@ -527,14 +531,23 @@ pub unsafe extern "C" fn openttd_rust_engine_start_all(s: *const Services) {
     }
 }
 unsafe fn wagon(s: &Services, e: EngineRef) -> bool {
-    e.kind == 0 && unsafe { call!(s, rail_kind, e.shell) } == 2
+    e.kind == VehicleType::TRAIN
+        && unsafe { call!(s, rail_kind, e.shell) } == RailVehicleTypes::WAGON
 }
-unsafe fn disabled(s: &Services, kind: u8, ai: bool) -> bool {
+unsafe fn disabled(s: &Services, kind: VehicleType, ai: bool) -> bool {
     match kind {
-        0 => unsafe { call!(s, train_limit) == 0 || (ai && call!(s, ai_train_disabled)) },
-        1 => unsafe { call!(s, road_limit) == 0 || (ai && call!(s, ai_road_disabled)) },
-        2 => unsafe { call!(s, ship_limit) == 0 || (ai && call!(s, ai_ship_disabled)) },
-        3 => unsafe { call!(s, aircraft_limit) == 0 || (ai && call!(s, ai_aircraft_disabled)) },
+        VehicleType::TRAIN => unsafe {
+            call!(s, train_limit) == 0 || (ai && call!(s, ai_train_disabled))
+        },
+        VehicleType::ROAD => unsafe {
+            call!(s, road_limit) == 0 || (ai && call!(s, ai_road_disabled))
+        },
+        VehicleType::SHIP => unsafe {
+            call!(s, ship_limit) == 0 || (ai && call!(s, ai_ship_disabled))
+        },
+        VehicleType::AIRCRAFT => unsafe {
+            call!(s, aircraft_limit) == 0 || (ai && call!(s, ai_aircraft_disabled))
+        },
         _ => unreachable!(),
     }
 }
@@ -545,9 +558,9 @@ unsafe fn enable(s: &Services, e: EngineRef, company: u8) {
         read!(e, company_avail) | (1u16 << company)
     );
     unsafe {
-        if e.kind == 0 {
+        if e.kind == VehicleType::TRAIN {
             call!(s, update_railtypes, company);
-        } else if e.kind == 1 {
+        } else if e.kind == VehicleType::ROAD {
             call!(s, update_roadtypes, company);
         }
     }
@@ -565,9 +578,9 @@ unsafe fn disable(s: &Services, e: EngineRef, company: u8) {
         read!(e, company_avail) & !(1u16 << company)
     );
     unsafe {
-        if e.kind == 0 {
+        if e.kind == VehicleType::TRAIN {
             call!(s, update_railtypes, company);
-        } else if e.kind == 1 {
+        } else if e.kind == VehicleType::ROAD {
             call!(s, update_roadtypes, company);
         }
     }
@@ -612,7 +625,7 @@ unsafe fn accept(s: &Services, e: EngineRef, company: u8, depth: i32) {
     }
 }
 unsafe fn preview_company(s: &Services, e: EngineRef) -> u8 {
-    let mask = if e.kind == 0 {
+    let mask = if e.kind == VehicleType::TRAIN {
         u64::MAX
     } else {
         unsafe { call!(s, refit_mask, e.shell) }
@@ -740,7 +753,7 @@ unsafe fn available(s: &Services, e: EngineRef, date: i32) {
     if unsafe { wagon(s, e) } {
         return;
     }
-    if e.kind == 0 {
+    if e.kind == VehicleType::TRAIN {
         let introduced = unsafe { call!(s, introduces_railtypes, e.shell) };
         let mut from = 0;
         loop {
@@ -754,7 +767,7 @@ unsafe fn available(s: &Services, e: EngineRef, date: i32) {
                 call!(s, set_railtypes, c.id, types, date);
             }
         }
-    } else if e.kind == 1 {
+    } else if e.kind == VehicleType::ROAD {
         let introduced = unsafe { call!(s, introduces_roadtypes, e.shell) };
         let mut from = 0;
         loop {
@@ -853,7 +866,7 @@ pub unsafe extern "C" fn openttd_rust_engine_clear_hidden(s: *const Services, co
 fn company_mask(company: u8) -> u16 {
     if company < 16 { 1 << company } else { 0 }
 }
-unsafe fn buildable(s: &Services, e: EngineRef, kind: u8, company: u8) -> bool {
+unsafe fn buildable(s: &Services, e: EngineRef, kind: VehicleType, company: u8) -> bool {
     if e.shell.is_null() || e.kind != kind {
         return false;
     }
@@ -868,14 +881,14 @@ unsafe fn buildable(s: &Services, e: EngineRef, kind: u8, company: u8) -> bool {
         return false;
     }
     if company != OWNER_DEITY {
-        if kind == 0
+        if kind == VehicleType::TRAIN
             && unsafe {
                 call!(s, compatible_railtypes, e.shell) & call!(s, company_railtypes, company)
             } == 0
         {
             return false;
         }
-        if kind == 1
+        if kind == VehicleType::ROAD
             && unsafe {
                 call!(s, powered_roadtypes, e.shell) & call!(s, company_roadtypes, company)
             } == 0
@@ -889,7 +902,7 @@ unsafe fn buildable(s: &Services, e: EngineRef, kind: u8, company: u8) -> bool {
 pub unsafe extern "C" fn openttd_rust_engine_buildable(
     s: *const Services,
     e: EngineRef,
-    kind: u8,
+    kind: VehicleType,
     company: u8,
 ) -> bool {
     crate::witness::hit(crate::witness::ENGINE_ENTRIES);

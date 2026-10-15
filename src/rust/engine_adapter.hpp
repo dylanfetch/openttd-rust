@@ -84,15 +84,14 @@ static void Engine_clear_last_variant(const OpenTTDEngine *shell) noexcept
 		if (e->display_last_variant == removed->index) e->display_last_variant = EngineID::Invalid();
 	}
 }
-static void Engine_refresh_type(uint8_t type) noexcept { AddRemoveEngineFromAutoreplaceAndBuildWindows(static_cast<VehicleType>(type)); }
+static void Engine_refresh_type(VehicleType type) noexcept { AddRemoveEngineFromAutoreplaceAndBuildWindows(type); }
 static void Engine_refresh_lists(bool dirty) noexcept
 {
 	InvalidateWindowClassesData(WC_BUILD_VEHICLE);
 	if (dirty) { SetWindowClassesDirty(WC_BUILD_VEHICLE); SetWindowClassesDirty(WC_REPLACE_VEHICLE); }
 }
-static OpenTTDEngineCompanyPreview Engine_company_preview(const void *shell) noexcept
+static OpenTTDEngineCompanyPreview Engine_company_preview(const Company *c) noexcept
 {
-	const Company *c = static_cast<const Company *>(shell);
 	return {.blocked = c->Finances().block_preview, .performance = c->Finances().old_economy[0].performance_history};
 }
 static OpenTTDEngineVehicleCargo Engine_vehicle_cargo(OpenTTDVehicle *handle) noexcept
@@ -113,13 +112,13 @@ static void Engine_block_preview(uint8_t company) noexcept { Company::Get(Compan
 
 
 
-static void Engine_toolbar_release(uint8_t type) noexcept
+static void Engine_toolbar_release(VehicleType type) noexcept
 {
 	if (type == VEH_ROAD) InvalidateWindowData(WC_BUILD_TOOLBAR, TRANSPORT_ROAD);
 	if (type == VEH_SHIP) InvalidateWindowData(WC_BUILD_TOOLBAR, TRANSPORT_WATER);
 	if (type == VEH_AIRCRAFT) InvalidateWindowData(WC_BUILD_TOOLBAR, TRANSPORT_AIR);
 }
-static void Engine_toolbar_enable(uint8_t type) noexcept { InvalidateWindowData(WC_MAIN_TOOLBAR, 0); Engine_toolbar_release(type); }
+static void Engine_toolbar_enable(VehicleType type) noexcept { InvalidateWindowData(WC_MAIN_TOOLBAR, 0); Engine_toolbar_release(type); }
 static void Engine_close_preview(uint16_t engine) noexcept { CloseWindowById(WC_ENGINE_PREVIEW, engine); }
 static void Engine_invalidate_preview(uint16_t engine) noexcept { InvalidateWindowData(WC_ENGINE_PREVIEW, engine); }
 static void Engine_offer_preview(uint16_t engine, uint8_t company, bool ai) noexcept

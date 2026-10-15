@@ -10,9 +10,12 @@
 #define RUST_ENGINE_FFI_H
 #include "services_ffi.h"
 #include "engine_lifecycle.hpp"
+#include "../engine_type.h"
+#include "../vehicle_type.h"
 struct OpenTTDEngine;
 struct OpenTTDVehicle;
-struct OpenTTDEngineRef { const OpenTTDEngine *shell; OpenTTDEngineLifecycle *state; uint16_t id; uint8_t type; };
+struct Company;
+struct OpenTTDEngineRef { const OpenTTDEngine *shell; OpenTTDEngineLifecycle *state; uint16_t id; VehicleType type; };
 struct OpenTTDEngineSyncVariant { uint16_t parent; bool sync; };
 struct OpenTTDEngineDisplayVariant { uint16_t parent, display; };
 struct OpenTTDEnginePreviewVariant { uint16_t parent; bool join; };
@@ -22,9 +25,9 @@ struct OpenTTDEngineSeed { int32_t base_intro, lifelength; uint8_t decay_speed; 
 struct OpenTTDEngineYear { int32_t base_intro, lifelength; };
 struct OpenTTDEngineYMD { int32_t year; uint8_t month, day; };
 struct OpenTTDEngineStartSettings { uint32_t generation_seed; int32_t starting_year, date; };
-struct OpenTTDEngineCompany { const void *shell; uint8_t id; };
+struct OpenTTDEngineCompany { const Company *shell; uint8_t id; };
 struct OpenTTDEngineCompanyPreview { uint8_t blocked; int32_t performance; };
-struct OpenTTDEngineVehicle { OpenTTDVehicle *shell; uint32_t id; uint8_t owner, type; };
+struct OpenTTDEngineVehicle { OpenTTDVehicle *shell; uint32_t id; uint8_t owner; VehicleType type; };
 struct OpenTTDEngineVehicleCargo { const OpenTTDEngine *engine; uint8_t cargo; };
 /** Every callback is noexcept; script events only enqueue, no VM executes.
  * No owner borrow survives any callback, including native type availability,
@@ -60,12 +63,12 @@ struct OpenTTDEngineServices {
 	int32_t (*ymd_to_date)(int32_t, uint8_t, uint8_t) noexcept;
 	bool (*enabled)(const OpenTTDEngine *) noexcept;
 	bool (*climate)(const OpenTTDEngine *) noexcept;
-	uint8_t (*rail_kind)(const OpenTTDEngine *) noexcept;
+	RailVehicleTypes (*rail_kind)(const OpenTTDEngine *) noexcept;
 	void (*clear_last_variant)(const OpenTTDEngine *) noexcept;
-	void (*refresh_type)(uint8_t) noexcept;
+	void (*refresh_type)(VehicleType) noexcept;
 	void (*refresh_lists)(bool) noexcept;
 	OpenTTDEngineCompany (*company_next)(uint32_t) noexcept;
-	OpenTTDEngineCompanyPreview (*company_preview)(const void *) noexcept;
+	OpenTTDEngineCompanyPreview (*company_preview)(const Company *) noexcept;
 	OpenTTDEngineVehicle (*vehicle_next)(uint32_t) noexcept;
 	OpenTTDEngineVehicleCargo (*vehicle_cargo)(OpenTTDVehicle *) noexcept;
 	bool (*can_carry)(const OpenTTDEngine *) noexcept;
@@ -86,8 +89,8 @@ struct OpenTTDEngineServices {
 	void (*set_roadtypes)(uint8_t, uint64_t, int32_t) noexcept;
 	uint8_t (*current_company)() noexcept;
 	uint8_t (*local_company)() noexcept;
-	void (*toolbar_enable)(uint8_t) noexcept;
-	void (*toolbar_release)(uint8_t) noexcept;
+	void (*toolbar_enable)(VehicleType) noexcept;
+	void (*toolbar_release)(VehicleType) noexcept;
 	void (*close_preview)(uint16_t) noexcept;
 	void (*invalidate_preview)(uint16_t) noexcept;
 	void (*offer_preview)(uint16_t, uint8_t, bool) noexcept;
@@ -105,7 +108,7 @@ void openttd_rust_engine_start_all(const OpenTTDEngineServices *);
 void openttd_rust_engine_daily(const OpenTTDEngineServices *);
 void openttd_rust_engine_monthly(const OpenTTDEngineServices *);
 void openttd_rust_engine_clear_hidden(const OpenTTDEngineServices *, uint8_t);
-bool openttd_rust_engine_buildable(const OpenTTDEngineServices *, OpenTTDEngineRef, uint8_t, uint8_t);
+bool openttd_rust_engine_buildable(const OpenTTDEngineServices *, OpenTTDEngineRef, VehicleType, uint8_t);
 bool openttd_rust_engine_variant_hidden(const OpenTTDEngineServices *, OpenTTDEngineRef, uint8_t);
 uint8_t openttd_rust_engine_visibility(const OpenTTDEngineServices *, OpenTTDEngineRef, bool, bool);
 uint8_t openttd_rust_engine_want_preview(const OpenTTDEngineServices *, OpenTTDEngineRef, bool);
