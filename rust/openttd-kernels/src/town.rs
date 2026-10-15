@@ -171,7 +171,6 @@ pub(crate) unsafe fn population(state: *const State) -> u32 {
     unsafe { (*state).simulation.population }
 }
 static GENERATING_TOWN: GameState<bool> = GameState::new(false);
-#[unsafe(no_mangle)]
 pub extern "C" fn openttd_rust_town_generating_exchange(generating: bool) -> bool {
     GENERATING_TOWN.with(|flag| {
         // SAFETY: Serialized native entry; the flag is process-wide.
@@ -1994,15 +1993,6 @@ impl Engine<'_> {
     }
 }
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_town_grow(
-    leaves: *const Leaves,
-    services: *const Services,
-    town: u32,
-    modes: u32,
-) -> bool {
-    engine(leaves, services).bind(town).grow(town, modes)
-}
-#[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_town_try_house(
     leaves: *const Leaves,
     services: *const Services,
@@ -2035,14 +2025,6 @@ pub unsafe extern "C" fn openttd_rust_town_tick_all(
     services: *const Services,
 ) {
     engine(leaves, services).tick_all();
-}
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_town_update_rate(
-    leaves: *const Leaves,
-    services: *const Services,
-    town: u32,
-) {
-    engine(leaves, services).bind(town).update_rate(town);
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_town_update_growth(

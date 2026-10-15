@@ -45,8 +45,6 @@ struct OpenTTDTownFoundingServices {
 	uint (*water_distance)(uint32_t, bool) noexcept;
 	uint (*scale_size)(uint) noexcept;
 	uint (*scale_land)(uint) noexcept;
-	uint8_t (*current_company)() noexcept;
-	void (*set_company)(uint8_t) noexcept;
 	TownFounding (*found_setting)() noexcept;
 	TownLayout (*layout_setting)() noexcept;
 	uint8_t (*initial_city_size)() noexcept;
@@ -89,7 +87,6 @@ struct OpenTTDTownFoundingServices {
 };
 const OpenTTDTownFoundingServices &GetRustTownFoundingServices() noexcept;
 extern "C" {
-void openttd_rust_town_initialize_layout(OpenTTDTownState *, TownLayout, const OpenTTDSharedServices *);
 void openttd_rust_town_found(const OpenTTDTownFoundingServices *, OpenTTDTownFoundingFrame *, OpenTTDTownNameFrame *, OpenTTDCommandCost *, uint32_t, TownSize, bool, TownLayout, bool, uint32_t, OpenTTDByteSpan, bool);
 uint openttd_rust_town_default_number(const OpenTTDTownFoundingServices *);
 bool openttd_rust_town_generate(const OpenTTDTownFoundingServices *, OpenTTDTownFoundingFrame *, OpenTTDTownNameFrame *, TownLayout, bool, uint, bool *);

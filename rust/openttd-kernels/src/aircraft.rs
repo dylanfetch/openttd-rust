@@ -2248,19 +2248,6 @@ pub unsafe extern "C" fn openttd_rust_aircraft_replacement(leaves: *const Leaves
 /// Handles/state and immutable services satisfy the source lifetime preconditions.
 /// Raw scalar accesses end before noexcept callbacks; no borrow survives reentry.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_aircraft_nearest_hangar(
-    leaves: *const Leaves,
-    id: Vehicle,
-) -> u16 {
-    crate::witness::hit(crate::witness::AIRCRAFT_ENTRIES);
-    let w = unsafe { World::new(leaves) };
-    w.nearest_hangar(id) as u16
-}
-/// Run the original controller synchronously over live handles.
-/// # Safety
-/// Handles/state and immutable services satisfy the source lifetime preconditions.
-/// Raw scalar accesses end before noexcept callbacks; no borrow survives reentry.
-#[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_aircraft_closest_depot(
     leaves: *const Leaves,
     id: Vehicle,

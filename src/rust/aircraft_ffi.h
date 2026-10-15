@@ -138,7 +138,6 @@ void OPENTTD_AIRCRAFT_CALL openttd_rust_aircraft_next_airport(const OpenTTDAircr
 void OPENTTD_AIRCRAFT_CALL openttd_rust_aircraft_leave_hangar(const OpenTTDAircraftLeaves *, OpenTTDAircraftVehicle, uint8_t);
 void OPENTTD_AIRCRAFT_CALL openttd_rust_aircraft_order_location(const OpenTTDAircraftLeaves *, OpenTTDAircraftVehicle);
 void OPENTTD_AIRCRAFT_CALL openttd_rust_aircraft_replacement(const OpenTTDAircraftLeaves *, uint16_t);
-uint16_t OPENTTD_AIRCRAFT_CALL openttd_rust_aircraft_nearest_hangar(const OpenTTDAircraftLeaves *, OpenTTDAircraftVehicle);
 uint16_t OPENTTD_AIRCRAFT_CALL openttd_rust_aircraft_closest_depot(const OpenTTDAircraftLeaves *, OpenTTDAircraftVehicle);
 bool OPENTTD_AIRCRAFT_CALL openttd_rust_aircraft_event(const OpenTTDAircraftLeaves *, OpenTTDAircraftVehicle, bool);
 void OPENTTD_AIRCRAFT_CALL openttd_rust_aircraft_release_blocks(const OpenTTDAircraftLeaves *, OpenTTDAircraftVehicle);

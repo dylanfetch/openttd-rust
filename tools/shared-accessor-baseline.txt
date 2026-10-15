@@ -145,7 +145,6 @@ src/rust/ship_control_services.h | Ship_station_dock(uint32_t station) noexcept 
 src/rust/ship_control_services.h | Ship_station_visits(uint32_t station) noexcept | d145d1722eb9a141 | 1
 src/rust/ship_control_services.h | Ship_station_xy(uint32_t station) noexcept | efc252da0f94199f | 1
 src/rust/sound_services.h | OpenTTDAmbientSound() noexcept | d25b0cbd8aa2d19e | 1
-src/rust/station_services.h | OpenTTDStationActivityOf(const Station *station) noexcept | 25f9ce59c8a5a35e | 1
 src/rust/station_services.h | OpenTTDStationOwner(const BaseStation *station) noexcept | aeacdaed578ac71a | 1
 src/rust/station_services.h | RustStationAirportTile(const Station *s) noexcept | afc031b1b93ed402 | 1
 src/rust/station_services.h | RustStationHasAirport(const Station *s) noexcept | aa92b59f9633a60c | 1

@@ -329,10 +329,6 @@ const OpenTTDRailMapServices &GetRustRailMapServices() noexcept
 
 		.is_rail_depot = RustRailIsDepot,
 		.rail_depot_direction = RustRailDepotDirection,
-		.rail_tracks = RustRailTracks,
-		.has_signals = RustRailHasSignals,
-		.has_signal_track = RustRailHasSignalTrack,
-		.signal_type = RustRailSignalType,
 		.has_signal_trackdir = RustRailHasSignalTrackdir,
 		.signal_state = RustRailSignalState,
 		.set_signal_state = RustRailSetSignalState,

@@ -258,16 +258,6 @@ pub unsafe extern "C" fn openttd_rust_train_state_get_user_def_data(state: *cons
     // SAFETY: Caller supplies a live owner and this scalar read ends before return.
     unsafe { (*state).user_def_data }
 }
-/// Write the shell's canonical `user_def_data` scalar.
-/// # Safety
-/// The serialized shell owns this exclusively accessible live state.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_train_state_set_user_def_data(state: *mut State, value: u8) {
-    // SAFETY: Exclusive scalar access, retaining no state borrow.
-    unsafe {
-        (*state).user_def_data = value;
-    }
-}
 /// Read the shell's canonical `cached_curve_speed_mod` scalar.
 /// # Safety
 /// The serialized shell owns a live state; no reference escapes this call.
