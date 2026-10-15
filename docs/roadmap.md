@@ -177,9 +177,9 @@ owners are active. Engine and signal merged trees match their full validations.
 | #249 / #254 | integrated, worktree removed | Fixing review/full CI passed; 206 baseline fingerprints, no additions permitted. |
 | #219 / #245 | integrated, worktree removed | Fixing reviews, semantic/native evidence, all six speed gates and exact-head full CI passed. |
 | #220 / #248 | integrated, worktree removed | Fixing reviews, semantic/native evidence, all six speed gates and exact-head full CI passed. |
-| #212 / #255 | `landscape-owner-212`, `b2b18831ec` gate | Native/focused semantics pass; full speed gate failed. Adopt #245 and fix attributed clear/water/dispatch overhead; tooling ceiling 500. |
-| #213 / #257 | `vehicle-owner-213`, `1e168327af` | Full maintenance implemented, #245 adopted and trivial date wires fixed; clean native verification next. Initial a110 gate covers scheduler only. |
-| #246 / #258 | `town-founding-246`, `425710778d` milestone | Save staging removed; full founding/name source adopts #245. Native checks pass; default branch/lifetime fixtures run within 300 tooling lines. |
+| #212 / #255 | `landscape-owner-212`, `f8c1df5063` | Attributed clear/water/dispatch fix passes native/focused semantics. Finish single-resolution/void-service corrections, then repeat full gate; tooling ceiling 500. |
+| #213 / #257 | `vehicle-owner-213`, `3de2275c5a` | Full maintenance, trivial date wires and canonical enum fixed; native/focused checks run after two fixture fixes. Initial a110 gate covers scheduler only; tooling ceiling 375. |
+| #246 / #258 | `town-founding-246`, `425710778d` milestone | Full founding/name fixtures pass; correct strong-ID wires and verify real Windows calls before final freeze/review. Tooling ceiling 320, bounded ABI addition selected on #246. |
 | #256 / #247 | unstarted | Complete house lifecycle, then town commands/deletion, after #246. |
 | #64 / #66 | `issue/64-curve-family`, `aab5211801` | Paused draft/worktree; leave untouched, not a fallback. |
 | Paused integration | `integration/curve-script`, `c19f09cf8b` | Locked worktree preserved; no work. |
