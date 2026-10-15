@@ -551,7 +551,7 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         679 => layout!(crate::aircraft::HangarCandidate, item; owner, airport, hangar),
         740 => layout!(crate::vehicle::scheduler::PoolCursor, item; slots, slots_len, first_unused),
         741 => {
-            layout!(crate::vehicle::scheduler::PostTick, item; vehicle_type, front, period, counter, motion, speed, front_type, subtype, tick, front_status, status)
+            layout!(crate::vehicle::scheduler::PostTick, item; vehicle_type, period, counter, motion, speed, front_type, subtype, tick, front_status, status)
         }
         743 => layout!(crate::vehicle::scheduler::DayCallback, item; day, has_engine),
         748 => layout!(crate::vehicle::scheduler::StationLookup, item; station, id),

@@ -218,7 +218,6 @@ struct OpenTTDVehiclePoolCursor {
 /** Named actual scalar members. No reference into the shell crosses a callback. */
 struct OpenTTDVehiclePostTick {
 	VehicleType type;
-	OpenTTDVehicle *front;
 	const uint16_t *period;
 	uint16_t *counter;
 	uint32_t *motion;

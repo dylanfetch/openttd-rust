@@ -44,7 +44,6 @@ pub struct PoolCursor {
 #[repr(C)]
 pub struct PostTick {
     pub vehicle_type: VehicleType,
-    pub front: Option<VehicleRef>,
     pub period: *const u16,
     pub counter: *mut u16,
     pub motion: *mut u32,
@@ -552,7 +551,6 @@ mod tests {
         c.events.push("post");
         PostTick {
             vehicle_type: c.post_type,
-            front: Some(v),
             period: &raw const c.period,
             counter: if c.hide_counter {
                 null_mut()
