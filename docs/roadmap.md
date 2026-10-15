@@ -4,11 +4,12 @@ Root owns selection here; `AGENTS.md` and `docs/rust-migration.md` define proces
 If an issue conflicts, follow this roadmap and report it to root. Keep this
 forward-looking, about 200 lines; completed work is one row, with evidence in PRs.
 
-## Where the fork stands (2026-10-15, `c9f4e5c770`)
+## Where the fork stands (2026-10-15, `7feb00248f`)
 
-- Twenty-seven ownership ports. Whole fork: Rust 60,497 / tooling 31,189 / glue 27,289 / original retired 38,219 of 470,612 `src/` lines (8.12%). Simulation: 30,248 / 102,615 (29.48%); source counts, not behavioral completion.
+- Twenty-seven ownership ports. Whole fork: Rust 60,520 / tooling 31,190 / glue 27,289 / original retired 38,219 of 470,612 `src/` lines (8.12%). Simulation: 30,248 / 102,615 (29.48%); source counts, not behavioral completion.
 - Since the eleventh review, engine #248, signals #245 and town founding #258 integrated, retiring 1,717 original lines. Landscape #212 and vehicle #213 missed their final gates after profiled fix rounds and stopped as drafts at the pause.
-- Every stored speed cap passes at tip (values on #258). CI on `rust-migration` is green.
+- Latest calibrated timings (#258): TGP 1.122x, play saves 1.234x-1.345x; all six caps passed. Timing was not repeated for the subsequent fidelity/housekeeping changes.
+- #262 fixes ScriptList overflow; #259 H1-H3 remove stale repository state, compact docs and delete 2,142 workflow/comment lines. These two maintenance integrations retire no additional game C++; ownership resumes after the selected cleanup. Required CI passes; no new coverage gap is closed beyond #262's rank extremes (#156).
 - Two unintegrated component drafts, #255 and #257; both conflict with the town base.
 - Largest original simulation files remaining: station_cmd 4.5k lines, rail_cmd 3.2k, vehicle 3.0k, road_cmd 2.7k, tunnelbridge 2.2k, town_cmd 1.9k, landscape 1.8k, water 1.5k.
 
@@ -37,6 +38,7 @@ Actions, in order:
 2. **#260 next.** It is a small fidelity fix.
 3. **Housekeeping PRs, at most three in flight alongside the work order:**
    - #259 H2 (a docs-only commit by gpt-6-luna at medium effort), H3 (workflows) and H4 (dead code with its checks);
+     H4's re-selected ceiling is 160 added tooling lines, including tests, baseline data and ABI edits (#259).
    - then #261 R1-R4; R1-R3 wait for H4, because they touch the same files;
    - #259 H5 last.
 
@@ -112,6 +114,7 @@ later rows use original retirement with net glue in the PR (#223).
 | #252 (Windows runner) | #253 | direct | `cfc98a16a7` | 0 / 0 / 0 / 0 |
 | #249 (shared-accessor enforcement) | #254 | direct | `8f9d4fc906` | 0 / 431 / 0 / 0 |
 | #260 (ScriptList overflow fidelity) | #262 | direct | `c54129895b` | 33 / 3 / 0 / 0; net glue 0 |
+| #259 H3 (inert workflows) | #263 | direct | `7feb00248f` | 0 / 0 / 0 / 0; workflow/comment net -2142 |
 
 Paused, not fallbacks: #64 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -141,7 +144,7 @@ go in `KNOWN_FAILURES` with an issue, never in masks (`docs/rust-migration.md`).
 Integrate reviewed work first, in order of readiness, with at most six
 unintegrated component branches. Housekeeping (#259) and #156 run in parallel.
 
-1. **Housekeeping:** #259 H1, then #260, then up to three of #259 H2-H5 and #261 R1-R4 at a time, alongside the items below.
+1. **Housekeeping:** #259 H1-H3 and #260 complete. H4 next (160 added tooling lines including baseline/tests/ABI edits), then #261 R1-R4 and H5 last; at most three maintenance PRs in flight alongside the items below.
 2. **#212 landscape (#255) and #213 vehicle (#257).** Update each from base and resolve the town conflicts; a fresh reviewer checks the resolution. Re-freeze against the new tip, profile the head with callgrind, then root re-selects a bounded fix with its gate, or re-scopes the owner. The selected boundaries stand:
    - landscape: an inlined dispatch on the raw type byte, `noexcept` `TileLoop_*` handlers called directly, Rust transition control and no raw-map extension; gate within 11 ms on TGP, interleaved A/B against tip;
    - vehicle: a pool-cursor descriptor, one slim dispatch record and one post-tick bundle, at most about three C++ calls per vehicle (`docs/design/world-state.md`); gate at most 6 ns per vehicle-tick visit on Opus.
@@ -162,14 +165,14 @@ that a `SaveLoad` descriptor cannot address through the alias.
 
 ## Resume checkpoint
 
-Resumed for a short session. #259 H1 is complete (receipt on the issue): merged
-branches and obsolete worktrees removed, auto-deletion enabled, main `.local/`
-down to 8.5 GiB. #260 is integrated after review and full CI. Keep tasks bounded:
-finish workflow cleanup next; larger ownership drafts remain unchanged.
+Resumed for a short session. #259 H1-H3 and #260 are complete; CI_ON_DEMAND is
+restored after #263's passing bootstrap. Keep tasks bounded: H4 dead-code cleanup
+next; larger ownership drafts remain unchanged. H4's read-only plan and budget
+re-selection are on #259.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #259 / #263 | `remove-inert-workflows-259`, `92d04db254` | H1-H2 complete. H3 review passes; update from base, then bootstrap full CI. H4-H5 unstarted. |
+| #259 | H1-H3 complete; H4 selected | Dead FFI, shared founding services and three lexical guards; 160-line tooling ceiling. H5 unstarted. |
 | #261 | unstarted | R1-R4 after #259 H4 merges. |
 | #212 / #255 | `landscape-owner-212`, `63c67959ee` | Stopped: TGP gate missed (see PR). Conflicts with town base. Next: update, profile, root re-selection. |
 | #213 / #257 | `vehicle-owner-213`, `67611082f7` | Stopped: CPU gate missed (see PR). Conflicts with town base. Next: update, profile, root re-selection. |
