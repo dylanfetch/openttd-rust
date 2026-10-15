@@ -38,7 +38,7 @@ Actions, in order:
 2. **#260 next.** It is a small fidelity fix.
 3. **Housekeeping PRs, at most three in flight alongside the work order:**
    - #259 H2 (a docs-only commit by gpt-6-luna at medium effort), H3 (workflows) and H4 (dead code with its checks);
-     H4's re-selected ceiling is 160 added tooling lines, including tests, baseline data and ABI edits (#259).
+     H4's re-selected ceiling is 190 added tooling lines, including tests, baseline data and ABI edits (#259); review found two orphan-guard defects needing regressions.
    - then #261 R1-R4; R1-R3 wait for H4, because they touch the same files;
    - #259 H5 last.
 
@@ -144,7 +144,7 @@ go in `KNOWN_FAILURES` with an issue, never in masks (`docs/rust-migration.md`).
 Integrate reviewed work first, in order of readiness, with at most six
 unintegrated component branches. Housekeeping (#259) and #156 run in parallel.
 
-1. **Housekeeping:** #259 H1-H3 and #260 complete. H4 next (160 added tooling lines including baseline/tests/ABI edits), then #261 R1-R4 and H5 last; at most three maintenance PRs in flight alongside the items below.
+1. **Housekeeping:** #259 H1-H3 and #260 complete. H4 next (190 added tooling lines including baseline/tests/ABI edits), then #261 R1-R4 and H5 last; at most three maintenance PRs in flight alongside the items below.
 2. **#212 landscape (#255) and #213 vehicle (#257).** Update each from base and resolve the town conflicts; a fresh reviewer checks the resolution. Re-freeze against the new tip, profile the head with callgrind, then root re-selects a bounded fix with its gate, or re-scopes the owner. The selected boundaries stand:
    - landscape: an inlined dispatch on the raw type byte, `noexcept` `TileLoop_*` handlers called directly, Rust transition control and no raw-map extension; gate within 11 ms on TGP, interleaved A/B against tip;
    - vehicle: a pool-cursor descriptor, one slim dispatch record and one post-tick bundle, at most about three C++ calls per vehicle (`docs/design/world-state.md`); gate at most 6 ns per vehicle-tick visit on Opus.
@@ -172,7 +172,7 @@ re-selection are on #259.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #259 H4 | `cleanup-dead-ffi-259`, base `ec512af31e` | `/root/cleanup_dead_ffi_h4` implementing dead FFI, shared founding services and lexical guards; 160-line tooling ceiling. H5 unstarted. |
+| #259 H4 / #264 | `cleanup-dead-ffi-259`, `2c65620788` | `/root/review_dead_ffi_264` fixing two orphan-guard findings; 190-line tooling ceiling. Initial full CI superseded; final-head CI required. H5 unstarted. |
 | #261 | unstarted | R1-R4 after #259 H4 merges. |
 | #212 / #255 | `landscape-owner-212`, `63c67959ee` | Stopped: TGP gate missed (see PR). Conflicts with town base. Next: update, profile, root re-selection. |
 | #213 / #257 | `vehicle-owner-213`, `67611082f7` | Stopped: CPU gate missed (see PR). Conflicts with town base. Next: update, profile, root re-selection. |
