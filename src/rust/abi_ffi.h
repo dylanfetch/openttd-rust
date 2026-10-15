@@ -45,7 +45,7 @@ extern "C" {
  * Existing train allocation spans 248-385; other existing low IDs remain.
  * Reserved component blocks: company 400-429, town 430-459,
  * shared vehicle/road services 460-499. Allocate within the component's block.
- * Landscape block: 780-781 scheduler services, 782 allocation, 783 native base-tile layout.
+ * Landscape block: 780-781 scheduler services, 782 allocation, 783 native base-tile layout; 784-801 ground/flood tables and consumed fields.
  * Item 0 size, 1 alignment, then every field offset in declaration order.
  * Unknown type/item returns SIZE_MAX. No memory borrow, ownership or callback.
  * Native extern-C convention (cdecl on i686 MSVC); Rust panic never unwinds.

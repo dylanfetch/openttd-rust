@@ -15,60 +15,98 @@
     clippy::too_many_lines,
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
-    clippy::if_not_else
+    clippy::if_not_else,
+    clippy::too_many_arguments
 )]
-use crate::services::Services;
+use crate::services::{
+    ClearGroundType, DiagDirection, Foundation, LandscapeType, RailGroundType, RoadBits, RoadType,
+    Roadside, Services, Slope, TrackBits, WaterClass,
+};
+
+#[repr(usize)]
+pub(crate) enum Witness {
+    SnowStart,
+    SnowChange,
+    SnowClear,
+    Desert,
+    FieldFence,
+    FieldCycle,
+    FieldOrphan,
+    RailGround,
+    Roadside,
+    RoadWorkStart,
+    RoadWorkEnd,
+    RoadRemove,
+    TunnelGround,
+    FloodSuccess,
+    FloodFail,
+    DryCoast,
+    DryRail,
+    DryTree,
+    Wakeup,
+    HalfRailRemove,
+    HalfRail,
+    BridgeStart,
+    BridgeEnd,
+    AirportMember,
+    VehicleCrash,
+    CrashedSkip,
+}
+#[inline]
+pub(crate) fn hit(branch: Witness) {
+    crate::witness::hit(crate::witness::LANDSCAPE + branch as usize);
+}
 
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct ClearGround {
-    pub ground: u8,
-    pub density: u8,
-    pub counter: u8,
+    pub ground: ClearGroundType,
+    pub density: u32,
+    pub counter: u32,
     pub snow: bool,
 }
 #[repr(C)]
 pub struct FieldGround {
     pub industry: u16,
-    pub field_type: u8,
+    pub field_type: u32,
 }
 #[repr(C)]
 pub struct ClearServices {
     pub observe: extern "C" fn(u32) -> ClearGround,
-    pub set_ground: extern "C" fn(u32, u8, u32),
+    pub set_ground: extern "C" fn(u32, ClearGroundType, u32),
     pub set_density: extern "C" fn(u32, u32),
     pub set_counter: extern "C" fn(u32, u32),
     pub clear_snow: extern "C" fn(u32),
     pub make_snow: extern "C" fn(u32, u32),
-    pub make_clear: extern "C" fn(u32, u8, u32),
-    pub fence: extern "C" fn(u32, u8) -> u32,
-    pub set_fence: extern "C" fn(u32, u8, u32),
+    pub make_clear: extern "C" fn(u32, ClearGroundType, u32),
+    pub fence: extern "C" fn(u32, DiagDirection) -> u32,
+    pub set_fence: extern "C" fn(u32, DiagDirection, u32),
     pub field: extern "C" fn(u32) -> FieldGround,
     pub set_field: extern "C" fn(u32, u32),
     pub has_water_class: extern "C" fn(u32) -> bool,
-    pub water_class: extern "C" fn(u32) -> u8,
+    pub water_class: extern "C" fn(u32) -> WaterClass,
     pub ambient: extern "C" fn(u32) -> bool,
 }
 #[repr(C)]
 pub struct RailSnowGround {
     pub z: i32,
-    pub slope: u8,
-    pub tracks: u8,
+    pub slope: Slope,
+    pub tracks: TrackBits,
     pub plain: bool,
 }
 #[repr(C)]
 pub struct RailFenceGround {
-    pub tracks: u8,
+    pub tracks: TrackBits,
     pub owner: u8,
     pub plain: bool,
 }
 #[repr(C)]
 pub struct RailServices {
-    pub ground: extern "C" fn(u32) -> u8,
-    pub set_ground: extern "C" fn(u32, u8),
+    pub ground: extern "C" fn(u32) -> RailGroundType,
+    pub set_ground: extern "C" fn(u32, RailGroundType),
     pub snow: extern "C" fn(u32) -> RailSnowGround,
     pub fences: extern "C" fn(u32) -> RailFenceGround,
-    pub foundation: extern "C" fn(u8, u8) -> u8,
+    pub foundation: extern "C" fn(Slope, TrackBits) -> Foundation,
     pub owned_land: extern "C" fn(u32) -> bool,
     pub water_loop: extern "C" fn(u32),
 }
@@ -103,12 +141,13 @@ fn steep(slope: u8) -> bool {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_clear_tile_loop(
     tile: u32,
-    climate: u8,
+    climate: LandscapeType,
     editor: bool,
     size_x: u32,
     clear: *const ClearServices,
     shared: *const Services,
 ) {
+    let climate = climate.0;
     // SAFETY: Caller supplies immutable live tables. No state borrow crosses a call.
     let (c, s) = unsafe { (&*clear, &*shared) };
     (c.ambient)(tile);
@@ -119,24 +158,27 @@ pub unsafe extern "C" fn openttd_rust_clear_tile_loop(
         if !ground.snow {
             if k >= 0 {
                 (c.make_snow)(tile, 0);
+                hit(Witness::SnowStart);
                 changed = true;
             }
         } else {
-            let required = k.clamp(0, 3) as u8;
+            let required = k.clamp(0, 3) as u32;
             if ground.density == required {
                 if k < 0 {
                     (c.clear_snow)(tile);
+                    hit(Witness::SnowClear);
                     changed = true;
                 }
             } else {
                 (c.set_density)(
                     tile,
-                    u32::from(if ground.density < required {
+                    if ground.density < required {
                         ground.density + 1
                     } else {
                         ground.density - 1
-                    }),
+                    },
                 );
+                hit(Witness::SnowChange);
                 changed = true;
             }
         }
@@ -145,7 +187,7 @@ pub unsafe extern "C" fn openttd_rust_clear_tile_loop(
             ground = (c.observe)(tile);
         }
     } else if climate == 2 {
-        let current = if ground.ground == 5 {
+        let current = if ground.ground.0 == 5 {
             ground.density
         } else {
             0
@@ -156,74 +198,78 @@ pub unsafe extern "C" fn openttd_rust_clear_tile_loop(
                 let t = diagonal(tile, direction, size_x);
                 (s.tile_valid)(t)
                     && ((s.tropic_zone)(t) != 1
-                        || ((c.has_water_class)(t) && (c.water_class)(t) == 0))
+                        || ((c.has_water_class)(t) && (c.water_class)(t).0 == 0))
             });
             expected = if normal { 1 } else { 3 };
         }
         if current != expected {
             (c.set_ground)(
                 tile,
-                if expected == 0 { 0 } else { 5 },
-                if expected == 0 {
-                    3
-                } else {
-                    u32::from(expected)
-                },
+                ClearGroundType(if expected == 0 { 0 } else { 5 }),
+                if expected == 0 { 3 } else { expected },
             );
             (s.mark_dirty)(tile);
+            hit(Witness::Desert);
             ground = (c.observe)(tile);
         }
     }
     if ground.snow {
         return;
     }
-    match ground.ground {
+    match ground.ground.0 {
         0 => {
             if ground.density == 3 {
                 return;
             }
             if editor {
-                (c.set_ground)(tile, u8::from((s.random)(s.context) & 255 <= 21), 3);
+                (c.set_ground)(
+                    tile,
+                    ClearGroundType(u8::from((s.random)(s.context) & 255 <= 21)),
+                    3,
+                );
             } else if ground.counter < 7 {
-                (c.set_counter)(tile, u32::from(ground.counter) + 1);
+                (c.set_counter)(tile, ground.counter + 1);
                 return;
             } else {
                 (c.set_counter)(tile, 0);
-                (c.set_density)(tile, u32::from(ground.density) + 1);
+                (c.set_density)(tile, ground.density + 1);
             }
         }
         3 => {
             let mut dirty = false;
             for direction in 0..4 {
-                if (c.fence)(tile, direction) != 0 {
+                if (c.fence)(tile, DiagDirection(direction)) != 0 {
                     continue;
                 }
                 let neighbour = diagonal(tile, direction, size_x);
-                if (s.tile_type)(neighbour) == 0 && (c.observe)(neighbour).ground == 3 {
+                if (s.tile_type)(neighbour) == 0 && (c.observe)(neighbour).ground.0 == 3 {
                     continue;
                 }
-                (c.set_fence)(tile, direction, 3);
+                (c.set_fence)(tile, DiagDirection(direction), 3);
                 dirty = true;
             }
             if dirty {
                 (s.mark_dirty)(tile);
+                hit(Witness::FieldFence);
             }
             if editor {
                 return;
             }
             if ground.counter < 7 {
-                (c.set_counter)(tile, u32::from(ground.counter) + 1);
+                (c.set_counter)(tile, ground.counter + 1);
                 return;
             }
             (c.set_counter)(tile, 0);
             let field = (c.field)(tile);
             if field.industry == u16::MAX && field.field_type >= 7 {
-                (c.make_clear)(tile, 0, 2);
+                (c.make_clear)(tile, ClearGroundType(0), 2);
+                hit(Witness::FieldOrphan);
             } else {
+                hit(Witness::FieldCycle);
                 (c.set_field)(
                     tile,
                     if field.field_type < 8 {
-                        u32::from(field.field_type) + 1
+                        field.field_type + 1
                     } else {
                         0
                     },
@@ -240,14 +286,15 @@ pub unsafe extern "C" fn openttd_rust_clear_tile_loop(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_rail_tile_loop(
     tile: u32,
-    climate: u8,
+    climate: LandscapeType,
     size_x: u32,
     rail: *const RailServices,
     shared: *const Services,
 ) {
+    let climate = climate.0;
     // SAFETY: Caller supplies immutable live tables; observations are copied.
     let (r, s) = unsafe { (&*rail, &*shared) };
-    let old = (r.ground)(tile);
+    let old = (r.ground)(tile).0;
     if old == 13 {
         (r.water_loop)(tile);
         return;
@@ -257,28 +304,28 @@ pub unsafe extern "C" fn openttd_rust_rail_tile_loop(
         let mut ground = (r.snow)(tile);
         let mut half = false;
         if ground.plain {
-            let foundation = (r.foundation)(ground.slope, ground.tracks);
+            let foundation = (r.foundation)(ground.slope, ground.tracks).0;
             match foundation {
                 0 => {
-                    if three_corners(ground.slope) {
+                    if three_corners(ground.slope.0) {
                         ground.z += 1;
                     }
                 }
                 2 | 3 => {
-                    if steep(ground.slope) {
+                    if steep(ground.slope.0) {
                         ground.z += 1;
                     }
                 }
                 4 => ground.z += 1,
                 _ => {
-                    if steep(ground.slope) {
+                    if steep(ground.slope.0) {
                         ground.z += 1;
                     }
                     ground.z += 1;
                 }
             }
             half = (5..10).contains(&foundation);
-        } else if ground.slope != 0 {
+        } else if ground.slope.0 != 0 {
             ground.z += 1;
         }
         let snow = i32::from((s.snow_line)());
@@ -298,7 +345,7 @@ pub unsafe extern "C" fn openttd_rust_rail_tile_loop(
         }
         let mut fences = 0_u8;
         for (direction, tracks) in [37, 42, 25, 22].into_iter().enumerate() {
-            if ground.tracks & tracks != 0 {
+            if ground.tracks.0 & tracks != 0 {
                 continue;
             }
             let neighbour = diagonal(tile, direction as u8, size_x);
@@ -330,7 +377,8 @@ pub unsafe extern "C" fn openttd_rust_rail_tile_loop(
         }
     });
     if old != new {
-        (r.set_ground)(tile, new);
+        (r.set_ground)(tile, RailGroundType(new));
+        hit(Witness::RailGround);
         (s.mark_dirty)(tile);
     }
 }
@@ -340,10 +388,11 @@ pub unsafe extern "C" fn openttd_rust_rail_tile_loop(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_tunnel_tile_loop(
     tile: u32,
-    climate: u8,
+    climate: LandscapeType,
     tunnel: *const TunnelServices,
     shared: *const Services,
 ) {
+    let climate = climate.0;
     // SAFETY: Caller supplies immutable live tables; no mutable borrow retained.
     let (t, s) = unsafe { (&*tunnel, &*shared) };
     if climate == 1 {
@@ -351,10 +400,279 @@ pub unsafe extern "C" fn openttd_rust_tunnel_tile_loop(
         let snow = ground.z > i32::from((s.snow_line)());
         if ground.snow != snow {
             (t.set_snow_or_desert)(tile, !ground.snow);
+            hit(Witness::TunnelGround);
             (s.mark_dirty)(tile);
         }
     } else if climate == 2 && (s.tropic_zone)(tile) == 1 && !(t.snow_or_desert)(tile) {
         (t.set_snow_or_desert)(tile, true);
+        hit(Witness::TunnelGround);
         (s.mark_dirty)(tile);
     }
+}
+
+#[repr(C)]
+pub struct FoundationSlope {
+    pub z: i32,
+    pub slope: Slope,
+}
+#[repr(C)]
+pub struct Call {
+    _private: [u8; 0],
+}
+#[repr(C)]
+pub struct CostServices {
+    pub commands: *const crate::services::CommandServices,
+    pub costs: *const crate::services::CommandCostServices,
+    pub prepare: extern "C" fn(*mut Call) -> *mut crate::services::CommandCost,
+    pub release: extern "C" fn(*mut Call),
+}
+#[repr(C)]
+pub struct RoadSnowGround {
+    pub z: i32,
+    pub snow: bool,
+}
+#[repr(C)]
+pub struct RoadServices {
+    pub snow: extern "C" fn(u32) -> RoadSnowGround,
+    pub snow_or_desert: extern "C" fn(u32) -> bool,
+    pub toggle_snow_or_desert: extern "C" fn(u32),
+    pub roadside: extern "C" fn(u32) -> Roadside,
+    pub set_roadside: extern "C" fn(u32, Roadside),
+    pub work_counter: extern "C" fn(u32) -> u32,
+    pub set_work_counter: extern "C" fn(u32, u32),
+    pub foundation: extern "C" fn(u32) -> FoundationSlope,
+    pub all_bits: extern "C" fn(u32) -> RoadBits,
+    pub ensure_no_vehicle: extern "C" fn(*mut crate::services::CommandCost, u32),
+    pub play_sound: extern "C" fn(u32, u16),
+    pub bulldozer: extern "C" fn(u32),
+    pub cleanup: extern "C" fn(u32, RoadBits) -> RoadBits,
+    pub remove: extern "C" fn(u32, RoadBits),
+    pub town_road_type: extern "C" fn() -> RoadType,
+    pub set_road_type: extern "C" fn(u32, RoadType),
+}
+
+/// # Safety
+/// All tables and native lazy result context outlive this serialized entry. No
+/// Rust borrow denotes native command storage or a town across command callbacks.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_road_tile_loop(
+    tile: u32,
+    climate: LandscapeType,
+    ambient: bool,
+    rebuild: bool,
+    size_x: u32,
+    call: *mut Call,
+    costs: *const CostServices,
+    roads: *const RoadServices,
+    shared: *const Services,
+) {
+    let climate = climate.0;
+    // SAFETY: Live immutable tables; native storage is accessed only by its leaves.
+    let (c, r, s) = unsafe { (&*costs, &*roads, &*shared) };
+    if climate == 1 {
+        let ground = (r.snow)(tile);
+        if ground.snow != (ground.z > i32::from((s.snow_line)())) {
+            (r.toggle_snow_or_desert)(tile);
+            (s.mark_dirty)(tile);
+        }
+    } else if climate == 2 && (s.tropic_zone)(tile) == 1 && !(r.snow_or_desert)(tile) {
+        (r.toggle_snow_or_desert)(tile);
+        (s.mark_dirty)(tile);
+    }
+    if (s.is_road_depot)(tile) {
+        return;
+    }
+    let town = (s.closest_town)(tile, u32::MAX);
+    let side = (r.roadside)(tile).0;
+    if side < 6 {
+        let mut zone = 0;
+        if !town.is_null() {
+            let owner = (s.town_owner)(town);
+            // SAFETY: The shared town owner belongs to the live closest-town shell.
+            // Only copied inputs survive the following native services.
+            let (months, group, distance) =
+                unsafe { crate::town::road_context(owner, tile, size_x) };
+            zone = group;
+            if months != 0 && (distance < 8 || zone != 0) && (s.is_normal_road)(tile) {
+                let bits = (r.all_bits)(tile);
+                if bits.0.count_ones() > 1 && (r.foundation)(tile).slope.0 == 0 {
+                    let out = (c.prepare)(call);
+                    (r.ensure_no_vehicle)(out, tile);
+                    // SAFETY: The result remains a live native object until release.
+                    let empty = unsafe { ((*c.costs).success)(out) };
+                    (c.release)(call);
+                    if empty && crate::services::chance16_i(1, 40, (s.random)(s.context)) {
+                        (r.set_roadside)(tile, Roadside(if side <= 1 { 6 } else { 7 }));
+                        hit(Witness::RoadWorkStart);
+                        if ambient {
+                            (r.play_sound)(tile, 31);
+                        }
+                        (r.bulldozer)(tile);
+                        (s.mark_dirty)(tile);
+                        return;
+                    }
+                }
+            }
+        }
+        let desired = match zone {
+            0 => [1, 1],
+            1 | 2 => {
+                if climate == 3 && zone == 2 {
+                    [3, 2]
+                } else {
+                    [2, 2]
+                }
+            }
+            3 => {
+                if climate == 3 {
+                    [3, 2]
+                } else {
+                    [5, 5]
+                }
+            }
+            _ => [3, 2],
+        };
+        if side == desired[0] {
+            return;
+        }
+        (r.set_roadside)(
+            tile,
+            Roadside(if side == desired[1] {
+                desired[0]
+            } else if side == 0 {
+                desired[1]
+            } else {
+                0
+            }),
+        );
+        (s.mark_dirty)(tile);
+        hit(Witness::Roadside);
+    } else {
+        let counter = ((r.work_counter)(tile) + 1) & 15;
+        (r.set_work_counter)(tile, counter);
+        if counter != 15 {
+            return;
+        }
+        (r.set_roadside)(tile, Roadside(if side == 6 { 1 } else { 2 }));
+        (r.set_work_counter)(tile, 0);
+        hit(Witness::RoadWorkEnd);
+        if rebuild {
+            let old = RoadBits((s.road_bits)(tile, 0, false));
+            let new = (r.cleanup)(tile, old);
+            if old != new {
+                (r.remove)(tile, RoadBits(old.0 ^ new.0));
+                hit(Witness::RoadRemove);
+                if new.0 == 0 {
+                    (s.mark_dirty)(tile);
+                    return;
+                }
+            }
+        }
+        if (s.road_owner)(tile) == 15 {
+            let road_type = (r.town_road_type)();
+            if road_type.0 != (s.road_type)(tile) {
+                (r.set_road_type)(tile, road_type);
+            }
+        }
+        (s.mark_dirty)(tile);
+    }
+}
+
+/// Actual record-return and enum-argument calls for every default native ABI.
+#[repr(C)]
+pub struct ABICalls {
+    pub clear: extern "C" fn() -> ClearGround,
+    pub field: extern "C" fn() -> FieldGround,
+    pub rail_snow: extern "C" fn() -> RailSnowGround,
+    pub rail_fence: extern "C" fn() -> RailFenceGround,
+    pub foundation: extern "C" fn() -> FoundationSlope,
+    pub road_snow: extern "C" fn() -> RoadSnowGround,
+    pub tunnel: extern "C" fn() -> TunnelGround,
+    pub airport: extern "C" fn() -> crate::water::AirportGround,
+    pub victim: extern "C" fn() -> crate::water::FloodVictim,
+    pub aircraft: extern "C" fn() -> crate::water::AircraftFloodPose,
+    pub ground: extern "C" fn() -> crate::water::GroundFloodPose,
+    pub enums: extern "C" fn(
+        ClearGroundType,
+        RailGroundType,
+        Slope,
+        TrackBits,
+        crate::services::Track,
+        Foundation,
+        Roadside,
+        RoadBits,
+        RoadType,
+        crate::services::TreeGround,
+        WaterClass,
+        crate::services::FloodingBehaviour,
+        DiagDirection,
+        LandscapeType,
+        crate::vehicle::VehicleType,
+    ) -> bool,
+}
+/// # Safety
+/// A complete immutable fixture table. Returned opaque handles are marker values
+/// for this ABI-only call; they are compared, never dereferenced or used by game services.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn openttd_rust_ground_abi_calls(calls: *const ABICalls) -> bool {
+    // SAFETY: Caller provides actual typed native functions for this fixture.
+    let c = unsafe { &*calls };
+    let clear = (c.clear)();
+    let field = (c.field)();
+    let snow = (c.rail_snow)();
+    let fence = (c.rail_fence)();
+    let foundation = (c.foundation)();
+    let road = (c.road_snow)();
+    let tunnel = (c.tunnel)();
+    let airport = (c.airport)();
+    let victim = (c.victim)();
+    let aircraft = (c.aircraft)();
+    let ground = (c.ground)();
+    clear.ground.0 == 240
+        && clear.density == 0x89ab_cdef
+        && clear.counter == 0x7654_3210
+        && clear.snow
+        && field.industry == 0xfedc
+        && field.field_type == 0x9876_5432
+        && snow.z == -42
+        && snow.slope.0 == 238
+        && snow.tracks.0 == 237
+        && snow.plain
+        && fence.tracks.0 == 236
+        && fence.owner == 235
+        && !fence.plain
+        && foundation.z == 123_456
+        && foundation.slope.0 == 234
+        && road.z == -123_456
+        && road.snow
+        && tunnel.z == 789
+        && !tunnel.snow
+        && airport.station.is_null()
+        && airport.tile == 0x1234_5678
+        && airport.width == 0xabcd
+        && airport.height == 0xdcba
+        && victim.status == 233
+        && victim.kind.0 == 226
+        && aircraft.tile == 0x8765_4321
+        && aircraft.z == -789
+        && aircraft.subtype == 232
+        && ground.z == 777
+        && ground.first.addr() != 0
+        && (c.enums)(
+            clear.ground,
+            RailGroundType(239),
+            snow.slope,
+            snow.tracks,
+            crate::services::Track(227),
+            Foundation(228),
+            Roadside(229),
+            RoadBits(230),
+            RoadType(231),
+            crate::services::TreeGround(232),
+            WaterClass(233),
+            crate::services::FloodingBehaviour(234),
+            DiagDirection(235),
+            LandscapeType(236),
+            victim.kind,
+        )
 }

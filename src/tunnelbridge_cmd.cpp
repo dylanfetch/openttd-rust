@@ -1845,7 +1845,7 @@ const OpenTTDTunnelServices &GetRustTunnelGroundServices() noexcept
 }
 static void TileLoop_TunnelBridge(uint32_t tile) noexcept
 {
-	openttd_rust_tunnel_tile_loop(tile, OpenTTDLandscapeValue(), &GetRustTunnelGroundServices(), &GetRustSharedServices());
+	openttd_rust_tunnel_tile_loop(tile, OpenTTDLandscape(), &GetRustTunnelGroundServices(), &GetRustSharedServices());
 }
 #else
 static void TileLoop_TunnelBridge(TileIndex tile)

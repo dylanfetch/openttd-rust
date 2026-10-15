@@ -46,6 +46,7 @@
 #include "rust/company_services.h"
 #include "rust/environment_services.h"
 #include "rust/station_services.h"
+#include "rust/services_landscape.h"
 #endif
 #include "town_kdtree.h"
 #include "townname_func.h"
@@ -981,7 +982,7 @@ static void RustTown_dirty_town(uint32_t town) noexcept
 }
 static uint32_t RustTown_foundation_slope(uint32_t tile) noexcept
 {
-	return std::get<0>(GetFoundationSlope(TileIndex{tile}));
+	return RustFoundationSlope(tile).slope;
 }
 static int64_t RustTown_terraform_price() noexcept
 {
@@ -989,7 +990,7 @@ static int64_t RustTown_terraform_price() noexcept
 }
 static uint32_t RustTown_clean_road_bits(uint32_t tile, uint32_t bits) noexcept
 {
-	return CleanUpRoadBits(TileIndex{tile}, static_cast<RoadBits>(bits));
+	return RustCleanRoadBits(TileIndex{tile}, static_cast<RoadBits>(bits));
 }
 static void RustTown_set_road_town(uint32_t tile, uint32_t town) noexcept
 {

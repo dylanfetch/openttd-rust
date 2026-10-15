@@ -13,10 +13,16 @@
 #include "../rust/abi_ffi.h"
 #include "../tile_map.h"
 #include "landscape_protocol.hpp"
+#include "ground_protocol.hpp"
 #endif
 #include "../safeguards.h"
 
 #ifdef WITH_RUST
+TEST_CASE("Rust ground enum and consumed-record native calls")
+{
+	CHECK(GroundProbe::Run());
+}
+
 TEST_CASE("Rust landscape scalar native handler calls")
 {
 	LandscapeProbe::Run([](bool result) { CHECK(result); });

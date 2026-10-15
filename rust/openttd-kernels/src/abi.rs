@@ -41,6 +41,20 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         620 => {
             layout!(crate::services::CommandCostServices, item; zero, error, expense_money, error_param, add, move_cost, amount, success, error_message, money)
         }
+        792 => layout!(crate::ground::FoundationSlope, item; z, slope),
+        793 => layout!(crate::ground::CostServices, item; commands, costs, prepare, release),
+        794 => layout!(crate::ground::RoadSnowGround, item; z, snow),
+        795 => {
+            layout!(crate::ground::RoadServices, item; snow, snow_or_desert, toggle_snow_or_desert, roadside, set_roadside, work_counter, set_work_counter, foundation, all_bits, ensure_no_vehicle, play_sound, bulldozer, cleanup, remove, town_road_type, set_road_type)
+        }
+        796 => layout!(crate::water::AirportGround, item; station, tile, width, height),
+        797 => layout!(crate::water::TileVehicleCursor, item; storage),
+        798 => {
+            layout!(crate::water::WaterServices, item; rail, clear, vehicles, costs, ambient, non_flooding, set_non_flooding, coast, tree_ground, set_tree_ground, make_clear, make_shore, make_sea, foundation, buoy_or_dock, canal_or_river, possible_docking, check_docking, invalidate_region, update_signals, set_company, tracks, remove_rail, apply_foundation, iterator_begin, iterator_current, iterator_next, iterator_end, airport_tile, airport, airport_member, airport_z, victim, aircraft_pose, ground_pose, crash, ai_event, game_event, news, bridge_height)
+        }
+        799 => layout!(crate::water::FloodVictim, item; status, kind),
+        800 => layout!(crate::water::AircraftFloodPose, item; tile, z, subtype),
+        801 => layout!(crate::water::GroundFloodPose, item; z, first),
         784 => layout!(crate::ground::ClearGround, item; ground, density, counter, snow),
         785 => layout!(crate::ground::FieldGround, item; industry, field_type),
         786 => {

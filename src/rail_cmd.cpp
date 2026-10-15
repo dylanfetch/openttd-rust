@@ -39,8 +39,8 @@
 #include "table/track_land.h"
 
 #ifdef WITH_RUST
-#include "rust/ground_ffi.h"
-#include "rust/landscape_services.h"
+#include "rust/ground_services.h"
+#include "rust/services_landscape.h"
 #include "rust/environment_services.h"
 #endif
 
@@ -762,6 +762,14 @@ CommandCost CmdRemoveSingleRail(DoCommandFlags flags, TileIndex tile, Track trac
  * @param t The tile to flood.
  * @return true if something was flooded.
  */
+#ifdef WITH_RUST
+bool FloodHalftile(TileIndex tile)
+{
+	assert(IsPlainRailTile(tile));
+	OpenTTDGroundCall call;
+	return openttd_rust_flood_halftile(tile.base(), &call, &GetRustWaterGroundServices(), &GetRustSharedServices());
+}
+#else
 bool FloodHalftile(TileIndex t)
 {
 	assert(IsPlainRailTile(t));
@@ -806,6 +814,8 @@ bool FloodHalftile(TileIndex t)
 	}
 	return flooded;
 }
+
+#endif
 
 static const TileIndexDiffC _trackdelta[] = {
 	{ -1,  0 }, {  0,  1 }, { -1,  0 }, {  0,  1 }, {  1,  0 }, {  0,  1 },
@@ -2602,11 +2612,11 @@ static Foundation GetFoundation_Track(TileIndex tile, Slope tileh)
 const OpenTTDRailServices &GetRustRailGroundServices() noexcept
 {
 	static const OpenTTDRailServices services{
-		.ground = [](uint32_t t) noexcept { return to_underlying(GetRailGroundType(TileIndex{t})); },
-		.set_ground = [](uint32_t t, uint8_t g) noexcept { SetRailGroundType(TileIndex{t}, static_cast<RailGroundType>(g)); },
-		.snow = [](uint32_t index) noexcept { TileIndex t{index}; auto [slope, z] = GetTileSlopeZ(t); bool plain = IsPlainRail(t); return OpenTTDRailSnowGround{.z = z, .slope = slope, .tracks = static_cast<uint8_t>(plain ? GetTrackBits(t) : TRACK_BIT_NONE), .plain = plain}; },
-		.fences = [](uint32_t index) noexcept { TileIndex t{index}; bool plain = IsPlainRail(t); return OpenTTDRailFenceGround{.tracks = static_cast<uint8_t>(plain ? GetTrackBits(t) : TRACK_BIT_NONE), .owner = plain ? GetTileOwner(t).base() : uint8_t{}, .plain = plain}; },
-		.foundation = [](uint8_t slope, uint8_t tracks) noexcept { return static_cast<uint8_t>(GetRailFoundation(static_cast<Slope>(slope), static_cast<TrackBits>(tracks))); },
+		.ground = [](uint32_t t) noexcept { return GetRailGroundType(TileIndex{t}); },
+		.set_ground = [](uint32_t t, RailGroundType g) noexcept { SetRailGroundType(TileIndex{t}, g); },
+		.snow = [](uint32_t index) noexcept { TileIndex t{index}; auto [slope, z] = GetTileSlopeZ(t); bool plain = RustPlainRailTile(index); return OpenTTDRailSnowGround{.z = z, .slope = slope, .tracks = plain ? RustRailTrackBits(index) : TRACK_BIT_NONE, .plain = plain}; },
+		.fences = [](uint32_t index) noexcept { bool plain = RustPlainRailTile(index); return OpenTTDRailFenceGround{.tracks = plain ? RustRailTrackBits(index) : TRACK_BIT_NONE, .owner = plain ? RustTileOwnerValue(index) : uint8_t{}, .plain = plain}; },
+		.foundation = [](Slope slope, TrackBits tracks) noexcept { return GetRailFoundation(slope, tracks); },
 		.owned_land = [](uint32_t t) noexcept { return IsObjectType(TileIndex{t}, OBJECT_OWNED_LAND); },
 		.water_loop = RustTileLoopWater,
 	};
@@ -2614,7 +2624,7 @@ const OpenTTDRailServices &GetRustRailGroundServices() noexcept
 }
 static void TileLoop_Track(uint32_t tile) noexcept
 {
-	openttd_rust_rail_tile_loop(tile, OpenTTDLandscapeValue(), Map::SizeX(), &GetRustRailGroundServices(), &GetRustSharedServices());
+	openttd_rust_rail_tile_loop(tile, OpenTTDLandscape(), Map::SizeX(), &GetRustRailGroundServices(), &GetRustSharedServices());
 }
 #else
 static void TileLoop_Track(TileIndex tile)

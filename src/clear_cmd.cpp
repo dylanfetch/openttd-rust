@@ -23,7 +23,7 @@
 
 #ifdef WITH_RUST
 #include "rust/ground_ffi.h"
-#include "rust/landscape_services.h"
+#include "rust/services_landscape.h"
 #include "rust/environment_services.h"
 #endif
 
@@ -177,25 +177,25 @@ static Foundation GetFoundation_Clear(TileIndex, Slope)
 const OpenTTDClearServices &GetRustClearServices() noexcept
 {
 	static const OpenTTDClearServices services{
-		.observe = [](uint32_t index) noexcept { TileIndex t{index}; return OpenTTDClearGround{.ground = GetClearGround(t), .density = static_cast<uint8_t>(GetClearDensity(t)), .counter = static_cast<uint8_t>(GetClearCounter(t)), .snow = IsSnowTile(t)}; },
-		.set_ground = [](uint32_t t, uint8_t g, uint32_t d) noexcept { SetClearGroundDensity(TileIndex{t}, static_cast<ClearGround>(g), d); },
+		.observe = [](uint32_t index) noexcept { TileIndex t{index}; return OpenTTDClearGround{.ground = RustClearGround(index), .density = RustClearDensity(index), .counter = GetClearCounter(t), .snow = RustSnowTile(index)}; },
+		.set_ground = [](uint32_t t, ClearGround g, uint32_t d) noexcept { SetClearGroundDensity(TileIndex{t}, g, d); },
 		.set_density = [](uint32_t t, uint32_t d) noexcept { SetClearDensity(TileIndex{t}, d); },
 		.set_counter = [](uint32_t t, uint32_t c) noexcept { SetClearCounter(TileIndex{t}, c); },
 		.clear_snow = [](uint32_t t) noexcept { ClearSnow(TileIndex{t}); },
 		.make_snow = RustMakeSnow, .make_clear = RustMakeClear,
-		.fence = [](uint32_t t, uint8_t d) noexcept { return GetFence(TileIndex{t}, static_cast<DiagDirection>(d)); },
-		.set_fence = [](uint32_t t, uint8_t d, uint32_t f) noexcept { SetFence(TileIndex{t}, static_cast<DiagDirection>(d), f); },
-		.field = [](uint32_t t) noexcept { return OpenTTDFieldGround{.industry = GetIndustryIndexOfField(TileIndex{t}).base(), .type = static_cast<uint8_t>(GetFieldType(TileIndex{t}))}; },
+		.fence = [](uint32_t t, DiagDirection d) noexcept { return GetFence(TileIndex{t}, d); },
+		.set_fence = [](uint32_t t, DiagDirection d, uint32_t f) noexcept { SetFence(TileIndex{t}, d, f); },
+		.field = [](uint32_t t) noexcept { return OpenTTDFieldGround{.industry = RustFieldIndustryValue(t), .type = GetFieldType(TileIndex{t})}; },
 		.set_field = [](uint32_t t, uint32_t f) noexcept { SetFieldType(TileIndex{t}, f); },
-		.has_water_class = [](uint32_t t) noexcept { return HasTileWaterClass(TileIndex{t}); },
-		.water_class = [](uint32_t t) noexcept { return to_underlying(GetWaterClass(TileIndex{t})); },
+		.has_water_class = RustHasWaterClass,
+		.water_class = RustWaterClass,
 		.ambient = RustAmbientSound,
 	};
 	return services;
 }
 static void TileLoop_Clear(uint32_t tile) noexcept
 {
-	openttd_rust_clear_tile_loop(tile, OpenTTDLandscapeValue(), OpenTTDEditor(), Map::SizeX(), &GetRustClearServices(), &GetRustSharedServices());
+	openttd_rust_clear_tile_loop(tile, OpenTTDLandscape(), OpenTTDEditor(), Map::SizeX(), &GetRustClearServices(), &GetRustSharedServices());
 }
 #else
 static void UpdateFences(TileIndex tile)

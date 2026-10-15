@@ -10,6 +10,63 @@
 #![allow(unsafe_code, clippy::cast_possible_truncation)]
 use std::ffi::c_void;
 
+/// Native `ClearGround` representation; every byte pattern is retained.
+#[repr(transparent)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct ClearGroundType(pub u8);
+/// Native `RailGroundType` representation; every byte pattern is retained.
+#[repr(transparent)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct RailGroundType(pub u8);
+/// Native `Slope` representation; every byte pattern is retained.
+#[repr(transparent)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct Slope(pub u8);
+/// Native `TrackBits` representation; every byte pattern is retained.
+#[repr(transparent)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct TrackBits(pub u8);
+/// Native `Track` representation; every byte pattern is retained.
+#[repr(transparent)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct Track(pub u8);
+/// Native `Foundation` representation; every byte pattern is retained.
+#[repr(transparent)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct Foundation(pub u8);
+/// Native `Roadside` representation; every byte pattern is retained.
+#[repr(transparent)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct Roadside(pub u8);
+/// Native `RoadBits` representation; every byte pattern is retained.
+#[repr(transparent)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct RoadBits(pub u8);
+/// Native `RoadType` representation; every byte pattern is retained.
+#[repr(transparent)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct RoadType(pub u8);
+/// Native `TreeGround` representation; every byte pattern is retained.
+#[repr(transparent)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct TreeGround(pub u8);
+/// Native `WaterClass` representation; every byte pattern is retained.
+#[repr(transparent)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct WaterClass(pub u8);
+/// Native `FloodingBehaviour` representation; every byte pattern is retained.
+#[repr(transparent)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct FloodingBehaviour(pub u8);
+/// Native `DiagDirection` representation; every byte pattern is retained.
+#[repr(transparent)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct DiagDirection(pub u8);
+/// Native `LandscapeType` representation; every byte pattern is retained.
+#[repr(transparent)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct LandscapeType(pub u8);
+
 /// Original `TILE_HEIGHT`, shared by raw-to-pixel map consumers.
 pub const TILE_HEIGHT: u32 = 8;
 

@@ -32,7 +32,7 @@
 #include "table/clear_land.h"
 
 #ifdef WITH_RUST
-#include "rust/landscape_services.h"
+#include "rust/services_landscape.h"
 #endif
 
 #include "safeguards.h"
@@ -84,12 +84,12 @@ static OpenTTDTreePlantObservation TreePlantObservation(uint32_t index) noexcept
 	o.zone = GetTropicZone(tile);
 	if (o.tile_type == MP_CLEAR) {
 		o.bridge = IsBridgeAbove(tile);
-		o.ground = GetClearGround(tile);
-		o.density = GetClearDensity(tile);
-		o.snow = IsSnowTile(tile);
+		o.ground = static_cast<uint8_t>(RustClearGround(index));
+		o.density = static_cast<uint8_t>(RustClearDensity(index));
+		o.snow = RustSnowTile(index);
 	} else if (o.tile_type == MP_WATER) {
 		o.bridge = IsBridgeAbove(tile);
-		o.coast = IsCoast(tile) && !IsSlopeWithOneCornerRaised(GetTileSlope(tile));
+		o.coast = RustIsCoast(index) && !IsSlopeWithOneCornerRaised(GetTileSlope(tile));
 	}
 	return o;
 }
@@ -98,7 +98,7 @@ static OpenTTDTreeObservation TreeObservation(uint32_t index) noexcept
 {
 	TileIndex tile{index};
 	return {
-		.ground = GetTreeGround(tile),
+		.ground = static_cast<uint8_t>(RustTreeGround(index)),
 		.density = static_cast<uint8_t>(GetTreeDensity(tile)),
 		.species = GetTreeType(tile),
 		.count = static_cast<uint8_t>(GetTreeCount(tile)),
@@ -159,11 +159,11 @@ static const OpenTTDTreeServices _tree_services{
 	.make_tree = [](uint32_t tile, uint8_t type, uint32_t count, uint8_t growth, uint8_t ground, uint32_t density) noexcept {
 		MakeTree(TileIndex{tile}, static_cast<TreeType>(type), count, static_cast<TreeGrowthStage>(growth), static_cast<TreeGround>(ground), density);
 	},
-	.set_ground_density = RustSetTreeGroundDensity,
+	.set_ground_density = RustSetTreeGroundDensityValue,
 	.add_count = [](uint32_t tile, int32_t count) noexcept { AddTreeCount(TileIndex{tile}, count); },
 	.add_growth = [](uint32_t tile, int32_t growth) noexcept { AddTreeGrowth(TileIndex{tile}, growth); },
 	.set_growth = [](uint32_t tile, uint8_t growth) noexcept { SetTreeGrowth(TileIndex{tile}, static_cast<TreeGrowthStage>(growth)); },
-	.make_clear = RustMakeClear,
+	.make_clear = RustMakeClearValue,
 	.make_shore = RustMakeShore,
 	.make_snow = RustMakeSnow,
 	.clear_neighbour_flooding = RustClearNeighbourFlooding,

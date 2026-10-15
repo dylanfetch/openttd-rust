@@ -15,6 +15,11 @@
 //! callers end every owner borrow before calling one that can reenter Rust.
 use std::ptr::NonNull;
 
+/// Native `VehicleType` byte; unknown values retain the source default branches.
+#[repr(transparent)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct VehicleType(pub u8);
+
 /// Opaque C++ `Vehicle`.
 #[repr(C)]
 pub struct OpenTTDVehicle {

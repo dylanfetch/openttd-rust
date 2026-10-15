@@ -5,6 +5,7 @@
 	* See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
 	*/
 
+#include "services_landscape.h"
 #include "services_ffi.h"
 
 /** @file train_reservation_services.h Direct map/PBS/follower services. */
@@ -342,7 +343,7 @@ static void TrainReservationUnreserve(void *, OpenTTDTrainHandle, uint32_t a, ui
 }
 static void TrainReservationUpdateBuffer(void *, OpenTTDTrainHandle) noexcept
 {
-	UpdateSignalsInBuffer();
+	RustUpdateSignals();
 }
 static void TrainReservationWriteDest(void *, OpenTTDTrainHandle id, uint32_t a) noexcept
 {

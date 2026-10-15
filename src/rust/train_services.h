@@ -11,6 +11,7 @@
 #include "sound_services.h"
 
 #include "vehicle_services.h"
+#include "services_landscape.h"
 #include "settings_services.h"
 
 /* Compile-time adapters retain the legacy callback widths while sharing the actual reads. */
@@ -273,7 +274,7 @@ static uint64_t TrainCrossingRoadAxis(OpenTTDTrainHandle, uint32_t a) noexcept
 }
 static void TrainCrossingSound(OpenTTDTrainHandle, uint32_t a) noexcept
 {
-	SndPlayTileFx(SND_0E_LEVEL_CROSSING, TileIndex(a));
+	RustPlayTileSound(a, SND_0E_LEVEL_CROSSING);
 }
 static uint64_t TrainCurveAdvantage(OpenTTDTrainHandle id) noexcept
 {
@@ -814,7 +815,7 @@ static uint64_t TrainTrackdirReaches(OpenTTDTrainHandle, uint8_t a) noexcept
 }
 static uint64_t TrainTrackBits(OpenTTDTrainHandle, uint32_t a) noexcept
 {
-	return GetTrackBits(TileIndex(a));
+	return static_cast<uint64_t>(RustRailTrackBits(a));
 }
 static uint64_t TrainTrackCrosses(OpenTTDTrainHandle, uint8_t a) noexcept
 {
@@ -948,7 +949,7 @@ static uint8_t TrainVisitNear(int32_t x, int32_t y, void *context, uint8_t (*vis
 static OpenTTDTrainHandle TrainReadFirst(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return TrainHandle(v->First());
+	return TrainHandle(static_cast<const Train *>(RustVehicleFirst(v)));
 }
 static OpenTTDTrainHandle TrainReadNext(OpenTTDTrainHandle id) noexcept
 {

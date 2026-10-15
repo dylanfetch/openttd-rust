@@ -28,6 +28,9 @@ pub const RAIL: usize = 64;
 #[cfg(test)]
 pub const WATER: usize = 87;
 
+/// First landscape ground/flood owner branch counter.
+pub const LANDSCAPE: usize = 108;
+
 /// `train.tick_first` witness.
 pub const TRAIN_TICK_FIRST: usize = 0;
 /// `train.tick_second` witness.
@@ -251,7 +254,7 @@ pub const AIRCRAFT_CACHE_ENTRIES: usize = 106;
 pub const AIRCRAFT_DISASTER_ENTRIES: usize = 107;
 
 /// Counter names, grouped by the prefix the harness selects.
-pub const NAMES: [&str; 108] = [
+pub const NAMES: [&str; 134] = [
     "train.tick_first",
     "train.tick_second",
     "train.reversal",
@@ -360,6 +363,32 @@ pub const NAMES: [&str; 108] = [
     "aircraft.observation_bytes",
     "aircraft.cache_entries",
     "aircraft.disaster_entries",
+    "landscape.snow_start",
+    "landscape.snow_change",
+    "landscape.snow_clear",
+    "landscape.desert",
+    "landscape.field_fence",
+    "landscape.field_cycle",
+    "landscape.field_orphan",
+    "landscape.rail_ground",
+    "landscape.roadside",
+    "landscape.road_work_start",
+    "landscape.road_work_end",
+    "landscape.road_remove",
+    "landscape.tunnel_ground",
+    "landscape.flood_success",
+    "landscape.flood_fail",
+    "landscape.dry_coast",
+    "landscape.dry_rail",
+    "landscape.dry_tree",
+    "landscape.wakeup",
+    "landscape.half_rail_remove",
+    "landscape.half_rail",
+    "landscape.bridge_start",
+    "landscape.bridge_end",
+    "landscape.airport_member",
+    "landscape.vehicle_crash",
+    "landscape.crashed_skip",
 ];
 
 static ENABLED: AtomicBool = AtomicBool::new(false);

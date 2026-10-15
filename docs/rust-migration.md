@@ -532,6 +532,33 @@ seeds and non-square maps, including extreme aspect ratios. They compare decoded
 snapshots and plain exit saves. This is sampled evidence; maximum 4096 maps, interactive
 progress cancellation and Windows/macOS runtime parity are not exercised locally.
 
+### Landscape scheduler, ground and flooding
+
+The #212 owner ([PR #255](https://github.com/fetch-laboratories/openttd-rust/pull/255))
+controls `RunTileLoop`, clear/rail/road/tunnel ground evolution, flooding behaviour,
+half-tile rail removal, dry-up, neighbour wakeups and flood-victim traversal.
+The process-global Rust cursor commits only after the complete source batch;
+DATE, legacy loading, reset and zero repair retain their original widths/order.
+Native map/pool storage, shared commands, event insertion and effects remain typed
+`noexcept` services. Original selected bodies compile only without `WITH_RUST`.
+
+The in-entry LFSR reads each live type byte from audited native allocation metadata.
+Native handlers use scalar signatures and local strong-index construction. Ground
+interfaces use actual native enums, transparent Rust carriers retaining all byte
+patterns, exact uint counters and typed station handles. Legacy shared protocols
+adapt explicitly. Native command results are lazy stack storage; no hot call
+allocates a protocol object or copies a complete native tile/vehicle record.
+Vehicle hash iterators advance after crash/events/news/effects; airport rectangle
+membership, bridge start/end order and nested company restoration follow source.
+No ordinary-play callback unwinds; generation-progress cancellation is outside tick.
+
+`verify`, the default landscape comparison and `simulate landscape roads-flooding`
+exercise ABI calls, scheduler gaps, declared ground endpoints and flood branches;
+`--self` and `--soak` extend semantic evidence. Required named witnesses fail when
+missing. The comparison imports the unchanged scheduler for unreachable dimensions
+and cursor/reentry phases. Remaining matrix/editor/NewGRF/threaded gaps are in #156.
+`TreeObservation` remains; the scheduler gate does not remove its full facade cost.
+
 ### Landscape partial-pixel height
 
 `GetPartialPixelZ`, the scalar landscape height kernel, runs in Rust behind its

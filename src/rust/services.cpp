@@ -35,6 +35,7 @@
 #include "../safeguards.h"
 #include "settings_services.h"
 #include "environment_services.h"
+#include "services_landscape.h"
 #include "../cheat_type.h"
 #include "../timer/timer_game_economy.h"
 
@@ -100,7 +101,6 @@ static uint32_t SharedIndustry(int32_t x, int32_t y, uint32_t *index) noexcept
 	return GetIndustryGfx(tile) == GFX_BUBBLE_CATCHER ? 2 : 1;
 }
 
-static uint8_t MapSvcTileOwner(uint32_t tile) noexcept { return GetTileOwner(TileIndex(tile)).base(); }
 static uint16_t MapSvcStationIndex(uint32_t tile) noexcept { return GetStationIndex(TileIndex(tile)).base(); }
 static uint16_t MapSvcDepotIndex(uint32_t tile) noexcept { return GetDepotIndex(TileIndex(tile)).base(); }
 static bool MapSvcIsLevelCrossing(uint32_t tile) noexcept { return IsLevelCrossingTile(TileIndex(tile)); }
@@ -134,7 +134,6 @@ static uint32_t Shared_tile_height(uint32_t tile) noexcept { return TileHeight(T
 static uint8_t Shared_bridge_axis(uint32_t tile) noexcept { return GetBridgeAxis(TileIndex{tile}); }
 static bool Shared_has_water_ground(uint32_t tile) noexcept { return HasTileWaterGround(TileIndex{tile}); }
 static bool Shared_is_sea(uint32_t tile) noexcept { return IsSea(TileIndex{tile}); }
-static bool Shared_is_plain_rail(uint32_t tile) noexcept { return IsPlainRailTile(TileIndex{tile}); }
 static bool Shared_is_bridge(uint32_t tile) noexcept { return IsBridgeTile(TileIndex{tile}); }
 static uint8_t Shared_tunnel_transport(uint32_t tile) noexcept { return GetTunnelBridgeTransportType(TileIndex{tile}); }
 static uint32_t Shared_other_tunnel_end(uint32_t tile) noexcept { return GetOtherTunnelBridgeEnd(TileIndex{tile}).base(); }
@@ -176,7 +175,7 @@ const OpenTTDSharedServices &GetRustSharedServices() noexcept
 		.tile_slope = SharedTileSlope,
 		.mark_dirty = SharedMarkDirty,
 		.set_tropic_zone = SharedSetTropicZone,
-		.tile_owner = MapSvcTileOwner,
+		.tile_owner = RustTileOwnerValue,
 		.station_index = MapSvcStationIndex,
 		.depot_index = MapSvcDepotIndex,
 		.is_level_crossing = MapSvcIsLevelCrossing,
@@ -192,7 +191,7 @@ const OpenTTDSharedServices &GetRustSharedServices() noexcept
 		.bridge_axis = Shared_bridge_axis,
 		.has_water_ground = Shared_has_water_ground,
 		.is_sea = Shared_is_sea,
-		.is_plain_rail = Shared_is_plain_rail,
+		.is_plain_rail = RustPlainRailTile,
 		.is_bridge = Shared_is_bridge,
 		.tunnel_transport = Shared_tunnel_transport,
 		.other_tunnel_end = Shared_other_tunnel_end,
