@@ -9,6 +9,7 @@
 #ifdef WITH_RUST
 #include "company_adapter.h"
 #include "company_services.h"
+#include "vehicle_services.h"
 #include "presentation_services.h"
 #include "settings_services.h"
 #include "../company_base.h"
