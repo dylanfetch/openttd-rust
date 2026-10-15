@@ -148,8 +148,11 @@ static OpenTTDSignalSetTrace SignalSetTrace(std::string_view name)
 	while (set.Get(&tile, &dir)) { }
 	r.drained_count = set.Items();
 	r.overflow_drained = set.Overflowed();
+	/* Sticky overflow must not reject insertion into the drained set. */
+	r.refill_succeeded &= set.Add(TileIndex(UINT32_MAX), invalid);
 	set.Reset();
 	r.overflow_reset = set.Overflowed();
+	r.refill_succeeded &= set.Items() == 0;
 	return r;
 }
 #endif

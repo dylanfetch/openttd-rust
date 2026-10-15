@@ -706,36 +706,6 @@ pub unsafe extern "C" fn openttd_rust_signal_inspect(output: *mut Snapshot) {
 mod tests {
     use super::*;
     #[test]
-    fn duplicates_first_remove_swap_last_and_lifo() {
-        let a = Item { tile: 1, dir: 0 };
-        let b = Item { tile: 2, dir: 255 };
-        let c = Item { tile: 1, dir: 2 };
-        let mut set = SmallSet::<4>::new();
-        for item in [a, b, a, c] {
-            assert!(set.add(item));
-        }
-        assert!(set.remove(a));
-        assert_eq!(set.get(), Some(a));
-        assert_eq!(set.get(), Some(b));
-        assert_eq!(set.get(), Some(c));
-        assert_eq!(set.get(), None);
-    }
-    #[test]
-    fn capacity_failure_survives_drain_until_reset() {
-        let mut set = SmallSet::<64>::new();
-        for tile in 0..64 {
-            assert!(set.add(Item { tile, dir: 0 }));
-        }
-        assert!(!set.add(Item { tile: 64, dir: 0 }));
-        assert!(set.overflowed);
-        while set.get().is_some() {}
-        assert!(set.overflowed);
-        assert!(set.add(Item { tile: 65, dir: 255 }));
-        set.reset();
-        assert!(!set.overflowed);
-        assert_eq!(set.count, 0);
-    }
-    #[test]
     fn process_owner_is_shared_across_serialized_game_threads() {
         access(|s| {
             s.global.reset();
@@ -823,7 +793,7 @@ pub struct SetTrace {
     pub overflow_full: bool,
     /// Swap-last preserved the last element at the removed first position.
     pub first_after_remove: SignalItem,
-    /// Add succeeds again after removal, with sentinel direction preserved.
+    /// Refill succeeds after removal/drain with sticky overflow; Reset empties it.
     pub refill_succeeded: bool,
     /// First LIFO item after refill.
     pub refill_pop: SignalItem,
@@ -876,7 +846,7 @@ fn probe_set<const N: usize>(overflow: extern "C" fn()) -> SetTrace {
     let overflow_full = set.overflowed;
     set.remove(Item { tile: 0, dir: 0 });
     let first_after_remove = set.data[0].into();
-    let refill_succeeded = set.add(Item {
+    let mut refill_succeeded = set.add(Item {
         tile: u32::MAX,
         dir: INVALID,
     });
@@ -884,7 +854,12 @@ fn probe_set<const N: usize>(overflow: extern "C" fn()) -> SetTrace {
     while set.get().is_some() {}
     let drained_count = set.count as u32;
     let overflow_drained = set.overflowed;
+    refill_succeeded &= set.add(Item {
+        tile: u32::MAX,
+        dir: INVALID,
+    });
     set.reset();
+    refill_succeeded &= set.count == 0;
     SetTrace {
         duplicate_count,
         duplicate_pop,
