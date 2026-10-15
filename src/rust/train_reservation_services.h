@@ -89,10 +89,6 @@ static uint64_t TrainReservationFree(void *, OpenTTDTrainHandle id, uint32_t a, 
 	TileIndex t(static_cast<uint32_t>(a));
 	return IsWaitingPositionFree(v, t, static_cast<Trackdir>(b), _settings_game.pf.forbid_90_deg);
 }
-static uint64_t TrainReservationGreen(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
-{
-	return RustRailSignalState(a, b) == SIGNAL_STATE_GREEN;
-}
 static uint64_t TrainReservationHasPbs(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
@@ -250,10 +246,6 @@ static void TrainReservationSetPlatform(void *, OpenTTDTrainHandle, uint32_t a, 
 {
 	TileIndex t(static_cast<uint32_t>(a));
 	SetRailStationPlatformReservation(t, static_cast<DiagDirection>(b), c != 0);
-}
-static void TrainReservationSetSignal(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b, uint8_t c) noexcept
-{
-	RustRailSetSignalState(a, b, c != 0 ? SIGNAL_STATE_GREEN : SIGNAL_STATE_RED);
 }
 static void TrainReservationSetTunnel(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {
