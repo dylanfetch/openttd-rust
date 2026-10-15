@@ -46,4 +46,13 @@ inline void RustPlayTileSound(uint32_t tile, uint16_t sound) noexcept { SndPlayT
 inline void RustPlayTileSoundBySound(uint16_t sound, uint32_t tile) noexcept { RustPlayTileSound(tile, sound); }
 inline void RustClearSquare(uint32_t tile) noexcept { DoClearSquare(TileIndex{tile}); }
 inline void RustUpdateSignals() noexcept { UpdateSignalsInBuffer(); }
+/* Necessary legacy signatures: context handles are unused and scalar return
+ * widths are retained. All native work remains in the canonical typed leaves. */
+inline uint32_t RustFoundationSlopeValue(uint32_t tile) noexcept { return RustFoundationSlope(tile).slope; }
+template <typename Context>
+inline uint64_t RustRailTrackBitsValue(Context, uint32_t tile) noexcept { return static_cast<uint64_t>(RustRailTrackBits(tile)); }
+template <typename Context>
+inline void RustCrossingSound(Context, uint32_t tile) noexcept { RustPlayTileSound(tile, SND_0E_LEVEL_CROSSING); }
+template <typename Context>
+inline void RustUpdateSignalsContext(void *, Context) noexcept { RustUpdateSignals(); }
 #endif /* RUST_SERVICES_LANDSCAPE_H */

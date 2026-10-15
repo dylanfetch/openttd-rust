@@ -272,10 +272,6 @@ static uint64_t TrainCrossingRoadAxis(OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	return GetCrossingRoadAxis(TileIndex(a));
 }
-static void TrainCrossingSound(OpenTTDTrainHandle, uint32_t a) noexcept
-{
-	RustPlayTileSound(a, SND_0E_LEVEL_CROSSING);
-}
 static uint64_t TrainCurveAdvantage(OpenTTDTrainHandle id) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
@@ -812,10 +808,6 @@ static uint64_t TrainTrackdirExit(OpenTTDTrainHandle, uint8_t a) noexcept
 static uint64_t TrainTrackdirReaches(OpenTTDTrainHandle, uint8_t a) noexcept
 {
 	return DiagdirReachesTrackdirs(static_cast<DiagDirection>(a));
-}
-static uint64_t TrainTrackBits(OpenTTDTrainHandle, uint32_t a) noexcept
-{
-	return static_cast<uint64_t>(RustRailTrackBits(a));
 }
 static uint64_t TrainTrackCrosses(OpenTTDTrainHandle, uint8_t a) noexcept
 {

@@ -7,6 +7,7 @@
 
 #include "vehicle_services.h"
 #include "company_services.h"
+#include "presentation_services.h"
 
 struct FleetVehicleListContext { VehicleList list; const VehicleListIdentifier &vli; };
 /* Fleet shared-world services. No selected group algorithm remains here.
@@ -14,8 +15,6 @@ struct FleetVehicleListContext { VehicleList list; const VehicleListIdentifier &
  * Rust ends canonical field accesses before callbacks/reentry/destruction. */
 static void * FleetGroup_group(uint16_t id) noexcept { auto *g = Group::GetIfValid(GroupID(id)); return g == nullptr ? nullptr : g->state.state; }
 static uint32_t FleetGroup_next_group(uint32_t from) noexcept { for (Group *g : Group::Iterate(from)) { if (g->index.base() >= from) return g->index.base(); } return UINT32_MAX; }
-static uint32_t FleetGroup_next_company(uint32_t from) noexcept { for (Company *c : Company::Iterate(from)) { if (c->index.base() >= from) return c->index.base(); } return UINT32_MAX; }
-static void * FleetGroup_next_vehicle(uint32_t from) noexcept { for (Vehicle *v : Vehicle::Iterate(from)) { if (v->index.base() >= from) return v; } return nullptr; }
 static void * FleetGroup_vehicle(uint32_t id) noexcept { return Vehicle::GetIfValid(VehicleID(id)); }
 static uint32_t FleetGroup_vehicle_id(void *shell) noexcept { auto *v = static_cast<Vehicle *>(shell); return v->index.base(); }
 static uint8_t FleetGroup_vehicle_type(void *shell) noexcept { auto *v = static_cast<Vehicle *>(shell); return v->type; }
@@ -39,7 +38,6 @@ static void * FleetGroup_renew_state(void *shell) noexcept { return static_cast<
 static void * FleetGroup_next_renew(uint32_t from) noexcept { for (EngineRenew *er : EngineRenew::Iterate(from)) { if (er->index.base() >= from) return er; } return nullptr; }
 static uint32_t FleetGroup_renew_id(void *shell) noexcept { return static_cast<EngineRenew *>(shell)->index.base(); }
 static uint8_t FleetGroup_engine_type(uint16_t engine) noexcept { return Engine::Get(EngineID(engine))->type; }
-static uint8_t FleetGroup_current_company() noexcept { return OpenTTDCurrentCompany().base(); }
 static bool FleetGroup_buildable_type(uint8_t type) noexcept { return IsCompanyBuildableVehicleType(static_cast<VehicleType>(type)); }
 static bool FleetGroup_can_allocate() noexcept { return Group::CanAllocateItem(); }
 static uint16_t FleetGroup_allocate(uint8_t owner, uint8_t type) noexcept { return (new Group(CompanyID(owner), static_cast<VehicleType>(type)))->index.base(); }
@@ -54,7 +52,6 @@ static void FleetGroup_remove_rule(uint8_t owner, uint16_t engine, uint16_t id, 
 static void FleetGroup_remove_vehicles(uint16_t id, uint32_t flags) noexcept { Command<CMD_REMOVE_ALL_VEHICLES_GROUP>::Do(DoCommandFlags(static_cast<uint16_t>(flags)), GroupID(id)); }
 static void FleetGroup_delete_child(uint16_t id, uint32_t flags) noexcept { Command<CMD_DELETE_GROUP>::Do(DoCommandFlags(static_cast<uint16_t>(flags)), GroupID(id)); }
 static void FleetGroup_add_to_group(uint16_t id, uint32_t vehicle, uint32_t flags) noexcept { Command<CMD_ADD_VEHICLE_GROUP>::Do(DoCommandFlags(static_cast<uint16_t>(flags)), GroupID(id), VehicleID(vehicle), false, VehicleListIdentifier{}); }
-static size_t FleetGroup_utf8_length(const uint8_t *text, size_t length) noexcept { return Utf8StringLength(std::string_view(reinterpret_cast<const char *>(text), length)); }
 static void FleetGroup_list_dirty(uint8_t owner, uint8_t type) noexcept { InvalidateWindowData(GetWindowClassForVehicleType(static_cast<VehicleType>(type)), VehicleListIdentifier(VL_GROUP_LIST, static_cast<VehicleType>(type), CompanyID(owner)).ToWindowNumber()); }
 static void FleetGroup_list_set_dirty(uint8_t owner, uint8_t type) noexcept { SetWindowDirty(GetWindowClassForVehicleType(static_cast<VehicleType>(type)), VehicleListIdentifier(VL_GROUP_LIST, static_cast<VehicleType>(type), CompanyID(owner)).ToWindowNumber()); }
 static void FleetGroup_colour_dirty(uint8_t owner, uint8_t type) noexcept { InvalidateWindowData(WC_COMPANY_COLOUR, CompanyID(owner), static_cast<VehicleType>(type)); }
@@ -64,7 +61,6 @@ static void FleetGroup_alter_dirty(uint8_t type) noexcept { InvalidateWindowData
 static void FleetGroup_vehicle_dirty(uint32_t id) noexcept { InvalidateWindowData(WC_VEHICLE_VIEW, VehicleID(id)); InvalidateWindowData(WC_VEHICLE_DETAILS, VehicleID(id)); }
 static void FleetGroup_depot_dirty(void *shell) noexcept { SetWindowDirty(WC_VEHICLE_DEPOT, static_cast<Vehicle *>(shell)->tile); }
 static void FleetGroup_close_replace(uint8_t type) noexcept { CloseWindowById(WC_REPLACE_VEHICLE, type); }
-static void FleetGroup_screen_dirty() noexcept { MarkWholeScreenDirty(); }
 static bool FleetGroup_list_generate(void *context) noexcept { auto *c = static_cast<FleetVehicleListContext *>(context); return GenerateVehicleSortList(&c->list, c->vli); }
 static void FleetGroup_list_push(void *context, void *shell) noexcept { static_cast<FleetVehicleListContext *>(context)->list.push_back(static_cast<Vehicle *>(shell)); }
 static size_t FleetGroup_list_size(void *context) noexcept { return static_cast<FleetVehicleListContext *>(context)->list.size(); }
@@ -75,8 +71,8 @@ static void FleetGroup_renew_delete(void *shell) noexcept { delete static_cast<E
 static const OpenTTDFleetGroupServices _fleet_group_services{
 	.group = FleetGroup_group,
 	.next_group = FleetGroup_next_group,
-	.next_company = FleetGroup_next_company,
-	.next_vehicle = FleetGroup_next_vehicle,
+	.next_company = RustNextCompanyID,
+	.next_vehicle = RustNextVehicle,
 	.vehicle = FleetGroup_vehicle,
 	.vehicle_id = FleetGroup_vehicle_id,
 	.vehicle_type = FleetGroup_vehicle_type,
@@ -101,7 +97,7 @@ static const OpenTTDFleetGroupServices _fleet_group_services{
 	.next_renew = FleetGroup_next_renew,
 	.renew_id = FleetGroup_renew_id,
 	.engine_type = FleetGroup_engine_type,
-	.current_company = FleetGroup_current_company,
+	.current_company = RustCurrentCompanyID,
 	.buildable_type = FleetGroup_buildable_type,
 	.can_allocate = FleetGroup_can_allocate,
 	.allocate = FleetGroup_allocate,
@@ -116,7 +112,7 @@ static const OpenTTDFleetGroupServices _fleet_group_services{
 	.remove_vehicles = FleetGroup_remove_vehicles,
 	.delete_child = FleetGroup_delete_child,
 	.add_to_group = FleetGroup_add_to_group,
-	.utf8_length = FleetGroup_utf8_length,
+	.utf8_length = RustUtf8Length,
 	.list_dirty = FleetGroup_list_dirty,
 	.list_set_dirty = FleetGroup_list_set_dirty,
 	.colour_dirty = FleetGroup_colour_dirty,
@@ -126,7 +122,7 @@ static const OpenTTDFleetGroupServices _fleet_group_services{
 	.vehicle_dirty = FleetGroup_vehicle_dirty,
 	.depot_dirty = FleetGroup_depot_dirty,
 	.close_replace = FleetGroup_close_replace,
-	.screen_dirty = FleetGroup_screen_dirty,
+	.screen_dirty = RustScreenDirty,
 	.list_generate = FleetGroup_list_generate,
 	.list_push = FleetGroup_list_push,
 	.list_size = FleetGroup_list_size,

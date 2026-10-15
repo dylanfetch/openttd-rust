@@ -569,3 +569,23 @@ mod tests {
         );
     }
 }
+
+/// Shared complete RNG state; both streams survive scoped engine reseeding.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct RandomSeeds {
+    /// Simulation stream state.
+    pub random: [u32; 2],
+    /// Presentation stream state.
+    pub interactive: [u32; 2],
+}
+#[repr(C)]
+/// Borrowed synchronous shared RNG operations.
+pub struct RandomServices {
+    /// Save both streams without a draw.
+    pub save: unsafe extern "C" fn() -> RandomSeeds,
+    /// Restore both streams without a draw.
+    pub restore: unsafe extern "C" fn(RandomSeeds),
+    /// Original `SetRandomSeed` operation.
+    pub set_seed: unsafe extern "C" fn(u32),
+}

@@ -341,10 +341,6 @@ static void TrainReservationUnreserve(void *, OpenTTDTrainHandle, uint32_t a, ui
 	TileIndex t(static_cast<uint32_t>(a));
 	UnreserveRailTrack(t, static_cast<Track>(b));
 }
-static void TrainReservationUpdateBuffer(void *, OpenTTDTrainHandle) noexcept
-{
-	RustUpdateSignals();
-}
 static void TrainReservationWriteDest(void *, OpenTTDTrainHandle id, uint32_t a) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);

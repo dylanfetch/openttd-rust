@@ -195,7 +195,8 @@ const OpenTTDClearServices &GetRustClearServices() noexcept
 }
 static void TileLoop_Clear(uint32_t tile) noexcept
 {
-	openttd_rust_clear_tile_loop(tile, OpenTTDLandscape(), OpenTTDEditor(), Map::SizeX(), &GetRustClearServices(), &GetRustSharedServices());
+	const uint32_t size_x = Map::SizeX();
+	openttd_rust_clear_tile_loop(tile, OpenTTDLandscape(), OpenTTDEditor(), size_x, &GetRustClearServices(), &GetRustSharedServices());
 }
 #else
 static void UpdateFences(TileIndex tile)

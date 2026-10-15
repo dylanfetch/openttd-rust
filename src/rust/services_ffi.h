@@ -100,6 +100,14 @@ const OpenTTDSharedServices &GetRustSharedServices() noexcept;
 /* Shared reader ABI used by default allocation/layout/oracle tests, not game
  * dispatch. Null base selects the existing callback backend. No pointer retained. */
 extern "C" uint8_t openttd_rust_shared_tile_type(OpenTTDTileTypeAllocation, uint8_t (*callback)(uint32_t) noexcept, uint32_t tile);
+/** Shared save/reseed/restore of BOTH original RNG streams. */
+struct OpenTTDRandomSeeds { uint32_t random[2], interactive[2]; };
+struct OpenTTDRandomServices {
+	OpenTTDRandomSeeds (*save)() noexcept;
+	void (*restore)(OpenTTDRandomSeeds) noexcept;
+	void (*set_seed)(uint32_t) noexcept;
+};
+const OpenTTDRandomServices &GetRustRandomServices() noexcept;
 
 /* Standalone fixtures without a game map: map predicates return zero and writes do nothing. */
 template <typename Result, typename... Args>

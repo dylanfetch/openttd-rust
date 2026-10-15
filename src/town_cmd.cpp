@@ -980,10 +980,6 @@ static void RustTown_dirty_town(uint32_t town) noexcept
 {
 	SetWindowDirty(WC_TOWN_VIEW, TownID(town));
 }
-static uint32_t RustTown_foundation_slope(uint32_t tile) noexcept
-{
-	return RustFoundationSlope(tile).slope;
-}
 static int64_t RustTown_terraform_price() noexcept
 {
 	return _price[PR_TERRAFORM];
@@ -1134,7 +1130,7 @@ static const OpenTTDTownLeaves &GetRustTownServices() noexcept
 		.station_owner = RustTownStationOwner,
 		.dirty_authority = RustTownDirtyAuthority,
 		.dirty_town = RustTown_dirty_town,
-		.foundation_slope = RustTown_foundation_slope,
+		.foundation_slope = RustFoundationSlopeValue,
 		.terraform_price = RustTown_terraform_price,
 		.clean_road_bits = RustTown_clean_road_bits,
 		.set_road_town = RustTown_set_road_town,

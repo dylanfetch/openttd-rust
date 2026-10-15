@@ -2624,7 +2624,8 @@ const OpenTTDRailServices &GetRustRailGroundServices() noexcept
 }
 static void TileLoop_Track(uint32_t tile) noexcept
 {
-	openttd_rust_rail_tile_loop(tile, OpenTTDLandscape(), Map::SizeX(), &GetRustRailGroundServices(), &GetRustSharedServices());
+	const uint32_t size_x = Map::SizeX();
+	openttd_rust_rail_tile_loop(tile, OpenTTDLandscape(), size_x, &GetRustRailGroundServices(), &GetRustSharedServices());
 }
 #else
 static void TileLoop_Track(TileIndex tile)

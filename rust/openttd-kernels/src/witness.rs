@@ -28,9 +28,6 @@ pub const RAIL: usize = 64;
 #[cfg(test)]
 pub const WATER: usize = 87;
 
-/// First landscape ground/flood owner branch counter.
-pub const LANDSCAPE: usize = 108;
-
 /// `train.tick_first` witness.
 pub const TRAIN_TICK_FIRST: usize = 0;
 /// `train.tick_second` witness.
@@ -253,8 +250,41 @@ pub const AIRCRAFT_CACHE_ENTRIES: usize = 106;
 /// Ownerless flight helper ingress, also included in total entries.
 pub const AIRCRAFT_DISASTER_ENTRIES: usize = 107;
 
+/// Ground/flood branch witness base.
+pub const LANDSCAPE: usize = 122;
+
 /// Counter names, grouped by the prefix the harness selects.
-pub const NAMES: [&str; 134] = [
+/// Engine services witness.
+pub const ENGINE_SERVICES: usize = 108;
+/// Engine bytes witness.
+pub const ENGINE_BYTES: usize = 109;
+/// Engine sync witness.
+pub const ENGINE_SYNC: usize = 110;
+/// Engine retire witness.
+pub const ENGINE_RETIRE: usize = 111;
+/// Engine `never_expire` witness.
+pub const ENGINE_NEVER_EXPIRE: usize = 112;
+/// Engine accept witness.
+pub const ENGINE_ACCEPT: usize = 113;
+/// Engine join witness.
+pub const ENGINE_JOIN: usize = 114;
+/// Engine offer witness.
+pub const ENGINE_OFFER: usize = 115;
+/// Engine penalty witness.
+pub const ENGINE_PENALTY: usize = 116;
+/// Engine cutoff witness.
+pub const ENGINE_CUTOFF: usize = 117;
+/// Engine visibility witness.
+pub const ENGINE_VISIBILITY: usize = 118;
+/// Engine control witness.
+pub const ENGINE_CONTROL: usize = 119;
+/// Engine rename witness.
+pub const ENGINE_RENAME: usize = 120;
+
+/// Engine native entry witness.
+pub const ENGINE_ENTRIES: usize = 121;
+
+pub const NAMES: [&str; 148] = [
     "train.tick_first",
     "train.tick_second",
     "train.reversal",
@@ -363,6 +393,20 @@ pub const NAMES: [&str; 134] = [
     "aircraft.observation_bytes",
     "aircraft.cache_entries",
     "aircraft.disaster_entries",
+    "engine.services",
+    "engine.bytes",
+    "engine.sync",
+    "engine.retire",
+    "engine.never_expire",
+    "engine.accept",
+    "engine.join",
+    "engine.offer",
+    "engine.penalty",
+    "engine.cutoff",
+    "engine.visibility",
+    "engine.control",
+    "engine.rename",
+    "engine.entries",
     "landscape.snow_start",
     "landscape.snow_change",
     "landscape.snow_clear",
