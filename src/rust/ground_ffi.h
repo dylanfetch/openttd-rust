@@ -28,6 +28,8 @@ enum class LandscapeType : uint8_t;
 enum VehicleType : uint8_t;
 #include "command_services_ffi.h"
 #include "command_cost_ffi.h"
+/* Post-climate guarded reads only; inactive members contain neutral wire values. */
+struct OpenTTDClearSurface { uint32_t density; ClearGround ground; bool snow; };
 struct OpenTTDFieldFences { uint32_t ne; uint32_t se; uint32_t sw; uint32_t nw; };
 /* Strong IDs (IndustryID16, Owner/CompanyID8) and VehStates8 retain their
  * established underlying wire values;
@@ -39,6 +41,7 @@ struct OpenTTDClearServices {
 	uint32_t (*density)(uint32_t) noexcept;
 	uint32_t (*counter)(uint32_t) noexcept;
 	bool (*snow)(uint32_t) noexcept;
+	OpenTTDClearSurface (*surface)(uint32_t) noexcept;
 	void (*set_ground)(uint32_t, ClearGround, uint32_t) noexcept;
 	void (*set_density)(uint32_t, uint32_t) noexcept;
 	void (*set_counter)(uint32_t, uint32_t) noexcept;
@@ -104,8 +107,8 @@ const OpenTTDTunnelServices &GetRustTunnelGroundServices() noexcept;
 struct OpenTTDWaterGroundServices;
 extern "C" {
 void openttd_rust_road_tile_loop(uint32_t, LandscapeType, bool, bool, uint32_t, OpenTTDGroundCall *, const OpenTTDGroundCostServices *, const OpenTTDRoadGroundServices *, const OpenTTDSharedServices *);
-void openttd_rust_clear_tile_loop(uint32_t, LandscapeType, bool, uint32_t, const OpenTTDClearServices *, const OpenTTDSharedServices *);
-void openttd_rust_rail_tile_loop(uint32_t, LandscapeType, uint32_t, uint32_t, OpenTTDGroundCall *, const OpenTTDWaterGroundServices *, const OpenTTDRailServices *, const OpenTTDSharedServices *);
+void openttd_rust_clear_tile_loop(uint32_t, LandscapeType, bool, bool, uint32_t, const OpenTTDClearServices *, const OpenTTDSharedServices *);
+void openttd_rust_rail_tile_loop(uint32_t, LandscapeType, bool, uint32_t, uint32_t, OpenTTDGroundCall *, const OpenTTDWaterGroundServices *, const OpenTTDRailServices *, const OpenTTDSharedServices *);
 void openttd_rust_tunnel_tile_loop(uint32_t, LandscapeType, const OpenTTDTunnelServices *, const OpenTTDSharedServices *);
 }
 struct OpenTTDVehicle;
@@ -161,7 +164,7 @@ struct OpenTTDWaterGroundServices {
 };
 const OpenTTDWaterGroundServices &GetRustWaterGroundServices() noexcept;
 extern "C" {
-void openttd_rust_water_tile_loop(uint32_t, uint32_t, uint32_t, OpenTTDGroundCall *, const OpenTTDWaterGroundServices *, const OpenTTDSharedServices *);
+void openttd_rust_water_tile_loop(uint32_t, uint32_t, uint32_t, bool, OpenTTDGroundCall *, const OpenTTDWaterGroundServices *, const OpenTTDSharedServices *);
 bool openttd_rust_flood_halftile(uint32_t, OpenTTDGroundCall *, const OpenTTDWaterGroundServices *, const OpenTTDSharedServices *);
 FloodingBehaviour openttd_rust_flooding_behaviour(uint32_t, const OpenTTDWaterGroundServices *, const OpenTTDSharedServices *);
 void openttd_rust_clear_neighbour_flooding(uint32_t, uint32_t, const OpenTTDWaterGroundServices *, const OpenTTDSharedServices *);
@@ -171,6 +174,7 @@ void openttd_rust_dirty_water_neighbours(uint32_t, uint32_t, const OpenTTDWaterG
  * parameters, including all-byte values, not just size/offset metadata. */
 struct OpenTTDGroundABICalls {
 	OpenTTDFieldFences (*fences)() noexcept;
+	OpenTTDClearSurface (*surface)() noexcept;
 	OpenTTDFieldGround (*field)() noexcept;
 	OpenTTDRailSnowGround (*rail_snow)() noexcept;
 	OpenTTDRailFenceGround (*rail_fence)() noexcept;

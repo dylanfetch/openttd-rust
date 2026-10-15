@@ -24,12 +24,25 @@ inline OpenTTDFoundationSlope RustFoundationSlope(uint32_t tile) noexcept { auto
 inline RoadBits RustCleanRoadBits(TileIndex tile, RoadBits bits) noexcept { return CleanUpRoadBits(tile, bits); }
 inline uint8_t RustTileOwnerValue(uint32_t tile) noexcept { return GetTileOwner(TileIndex{tile}).base(); }
 inline bool RustPlainRailTile(uint32_t tile) noexcept { return IsPlainRailTile(TileIndex{tile}); }
-inline ClearGround RustClearGround(uint32_t tile) noexcept { return GetClearGround(TileIndex{tile}); }
-inline bool RustClearFieldTile(Tile tile) noexcept { return IsTileType(tile, MP_CLEAR) && IsClearGround(tile, CLEAR_FIELDS); }
+inline ClearGround RustClearGround(Tile tile) noexcept { return GetClearGround(tile); }
+inline ClearGround RustClearGround(uint32_t index) noexcept { return RustClearGround(Tile{TileIndex{index}}); }
+inline bool RustClearFieldTile(Tile tile) noexcept { return IsTileType(tile, MP_CLEAR) && RustClearGround(tile) == CLEAR_FIELDS; }
 inline bool RustClearFieldTile(uint32_t index) noexcept { return RustClearFieldTile(Tile{TileIndex{index}}); }
-inline uint32_t RustClearDensity(uint32_t tile) noexcept { return GetClearDensity(TileIndex{tile}); }
+inline uint32_t RustClearDensity(Tile tile) noexcept { return GetClearDensity(tile); }
+inline uint32_t RustClearDensity(uint32_t index) noexcept { return RustClearDensity(Tile{TileIndex{index}}); }
 inline uint32_t RustClearCounter(uint32_t tile) noexcept { return GetClearCounter(TileIndex{tile}); }
-inline bool RustSnowTile(uint32_t tile) noexcept { return IsSnowTile(TileIndex{tile}); }
+inline bool RustSnowTile(Tile tile) noexcept { return IsSnowTile(tile); }
+inline bool RustSnowTile(uint32_t index) noexcept { return RustSnowTile(Tile{TileIndex{index}}); }
+inline OpenTTDClearSurface RustClearSurface(uint32_t index) noexcept
+{
+	Tile tile{TileIndex{index}};
+	OpenTTDClearSurface surface{.density = 0, .ground = CLEAR_GRASS, .snow = RustSnowTile(tile)};
+	if (!surface.snow) {
+		surface.ground = RustClearGround(tile);
+		if (surface.ground == CLEAR_GRASS) surface.density = RustClearDensity(tile);
+	}
+	return surface;
+}
 inline IndustryID RustFieldIndustry(Tile tile) noexcept { return GetIndustryIndexOfField(tile); }
 inline uint16_t RustFieldIndustryValue(uint32_t index) noexcept { return RustFieldIndustry(Tile{TileIndex{index}}).base(); }
 inline bool RustFieldOfIndustry(Tile tile, IndustryID industry) noexcept { return RustClearFieldTile(tile) && RustFieldIndustry(tile) == industry; }
@@ -47,9 +60,10 @@ inline void RustSetTreeGroundDensity(uint32_t tile, TreeGround ground, uint32_t 
 inline void RustSetTreeGroundDensityValue(uint32_t tile, uint8_t ground, uint32_t density) noexcept { RustSetTreeGroundDensity(tile, static_cast<TreeGround>(ground), density); }
 inline void RustClearNeighbourFlooding(uint32_t tile) noexcept { ClearNeighbourNonFloodingStates(TileIndex{tile}); }
 inline void RustTileLoopWater(uint32_t tile) noexcept { TileLoop_Water(tile); }
+inline bool RustAmbientSoundEnabled() noexcept { return HasGrfMiscBit(GrfMiscBit::AmbientSoundCallback); }
 inline void RustAmbientSound(uint32_t tile) noexcept { AmbientSoundEffect(TileIndex{tile}); }
 /* The existing tree ABI uses this post-callback flag to refresh its observation. */
-inline bool RustAmbientSoundLegacy(uint32_t tile) noexcept { RustAmbientSound(tile); return HasGrfMiscBit(GrfMiscBit::AmbientSoundCallback); }
+inline bool RustAmbientSoundLegacy(uint32_t tile) noexcept { RustAmbientSound(tile); return RustAmbientSoundEnabled(); }
 inline void RustPlayTileSound(uint32_t tile, uint16_t sound) noexcept { SndPlayTileFx(sound, TileIndex{tile}); }
 inline void RustPlayTileSoundBySound(uint16_t sound, uint32_t tile) noexcept { RustPlayTileSound(tile, sound); }
 inline void RustClearSquare(uint32_t tile) noexcept { DoClearSquare(TileIndex{tile}); }

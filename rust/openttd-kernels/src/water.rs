@@ -511,12 +511,13 @@ pub unsafe extern "C" fn openttd_rust_water_tile_loop(
     tile: u32,
     size_x: u32,
     size_y: u32,
+    ambient_callback: bool,
     call: *mut Call,
     w: *const WaterServices,
     s: *const Services,
 ) {
     // SAFETY: Same synchronous table contract as the in-crate scheduler entry.
-    unsafe { water_tile_loop(tile, size_x, size_y, call, w, s) };
+    unsafe { water_tile_loop(tile, size_x, size_y, ambient_callback, call, w, s) };
 }
 #[allow(clippy::inline_always)]
 #[inline(always)]
@@ -524,6 +525,7 @@ pub(crate) unsafe fn water_tile_loop(
     tile: u32,
     size_x: u32,
     size_y: u32,
+    ambient_callback: bool,
     call: *mut Call,
     w: *const WaterServices,
     s: *const Services,
@@ -531,7 +533,9 @@ pub(crate) unsafe fn water_tile_loop(
     // SAFETY: Live immutable tables; no owner access spans ambient sound.
     let (water, shared) = unsafe { (&*w, &*s) };
     if (shared.tile_type)(tile) == 6 {
-        (water.ambient)(tile);
+        if ambient_callback {
+            (water.ambient)(tile);
+        }
         if (water.non_flooding)(tile) {
             return;
         }

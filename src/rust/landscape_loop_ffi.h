@@ -33,6 +33,7 @@ struct OpenTTDGroundLoopServices {
 	LandscapeType climate;
 	bool editor;
 	bool rebuild;
+	bool ambient_callback;
 };
 /* Native handlers retain their complete original bodies. No generic dispatch slot.
  * World callbacks may mutate/reenter; no cursor borrow spans a callback. Tables are

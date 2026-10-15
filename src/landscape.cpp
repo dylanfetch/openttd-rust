@@ -51,6 +51,7 @@
 #include "rust/landscape_loop_ffi.h"
 #include "rust/ground_services.h"
 #include "rust/environment_services.h"
+#include "rust/services_landscape.h"
 #endif
 
 #include "safeguards.h"
@@ -832,7 +833,7 @@ void RunTileLoop()
 		.tile_types = GetRustTileTypeAllocation(),
 		.trees = &GetRustTreeServices(),
 		.industry = GetRustIndustryLoopServices(),
-		.ground = {.clear = &GetRustClearServices(), .rail = &GetRustRailGroundServices(), .road = &GetRustRoadGroundServices(), .tunnel = &GetRustTunnelGroundServices(), .water = &GetRustWaterGroundServices(), .costs = &GetRustGroundCostServices(), .call = &call, .climate = OpenTTDLandscape(), .editor = OpenTTDEditor(), .rebuild = _settings_game.economy.mod_road_rebuild},
+		.ground = {.clear = &GetRustClearServices(), .rail = &GetRustRailGroundServices(), .road = &GetRustRoadGroundServices(), .tunnel = &GetRustTunnelGroundServices(), .water = &GetRustWaterGroundServices(), .costs = &GetRustGroundCostServices(), .call = &call, .climate = OpenTTDLandscape(), .editor = OpenTTDEditor(), .rebuild = _settings_game.economy.mod_road_rebuild, .ambient_callback = RustAmbientSoundEnabled()},
 		.house_loop = _tile_type_town_procs.tile_loop_proc,
 		.station_loop = _tile_type_station_procs.tile_loop_proc,
 		.void_loop = _tile_type_void_procs.tile_loop_proc,

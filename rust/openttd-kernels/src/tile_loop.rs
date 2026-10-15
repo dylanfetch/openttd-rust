@@ -14,7 +14,11 @@
 //! tile handlers may mutate tiles/pools, run landscape/road/crash commands or queue
 //! script events, but none changes map dimensions, climate, tree placement, tick
 //! counter, editor mode, road-rebuild or client ambient settings. Generation progress also runs outside this
-//! entry. Thus the existing tree settings can be captured once per source batch;
+//! entry. `_misc_grf_features` is changed by reset and GRF `ActionD` loading,
+//! both excluded from this batch. The ambient callback feature bit is captured
+//! per independent entry, never cached globally or substituted by client audio.
+//! Enabled callbacks retain their source RNG position; the tree legacy adapter
+//! still rereads the feature bit after its call. Thus settings are entry-local;
 //! tree/map observations still occur inside each owner at original callback sites.
 //!
 //! Raw type descriptor lifetime: `Map::Allocate` is reached only from game reset
@@ -62,6 +66,7 @@ pub extern "C" fn openttd_rust_tile_loop_cursor() -> *mut u32 {
 
 /// Existing industry tables consumed by this entry, borrowed for the batch.
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct IndustryServices {
     pub production: *const industry::Services,
     pub construction: *const industry::ConstructionServices,
@@ -72,6 +77,7 @@ pub struct IndustryServices {
 
 /// Direct ground owners and one independent native lazy-result context per batch.
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct GroundServices {
     pub clear: *const ground::ClearServices,
     pub rail: *const ground::RailServices,
@@ -83,10 +89,12 @@ pub struct GroundServices {
     pub climate: services::LandscapeType,
     pub editor: bool,
     pub rebuild: bool,
+    pub ambient_callback: bool,
 }
 
 /// Each native handler remains separately typed; map reads use the shared table.
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct Services {
     pub shared: *const services::Services,
     pub tile_types: services::TileTypeAllocation,
@@ -121,6 +129,7 @@ unsafe fn dispatch(
                 tile,
                 g.climate,
                 g.editor,
+                g.ambient_callback,
                 settings.size_x,
                 g.clear,
                 s.shared,
@@ -130,6 +139,7 @@ unsafe fn dispatch(
             ground::openttd_rust_rail_tile_loop(
                 tile,
                 g.climate,
+                g.ambient_callback,
                 settings.size_x,
                 size_y,
                 g.call,
@@ -155,7 +165,15 @@ unsafe fn dispatch(
         4 => unsafe { trees::openttd_rust_trees_tile_loop(tile, settings, s.trees, s.shared) },
         5 => (s.station_loop)(tile),
         6 => unsafe {
-            water::water_tile_loop(tile, settings.size_x, size_y, g.call, g.water, s.shared);
+            water::water_tile_loop(
+                tile,
+                settings.size_x,
+                size_y,
+                g.ambient_callback,
+                g.call,
+                g.water,
+                s.shared,
+            );
         },
         7 => (s.void_loop)(tile),
         8 => unsafe {
@@ -192,7 +210,10 @@ pub unsafe extern "C" fn openttd_rust_run_tile_loop(
 ) {
     // SAFETY: The caller supplies a live immutable table; no state borrow spans
     // dispatch. A nested call therefore preserves original commit-after-batch.
-    let s = unsafe { &*services };
+    // Copy only immutable pointer/function/settings metadata into an unescaped
+    // entry-local value; unused/null child tables are never dereferenced.
+    let snapshot = unsafe { *services };
+    let s = &snapshot;
     // SAFETY: The native scheduler facade acquires the actual allocation once.
     // Its serialized no-reset/no-yield call graph keeps it live for this batch;
     // only descriptor metadata, never an actual map access, spans dispatch.
@@ -206,9 +227,10 @@ pub unsafe extern "C" fn openttd_rust_run_tile_loop(
         unsafe { dispatch(0, log_x, size_y, settings, s, &types) };
         count -= 1;
     }
-    for _ in 0..count {
+    while count != 0 {
         unsafe { dispatch(tile, log_x, size_y, settings, s, &types) };
         tile = (tile >> 1) ^ (0_u32.wrapping_sub(tile & 1) & feedback);
+        count -= 1;
     }
     unsafe { CURSOR = tile };
 }

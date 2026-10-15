@@ -66,6 +66,12 @@ pub struct FieldFences {
     pub nw: u32,
 }
 #[repr(C)]
+pub struct ClearSurface {
+    pub density: u32,
+    pub ground: ClearGroundType,
+    pub snow: bool,
+}
+#[repr(C)]
 pub struct FieldGround {
     pub industry: u16,
     pub field_type: u32,
@@ -77,6 +83,7 @@ pub struct ClearServices {
     pub density: extern "C" fn(u32) -> u32,
     pub counter: extern "C" fn(u32) -> u32,
     pub snow: extern "C" fn(u32) -> bool,
+    pub surface: extern "C" fn(u32) -> ClearSurface,
     pub set_ground: extern "C" fn(u32, ClearGroundType, u32),
     pub set_density: extern "C" fn(u32, u32),
     pub set_counter: extern "C" fn(u32, u32),
@@ -139,6 +146,16 @@ fn steep(slope: u8) -> bool {
     slope & 16 != 0
 }
 
+#[allow(clippy::inline_always)]
+#[inline(always)]
+fn field_fence(tile: u32, size_x: u32, direction: u8, fence: u32, c: &ClearServices) -> bool {
+    if fence != 0 || (c.field_tile)(diagonal(tile, direction, size_x)) {
+        return false;
+    }
+    (c.set_fence)(tile, DiagDirection(direction), 3);
+    true
+}
+
 /// # Safety
 /// Tables are live for this serialized synchronous entry; callbacks do not unwind.
 #[unsafe(no_mangle)]
@@ -146,12 +163,23 @@ pub unsafe extern "C" fn openttd_rust_clear_tile_loop(
     tile: u32,
     climate: LandscapeType,
     editor: bool,
+    ambient_callback: bool,
     size_x: u32,
     clear: *const ClearServices,
     shared: *const Services,
 ) {
     // SAFETY: Same synchronous table contract as the in-crate scheduler entry.
-    unsafe { clear_tile_loop(tile, climate, editor, size_x, clear, shared) };
+    unsafe {
+        clear_tile_loop(
+            tile,
+            climate,
+            editor,
+            ambient_callback,
+            size_x,
+            clear,
+            shared,
+        );
+    };
 }
 #[allow(clippy::inline_always)]
 #[inline(always)]
@@ -159,6 +187,7 @@ pub(crate) unsafe fn clear_tile_loop(
     tile: u32,
     climate: LandscapeType,
     editor: bool,
+    ambient_callback: bool,
     size_x: u32,
     clear: *const ClearServices,
     shared: *const Services,
@@ -166,7 +195,9 @@ pub(crate) unsafe fn clear_tile_loop(
     let climate = climate.0;
     // SAFETY: Caller supplies immutable live tables. No state borrow crosses a call.
     let (c, s) = unsafe { (&*clear, &*shared) };
-    (c.ambient)(tile);
+    if ambient_callback {
+        (c.ambient)(tile);
+    }
     if climate == 1 {
         let k = (s.tile_z)(tile) - i32::from((s.snow_line)()) + 1;
         if !(c.snow)(tile) {
@@ -223,12 +254,13 @@ pub(crate) unsafe fn clear_tile_loop(
             hit(Witness::Desert);
         }
     }
-    if (c.snow)(tile) {
+    let surface = (c.surface)(tile);
+    if surface.snow {
         return;
     }
-    match (c.ground)(tile).0 {
+    match surface.ground.0 {
         0 => {
-            let density = (c.density)(tile);
+            let density = surface.density;
             if density == 3 {
                 return;
             }
@@ -249,25 +281,13 @@ pub(crate) unsafe fn clear_tile_loop(
             }
         }
         3 => {
-            // All directions are consumed. SetFence writes disjoint bits; the
-            // intervening neighbour getters are pure and dirtying follows the loop.
+            // Four ordered steps keep each guarded live neighbour read and write.
+            // SetFence's fields are disjoint; dirtying remains after all four.
             let fences = (c.fences)(tile);
-            let mut dirty = false;
-            for (direction, fence) in [fences.ne, fences.se, fences.sw, fences.nw]
-                .into_iter()
-                .enumerate()
-            {
-                if fence != 0 {
-                    continue;
-                }
-                let direction = direction as u8;
-                let neighbour = diagonal(tile, direction, size_x);
-                if (c.field_tile)(neighbour) {
-                    continue;
-                }
-                (c.set_fence)(tile, DiagDirection(direction), 3);
-                dirty = true;
-            }
+            let mut dirty = field_fence(tile, size_x, 0, fences.ne, c);
+            dirty |= field_fence(tile, size_x, 1, fences.se, c);
+            dirty |= field_fence(tile, size_x, 2, fences.sw, c);
+            dirty |= field_fence(tile, size_x, 3, fences.nw, c);
             if dirty {
                 (s.mark_dirty)(tile);
                 hit(Witness::FieldFence);
@@ -308,6 +328,7 @@ pub(crate) unsafe fn clear_tile_loop(
 pub unsafe extern "C" fn openttd_rust_rail_tile_loop(
     tile: u32,
     climate: LandscapeType,
+    ambient_callback: bool,
     size_x: u32,
     size_y: u32,
     call: *mut Call,
@@ -323,7 +344,15 @@ pub unsafe extern "C" fn openttd_rust_rail_tile_loop(
         // SAFETY: The same serialized facade/batch owns this independent native
         // result context; no result is live before this source early return.
         unsafe {
-            crate::water::water_tile_loop(tile, size_x, size_y, call, water, shared);
+            crate::water::water_tile_loop(
+                tile,
+                size_x,
+                size_y,
+                ambient_callback,
+                call,
+                water,
+                shared,
+            );
         };
         return;
     }
@@ -610,6 +639,7 @@ pub unsafe extern "C" fn openttd_rust_road_tile_loop(
 #[repr(C)]
 pub struct ABICalls {
     pub fences: extern "C" fn() -> FieldFences,
+    pub surface: extern "C" fn() -> ClearSurface,
     pub field: extern "C" fn() -> FieldGround,
     pub rail_snow: extern "C" fn() -> RailSnowGround,
     pub rail_fence: extern "C" fn() -> RailFenceGround,
@@ -646,6 +676,7 @@ pub unsafe extern "C" fn openttd_rust_ground_abi_calls(calls: *const ABICalls) -
     // SAFETY: Caller provides actual typed native functions for this fixture.
     let c = unsafe { &*calls };
     let fences = (c.fences)();
+    let surface = (c.surface)();
     let field = (c.field)();
     let snow = (c.rail_snow)();
     let fence = (c.rail_fence)();
@@ -660,6 +691,9 @@ pub unsafe extern "C" fn openttd_rust_ground_abi_calls(calls: *const ABICalls) -
         && fences.se == 0x89ab_cdef
         && fences.sw == 0x7654_3210
         && fences.nw == 0x1234_5678
+        && surface.density == 0x89ab_cdef
+        && surface.ground.0 == 240
+        && surface.snow
         && field.industry == 0xfedc
         && field.field_type == 0x9876_5432
         && snow.z == -42

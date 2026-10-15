@@ -45,7 +45,7 @@ extern "C" {
  * Existing train allocation spans 248-385; other existing low IDs remain.
  * Reserved component blocks: company 400-429, town 430-459,
  * shared vehicle/road services 460-499. Allocate within the component's block.
- * Landscape block: 780-781 scheduler services, 782 allocation, 783 native base-tile layout; 784-801 ground/flood tables and consumed fields; 802 direct ground owner bundle.
+ * Landscape block: 780-781 scheduler services, 782 allocation, 783 native base-tile layout; 784-801 ground/flood tables and consumed fields; 802 direct ground owner bundle; 803 guarded clear surface.
  * 820 signal services, 821 canonical rail-map services; 822 diagnostic snapshot, 823 tile/direction; 824-829 phase observations, 830 direct context; 831 fixed-set probe trace; 832-859 reserved.
  * Item 0 size, 1 alignment, then every field offset in declaration order.
  * Unknown type/item returns SIZE_MAX. No memory borrow, ownership or callback.

@@ -177,7 +177,7 @@ static Foundation GetFoundation_Clear(TileIndex, Slope)
 const OpenTTDClearServices &GetRustClearServices() noexcept
 {
 	static const OpenTTDClearServices services{
-		.ground = RustClearGround, .field_tile = RustClearFieldTile, .density = RustClearDensity, .counter = RustClearCounter, .snow = RustSnowTile,
+		.ground = RustClearGround, .field_tile = RustClearFieldTile, .density = RustClearDensity, .counter = RustClearCounter, .snow = RustSnowTile, .surface = RustClearSurface,
 		.set_ground = [](uint32_t t, ClearGround g, uint32_t d) noexcept { SetClearGroundDensity(TileIndex{t}, g, d); },
 		.set_density = [](uint32_t t, uint32_t d) noexcept { SetClearDensity(TileIndex{t}, d); },
 		.set_counter = [](uint32_t t, uint32_t c) noexcept { SetClearCounter(TileIndex{t}, c); },
@@ -196,7 +196,7 @@ const OpenTTDClearServices &GetRustClearServices() noexcept
 static void TileLoop_Clear(uint32_t tile) noexcept
 {
 	const uint32_t size_x = Map::SizeX();
-	openttd_rust_clear_tile_loop(tile, OpenTTDLandscape(), OpenTTDEditor(), size_x, &GetRustClearServices(), &GetRustSharedServices());
+	openttd_rust_clear_tile_loop(tile, OpenTTDLandscape(), OpenTTDEditor(), RustAmbientSoundEnabled(), size_x, &GetRustClearServices(), &GetRustSharedServices());
 }
 #else
 static void UpdateFences(TileIndex tile)

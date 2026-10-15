@@ -2625,7 +2625,7 @@ static void TileLoop_Track(uint32_t tile) noexcept
 {
 	const uint32_t size_x = Map::SizeX();
 	OpenTTDGroundCall call;
-	openttd_rust_rail_tile_loop(tile, OpenTTDLandscape(), size_x, Map::SizeY(), &call, &GetRustWaterGroundServices(), &GetRustRailGroundServices(), &GetRustSharedServices());
+	openttd_rust_rail_tile_loop(tile, OpenTTDLandscape(), RustAmbientSoundEnabled(), size_x, Map::SizeY(), &call, &GetRustWaterGroundServices(), &GetRustRailGroundServices(), &GetRustSharedServices());
 }
 #else
 static void TileLoop_Track(TileIndex tile)

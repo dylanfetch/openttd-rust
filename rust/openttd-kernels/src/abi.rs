@@ -109,10 +109,11 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         799 => layout!(crate::water::FloodVictim, item; status, kind),
         800 => layout!(crate::water::AircraftFloodPose, item; tile, z, subtype),
         801 => layout!(crate::water::GroundFloodPose, item; z, first),
+        803 => layout!(crate::ground::ClearSurface, item; density, ground, snow),
         784 => layout!(crate::ground::FieldFences, item; ne, se, sw, nw),
         785 => layout!(crate::ground::FieldGround, item; industry, field_type),
         786 => {
-            layout!(crate::ground::ClearServices, item; ground, field_tile, density, counter, snow, set_ground, set_density, set_counter, clear_snow, make_snow, make_clear, fences, set_fence, field, set_field, has_water_class, water_class, ambient)
+            layout!(crate::ground::ClearServices, item; ground, field_tile, density, counter, snow, surface, set_ground, set_density, set_counter, clear_snow, make_snow, make_clear, fences, set_fence, field, set_field, has_water_class, water_class, ambient)
         }
         787 => layout!(crate::ground::RailSnowGround, item; z, slope, tracks, plain),
         788 => layout!(crate::ground::RailFenceGround, item; tracks, owner, plain),
@@ -126,7 +127,7 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         782 => layout!(crate::services::TileTypeAllocation, item; base, count),
         783 => layout!(crate::services::BaseTileLayout, item; kind, height, m2, m1, m3, m4, m5),
         802 => {
-            layout!(crate::tile_loop::GroundServices, item; clear, rail, road, tunnel, water, costs, call, climate, editor, rebuild)
+            layout!(crate::tile_loop::GroundServices, item; clear, rail, road, tunnel, water, costs, call, climate, editor, rebuild, ambient_callback)
         }
         780 => {
             layout!(crate::tile_loop::IndustryServices, item; production, construction, lifecycle, tiles, generation)
