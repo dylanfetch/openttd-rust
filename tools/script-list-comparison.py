@@ -326,7 +326,7 @@ def main():
             "Full unchanged game regressions are primary; this only closes listed gaps",
             "Command-disabling scope uses a host bool sentinel; actual VM/allocator/operation limit remain unchanged",
             "Save/clone TileList bodies are extracted unchanged; world population is not simulated",
-            "Undefined signed-overflow/evaded invalid-iterator valuation cases excluded",
+            "Modification-token wrap after 2^31 changes and evaded invalid-iterator valuation cases are not exercised",
             "Load nonnumeric/integer failed-getter and unrepresentable float cases excluded (deferred issue #67)",
             "VM filter uses four stable typed items, including two live index reads across a real callback; no simulated world",
             "Cargo fixture directly initializes scalar collector without world validation; unchanged stationlist saved-game regression is world/query adapter evidence",

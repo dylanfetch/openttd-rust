@@ -938,16 +938,16 @@ saving does not reset public iteration; mixed-type load validation is unchanged.
 
 The scalar/pointer ABI avoids aggregate returns on 32-bit hosts; items/values are
 signed 64-bit and modification tokens signed 32-bit. Two-list operations detect
-self-aliasing before creating references. Outside the reproduced domain: original
-signed modification-counter overflow, nonempty rank decrement overflow,
-overflowing Count()-count, and callbacks that invalidate iterators while evading
-the modification check.
+self-aliasing before creating references. Rank arithmetic and modification tokens
+wrap like the compiled original, including signed-minimum rank arguments (#260).
+Callbacks that invalidate iterators while evading the modification check remain
+outside the evidence.
 
 Evidence: unchanged `regression_regression` and `regression_stationlist`, plus
 `python3 tools/script-list-comparison.py` (original, Rust and portable binaries at
 O0/O2 with the bundled VM: cursor swaps and insertions, self operations, pending
-removals, empty-list union, filters, zero/negative ranks, callback failures,
-partial commits, operation charges, List/TileList save/load and clones). It
+removals, empty-list union, filters, zero/negative/signed-limit ranks, callback
+failures, partial commits, operation charges, List/TileList save/load and clones). It
 substitutes a command-permission bool for the game instance and populates no
 world; it is not VM, savegame or allocation-failure equivalence.
 

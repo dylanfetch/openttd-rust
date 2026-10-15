@@ -267,7 +267,8 @@ static void OwnerGaps()
 			}
 			Record("filter", list, operation); Drain("filter-next", list);
 		}
-		for (unsigned operation = 0; operation != 4; ++operation) for (SQInteger count : {0, -1, 2, 6}) {
+		for (unsigned operation = 0; operation != 4; ++operation) for (SQInteger count : std::array<SQInteger, 8>{
+				0, -1, 2, 6, INT64_MIN, INT64_MIN + 1, INT64_MIN + 4, INT64_MAX}) {
 			TestList list; Fill(list); list.Sort(mode, ascending); list.Begin();
 			switch (operation) {
 				case 0: list.RemoveTop(count); break; case 1: list.RemoveBottom(count); break;
