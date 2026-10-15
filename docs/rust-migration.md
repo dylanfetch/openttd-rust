@@ -1838,5 +1838,5 @@ adapter declares variant and cutoff spec inputs for unchanged reference bodies;
 branch results, command costs and semantic saves must match. Counters record
 native entries, service crossings and returned bytes, disabled for timing.
 External NewGRF programs/retire_early, ENGS and TTO/TTD fixtures, legacy preview
-conversion and threaded GUI/presentation remain #156 gaps. Final independent
-review, coordinated speed budgets and exact-head full CI still gate integration.
+conversion and threaded GUI/presentation remain #156 gaps. #248 records the
+fixing reviews, source comparisons and final-head CI/speed results.

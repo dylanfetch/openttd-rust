@@ -4,14 +4,14 @@ Root owns selection here; `AGENTS.md` and `docs/rust-migration.md` define proces
 If an issue conflicts, follow this roadmap and report it to root. Keep this
 forward-looking, about 200 lines; completed work is one row, with evidence in PRs.
 
-## Where the fork stands (2026-10-14, `8f9d4fc906`)
+## Where the fork stands (2026-10-14, `d2115d1c3d`)
 
-- Twenty-four ownership ports. Whole fork: Rust 56,978 / tooling 29,797 / glue 26,077 / original retired 36,502 of 470,612 `src/` lines (7.76%). Simulation: 28,522 / 102,615 (27.80%); source counts, not behavioral completion.
-- This restart integrated selected CI work #253/#254: zero original retirement, +431 tooling, unchanged glue. The next work is four simulation owners, not more CI tooling.
-- Latest accepted speed (eleventh-review audit): TGP 1.123, Opus 1.250, Grok 1.245, Ridge 1996 1.225, 2000 1.293, 2016 1.344. CI-only integrations change no game body; new owner timing is pending.
-- Six unintegrated branches: signals #245, engine #248, landscape #255, vehicle #213, idle #244 and paused #66. No new component starts until a slot frees.
-- #252 compatibility and warm acceptance passed; eight Windows vCPUs retained. #249 is enforced in quick CI. #233 has observed two of three code merges, below 10 GiB so far; #244 stays idle.
-- Largest original simulation files remaining: station_cmd 4.5k lines, rail_cmd 3.2k, vehicle 3.0k, road_cmd 2.7k, town_cmd 2.5k, tunnelbridge 2.2k, landscape 1.8k, water 1.5k, engine 1.3k.
+- Twenty-five ownership ports. Whole fork: Rust 58,188 / tooling 30,152 / glue 26,867 / original retired 37,081 of 470,612 `src/` lines (7.88%). Simulation: 29,072 / 102,615 (28.33%); source counts, not behavioral completion.
+- This restart integrated #253/#254 and engine #248: 579 original lines retired; engine's retained native services and default witnesses cost 790 net glue / 369 added tooling. Signals is next; no new CI tooling is selected.
+- Engine final accepted speed: TGP 1.128, Opus 1.229, Grok 1.227, Ridge 1996 1.234, 2000 1.297, 2016 1.309. All six stored caps plus 3% pass; invocation spread and every raw sample remain in #248. Caps are unchanged.
+- Six unintegrated branches: signals #245, landscape #255, vehicle #257, town #246, idle #244 and paused #66. No new component branch until a slot frees.
+- #252 acceptance passed; eight Windows vCPUs retained. #249 is enforced in quick CI. #233 has observed the third code merge; finish its cache-save wave before deciding #244.
+- Largest original simulation files remaining: station_cmd 4.5k lines, rail_cmd 3.2k, vehicle 3.0k, road_cmd 2.7k, town_cmd 2.5k, tunnelbridge 2.2k, landscape 1.8k, water 1.5k.
 
 ## Eleventh steering review (2026-10-14, throughput and enforcement)
 
@@ -33,7 +33,7 @@ Actions, in order:
 1. **Do not work on #244.** Blacksmith moved the Linux caches out of GitHub's 10 GiB, so its cache-peak problem is likely gone. Over the next three code merges, record GitHub's peak cache usage on #233. If it stays under 10 GiB, close #233 as met and #243/#244 unmerged (keep the branch, remove the worktree). If it goes over, resume #244: fix the platform gate failure and the quick-job ccache fixture, then bootstrap, full CI and #233 live acceptance.
 2. **#249 shared-accessor check:** integrated in #254. Keep its baseline shrinking; do not block ownership on tooling-only base adoption.
 3. **#245 signals:** apply the two fixes in its steering comment, record its gaps (posted on #156), then do final-head validation, timing, a fresh fixing review, full CI and integrate.
-4. **#248 engine:** fix the build break, add `engines.py` witnesses, delete the duplicated accessors and apply the rest of its steering comment. Then review, CI and integrate.
+4. **#248 engine:** integrated after fixing reviews, default witnesses, six speed gates and exact-head full CI. Evidence remains on #248.
 5. **Re-select #212 from integrated tip.**
    - Boundary: R0's scheduler with an inlined dispatch on the raw type byte and direct native handler pointers. Declare `TileLoop_*` `noexcept` under `WITH_RUST`; no lambda trampolines and no pointer cast.
    - Then the full ground/flood scope.
@@ -87,6 +87,7 @@ Metrics are `tools/port-metrics.py`: Rust / tooling / C++ glue / C++ retired.
 | #147 | Fleet groups and autoreplace | #197 | `a7a6e6650a` | 2686 / 577 / 1199 / 1454 |
 | #150 | Industry construction and lifecycle | #218 | `648d44e940` | 3066 / 701 / 1433 / 1736 |
 | #148 | Town canonical state and periodic policy (narrow scope) | #216 | `59385bce59` | 1848 / 694 / 1418 / 340 |
+| #220 | Engine lifecycle and canonical design state | #248 | `d2115d1c3d` | 1218 / 369 / 833 / 579 |
 
 Harness and process: #72 harness (#85), #84 play saves (#87), #97 provenance
 freeze (#100), #88 Ruff (#92), #75 partial-pixel fidelity (#91), #90 world-state
@@ -145,7 +146,7 @@ go in `KNOWN_FAILURES` with an issue, never in masks (`docs/rust-migration.md`).
 Integrate reviewed work first, in order of readiness, with at most six
 unintegrated branches (#157). Independent items (#156, #249) may run in parallel.
 
-1. **#245 signals, then #248 engine,** per the eleventh review's actions 3-4.
+1. **#245 signals:** finish the integrated-engine conflict update, fresh resolution review, timing and exact-head CI. #248 engine is integrated.
 2. **#212 landscape, then #213 vehicle tick,** per actions 5-6. These are the largest remaining simulation owners. They also delete the tree facade (16.8 ms on TGP) and the per-vehicle scheduler crossings.
 3. **Town:** #246 founding, generation and names from integrated #216; then #256 house lifecycle/tile simulation; then #247 commands, authority and deletion. Reuse the sole town owner and generation unwind contract.
 4. **Next owners**, planned when fewer than two unstarted components remain: station tile, cargo and rating control (`station_cmd`); rail and road track commands and tile procs; tunnel/bridge. Guide the selection by the world-state design and the tip profile.
@@ -163,21 +164,22 @@ that a `SaveLoad` descriptor cannot address through the alias.
 
 ## Resume checkpoint
 
-Root resumed from `fe337e4e40` with `/start-development`. The last code revision
-is green. #253/#254 are integrated and their worktrees removed; #252 acceptance is
-complete. Root owns CI/integration and #233 observation. Two ownership agents,
-two fixing reviewers and a bounded landscape evidence planner are active.
+Root resumed with `/start-development`. #253/#254/#248 are integrated and their
+worktrees removed; #252 acceptance is complete. Engine's merged tree matches its
+full validation. Root owns CI/integration and #233 observation. Landscape, vehicle
+and town owners plus the signal fixing reviewer are active.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #233 / #243 / #244 | `ci-cache-peak-233`, `1288db61b4` | Root sampling; two of three code merges observed. Leave #244 idle (action 1). |
+| #233 / #243 / #244 | `ci-cache-peak-233`, `1288db61b4` | Third code merge observed; finish its cache-save wave, then action 1. Leave #244 idle. |
 | #252 / #253 | integrated, worktree removed | Closed: compatibility/full CI and warm-cache/CPU acceptance passed; eight vCPUs retained, scheduling restored. |
 | #249 / #254 | integrated, worktree removed | Fixing review/full CI passed; 206 baseline fingerprints, no additions permitted. |
-| #219 / #245 | `signal-owner-219`, `f358184498` | `signals_review_245`: affected 25/25 pass; fixing shared meanings/new enum service types, then native/focused checks and quiet timing. |
-| #220 / #248 | `engine-lifecycle-220`, `8d66856d6a` | `engine_review_248`: typed-year/copy fixes and native/focused pass; finish canonical bundle reads, then quiet timing/full CI. |
-| #212 / #255 | `landscape-owner-212`, `87cd4cb673` | `landscape_owner_212`: initial gate accepted on PR; implementing full ground/flood scope. Bounded evidence planning in parallel. |
-| #213 / #257 | `vehicle-owner-213`, `b380d4c8ff` | `vehicle_owner_213`: all 166 native tests pass; focused semantics, unused bundle-field cleanup, then initial quiet Opus gate. |
-| #246 / #256 / #247 | unstarted | Founding/names, then complete house lifecycle, then town commands/deletion. |
+| #219 / #245 | `signal-owner-219`, `05890fd2da` | Native/width fixes pass; finish review disposition, resolve #248 base conflict, fresh resolution review, then timing/full CI. |
+| #220 / #248 | integrated, worktree removed | Fixing reviews, semantic/native evidence, all six speed gates and exact-head full CI passed. |
+| #212 / #255 | `landscape-owner-212`, full milestone | Initial TGP gate accepted; full ground/flood and default witnesses pass locally. Adopt #248 types, final checks and fresh review next. |
+| #213 / #257 | `vehicle-owner-213`, `8b0b676307` | Initial a110 gate accepted narrowly; #248 adopted. Implement remaining maintenance scope, then fresh review/final gates. |
+| #246 | `town-founding-246`, `d2115d1c3d` | `town_founding_246`: remove descriptor-addressable save staging, then founding/generation/name ownership. |
+| #256 / #247 | unstarted | Complete house lifecycle, then town commands/deletion, after #246. |
 | #64 / #66 | `issue/64-curve-family`, `aab5211801` | Paused draft/worktree; leave untouched, not a fallback. |
 | Paused integration | `integration/curve-script`, `c19f09cf8b` | Locked worktree preserved; no work. |
 | Disaster evidence | `evidence-disaster-vehicles`, `a775543162` | Locked evidence worktree preserved; no work. |
