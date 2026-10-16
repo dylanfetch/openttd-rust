@@ -23,6 +23,7 @@
     clippy::decimal_bitwise_operands
 )]
 pub mod founding;
+pub mod house;
 pub mod names;
 
 use crate::services::{Map, Services, chance16_i};
@@ -248,18 +249,6 @@ unsafe fn change_population(leaves: &Leaves, state: *mut State, town: u32, amoun
     (leaves.population_changed)(town);
 }
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_town_change_population(
-    leaves: *const Leaves,
-    state: *mut State,
-    town: u32,
-    amount: i32,
-) {
-    // SAFETY: Immutable table and live owner outlive the synchronous invocation.
-    unsafe {
-        change_population(&*leaves, state, town, amount);
-    }
-}
-#[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_town_world_population(leaves: *const Leaves) -> u32 {
     // SAFETY: Immutable table remains live; no owner access spans pool iteration.
     let leaves = unsafe { &*leaves };
@@ -463,12 +452,8 @@ pub extern "C" fn openttd_rust_town_global_class_counts_resize(count: usize) {
         (*cell.get()).classes.resize(count, 0);
     });
 }
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_town_increase_building(
-    state: *mut State,
-    house: u16,
-    class: u16,
-) {
+/// Count one built house part in its town and the process-wide totals.
+unsafe fn increase_building(state: *mut State, house: u16, class: u16) {
     // SAFETY: Original valid spec/count indices; no callback while borrowed.
     let state = unsafe { &mut *state };
     BUILDING_COUNTS.with(|cell| {
@@ -483,12 +468,8 @@ pub unsafe extern "C" fn openttd_rust_town_increase_building(
         }
     });
 }
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_town_decrease_building(
-    state: *mut State,
-    house: u16,
-    class: u16,
-) {
+/// Saturating removal of one house part from town and process-wide totals.
+unsafe fn decrease_building(state: *mut State, house: u16, class: u16) {
     // SAFETY: Source valid indices and serialized original lifetime preconditions.
     let state = unsafe { &mut *state };
     BUILDING_COUNTS.with(|cell| {
@@ -716,7 +697,7 @@ pub struct Leaves {
     pub build_tunnel: extern "C" fn(u32, u32, u32) -> bool,
     pub clear_house_land: extern "C" fn(u32),
     pub allow_construction: extern "C" fn(u32, u32, u32, u32) -> bool,
-    pub construction_animation: extern "C" fn(u32),
+    pub houses: *const house::HouseServices,
 }
 pub type StationActivity = crate::station_service::StationActivity;
 #[repr(C)]
@@ -1709,7 +1690,7 @@ impl Engine<'_> {
         let class = (self.leaves.house_class)(house as u16);
         // SAFETY: Entry resolved the live town once. Count borrows end here,
         // before map writes or callbacks can reenter and mutate the owner.
-        unsafe { openttd_rust_town_increase_building(self.owner, house as u16, class) };
+        unsafe { increase_building(self.owner, house as u16, class) };
         (self.leaves.make_house)(
             tile,
             town,
@@ -1798,15 +1779,15 @@ impl Engine<'_> {
         }
         self.update_rate(town);
         let size = u32::from((self.leaves.house_flags)(house as u16));
-        (self.leaves.construction_animation)(tile);
+        house::stage_changed(self.leaves, self.services, tile);
         if size & 24 != 0 {
-            (self.leaves.construction_animation)(self.offset(tile, 0, 1));
+            house::stage_changed(self.leaves, self.services, self.offset(tile, 0, 1));
         }
         if size & 20 != 0 {
-            (self.leaves.construction_animation)(self.offset(tile, 1, 0));
+            house::stage_changed(self.leaves, self.services, self.offset(tile, 1, 0));
         }
         if size & 16 != 0 {
-            (self.leaves.construction_animation)(self.offset(tile, 1, 1));
+            house::stage_changed(self.leaves, self.services, self.offset(tile, 1, 1));
         }
     }
     fn try_house(&self, town: u32, base: u32, modes: u32) -> bool {
@@ -2361,36 +2342,6 @@ pub unsafe extern "C" fn openttd_rust_town_change_rating(
     }
 }
 
-/// House fields consumed only by the yearly traversal, with immediate map access.
-#[repr(C)]
-pub struct YearlyServices {
-    pub completed: extern "C" fn(u32) -> bool,
-    pub age: extern "C" fn(u32) -> u8,
-    pub set_age: extern "C" fn(u32, u8),
-}
-/// Original `Map::Iterate` order and completed-house age saturation.
-/// SAFETY: Immutable tables live through this serialized native timer entry.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_town_yearly(
-    services: *const Services,
-    houses: *const YearlyServices,
-    size: u32,
-) {
-    // SAFETY: Borrowed tables outlive traversal; map access ends before mutations.
-    let (services, houses) = unsafe { (&*services, &*houses) };
-    for tile in 0..size {
-        if (services.tile_type)(tile) != 3 {
-            continue;
-        }
-        if (houses.completed)(tile) {
-            let age = (houses.age)(tile);
-            if age < u8::MAX {
-                (houses.set_age)(tile, age + 1);
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2422,7 +2373,7 @@ mod tests {
             // SAFETY: Owner lives on the suspended parent stack; spawn/join prevents
             // concurrent reads and every index is valid in both sized owners.
             unsafe {
-                openttd_rust_town_increase_building(owner, 110, 15);
+                increase_building(owner, 110, 15);
             }
             RATING_TEST.with(|cell| {
                 // SAFETY: Serialized access; same process-wide test scratch.
@@ -2450,7 +2401,7 @@ mod tests {
             assert_eq!(*ids.data.cast::<u32>().add(110), 1);
             assert_eq!(*classes.data.cast::<u32>().add(15), 1);
             assert_eq!(openttd_rust_town_rating(&raw const owner, 42, 0), -99);
-            openttd_rust_town_decrease_building(&raw mut owner, 110, 15);
+            decrease_building(&raw mut owner, 110, 15);
             assert_eq!(*ids.data.cast::<u32>().add(110), 0);
             assert_eq!(*classes.data.cast::<u32>().add(15), 0);
         }

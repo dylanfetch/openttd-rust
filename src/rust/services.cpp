@@ -41,6 +41,8 @@
 #include "../tree_map.h"
 #include "../cheat_type.h"
 #include "../timer/timer_game_economy.h"
+#include "../economy_func.h"
+#include "../autoslope.h"
 
 static CommandCost *NativeCost(OpenTTDCommandCost *cost) noexcept { return reinterpret_cast<CommandCost *>(cost); }
 static const CommandCost *NativeCost(const OpenTTDCommandCost *cost) noexcept { return reinterpret_cast<const CommandCost *>(cost); }
@@ -93,6 +95,10 @@ OpenTTDTownState *OpenTTDTownOwnerByID(uint32_t id) noexcept
 }
 
 void OpenTTDAssertTownGenerationContext() noexcept { assert(_game_mode == GM_EDITOR || _generating_world); }
+size_t OpenTTDTownCount() noexcept { return Town::GetNumItems(); }
+bool OpenTTDEconomyRecession() noexcept { return EconomyIsInRecession(); }
+bool OpenTTDAutoslopeEnabled() noexcept { return AutoslopeEnabled(); }
+int64_t OpenTTDFoundationPrice() noexcept { return _price[PR_BUILD_FOUNDATION]; }
 
 bool OpenTTDIsTileFlat(uint32_t tile) noexcept { return IsTileFlat(TileIndex(tile)); }
 ClearGround OpenTTDClearGround(uint32_t tile) noexcept { return GetClearGround(TileIndex(tile)); }

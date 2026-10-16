@@ -33,4 +33,8 @@ ClearGround OpenTTDClearGround(uint32_t tile) noexcept;
 TreeGround OpenTTDTreeGround(uint32_t tile) noexcept;
 inline bool OpenTTDExchangeGeneratingWorld(bool value) noexcept { return std::exchange(_generating_world, value); }
 void OpenTTDAssertTownGenerationContext() noexcept;
+size_t OpenTTDTownCount() noexcept;
+bool OpenTTDEconomyRecession() noexcept;
+bool OpenTTDAutoslopeEnabled() noexcept;
+int64_t OpenTTDFoundationPrice() noexcept;
 #endif /* RUST_ENVIRONMENT_SERVICES_H */

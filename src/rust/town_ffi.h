@@ -15,6 +15,7 @@
 #include "command_cost_ffi.h"
 #include <cstddef>
 struct OpenTTDTownState;
+struct OpenTTDHouseServices;
 struct OpenTTDTownGrowthFields { uint16_t counter, rate; uint8_t funding, road, flags; };
 struct OpenTTDTownReceived { uint16_t old_max, new_max, old_act, new_act; };
 struct OpenTTDTownSimulationFields {
@@ -40,11 +41,6 @@ struct OpenTTDTownRoadChoice { int32_t introduction_date; uint16_t max_speed; bo
 struct OpenTTDTownHouseAvailability { uint16_t zones; uint16_t override_id; uint16_t class_id; uint8_t probability; bool enabled; };
 struct OpenTTDTownHousePlacement { int32_t min_year; int32_t max_year; uint8_t flags; uint8_t extra_flags; };
 struct OpenTTDTownHouseConstruction { uint8_t extra_flags; uint8_t population; };
-struct OpenTTDTownYearlyServices {
-	bool (*completed)(uint32_t) noexcept;
-	uint8_t (*age)(uint32_t) noexcept;
-	void (*set_age)(uint32_t, uint8_t) noexcept;
-};
 struct OpenTTDTownAuthorityServices {
 	uint8_t (*council_tolerance)() noexcept;
 	bool (*bulldozer)() noexcept;
@@ -99,7 +95,7 @@ struct OpenTTDTownLeaves {
 	bool (*build_tunnel)(uint32_t tile, uint32_t road_type, uint32_t execute) noexcept;
 	void (*clear_house_land)(uint32_t tile) noexcept;
 	bool (*allow_construction)(uint32_t town, uint32_t tile, uint32_t house, uint32_t random) noexcept;
-	void (*construction_animation)(uint32_t tile) noexcept;
+	const OpenTTDHouseServices *houses;
 };
 /* Services are synchronous noexcept calls. No owner reference spans one. Commands
  * and bounded NewGRF resolution may reenter; ordinary gameplay does not throw.
@@ -107,11 +103,9 @@ struct OpenTTDTownLeaves {
 extern "C" {
 OpenTTDByteSpan openttd_rust_town_name(const OpenTTDTownState *);
 void openttd_rust_town_set_name(OpenTTDTownState *, OpenTTDByteSpan);
-void openttd_rust_town_yearly(const OpenTTDSharedServices *, const OpenTTDTownYearlyServices *, uint32_t);
 void openttd_rust_town_authority_station(const OpenTTDTownAuthorityServices *, const OpenTTDSharedServices *, const OpenTTDCommandCostServices *, OpenTTDCommandCost *, uint32_t, bool);
 void openttd_rust_town_authority_remove(const OpenTTDTownAuthorityServices *, const OpenTTDSharedServices *, const OpenTTDCommandCostServices *, OpenTTDCommandCost *, const OpenTTDTownHandle *, bool, uint8_t);
 void openttd_rust_town_update_radius(OpenTTDTownState *);
-void openttd_rust_town_change_population(const OpenTTDTownLeaves *, OpenTTDTownState *, uint32_t, int32_t);
 uint32_t openttd_rust_town_world_population(const OpenTTDTownLeaves *);
 OpenTTDTownSimulationFields *openttd_rust_town_simulation(OpenTTDTownState *);
 OpenTTDTownSlots openttd_rust_town_supplied_view(OpenTTDTownState *);
@@ -128,8 +122,6 @@ OpenTTDTownSlots openttd_rust_town_class_counts(OpenTTDTownState *);
 void openttd_rust_town_class_counts_resize(OpenTTDTownState *, size_t);
 OpenTTDTownSlots openttd_rust_town_global_class_counts();
 void openttd_rust_town_global_class_counts_resize(size_t);
-void openttd_rust_town_increase_building(OpenTTDTownState *, uint16_t, uint16_t);
-void openttd_rust_town_decrease_building(OpenTTDTownState *, uint16_t, uint16_t);
 OpenTTDTownSuppliedHistory openttd_rust_town_sum_history(const OpenTTDTownSuppliedHistory *, size_t);
 void openttd_rust_town_rating_test(bool);
 int32_t openttd_rust_town_rating(const OpenTTDTownState *, uintptr_t, uint8_t);

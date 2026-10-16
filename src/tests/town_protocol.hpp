@@ -9,6 +9,7 @@
 #ifndef TOWN_PROTOCOL_HPP
 #define TOWN_PROTOCOL_HPP
 #include "../rust/town_ffi.h"
+#include "../rust/house_ffi.h"
 #include <algorithm>
 #include <array>
 #include <memory>
@@ -88,7 +89,18 @@ static inline bool TownProtocol_allow_construction(uint32_t, uint32_t, uint32_t,
 {
 	openttd_rust_town_growth(town_protocol_world->owner)->flags = 0x88; return true;
 }
-static inline void TownProtocol_construction_animation(uint32_t) noexcept { town_protocol_world->animations++; }
+static inline OpenTTDHouseTile TownProtocol_house_tile(uint32_t) noexcept { return {}; }
+static inline uint16_t TownProtocol_house_callbacks(uint16_t) noexcept { return 1U << 3; }
+static inline void TownProtocol_change_frame(uint16_t, uint32_t, uint32_t, uint32_t, uint64_t) noexcept { town_protocol_world->animations++; }
+/* Only the construction-stage animation trigger is reachable from house building;
+ * the remaining services stay null. */
+static inline const OpenTTDHouseServices town_protocol_houses = [] {
+	OpenTTDHouseServices houses{};
+	houses.tile = TownProtocol_house_tile;
+	houses.callbacks = TownProtocol_house_callbacks;
+	houses.change_frame = TownProtocol_change_frame;
+	return houses;
+}();
 static inline OpenTTDTownLeaves TownProtocolServices()
 {
 	return {
@@ -138,7 +150,7 @@ static inline OpenTTDTownLeaves TownProtocolServices()
 		.build_tunnel = TownProtocol_build_tunnel,
 		.clear_house_land = TownProtocol_clear_house_land,
 		.allow_construction = TownProtocol_allow_construction,
-		.construction_animation = TownProtocol_construction_animation,
+		.houses = &town_protocol_houses,
 	};
 }
 template <typename Check> void CheckTownProtocol(Check check)

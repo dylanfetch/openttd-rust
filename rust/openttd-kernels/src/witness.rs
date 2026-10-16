@@ -398,9 +398,11 @@ pub const TOWN_GRID: usize = 176;
 pub const TOWN_NAME_SET: usize = 177;
 /// `town.entries` witness.
 pub const TOWN_ENTRIES: usize = 178;
+/// First house lifecycle counter; `town/house.rs` names the offsets.
+pub const HOUSE: usize = 179;
 
 /// Counter names, grouped by the prefix the harness selects.
-pub const NAMES: [&str; 179] = [
+pub const NAMES: [&str; 196] = [
     "train.tick_first",
     "train.tick_second",
     "train.reversal",
@@ -580,6 +582,23 @@ pub const NAMES: [&str; 179] = [
     "town.grid",
     "town.name_set",
     "town.entries",
+    "house.stage",
+    "house.complete",
+    "house.lift_start",
+    "house.lift_stop",
+    "house.original",
+    "house.binomial",
+    "house.recession",
+    "house.rebuild",
+    "house.replace",
+    "house.clear_auto",
+    "house.clear_refused",
+    "house.clear_execute",
+    "house.autoslope",
+    "house.place",
+    "house.place_error",
+    "house.station_removed",
+    "house.protected",
 ];
 
 static ENABLED: AtomicBool = AtomicBool::new(false);
@@ -642,6 +661,7 @@ mod tests {
             (SHIP_YAPF, "ship_yapf."),
             (RAIL, "rail."),
             (WATER, "water."),
+            (HOUSE, "house."),
         ] {
             assert!(NAMES[base].starts_with(prefix));
             assert!(base == 0 || !NAMES[base - 1].starts_with(prefix));
