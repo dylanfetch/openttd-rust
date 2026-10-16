@@ -149,7 +149,7 @@ unintegrated component branches. Housekeeping (#259) and #156 run in parallel.
    - landscape: an inlined dispatch on the raw type byte, `noexcept` `TileLoop_*` handlers called directly, Rust transition control and no raw-map extension; gate within 11 ms on TGP, interleaved A/B against tip;
    - vehicle: a pool-cursor descriptor, one slim dispatch record and one post-tick bundle, at most about three C++ calls per vehicle (`docs/design/world-state.md`); gate at most 6 ns per vehicle-tick visit on Opus.
 3. **Town:** #256 house lifecycle and tile simulation, then #247 commands, authority and deletion. Reuse the sole town owner and generation unwind contract.
-4. **Next owners**, planned when fewer than two unstarted components remain: station tile, cargo and rating control (`station_cmd`); rail and road track commands and tile procs; tunnel/bridge. Guide the selection by the world-state design and the tip profile.
+4. **Next owners (#265-#267, planned 2026-10-15):** #265 rail track/depot/signal commands and procs, then #266 road commands (reuses #265's crossing/track services), then #267 station construction/joining/removal on the #125 owner. Tile loops stay #212's; hot per-vehicle procs stay native. Tunnel/bridge follows once #247 and #212 settle.
 5. **Conversions buy speed headroom** and never block ownership:
    - aircraft (94 calls per tick);
    - road vehicles (12.6 per tick);
@@ -172,11 +172,12 @@ profiles, and times caps on a quiet host.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #259 H4 / #264 | `cleanup-dead-ffi-259`, `2c65620788` | `/root/fix_review_264` fixes the two guard defects within 190 lines; then root verifies, full CI, integrate. |
+| #259 H4 / #264 | `cleanup-dead-ffi-259`, `836f134040` | Fix review done (174/190 lines); root verified fixes; exact-head full CI running, then integrate. |
 | #212 / #255 | `landscape-owner-212`, `63c67959ee` | `/root/landscape_update_profile_255`: base update, callgrind attribution, one proposed fix; root selects. Resolution needs a fresh reviewer. |
 | #213 / #257 | `vehicle-owner-213`, `67611082f7` | `/root/vehicle_update_profile_257`: same as #255. |
 | #256 | `house-lifecycle-256` (new) | `/root/house_lifecycle_256` implementing; draft PR pending. |
 | #261 R4 | `save-staging-261` (new) | `/root/save_staging_261_r4` implementing; R1-R3 wait for H4. |
+| #265 | `rail-commands-265` (new) | `/root/rail_commands_265` implementing; #266 and #267 unstarted. |
 | #64 / #66 | remote `issue/64-curve-family`, `aab5211801` | #66 closed unmerged; #64 stays paused. |
 
 ABI blocks:
@@ -185,7 +186,7 @@ ABI blocks:
 - station/loading 500-559, industry 560-619 (572 is the shared ByteSpan), CommandCost 620-629
 - town lifecycle 630-669, aircraft 670-739
 - vehicle 740-779, landscape 780-819, signals 820-859, engines 860-919
-- house lifecycle 920-979
+- house lifecycle 920-979, rail commands 980-1019, road commands 1020-1059, station construction 1060-1119
 
 Check only consumed layouts.
 
