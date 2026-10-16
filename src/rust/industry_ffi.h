@@ -311,7 +311,6 @@ typedef struct OpenTTDIndustryTilePolicyServices {
 	void (*close_game)(OpenTTDIndustryShell *) OPENTTD_INDUSTRY_NOEXCEPT;
 	void (*destroy)(OpenTTDIndustryShell *) OPENTTD_INDUSTRY_NOEXCEPT;
 	int64_t (*removal_cost)(const OpenTTDIndustrySpecHandle *) OPENTTD_INDUSTRY_NOEXCEPT;
-	bool (*autoslope_enabled)(void) OPENTTD_INDUSTRY_NOEXCEPT;
 	int32_t (*tile_max_z)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
 	bool (*autoslope_callback)(const OpenTTDIndustryTileSpec *) OPENTTD_INDUSTRY_NOEXCEPT;
 	bool (*callback_boolean)(const OpenTTDIndustryTileSpec *, uint16_t, uint16_t) OPENTTD_INDUSTRY_NOEXCEPT;

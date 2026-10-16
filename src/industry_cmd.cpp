@@ -3911,7 +3911,6 @@ static const OpenTTDIndustryTilePolicyServices &GetIndustryTilePolicyServices()
 		.close_game = [](Industry *industry) noexcept { Game::NewEvent(new ScriptEventIndustryClose(industry->index)); },
 		.destroy = [](Industry *industry) noexcept { delete industry; },
 		.removal_cost = [](const OpenTTDIndustrySpecHandle *spec) noexcept -> int64_t { return reinterpret_cast<const IndustrySpec *>(spec)->GetRemovalCost(); },
-		.autoslope_enabled = []() noexcept -> bool { return AutoslopeEnabled(); },
 		.tile_max_z = [](uint32_t tile) noexcept -> int32_t { return OpenTTDTileMaxZ(TileIndex(tile)); },
 		.autoslope_callback = [](const OpenTTDIndustryTileSpec *spec) noexcept -> bool { return spec->callback_mask.Test(IndustryTileCallbackMask::Autoslope); },
 		.callback_boolean = [](const OpenTTDIndustryTileSpec *spec, uint16_t callback, uint16_t result) noexcept -> bool { return ConvertBooleanCallback(spec->grf_prop.grffile, callback, result); },

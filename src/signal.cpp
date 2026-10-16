@@ -66,6 +66,11 @@ static const OpenTTDSignalServices _signal_services{
 	.assert_company = SignalAssertCompany,
 };
 
+const OpenTTDSignalServices &GetRustSignalServices() noexcept
+{
+	return _signal_services;
+}
+
 OpenTTDSignalContext GetRustSignalContext() noexcept
 {
 	return {&GetRustSharedServices(), &GetRustRailMapServices(), &_signal_services, OpenTTDMapLogX()};

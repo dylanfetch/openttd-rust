@@ -85,6 +85,8 @@ struct OpenTTDSharedServices {
 	int32_t (*economy_date)() noexcept;
 	int32_t (*calendar_date)() noexcept;
 	int32_t (*slope)(int32_t, int32_t) noexcept;
+	bool (*build_on_slopes)() noexcept;
+	bool (*autoslope)() noexcept;
 };
 const OpenTTDSharedServices &GetRustSharedServices() noexcept;
 /** Shared save/reseed/restore of BOTH original RNG streams. */
@@ -129,6 +131,40 @@ struct OpenTTDRailMapServices {
 	void (*set_signal_state)(uint32_t, uint8_t, uint8_t) noexcept;
 	uint32_t (*other_tunnel_bridge_end)(uint32_t) noexcept;
 	uint32_t (*rail_track_status)(uint32_t, uint8_t) noexcept;
+	/* Rail command, depot and level-crossing leaves (#265). */
+	TrackBits (*rail_tracks)(uint32_t) noexcept;
+	bool (*has_signals)(uint32_t) noexcept;
+	SignalType (*signal_type)(uint32_t, uint8_t) noexcept;
+	uint8_t (*rail_type)(uint32_t) noexcept;
+	void (*set_rail_type)(uint32_t, uint8_t) noexcept;
+	uint8_t (*rail_tile_type)(uint32_t) noexcept;
+	uint8_t (*rail_ground)(uint32_t) noexcept;
+	void (*set_rail_ground)(uint32_t, uint8_t) noexcept;
+	void (*set_track_bits)(uint32_t, uint8_t) noexcept;
+	uint8_t (*present_signals)(uint32_t) noexcept;
+	void (*set_present_signals)(uint32_t, uint8_t) noexcept;
+	uint8_t (*signal_states)(uint32_t) noexcept;
+	void (*set_signal_states)(uint32_t, uint8_t) noexcept;
+	void (*set_has_signals)(uint32_t, bool) noexcept;
+	void (*set_signal_type)(uint32_t, uint8_t, uint8_t) noexcept;
+	uint8_t (*signal_variant)(uint32_t, uint8_t) noexcept;
+	void (*set_signal_variant)(uint32_t, uint8_t, uint8_t) noexcept;
+	void (*cycle_signal_side)(uint32_t, uint8_t) noexcept;
+	TrackBits (*reserved_tracks)(uint32_t) noexcept;
+	TrackBits (*rail_reservation)(uint32_t) noexcept;
+	void (*set_track_reservation)(uint32_t, uint8_t) noexcept;
+	bool (*depot_reserved)(uint32_t) noexcept;
+	void (*set_depot_exit)(uint32_t, uint8_t) noexcept;
+	void (*make_rail_normal)(uint32_t, uint8_t, uint8_t, uint8_t) noexcept;
+	void (*make_rail_depot)(uint32_t, uint8_t, uint16_t, uint8_t, uint8_t) noexcept;
+	TrackBits (*crossing_rail_bits)(uint32_t) noexcept;
+	Axis (*crossing_road_axis)(uint32_t) noexcept;
+	bool (*has_station_rail)(uint32_t) noexcept;
+	bool (*is_rail_station)(uint32_t) noexcept;
+	bool (*station_blocked)(uint32_t) noexcept;
+	uint8_t (*station_track)(uint32_t) noexcept;
+	bool (*wormhole_reserved)(uint32_t) noexcept;
+	void (*set_tile_owner)(uint32_t, uint8_t) noexcept;
 };
 const OpenTTDRailMapServices &GetRustRailMapServices() noexcept;
 
@@ -201,6 +237,8 @@ inline OpenTTDSharedServices OpenTTDFixtureSharedServices(void *context, uint32_
 		.economy_date = OpenTTDFixtureMapService<int32_t>,
 		.calendar_date = OpenTTDFixtureMapService<int32_t>,
 		.slope = OpenTTDFixtureMapService<int32_t, int32_t, int32_t>,
+		.build_on_slopes = OpenTTDFixtureMapService<bool>,
+		.autoslope = OpenTTDFixtureMapService<bool>,
 	};
 }
 #endif /* RUST_SERVICES_FFI_H */

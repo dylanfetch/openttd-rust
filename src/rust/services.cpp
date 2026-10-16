@@ -54,12 +54,14 @@ static void CostAmount(OpenTTDCommandCost *out, int64_t amount) noexcept { Nativ
 static bool CostSuccess(const OpenTTDCommandCost *cost) noexcept { return OpenTTDCommandCostSuccess(NativeCost(cost)); }
 static uint32_t CostErrorMessage(const OpenTTDCommandCost *cost) noexcept { return NativeCost(cost)->GetErrorMessage(); }
 static int64_t CostMoney(const OpenTTDCommandCost *cost) noexcept { return NativeCost(cost)->GetCost(); }
+static void CostMakeError(OpenTTDCommandCost *cost, uint32_t message) noexcept { NativeCost(cost)->MakeError(message); }
 const OpenTTDCommandCostServices &GetRustCommandCostServices() noexcept
 {
 	static const OpenTTDCommandCostServices services{
 		.zero = CostZero, .error = CostError, .expense_money = CostExpenseMoney,
 		.error_param = CostErrorParam, .add = CostAdd, .move = CostMove,
 		.amount = CostAmount, .success = CostSuccess, .error_message = CostErrorMessage, .money = CostMoney,
+		.make_error = CostMakeError,
 	};
 	return services;
 }
@@ -234,6 +236,8 @@ const OpenTTDSharedServices &GetRustSharedServices() noexcept
 		.economy_date = SharedEconomyDate,
 		.calendar_date = SharedCalendarDate,
 		.slope = SharedSlope,
+		.build_on_slopes = RustBuildOnSlopes,
+		.autoslope = RustAutoslopeEnabled,
 	};
 	return services;
 }
@@ -334,6 +338,39 @@ const OpenTTDRailMapServices &GetRustRailMapServices() noexcept
 		.set_signal_state = RustRailSetSignalState,
 		.other_tunnel_bridge_end = RustOtherTunnelBridgeEnd,
 		.rail_track_status = RustRailTrackStatus,
+		.rail_tracks = RustRailTracks,
+		.has_signals = RustRailHasSignals,
+		.signal_type = RustRailSignalType,
+		.rail_type = RustRailType,
+		.set_rail_type = RustSetRailType,
+		.rail_tile_type = RustRailTileType,
+		.rail_ground = RustRailGround,
+		.set_rail_ground = RustSetRailGround,
+		.set_track_bits = RustSetTrackBits,
+		.present_signals = RustRailPresentSignals,
+		.set_present_signals = RustSetPresentSignals,
+		.signal_states = RustSignalStates,
+		.set_signal_states = RustSetSignalStates,
+		.set_has_signals = RustSetHasSignals,
+		.set_signal_type = RustSetSignalType,
+		.signal_variant = RustSignalVariant,
+		.set_signal_variant = RustSetSignalVariant,
+		.cycle_signal_side = RustCycleSignalSide,
+		.reserved_tracks = RustReservedTracks,
+		.rail_reservation = RustRailReservation,
+		.set_track_reservation = RustSetTrackReservation,
+		.depot_reserved = RustDepotReserved,
+		.set_depot_exit = RustSetDepotExit,
+		.make_rail_normal = RustMakeRailNormal,
+		.make_rail_depot = RustMakeRailDepot,
+		.crossing_rail_bits = RustCrossingRailBits,
+		.crossing_road_axis = RustCrossingRoadAxis,
+		.has_station_rail = RustHasStationRail,
+		.is_rail_station = RustIsRailStation,
+		.station_blocked = RustStationBlocked,
+		.station_track = RustRailStationTrack,
+		.wormhole_reserved = RustWormholeReserved,
+		.set_tile_owner = RustSetTileOwner,
 	};
 	return services;
 }

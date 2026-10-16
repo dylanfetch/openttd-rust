@@ -45,6 +45,8 @@ pub struct CommandCostServices {
     pub error_message: extern "C" fn(*const CommandCost) -> u32,
     /// Query native `GetCost()`.
     pub money: extern "C" fn(*const CommandCost) -> i64,
+    /// Native `MakeError`, keeping owner and encoded message.
+    pub make_error: extern "C" fn(*mut CommandCost, u32),
 }
 
 /// Ordinary direct commands. Native result storage retains complete errors and
@@ -203,6 +205,10 @@ pub struct Services {
     pub calendar_date: extern "C" fn() -> i32,
     /// Shared live slope observation.
     pub slope: extern "C" fn(i32, i32) -> i32,
+    /// `construction.build_on_slopes`.
+    pub build_on_slopes: extern "C" fn() -> bool,
+    /// `AutoslopeEnabled()`.
+    pub autoslope: extern "C" fn() -> bool,
 }
 impl Services {
     /// Draw one shared random word.
@@ -219,6 +225,7 @@ impl Services {
 /// Standalone test table: map predicates return zero and writes do nothing.
 #[cfg(test)]
 #[must_use]
+#[allow(clippy::too_many_lines)]
 pub fn fixture(
     context: *mut c_void,
     random: extern "C" fn(*mut c_void) -> u32,
@@ -323,6 +330,8 @@ pub fn fixture(
         economy_date: zero_year,
         calendar_date: zero_year,
         slope,
+        build_on_slopes: flag0,
+        autoslope: flag0,
     }
 }
 /// Map dimensions read once per entry.
@@ -578,4 +587,70 @@ pub struct RailMapServices {
     pub other_tunnel_bridge_end: extern "C" fn(u32) -> u32,
     /// Native `rail_track_status` map operation at the original observation point.
     pub rail_track_status: extern "C" fn(u32, u8) -> u32,
+    /// Native `GetTrackBits`.
+    pub rail_tracks: extern "C" fn(u32) -> TrackBits,
+    /// Native `HasSignals`.
+    pub has_signals: extern "C" fn(u32) -> bool,
+    /// Native `GetSignalType`.
+    pub signal_type: extern "C" fn(u32, u8) -> SignalType,
+    /// Native `GetRailType`.
+    pub rail_type: extern "C" fn(u32) -> u8,
+    /// Native `SetRailType`.
+    pub set_rail_type: extern "C" fn(u32, u8),
+    /// Native `GetRailTileType`.
+    pub rail_tile_type: extern "C" fn(u32) -> u8,
+    /// Native `GetRailGroundType`.
+    pub rail_ground: extern "C" fn(u32) -> u8,
+    /// Native `SetRailGroundType`.
+    pub set_rail_ground: extern "C" fn(u32, u8),
+    /// Native `SetTrackBits`.
+    pub set_track_bits: extern "C" fn(u32, u8),
+    /// Native `GetPresentSignals`.
+    pub present_signals: extern "C" fn(u32) -> u8,
+    /// Native `SetPresentSignals`.
+    pub set_present_signals: extern "C" fn(u32, u8),
+    /// Native `GetSignalStates`.
+    pub signal_states: extern "C" fn(u32) -> u8,
+    /// Native `SetSignalStates`.
+    pub set_signal_states: extern "C" fn(u32, u8),
+    /// Native `SetHasSignals`.
+    pub set_has_signals: extern "C" fn(u32, bool),
+    /// Native `SetSignalType`.
+    pub set_signal_type: extern "C" fn(u32, u8, u8),
+    /// Native `GetSignalVariant`.
+    pub signal_variant: extern "C" fn(u32, u8) -> u8,
+    /// Native `SetSignalVariant`.
+    pub set_signal_variant: extern "C" fn(u32, u8, u8),
+    /// Native `CycleSignalSide`.
+    pub cycle_signal_side: extern "C" fn(u32, u8),
+    /// Native `GetReservedTrackbits`.
+    pub reserved_tracks: extern "C" fn(u32) -> TrackBits,
+    /// Native `GetRailReservationTrackBits`.
+    pub rail_reservation: extern "C" fn(u32) -> TrackBits,
+    /// Native `SetTrackReservation`.
+    pub set_track_reservation: extern "C" fn(u32, u8),
+    /// Native `HasDepotReservation`.
+    pub depot_reserved: extern "C" fn(u32) -> bool,
+    /// Native `SetRailDepotExitDirection`.
+    pub set_depot_exit: extern "C" fn(u32, u8),
+    /// Native `MakeRailNormal(tile, owner, bits, railtype)`.
+    pub make_rail_normal: extern "C" fn(u32, u8, u8, u8),
+    /// Native `MakeRailDepot(tile, owner, depot, dir, railtype)`.
+    pub make_rail_depot: extern "C" fn(u32, u8, u16, u8, u8),
+    /// Native `GetCrossingRailBits`.
+    pub crossing_rail_bits: extern "C" fn(u32) -> TrackBits,
+    /// Native `GetCrossingRoadAxis`.
+    pub crossing_road_axis: extern "C" fn(u32) -> Axis,
+    /// Native `HasStationRail`.
+    pub has_station_rail: extern "C" fn(u32) -> bool,
+    /// Native `IsRailStationTile`.
+    pub is_rail_station: extern "C" fn(u32) -> bool,
+    /// Native `IsStationTileBlocked`.
+    pub station_blocked: extern "C" fn(u32) -> bool,
+    /// Native `GetRailStationTrack`.
+    pub station_track: extern "C" fn(u32) -> u8,
+    /// Native `HasTunnelBridgeReservation`.
+    pub wormhole_reserved: extern "C" fn(u32) -> bool,
+    /// Native `SetTileOwner`.
+    pub set_tile_owner: extern "C" fn(u32, u8),
 }

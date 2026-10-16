@@ -152,9 +152,9 @@ TEST_CASE("Commands - shared native stack result layouts and encoded parameters"
 	const auto &commands = GetRustCommandServices();
 	FleetSlotsFilled(621, &commands, 1);
 	using T = OpenTTDCommandCostServices;
-	FleetLayout(620, {sizeof(T), alignof(T), offsetof(T, zero), offsetof(T, error), offsetof(T, expense_money), offsetof(T, error_param), offsetof(T, add), offsetof(T, move), offsetof(T, amount), offsetof(T, success), offsetof(T, error_message), offsetof(T, money)});
+	FleetLayout(620, {sizeof(T), alignof(T), offsetof(T, zero), offsetof(T, error), offsetof(T, expense_money), offsetof(T, error_param), offsetof(T, add), offsetof(T, move), offsetof(T, amount), offsetof(T, success), offsetof(T, error_message), offsetof(T, money), offsetof(T, make_error)});
 	const auto &w = GetRustCommandCostServices();
-	FleetSlotsFilled(620, &w, 10);
+	FleetSlotsFilled(620, &w, 11);
 	AutoRestoreBackup<CompanyID> current(_current_company, CompanyID(0));
 	AutoRestoreBackup<CompanyID> local(_local_company, CompanyID(0));
 	CommandCost result;

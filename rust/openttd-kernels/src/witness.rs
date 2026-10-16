@@ -399,8 +399,101 @@ pub const TOWN_NAME_SET: usize = 177;
 /// `town.entries` witness.
 pub const TOWN_ENTRIES: usize = 178;
 
+/// `rail_cmd.entries` witness.
+pub const RAIL_CMD_ENTRIES: usize = 179;
+/// `rail_cmd.build_rail` witness.
+pub const RAIL_CMD_BUILD_RAIL: usize = 180;
+/// `rail_cmd.build_not_plain` witness.
+pub const RAIL_CMD_BUILD_NOT_PLAIN: usize = 181;
+/// `rail_cmd.build_remove_signals` witness.
+pub const RAIL_CMD_BUILD_REMOVE_SIGNALS: usize = 182;
+/// `rail_cmd.build_convert` witness.
+pub const RAIL_CMD_BUILD_CONVERT: usize = 183;
+/// `rail_cmd.build_crossing` witness.
+pub const RAIL_CMD_BUILD_CROSSING: usize = 184;
+/// `rail_cmd.build_clear` witness.
+pub const RAIL_CMD_BUILD_CLEAR: usize = 185;
+/// `rail_cmd.build_half_water` witness.
+pub const RAIL_CMD_BUILD_HALF_WATER: usize = 186;
+/// `rail_cmd.remove_rail` witness.
+pub const RAIL_CMD_REMOVE_RAIL: usize = 187;
+/// `rail_cmd.remove_crossing` witness.
+pub const RAIL_CMD_REMOVE_CROSSING: usize = 188;
+/// `rail_cmd.remove_shore` witness.
+pub const RAIL_CMD_REMOVE_SHORE: usize = 189;
+/// `rail_cmd.remove_signal_charge` witness.
+pub const RAIL_CMD_REMOVE_SIGNAL_CHARGE: usize = 190;
+/// `rail_cmd.remove_diagonal_crossing` witness.
+pub const RAIL_CMD_REMOVE_DIAGONAL_CROSSING: usize = 191;
+/// `rail_cmd.drag_build` witness.
+pub const RAIL_CMD_DRAG_BUILD: usize = 192;
+/// `rail_cmd.drag_remove` witness.
+pub const RAIL_CMD_DRAG_REMOVE: usize = 193;
+/// `rail_cmd.drag_obstacle` witness.
+pub const RAIL_CMD_DRAG_OBSTACLE: usize = 194;
+/// `rail_cmd.depot_build` witness.
+pub const RAIL_CMD_DEPOT_BUILD: usize = 195;
+/// `rail_cmd.depot_rotate` witness.
+pub const RAIL_CMD_DEPOT_ROTATE: usize = 196;
+/// `rail_cmd.signal_build` witness.
+pub const RAIL_CMD_SIGNAL_BUILD: usize = 197;
+/// `rail_cmd.signal_convert` witness.
+pub const RAIL_CMD_SIGNAL_CONVERT: usize = 198;
+/// `rail_cmd.signal_variant` witness.
+pub const RAIL_CMD_SIGNAL_VARIANT: usize = 199;
+/// `rail_cmd.signal_cycle_type` witness.
+pub const RAIL_CMD_SIGNAL_CYCLE_TYPE: usize = 200;
+/// `rail_cmd.signal_cycle_side` witness.
+pub const RAIL_CMD_SIGNAL_CYCLE_SIDE: usize = 201;
+/// `rail_cmd.signal_copy` witness.
+pub const RAIL_CMD_SIGNAL_COPY: usize = 202;
+/// `rail_cmd.signal_pbs_state` witness.
+pub const RAIL_CMD_SIGNAL_PBS_STATE: usize = 203;
+/// `rail_cmd.signal_reserve` witness.
+pub const RAIL_CMD_SIGNAL_RESERVE: usize = 204;
+/// `rail_cmd.signal_drag` witness.
+pub const RAIL_CMD_SIGNAL_DRAG: usize = 205;
+/// `rail_cmd.signal_drag_remove` witness.
+pub const RAIL_CMD_SIGNAL_DRAG_REMOVE: usize = 206;
+/// `rail_cmd.signal_minimise` witness.
+pub const RAIL_CMD_SIGNAL_MINIMISE: usize = 207;
+/// `rail_cmd.signal_autofill` witness.
+pub const RAIL_CMD_SIGNAL_AUTOFILL: usize = 208;
+/// `rail_cmd.signal_wormhole` witness.
+pub const RAIL_CMD_SIGNAL_WORMHOLE: usize = 209;
+/// `rail_cmd.signal_remove` witness.
+pub const RAIL_CMD_SIGNAL_REMOVE: usize = 210;
+/// `rail_cmd.signal_remove_path_end` witness.
+pub const RAIL_CMD_SIGNAL_REMOVE_PATH_END: usize = 211;
+/// `rail_cmd.convert_rail` witness.
+pub const RAIL_CMD_CONVERT_RAIL: usize = 212;
+/// `rail_cmd.convert_depot` witness.
+pub const RAIL_CMD_CONVERT_DEPOT: usize = 213;
+/// `rail_cmd.convert_wormhole` witness.
+pub const RAIL_CMD_CONVERT_WORMHOLE: usize = 214;
+/// `rail_cmd.convert_station_crossing` witness.
+pub const RAIL_CMD_CONVERT_STATION_CROSSING: usize = 215;
+/// `rail_cmd.convert_reroute` witness.
+pub const RAIL_CMD_CONVERT_REROUTE: usize = 216;
+/// `rail_cmd.clear_rail` witness.
+pub const RAIL_CMD_CLEAR_RAIL: usize = 217;
+/// `rail_cmd.clear_water` witness.
+pub const RAIL_CMD_CLEAR_WATER: usize = 218;
+/// `rail_cmd.clear_depot` witness.
+pub const RAIL_CMD_CLEAR_DEPOT: usize = 219;
+/// `rail_cmd.owner_transfer` witness.
+pub const RAIL_CMD_OWNER_TRANSFER: usize = 220;
+/// `rail_cmd.owner_clear` witness.
+pub const RAIL_CMD_OWNER_CLEAR: usize = 221;
+/// `rail_cmd.terraform_corner` witness.
+pub const RAIL_CMD_TERRAFORM_CORNER: usize = 222;
+/// `rail_cmd.terraform_depot` witness.
+pub const RAIL_CMD_TERRAFORM_DEPOT: usize = 223;
+/// `rail_cmd.build_above_clear` witness.
+pub const RAIL_CMD_BUILD_ABOVE_CLEAR: usize = 224;
+
 /// Counter names, grouped by the prefix the harness selects.
-pub const NAMES: [&str; 179] = [
+pub const NAMES: [&str; 225] = [
     "train.tick_first",
     "train.tick_second",
     "train.reversal",
@@ -580,6 +673,52 @@ pub const NAMES: [&str; 179] = [
     "town.grid",
     "town.name_set",
     "town.entries",
+    "rail_cmd.entries",
+    "rail_cmd.build_rail",
+    "rail_cmd.build_not_plain",
+    "rail_cmd.build_remove_signals",
+    "rail_cmd.build_convert",
+    "rail_cmd.build_crossing",
+    "rail_cmd.build_clear",
+    "rail_cmd.build_half_water",
+    "rail_cmd.remove_rail",
+    "rail_cmd.remove_crossing",
+    "rail_cmd.remove_shore",
+    "rail_cmd.remove_signal_charge",
+    "rail_cmd.remove_diagonal_crossing",
+    "rail_cmd.drag_build",
+    "rail_cmd.drag_remove",
+    "rail_cmd.drag_obstacle",
+    "rail_cmd.depot_build",
+    "rail_cmd.depot_rotate",
+    "rail_cmd.signal_build",
+    "rail_cmd.signal_convert",
+    "rail_cmd.signal_variant",
+    "rail_cmd.signal_cycle_type",
+    "rail_cmd.signal_cycle_side",
+    "rail_cmd.signal_copy",
+    "rail_cmd.signal_pbs_state",
+    "rail_cmd.signal_reserve",
+    "rail_cmd.signal_drag",
+    "rail_cmd.signal_drag_remove",
+    "rail_cmd.signal_minimise",
+    "rail_cmd.signal_autofill",
+    "rail_cmd.signal_wormhole",
+    "rail_cmd.signal_remove",
+    "rail_cmd.signal_remove_path_end",
+    "rail_cmd.convert_rail",
+    "rail_cmd.convert_depot",
+    "rail_cmd.convert_wormhole",
+    "rail_cmd.convert_station_crossing",
+    "rail_cmd.convert_reroute",
+    "rail_cmd.clear_rail",
+    "rail_cmd.clear_water",
+    "rail_cmd.clear_depot",
+    "rail_cmd.owner_transfer",
+    "rail_cmd.owner_clear",
+    "rail_cmd.terraform_corner",
+    "rail_cmd.terraform_depot",
+    "rail_cmd.build_above_clear",
 ];
 
 static ENABLED: AtomicBool = AtomicBool::new(false);

@@ -357,6 +357,7 @@ static void CompareAuthority()
 		.success = +[](const OpenTTDCommandCost *) noexcept -> bool { std::abort(); },
 		.error_message = +[](const OpenTTDCommandCost *) noexcept -> uint32_t { std::abort(); },
 		.money = +[](const OpenTTDCommandCost *) noexcept -> int64_t { std::abort(); },
+		.make_error = +[](OpenTTDCommandCost *, uint32_t) noexcept { std::abort(); },
 	};
 	costs.zero = +[](OpenTTDCommandCost *out) noexcept { *reinterpret_cast<CommandCost *>(out) = {}; };
 	costs.error_param = +[](OpenTTDCommandCost *out, uint32_t error, uint64_t parameter) noexcept { *reinterpret_cast<CommandCost *>(out) = CommandCostWithParam(error, parameter); };

@@ -399,6 +399,12 @@ pub unsafe extern "C" fn openttd_rust_company_state_destroy(p: *mut Finances) {
 pub extern "C" fn openttd_rust_economy_state() -> *mut Economy {
     &raw mut ECONOMY
 }
+/// Current `_price[index]` for other Rust owners under the game-state mutex.
+pub(crate) fn price(index: usize) -> i64 {
+    // SAFETY: process-lifetime storage; game-state mutex serializes access and
+    // callers pass a source `Price` index below `PR_END`.
+    unsafe { (&raw const PRICES).cast::<i64>().add(index).read() }
+}
 /// Stable process-lifetime prices; no concurrent accesses are permitted.
 #[unsafe(no_mangle)]
 pub extern "C" fn openttd_rust_economy_prices() -> *mut i64 {
