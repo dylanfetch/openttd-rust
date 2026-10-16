@@ -234,176 +234,176 @@ pub const STATION_GRADUAL_UNLOAD: usize = 99;
 
 /// `station.full_load_reserve` branch.
 pub const STATION_FULL_LOAD_RESERVE: usize = 100;
+/// `station.stale_restrict` branch.
+pub const STATION_STALE_RESTRICT: usize = 101;
+/// `station.stale_release` branch.
+pub const STATION_STALE_RELEASE: usize = 102;
 
 /// Primary aircraft ticks, including both event passes.
-pub const AIRCRAFT_TICKS: usize = 101;
+pub const AIRCRAFT_TICKS: usize = 103;
 /// Aircraft calls into native services, including shared services.
-pub const AIRCRAFT_SERVICES: usize = 102;
+pub const AIRCRAFT_SERVICES: usize = 104;
 /// Native calls into aircraft controllers/helpers (excluding owner allocation).
-pub const AIRCRAFT_ENTRIES: usize = 103;
+pub const AIRCRAFT_ENTRIES: usize = 105;
 /// Aircraft service station-pool resolutions.
-pub const AIRCRAFT_STATIONS: usize = 104;
+pub const AIRCRAFT_STATIONS: usize = 106;
 /// Bytes returned by aircraft observations (including record padding).
-pub const AIRCRAFT_BYTES: usize = 105;
+pub const AIRCRAFT_BYTES: usize = 107;
 /// Cache helper ingress, also included in total entries.
-pub const AIRCRAFT_CACHE_ENTRIES: usize = 106;
+pub const AIRCRAFT_CACHE_ENTRIES: usize = 108;
 /// Ownerless flight helper ingress, also included in total entries.
-pub const AIRCRAFT_DISASTER_ENTRIES: usize = 107;
+pub const AIRCRAFT_DISASTER_ENTRIES: usize = 109;
 
 /// Engine services witness.
-pub const ENGINE_SERVICES: usize = 108;
+pub const ENGINE_SERVICES: usize = 110;
 /// Engine bytes witness.
-pub const ENGINE_BYTES: usize = 109;
+pub const ENGINE_BYTES: usize = 111;
 /// Engine sync witness.
-pub const ENGINE_SYNC: usize = 110;
+pub const ENGINE_SYNC: usize = 112;
 /// Engine retire witness.
-pub const ENGINE_RETIRE: usize = 111;
+pub const ENGINE_RETIRE: usize = 113;
 /// Engine `never_expire` witness.
-pub const ENGINE_NEVER_EXPIRE: usize = 112;
+pub const ENGINE_NEVER_EXPIRE: usize = 114;
 /// Engine accept witness.
-pub const ENGINE_ACCEPT: usize = 113;
+pub const ENGINE_ACCEPT: usize = 115;
 /// Engine join witness.
-pub const ENGINE_JOIN: usize = 114;
+pub const ENGINE_JOIN: usize = 116;
 /// Engine offer witness.
-pub const ENGINE_OFFER: usize = 115;
+pub const ENGINE_OFFER: usize = 117;
 /// Engine penalty witness.
-pub const ENGINE_PENALTY: usize = 116;
+pub const ENGINE_PENALTY: usize = 118;
 /// Engine cutoff witness.
-pub const ENGINE_CUTOFF: usize = 117;
+pub const ENGINE_CUTOFF: usize = 119;
 /// Engine visibility witness.
-pub const ENGINE_VISIBILITY: usize = 118;
+pub const ENGINE_VISIBILITY: usize = 120;
 /// Engine control witness.
-pub const ENGINE_CONTROL: usize = 119;
+pub const ENGINE_CONTROL: usize = 121;
 /// Engine rename witness.
-pub const ENGINE_RENAME: usize = 120;
+pub const ENGINE_RENAME: usize = 122;
 
 /// Engine native entry witness.
-pub const ENGINE_ENTRIES: usize = 121;
+pub const ENGINE_ENTRIES: usize = 123;
 
 /// Signal `updates` witness.
-pub const SIGNAL_UPDATES: usize = 122;
+pub const SIGNAL_UPDATES: usize = 124;
 /// Signal `tiles` witness.
-pub const SIGNAL_TILES: usize = 123;
+pub const SIGNAL_TILES: usize = 125;
 /// Signal `services` witness.
-pub const SIGNAL_SERVICES: usize = 124;
+pub const SIGNAL_SERVICES: usize = 126;
 /// Signal `tbu_overflow` witness.
-pub const SIGNAL_TBU_OVERFLOW: usize = 125;
+pub const SIGNAL_TBU_OVERFLOW: usize = 127;
 /// Signal `tbd_overflow` witness.
-pub const SIGNAL_TBD_OVERFLOW: usize = 126;
+pub const SIGNAL_TBD_OVERFLOW: usize = 128;
 /// Signal `global_overflow` witness.
-pub const SIGNAL_GLOBAL_OVERFLOW: usize = 127;
+pub const SIGNAL_GLOBAL_OVERFLOW: usize = 129;
 /// Signal `train` witness.
-pub const SIGNAL_TRAIN: usize = 128;
+pub const SIGNAL_TRAIN: usize = 130;
 /// Signal `owner_barrier` witness.
-pub const SIGNAL_OWNER_BARRIER: usize = 129;
+pub const SIGNAL_OWNER_BARRIER: usize = 131;
 /// Signal `depot` witness.
-pub const SIGNAL_DEPOT: usize = 130;
+pub const SIGNAL_DEPOT: usize = 132;
 /// Signal `split` witness.
-pub const SIGNAL_SPLIT: usize = 131;
+pub const SIGNAL_SPLIT: usize = 133;
 /// Signal `pbs` witness.
-pub const SIGNAL_PBS: usize = 132;
+pub const SIGNAL_PBS: usize = 134;
 /// Signal `multi_enter` witness.
-pub const SIGNAL_MULTI_ENTER: usize = 133;
+pub const SIGNAL_MULTI_ENTER: usize = 135;
 /// Signal `exit` witness.
-pub const SIGNAL_EXIT: usize = 134;
+pub const SIGNAL_EXIT: usize = 136;
 /// Signal `green_exit` witness.
-pub const SIGNAL_GREEN_EXIT: usize = 135;
+pub const SIGNAL_GREEN_EXIT: usize = 137;
 /// Signal `station` witness.
-pub const SIGNAL_STATION: usize = 136;
+pub const SIGNAL_STATION: usize = 138;
 /// Signal `crossing` witness.
-pub const SIGNAL_CROSSING: usize = 137;
+pub const SIGNAL_CROSSING: usize = 139;
 /// Signal `wormhole` witness.
-pub const SIGNAL_WORMHOLE: usize = 138;
+pub const SIGNAL_WORMHOLE: usize = 140;
 /// Signal `reserved_skip` witness.
-pub const SIGNAL_RESERVED_SKIP: usize = 139;
+pub const SIGNAL_RESERVED_SKIP: usize = 141;
 /// Signal `combo` witness.
-pub const SIGNAL_COMBO: usize = 140;
+pub const SIGNAL_COMBO: usize = 142;
 /// Signal `propagate` witness.
-pub const SIGNAL_PROPAGATE: usize = 141;
+pub const SIGNAL_PROPAGATE: usize = 143;
 /// Signal `changed` witness.
-pub const SIGNAL_CHANGED: usize = 142;
+pub const SIGNAL_CHANGED: usize = 144;
 /// Signal `reset` witness.
-pub const SIGNAL_RESET: usize = 143;
+pub const SIGNAL_RESET: usize = 145;
 /// Signal `forced_flush` witness.
-pub const SIGNAL_FORCED_FLUSH: usize = 144;
+pub const SIGNAL_FORCED_FLUSH: usize = 146;
 
 /// Bytes returned by signal-facing typed native services.
-pub const SIGNAL_BYTES: usize = 145;
+pub const SIGNAL_BYTES: usize = 147;
 
 /// Signal boundary `entries` counter.
-pub const SIGNAL_ENTRIES: usize = 146;
+pub const SIGNAL_ENTRIES: usize = 148;
 /// Signal boundary `context_acquisitions` counter.
-pub const SIGNAL_CONTEXT_ACQUISITIONS: usize = 147;
+pub const SIGNAL_CONTEXT_ACQUISITIONS: usize = 149;
 /// Signal boundary `context_owner_reads` counter.
-pub const SIGNAL_CONTEXT_OWNER_READS: usize = 148;
+pub const SIGNAL_CONTEXT_OWNER_READS: usize = 150;
 /// Signal boundary `occupancy_accessors` counter.
-pub const SIGNAL_OCCUPANCY_ACCESSORS: usize = 149;
+pub const SIGNAL_OCCUPANCY_ACCESSORS: usize = 151;
 /// Signal boundary `context_bytes` counter.
-pub const SIGNAL_CONTEXT_BYTES: usize = 150;
+pub const SIGNAL_CONTEXT_BYTES: usize = 152;
 /// Signal boundary `classification_bytes` counter.
-pub const SIGNAL_CLASSIFICATION_BYTES: usize = 151;
+pub const SIGNAL_CLASSIFICATION_BYTES: usize = 153;
 
 /// Signal multiple exit detection.
-pub const SIGNAL_MULTI_EXIT: usize = 152;
+pub const SIGNAL_MULTI_EXIT: usize = 154;
 /// Signal multiple green exit detection.
-pub const SIGNAL_MULTI_GREEN: usize = 153;
+pub const SIGNAL_MULTI_GREEN: usize = 155;
 /// Signal combo red rule with multiple exits.
-pub const SIGNAL_COMBO_RED: usize = 154;
+pub const SIGNAL_COMBO_RED: usize = 156;
 /// Signal empty neighbour buffer continue.
-pub const SIGNAL_NEIGHBOUR_CONTINUE: usize = 155;
+pub const SIGNAL_NEIGHBOUR_CONTINUE: usize = 157;
 
 /// `town.services` witness.
-pub const TOWN_SERVICES: usize = 156;
+pub const TOWN_SERVICES: usize = 158;
 /// `town.bytes` witness.
-pub const TOWN_BYTES: usize = 157;
+pub const TOWN_BYTES: usize = 159;
 /// `town.placement` witness.
-pub const TOWN_PLACEMENT: usize = 158;
+pub const TOWN_PLACEMENT: usize = 160;
 /// `town.growth` witness.
-pub const TOWN_GROWTH: usize = 159;
+pub const TOWN_GROWTH: usize = 161;
 /// `town.generated` witness.
-pub const TOWN_GENERATED: usize = 160;
+pub const TOWN_GENERATED: usize = 162;
 /// `town.coast` witness.
-pub const TOWN_COAST: usize = 161;
+pub const TOWN_COAST: usize = 163;
 /// `town.manual` witness.
-pub const TOWN_MANUAL: usize = 162;
+pub const TOWN_MANUAL: usize = 164;
 /// `town.deity` witness.
-pub const TOWN_DEITY: usize = 163;
+pub const TOWN_DEITY: usize = 165;
 /// `town.editor` witness.
-pub const TOWN_EDITOR: usize = 164;
+pub const TOWN_EDITOR: usize = 166;
 /// `town.invalid` witness.
-pub const TOWN_INVALID: usize = 165;
+pub const TOWN_INVALID: usize = 167;
 /// `town.duplicate` witness.
-pub const TOWN_DUPLICATE: usize = 166;
+pub const TOWN_DUPLICATE: usize = 168;
 /// `town.money` witness.
-pub const TOWN_MONEY: usize = 167;
+pub const TOWN_MONEY: usize = 169;
 /// `town.zero_growth` witness.
-pub const TOWN_ZERO_GROWTH: usize = 168;
+pub const TOWN_ZERO_GROWTH: usize = 170;
 /// `town.retry` witness.
-pub const TOWN_RETRY: usize = 169;
+pub const TOWN_RETRY: usize = 171;
 /// `town.rename` witness.
-pub const TOWN_RENAME: usize = 170;
+pub const TOWN_RENAME: usize = 172;
 /// `town.name_retry` witness.
-pub const TOWN_NAME_RETRY: usize = 171;
+pub const TOWN_NAME_RETRY: usize = 173;
 /// `town.name_exhausted` witness.
-pub const TOWN_NAME_EXHAUSTED: usize = 172;
+pub const TOWN_NAME_EXHAUSTED: usize = 174;
 /// `town.name_duplicate` witness.
-pub const TOWN_NAME_DUPLICATE: usize = 173;
+pub const TOWN_NAME_DUPLICATE: usize = 175;
 /// `town.fallback` witness.
-pub const TOWN_FALLBACK: usize = 174;
+pub const TOWN_FALLBACK: usize = 176;
 /// `town.cancelled` witness.
-pub const TOWN_CANCELLED: usize = 175;
+pub const TOWN_CANCELLED: usize = 177;
 /// `town.grid` witness.
-pub const TOWN_GRID: usize = 176;
+pub const TOWN_GRID: usize = 178;
 /// `town.name_set` witness.
-pub const TOWN_NAME_SET: usize = 177;
+pub const TOWN_NAME_SET: usize = 179;
 /// `town.entries` witness.
-pub const TOWN_ENTRIES: usize = 178;
+pub const TOWN_ENTRIES: usize = 180;
 /// `town.no_cities` witness: generation with `larger_towns == 0`.
-pub const TOWN_NO_CITIES: usize = 179;
-/// `station.stale_restrict` branch.
-pub const STATION_STALE_RESTRICT: usize = 180;
-/// `station.stale_release` branch.
-pub const STATION_STALE_RELEASE: usize = 181;
+pub const TOWN_NO_CITIES: usize = 181;
 
 /// Counter names, grouped by the prefix the harness selects.
 pub const NAMES: [&str; 182] = [
@@ -508,6 +508,8 @@ pub const NAMES: [&str; 182] = [
     "station.unload_cargo",
     "station.gradual_unload",
     "station.full_load_reserve",
+    "station.stale_restrict",
+    "station.stale_release",
     "aircraft.ticks",
     "aircraft.services",
     "aircraft.entries",
@@ -587,8 +589,6 @@ pub const NAMES: [&str; 182] = [
     "town.name_set",
     "town.entries",
     "town.no_cities",
-    "station.stale_restrict",
-    "station.stale_release",
 ];
 
 static ENABLED: AtomicBool = AtomicBool::new(false);
@@ -645,6 +645,9 @@ mod tests {
     use super::*;
     #[test]
     fn groups_start_at_their_prefix() {
+        fn group(name: &str) -> &str {
+            name.split_once('.').map_or(name, |(group, _)| group)
+        }
         for (base, prefix) in [
             (TRAIN, "train."),
             (SHIP, "ship."),
@@ -654,6 +657,11 @@ mod tests {
         ] {
             assert!(NAMES[base].starts_with(prefix));
             assert!(base == 0 || !NAMES[base - 1].starts_with(prefix));
+        }
+        for (index, name) in NAMES.iter().enumerate().skip(1) {
+            if group(name) != group(NAMES[index - 1]) {
+                assert!(!NAMES[..index].iter().any(|n| group(n) == group(name)));
+            }
         }
         let mut length = 0;
         assert!(unsafe { openttd_rust_witness_name(NAMES.len(), &raw mut length) }.is_null());
