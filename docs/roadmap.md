@@ -115,6 +115,7 @@ later rows use original retirement with net glue in the PR (#223).
 | #249 (shared-accessor enforcement) | #254 | direct | `8f9d4fc906` | 0 / 431 / 0 / 0 |
 | #260 (ScriptList overflow fidelity) | #262 | direct | `c54129895b` | 33 / 3 / 0 / 0; net glue 0 |
 | #259 H3 (inert workflows) | #263 | direct | `7feb00248f` | 0 / 0 / 0 / 0; workflow/comment net -2142 |
+| #259 H4 (dead FFI, orphan guards) | #264 | direct | `af1abf96b4` | 6 / 174 / 12 / 4; net glue -75 |
 
 Paused, not fallbacks: #64 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -144,7 +145,7 @@ go in `KNOWN_FAILURES` with an issue, never in masks (`docs/rust-migration.md`).
 Integrate reviewed work first, in order of readiness, with at most six
 unintegrated component branches. Housekeeping (#259) and #156 run in parallel.
 
-1. **Housekeeping:** #259 H1-H3 and #260 complete. H4 next (190 added tooling lines including baseline/tests/ABI edits), then #261 R1-R4 and H5 last; at most three maintenance PRs in flight alongside the items below.
+1. **Housekeeping:** #259 H1-H4 and #260 complete. #261 R1-R4 next (R4 running), H5 last; at most three maintenance PRs in flight alongside the items below.
 2. **#212 landscape (#255) and #213 vehicle (#257).** Update each from base and resolve the town conflicts; a fresh reviewer checks the resolution. Re-freeze against the new tip, profile the head with callgrind, then root re-selects a bounded fix with its gate, or re-scopes the owner. The selected boundaries stand:
    - landscape: an inlined dispatch on the raw type byte, `noexcept` `TileLoop_*` handlers called directly, Rust transition control and no raw-map extension; gate within 11 ms on TGP, interleaved A/B against tip;
    - vehicle: a pool-cursor descriptor, one slim dispatch record and one post-tick bundle, at most about three C++ calls per vehicle (`docs/design/world-state.md`); gate at most 6 ns per vehicle-tick visit on Opus.
@@ -172,11 +173,10 @@ profiles, and times caps on a quiet host.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #259 H4 / #264 | `cleanup-dead-ffi-259`, `836f134040` | Fix review done (174/190 lines); root verified fixes; exact-head full CI running, then integrate. |
 | #212 / #255 | `landscape-owner-212`, `63c67959ee` | `/root/landscape_update_profile_255`: base update, callgrind attribution, one proposed fix; root selects. Resolution needs a fresh reviewer. |
 | #213 / #257 | `vehicle-owner-213`, `67611082f7` | `/root/vehicle_update_profile_257`: same as #255. |
 | #256 | `house-lifecycle-256` (new) | `/root/house_lifecycle_256` implementing; draft PR pending. |
-| #261 R4 | `save-staging-261` (new) | `/root/save_staging_261_r4` implementing; R1-R3 wait for H4. |
+| #261 R4 | `save-staging-261` (new) | `/root/save_staging_261_r4` implementing; R1-R3 unblocked, start when a slot frees. |
 | #265 | `rail-commands-265` (new) | `/root/rail_commands_265` implementing; #266 and #267 unstarted. |
 | #64 / #66 | remote `issue/64-curve-family`, `aab5211801` | #66 closed unmerged; #64 stays paused. |
 
