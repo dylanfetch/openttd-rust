@@ -141,7 +141,9 @@ def boundary_hits(files, wrappers, originals):
         for p, s in files.items()
     )
     counts = Counter(re.findall(r"\bopenttd_rust_\w+\b", combined))
-    prototype = r"(?m)^(?!\s*return\b)[\w *&]+\b(openttd_rust_\w+)\([^{};]*\);"
+    prototype = (
+        r"(?m)^\s*(?!return\b|else\b)\w[\w *&]*[\s*&](openttd_rust_\w+)\([^{};]*\);"
+    )
     declarations = Counter(re.findall(prototype, combined))
     for path, source in files.items():
         if path.endswith(".rs"):

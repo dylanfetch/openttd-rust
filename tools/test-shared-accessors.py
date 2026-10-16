@@ -88,6 +88,8 @@ with tempfile.TemporaryDirectory() as directory:
         (port, "void Call() { openttd_rust_dead(); }", False),
         (owner, "fn call() { openttd_rust_dead(); }", False),
         (caller, "source = 'openttd_rust_dead();'", False),
+        (port, "void Call() {\n    openttd_rust_dead();\n}", False),
+        (port, "void Call() {\n    openttd_rust_dead(\n        1);\n}", False),
         (port, "// openttd_rust_dead\n/* openttd_rust_dead */", True),
         (owner, "// openttd_rust_dead", True),
         (caller, "x = 1  # openttd_rust_dead()", True),
