@@ -868,7 +868,7 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
 
 
 HOUSE_BRANCHES = (
-    "stage complete lift_start lift_stop rebuild clear_auto clear_refused "
+    "stage complete lift_start lift_stop rebuild replace clear_auto clear_refused "
     "clear_execute autoslope place place_error protected"
 ).split()
 HOUSE_MODE_BRANCHES = {"original": ["original", "recession"], "binomial": ["binomial"]}

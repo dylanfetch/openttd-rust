@@ -12,6 +12,7 @@
 #include "company_func.h"
 #include "core/backup_type.hpp"
 #include "core/random_func.hpp"
+#include "town.h"
 #include "town_cmd.h"
 #include "townname_func.h"
 #include "house.h"
@@ -98,9 +99,17 @@ static bool HousesScenario(std::span<std::string_view> args)
 		Cost("house-occupied", Place::Do(DoCommandFlag::Execute, single->first, other, false, false));
 		Cost("house-replace", Place::Do(DoCommandFlag::Execute, single->first, single->second, false, true));
 	}
+	for (const auto &[tile, house] : sites) Cost("house-protected", Clear::Do({}, tile));
+	/* Autoslope applies to companies only; funding sets the growth flag the rebuild path needs. */
+	owner.Change(company->index);
+#ifdef WITH_RUST
+	Backup<Money> money(company->Finances().money, 1000000000000LL);
+#else
+	Backup<Money> money(company->money, 1000000000000LL);
+#endif
+	Cost("house-fund", Command<CMD_DO_TOWN_ACTION>::Do(DoCommandFlag::Execute, ClosestTownFromTile(centre, UINT_MAX)->index, TownAction::FundBuildings));
 	bool terraformed = false;
 	for (const auto &[tile, house] : sites) {
-		Cost("house-protected", Clear::Do({}, tile));
 		CommandCost lower = std::get<0>(Command<CMD_TERRAFORM_LAND>::Do({}, tile, SLOPE_N, false));
 		Cost("house-terraform", lower);
 		if (lower.Succeeded() && !terraformed) {
@@ -108,7 +117,6 @@ static bool HousesScenario(std::span<std::string_view> args)
 			Cost("house-terraform-execute", std::get<0>(Command<CMD_TERRAFORM_LAND>::Do(DoCommandFlag::Execute, tile, SLOPE_N, false)));
 		}
 	}
-	owner.Change(company->index);
 	uint cleared = 0;
 	for (TileIndex tile : window) {
 		if (cleared == 24 || !IsTileType(tile, MP_HOUSE)) continue;
@@ -121,7 +129,7 @@ static bool HousesScenario(std::span<std::string_view> args)
 	for (TileIndex tile{}; tile < Map::Size(); ++tile) {
 		if (IsTileType(tile, MP_HOUSE)) for (int age = 0; age < 255; ++age) IncrementHouseAge(tile);
 	}
-	place.Restore(); owner.Restore();
+	money.Restore(); place.Restore(); owner.Restore();
 	fmt::print(stderr, "TOWN house-done {}\n", cleared);
 	return true;
 }

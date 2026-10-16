@@ -1100,8 +1100,8 @@ exhaustive.
 
 Issue #120 moves town tick traversal, road/build choices, terrain retries, house
 selection/placement and expansion into Rust. The partial #148 extension owns town metadata,
-histories, ratings and building counts; C++ retains house tile loops and remaining
-authority/deletion commands. Native field aliases expose one Rust owner, with process-wide state
+histories, ratings and building counts; #256 moves house tile loops and deletion
+commands. Native field aliases expose one Rust owner, with process-wide state
 under the game-state mutex.
 
 Rust ends owner borrows before commands or NewGRF callbacks that can reenter. The default
@@ -1414,3 +1414,21 @@ match. Counters record native entries, service crossings and returned bytes, dis
 timing. External NewGRF programs/retire_early, ENGS and TTO/TTD fixtures, legacy preview
 conversion and threaded GUI/presentation remain #156 gaps. #248 records the fixing reviews,
 source comparisons and final-head CI/speed results.
+
+### House lifecycle and tile simulation (#256)
+
+`town/house.rs` owns `TileLoop_Town` (construction stages, rebuild/replacement, original and
+binomial cargo with recession halving), builtin lift animation, produced/accepted cargo,
+north-part normalisation, `ClearTile_Town`/`ClearTownHouse`/`RemoveNearbyStations`,
+`TerraformTile_Town`, `CmdPlaceHouse`, cache rebuild/repair traversals, yearly aging and the
+NewGRF house tile loop, `CanDeleteHouse`, animation triggers and rerandomisation. It writes the
+sole Rust town owner directly and ends each owner access before any callback, command or station
+service. C++ keeps thin facades, the generic `HouseResolverObject`/reseed sum,
+`HouseAnimationBase`, `StationFinder`/`MoveGoodsToStation` and `GetHouseNorthPart` for resolver
+variables; original bodies compile only portably. Town count, recession, autoslope, foundation
+price, tick counter and animated-tile removal are shared services.
+`python3 tools/migration.py simulate town-houses- --jobs 2` places every original house through
+`CmdPlaceHouse`, compares error histograms, occupied/replace, protected clears, autoslope
+terraform, company clearance until refusal and aged-house rebuild in both cargo modes, and
+requires candidate `house.*` witnesses. NewGRF house callbacks and station removal on house
+clearance remain #156 gaps.
