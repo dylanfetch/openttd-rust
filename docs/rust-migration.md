@@ -1426,7 +1426,7 @@ sole Rust town owner directly and ends each owner access before any callback, co
 service. C++ keeps thin facades, the generic `HouseResolverObject`/reseed sum,
 `HouseAnimationBase`, `StationFinder`/`MoveGoodsToStation` and `GetHouseNorthPart` for resolver
 variables; original bodies compile only portably. Town count, recession, autoslope, foundation
-price, tick counter and animated-tile removal are shared services.
+price, tick counter, animated-tile removal and `DoClearSquare` are shared services.
 `python3 tools/migration.py simulate town-houses- --jobs 2` places every original house through
 `CmdPlaceHouse`, compares error histograms, occupied/replace, protected clears, autoslope
 terraform, company clearance until refusal and aged-house rebuild in both cargo modes, and
