@@ -181,6 +181,7 @@ static size_t SharedTownCount() noexcept { return Town::GetNumItems(); }
 static bool SharedRecession() noexcept { return EconomyIsInRecession(); }
 static bool SharedAutoslope() noexcept { return AutoslopeEnabled(); }
 static int64_t SharedFoundationPrice() noexcept { return _price[PR_BUILD_FOUNDATION]; }
+static void SharedClearSquare(uint32_t tile) noexcept { DoClearSquare(TileIndex{tile}); }
 
 const OpenTTDSharedServices &GetRustSharedServices() noexcept
 {
@@ -248,6 +249,7 @@ const OpenTTDSharedServices &GetRustSharedServices() noexcept
 		.foundation_price = SharedFoundationPrice,
 		.tick_counter = openttd_orders_tick_counter,
 		.delete_animated = OpenTTDDeleteAnimatedTile,
+		.clear_square = SharedClearSquare,
 	};
 	return services;
 }

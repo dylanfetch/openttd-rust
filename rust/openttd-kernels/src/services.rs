@@ -215,6 +215,8 @@ pub struct Services {
     pub tick_counter: extern "C" fn() -> u64,
     /// Remove a tile from the animated tile list.
     pub delete_animated: extern "C" fn(u32),
+    /// `DoClearSquare`: make the tile bare land.
+    pub clear_square: extern "C" fn(u32),
 }
 impl Services {
     /// Draw one shared random word.
@@ -351,6 +353,7 @@ pub fn fixture(
         foundation_price: money0,
         tick_counter: tick0,
         delete_animated: tile,
+        clear_square: tile,
     }
 }
 /// Map dimensions read once per entry.

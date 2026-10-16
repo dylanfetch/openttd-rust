@@ -56,7 +56,6 @@ struct OpenTTDHouseServices {
 	void (*set_random_bits)(uint32_t, uint8_t) noexcept;
 	void (*set_random_triggers)(uint32_t, uint8_t) noexcept;
 	void (*set_type)(uint32_t, uint16_t) noexcept;
-	void (*clear_square)(uint32_t) noexcept;
 	void (*animate_new)(uint32_t) noexcept;
 	void (*delete_inspect)(uint32_t) noexcept;
 	uint16_t (*callback)(uint16_t, uint32_t, uint32_t, uint16_t, Town *, uint32_t, bool) noexcept;

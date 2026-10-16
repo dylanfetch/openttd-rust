@@ -1169,7 +1169,6 @@ static const OpenTTDHouseServices &GetRustHouseServices() noexcept
 		.set_random_bits = [](uint32_t tile, uint8_t bits) noexcept { SetHouseRandomBits(TileIndex{tile}, bits); },
 		.set_random_triggers = [](uint32_t tile, uint8_t triggers) noexcept { SetHouseRandomTriggers(TileIndex{tile}, HouseRandomTriggers{triggers}); },
 		.set_type = [](uint32_t tile, uint16_t house) noexcept { SetHouseType(TileIndex{tile}, house); },
-		.clear_square = [](uint32_t tile) noexcept { DoClearSquare(TileIndex{tile}); },
 		.animate_new = OpenTTDAnimateNewHouse,
 		.delete_inspect = [](uint32_t tile) noexcept { DeleteNewGRFInspectWindow(GSF_HOUSES, tile); },
 		.callback = [](uint16_t callback, uint32_t param1, uint32_t param2, uint16_t house, Town *town, uint32_t tile, bool not_yet_constructed) noexcept -> uint16_t {

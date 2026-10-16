@@ -177,7 +177,6 @@ pub struct HouseServices {
     pub set_random_bits: extern "C" fn(u32, u8),
     pub set_random_triggers: extern "C" fn(u32, u8),
     pub set_type: extern "C" fn(u32, u16),
-    pub clear_square: extern "C" fn(u32),
     pub animate_new: extern "C" fn(u32),
     pub delete_inspect: extern "C" fn(u32),
     pub callback: extern "C" fn(u16, u32, u32, u16, *mut TownHandle, u32, bool) -> u16,
@@ -314,7 +313,7 @@ impl House<'_> {
         let class = (self.l.house_class)(house);
         // SAFETY: Live owner; count access ends before the map services below.
         unsafe { super::decrease_building(town.state, house, class) };
-        (self.h.clear_square)(tile);
+        (self.s.clear_square)(tile);
         (self.h.delete_inspect)(tile);
     }
     /// `ClearTownHouse`: population, counts and flags precede the footprint.
@@ -1088,10 +1087,10 @@ impl House<'_> {
                     valid &= self.part_valid(tile.wrapping_add(map.diff(1, 1)), id + 3);
                 }
                 if !valid {
-                    (self.h.clear_square)(tile);
+                    (self.s.clear_square)(tile);
                 }
             } else if !self.part_valid(north, id) {
-                (self.h.clear_square)(tile);
+                (self.s.clear_square)(tile);
             }
         }
         self.rebuild_caches();
