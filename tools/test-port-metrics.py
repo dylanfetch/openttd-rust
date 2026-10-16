@@ -87,6 +87,7 @@ class PortMetricsTests(unittest.TestCase):
             "#ifdef WITH_RUST\nrust_a();\n\n#else\n"
             "int a = 1;\nint b = 2;\n#endif\n\nint c = 3;\n",
         )
+        (self.root / "src/town_gui.cpp").unlink()  # Retired, but not simulation.
         first = self.commit()
         self.write(
             "src/town_cmd.cpp",
@@ -96,7 +97,7 @@ class PortMetricsTests(unittest.TestCase):
         second = self.commit()
         keys = ("retired", "glue", "glue_removed", "net_glue")
         self.assertEqual(
-            counts(METRICS.metrics(METRICS.BASELINE, first), *keys), (2, 5, 0, 5)
+            counts(METRICS.metrics(METRICS.BASELINE, first), *keys), (3, 5, 0, 5)
         )
         self.assertEqual(counts(METRICS.metrics(first, second), *keys), (2, 3, 3, 0))
 
@@ -109,18 +110,18 @@ class PortMetricsTests(unittest.TestCase):
         self.assertEqual(reversed_result["retired"], -result["retired"])
         self.assertEqual(reversed_result["net_glue"], -result["net_glue"])
 
-        # The whole-fork share counts only simulation sources.
+        # The whole-fork share counts only simulation sources, as a percentage.
         output = io.StringIO()
-        argv = ["port-metrics.py", "--whole-fork", "--head", second, "--json"]
+        argv = ["port-metrics.py", "--whole-fork", "--head", first, "--json"]
         with mock.patch("sys.argv", argv), contextlib.redirect_stdout(output):
             METRICS.main()
         whole = json.loads(output.getvalue())
         self.assertEqual(whole["base"], METRICS.BASELINE)
         self.assertEqual(
             counts(whole, "retired", "simulation_retired", "simulation_total"),
-            (4, 4, 4),
+            (3, 2, 4),
         )
-        self.assertEqual(whole["simulation_percent"], 100)
+        self.assertEqual(whole["simulation_percent"], 50)
 
     def test_simulation_inventory(self):
         for path in (
