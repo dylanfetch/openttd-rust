@@ -163,8 +163,12 @@ template <typename Check> void CheckTownProtocol(Check check)
 	services.tile_valid = [](uint32_t) noexcept { return true; };
 	services.distance_from_edge = [](uint32_t) noexcept { return uint32_t(1); };
 	services.road_type = [](uint32_t) noexcept { return uint8_t(63); };
-	check(!openttd_rust_town_grow(&leaves, &services, 0, 1) && w.draws == 0 && w.company == 7);
-	check(openttd_rust_town_grow(&leaves, &services, 0, 2) && w.roads == 1 && w.draws == 1 && w.company == 7);
+	openttd_rust_town_expand(&leaves, &services, 0, 1, 1);
+	check(w.roads == 0 && w.draws == 0 && w.company == 7);
+	openttd_rust_town_expand(&leaves, &services, 0, 1, 2);
+	check(w.roads == 1 && w.draws == 1 && w.company == 7);
+	/* Expansion updates radii; restore the isolated house-placement setup. */
+	std::fill_n(fields->radius, 5, 100);
 	w.clears = 0; w.clear_ok = false;
 	openttd_rust_town_expand(&leaves, &services, 0, 1, 2);
 	check(w.clears == 25 * 13 && w.company == 7 && w.draws == 1);

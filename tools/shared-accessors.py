@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Reject new single-read shared-world wrappers; existing fingerprints only shrink."""
+"""Ratchet shared wrappers, orphan Rust exports and repeated service bindings."""
 
 import argparse
 import hashlib
+import io
 import json
 import re
 import subprocess
+import tokenize
 from collections import Counter
 from pathlib import Path
 
@@ -45,7 +47,7 @@ def definitions(source):
         yield header, body, source[: match.start()].count("\n") + 1
 
 
-def single_read(header, body, helpers):
+def single_read(header, body, helpers, writes=False):
     statements = [s.strip() for s in body.split(";") if s.strip()]
     if not statements or any("{" in s or "}" in s for s in statements):
         return False
@@ -56,6 +58,11 @@ def single_read(header, body, helpers):
             return False
         aliases.append(alias[2])
     expression = re.sub(r"^return\s+", "", statements[-1])
+    if writes:
+        assignment = re.fullmatch(r"([^=]+?)(?<![!<>])=(?!=).+", expression)
+        if not assignment:
+            return False
+        expression = assignment[1]
     if re.search(r"(?<![=!<>])=(?!=)|\+\+|--|\b(?:new|delete|throw)\b", expression):
         return False
     reads = len(WORLD.findall(expression))
@@ -80,7 +87,7 @@ def single_read(header, body, helpers):
     return bool(calls & helpers) and calls <= helpers | {"base", "to_underlying"}
 
 
-def collect(files, originals):
+def collect(files, originals, writes=False):
     helpers = {
         h.split("(")[0].strip()
         for p, s in files.items()
@@ -103,11 +110,64 @@ def collect(files, originals):
             key = identity(header, body)
             if inherited[key]:
                 inherited[key] -= 1
-            elif single_read(header, body, helpers):
+            elif single_read(header, body, helpers, writes):
                 digest = hashlib.sha256("".join(body.split()).encode()).hexdigest()[:16]
-                key = f"{path} | {header} | {digest}"
+                key = ("write | " if writes else "") + f"{path} | {header} | {digest}"
                 occurrences[key] += 1
                 hits[f"{key} | {occurrences[key]}"] = line
+    return hits
+
+
+def sources(revision=None):
+    command = ("ls-tree", "-r", "--name-only", revision) if revision else ("ls-files",)
+    return {
+        p: git("show", f"{revision}:{p}") if revision else (ROOT / p).read_text()
+        for p in git(*command, "--", "src", "rust", "tools").splitlines()
+        if Path(p).suffix in {".rs", ".cpp", ".h", ".hpp", ".py"}
+        and (revision or (ROOT / p).is_file())
+    }
+
+
+def boundary_hits(files, wrappers, originals):
+    hits = collect(wrappers, originals, writes=True)
+    combined = "\n".join(
+        " ".join(
+            t.string
+            for t in tokenize.generate_tokens(io.StringIO(s).readline)
+            if t.type != tokenize.COMMENT  # Python strings stay generated references.
+        )
+        if p.endswith(".py")
+        else re.sub(r"//[^\n]*|/\*.*?\*/", "", s, flags=re.S)
+        for p, s in files.items()
+    )
+    counts = Counter(re.findall(r"\bopenttd_rust_\w+\b", combined))
+    prototype = (
+        r"(?m)^\s*(?!return\b|else\b)\w[\w *&]*[\s*&](openttd_rust_\w+)\([^{};]*\);"
+    )
+    declarations = Counter(re.findall(prototype, combined))
+    for path, source in files.items():
+        if path.endswith(".rs"):
+            for name in re.findall(
+                r"#\[unsafe\(no_mangle\)\][^;{}]*?\bfn (openttd_rust_\w+)\(", source
+            ):
+                if counts[name] == 1 + declarations[name]:
+                    hits[f"orphan | {name}"] = 1
+    native = "\n".join(
+        s for p, s in files.items() if Path(p).suffix in {".cpp", ".h", ".hpp"}
+    )
+    functions = set(re.findall(r"\b(\w+)\s*\([^{};]*\)\s*noexcept\s*\{", native))
+    bindings = Counter()
+    for table in re.findall(
+        r"OpenTTD\w*(?:Services|Leaves)\s+\w+\s*(?:=\s*)?\{(.*?)\n\s*};",
+        native,
+        re.S,
+    ):
+        bindings.update(
+            n for n in re.findall(r"\.\w+\s*=\s*(\w+)\s*[,}]", table) if n in functions
+        )
+    for name, count in bindings.items():
+        if count > 1:
+            hits[f"binding | {name} | {count}"] = 1
     return hits
 
 
@@ -124,13 +184,33 @@ def main():
     }
     tracked = set(git("ls-tree", "-r", "--name-only", pinned, "src").splitlines())
     originals = {p: git("show", f"{pinned}:{p}") for p in files if p in tracked}
-    hits = collect(files, originals)
+    hits = collect(files, originals) | boundary_hits(sources(), files, originals)
     baseline = set((ROOT / BASELINE).read_text().splitlines())
     previous = baseline
     if args.base_ref:
         tracked_base = git("ls-tree", "-r", "--name-only", args.base_ref).splitlines()
         if BASELINE in tracked_base:
             previous = set(git("show", f"{args.base_ref}:{BASELINE}").splitlines())
+        if not any(
+            k.startswith(("binding |", "write |", "orphan |")) for k in previous
+        ):
+            base_files = sources(args.base_ref)
+            base_paths = git(
+                "diff", "--name-only", pinned, args.base_ref, "--", "src"
+            ).splitlines()
+            wrappers = {
+                p: s
+                for p, s in base_files.items()
+                if p in base_paths and Path(p).suffix in {".h", ".hpp", ".cpp"}
+            }
+            reference = {
+                p: git("show", f"{pinned}:{p}") for p in wrappers if p in tracked
+            }
+            previous |= set(boundary_hits(base_files, wrappers, reference))
+    for key in previous.copy():
+        if key.startswith("binding | "):
+            name, count = key.rsplit(" | ", 1)
+            previous.update(f"{name} | {n}" for n in range(2, int(count) + 1))
     new, growth = set(hits) - baseline, baseline - previous
     for key in new:
         print(f"{key.split(' | ')[0]}:{hits[key]}: new shared accessor: {key}")

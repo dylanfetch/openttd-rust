@@ -18,10 +18,6 @@ inline const Station *StationOf(const OpenTTDStation *s) noexcept { return reint
 inline uint32_t RustStationAirportTile(const Station *s) noexcept { return s->airport.tile.base(); }
 inline uint32_t RustStationLocation(const Station *s) noexcept { return s->xy.base(); }
 inline Owner OpenTTDStationOwner(const BaseStation *station) noexcept { return station->owner; }
-inline OpenTTDStationActivity OpenTTDStationActivityOf(const Station *station) noexcept
-{
-	return openttd_rust_station_activity(station->rust_service.get());
-}
 const OpenTTDStationService *OpenTTDStationActivityOwner(const OpenTTDStation *station) noexcept;
 inline bool RustStationHasAirport(const Station *s) noexcept { return s->facilities.Test(StationFacility::Airport); }
 inline bool RustStationHasHangar(const Station *s) noexcept { return s->airport.HasHangar(); }

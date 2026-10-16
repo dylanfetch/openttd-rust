@@ -41,7 +41,6 @@ void OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_set_force_proceed(OpenTTD
 uint8_t OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_get_cached_tilt(const OpenTTDTrainState *);
 void OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_set_cached_tilt(OpenTTDTrainState *, uint8_t);
 uint8_t OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_get_user_def_data(const OpenTTDTrainState *);
-void OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_set_user_def_data(OpenTTDTrainState *, uint8_t);
 int16_t OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_get_cached_curve_speed_mod(const OpenTTDTrainState *);
 void OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_set_cached_curve_speed_mod(OpenTTDTrainState *, int16_t);
 uint16_t OPENTTD_TRAIN_STATE_CALL openttd_rust_train_state_get_cached_max_curve_speed(const OpenTTDTrainState *);

@@ -944,17 +944,6 @@ fn change(i: *mut c_void, s: &Services, monthly: bool) {
         unsafe { (s.news)(i, str, close) };
     }
 }
-/// # Safety
-/// Live shell and synchronous services. Bounded `NewGRF` resolution cannot invoke
-/// script VMs; news only queues events. No owner borrow crosses a service.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_industry_change(
-    i: *mut c_void,
-    monthly: u8,
-    s: *const Services,
-) {
-    change(i, unsafe { &*s }, monthly != 0);
-}
 fn type_data(f: *mut BuildFields, kind: u8, s: &Services) -> bool {
     let probability = game_probability(kind, s);
     let p = probability as u32;

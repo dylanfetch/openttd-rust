@@ -3667,22 +3667,6 @@ pub unsafe extern "C" fn openttd_rust_train_mark_stuck(
 /// # Safety
 /// The descriptors and shell must remain live until the call returns; callbacks may reenter.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_train_approaching_crossing(
-    id: Handle,
-    leaves: *const Leaves,
-    services: *const Services,
-) -> u32 {
-    // SAFETY: Immutable descriptors are live for this call; unaligned supports MSVC x86.
-    let g = Game {
-        leaves: unsafe { &*leaves },
-        services: unsafe { &*services },
-    };
-    g.approaching_crossing(id)
-}
-/// Invoke synchronous train policy with live serialized services.
-/// # Safety
-/// The descriptors and shell must remain live until the call returns; callbacks may reenter.
-#[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_train_reverse_swap(
     id: Handle,
     left: i32,
@@ -3820,22 +3804,6 @@ pub unsafe extern "C" fn openttd_rust_train_crash(
 /// # Safety
 /// The descriptors and shell must remain live until the call returns; callbacks may reenter.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_train_stay_depot(
-    id: Handle,
-    leaves: *const Leaves,
-    services: *const Services,
-) -> u8 {
-    // SAFETY: Immutable descriptors are live for this call; unaligned supports MSVC x86.
-    let g = Game {
-        leaves: unsafe { &*leaves },
-        services: unsafe { &*services },
-    };
-    u8::from(g.stay_depot(id))
-}
-/// Invoke synchronous train policy with live serialized services.
-/// # Safety
-/// The descriptors and shell must remain live until the call returns; callbacks may reenter.
-#[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_train_needs_service(
     id: Handle,
     leaves: *const Leaves,
@@ -3847,22 +3815,6 @@ pub unsafe extern "C" fn openttd_rust_train_needs_service(
         services: unsafe { &*services },
     };
     g.needs_service(id);
-}
-/// Invoke synchronous train policy with live serialized services.
-/// # Safety
-/// The descriptors and shell must remain live until the call returns; callbacks may reenter.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_train_next_force(
-    id: Handle,
-    leaves: *const Leaves,
-    services: *const Services,
-) -> u8 {
-    // SAFETY: Immutable descriptors are live for this call; unaligned supports MSVC x86.
-    let g = Game {
-        leaves: unsafe { &*leaves },
-        services: unsafe { &*services },
-    };
-    g.next_force(id)
 }
 /// Invoke synchronous train policy with live serialized services.
 /// # Safety
