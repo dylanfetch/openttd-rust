@@ -15,7 +15,6 @@
 struct Town;
 struct Station;
 using OpenTTDStation = Station;
-struct OpenTTDTownRef;
 struct OpenTTDCommandServices;
 
 /** Packed house tile fields copied through the town_map.h getters. */

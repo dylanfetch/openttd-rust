@@ -10,7 +10,6 @@
 #define TOWN_PROTOCOL_HPP
 #include "../rust/town_ffi.h"
 #include "../rust/house_ffi.h"
-#include "../rust/town_name_ffi.h"
 #include "../rust/command_services_ffi.h"
 #include <algorithm>
 #include <array>
