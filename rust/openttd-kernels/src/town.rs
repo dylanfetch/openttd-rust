@@ -1974,33 +1974,6 @@ impl Engine<'_> {
     }
 }
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_town_try_house(
-    leaves: *const Leaves,
-    services: *const Services,
-    town: u32,
-    tile: u32,
-    modes: u32,
-) -> bool {
-    engine(leaves, services)
-        .bind(town)
-        .try_house(town, tile, modes)
-}
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_town_build_house(
-    leaves: *const Leaves,
-    services: *const Services,
-    town: u32,
-    tile: u32,
-    house: u32,
-    random: u32,
-    complete: bool,
-    protected: bool,
-) {
-    engine(leaves, services)
-        .bind(town)
-        .build_house(town, tile, house, random, complete, protected);
-}
-#[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_town_tick_all(
     leaves: *const Leaves,
     services: *const Services,

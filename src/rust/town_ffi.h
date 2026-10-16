@@ -130,8 +130,6 @@ void openttd_rust_town_monthly_all(const OpenTTDTownLeaves *, const OpenTTDShare
 OpenTTDTownState *openttd_rust_town_new();
 void openttd_rust_town_destroy(OpenTTDTownState *);
 OpenTTDTownGrowthFields *openttd_rust_town_growth(OpenTTDTownState *);
-bool openttd_rust_town_try_house(const OpenTTDTownLeaves *, const OpenTTDSharedServices *, uint32_t town, uint32_t tile, uint32_t modes);
-void openttd_rust_town_build_house(const OpenTTDTownLeaves *, const OpenTTDSharedServices *, uint32_t town, uint32_t tile, uint32_t house, uint32_t random, bool complete, bool is_protected);
 void openttd_rust_town_tick_all(const OpenTTDTownLeaves *, const OpenTTDSharedServices *);
 void openttd_rust_town_update_growth(const OpenTTDTownLeaves *, const OpenTTDSharedServices *, uint32_t town);
 void openttd_rust_town_expand(const OpenTTDTownLeaves *, const OpenTTDSharedServices *, uint32_t town, uint32_t amount, uint32_t modes);

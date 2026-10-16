@@ -10,6 +10,8 @@
 #define TOWN_PROTOCOL_HPP
 #include "../rust/town_ffi.h"
 #include "../rust/house_ffi.h"
+#include "../rust/town_name_ffi.h"
+#include "../rust/command_services_ffi.h"
 #include <algorithm>
 #include <array>
 #include <memory>
@@ -20,7 +22,7 @@ struct TownProtocolWorld {
 	uint32_t population = 0, draws = 0, company = 7;
 	bool house_callback = false, clear_ok = true;
 	uint16_t house_class = 0;
-	uint32_t clears = 0, animations = 0, roads = 0;
+	uint32_t clears = 0, animations = 0, roads = 0, landscape_clears = 0, house_count = 1;
 	std::vector<std::array<uint32_t, 4>> writes;
 };
 static inline TownProtocolWorld *town_protocol_world;
@@ -30,7 +32,7 @@ static inline uint64_t TownProtocolLeaf(uint32_t op, uint32_t id, uint32_t a, ui
 	switch (op) {
 		case 8: { uint32_t previous = w.company; w.company = a; return previous; }
 		case 10: w.writes.push_back({id, a, b, c}); break;
-		case 17: return 1;
+		case 17: return w.house_count;
 		case 20: return UINT32_MAX;
 	}
 	return 0;
@@ -55,7 +57,7 @@ static inline int32_t TownProtocol_calendar_year() noexcept { return 1950; }
 static inline bool TownProtocol_allow_roads() noexcept { return false; }
 static inline uint8_t TownProtocol_road_flags(uint8_t) noexcept { return 0; }
 static inline OpenTTDTownHouseAvailability TownProtocol_house_availability(uint16_t) noexcept { return {.zones = 0xFFFF, .override_id = UINT16_MAX, .class_id = town_protocol_world->house_class, .probability = 1, .enabled = true}; }
-static inline uint8_t TownProtocol_house_flags(uint16_t id) noexcept { return id == 0 ? 1 : 16; }
+static inline uint8_t TownProtocol_house_flags(uint16_t id) noexcept { return id == 0 || id == 2 ? 1 : 16; }
 static inline OpenTTDTownHousePlacement TownProtocol_house_placement(uint16_t id) noexcept { return {.min_year = 0, .max_year = 5000, .flags = TownProtocol_house_flags(id), .extra_flags = 0}; }
 static inline OpenTTDTownHouseConstruction TownProtocol_house_construction(uint16_t) noexcept { return {.extra_flags = 0, .population = 10}; }
 static inline uint8_t TownProtocol_house_extra_flags(uint16_t) noexcept { return 0; }
@@ -67,7 +69,7 @@ static inline int64_t TownProtocol_terraform_price() noexcept { return TownProto
 static inline uint32_t TownProtocol_clean_road_bits(uint32_t tile, uint32_t bits) noexcept { return static_cast<uint32_t>(TownProtocolLeaf(6, tile, bits, 0, 0)); }
 static inline void TownProtocol_set_road_town(uint32_t tile, uint32_t town) noexcept { TownProtocolLeaf(7, tile, town, 0, 0); }
 static inline uint32_t TownProtocol_exchange_company(uint32_t company) noexcept { return static_cast<uint32_t>(TownProtocolLeaf(8, 0, company, 0, 0)); }
-static inline uint16_t TownProtocol_house_class(uint16_t) noexcept { return town_protocol_world->house_class; }
+static inline uint16_t TownProtocol_house_class(uint16_t id) noexcept { return id == 2 ? 0 : town_protocol_world->house_class; }
 static inline void TownProtocol_make_house(uint32_t tile, uint32_t town, uint32_t house, uint32_t construction) noexcept { TownProtocolLeaf(10, tile, town, house, construction); }
 static inline void TownProtocol_add_animation(uint32_t tile, bool) noexcept { TownProtocolLeaf(11, tile, 0, 0, 0); }
 static inline void TownProtocol_population_changed(uint32_t) noexcept { town_protocol_world->population = openttd_rust_town_simulation(town_protocol_world->owner)->population; }
@@ -89,17 +91,45 @@ static inline bool TownProtocol_allow_construction(uint32_t, uint32_t, uint32_t,
 {
 	openttd_rust_town_growth(town_protocol_world->owner)->flags = 0x88; return true;
 }
-static inline OpenTTDHouseTile TownProtocol_house_tile(uint32_t) noexcept { return {}; }
+/* The map holds one completed, old 1x1 house 2 whose rebuild reaches TryBuildTownHouse. */
+static inline OpenTTDHouseTile TownProtocol_house_tile(uint32_t) noexcept { return {.house = 2, .town = 0, .age = 255, .completed = true}; }
 static inline uint16_t TownProtocol_house_callbacks(uint16_t) noexcept { return 1U << 3; }
 static inline void TownProtocol_change_frame(uint16_t, uint32_t, uint32_t, uint32_t, uint64_t) noexcept { town_protocol_world->animations++; }
-/* Only the construction-stage animation trigger is reachable from house building;
- * the remaining services stay null. */
+struct TownProtocolCost { bool ok; };
+static inline TownProtocolCost *TownProtocolCostOf(const OpenTTDCommandCost *cost) noexcept { return reinterpret_cast<TownProtocolCost *>(const_cast<OpenTTDCommandCost *>(cost)); }
+static inline OpenTTDCommandCostServices TownProtocolCosts()
+{
+	auto costs = OpenTTDCommandCostServices{};
+	costs.zero = [](OpenTTDCommandCost *cost) noexcept { TownProtocolCostOf(cost)->ok = true; };
+	costs.error = [](OpenTTDCommandCost *cost, uint32_t) noexcept { TownProtocolCostOf(cost)->ok = false; };
+	costs.success = [](const OpenTTDCommandCost *cost) noexcept { return TownProtocolCostOf(cost)->ok; };
+	return costs;
+}
+static inline const OpenTTDCommandCostServices town_protocol_costs = TownProtocolCosts();
+static inline const OpenTTDCommandServices town_protocol_commands{
+	.landscape_clear = [](OpenTTDCommandCost *cost, uint32_t, uint16_t) noexcept { town_protocol_world->landscape_clears++; TownProtocolCostOf(cost)->ok = true; },
+};
+static inline const OpenTTDTownAuthorityServices town_protocol_authority{
+	.town_index = [](const OpenTTDTownHandle *) noexcept -> uint16_t { return 0; },
+};
+/* Services reached by the house tile-loop rebuild and CmdPlaceHouse; the rest stay null. */
 static inline OpenTTDHouseServices TownProtocolHouses()
 {
 	auto houses = OpenTTDHouseServices{};
+	houses.cost = &town_protocol_costs;
+	houses.commands = &town_protocol_commands;
+	houses.authority = &town_protocol_authority;
 	houses.tile = TownProtocol_house_tile;
+	houses.town = [](uint32_t) noexcept -> OpenTTDTownRef { return {nullptr, town_protocol_world->owner, 0}; };
+	houses.behaviour = [](uint16_t id) noexcept -> OpenTTDHouseBehaviour { return {.callbacks = 0, .flags = TownProtocol_house_flags(id)}; };
 	houses.callbacks = TownProtocol_house_callbacks;
+	houses.delete_inspect = [](uint32_t) noexcept {};
 	houses.change_frame = TownProtocol_change_frame;
+	houses.next_near_station = [](Town *, OpenTTDStation *) noexcept -> OpenTTDStation * { return nullptr; };
+	houses.production_cargo = [](uint8_t, uint32_t) noexcept -> OpenTTDHouseCargo { return {UINT8_MAX, 0}; };
+	houses.cargogen_mode = []() noexcept -> uint8_t { return 0; };
+	houses.place_houses = []() noexcept -> uint8_t { return 2; };
+	houses.company_human = [](uint8_t) noexcept { return true; };
 	return houses;
 }
 static inline const OpenTTDHouseServices town_protocol_houses = TownProtocolHouses();
@@ -189,16 +219,27 @@ template <typename Check> void CheckTownProtocol(Check check)
 	w.clear_ok = true; w.house_callback = true;
 	auto *id_counts = static_cast<uint16_t *>(openttd_rust_town_id_counts(owner.get()).data);
 	auto *class_counts = static_cast<uint16_t *>(openttd_rust_town_class_counts(owner.get()).data);
+	/* A growing town rebuilds the expired house: one draw, clear, then TryBuildTownHouse. */
+	const auto rebuild = [&] {
+		fields->time_until_rebuild = 1; fields->num_houses++;
+		openttd_rust_town_growth(owner.get())->flags |= 1;
+		openttd_rust_house_tile_loop(&leaves, &services, 2080, nullptr);
+	};
 	id_counts[0] = UINT16_MAX;
-	check(!openttd_rust_town_try_house(&leaves, &services, 0, 2080, 1) && w.draws == 1);
+	rebuild();
+	check(w.writes.empty() && w.draws == 2 && w.company == 7 && fields->time_until_rebuild == 0xCD + 192);
 	id_counts[0] = 0; w.house_class = 1; class_counts[1] = UINT16_MAX;
-	check(!openttd_rust_town_try_house(&leaves, &services, 0, 2080, 1) && w.draws == 1);
+	rebuild();
+	check(w.writes.empty() && w.draws == 3);
 	w.house_class = 0; class_counts[1] = 0;
-	check(openttd_rust_town_try_house(&leaves, &services, 0, 2080, 1));
+	rebuild();
 	check(fields->num_houses == 1 && w.writes.size() == 1 && w.animations == 1 && openttd_rust_town_growth(owner.get())->flags == 0x88);
-	w.writes.clear(); w.house_callback = false; w.clears = 0; w.animations = 0;
-	openttd_rust_town_build_house(&leaves, &services, 0, 2080, 1, 43, true, true);
-	check(w.clears == 4 && w.animations == 4 && w.writes.size() == 4);
+	/* CmdPlaceHouse executes a completed, protected 2x2 house through BuildTownHouse. */
+	w.writes.clear(); w.house_callback = false; w.clears = 0; w.animations = 0; w.house_count = 5;
+	TownProtocolCost cost{};
+	services.town_count = []() noexcept -> size_t { return 1; };
+	openttd_rust_house_place(&leaves, &services, reinterpret_cast<OpenTTDCommandCost *>(&cost), 1, 2080, 1, true, false);
+	check(cost.ok && w.landscape_clears == 4 && w.clears == 4 && w.animations == 4 && w.writes.size() == 4);
 	check(w.writes[0][0] == 2080 && w.writes[1][0] == 2144 && w.writes[2][0] == 2081 && w.writes[3][0] == 2145);
 	check(w.writes[0][2] == 1 && w.writes[1][2] == 2 && w.writes[2][2] == 3 && w.writes[3][2] == 4);
 	check(w.population == 10 && fields->num_houses == 2);
