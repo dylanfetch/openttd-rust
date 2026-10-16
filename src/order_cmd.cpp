@@ -426,10 +426,6 @@ extern "C" uint64_t openttd_orders_unique_backup_name(void *ctx) noexcept
 	return IsUniqueVehicleName(static_cast<OrderBackup *>(ctx)->name);
 }
 
-extern "C" uint64_t openttd_orders_backup_id(void *ctx) noexcept
-{
-	return static_cast<OrderBackup *>(ctx)->index.base();
-}
 
 extern "C" uint64_t openttd_orders_backup_hangar(void *ctx) noexcept
 {
@@ -726,7 +722,6 @@ static const OpenTTDOrdersLeaves _rust_orders_leaves{
 	openttd_orders_vehicle_tile,
 	openttd_orders_vehicle_group,
 	openttd_orders_unique_backup_name,
-	openttd_orders_backup_id,
 	openttd_orders_backup_hangar,
 	openttd_orders_review_setting,
 	openttd_orders_local_owner,

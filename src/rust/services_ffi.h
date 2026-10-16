@@ -133,10 +133,6 @@ struct OpenTTDRailMapServices {
 
 	bool (*is_rail_depot)(uint32_t) noexcept;
 	DiagDirection (*rail_depot_direction)(uint32_t) noexcept;
-	TrackBits (*rail_tracks)(uint32_t) noexcept;
-	bool (*has_signals)(uint32_t) noexcept;
-	bool (*has_signal_track)(uint32_t, uint8_t) noexcept;
-	SignalType (*signal_type)(uint32_t, uint8_t) noexcept;
 	bool (*has_signal_trackdir)(uint32_t, uint8_t) noexcept;
 	SignalState (*signal_state)(uint32_t, uint8_t) noexcept;
 	void (*set_signal_state)(uint32_t, uint8_t, uint8_t) noexcept;

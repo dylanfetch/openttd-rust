@@ -319,7 +319,6 @@ void openttd_rust_station_prepare(OpenTTDVehicle *, const OpenTTDStationServices
 /* An empty queue touches only its Rust owner; service tables may be null then. */
 void openttd_rust_station_load(OpenTTDStationService *, const OpenTTDStationServices *, const OpenTTDStationLoading *);
 void openttd_rust_station_acceptance(OpenTTDBaseStation *, const OpenTTDStationServices *, uint8_t);
-void openttd_rust_station_rating(OpenTTDBaseStation *, const OpenTTDStationServices *);
 void openttd_rust_station_watched(OpenTTDBaseStation *, const OpenTTDStationServices *);
 void openttd_rust_station_tick(const OpenTTDStationServices *, const OpenTTDStationLinks *);
 void openttd_rust_station_stale(OpenTTDBaseStation *, const OpenTTDStationServices *, const OpenTTDStationLinks *);

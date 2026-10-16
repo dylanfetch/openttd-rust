@@ -364,7 +364,9 @@ struct Town : TownPool::PoolItem<&_town_pool> {
 	/** Destroy the town. */
 	~Town();
 
+#ifndef WITH_RUST
 	void InitializeLayout(TownLayout layout);
+#endif
 
 	/**
 	 * Calculate the max town noise.
