@@ -22,6 +22,7 @@ struct Train;
 struct OpenTTDRailConvertFrame; ///< Caller-owned TileIterator and ordered affected-train list.
 struct OpenTTDSlopeZ { int32_t z; uint8_t slope; };
 struct OpenTTDRailTrainParking { uint8_t track; uint8_t status; uint16_t speed; uint8_t order; };
+struct OpenTTDRailTrainPosition { uint32_t tile; uint8_t trackdir; };
 struct OpenTTDNormalRoad { bool works; uint8_t disallowed, road_type, tram_type, road_bits, tram_bits; };
 struct OpenTTDCrossingRoad { uint8_t bits, road_type, tram_type; uint16_t town; uint8_t road_owner, tram_owner; };
 struct OpenTTDRailCommandStrings {
@@ -70,10 +71,8 @@ struct OpenTTDRailCommandServices {
 	void (*signal_infrastructure)(uint8_t, uint32_t) noexcept;
 	void (*infrastructure_dirty)(uint8_t) noexcept;
 	Train *(*reserving_train)(uint32_t, uint8_t) noexcept;
-	void (*free_reservation)(Train *) noexcept;
-	void (*try_reserve)(Train *, bool) noexcept;
 	OpenTTDRailTrainParking (*parking)(Train *) noexcept;
-	bool (*safe_waiting)(Train *) noexcept;
+	OpenTTDRailTrainPosition (*train_position)(Train *) noexcept;
 	void (*layout_changed)(uint32_t, uint8_t) noexcept;
 	void (*update_crossing)(uint32_t) noexcept;
 	void (*mark_crossings)(uint32_t, uint8_t) noexcept;

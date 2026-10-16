@@ -191,7 +191,6 @@ pub struct Leaves {
     pub reserved: extern "C" fn(*mut std::ffi::c_void, Handle, u32) -> u64,
     pub reserve_paths: extern "C" fn(*mut std::ffi::c_void, Handle) -> u64,
     pub restore_order: extern "C" fn(*mut std::ffi::c_void, Handle),
-    pub safe: extern "C" fn(*mut std::ffi::c_void, Handle, u32, u8) -> u64,
     pub save_order: extern "C" fn(*mut std::ffi::c_void, Handle),
     pub service: extern "C" fn(*mut std::ffi::c_void, Handle),
     pub set_depot: extern "C" fn(*mut std::ffi::c_void, Handle, u32, u8),
@@ -202,6 +201,7 @@ pub struct Leaves {
     pub show_res: extern "C" fn(*mut std::ffi::c_void, Handle) -> u64,
     pub signal_context: extern "C" fn() -> crate::signal::Context,
     pub vehicle: *const crate::vehicle::VehicleServices,
+    pub shared: *const crate::services::Services,
     pub start_stop: extern "C" fn(*mut std::ffi::c_void, Handle),
     pub station: extern "C" fn(*mut std::ffi::c_void, Handle, u32) -> u64,
     pub station_train: extern "C" fn(*mut std::ffi::c_void, Handle, u16) -> u64,
@@ -420,8 +420,9 @@ impl Game<'_> {
         (self.leaves.restore_order)(self.context, id);
         0
     }
-    fn svc_safe(&self, id: Handle, a: u64, b: u64) -> u64 {
-        (self.leaves.safe)(self.context, id, a as u32, b as u8)
+    fn shared(&self) -> &crate::services::Services {
+        // SAFETY: Native installs the process-lifetime shared table; tests a live fixture.
+        unsafe { &*self.leaves.shared }
     }
     fn svc_save_order(&self, id: Handle) -> u64 {
         (self.leaves.save_order)(self.context, id);
@@ -757,7 +758,7 @@ fn extend(g: &Game, id: Handle, new_tracks: &mut u8, enterdir: &mut u8) -> Pbs {
         tile = ft.new_tile;
         td = first(ft.dirs);
         let rev = td ^ 8;
-        if g.svc_safe(id, u64::from(tile), u64::from(td)) != 0 {
+        if (g.shared().safe_waiting_position)(id.shell.cast(), tile, td) {
             if !((g.svc_free(id, u64::from(tile), u64::from(td)) != 0)
                 && g.reserve_bounded(id, tile, td))
             {
@@ -1040,7 +1041,7 @@ fn choose(
         return (best, got);
     }
     got = true;
-    while g.svc_safe(id, u64::from(dest.tile), u64::from(dest.td)) == 0 {
+    while !(g.shared().safe_waiting_position)(id.shell.cast(), dest.tile, dest.td) {
         let exit = g.dir(id, dest.td);
         let next = g.add(id, dest.tile, exit);
         let mut reachable = tracks(g.svc_track_status(id, u64::from(next)) as u16)
@@ -1472,7 +1473,6 @@ mod tests {
             reserved: unused!((*mut std::ffi::c_void, Handle, u32); u64),
             reserve_paths: unused!((*mut std::ffi::c_void, Handle); u64),
             restore_order: unused!((*mut std::ffi::c_void, Handle); ()),
-            safe: unused!((*mut std::ffi::c_void, Handle, u32, u8); u64),
             save_order: unused!((*mut std::ffi::c_void, Handle); ()),
             service: unused!((*mut std::ffi::c_void, Handle); ()),
             set_depot: unused!((*mut std::ffi::c_void, Handle, u32, u8); ()),
@@ -1483,6 +1483,7 @@ mod tests {
             show_res: unused!((*mut std::ffi::c_void, Handle); u64),
             signal_context: unused!(() ; crate::signal::Context),
             vehicle: std::ptr::null(),
+            shared: std::ptr::null(),
             start_stop: unused!((*mut std::ffi::c_void, Handle); ()),
             station: unused!((*mut std::ffi::c_void, Handle, u32); u64),
             station_train: unused!((*mut std::ffi::c_void, Handle, u16); u64),
@@ -1576,9 +1577,21 @@ mod tests {
             1
         }
     }
-    extern "C" fn safe(_: *mut std::ffi::c_void, h: Handle, tile: u32, _: u8) -> u64 {
-        // SAFETY: Live mock for this synchronous scalar callback.
-        unsafe { u64::from(mock(h).stop == 2 && tile == 2) }
+    extern "C" fn safe(v: *const crate::services::Train, tile: u32, _: u8) -> bool {
+        // SAFETY: The train shell is the live mock for this synchronous scalar callback.
+        unsafe { (*v.cast::<Mock>()).stop == 2 && tile == 2 }
+    }
+    extern "C" fn no_random(_: *mut std::ffi::c_void) -> u32 {
+        std::process::abort()
+    }
+    extern "C" fn no_industry(_: i32, _: i32, _: *mut u32) -> u32 {
+        std::process::abort()
+    }
+    fn extension_shared() -> crate::services::Services {
+        crate::services::Services {
+            safe_waiting_position: safe,
+            ..crate::services::fixture(std::ptr::null_mut(), no_random, no_industry)
+        }
     }
     extern "C" fn try_track(_: *mut std::ffi::c_void, h: Handle, tile: u32, track: u8) -> u64 {
         // SAFETY: The callback ends this mock access before returning to policy.
@@ -1606,12 +1619,12 @@ mod tests {
             mock(h).log.push(("mark", tile, 0));
         }
     }
-    fn extension_leaves() -> Leaves {
+    fn extension_leaves(shared: &crate::services::Services) -> Leaves {
         Leaves {
+            shared,
             blocking: zero_track,
             rail90: zero_pair,
             is_railway: zero_tile,
-            safe,
             free: one_track,
             has_pbs: one_track,
             green: one_track,
@@ -1628,7 +1641,8 @@ mod tests {
     fn controller_extension_rolls_back_only_new_tracks_and_restores_signal_order() {
         let mut m = Mock::new(0);
         let h = m.handle();
-        let ls = extension_leaves();
+        let shared = extension_shared();
+        let ls = extension_leaves(&shared);
         let g = Game {
             vehicle: std::ptr::null_mut(),
             leaves: &ls,
@@ -1659,7 +1673,8 @@ mod tests {
         for stop in [1, 2] {
             let mut m = Mock::new(stop);
             let h = m.handle();
-            let ls = extension_leaves();
+            let shared = extension_shared();
+            let ls = extension_leaves(&shared);
             let g = Game {
                 vehicle: std::ptr::null_mut(),
                 leaves: &ls,

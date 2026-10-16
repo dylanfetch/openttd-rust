@@ -18,13 +18,17 @@
  * Map predicates take a TileIndex value and return the original accessor's
  * underlying type: TileType, TropicZone and Slope are uint8_t, GetTileZ is int.
  * mark_dirty is MarkTileDirtyByTile(tile), set_tropic_zone is SetTropicZone and
- * clear_square is DoClearSquare(tile).
+ * clear_square is DoClearSquare(tile). free_train_reservation is
+ * FreeTrainTrackReservation(v), try_path_reserve is TryPathReserve(v, mark_as_stuck,
+ * first_tile_okay) and safe_waiting_position is IsSafeWaitingPosition(v, tile,
+ * trackdir, true, forbid_90_deg); the last two can reenter Rust train owners.
  * Random logging still runs, but its debug source location names this wrapper.
  * Industry query returns 0 not industry,1 industry,2 bubble catcher and writes
  * TileVirtXY(x,y). It observes only type and industry graphics.
  * An environmental exception terminates rather than unwinding through Rust. */
 struct OpenTTDTownHandle; // Opaque native Town shell; never dereferenced in Rust.
 struct OpenTTDTownState;
+struct Train; // Native Train shell; never dereferenced in Rust.
 struct OpenTTDSharedServices {
 	void *context;
 	uint32_t (*random)(void *) noexcept;
@@ -89,6 +93,9 @@ struct OpenTTDSharedServices {
 	bool (*build_on_slopes)() noexcept;
 	bool (*autoslope)() noexcept;
 	void (*clear_square)(uint32_t) noexcept;
+	void (*free_train_reservation)(const Train *) noexcept;
+	bool (*try_path_reserve)(Train *, bool, bool) noexcept;
+	bool (*safe_waiting_position)(const Train *, uint32_t, uint8_t) noexcept;
 };
 const OpenTTDSharedServices &GetRustSharedServices() noexcept;
 /** Shared save/reseed/restore of BOTH original RNG streams. */
@@ -242,6 +249,9 @@ inline OpenTTDSharedServices OpenTTDFixtureSharedServices(void *context, uint32_
 		.build_on_slopes = OpenTTDFixtureMapService<bool>,
 		.autoslope = OpenTTDFixtureMapService<bool>,
 		.clear_square = OpenTTDFixtureMapService<void, uint32_t>,
+		.free_train_reservation = OpenTTDFixtureMapService<void, const Train *>,
+		.try_path_reserve = OpenTTDFixtureMapService<bool, Train *, bool, bool>,
+		.safe_waiting_position = OpenTTDFixtureMapService<bool, const Train *, uint32_t, uint8_t>,
 	};
 }
 #endif /* RUST_SERVICES_FFI_H */

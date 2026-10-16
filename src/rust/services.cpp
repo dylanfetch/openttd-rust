@@ -26,6 +26,7 @@
 #include "../bridge.h"
 #include "../water_map.h"
 #include "../pbs.h"
+#include "../train.h"
 #include "../company_base.h"
 #include "../company_func.h"
 #include "../command_type.h"
@@ -107,6 +108,9 @@ static int32_t SharedTileZ(uint32_t tile) noexcept { return GetTileZ(TileIndex{t
 static uint8_t SharedTileSlope(uint32_t tile) noexcept { return GetTileSlope(TileIndex{tile}); }
 static void SharedMarkDirty(uint32_t tile) noexcept { MarkTileDirtyByTile(TileIndex{tile}); }
 static void SharedClearSquare(uint32_t tile) noexcept { DoClearSquare(TileIndex{tile}); }
+static void SharedFreeTrainReservation(const Train *v) noexcept { FreeTrainTrackReservation(v); }
+static bool SharedTryPathReserve(Train *v, bool mark_as_stuck, bool first_tile_okay) noexcept { return TryPathReserve(v, mark_as_stuck, first_tile_okay); }
+static bool SharedSafeWaitingPosition(const Train *v, uint32_t tile, uint8_t trackdir) noexcept { return IsSafeWaitingPosition(v, TileIndex{tile}, static_cast<Trackdir>(trackdir), true, RustForbid90Deg()); }
 static void SharedSetTropicZone(uint32_t tile, uint8_t zone) noexcept { SetTropicZone(TileIndex{tile}, static_cast<TropicZone>(zone)); }
 
 /** Pure map query; no allocation, reentry or C++ exception crosses into Rust. */
@@ -240,6 +244,9 @@ const OpenTTDSharedServices &GetRustSharedServices() noexcept
 		.build_on_slopes = RustBuildOnSlopes,
 		.autoslope = RustAutoslopeEnabled,
 		.clear_square = SharedClearSquare,
+		.free_train_reservation = SharedFreeTrainReservation,
+		.try_path_reserve = SharedTryPathReserve,
+		.safe_waiting_position = SharedSafeWaitingPosition,
 	};
 	return services;
 }

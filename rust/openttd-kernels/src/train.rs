@@ -561,7 +561,6 @@ pub struct Leaves {
     pub enter_tile: extern "C" fn(Handle, u32, i32, i32) -> u64,
     pub find_depot: extern "C" fn(Handle, i32) -> Depot,
     pub first_track: extern "C" fn(Handle, u8) -> u64,
-    pub free_reservation: extern "C" fn(Handle),
     pub grf_version: extern "C" fn(Handle) -> u64,
     pub handle_breakdown: extern "C" fn(Handle) -> u64,
     pub has_depot_res: extern "C" fn(Handle, u32) -> u64,
@@ -666,7 +665,6 @@ pub struct Leaves {
     pub train_list: extern "C" fn(Handle),
     pub train_visit: extern "C" fn(Handle) -> u64,
     pub truncate_cargo: extern "C" fn(Handle, u32),
-    pub try_path: extern "C" fn(Handle, u8, u8) -> u64,
     pub try_reserve: extern "C" fn(Handle, u32, u8, u8) -> u64,
     pub tunnel_dir: extern "C" fn(Handle, u32) -> u64,
     pub unreserve: extern "C" fn(Handle, u32, u8),
@@ -1116,10 +1114,6 @@ impl Game<'_> {
     fn svc_first_track(&self, id: Handle, a: u64) -> u64 {
         (self.leaves.first_track)(id, a as u8)
     }
-    fn svc_free_reservation(&self, id: Handle) -> u64 {
-        (self.leaves.free_reservation)(id);
-        0
-    }
     fn svc_grf_version(&self, id: Handle) -> u64 {
         (self.leaves.grf_version)(id)
     }
@@ -1478,9 +1472,6 @@ impl Game<'_> {
     fn svc_truncate_cargo(&self, id: Handle, a: u64) -> u64 {
         (self.leaves.truncate_cargo)(id, a as u32);
         0
-    }
-    fn svc_try_path(&self, id: Handle, a: u64, b: u64) -> u64 {
-        (self.leaves.try_path)(id, a as u8, b as u8)
     }
     fn svc_try_reserve(&self, id: Handle, a: u64, b: u64, c: u64) -> u64 {
         (self.leaves.try_reserve)(id, a as u32, b as u8, c as u8)
@@ -2267,7 +2258,7 @@ impl Game<'_> {
             self.svc_depot_dirty(id);
         }
         if !id.flag(8) {
-            self.svc_free_reservation(id);
+            (self.services.free_train_reservation)(id.shell.cast());
         }
         let crossing = self.approaching_crossing(id);
         let mut r = self.svc_count_chain(id) as i32 - 1;
@@ -2342,7 +2333,7 @@ impl Game<'_> {
                     1,
                 );
             }
-            if self.svc_try_path(id, 0, u64::from(okay)) != 0 {
+            if (self.services.try_path_reserve)(id.shell.cast(), false, okay) {
                 self.svc_check_next(id);
             } else if self.read_order(id) != 3 {
                 self.mark_stuck(id);
@@ -2766,7 +2757,7 @@ impl Game<'_> {
             if self.read_front(id) != 0 && self.moved_signals(id, new, entered) {
                 if (self.svc_has_reserved(id, u64::from(new), u64::from(id.track())) == 0
                     && self.reserve_track(id, new, u64::from(id.track().trailing_zeros())) == 0)
-                    || self.svc_try_path(id, 0, 0) == 0
+                    || !(self.services.try_path_reserve)(id.shell.cast(), false, false)
                 {
                     self.mark_stuck(id);
                 }
@@ -2825,7 +2816,7 @@ impl Game<'_> {
         if self.read_front(id) != 0 {
             victims += 2;
             if !id.flag(8) {
-                self.svc_free_reservation(id);
+                (self.services.free_train_reservation)(id.shell.cast());
             }
             let mut u = id;
             while u != Handle::NONE {
@@ -3131,7 +3122,7 @@ impl Game<'_> {
             return true;
         }
         if segment == self.svc_sigseg_pbs(id)
-            && self.svc_try_path(id, 0, 0) == 0
+            && !(self.services.try_path_reserve)(id.shell.cast(), false, false)
             && id.get_force_proceed() == 0
         {
             self.svc_train_list(id);
@@ -3204,7 +3195,7 @@ impl Game<'_> {
                 == self.svc_sigseg_pbs(id)
                 || self.svc_reserve_paths(id) != 0
             {
-                self.svc_try_path(id, 1, 1);
+                (self.services.try_path_reserve)(id.shell.cast(), true, true);
             }
             id.set_flag(9, false);
         }
@@ -3226,7 +3217,7 @@ impl Game<'_> {
             if !turn && wait % self.svc_backoff(id) != 0 && id.get_force_proceed() == 0 {
                 return true;
             }
-            if self.svc_try_path(id, 0, 0) == 0 {
+            if !(self.services.try_path_reserve)(id.shell.cast(), false, false) {
                 if turn {
                     crate::witness::hit(crate::witness::TRAIN_STUCK_REVERSE);
                     self.reverse(id);

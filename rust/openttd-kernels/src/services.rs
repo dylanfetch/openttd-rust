@@ -77,10 +77,18 @@ pub struct ByteSpan {
     pub size: usize,
 }
 
+/// Opaque native `Train` shell; never dereferenced in Rust.
+#[repr(C)]
+pub struct Train {
+    _private: [u8; 0],
+}
+
 /// Immutable call table supplied by the game (or isolated test world). No global
 /// registration or game symbol imports are needed by standalone Cargo binaries.
 /// The context and function addresses outlive the component invocation; callbacks
-/// do not throw or reenter, and output pointers are borrowed for that call only.
+/// do not throw, only the train reservation entries reenter Rust train owners
+/// (callers hold no borrow across them), and output pointers are borrowed for
+/// that call only.
 /// Map predicates take a `TileIndex` value and return the accessor's underlying type.
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -211,6 +219,12 @@ pub struct Services {
     pub autoslope: extern "C" fn() -> bool,
     /// `DoClearSquare`.
     pub clear_square: extern "C" fn(u32),
+    /// `FreeTrainTrackReservation(v)`.
+    pub free_train_reservation: extern "C" fn(*const Train),
+    /// `TryPathReserve(v, mark_as_stuck, first_tile_okay)`.
+    pub try_path_reserve: extern "C" fn(*mut Train, bool, bool) -> bool,
+    /// `IsSafeWaitingPosition(v, tile, trackdir, true, forbid_90_deg)`.
+    pub safe_waiting_position: extern "C" fn(*const Train, u32, u8) -> bool,
 }
 impl Services {
     /// Draw one shared random word.
@@ -252,6 +266,13 @@ pub fn fixture(
         0
     }
     extern "C" fn tile(_: u32) {}
+    extern "C" fn train(_: *const Train) {}
+    extern "C" fn train_path(_: *mut Train, _: bool, _: bool) -> bool {
+        false
+    }
+    extern "C" fn train_safe(_: *const Train, _: u32, _: u8) -> bool {
+        false
+    }
     extern "C" fn zone(_: u32, _: u8) {}
     extern "C" fn word(_: u32) -> u32 {
         0
@@ -335,6 +356,9 @@ pub fn fixture(
         build_on_slopes: flag0,
         autoslope: flag0,
         clear_square: tile,
+        free_train_reservation: train,
+        try_path_reserve: train_path,
+        safe_waiting_position: train_safe,
     }
 }
 /// Map dimensions read once per entry.

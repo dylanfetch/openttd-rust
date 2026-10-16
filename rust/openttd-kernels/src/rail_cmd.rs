@@ -20,16 +20,12 @@
     clippy::too_many_lines,
     clippy::fn_params_excessive_bools
 )]
+pub use crate::services::Train;
 use crate::services::{
     CommandCost, CommandCostServices, CommandServices, Map, RailMapServices, Services,
 };
 use crate::witness as w;
 
-/// Opaque native `Train` shell; never dereferenced in Rust.
-#[repr(C)]
-pub struct Train {
-    _private: [u8; 0],
-}
 /// Opaque caller-owned native frame holding the conversion area iterator and
 /// the ordered affected-train list of `CmdConvertRail`.
 #[repr(C)]
@@ -45,6 +41,15 @@ pub struct SlopeZ {
     pub z: i32,
     /// Slope on top of the foundation.
     pub slope: u8,
+}
+/// Train position read only when the safe-waiting check runs.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct TrainPosition {
+    /// `v->tile`.
+    pub tile: u32,
+    /// `v->GetVehicleTrackdir()`.
+    pub trackdir: u8,
 }
 /// Train fields read together at the signal re-reservation branch.
 #[repr(C)]
@@ -197,14 +202,10 @@ pub struct RailCommandServices {
     pub infrastructure_dirty: extern "C" fn(u8),
     /// `GetTrainForReservation`.
     pub reserving_train: extern "C" fn(u32, u8) -> *mut Train,
-    /// `FreeTrainTrackReservation`.
-    pub free_reservation: extern "C" fn(*mut Train),
-    /// `TryPathReserve(v, mark_as_stuck)`.
-    pub try_reserve: extern "C" fn(*mut Train, bool),
     /// Train fields read at the signal re-reservation branch.
     pub parking: extern "C" fn(*mut Train) -> TrainParking,
-    /// `IsSafeWaitingPosition(v, v->tile, v->GetVehicleTrackdir(), true, forbid_90_deg)`.
-    pub safe_waiting: extern "C" fn(*mut Train) -> bool,
+    /// `v->tile` and `v->GetVehicleTrackdir()`, read only for the safe-waiting check.
+    pub train_position: extern "C" fn(*mut Train) -> TrainPosition,
     /// `YapfNotifyTrackLayoutChange`.
     pub layout_changed: extern "C" fn(u32, u8),
     /// `UpdateLevelCrossing(tile, false)`.
@@ -870,7 +871,7 @@ impl<'a> Ctx<'a> {
                     if self.reserved(tile) & trackbit != 0 {
                         v = (self.s.reserving_train)(tile, track);
                         if !v.is_null() {
-                            (self.s.free_reservation)(v);
+                            (self.shared.free_train_reservation)(v);
                         }
                     }
                     owner = (self.shared.tile_owner)(tile);
@@ -916,7 +917,7 @@ impl<'a> Ctx<'a> {
                     if self.reserved(tile) & trackbit != 0 {
                         v = (self.s.reserving_train)(tile, track);
                         if !v.is_null() {
-                            (self.s.free_reservation)(v);
+                            (self.shared.free_train_reservation)(v);
                         }
                     }
                     owner = (self.shared.tile_owner)(tile);
@@ -961,7 +962,7 @@ impl<'a> Ctx<'a> {
                 (self.s.layout_changed)(tile, track);
             }
             if !v.is_null() {
-                (self.s.try_reserve)(v, true);
+                (self.shared.try_path_reserve)(v, true, false);
             }
         }
     }
@@ -1234,7 +1235,7 @@ impl<'a> Ctx<'a> {
         if self.reserved(tile) & (1 << track) != 0 {
             v = (self.s.reserving_train)(tile, track);
             if !v.is_null() {
-                (self.s.free_reservation)(v);
+                (self.shared.free_train_reservation)(v);
             }
         }
         if !(self.rail.has_signals)(tile) {
@@ -1324,9 +1325,12 @@ impl<'a> Ctx<'a> {
             let p = (self.s.parking)(v);
             if p.track != BIT_DEPOT {
                 let parked = (p.status & STOPPED != 0 && p.speed == 0) || p.order == OT_LOADING;
-                if !parked || !(self.s.safe_waiting)(v) {
+                if !parked || {
+                    let at = (self.s.train_position)(v);
+                    !(self.shared.safe_waiting_position)(v, at.tile, at.trackdir)
+                } {
                     w::hit(w::RAIL_CMD_SIGNAL_RESERVE);
-                    (self.s.try_reserve)(v, true);
+                    (self.shared.try_path_reserve)(v, true, false);
                 }
             }
         }
@@ -1669,7 +1673,7 @@ impl<'a> Ctx<'a> {
             self.add_track(tile, track, (self.shared.tile_owner)(tile));
             (self.s.layout_changed)(tile, track);
             if !v.is_null() {
-                (self.s.try_reserve)(v, false);
+                (self.shared.try_path_reserve)(v, false, false);
             }
             (self.shared.mark_dirty)(tile);
         }
@@ -1901,7 +1905,7 @@ impl<'a> Ctx<'a> {
             }
         }
         for v in affected {
-            (self.s.try_reserve)(v, true);
+            (self.shared.try_path_reserve)(v, true, false);
         }
         true
     }
@@ -1910,7 +1914,7 @@ impl<'a> Ctx<'a> {
         let v = (self.s.reserving_train)(tile, track);
         if !v.is_null() && !(self.s.train_powered)(v, totype) {
             w::hit(w::RAIL_CMD_CONVERT_REROUTE);
-            (self.s.free_reservation)(v);
+            (self.shared.free_train_reservation)(v);
             affected.push(v);
         }
     }
@@ -1935,7 +1939,7 @@ impl<'a> Ctx<'a> {
             if (self.rail.depot_reserved)(tile) {
                 v = (self.s.reserving_train)(tile, dir & 1);
                 if !v.is_null() {
-                    (self.s.free_reservation)(v);
+                    (self.shared.free_train_reservation)(v);
                 }
             }
             self.rail_infra(owner, (self.rail.rail_type)(tile), 1_u32.wrapping_neg());
@@ -1945,7 +1949,7 @@ impl<'a> Ctx<'a> {
             self.add_side(tile, dir, owner);
             (self.s.layout_changed)(tile, dir & 1);
             if !v.is_null() {
-                (self.s.try_reserve)(v, true);
+                (self.shared.try_path_reserve)(v, true, false);
             }
         }
         cost.set(price(PR_CLEAR_DEPOT_TRAIN));

@@ -366,11 +366,6 @@ static uint64_t TrainFirstTrack(OpenTTDTrainHandle, uint8_t a) noexcept
 {
 	return FindFirstTrack(static_cast<TrackBits>(a));
 }
-static void TrainFreeReservation(OpenTTDTrainHandle id) noexcept
-{
-	Train *v = static_cast<Train *>(id.shell);
-	FreeTrainTrackReservation(v);
-}
 static uint64_t TrainGrfVersion(OpenTTDTrainHandle id) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
@@ -784,11 +779,6 @@ static void TrainTruncateCargo(OpenTTDTrainHandle id, uint32_t a) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
 	v->cargo.Truncate(static_cast<uint>(a));
-}
-static uint64_t TrainTryPath(OpenTTDTrainHandle id, uint8_t a, uint8_t b) noexcept
-{
-	Train *v = static_cast<Train *>(id.shell);
-	return TryPathReserve(v, a != 0, b != 0);
 }
 static uint64_t TrainTryReserve(OpenTTDTrainHandle, uint32_t a, uint8_t b, uint8_t c) noexcept
 {

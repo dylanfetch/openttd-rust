@@ -214,12 +214,6 @@ static void TrainReservationRestoreOrder(void *context, OpenTTDTrainHandle id) n
 	auto *ctx = static_cast<TrainReservationContext *>(context);
 	v->current_order = *ctx->saved_order;
 }
-static uint64_t TrainReservationSafe(void *, OpenTTDTrainHandle id, uint32_t a, uint8_t b) noexcept
-{
-	Train *v = static_cast<Train *>(id.shell);
-	TileIndex t(static_cast<uint32_t>(a));
-	return IsSafeWaitingPosition(v, t, static_cast<Trackdir>(b), true, _settings_game.pf.forbid_90_deg);
-}
 static void TrainReservationSaveOrder(void *context, OpenTTDTrainHandle id) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
