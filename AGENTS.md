@@ -64,10 +64,10 @@ fork; the remaining upstream documentation explains behavior and architecture.
   finding. Command ports share one set of command-check services. A PR that
   adds a shared accessor deletes the integrated copies, and a PR that removes a
   caller deletes the export, declaration or callback field it orphans. Services
-  return their real types on both sides and tables use designated initializers. Existing ports convert
-  under #168 and #199. Root grants no exceptions at integration: a port whose
-  hot path allocates per call, dispatches by opcode or copies whole records is
-  fixed before it integrates.
+  return their real types on both sides and tables use designated
+  initializers. Existing ports convert under #168 and #199. Root grants no
+  exceptions at integration: a port whose hot path allocates per call,
+  dispatches by opcode or copies whole records is fixed before it integrates.
 - A port that misses a speed budget gets a profile-guided fix round before it
   is deferred. Attribute the cost per function (callgrind instruction counts
   work on this host, where hardware counters do not) and fix the attributed
