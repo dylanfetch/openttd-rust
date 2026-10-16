@@ -146,9 +146,7 @@ Integrate reviewed work first, in order of readiness, with at most six
 unintegrated component branches. Housekeeping (#259) and #156 run in parallel.
 
 1. **Housekeeping:** #259 H1-H4 and #260 complete. #261 R1-R4 next (R4 running), H5 last; at most three maintenance PRs in flight alongside the items below.
-2. **#212 landscape (#255) and #213 vehicle (#257).** Update each from base and resolve the town conflicts; a fresh reviewer checks the resolution. Re-freeze against the new tip, profile the head with callgrind, then root re-selects a bounded fix with its gate, or re-scopes the owner. The selected boundaries stand:
-   - landscape: an inlined dispatch on the raw type byte, `noexcept` `TileLoop_*` handlers called directly, Rust transition control and no raw-map extension; gate within 11 ms on TGP, interleaved A/B against tip;
-   - vehicle: a pool-cursor descriptor, one slim dispatch record and one post-tick bundle, at most about three C++ calls per vehicle (`docs/design/world-state.md`); gate at most 6 ns per vehicle-tick visit on Opus.
+2. **#212 landscape and #213 vehicle: deferred 2026-10-16.** After base updates and profiled fix rounds, both still missed their gates (landscape +153.8M Ir vs ~122M; vehicle cost is the per-vehicle native Tick plus layout i-cache misses), and both retired fewer original lines than net glue plus tooling (844 vs 1,420; 388 vs 1,430). Drafts closed; branches `landscape-owner-212` (`20cc66dfe5`) and `vehicle-owner-213` (`21b78029c5`) stay on origin. Re-select #212 once a profile shows a clear/water map-read path near native cost (#108 revisit), and #213 once the #168 C-layout vehicle conversions allow inline reads.
 3. **Town:** #256 house lifecycle and tile simulation, then #247 commands, authority and deletion. Reuse the sole town owner and generation unwind contract.
 4. **Next owners (#265-#267, planned 2026-10-15):** #265 rail track/depot/signal commands and procs, then #266 road commands (reuses #265's crossing/track services), then #267 station construction/joining/removal on the #125 owner. Tile loops stay #212's; hot per-vehicle procs stay native. Tunnel/bridge follows once #247 and #212 settle.
 5. **Conversions buy speed headroom** and never block ownership:
@@ -166,18 +164,18 @@ that a `SaveLoad` descriptor cannot address through the alias.
 
 ## Resume checkpoint
 
-Resumed 2026-10-15 by the user (Claude Code root, claude-opus-5-5, high). The
-160-line gate was the wind-down's; H4 keeps the steering review's 190-line ceiling.
-Five agents run; root verifies fixes, selects the #255/#257 fix rounds from their
-profiles, and times caps on a quiet host.
+Resumed 2026-10-15 (Claude Code root, claude-opus-5-5, high). #264 integrated;
+#212/#213 deferred (Phase 2 item 2). Speed caps for #268, #269 and #270 wait for
+a quiet-host window, which root runs before integrating them.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #212 / #255 | `landscape-owner-212`, `63c67959ee` | `/root/landscape_update_profile_255`: base update, callgrind attribution, one proposed fix; root selects. Resolution needs a fresh reviewer. |
-| #213 / #257 | `vehicle-owner-213`, `67611082f7` | `/root/vehicle_update_profile_257`: same as #255. |
-| #256 | `house-lifecycle-256` (new) | `/root/house_lifecycle_256` implementing; draft PR pending. |
-| #261 R4 | `save-staging-261` (new) | `/root/save_staging_261_r4` implementing; R1-R3 unblocked, start when a slot frees. |
-| #265 | `rail-commands-265` (new) | `/root/rail_commands_265` implementing; #266 and #267 unstarted. |
+| #261 R4 / #268 | `save-staging-261`, `3e7b72b8d4` | Reviewed, fix verified, full CI passed. Six caps on a quiet host, then integrate. |
+| #261 R1 / #271 | `test-cleanup-261`, `5e3aab4c3f` | Reviewed, fixes verified; full CI requested. Integrate on pass. R2-R3 next. |
+| #256 / #269 | `house-lifecycle-256`, `f185761a9e` | Implemented; full simulation rerun, then fresh review, caps. |
+| #265 / #270 | `rail-commands-265`, `90cf900cf8` | Implemented (1,578 retired); `/root/review_rail_commands_270` reviewing. Then caps, full CI. |
+| #156 | `coverage-156-town-station` | `/root/coverage_156_town_station`: `larger_towns == 0`, station stale links. |
+| #266, #267, #247 | unstarted | #266 after #265 integrates its crossing services. |
 | #64 / #66 | remote `issue/64-curve-family`, `aab5211801` | #66 closed unmerged; #64 stays paused. |
 
 ABI blocks:
