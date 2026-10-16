@@ -1301,8 +1301,8 @@ mod layouts remain #156 limits.
 Rust owns the produced/accepted slots, optional accepted histories, production fields, sound
 countdown and industry-builder records. C++ industry shells expose nonowning views of these
 allocations; INDY, IBLD, ITBL, ECMY and TTO/TTD load adapters preserve the original names,
-widths, version gates and ordering. INDY, IBLD and ECMY scalars save through the reference
-aliases; only the Rust-owned industry text is staged.
+widths, version gates and ordering. INDY, IBLD, ECMY and TTO/TTD industry scalars load and
+save through the reference aliases; only the Rust-owned industry text is staged.
 
 Rust runs production/transport ticks, farm and lumber updates, NewGRF production application,
 monthly statistics/closure, daily changes and builder targets/retries. Borrows end before reentry.
