@@ -75,7 +75,13 @@ fork; the remaining upstream documentation explains behavior and architecture.
   and names an owned issue whose result can lift it. A re-selection condition
   that waits on another deferred or unscheduled item is circular; fix it before
   deferring. A core loop (tile loop, vehicle tick) that misses its gate or the
-  retirement ratio gets a boundary fix, not abandonment.
+  retirement ratio gets a boundary fix, not abandonment. It integrates over
+  budget when its profile attributes the remaining miss to per-call boundary
+  crossings (map or vehicle reads) that an open, owned boundary issue such as
+  #274 removes; the PR names that issue and its measured cost, and the cap
+  rises to the measured median. A miss within the spread of earlier runs is
+  not a miss. Design faults (per-call allocation, opcode dispatch, whole-record
+  copies) still block integration.
 - Evidence for game-logic ports is the semantic simulation harness (`python3
   tools/migration.py simulate`, #72) plus the existing tests; a new game-logic
   port integrates only after the harness exists and its scenarios exercise the

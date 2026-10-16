@@ -9,7 +9,7 @@ forward-looking, about 200 lines; completed work is one row, with evidence in PR
 - Twenty-seven ownership ports. Whole fork: Rust 60,339 / tooling 31,153 / glue 26,809 / original retired 38,223 of 470,612 `src/` lines (8.12%). Simulation: 30,252 / 102,615 (29.48%).
 - The last two sessions integrated only maintenance and coverage (#262-#264, #271, #272). No game C++ has been retired since #258.
 - Drafts that retire game C++: #270 rail commands (1,578) and #269 house lifecycle (882).
-- #212/#213 are deferred.
+- #212/#213 are re-selected under the core-loop boundary rule (user decision, 2026-10-16).
 - Speed at `cbede7244f`: all six caps pass. TGP is at 1.118 (target 1.15) and the play saves at 1.10-1.33.
 - Unintegrated component branches: two (#269, #270). Maintenance drafts: #268, #273.
 
@@ -40,7 +40,8 @@ Actions, in order:
    - #273: restore `unsafe` on fields that take pointers, then verify at the head.
    - #270: shared typed command checks, deleting the fleet and industry copies; road accessors through the shared set; one `IsSafeWaitingPosition`; real return types.
    - #269: the R1 fix round, extended to `HouseBehaviour`, one accessor per spec field, and the owner resolved once.
-2. **#274, one agent, alongside item 1.** Measure a read-only map view on #255's clear and water reads, and a post-tick vehicle view plus direct controller calls on `vehicle-owner-213`. If a view clears its gate, amend world-state.md, land the view as one shared PR, and re-select #212 or #213.
+2. **Reopen #257 and #255 alongside item 1** (user decision). #213's miss is within spread. #212 integrates over budget once its profile pins the excess on map reads that #274 removes. Each PR updates from base, gets a fresh review and Full validation, and raises its caps to the measured medians.
+   **#274, one agent, alongside.** Measure a read-only map view on #255's clear and water reads, and a post-tick vehicle view plus direct controller calls on `vehicle-owner-213`. If a view clears its gate, amend world-state.md and land the view as one shared PR that #212 and #213 adopt.
 3. **#275 cheap items alongside, as maintenance PRs.** Remove the `ClampTo` call to Rust and keep one road YAPF arena. Then fold road `GetCurrentMaxSpeed`, then convert road to a C-layout block, then the TGP items (industry `next_tick`, trees). Aircraft comes last.
 4. **#266 starts after #270 integrates,** on its shared command checks; then #267 and #247.
 
@@ -48,7 +49,7 @@ Actions, in order:
 - asks reviewers to grep each new wrapper's callee and report every existing wrapper of it;
 - has command ports share one set of command checks;
 - requires each deferral to name an owned issue that can lift it, and rules out circular conditions;
-- gives a core loop a boundary fix rather than abandonment.
+- gives a core loop a boundary fix rather than abandonment, and lets it integrate over budget when the miss is boundary crossings an owned issue removes (user decision).
 
 ## Earlier steering, still in force
 
@@ -119,7 +120,7 @@ go in `KNOWN_FAILURES` with an issue, never in masks (`docs/rust-migration.md`).
 1. **Shared-accessor check (#249).** A new per-port copy fails quick CI. The baseline of existing copies only shrinks; #259 H4 extends the check to orphaned exports and duplicate table bindings.
 2. **Speed ratchet (#155).**
    - **Caps:** `SPEED_BUDGETS` in `tools/simulation/roads.py` holds them. Each cap is the median of three `simulate <name> --benchmark 3 --jobs 2` invocations on an idle host.
-   - **Exceeding a cap:** a PR may exceed a cap by 3%, unless root accepts a stated reason that is not a boundary exception.
+   - **Exceeding a cap:** a PR may exceed a cap by 3%, unless root accepts a stated reason that is not a boundary exception. Core loops follow the AGENTS.md boundary rule instead.
    - **Lowering a cap:** a PR lowers a cap only when its median of three beats it by more than the invocation spread, about 2%.
    - **Targets:** play saves 1.5x, generation 1.15x.
    - **Misses:** attribute any miss with callgrind before changing scope (AGENTS.md).
@@ -137,7 +138,7 @@ Integrate reviewed work first, in order of readiness, with at most six
 unintegrated component branches. Maintenance (#259, #261, #275) and #156 run in parallel.
 
 1. **Drafts:** #268, #273, #270 and #269 with their 13th-review must-change items (PR comments).
-2. **#274 views,** then re-select #212 landscape and #213 vehicle on a passing view. Branches `landscape-owner-212` (`20cc66dfe5`) and `vehicle-owner-213` (`21b78029c5`) stay on origin.
+2. **#213 vehicle and #212 landscape** under the core-loop boundary rule, from branches `vehicle-owner-213` (`21b78029c5`) and `landscape-owner-212` (`20cc66dfe5`); #274 views follow as a shared PR.
 3. **#275 speed:**
    - the cheap items first (`ClampTo`, road YAPF arena);
    - then road `GetCurrentMaxSpeed` and the road C-layout block;
