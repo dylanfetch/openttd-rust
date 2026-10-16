@@ -1015,6 +1015,7 @@ unsafe fn stale(from: *mut BaseStation, w: &World, l: &Links) {
             } else {
                 let unrestricted = (l.edge_unrestricted)(graph, node, index);
                 if unrestricted != -1 && date.wrapping_sub(unrestricted) > timeout {
+                    crate::witness::hit(crate::witness::STATION_STALE_RESTRICT);
                     (l.restrict_edge)(graph, node, index);
                     let to_id = (l.station_id)(edge.destination);
                     (l.restrict_flows)(from, cargo, to_id);
@@ -1024,6 +1025,7 @@ unsafe fn stale(from: *mut BaseStation, w: &World, l: &Links) {
                 } else {
                     let restricted = (l.edge_restricted)(graph, node, index);
                     if restricted != -1 && date.wrapping_sub(restricted) > timeout {
+                        crate::witness::hit(crate::witness::STATION_STALE_RELEASE);
                         (l.release_edge)(graph, node, index);
                     }
                 }
