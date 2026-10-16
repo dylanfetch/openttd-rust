@@ -17,7 +17,8 @@
  * No Rust references into the map/pools survive calls. Output is call-scoped.
  * Map predicates take a TileIndex value and return the original accessor's
  * underlying type: TileType, TropicZone and Slope are uint8_t, GetTileZ is int.
- * mark_dirty is MarkTileDirtyByTile(tile) and set_tropic_zone is SetTropicZone.
+ * mark_dirty is MarkTileDirtyByTile(tile), set_tropic_zone is SetTropicZone and
+ * clear_square is DoClearSquare(tile).
  * Random logging still runs, but its debug source location names this wrapper.
  * Industry query returns 0 not industry,1 industry,2 bubble catcher and writes
  * TileVirtXY(x,y). It observes only type and industry graphics.
@@ -87,6 +88,7 @@ struct OpenTTDSharedServices {
 	int32_t (*slope)(int32_t, int32_t) noexcept;
 	bool (*build_on_slopes)() noexcept;
 	bool (*autoslope)() noexcept;
+	void (*clear_square)(uint32_t) noexcept;
 };
 const OpenTTDSharedServices &GetRustSharedServices() noexcept;
 /** Shared save/reseed/restore of BOTH original RNG streams. */
@@ -239,6 +241,7 @@ inline OpenTTDSharedServices OpenTTDFixtureSharedServices(void *context, uint32_
 		.slope = OpenTTDFixtureMapService<int32_t, int32_t, int32_t>,
 		.build_on_slopes = OpenTTDFixtureMapService<bool>,
 		.autoslope = OpenTTDFixtureMapService<bool>,
+		.clear_square = OpenTTDFixtureMapService<void, uint32_t>,
 	};
 }
 #endif /* RUST_SERVICES_FFI_H */

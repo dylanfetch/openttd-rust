@@ -1433,7 +1433,7 @@ No entry draws Random. C++ keeps a thin facade and one typed `noexcept` table (A
 - crossing, road and depot map writes;
 - the conversion `TileIterator` and affected-train list.
 
-Rail map leaves extend the shared `OpenTTDRailMapServices`. `build_on_slopes` and `AutoslopeEnabled` live in `OpenTTDSharedServices` for town, industry and rail. `TileLoop_Track`/`FloodHalftile`, track status and drawing stay native.
+Rail map leaves extend the shared `OpenTTDRailMapServices`. `build_on_slopes` and `AutoslopeEnabled` live in `OpenTTDSharedServices` for town, industry and rail, and `DoClearSquare` for trees and rail. `TileLoop_Track`/`FloodHalftile`, track status and drawing stay native.
 
 `python3 tools/migration.py simulate signals-rail-commands --jobs 2` compares every command result, the semantic saves and the required `rail_cmd.*` witnesses. It covers:
 

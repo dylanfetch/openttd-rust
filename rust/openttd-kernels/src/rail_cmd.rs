@@ -235,8 +235,6 @@ pub struct RailCommandServices {
     pub depot_windows: extern "C" fn(u32),
     /// `DeleteNewGRFInspectWindow(GSF_RAILTYPES, tile)`.
     pub close_inspect: extern "C" fn(u32),
-    /// `DoClearSquare`.
-    pub clear_square: extern "C" fn(u32),
     /// `MakeShore`, keeping the docking flag as the original does.
     pub make_shore: extern "C" fn(u32),
     /// `IsPossibleDockingTile` then `CheckForDockingTile`.
@@ -938,7 +936,7 @@ impl<'a> Ctx<'a> {
                             w::hit(w::RAIL_CMD_REMOVE_SHORE);
                             (self.s.make_shore)(tile);
                         } else {
-                            (self.s.clear_square)(tile);
+                            (self.shared.clear_square)(tile);
                         }
                         (self.s.close_inspect)(tile);
                     } else {
@@ -1943,7 +1941,7 @@ impl<'a> Ctx<'a> {
             self.rail_infra(owner, (self.rail.rail_type)(tile), 1_u32.wrapping_neg());
             (self.s.infrastructure_dirty)(owner);
             (self.s.delete_depot)(tile);
-            (self.s.clear_square)(tile);
+            (self.shared.clear_square)(tile);
             self.add_side(tile, dir, owner);
             (self.s.layout_changed)(tile, dir & 1);
             if !v.is_null() {
@@ -1992,7 +1990,7 @@ impl<'a> Ctx<'a> {
                     }
                     if flags & EXECUTE != 0 {
                         w::hit(w::RAIL_CMD_CLEAR_WATER);
-                        (self.s.clear_square)(tile);
+                        (self.shared.clear_square)(tile);
                     }
                     cost.add_money(price(PR_CLEAR_WATER));
                 }

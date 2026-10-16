@@ -3306,7 +3306,6 @@ const OpenTTDRailCommandServices &GetRustRailCommandServices() noexcept
 		.delete_depot = [](uint32_t tile) noexcept { delete Depot::GetByTile(TileIndex{tile}); },
 		.depot_windows = RailDepotWindows,
 		.close_inspect = [](uint32_t tile) noexcept { DeleteNewGRFInspectWindow(GSF_RAILTYPES, tile); },
-		.clear_square = [](uint32_t tile) noexcept { DoClearSquare(TileIndex{tile}); },
 		.make_shore = RailMakeShore,
 		.docking_check = RailDockingCheck,
 		.bridge_dirty = [](uint32_t tile) noexcept { MarkBridgeDirty(TileIndex{tile}); },

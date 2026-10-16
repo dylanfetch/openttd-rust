@@ -209,6 +209,8 @@ pub struct Services {
     pub build_on_slopes: extern "C" fn() -> bool,
     /// `AutoslopeEnabled()`.
     pub autoslope: extern "C" fn() -> bool,
+    /// `DoClearSquare`.
+    pub clear_square: extern "C" fn(u32),
 }
 impl Services {
     /// Draw one shared random word.
@@ -332,6 +334,7 @@ pub fn fixture(
         slope,
         build_on_slopes: flag0,
         autoslope: flag0,
+        clear_square: tile,
     }
 }
 /// Map dimensions read once per entry.

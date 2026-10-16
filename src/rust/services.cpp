@@ -106,6 +106,7 @@ static uint8_t SharedTropicZone(uint32_t tile) noexcept { return GetTropicZone(T
 static int32_t SharedTileZ(uint32_t tile) noexcept { return GetTileZ(TileIndex{tile}); }
 static uint8_t SharedTileSlope(uint32_t tile) noexcept { return GetTileSlope(TileIndex{tile}); }
 static void SharedMarkDirty(uint32_t tile) noexcept { MarkTileDirtyByTile(TileIndex{tile}); }
+static void SharedClearSquare(uint32_t tile) noexcept { DoClearSquare(TileIndex{tile}); }
 static void SharedSetTropicZone(uint32_t tile, uint8_t zone) noexcept { SetTropicZone(TileIndex{tile}, static_cast<TropicZone>(zone)); }
 
 /** Pure map query; no allocation, reentry or C++ exception crosses into Rust. */
@@ -238,6 +239,7 @@ const OpenTTDSharedServices &GetRustSharedServices() noexcept
 		.slope = SharedSlope,
 		.build_on_slopes = RustBuildOnSlopes,
 		.autoslope = RustAutoslopeEnabled,
+		.clear_square = SharedClearSquare,
 	};
 	return services;
 }

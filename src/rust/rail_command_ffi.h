@@ -89,7 +89,6 @@ struct OpenTTDRailCommandServices {
 	void (*delete_depot)(uint32_t) noexcept;
 	void (*depot_windows)(uint32_t) noexcept;
 	void (*close_inspect)(uint32_t) noexcept;
-	void (*clear_square)(uint32_t) noexcept;
 	void (*make_shore)(uint32_t) noexcept;
 	void (*docking_check)(uint32_t) noexcept;
 	void (*bridge_dirty)(uint32_t) noexcept;
