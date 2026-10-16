@@ -8,11 +8,15 @@
 /** @file house_ffi.h Typed native services for the Rust house lifecycle owner. */
 #ifndef RUST_HOUSE_FFI_H
 #define RUST_HOUSE_FFI_H
-#include "town_name_ffi.h"
-#include "command_services_ffi.h"
-#include "station_ffi.h"
+#include "town_ffi.h"
 #include <cstddef>
 #include <cstdint>
+/* Lean header: the standalone town protocol fixture includes it without game headers. */
+struct Town;
+struct Station;
+using OpenTTDStation = Station;
+struct OpenTTDTownRef;
+struct OpenTTDCommandServices;
 
 /** Packed house tile fields copied through the town_map.h getters. */
 struct OpenTTDHouseTile {
