@@ -53,7 +53,6 @@ struct OpenTTDHouseServices {
 	void (*set_random_triggers)(uint32_t, uint8_t) noexcept;
 	void (*set_type)(uint32_t, uint16_t) noexcept;
 	void (*clear_square)(uint32_t) noexcept;
-	void (*delete_animated)(uint32_t) noexcept;
 	void (*animate_new)(uint32_t) noexcept;
 	void (*delete_inspect)(uint32_t) noexcept;
 	uint16_t (*callback)(uint16_t, uint32_t, uint32_t, uint16_t, Town *, uint32_t, bool) noexcept;
@@ -71,13 +70,8 @@ struct OpenTTDHouseServices {
 	void (*add_cargo)(void *, uint8_t, uint32_t) noexcept;
 	uint8_t (*food_cargo)() noexcept;
 	uint32_t (*scale_cargo)(uint32_t) noexcept;
-	bool (*recession)() noexcept;
 	uint8_t (*cargogen_mode)() noexcept;
-	uint64_t (*tick_counter)() noexcept;
-	bool (*autoslope)() noexcept;
-	int64_t (*foundation_price)() noexcept;
 	uint8_t (*place_houses)() noexcept;
-	size_t (*town_count)() noexcept;
 	bool (*company_human)(uint8_t) noexcept;
 	void (*init_counts)() noexcept;
 	void (*rebuild_tree)() noexcept;
@@ -94,7 +88,6 @@ void openttd_rust_house_animate(const OpenTTDTownLeaves *, const OpenTTDSharedSe
 void openttd_rust_house_clear(const OpenTTDTownLeaves *, const OpenTTDSharedServices *, OpenTTDCommandCost *, uint32_t tile, uint16_t flags);
 void openttd_rust_house_terraform(const OpenTTDTownLeaves *, const OpenTTDSharedServices *, OpenTTDCommandCost *, uint32_t tile, uint16_t flags, int32_t z_new, uint8_t slope);
 void openttd_rust_house_place(const OpenTTDTownLeaves *, const OpenTTDSharedServices *, OpenTTDCommandCost *, uint16_t flags, uint32_t tile, uint16_t house, bool is_protected, bool replace);
-void openttd_rust_house_clear_town_house(const OpenTTDTownLeaves *, const OpenTTDSharedServices *, uint32_t tile);
 void openttd_rust_house_accepted(const OpenTTDTownLeaves *, const OpenTTDSharedServices *, uint32_t tile, uint16_t house, Town *town, void *acceptance, uint64_t *always);
 void openttd_rust_house_produced(const OpenTTDTownLeaves *, const OpenTTDSharedServices *, uint32_t tile, void *produced);
 void openttd_rust_house_watched(const OpenTTDTownLeaves *, const OpenTTDSharedServices *, uint32_t tile, uint64_t cargoes);

@@ -178,7 +178,6 @@ pub struct HouseServices {
     pub set_random_triggers: extern "C" fn(u32, u8),
     pub set_type: extern "C" fn(u32, u16),
     pub clear_square: extern "C" fn(u32),
-    pub delete_animated: extern "C" fn(u32),
     pub animate_new: extern "C" fn(u32),
     pub delete_inspect: extern "C" fn(u32),
     pub callback: extern "C" fn(u16, u32, u32, u16, *mut TownHandle, u32, bool) -> u16,
@@ -196,13 +195,8 @@ pub struct HouseServices {
     pub add_cargo: extern "C" fn(*mut c_void, u8, u32),
     pub food_cargo: extern "C" fn() -> u8,
     pub scale_cargo: extern "C" fn(u32) -> u32,
-    pub recession: extern "C" fn() -> bool,
     pub cargogen_mode: extern "C" fn() -> u8,
-    pub tick_counter: extern "C" fn() -> u64,
-    pub autoslope: extern "C" fn() -> bool,
-    pub foundation_price: extern "C" fn() -> i64,
     pub place_houses: extern "C" fn() -> u8,
-    pub town_count: extern "C" fn() -> usize,
     pub company_human: extern "C" fn(u8) -> bool,
     pub init_counts: extern "C" fn(),
     pub rebuild_tree: extern "C" fn(),
@@ -505,7 +499,7 @@ impl House<'_> {
         if amount == 0 {
             return;
         }
-        if recession && (self.h.recession)() {
+        if recession && (self.s.recession)() {
             witness::hit(W_RECESSION);
             amount = (amount + 1) >> 1;
         }
@@ -608,7 +602,7 @@ impl House<'_> {
                     self.generate_original(town, 2, spec.mail, finder);
                 }
                 1 => {
-                    if ((self.h.tick_counter)() >> 8) & 3 == u64::from(tile & 3) {
+                    if ((self.s.tick_counter)() >> 8) & 3 == u64::from(tile & 3) {
                         self.generate_binomial(town, 1, spec.population, finder);
                         self.generate_binomial(town, 2, spec.mail, finder);
                     }
@@ -671,11 +665,11 @@ impl House<'_> {
             (self.h.animate_new)(tile);
             return;
         }
-        if (self.h.tick_counter)() & 3 != 0 {
+        if (self.s.tick_counter)() & 3 != 0 {
             return;
         }
         if (self.l.house_flags)(rec.house) & ANIMATED == 0 {
-            (self.h.delete_animated)(tile);
+            (self.s.delete_animated)(tile);
             return;
         }
         let mut destination = rec.lift_destination;
@@ -698,7 +692,7 @@ impl House<'_> {
         if pos == dest {
             witness::hit(W_LIFT_STOP);
             (self.h.halt_lift)(tile);
-            (self.h.delete_animated)(tile);
+            (self.s.delete_animated)(tile);
         }
         self.dirty(tile);
     }
@@ -760,7 +754,7 @@ impl House<'_> {
     }
     /// `TerraformTile_Town`.
     fn terraform(&self, result: *mut CommandCost, tile: u32, flags: u16, z_new: i32, slope: u8) {
-        if (self.h.autoslope)() {
+        if (self.s.autoslope)() {
             let house = (self.h.tile)(tile).house;
             let mut north = house;
             self.north_part(&mut north, self.map());
@@ -779,7 +773,7 @@ impl House<'_> {
                 }
                 if allow {
                     witness::hit(W_AUTOSLOPE);
-                    (self.costs().expense_money)(result, 0, (self.h.foundation_price)());
+                    (self.costs().expense_money)(result, 0, (self.s.foundation_price)());
                     return;
                 }
             }
@@ -802,7 +796,7 @@ impl House<'_> {
             (c.error)(result, 0xFFFF);
             return;
         }
-        if (self.h.town_count)() == 0 {
+        if (self.s.town_count)() == 0 {
             (c.error)(result, self.h.errors.no_town);
             return;
         }
@@ -1162,15 +1156,6 @@ pub unsafe extern "C" fn openttd_rust_house_place(
     replace: bool,
 ) {
     house(leaves, services).place(result, flags, tile, id, protected, replace);
-}
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_house_clear_town_house(
-    leaves: *const Leaves,
-    services: *const Services,
-    tile: u32,
-) {
-    let house = house(leaves, services);
-    house.clear_town_house((house.h.town)(tile), tile);
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_house_accepted(

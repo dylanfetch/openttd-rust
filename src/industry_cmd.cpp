@@ -3685,7 +3685,6 @@ static const OpenTTDIndustryServices _industry_services = {
 	},
 	.restore_company = [](uint8_t company) noexcept { OpenTTDSetCurrentCompany(CompanyID(company)); },
 	.directory_dirty = [](uint8_t reason) noexcept { InvalidateWindowData(WC_INDUSTRY_DIRECTORY, 0, reason); },
-	.recession = OpenTTDEconomyRecession,
 	.economy_month = []() noexcept -> uint8_t { return TimerGameEconomy::month; },
 	.economy_year = []() noexcept -> int32_t { return TimerGameEconomy::year.base(); },
 	.days_since_last_month = []() noexcept -> uint32_t { return TimerGameEconomy::days_since_last_month; },
@@ -3836,8 +3835,6 @@ static const OpenTTDIndustryTileServices &GetIndustryTileServices()
 		.set_frame = OpenTTDSetAnimationFrame,
 		.animation_loop = [](uint32_t tile) noexcept -> uint8_t { return GetIndustryAnimationLoop(TileIndex(tile)); },
 		.set_animation_loop = [](uint32_t tile, uint8_t value) noexcept { SetIndustryAnimationLoop(TileIndex(tile), value); },
-		.delete_animated = OpenTTDDeleteAnimatedTile,
-		.tick_counter = openttd_orders_tick_counter,
 		.ambient = OpenTTDAmbientSound,
 		.animate_new = [](uint32_t tile) noexcept { AnimateNewIndustryTile(TileIndex(tile)); },
 		.construction_counter = [](uint32_t tile) noexcept -> uint8_t { return GetIndustryConstructionCounter(TileIndex(tile)); },
@@ -3911,11 +3908,9 @@ static const OpenTTDIndustryTilePolicyServices &GetIndustryTilePolicyServices()
 		.close_game = [](Industry *industry) noexcept { Game::NewEvent(new ScriptEventIndustryClose(industry->index)); },
 		.destroy = [](Industry *industry) noexcept { delete industry; },
 		.removal_cost = [](const OpenTTDIndustrySpecHandle *spec) noexcept -> int64_t { return reinterpret_cast<const IndustrySpec *>(spec)->GetRemovalCost(); },
-		.autoslope_enabled = OpenTTDAutoslopeEnabled,
 		.tile_max_z = [](uint32_t tile) noexcept -> int32_t { return OpenTTDTileMaxZ(TileIndex(tile)); },
 		.autoslope_callback = [](const OpenTTDIndustryTileSpec *spec) noexcept -> bool { return spec->callback_mask.Test(IndustryTileCallbackMask::Autoslope); },
 		.callback_boolean = [](const OpenTTDIndustryTileSpec *spec, uint16_t callback, uint16_t result) noexcept -> bool { return ConvertBooleanCallback(spec->grf_prop.grffile, callback, result); },
-		.foundation_cost = OpenTTDFoundationPrice,
 		.landscape_clear = [](OpenTTDIndustryCost *out, uint32_t tile, uint16_t flags) noexcept { *out = Command<CMD_LANDSCAPE_CLEAR>::Do(DoCommandFlags{flags}, TileIndex(tile)); },
 	};
 	return services;

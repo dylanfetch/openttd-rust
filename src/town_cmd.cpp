@@ -51,7 +51,6 @@
 #include "rust/town_founding_ffi.h"
 #include "rust/generation_services.hpp"
 #include "rust/house_ffi.h"
-#include "rust/orders_ffi.h"
 #endif
 #include "town_kdtree.h"
 #include "townname_func.h"
@@ -1171,7 +1170,6 @@ static const OpenTTDHouseServices &GetRustHouseServices() noexcept
 		.set_random_triggers = [](uint32_t tile, uint8_t triggers) noexcept { SetHouseRandomTriggers(TileIndex{tile}, HouseRandomTriggers{triggers}); },
 		.set_type = [](uint32_t tile, uint16_t house) noexcept { SetHouseType(TileIndex{tile}, house); },
 		.clear_square = [](uint32_t tile) noexcept { DoClearSquare(TileIndex{tile}); },
-		.delete_animated = OpenTTDDeleteAnimatedTile,
 		.animate_new = OpenTTDAnimateNewHouse,
 		.delete_inspect = [](uint32_t tile) noexcept { DeleteNewGRFInspectWindow(GSF_HOUSES, tile); },
 		.callback = [](uint16_t callback, uint32_t param1, uint32_t param2, uint16_t house, Town *town, uint32_t tile, bool not_yet_constructed) noexcept -> uint16_t {
@@ -1200,13 +1198,8 @@ static const OpenTTDHouseServices &GetRustHouseServices() noexcept
 		.add_cargo = [](void *cargoes, uint8_t cargo, uint32_t amount) noexcept { (*static_cast<CargoArray *>(cargoes))[cargo] += amount; },
 		.food_cargo = []() noexcept -> uint8_t { return GetCargoTypeByLabel(CT_FOOD); },
 		.scale_cargo = [](uint32_t amount) noexcept -> uint32_t { return ScaleByCargoScale(amount, true); },
-		.recession = OpenTTDEconomyRecession,
 		.cargogen_mode = OpenTTDTownCargoGenMode,
-		.tick_counter = openttd_orders_tick_counter,
-		.autoslope = OpenTTDAutoslopeEnabled,
-		.foundation_price = OpenTTDFoundationPrice,
 		.place_houses = OpenTTDPlaceHouses,
-		.town_count = OpenTTDTownCount,
 		.company_human = OpenTTDCompanyIsValidHuman,
 		.init_counts = []() noexcept { InitializeBuildingCounts(); },
 		.rebuild_tree = []() noexcept { RebuildTownKdtree(); },
@@ -2477,7 +2470,6 @@ const OpenTTDTownFoundingServices &GetRustTownFoundingServices() noexcept
 		.set_progress = [](OpenTTDTownFoundingFrame *frame, uint total) noexcept { return RunGenerationProgress(frame, [total] { SetGeneratingWorldProgress(GWP_TOWN, total); }); },
 		.increase_progress = [](OpenTTDTownFoundingFrame *frame) noexcept { return RunGenerationProgress(frame, [] { IncreaseGeneratingWorldProgress(GWP_TOWN); }); },
 		.no_town_error = []() noexcept { ShowErrorMessage(GetEncodedString(STR_ERROR_COULD_NOT_CREATE_TOWN), {}, WL_CRITICAL); },
-		.town_count = OpenTTDTownCount,
 		.random = &_random,
 		.edge_error = STR_ERROR_TOO_CLOSE_TO_EDGE_OF_MAP_SUB,
 		.close_error = STR_ERROR_TOO_CLOSE_TO_ANOTHER_TOWN,

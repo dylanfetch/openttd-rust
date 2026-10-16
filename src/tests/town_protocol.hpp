@@ -94,13 +94,15 @@ static inline uint16_t TownProtocol_house_callbacks(uint16_t) noexcept { return 
 static inline void TownProtocol_change_frame(uint16_t, uint32_t, uint32_t, uint32_t, uint64_t) noexcept { town_protocol_world->animations++; }
 /* Only the construction-stage animation trigger is reachable from house building;
  * the remaining services stay null. */
-static inline const OpenTTDHouseServices town_protocol_houses = [] {
-	OpenTTDHouseServices houses{};
+static inline OpenTTDHouseServices TownProtocolHouses()
+{
+	auto houses = OpenTTDHouseServices{};
 	houses.tile = TownProtocol_house_tile;
 	houses.callbacks = TownProtocol_house_callbacks;
 	houses.change_frame = TownProtocol_change_frame;
 	return houses;
-}();
+}
+static inline const OpenTTDHouseServices town_protocol_houses = TownProtocolHouses();
 static inline OpenTTDTownLeaves TownProtocolServices()
 {
 	return {
