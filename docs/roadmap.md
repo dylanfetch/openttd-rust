@@ -115,6 +115,7 @@ later rows use original retirement with net glue in the PR (#223).
 | #249 (shared-accessor enforcement) | #254 | direct | `8f9d4fc906` | 0 / 431 / 0 / 0 |
 | #260 (ScriptList overflow fidelity) | #262 | direct | `c54129895b` | 33 / 3 / 0 / 0; net glue 0 |
 | #259 H3 (inert workflows) | #263 | direct | `7feb00248f` | 0 / 0 / 0 / 0; workflow/comment net -2142 |
+| #259 H4 (dead FFI, orphan guards) | #264 | direct | `af1abf96b4` | 6 / 174 / 12 / 4; net glue -75 |
 
 Paused, not fallbacks: #64 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -144,12 +145,12 @@ go in `KNOWN_FAILURES` with an issue, never in masks (`docs/rust-migration.md`).
 Integrate reviewed work first, in order of readiness, with at most six
 unintegrated component branches. Housekeeping (#259) and #156 run in parallel.
 
-1. **Housekeeping:** #259 H1-H3 and #260 complete. H4 next (190 added tooling lines including baseline/tests/ABI edits), then #261 R1-R4 and H5 last; at most three maintenance PRs in flight alongside the items below.
+1. **Housekeeping:** #259 H1-H4 and #260 complete. #261 R1-R4 next (R4 running), H5 last; at most three maintenance PRs in flight alongside the items below.
 2. **#212 landscape (#255) and #213 vehicle (#257).** Update each from base and resolve the town conflicts; a fresh reviewer checks the resolution. Re-freeze against the new tip, profile the head with callgrind, then root re-selects a bounded fix with its gate, or re-scopes the owner. The selected boundaries stand:
    - landscape: an inlined dispatch on the raw type byte, `noexcept` `TileLoop_*` handlers called directly, Rust transition control and no raw-map extension; gate within 11 ms on TGP, interleaved A/B against tip;
    - vehicle: a pool-cursor descriptor, one slim dispatch record and one post-tick bundle, at most about three C++ calls per vehicle (`docs/design/world-state.md`); gate at most 6 ns per vehicle-tick visit on Opus.
 3. **Town:** #256 house lifecycle and tile simulation, then #247 commands, authority and deletion. Reuse the sole town owner and generation unwind contract.
-4. **Next owners**, planned when fewer than two unstarted components remain: station tile, cargo and rating control (`station_cmd`); rail and road track commands and tile procs; tunnel/bridge. Guide the selection by the world-state design and the tip profile.
+4. **Next owners (#265-#267, planned 2026-10-15):** #265 rail track/depot/signal commands and procs, then #266 road commands (reuses #265's crossing/track services), then #267 station construction/joining/removal on the #125 owner. Tile loops stay #212's; hot per-vehicle procs stay native. Tunnel/bridge follows once #247 and #212 settle.
 5. **Conversions buy speed headroom** and never block ownership:
    - aircraft (94 calls per tick);
    - road vehicles (12.6 per tick);
@@ -165,21 +166,19 @@ that a `SaveLoad` descriptor cannot address through the alias.
 
 ## Resume checkpoint
 
-Paused at the user's request. #262 and #263 integrated; #259 H1-H3 are done.
-#264 gates: implementation PASS (native and 24 semantic scenarios), review FAIL
-(two unfixed guard defects), tooling PASS (155/160), full validation FAIL
-(cancelled after review failed). No fix commits or further review round.
-All agents stopped; the retained H4 worktree is clean. Requested scratch cleanup
-is complete; CI_ON_DEMAND is true and post-merge CI is green. H5/#261 unstarted.
-Root recorded a 190-line selection before wind-down; the user's 160-line stop
-gate prevented integration. Decide the guard budget/scope before another fix.
+Resumed 2026-10-15 by the user (Claude Code root, claude-opus-5-5, high). The
+160-line gate was the wind-down's; H4 keeps the steering review's 190-line ceiling.
+Five agents run; root verifies fixes, selects the #255/#257 fix rounds from their
+profiles, and times caps on a quiet host.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #259 H4 / #264 | `cleanup-dead-ffi-259`, `2c65620788` | Stopped draft: comments hide orphans; indented calls look like declarations. User budget/scope decision, fixes, fresh review and final-head full CI needed. |
-| #212 / #255 | `landscape-owner-212`, `63c67959ee` | Stopped: TGP gate missed (see PR). Conflicts with town base. Next: update, profile, root re-selection. |
-| #213 / #257 | `vehicle-owner-213`, `67611082f7` | Stopped: CPU gate missed (see PR). Conflicts with town base. Next: update, profile, root re-selection. |
-| #64 / #66 | remote `issue/64-curve-family`, `aab5211801` | #66 closed unmerged; #64 stays paused. Local curve worktrees/branches removed; remote head retained. |
+| #212 / #255 | `landscape-owner-212`, `63c67959ee` | `/root/landscape_update_profile_255`: base update, callgrind attribution, one proposed fix; root selects. Resolution needs a fresh reviewer. |
+| #213 / #257 | `vehicle-owner-213`, `67611082f7` | `/root/vehicle_update_profile_257`: same as #255. |
+| #256 | `house-lifecycle-256` (new) | `/root/house_lifecycle_256` implementing; draft PR pending. |
+| #261 R4 | `save-staging-261` (new) | `/root/save_staging_261_r4` implementing; R1-R3 unblocked, start when a slot frees. |
+| #265 | `rail-commands-265` (new) | `/root/rail_commands_265` implementing; #266 and #267 unstarted. |
+| #64 / #66 | remote `issue/64-curve-family`, `aab5211801` | #66 closed unmerged; #64 stays paused. |
 
 ABI blocks:
 - train through 385, tree additions 386-389, fleet 390-399
@@ -187,7 +186,7 @@ ABI blocks:
 - station/loading 500-559, industry 560-619 (572 is the shared ByteSpan), CommandCost 620-629
 - town lifecycle 630-669, aircraft 670-739
 - vehicle 740-779, landscape 780-819, signals 820-859, engines 860-919
-- house lifecycle 920-979
+- house lifecycle 920-979, rail commands 980-1019, road commands 1020-1059, station construction 1060-1119
 
 Check only consumed layouts.
 

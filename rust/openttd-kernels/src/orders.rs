@@ -487,7 +487,6 @@ pub struct Leaves {
     pub vehicle_tile: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
     pub vehicle_group: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
     pub unique_backup_name: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub backup_id: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
     pub backup_hangar: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
     pub review_setting: unsafe extern "C" fn() -> u64,
     pub local_owner: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
@@ -1655,7 +1654,6 @@ pub unsafe extern "C" fn openttd_rust_timetable_change(
     1
 }
 
-#[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_timetable_validate_bulk(
     v: *mut c_void,
     field: u8,
@@ -2737,18 +2735,6 @@ pub unsafe extern "C" fn openttd_rust_delete_order(
 ) -> u64 {
     let control = Control { g: Game(leaves) };
     control.delete(v, index);
-    0
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_move_order(
-    v: *mut c_void,
-    from: u8,
-    to: u8,
-    leaves: *const Leaves,
-) -> u64 {
-    let control = Control { g: Game(leaves) };
-    control.move_order(v, from, to);
     0
 }
 

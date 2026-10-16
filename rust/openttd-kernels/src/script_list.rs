@@ -303,7 +303,6 @@ mod tests {
 #[allow(unsafe_code)]
 mod ffi {
     use super::List;
-    use std::ops::Bound::{Excluded, Unbounded};
     use std::ptr;
 
     #[unsafe(no_mangle)]
@@ -314,12 +313,6 @@ mod ffi {
     pub(crate) unsafe extern "C" fn openttd_rust_list_destroy(owner: *mut List) {
         unsafe {
             drop(Box::from_raw(owner));
-        }
-    }
-    #[unsafe(no_mangle)]
-    pub(crate) unsafe extern "C" fn openttd_rust_list_touch(owner: *mut List) {
-        unsafe {
-            (*owner).touch();
         }
     }
     #[unsafe(no_mangle)]
@@ -380,16 +373,6 @@ mod ffi {
     ) {
         unsafe {
             (*owner).sort(kind, ascending != 0);
-        }
-    }
-    #[unsafe(no_mangle)]
-    pub(crate) unsafe extern "C" fn openttd_rust_list_policy(
-        owner: *const List,
-        ascending: *mut u8,
-    ) -> i32 {
-        unsafe {
-            ascending.write(u8::from((*owner).ascending));
-            i32::from((*owner).sort_by_item)
         }
     }
     #[unsafe(no_mangle)]
@@ -473,32 +456,6 @@ mod ffi {
                 3 => destination.keep_list(source),
                 4 => destination.copy_contents(source),
                 _ => std::process::abort(),
-            }
-        }
-    }
-    #[unsafe(no_mangle)]
-    pub(crate) unsafe extern "C" fn openttd_rust_list_read(
-        owner: *const List,
-        has_after: u8,
-        after: i64,
-        key: *mut i64,
-        value: *mut i64,
-        token: *mut i32,
-    ) -> u8 {
-        unsafe {
-            let list = &*owner;
-            let item = if has_after != 0 {
-                list.items.range((Excluded(after), Unbounded)).next()
-            } else {
-                list.items.first_key_value()
-            };
-            if let Some((&found, &contents)) = item {
-                key.write(found);
-                value.write(contents);
-                token.write(list.modifications);
-                1
-            } else {
-                0
             }
         }
     }

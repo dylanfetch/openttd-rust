@@ -254,14 +254,6 @@ struct Train final : public GroundVehicle<Train, VEH_TRAIN> {
 		return this->tcache.cached_tilt;
 #endif
 	}
-	void SetCachedTilt(bool value)
-	{
-#ifdef WITH_RUST
-		openttd_rust_train_state_set_cached_tilt(this->rust_state.get(), value);
-#else
-		this->tcache.cached_tilt = value;
-#endif
-	}
 
 	uint8_t GetUserDefData() const
 	{
@@ -271,14 +263,6 @@ struct Train final : public GroundVehicle<Train, VEH_TRAIN> {
 		return this->tcache.user_def_data;
 #endif
 	}
-	void SetUserDefData(uint8_t value)
-	{
-#ifdef WITH_RUST
-		openttd_rust_train_state_set_user_def_data(this->rust_state.get(), value);
-#else
-		this->tcache.user_def_data = value;
-#endif
-	}
 
 	int16_t GetCachedCurveSpeedMod() const
 	{
@@ -286,14 +270,6 @@ struct Train final : public GroundVehicle<Train, VEH_TRAIN> {
 		return static_cast<int16_t>(static_cast<uint16_t>(openttd_rust_train_state_get_cached_curve_speed_mod(this->rust_state.get())));
 #else
 		return this->tcache.cached_curve_speed_mod;
-#endif
-	}
-	void SetCachedCurveSpeedMod(int16_t value)
-	{
-#ifdef WITH_RUST
-		openttd_rust_train_state_set_cached_curve_speed_mod(this->rust_state.get(), static_cast<int16_t>(static_cast<uint16_t>(value)));
-#else
-		this->tcache.cached_curve_speed_mod = value;
 #endif
 	}
 

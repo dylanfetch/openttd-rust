@@ -246,7 +246,6 @@ fn cargo_callbacks(
 /// Live newly allocated shell/owner, builder and immutable request/spec/layout.
 /// Native town/station relationships remain native. Resolver and world callbacks
 /// may reenter; raw scalar/slot access ends before every such call. Panics abort.
-#[unsafe(no_mangle)]
 #[allow(clippy::too_many_arguments)]
 pub unsafe extern "C" fn openttd_rust_industry_initialize(
     industry: *mut c_void,

@@ -476,7 +476,6 @@ void openttd_rust_train_economy_day(OpenTTDTrainHandle, const OpenTTDTrainServic
 int64_t openttd_rust_train_running_cost(OpenTTDTrainHandle, const OpenTTDTrainServices *, const OpenTTDSharedServices *);
 uint8_t openttd_rust_train_trackdir(OpenTTDTrainHandle, const OpenTTDTrainServices *, const OpenTTDSharedServices *);
 void openttd_rust_train_mark_stuck(OpenTTDTrainHandle, const OpenTTDTrainServices *, const OpenTTDSharedServices *);
-uint32_t openttd_rust_train_approaching_crossing(OpenTTDTrainHandle, const OpenTTDTrainServices *, const OpenTTDSharedServices *);
 void openttd_rust_train_reverse_swap(OpenTTDTrainHandle, int32_t, int32_t, const OpenTTDTrainServices *, const OpenTTDSharedServices *);
 uint8_t openttd_rust_train_train_on_tile(uint32_t, const OpenTTDTrainServices *, const OpenTTDSharedServices *);
 void openttd_rust_train_update_crossing(uint32_t, uint8_t, uint8_t, const OpenTTDTrainServices *, const OpenTTDSharedServices *);
@@ -485,9 +484,7 @@ void openttd_rust_train_crossing_removed(uint32_t, uint8_t, const OpenTTDTrainSe
 void openttd_rust_train_reverse(OpenTTDTrainHandle, const OpenTTDTrainServices *, const OpenTTDSharedServices *);
 uint8_t openttd_rust_train_controller(OpenTTDTrainHandle, OpenTTDTrainHandle, uint8_t, const OpenTTDTrainServices *, const OpenTTDSharedServices *);
 uint32_t openttd_rust_train_crash(OpenTTDTrainHandle, uint8_t, const OpenTTDTrainServices *, const OpenTTDSharedServices *);
-uint8_t openttd_rust_train_stay_depot(OpenTTDTrainHandle, const OpenTTDTrainServices *, const OpenTTDSharedServices *);
 void openttd_rust_train_needs_service(OpenTTDTrainHandle, const OpenTTDTrainServices *, const OpenTTDSharedServices *);
-uint8_t openttd_rust_train_next_force(OpenTTDTrainHandle, const OpenTTDTrainServices *, const OpenTTDSharedServices *);
 uint8_t openttd_rust_train_reverse_command(OpenTTDTrainHandle, uint8_t, uint8_t, const OpenTTDTrainServices *, const OpenTTDSharedServices *);
 uint8_t openttd_rust_train_force_command(OpenTTDTrainHandle, uint8_t, const OpenTTDTrainServices *, const OpenTTDSharedServices *);
 }

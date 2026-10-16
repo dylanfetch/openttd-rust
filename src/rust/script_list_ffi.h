@@ -29,7 +29,6 @@ struct OpenTTDScriptList;
  * outside the defined-input contract. No collection layout crosses this ABI. */
 struct OpenTTDScriptList *OPENTTD_LIST_CALL openttd_rust_list_new(void);
 void OPENTTD_LIST_CALL openttd_rust_list_destroy(struct OpenTTDScriptList *);
-void OPENTTD_LIST_CALL openttd_rust_list_touch(struct OpenTTDScriptList *);
 int32_t OPENTTD_LIST_CALL openttd_rust_list_token(const struct OpenTTDScriptList *);
 int64_t OPENTTD_LIST_CALL openttd_rust_list_count(const struct OpenTTDScriptList *);
 uint8_t OPENTTD_LIST_CALL openttd_rust_list_get(const struct OpenTTDScriptList *, int64_t, int64_t *);
@@ -38,7 +37,6 @@ void OPENTTD_LIST_CALL openttd_rust_list_remove(struct OpenTTDScriptList *, int6
 uint8_t OPENTTD_LIST_CALL openttd_rust_list_set(struct OpenTTDScriptList *, int64_t, int64_t);
 void OPENTTD_LIST_CALL openttd_rust_list_clear(struct OpenTTDScriptList *);
 void OPENTTD_LIST_CALL openttd_rust_list_sort(struct OpenTTDScriptList *, int32_t, uint8_t);
-int32_t OPENTTD_LIST_CALL openttd_rust_list_policy(const struct OpenTTDScriptList *, uint8_t *);
 /* Iteration 0=Begin, 1=Next, 2=IsEnd. Status zero means never initialized for
  * Next/IsEnd (C++ emits original diagnostic); value is otherwise the result. */
 uint8_t OPENTTD_LIST_CALL openttd_rust_list_iter(struct OpenTTDScriptList *, uint8_t, int64_t *);
@@ -49,10 +47,6 @@ void OPENTTD_LIST_CALL openttd_rust_list_rank(struct OpenTTDScriptList *, uint8_
 /* Combine: Add/Swap/Remove/Keep/CopyContents=0..4. CopyContents retains target's
  * original sort/init flow; it is used on freshly constructed clone targets. */
 void OPENTTD_LIST_CALL openttd_rust_list_combine(struct OpenTTDScriptList *, struct OpenTTDScriptList *, uint8_t);
-/* Ascending item read for valuation/save, independent of public iteration.
- * Returns absent/present; copies key/value/modification token and retains none.
- * has_after is 0/1. This does not reset or mutate the public live cursor. */
-uint8_t OPENTTD_LIST_CALL openttd_rust_list_read(const struct OpenTTDScriptList *, uint8_t, int64_t, int64_t *, int64_t *, int32_t *);
 /* ScriptList-specific resumable control. Operations: valuation/filter/save/load/
  * get/set/nexti = 0..6. Controllers own only scalar phase state, and never retain
  * list/VM/world pointers. Every host operation executes after step returns.

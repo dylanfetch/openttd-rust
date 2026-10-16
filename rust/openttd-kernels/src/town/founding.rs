@@ -71,8 +71,6 @@ pub struct FoundingServices {
     pub water_distance: extern "C" fn(Tile, bool) -> u32,
     pub scale_size: extern "C" fn(u32) -> u32,
     pub scale_land: extern "C" fn(u32) -> u32,
-    pub current_company: extern "C" fn() -> CompanyId,
-    pub set_company: extern "C" fn(CompanyId),
     pub found_setting: extern "C" fn() -> TownFounding,
     pub layout_setting: extern "C" fn() -> TownLayout,
     pub initial_city_size: extern "C" fn() -> u8,
@@ -418,10 +416,9 @@ impl<'a> Founding<'a> {
                     return Some(town);
                 }
                 w::hit(w::TOWN_ZERO_GROWTH);
-                let company = observed!((self.s.current_company)());
-                observed!((self.s.set_company)(CompanyId(15)));
+                let company = observed!((self.leaves.exchange_company)(15));
                 observed!((self.s.delete_town)(town.id));
-                observed!((self.s.set_company)(company));
+                observed!((self.leaves.exchange_company)(company));
                 observed!((self.s.assert_allocation)());
             }
             w::hit(w::TOWN_RETRY);
@@ -477,23 +474,6 @@ unsafe fn initialize_layout(state: *mut State, layout: TownLayout, size_x: u32) 
     }
 }
 /// # Safety
-/// The owner and immutable shared table are live under the game mutex. No owner borrow survives a service call.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_town_initialize_layout(
-    state: *mut State,
-    layout: TownLayout,
-    shared: *const Services,
-) {
-    let size_x = if layout.0 == 4 {
-        1_u32 << (unsafe { &*shared }.map_log_x)()
-    } else {
-        1
-    };
-    unsafe {
-        initialize_layout(state, layout, size_x);
-    }
-}
-/// # Safety
 /// The immutable native tables and their pointed-to services remain live for this synchronous call.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_town_default_number(s: *const FoundingServices) -> u32 {
@@ -526,7 +506,7 @@ pub unsafe extern "C" fn openttd_rust_town_found(
         return;
     }
     let editor = observed!((f.leaves.editor)());
-    let company = observed!((f.s.current_company)());
+    let company = CompanyId(observed!((f.shared.current_company)()));
     if editor {
         w::hit(w::TOWN_EDITOR);
     }
