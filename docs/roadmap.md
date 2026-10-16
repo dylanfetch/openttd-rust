@@ -4,14 +4,14 @@ Root owns selection here; `AGENTS.md` and `docs/rust-migration.md` define proces
 If an issue conflicts, follow this roadmap and report it to root. Keep this
 forward-looking, about 200 lines; completed work is one row, with evidence in PRs.
 
-## Where the fork stands (2026-10-16, `15e0ae1390`)
+## Where the fork stands (2026-10-16, `6ffbf8f302`)
 
-- Twenty-seven ownership ports. Whole fork: Rust 60,319 / tooling 31,140 / glue 26,809 / original retired 38,223 of 470,612 `src/` lines. Simulation: 30,252 / 102,615 (29.48%).
-- This session integrated #264 (H4, net glue -75) and #271 (R1, net glue -405; quick-CI Python tests 47.8 s to 11.2 s). No new game C++ retired yet.
-- Retirement in review: #270 rail commands (1,578 original lines vs 886 glue+tooling) and #269 house lifecycle (882 vs 453). #212/#213 deferred: speed misses after profiled rounds, and each retired less than it added.
-- Speed: last calibrated #258 (TGP 1.122x, play saves 1.234x-1.345x). #268, #269, #270 need quiet-host caps before integration; the host has not been quiet with five agents running, so root schedules a timing window.
-- Coverage gaps open on #156: house station removal and NewGRF house callbacks; four rail-command water/PBS branches; TTO/TTD industry load.
-- Unintegrated component branches: two (#269, #270). Maintenance: #268 (caps pending), R3 draft.
+- Twenty-seven ownership ports. Whole fork: Rust 60,339 / tooling 31,153 / glue 26,809 / original retired 38,223 of 470,612 `src/` lines (8.12%). Simulation: 30,252 / 102,615 (29.48%).
+- This session integrated #264 (H4, net glue -75), #271 (R1, net glue -405; quick-CI Python tests 47.8 s to 11.2 s) and #272 (two #156 gaps). No new game C++ retired yet.
+- Drafts that would retire game C++: #270 rail commands (1,578 original vs 890 glue+tooling) and #269 house lifecycle (882 vs 495). #212/#213 deferred: speed misses after profiled rounds, and each retired less than it added.
+- Speed: quiet-host caps pass for #268 and #269 at their heads (worst -0.91%). Last integrated calibration is #258.
+- Open #156 gaps: house station removal and NewGRF house callbacks; four rail-command water/PBS branches; TTO/TTD industry load.
+- Unintegrated component branches: two (#269, #270). Maintenance drafts: #268, #273. Post-merge CI on `6ffbf8f302` is green.
 
 ## Twelfth steering review (2026-10-15, housekeeping)
 
@@ -117,6 +117,7 @@ later rows use original retirement with net glue in the PR (#223).
 | #259 H3 (inert workflows) | #263 | direct | `7feb00248f` | 0 / 0 / 0 / 0; workflow/comment net -2142 |
 | #259 H4 (dead FFI, orphan guards) | #264 | direct | `af1abf96b4` | 6 / 174 / 12 / 4; net glue -75 |
 | #261 R1 (tests, one ABI layout table) | #271 | direct | `15e0ae1390` | 3 / 171 / 189 / 0; net glue -405 |
+| #156 (no-city towns, stale-link restrict/release) | #272 | direct | `6ffbf8f302` | 99 / 20 / 0 / 0; net glue 0 |
 
 Paused, not fallbacks: #64 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -146,7 +147,7 @@ go in `KNOWN_FAILURES` with an issue, never in masks (`docs/rust-migration.md`).
 Integrate reviewed work first, in order of readiness, with at most six
 unintegrated component branches. Housekeeping (#259) and #156 run in parallel.
 
-1. **Housekeeping:** #259 H1-H4 and #260 complete. #261 R1-R4 next (R4 running), H5 last; at most three maintenance PRs in flight alongside the items below.
+1. **Housekeeping:** #259 H1-H4, #260 and #261 R1 complete. R4 (#268) and R3 train/orders (#273) are drafts; R2 waits for #269/#270; H5 last; at most three maintenance PRs in flight alongside the items below.
 2. **#212 landscape and #213 vehicle: deferred 2026-10-16.** After base updates and profiled fix rounds, both still missed their gates (landscape +153.8M Ir vs ~122M; vehicle cost is the per-vehicle native Tick plus layout i-cache misses), and both retired fewer original lines than net glue plus tooling (844 vs 1,420; 388 vs 1,430). Drafts closed; branches `landscape-owner-212` (`20cc66dfe5`) and `vehicle-owner-213` (`21b78029c5`) stay on origin. Re-select #212 once a profile shows a clear/water map-read path near native cost (#108 revisit), and #213 once the #168 C-layout vehicle conversions allow inline reads.
 3. **Town:** #256 house lifecycle and tile simulation, then #247 commands, authority and deletion. Reuse the sole town owner and generation unwind contract.
 4. **Next owners (#265-#267, planned 2026-10-15):** #265 rail track/depot/signal commands and procs, then #266 road commands (reuses #265's crossing/track services), then #267 station construction/joining/removal on the #125 owner. Tile loops stay #212's; hot per-vehicle procs stay native. Tunnel/bridge follows once #247 and #212 settle.
@@ -165,19 +166,20 @@ that a `SaveLoad` descriptor cannot address through the alias.
 
 ## Resume checkpoint
 
-Resumed 2026-10-15 (Claude Code root, claude-opus-5-5, high). #264 and #271 integrated;
-#212/#213 deferred (Phase 2 item 2). Speed caps for #268, #269 and #270 wait for
-a quiet-host window, which root runs before integrating them.
+Paused at the user's request. All agents stopped. The work order is unchanged:
+finish the drafts below, then #266, #267, #247, R2 and H5 (all unstarted).
+#212/#213 deferred; older paused work untouched.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #261 R4 / #268 | `save-staging-261`, `3e7b72b8d4` | Reviewed, fix verified, full CI passed. Six caps on a quiet host, then integrate. |
-| #261 R3 | `rust-cleanup-261` (new) | `/root/rust_cleanup_261_r3`: train/orders forwarders and callback fields. R2 waits for #269/#270 (same files). |
-| #256 / #269 | `house-lifecycle-256`, `f185761a9e` | `/root/review_house_lifecycle_269` reviewing and rerunning the full simulation; then caps, full CI. |
-| #265 / #270 | `rail-commands-265`, `90cf900cf8` | Implemented (1,578 retired); `/root/review_rail_commands_270` reviewing. Then caps, full CI. |
-| #156 | `coverage-156-town-station` | `/root/coverage_156_town_station`: `larger_towns == 0`, station stale links. |
-| #266, #267, #247 | unstarted | #266 after #265 integrates its crossing services. |
+| #261 R4 / #268 | `save-staging-261`, `3e7b72b8d4` | Reviewed, Full validation and six caps pass. Conflicts with base in `src/tests/cargo_payment.cpp` (#271 layout form). Next: update, fresh reviewer checks the resolution, Full validation, merge. |
+| #256 / #269 | `house-lifecycle-256`, `3f5a9ec707` | Reviewed (5 fixes verified); 315/315 scenarios, verify and six caps pass. Blocker R1: 12-field `OpenTTDHouseTile` copied whole on hot paths. Next: R1 fix round, fresh review, caps, Full validation. |
+| #265 / #270 | `rail-commands-265`, `efc04c0f5b` | Reviewed at `90cf900cf8` (fix verified). Then reservation services shared (targeted checks pass). Next: fresh review of the conversion (and yapf `RailSafe`), full simulation, caps, Full validation. |
+| #261 R3 / #273 | `rust-cleanup-261`, `e95d3518c4` | Train/orders forwarders removed (-878 Rust); 313/313 scenarios. Next: verify at head, independent review, caps, Full validation. |
 | #64 / #66 | remote `issue/64-curve-family`, `aab5211801` | #66 closed unmerged; #64 stays paused. |
+
+#269 and #270 both move `clear_square` to the shared table; whichever integrates
+second adopts the first.
 
 ABI blocks:
 - train through 385, tree additions 386-389, fleet 390-399
