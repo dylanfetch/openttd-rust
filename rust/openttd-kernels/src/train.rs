@@ -7,6 +7,7 @@
 
 //! Complete train control. Canonical private fields are accessed only for one scalar
 //! operation; no Rust reference into an owner or world object crosses a callback.
+#![warn(clippy::undocumented_unsafe_blocks)]
 #![allow(
     unsafe_code,
     clippy::cast_possible_truncation,
@@ -2633,9 +2634,10 @@ pub unsafe extern "C" fn openttd_rust_train_consist_changed(
     leaves: *const Leaves,
     services: *const Services,
 ) {
-    // SAFETY: Immutable descriptors are live for this call; unaligned supports MSVC x86.
     let g = Game {
+        // SAFETY: The immutable callback table is live for this call.
         leaves: unsafe { &*leaves },
+        // SAFETY: The immutable services table is live for this call.
         services: unsafe { &*services },
     };
     g.consist_changed(id, allowed);
@@ -2649,9 +2651,10 @@ pub unsafe extern "C" fn openttd_rust_train_curve_limit(
     leaves: *const Leaves,
     services: *const Services,
 ) -> u16 {
-    // SAFETY: Immutable descriptors are live for this call; unaligned supports MSVC x86.
     let g = Game {
+        // SAFETY: The immutable callback table is live for this call.
         leaves: unsafe { &*leaves },
+        // SAFETY: The immutable services table is live for this call.
         services: unsafe { &*services },
     };
     g.curve_limit(id)
@@ -2665,9 +2668,10 @@ pub unsafe extern "C" fn openttd_rust_train_current_max_speed(
     leaves: *const Leaves,
     services: *const Services,
 ) -> i32 {
-    // SAFETY: Immutable descriptors are live for this call; unaligned supports MSVC x86.
     let g = Game {
+        // SAFETY: The immutable callback table is live for this call.
         leaves: unsafe { &*leaves },
+        // SAFETY: The immutable services table is live for this call.
         services: unsafe { &*services },
     };
     g.current_max_speed(id)
@@ -2681,9 +2685,10 @@ pub unsafe extern "C" fn openttd_rust_train_update_acceleration(
     leaves: *const Leaves,
     services: *const Services,
 ) {
-    // SAFETY: Immutable descriptors are live for this call; unaligned supports MSVC x86.
     let g = Game {
+        // SAFETY: The immutable callback table is live for this call.
         leaves: unsafe { &*leaves },
+        // SAFETY: The immutable services table is live for this call.
         services: unsafe { &*services },
     };
     g.update_acceleration(id);
@@ -2697,9 +2702,10 @@ pub unsafe extern "C" fn openttd_rust_train_update_speed(
     leaves: *const Leaves,
     services: *const Services,
 ) -> i32 {
-    // SAFETY: Immutable descriptors are live for this call; unaligned supports MSVC x86.
     let g = Game {
+        // SAFETY: The immutable callback table is live for this call.
         leaves: unsafe { &*leaves },
+        // SAFETY: The immutable services table is live for this call.
         services: unsafe { &*services },
     };
     g.update_speed(id)
@@ -2713,9 +2719,10 @@ pub unsafe extern "C" fn openttd_rust_train_mark_dirty(
     leaves: *const Leaves,
     services: *const Services,
 ) {
-    // SAFETY: Immutable descriptors are live for this call; unaligned supports MSVC x86.
     let g = Game {
+        // SAFETY: The immutable callback table is live for this call.
         leaves: unsafe { &*leaves },
+        // SAFETY: The immutable services table is live for this call.
         services: unsafe { &*services },
     };
     g.mark_dirty(id);
@@ -2729,9 +2736,10 @@ pub unsafe extern "C" fn openttd_rust_train_tick(
     leaves: *const Leaves,
     services: *const Services,
 ) -> u8 {
-    // SAFETY: Immutable descriptors are live for this call; unaligned supports MSVC x86.
     let g = Game {
+        // SAFETY: The immutable callback table is live for this call.
         leaves: unsafe { &*leaves },
+        // SAFETY: The immutable services table is live for this call.
         services: unsafe { &*services },
     };
     u8::from(g.tick(id))
@@ -2745,9 +2753,10 @@ pub unsafe extern "C" fn openttd_rust_train_calendar_day(
     leaves: *const Leaves,
     services: *const Services,
 ) {
-    // SAFETY: Immutable descriptors are live for this call; unaligned supports MSVC x86.
     let g = Game {
+        // SAFETY: The immutable callback table is live for this call.
         leaves: unsafe { &*leaves },
+        // SAFETY: The immutable services table is live for this call.
         services: unsafe { &*services },
     };
     (g.leaves.age)(id);
@@ -2761,9 +2770,10 @@ pub unsafe extern "C" fn openttd_rust_train_economy_day(
     leaves: *const Leaves,
     services: *const Services,
 ) {
-    // SAFETY: Immutable descriptors are live for this call; unaligned supports MSVC x86.
     let g = Game {
+        // SAFETY: The immutable callback table is live for this call.
         leaves: unsafe { &*leaves },
+        // SAFETY: The immutable services table is live for this call.
         services: unsafe { &*services },
     };
     g.economy_day(id);
@@ -2777,9 +2787,10 @@ pub unsafe extern "C" fn openttd_rust_train_running_cost(
     leaves: *const Leaves,
     services: *const Services,
 ) -> i64 {
-    // SAFETY: Immutable descriptors are live for this call; unaligned supports MSVC x86.
     let g = Game {
+        // SAFETY: The immutable callback table is live for this call.
         leaves: unsafe { &*leaves },
+        // SAFETY: The immutable services table is live for this call.
         services: unsafe { &*services },
     };
     g.running_cost(id)
@@ -2793,9 +2804,10 @@ pub unsafe extern "C" fn openttd_rust_train_trackdir(
     leaves: *const Leaves,
     services: *const Services,
 ) -> u8 {
-    // SAFETY: Immutable descriptors are live for this call; unaligned supports MSVC x86.
     let g = Game {
+        // SAFETY: The immutable callback table is live for this call.
         leaves: unsafe { &*leaves },
+        // SAFETY: The immutable services table is live for this call.
         services: unsafe { &*services },
     };
     g.trackdir(id)
@@ -2809,9 +2821,10 @@ pub unsafe extern "C" fn openttd_rust_train_mark_stuck(
     leaves: *const Leaves,
     services: *const Services,
 ) {
-    // SAFETY: Immutable descriptors are live for this call; unaligned supports MSVC x86.
     let g = Game {
+        // SAFETY: The immutable callback table is live for this call.
         leaves: unsafe { &*leaves },
+        // SAFETY: The immutable services table is live for this call.
         services: unsafe { &*services },
     };
     g.mark_stuck(id);
@@ -2827,9 +2840,10 @@ pub unsafe extern "C" fn openttd_rust_train_reverse_swap(
     leaves: *const Leaves,
     services: *const Services,
 ) {
-    // SAFETY: Immutable descriptors are live for this call; unaligned supports MSVC x86.
     let g = Game {
+        // SAFETY: The immutable callback table is live for this call.
         leaves: unsafe { &*leaves },
+        // SAFETY: The immutable services table is live for this call.
         services: unsafe { &*services },
     };
     g.reverse_swap(id, left, right);
@@ -2843,9 +2857,10 @@ pub unsafe extern "C" fn openttd_rust_train_train_on_tile(
     leaves: *const Leaves,
     services: *const Services,
 ) -> u8 {
-    // SAFETY: Immutable descriptors are live for this call; unaligned supports MSVC x86.
     let g = Game {
+        // SAFETY: The immutable callback table is live for this call.
         leaves: unsafe { &*leaves },
+        // SAFETY: The immutable services table is live for this call.
         services: unsafe { &*services },
     };
     u8::from(g.train_on_tile(tile))
@@ -2861,9 +2876,10 @@ pub unsafe extern "C" fn openttd_rust_train_update_crossing(
     leaves: *const Leaves,
     services: *const Services,
 ) {
-    // SAFETY: Immutable descriptors are live for this call; unaligned supports MSVC x86.
     let g = Game {
+        // SAFETY: The immutable callback table is live for this call.
         leaves: unsafe { &*leaves },
+        // SAFETY: The immutable services table is live for this call.
         services: unsafe { &*services },
     };
     g.update_crossing(tile, sound != 0, force_bar != 0);
@@ -2878,9 +2894,10 @@ pub unsafe extern "C" fn openttd_rust_train_adjacent_crossing_dirty(
     leaves: *const Leaves,
     services: *const Services,
 ) {
-    // SAFETY: Immutable descriptors are live for this call; unaligned supports MSVC x86.
     let g = Game {
+        // SAFETY: The immutable callback table is live for this call.
         leaves: unsafe { &*leaves },
+        // SAFETY: The immutable services table is live for this call.
         services: unsafe { &*services },
     };
     g.adjacent_crossing_dirty(tile, u64::from(axis));
@@ -2895,9 +2912,10 @@ pub unsafe extern "C" fn openttd_rust_train_crossing_removed(
     leaves: *const Leaves,
     services: *const Services,
 ) {
-    // SAFETY: Immutable descriptors are live for this call; unaligned supports MSVC x86.
     let g = Game {
+        // SAFETY: The immutable callback table is live for this call.
         leaves: unsafe { &*leaves },
+        // SAFETY: The immutable services table is live for this call.
         services: unsafe { &*services },
     };
     g.crossing_removed(tile, u64::from(axis));
@@ -2911,9 +2929,10 @@ pub unsafe extern "C" fn openttd_rust_train_reverse(
     leaves: *const Leaves,
     services: *const Services,
 ) {
-    // SAFETY: Immutable descriptors are live for this call; unaligned supports MSVC x86.
     let g = Game {
+        // SAFETY: The immutable callback table is live for this call.
         leaves: unsafe { &*leaves },
+        // SAFETY: The immutable services table is live for this call.
         services: unsafe { &*services },
     };
     g.reverse(id);
@@ -2929,9 +2948,10 @@ pub unsafe extern "C" fn openttd_rust_train_controller(
     leaves: *const Leaves,
     services: *const Services,
 ) -> u8 {
-    // SAFETY: Immutable descriptors are live for this call; unaligned supports MSVC x86.
     let g = Game {
+        // SAFETY: The immutable callback table is live for this call.
         leaves: unsafe { &*leaves },
+        // SAFETY: The immutable services table is live for this call.
         services: unsafe { &*services },
     };
     u8::from(g.controller(id, nomove, reverse != 0))
@@ -2946,9 +2966,10 @@ pub unsafe extern "C" fn openttd_rust_train_crash(
     leaves: *const Leaves,
     services: *const Services,
 ) -> u32 {
-    // SAFETY: Immutable descriptors are live for this call; unaligned supports MSVC x86.
     let g = Game {
+        // SAFETY: The immutable callback table is live for this call.
         leaves: unsafe { &*leaves },
+        // SAFETY: The immutable services table is live for this call.
         services: unsafe { &*services },
     };
     g.crash(id, flooded != 0)
@@ -2962,9 +2983,10 @@ pub unsafe extern "C" fn openttd_rust_train_needs_service(
     leaves: *const Leaves,
     services: *const Services,
 ) {
-    // SAFETY: Immutable descriptors are live for this call; unaligned supports MSVC x86.
     let g = Game {
+        // SAFETY: The immutable callback table is live for this call.
         leaves: unsafe { &*leaves },
+        // SAFETY: The immutable services table is live for this call.
         services: unsafe { &*services },
     };
     g.needs_service(id);
@@ -2980,9 +3002,10 @@ pub unsafe extern "C" fn openttd_rust_train_reverse_command(
     leaves: *const Leaves,
     services: *const Services,
 ) -> u8 {
-    // SAFETY: Immutable descriptors are live for this call; unaligned supports MSVC x86.
     let g = Game {
+        // SAFETY: The immutable callback table is live for this call.
         leaves: unsafe { &*leaves },
+        // SAFETY: The immutable services table is live for this call.
         services: unsafe { &*services },
     };
     g.reverse_command(id, execute != 0, single != 0)
@@ -2997,9 +3020,10 @@ pub unsafe extern "C" fn openttd_rust_train_force_command(
     leaves: *const Leaves,
     services: *const Services,
 ) -> u8 {
-    // SAFETY: Immutable descriptors are live for this call; unaligned supports MSVC x86.
     let g = Game {
+        // SAFETY: The immutable callback table is live for this call.
         leaves: unsafe { &*leaves },
+        // SAFETY: The immutable services table is live for this call.
         services: unsafe { &*services },
     };
     u8::from(g.force_command(id, execute != 0))
