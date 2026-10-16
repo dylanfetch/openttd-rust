@@ -411,462 +411,136 @@ pub unsafe extern "C" fn openttd_rust_order_vector_assign(
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct Leaves {
-    pub vehicle: unsafe extern "C" fn(*mut c_void) -> *mut VehicleOrders,
-    pub consist: unsafe extern "C" fn(*mut c_void) -> *mut Consist,
-    pub list: unsafe extern "C" fn(*mut c_void) -> *mut List,
-    pub vector: unsafe extern "C" fn(*mut c_void) -> *mut Vector,
-    pub backup: unsafe extern "C" fn(*mut c_void) -> *mut Backup,
-    pub backup_vector: unsafe extern "C" fn(*mut c_void) -> *mut Vector,
-    pub backup_consist: unsafe extern "C" fn(*mut c_void) -> *mut Consist,
-    pub first_vehicle: unsafe extern "C" fn(ctx: *mut c_void) -> *mut c_void,
-    pub last_station: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub ownerless_station: unsafe extern "C" fn(station: u16, if_valid: u8) -> u64,
-    pub vehicle_type: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub vehicle_status: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub tick_counter: unsafe extern "C" fn() -> u64,
-    pub primary_vehicle: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub vehicle_ownership: unsafe extern "C" fn(ctx: *mut c_void, result: *mut c_void) -> u64,
-    pub ticks_per_second: unsafe extern "C" fn() -> u64,
-    pub unit_number: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub economy_date: unsafe extern "C" fn() -> u64,
-    pub economy_fraction: unsafe extern "C" fn() -> u64,
-    pub maximum_date: unsafe extern "C" fn() -> u64,
-    pub timetable_year_limit: unsafe extern "C" fn() -> u64,
-    pub stopped_or_crashed: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub allocate_list: unsafe extern "C" fn() -> *mut c_void,
-    pub suppress_implicit: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub shared_window: unsafe extern "C" fn(ctx: *mut c_void, first: *mut c_void) -> u64,
-    pub vehicle_id: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub percent_filled: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub reliability: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub engine_reliability: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub display_speed: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub age_years: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub needs_service: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub remaining_years: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub airport_tile: unsafe extern "C" fn(destination: u16) -> u64,
-    pub base_station_tile: unsafe extern "C" fn(destination: u16) -> u64,
-    pub station_tile: unsafe extern "C" fn(destination: u16) -> u64,
-    pub depot_tile: unsafe extern "C" fn(destination: u16) -> u64,
-    pub distance: unsafe extern "C" fn(first: u32, second: u32, square: u8) -> u64,
-    pub station_location: unsafe extern "C" fn(ctx: *mut c_void, destination: u16) -> u64,
-    pub destination_tile: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub aircraft_flying: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub target_airport: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub waypoint_tile: unsafe extern "C" fn(destination: u16) -> u64,
-    pub at_station: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub tile_station: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub ship_station_tile: unsafe extern "C" fn(destination: u16) -> u64,
-    pub valid_station: unsafe extern "C" fn(destination: u16) -> u64,
-    pub station_owner: unsafe extern "C" fn(destination: u16) -> u64,
-    pub can_use_station: unsafe extern "C" fn(ctx: *mut c_void, destination: u16) -> u64,
-    pub owner_check: unsafe extern "C" fn(owner: u8, result: *mut c_void) -> u64,
-    pub station_error: unsafe extern "C" fn(ctx: *mut c_void, destination: u16) -> u64,
-    pub has_hangar: unsafe extern "C" fn(destination: u16) -> u64,
-    pub valid_depot: unsafe extern "C" fn(destination: u16) -> u64,
-    pub depot_owner: unsafe extern "C" fn(destination: u16) -> u64,
-    pub rail_depot: unsafe extern "C" fn(destination: u16) -> u64,
-    pub road_depot: unsafe extern "C" fn(destination: u16) -> u64,
-    pub ship_depot: unsafe extern "C" fn(destination: u16) -> u64,
-    pub valid_waypoint: unsafe extern "C" fn(destination: u16) -> u64,
-    pub waypoint_facilities: unsafe extern "C" fn(destination: u16) -> u64,
-    pub waypoint_owner: unsafe extern "C" fn(destination: u16) -> u64,
-    pub list_capacity: unsafe extern "C" fn() -> u64,
+    pub vehicle: extern "C" fn(*mut c_void) -> *mut VehicleOrders,
+    pub consist: extern "C" fn(*mut c_void) -> *mut Consist,
+    pub list: extern "C" fn(*mut c_void) -> *mut List,
+    pub vector: extern "C" fn(*mut c_void) -> *mut Vector,
+    pub backup: extern "C" fn(*mut c_void) -> *mut Backup,
+    pub backup_vector: extern "C" fn(*mut c_void) -> *mut Vector,
+    pub backup_consist: extern "C" fn(*mut c_void) -> *mut Consist,
+    pub first_vehicle: extern "C" fn(ctx: *mut c_void) -> *mut c_void,
+    pub last_station: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub ownerless_station: extern "C" fn(station: u16, if_valid: u8) -> u64,
+    pub vehicle_type: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub vehicle_status: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub tick_counter: extern "C" fn() -> u64,
+    pub primary_vehicle: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub vehicle_ownership: extern "C" fn(ctx: *mut c_void, result: *mut c_void) -> u64,
+    pub ticks_per_second: extern "C" fn() -> u64,
+    pub unit_number: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub economy_date: extern "C" fn() -> u64,
+    pub economy_fraction: extern "C" fn() -> u64,
+    pub maximum_date: extern "C" fn() -> u64,
+    pub timetable_year_limit: extern "C" fn() -> u64,
+    pub stopped_or_crashed: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub allocate_list: extern "C" fn() -> *mut c_void,
+    pub suppress_implicit: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub shared_window: extern "C" fn(ctx: *mut c_void, first: *mut c_void) -> u64,
+    pub vehicle_id: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub percent_filled: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub reliability: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub engine_reliability: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub display_speed: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub age_years: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub needs_service: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub remaining_years: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub airport_tile: extern "C" fn(destination: u16) -> u64,
+    pub base_station_tile: extern "C" fn(destination: u16) -> u64,
+    pub station_tile: extern "C" fn(destination: u16) -> u64,
+    pub depot_tile: extern "C" fn(destination: u16) -> u64,
+    pub distance: extern "C" fn(first: u32, second: u32, square: u8) -> u64,
+    pub station_location: extern "C" fn(ctx: *mut c_void, destination: u16) -> u64,
+    pub destination_tile: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub aircraft_flying: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub target_airport: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub waypoint_tile: extern "C" fn(destination: u16) -> u64,
+    pub at_station: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub tile_station: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub ship_station_tile: extern "C" fn(destination: u16) -> u64,
+    pub valid_station: extern "C" fn(destination: u16) -> u64,
+    pub station_owner: extern "C" fn(destination: u16) -> u64,
+    pub can_use_station: extern "C" fn(ctx: *mut c_void, destination: u16) -> u64,
+    pub owner_check: extern "C" fn(owner: u8, result: *mut c_void) -> u64,
+    pub station_error: extern "C" fn(ctx: *mut c_void, destination: u16) -> u64,
+    pub has_hangar: extern "C" fn(destination: u16) -> u64,
+    pub valid_depot: extern "C" fn(destination: u16) -> u64,
+    pub depot_owner: extern "C" fn(destination: u16) -> u64,
+    pub rail_depot: extern "C" fn(destination: u16) -> u64,
+    pub road_depot: extern "C" fn(destination: u16) -> u64,
+    pub ship_depot: extern "C" fn(destination: u16) -> u64,
+    pub valid_waypoint: extern "C" fn(destination: u16) -> u64,
+    pub waypoint_facilities: extern "C" fn(destination: u16) -> u64,
+    pub waypoint_owner: extern "C" fn(destination: u16) -> u64,
+    pub list_capacity: extern "C" fn() -> u64,
     pub next_backup: unsafe extern "C" fn(cursor: *mut u32) -> *mut c_void,
-    pub next_vehicle: unsafe extern "C" fn(first: u32) -> *mut c_void,
-    pub aircraft_range: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub aircraft_range_square: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub bus: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub backup_capacity: unsafe extern "C" fn() -> u64,
-    pub create_backup: unsafe extern "C" fn(ctx: *mut c_void, user: u32) -> *mut c_void,
-    pub networking: unsafe extern "C" fn() -> u64,
-    pub network_server: unsafe extern "C" fn() -> u64,
-    pub network_client: unsafe extern "C" fn() -> u64,
-    pub server_client: unsafe extern "C" fn() -> u64,
-    pub default_group: unsafe extern "C" fn() -> u64,
-    pub vehicle_tile: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub vehicle_group: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub unique_backup_name: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub backup_hangar: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub review_setting: unsafe extern "C" fn() -> u64,
-    pub local_owner: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub day_counter: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub fast_aircraft: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
-    pub short_strip: unsafe extern "C" fn(destination: u16) -> u64,
-    pub no_jet_crash: unsafe extern "C" fn() -> u64,
-    pub append_station: unsafe extern "C" fn(ctx: *mut c_void, station: u16),
-    pub invalidate_station_list: unsafe extern "C" fn(),
-    pub command_error: unsafe extern "C" fn(ctx: *mut c_void, error: u32, detail: u32),
-    pub timetable_dirty: unsafe extern "C" fn(ctx: *mut c_void),
-    pub invalidate_order: unsafe extern "C" fn(ctx: *mut c_void, data: i32),
-    pub vehicle_dirty: unsafe extern "C" fn(ctx: *mut c_void),
-    pub delete_order_news: unsafe extern "C" fn(ctx: *mut c_void),
-    pub suppress_implicit_write: unsafe extern "C" fn(ctx: *mut c_void, suppress: u8),
-    pub invalidate_vehicle_list: unsafe extern "C" fn(ctx: *mut c_void),
-    pub close_shared_window: unsafe extern "C" fn(ctx: *mut c_void, window: u32),
-    pub invalidate_shared_window: unsafe extern "C" fn(ctx: *mut c_void, window: u32, data: i32),
-    pub last_station_write: unsafe extern "C" fn(ctx: *mut c_void, station: u16),
-    pub dirty_vehicle_windows: unsafe extern "C" fn(ctx: *mut c_void),
-    pub capture_backup_metadata: unsafe extern "C" fn(ctx: *mut c_void, source: *mut c_void),
-    pub clear_backup_name: unsafe extern "C" fn(ctx: *mut c_void),
-    pub restore_backup_metadata: unsafe extern "C" fn(ctx: *mut c_void, backup: *mut c_void),
-    pub order_news: unsafe extern "C" fn(ctx: *mut c_void, message: u32),
-    pub debug_list: unsafe extern "C" fn(ctx: *mut c_void),
-    pub assert_departure_range: unsafe extern "C" fn(lower: i32, upper: i32),
-    pub delete_list: unsafe extern "C" fn(ctx: *mut c_void),
-    pub leave_station: unsafe extern "C" fn(ctx: *mut c_void),
-    pub reverse_train: unsafe extern "C" fn(ctx: *mut c_void),
-    pub next_airport: unsafe extern "C" fn(ctx: *mut c_void),
-    pub set_destination: unsafe extern "C" fn(ctx: *mut c_void, tile: u32),
+    pub next_vehicle: extern "C" fn(first: u32) -> *mut c_void,
+    pub aircraft_range: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub aircraft_range_square: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub bus: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub backup_capacity: extern "C" fn() -> u64,
+    pub create_backup: extern "C" fn(ctx: *mut c_void, user: u32) -> *mut c_void,
+    pub networking: extern "C" fn() -> u64,
+    pub network_server: extern "C" fn() -> u64,
+    pub network_client: extern "C" fn() -> u64,
+    pub server_client: extern "C" fn() -> u64,
+    pub default_group: extern "C" fn() -> u64,
+    pub vehicle_tile: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub vehicle_group: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub unique_backup_name: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub backup_hangar: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub review_setting: extern "C" fn() -> u64,
+    pub local_owner: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub day_counter: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub fast_aircraft: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub short_strip: extern "C" fn(destination: u16) -> u64,
+    pub no_jet_crash: extern "C" fn() -> u64,
+    pub append_station: extern "C" fn(ctx: *mut c_void, station: u16),
+    pub invalidate_station_list: extern "C" fn(),
+    pub command_error: extern "C" fn(ctx: *mut c_void, error: u32, detail: u32),
+    pub timetable_dirty: extern "C" fn(ctx: *mut c_void),
+    pub invalidate_order: extern "C" fn(ctx: *mut c_void, data: i32),
+    pub vehicle_dirty: extern "C" fn(ctx: *mut c_void),
+    pub delete_order_news: extern "C" fn(ctx: *mut c_void),
+    pub suppress_implicit_write: extern "C" fn(ctx: *mut c_void, suppress: u8),
+    pub invalidate_vehicle_list: extern "C" fn(ctx: *mut c_void),
+    pub close_shared_window: extern "C" fn(ctx: *mut c_void, window: u32),
+    pub invalidate_shared_window: extern "C" fn(ctx: *mut c_void, window: u32, data: i32),
+    pub last_station_write: extern "C" fn(ctx: *mut c_void, station: u16),
+    pub dirty_vehicle_windows: extern "C" fn(ctx: *mut c_void),
+    pub capture_backup_metadata: extern "C" fn(ctx: *mut c_void, source: *mut c_void),
+    pub clear_backup_name: extern "C" fn(ctx: *mut c_void),
+    pub restore_backup_metadata: extern "C" fn(ctx: *mut c_void, backup: *mut c_void),
+    pub order_news: extern "C" fn(ctx: *mut c_void, message: u32),
+    pub debug_list: extern "C" fn(ctx: *mut c_void),
+    pub assert_departure_range: extern "C" fn(lower: i32, upper: i32),
+    pub delete_list: extern "C" fn(ctx: *mut c_void),
+    pub leave_station: extern "C" fn(ctx: *mut c_void),
+    pub reverse_train: extern "C" fn(ctx: *mut c_void),
+    pub next_airport: extern "C" fn(ctx: *mut c_void),
+    pub set_destination: extern "C" fn(ctx: *mut c_void, tile: u32),
     pub closest_depot: unsafe extern "C" fn(ctx: *mut c_void, result: *mut Closest),
-    pub share_command: unsafe extern "C" fn(ctx: *mut c_void, source: *const c_void),
-    pub group_command: unsafe extern "C" fn(ctx: *mut c_void, group: u16),
-    pub delete_backup: unsafe extern "C" fn(ctx: *mut c_void),
-    pub clear_backup_gui: unsafe extern "C" fn(tile: u32, user: u32),
-    pub clear_backup_post: unsafe extern "C" fn(user: u32),
-    pub missing_aircraft_orders: unsafe extern "C" fn(ctx: *mut c_void),
-    pub change_timetable_command:
-        unsafe extern "C" fn(ctx: *mut c_void, index: u8, field: u8, value: u16),
+    pub share_command: extern "C" fn(ctx: *mut c_void, source: *const c_void),
+    pub group_command: extern "C" fn(ctx: *mut c_void, group: u16),
+    pub delete_backup: extern "C" fn(ctx: *mut c_void),
+    pub clear_backup_gui: extern "C" fn(tile: u32, user: u32),
+    pub clear_backup_post: extern "C" fn(user: u32),
+    pub missing_aircraft_orders: extern "C" fn(ctx: *mut c_void),
+    pub change_timetable_command: extern "C" fn(ctx: *mut c_void, index: u8, field: u8, value: u16),
 }
 #[derive(Clone, Copy)]
-struct Game(*const Leaves);
+struct Game(&'static Leaves);
 impl Game {
-    fn service_first_vehicle(self, ctx: *mut c_void) -> *mut c_void {
-        unsafe { ((*self.0).first_vehicle)(ctx) }
-    }
-    fn service_last_station(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).last_station)(ctx) }
-    }
-    fn service_ownerless_station(self, a: u64, b: u64) -> u64 {
-        unsafe { ((*self.0).ownerless_station)(a as u16, b as u8) }
-    }
-    fn service_vehicle_type(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).vehicle_type)(ctx) }
-    }
-    fn service_vehicle_status(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).vehicle_status)(ctx) }
-    }
-    fn service_tick_counter(self) -> u64 {
-        unsafe { ((*self.0).tick_counter)() }
-    }
-    fn service_primary_vehicle(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).primary_vehicle)(ctx) }
-    }
-    fn service_vehicle_ownership(self, ctx: *mut c_void, result: *mut c_void) -> u64 {
-        unsafe { ((*self.0).vehicle_ownership)(ctx, result) }
-    }
-    fn service_ticks_per_second(self) -> u64 {
-        unsafe { ((*self.0).ticks_per_second)() }
-    }
-    fn service_unit_number(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).unit_number)(ctx) }
-    }
-    fn service_economy_date(self) -> u64 {
-        unsafe { ((*self.0).economy_date)() }
-    }
-    fn service_economy_fraction(self) -> u64 {
-        unsafe { ((*self.0).economy_fraction)() }
-    }
-    fn service_maximum_date(self) -> u64 {
-        unsafe { ((*self.0).maximum_date)() }
-    }
-    fn service_timetable_year_limit(self) -> u64 {
-        unsafe { ((*self.0).timetable_year_limit)() }
-    }
-    fn service_stopped_or_crashed(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).stopped_or_crashed)(ctx) }
-    }
-    fn service_allocate_list(self) -> *mut c_void {
-        unsafe { ((*self.0).allocate_list)() }
-    }
-    fn service_suppress_implicit(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).suppress_implicit)(ctx) }
-    }
-    fn service_shared_window(self, ctx: *mut c_void, first: *mut c_void) -> u64 {
-        unsafe { ((*self.0).shared_window)(ctx, first) }
-    }
-    fn service_vehicle_id(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).vehicle_id)(ctx) }
-    }
-    fn service_percent_filled(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).percent_filled)(ctx) }
-    }
-    fn service_reliability(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).reliability)(ctx) }
-    }
-    fn service_engine_reliability(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).engine_reliability)(ctx) }
-    }
-    fn service_display_speed(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).display_speed)(ctx) }
-    }
-    fn service_age_years(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).age_years)(ctx) }
-    }
-    fn service_needs_service(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).needs_service)(ctx) }
-    }
-    fn service_remaining_years(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).remaining_years)(ctx) }
-    }
-    fn service_airport_tile(self, a: u64) -> u64 {
-        unsafe { ((*self.0).airport_tile)(a as u16) }
-    }
-    fn service_base_station_tile(self, a: u64) -> u64 {
-        unsafe { ((*self.0).base_station_tile)(a as u16) }
-    }
-    fn service_station_tile(self, a: u64) -> u64 {
-        unsafe { ((*self.0).station_tile)(a as u16) }
-    }
-    fn service_depot_tile(self, a: u64) -> u64 {
-        unsafe { ((*self.0).depot_tile)(a as u16) }
-    }
-    fn service_distance(self, a: u64, b: u64, c: u64) -> u64 {
-        unsafe { ((*self.0).distance)(a as u32, b as u32, c as u8) }
-    }
-    fn service_station_location(self, ctx: *mut c_void, a: u64) -> u64 {
-        unsafe { ((*self.0).station_location)(ctx, a as u16) }
-    }
-    fn service_destination_tile(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).destination_tile)(ctx) }
-    }
-    fn service_aircraft_flying(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).aircraft_flying)(ctx) }
-    }
-    fn service_target_airport(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).target_airport)(ctx) }
-    }
-    fn service_waypoint_tile(self, a: u64) -> u64 {
-        unsafe { ((*self.0).waypoint_tile)(a as u16) }
-    }
-    fn service_at_station(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).at_station)(ctx) }
-    }
-    fn service_tile_station(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).tile_station)(ctx) }
-    }
-    fn service_ship_station_tile(self, a: u64) -> u64 {
-        unsafe { ((*self.0).ship_station_tile)(a as u16) }
-    }
-    fn service_valid_station(self, a: u64) -> u64 {
-        unsafe { ((*self.0).valid_station)(a as u16) }
-    }
-    fn service_station_owner(self, a: u64) -> u64 {
-        unsafe { ((*self.0).station_owner)(a as u16) }
-    }
-    fn service_can_use_station(self, ctx: *mut c_void, a: u64) -> u64 {
-        unsafe { ((*self.0).can_use_station)(ctx, a as u16) }
-    }
-    fn service_owner_check(self, a: u64, result: *mut c_void) -> u64 {
-        unsafe { ((*self.0).owner_check)(a as u8, result) }
-    }
-    fn service_station_error(self, ctx: *mut c_void, a: u64) -> u64 {
-        unsafe { ((*self.0).station_error)(ctx, a as u16) }
-    }
-    fn service_has_hangar(self, a: u64) -> u64 {
-        unsafe { ((*self.0).has_hangar)(a as u16) }
-    }
-    fn service_valid_depot(self, a: u64) -> u64 {
-        unsafe { ((*self.0).valid_depot)(a as u16) }
-    }
-    fn service_depot_owner(self, a: u64) -> u64 {
-        unsafe { ((*self.0).depot_owner)(a as u16) }
-    }
-    fn service_rail_depot(self, a: u64) -> u64 {
-        unsafe { ((*self.0).rail_depot)(a as u16) }
-    }
-    fn service_road_depot(self, a: u64) -> u64 {
-        unsafe { ((*self.0).road_depot)(a as u16) }
-    }
-    fn service_ship_depot(self, a: u64) -> u64 {
-        unsafe { ((*self.0).ship_depot)(a as u16) }
-    }
-    fn service_valid_waypoint(self, a: u64) -> u64 {
-        unsafe { ((*self.0).valid_waypoint)(a as u16) }
-    }
-    fn service_waypoint_facilities(self, a: u64) -> u64 {
-        unsafe { ((*self.0).waypoint_facilities)(a as u16) }
-    }
-    fn service_waypoint_owner(self, a: u64) -> u64 {
-        unsafe { ((*self.0).waypoint_owner)(a as u16) }
-    }
-    fn service_list_capacity(self) -> u64 {
-        unsafe { ((*self.0).list_capacity)() }
-    }
-    fn service_next_backup(self, cursor: *mut u32) -> *mut c_void {
-        unsafe { ((*self.0).next_backup)(cursor) }
-    }
-    fn service_next_vehicle(self, a: u64) -> *mut c_void {
-        unsafe { ((*self.0).next_vehicle)(a as u32) }
-    }
-    fn service_aircraft_range(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).aircraft_range)(ctx) }
-    }
-    fn service_aircraft_range_square(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).aircraft_range_square)(ctx) }
-    }
-    fn service_bus(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).bus)(ctx) }
-    }
-    fn service_backup_capacity(self) -> u64 {
-        unsafe { ((*self.0).backup_capacity)() }
-    }
-    fn service_create_backup(self, ctx: *mut c_void, a: u64) -> *mut c_void {
-        unsafe { ((*self.0).create_backup)(ctx, a as u32) }
-    }
-    fn service_networking(self) -> u64 {
-        unsafe { ((*self.0).networking)() }
-    }
-    fn service_network_server(self) -> u64 {
-        unsafe { ((*self.0).network_server)() }
-    }
-    fn service_network_client(self) -> u64 {
-        unsafe { ((*self.0).network_client)() }
-    }
-    fn service_server_client(self) -> u64 {
-        unsafe { ((*self.0).server_client)() }
-    }
-    fn service_default_group(self) -> u64 {
-        unsafe { ((*self.0).default_group)() }
-    }
-    fn service_vehicle_tile(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).vehicle_tile)(ctx) }
-    }
-    fn service_vehicle_group(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).vehicle_group)(ctx) }
-    }
-    fn service_unique_backup_name(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).unique_backup_name)(ctx) }
-    }
-    fn service_backup_hangar(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).backup_hangar)(ctx) }
-    }
-    fn service_review_setting(self) -> u64 {
-        unsafe { ((*self.0).review_setting)() }
-    }
-    fn service_local_owner(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).local_owner)(ctx) }
-    }
-    fn service_day_counter(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).day_counter)(ctx) }
-    }
-    fn service_fast_aircraft(self, ctx: *mut c_void) -> u64 {
-        unsafe { ((*self.0).fast_aircraft)(ctx) }
-    }
-    fn service_short_strip(self, a: u64) -> u64 {
-        unsafe { ((*self.0).short_strip)(a as u16) }
-    }
-    fn service_no_jet_crash(self) -> u64 {
-        unsafe { ((*self.0).no_jet_crash)() }
-    }
-    fn service_append_station(self, ctx: *mut c_void, a: u64) {
-        unsafe { ((*self.0).append_station)(ctx, a as u16) }
-    }
-    fn service_invalidate_station_list(self) {
-        unsafe { ((*self.0).invalidate_station_list)() }
-    }
-    fn service_command_error(self, ctx: *mut c_void, a: u64, b: u64) {
-        unsafe { ((*self.0).command_error)(ctx, a as u32, b as u32) }
-    }
-    fn service_timetable_dirty(self, ctx: *mut c_void) {
-        unsafe { ((*self.0).timetable_dirty)(ctx) }
-    }
-    fn service_invalidate_order(self, ctx: *mut c_void, a: u64) {
-        unsafe { ((*self.0).invalidate_order)(ctx, a as i32) }
-    }
-    fn service_vehicle_dirty(self, ctx: *mut c_void) {
-        unsafe { ((*self.0).vehicle_dirty)(ctx) }
-    }
-    fn service_delete_order_news(self, ctx: *mut c_void) {
-        unsafe { ((*self.0).delete_order_news)(ctx) }
-    }
-    fn service_suppress_implicit_write(self, ctx: *mut c_void, a: u64) {
-        unsafe { ((*self.0).suppress_implicit_write)(ctx, a as u8) }
-    }
-    fn service_invalidate_vehicle_list(self, ctx: *mut c_void) {
-        unsafe { ((*self.0).invalidate_vehicle_list)(ctx) }
-    }
-    fn service_close_shared_window(self, ctx: *mut c_void, a: u64) {
-        unsafe { ((*self.0).close_shared_window)(ctx, a as u32) }
-    }
-    fn service_invalidate_shared_window(self, ctx: *mut c_void, a: u64, b: u64) {
-        unsafe { ((*self.0).invalidate_shared_window)(ctx, a as u32, b as i32) }
-    }
-    fn service_last_station_write(self, ctx: *mut c_void, a: u64) {
-        unsafe { ((*self.0).last_station_write)(ctx, a as u16) }
-    }
-    fn service_dirty_vehicle_windows(self, ctx: *mut c_void) {
-        unsafe { ((*self.0).dirty_vehicle_windows)(ctx) }
-    }
-    fn service_capture_backup_metadata(self, ctx: *mut c_void, source: *mut c_void) {
-        unsafe { ((*self.0).capture_backup_metadata)(ctx, source) }
-    }
-    fn service_clear_backup_name(self, ctx: *mut c_void) {
-        unsafe { ((*self.0).clear_backup_name)(ctx) }
-    }
-    fn service_restore_backup_metadata(self, ctx: *mut c_void, backup: *mut c_void) {
-        unsafe { ((*self.0).restore_backup_metadata)(ctx, backup) }
-    }
-    fn service_order_news(self, ctx: *mut c_void, a: u64) {
-        unsafe { ((*self.0).order_news)(ctx, a as u32) }
-    }
-    fn service_debug_list(self, ctx: *mut c_void) {
-        unsafe { ((*self.0).debug_list)(ctx) }
-    }
-    fn service_assert_departure_range(self, a: u64, b: u64) {
-        unsafe { ((*self.0).assert_departure_range)(a as i32, b as i32) }
-    }
-    fn service_delete_list(self, ctx: *mut c_void) {
-        unsafe { ((*self.0).delete_list)(ctx) }
-    }
-    fn service_leave_station(self, ctx: *mut c_void) {
-        unsafe { ((*self.0).leave_station)(ctx) }
-    }
-    fn service_reverse_train(self, ctx: *mut c_void) {
-        unsafe { ((*self.0).reverse_train)(ctx) }
-    }
-    fn service_next_airport(self, ctx: *mut c_void) {
-        unsafe { ((*self.0).next_airport)(ctx) }
-    }
-    fn service_set_destination(self, ctx: *mut c_void, a: u64) {
-        unsafe { ((*self.0).set_destination)(ctx, a as u32) }
-    }
-    fn service_closest_depot(self, ctx: *mut c_void, result: *mut Closest) {
-        unsafe { ((*self.0).closest_depot)(ctx, result) }
-    }
-    fn service_share_command(self, ctx: *mut c_void, source: *const c_void) {
-        unsafe { ((*self.0).share_command)(ctx, source) }
-    }
-    fn service_group_command(self, ctx: *mut c_void, a: u64) {
-        unsafe { ((*self.0).group_command)(ctx, a as u16) }
-    }
-    fn service_delete_backup(self, ctx: *mut c_void) {
-        unsafe { ((*self.0).delete_backup)(ctx) }
-    }
-    fn service_clear_backup_gui(self, a: u64, b: u64) {
-        unsafe { ((*self.0).clear_backup_gui)(a as u32, b as u32) }
-    }
-    fn service_clear_backup_post(self, a: u64) {
-        unsafe { ((*self.0).clear_backup_post)(a as u32) }
-    }
-    fn service_missing_aircraft_orders(self, ctx: *mut c_void) {
-        unsafe { ((*self.0).missing_aircraft_orders)(ctx) }
-    }
-    fn service_change_timetable_command(self, ctx: *mut c_void, a: u64, b: u64, c: u64) {
-        unsafe { ((*self.0).change_timetable_command)(ctx, a as u8, b as u8, c as u16) }
-    }
-
     fn vehicle(self, v: *mut c_void) -> *mut VehicleOrders {
-        unsafe { ((*self.0).vehicle)(v) }
+        (self.0.vehicle)(v)
     }
     fn consist(self, v: *mut c_void) -> *mut Consist {
-        unsafe { ((*self.0).consist)(v) }
+        (self.0.consist)(v)
     }
     fn list(self, list: *mut c_void) -> *mut List {
-        unsafe { ((*self.0).list)(list) }
+        (self.0.list)(list)
     }
     fn vector(self, list: *mut c_void) -> *mut Vector {
-        unsafe { ((*self.0).vector)(list) }
+        (self.0.vector)(list)
     }
     fn order_access(self, vehicle: *mut VehicleOrders) -> OrderAccess {
         let shell = unsafe { (*vehicle).orders };
@@ -894,7 +568,7 @@ impl Game {
     fn first(self, v: *mut c_void) -> *mut c_void {
         let list = self.orders(v);
         if list.is_null() {
-            self.service_first_vehicle(v)
+            (self.0.first_vehicle)(v)
         } else {
             unsafe { (*self.list(list)).first }
         }
@@ -1013,7 +687,7 @@ impl Game {
                 return;
             }
             let order = self.order(list, next).unwrap();
-            let last = self.service_last_station(v) as u16;
+            let last = (self.0.last_station)(v) as u16;
             if (order.kind() == 1 || order.kind() == 8)
                 && order.destination == last
                 && matches!(order.unload(), 1 | 2)
@@ -1023,7 +697,7 @@ impl Game {
             if order.kind() == 2 || order.destination == last {
                 continue;
             }
-            self.service_append_station(output, u64::from(order.destination));
+            (self.0.append_station)(output, order.destination);
             return;
         }
     }
@@ -1122,7 +796,7 @@ impl Order {
 pub unsafe extern "C" fn openttd_rust_list_init(
     list: *mut c_void,
     v: *mut c_void,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u32 {
     let g = Game(leaves);
     let state = g.list(list);
@@ -1167,7 +841,7 @@ pub unsafe extern "C" fn openttd_rust_list_init(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_list_recalculate(
     list: *mut c_void,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u32 {
     let g = Game(leaves);
     recalculate(g, list);
@@ -1178,17 +852,15 @@ pub unsafe extern "C" fn openttd_rust_list_recalculate(
 pub unsafe extern "C" fn openttd_rust_list_free(
     list: *mut c_void,
     keep: u8,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u32 {
     let g = Game(leaves);
     let state = g.list(list);
     {
         for index in 0..g.stored_count(list) {
             let order = g.stored_order(list, index);
-            if matches!(order.kind(), 1 | 6)
-                && g.service_ownerless_station(u64::from(order.destination), 1) != 0
-            {
-                g.service_invalidate_station_list();
+            if matches!(order.kind(), 1 | 6) && (g.0.ownerless_station)(order.destination, 1) != 0 {
+                (g.0.invalidate_station_list)();
                 break;
             }
         }
@@ -1209,7 +881,7 @@ pub unsafe extern "C" fn openttd_rust_list_decision(
     list: *mut c_void,
     next: u8,
     hops: u32,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u32 {
     let g = Game(leaves);
     u32::from(g.decision(list, next, hops))
@@ -1222,7 +894,7 @@ pub unsafe extern "C" fn openttd_rust_list_stopping(
     first: u8,
     hops: u32,
     output: *mut c_void,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u32 {
     let g = Game(leaves);
     g.stopping(list, v, first, hops, output);
@@ -1234,7 +906,7 @@ pub unsafe extern "C" fn openttd_rust_list_insert(
     list: *mut c_void,
     index: u32,
     input: *const Order,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u32 {
     let g = Game(leaves);
     let state = g.list(list);
@@ -1252,10 +924,8 @@ pub unsafe extern "C" fn openttd_rust_list_insert(
                 .total
                 .wrapping_add(i32::from(order.wait) + i32::from(order.travel));
         }
-        if matches!(order.kind(), 1 | 6)
-            && g.service_ownerless_station(u64::from(order.destination), 0) != 0
-        {
-            g.service_invalidate_station_list();
+        if matches!(order.kind(), 1 | 6) && (g.0.ownerless_station)(order.destination, 0) != 0 {
+            (g.0.invalidate_station_list)();
         }
     };
     0
@@ -1265,7 +935,7 @@ pub unsafe extern "C" fn openttd_rust_list_insert(
 pub unsafe extern "C" fn openttd_rust_list_delete(
     list: *mut c_void,
     index: u32,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u32 {
     let g = Game(leaves);
     let state = g.list(list);
@@ -1292,7 +962,7 @@ pub unsafe extern "C" fn openttd_rust_list_move(
     list: *mut c_void,
     from: u8,
     to: u8,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u32 {
     let g = Game(leaves);
     if from < g.size(list) && to < g.size(list) {
@@ -1307,7 +977,7 @@ pub unsafe extern "C" fn openttd_rust_list_move(
 pub unsafe extern "C" fn openttd_rust_list_remove_vehicle(
     list: *mut c_void,
     v: *mut c_void,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u32 {
     let g = Game(leaves);
     let state = g.list(list);
@@ -1323,7 +993,7 @@ pub unsafe extern "C" fn openttd_rust_list_remove_vehicle(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_list_complete(
     list: *mut c_void,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u32 {
     let g = Game(leaves);
     {
@@ -1377,7 +1047,7 @@ impl Game {
         }
     }
     fn dirty(self, v: *mut c_void) {
-        self.service_timetable_dirty(v);
+        (self.0.timetable_dirty)(v);
     }
     fn change_timetable(self, v: *mut c_void, index: u8, val: u16, field: u8, timetabled: bool) {
         let list = self.orders(v);
@@ -1465,8 +1135,7 @@ impl Game {
             just_started = unsafe { (*state).flags & (1 << 3) == 0 };
             if unsafe { (*state).start != 0 } {
                 unsafe {
-                    (*state).lateness =
-                        self.service_tick_counter().wrapping_sub((*state).start) as i32;
+                    (*state).lateness = (self.0.tick_counter)().wrapping_sub((*state).start) as i32;
                     (*state).start = 0;
                 }
             }
@@ -1490,7 +1159,7 @@ impl Game {
             return;
         }
         if order.kind() != 7 && (travelling || time > i32::from(order.wait) || remeasure) {
-            let seconds = self.service_ticks_per_second() as i32;
+            let seconds = (self.0.ticks_per_second)() as i32;
             let value =
                 (time.max(1).wrapping_add(seconds - 1) / seconds).wrapping_mul(seconds) as u16;
             if travelling && (autofill || !order.travel_timetabled()) {
@@ -1534,14 +1203,14 @@ impl Game {
         }
     }
     fn owner_check(self, v: *mut c_void, output: *mut c_void) -> bool {
-        self.service_vehicle_ownership(v, output) != 0
+        (self.0.vehicle_ownership)(v, output) != 0
     }
     fn command_error(self, output: *mut c_void, error: u32) -> u32 {
-        self.service_command_error(output, u64::from(error), 0);
+        (self.0.command_error)(output, error, 0);
         0
     }
     fn primary(self, v: *mut c_void) -> bool {
-        !v.is_null() && self.service_primary_vehicle(v) != 0
+        !v.is_null() && (self.0.primary_vehicle)(v) != 0
     }
     fn timetable_sort(self, a: *mut c_void, b: *mut c_void) -> std::cmp::Ordering {
         let sa = self.consist(a);
@@ -1568,8 +1237,7 @@ impl Game {
         if time != 0 {
             return time.cmp(&0);
         }
-        self.service_unit_number(b)
-            .cmp(&self.service_unit_number(a))
+        (self.0.unit_number)(b).cmp(&(self.0.unit_number)(a))
     }
 }
 
@@ -1583,7 +1251,7 @@ pub unsafe extern "C" fn openttd_rust_timetable_change(
     field: u8,
     value: u16,
     output: *mut c_void,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u32 {
     let g = Game(leaves);
     if !g.primary(v) {
@@ -1622,7 +1290,7 @@ pub unsafe extern "C" fn openttd_rust_timetable_change(
         if travel != order.travel && order.kind() == 7 {
             return g.command_error(output, 0);
         }
-        if speed != order.speed && (order.kind() == 7 || g.service_vehicle_type(v) == 3) {
+        if speed != order.speed && (order.kind() == 7 || (g.0.vehicle_type)(v) == 3) {
             return g.command_error(output, 0);
         }
         if execute != 0 {
@@ -1658,7 +1326,7 @@ pub unsafe extern "C" fn openttd_rust_timetable_validate_bulk(
     v: *mut c_void,
     field: u8,
     output: *mut c_void,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u32 {
     let g = Game(leaves);
     if !g.primary(v) {
@@ -1679,7 +1347,7 @@ pub unsafe extern "C" fn openttd_rust_timetable_on_time(
     execute: u8,
     apply_group: u8,
     output: *mut c_void,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u32 {
     let g = Game(leaves);
     if !g.primary(v) {
@@ -1738,7 +1406,7 @@ pub unsafe extern "C" fn openttd_rust_timetable_start(
     all: u8,
     start: u64,
     output: *mut c_void,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u32 {
     let g = Game(leaves);
     if !g.primary(v) {
@@ -1753,17 +1421,17 @@ pub unsafe extern "C" fn openttd_rust_timetable_start(
     {
         let list = g.orders(v);
         let total = g.duration(list);
-        let date = g.service_economy_date() as i32;
+        let date = (g.0.economy_date)() as i32;
         let start_date = date.wrapping_add(
-            (start.wrapping_sub(g.service_tick_counter()) as i32)
-                .wrapping_add(g.service_economy_fraction() as i32)
+            (start.wrapping_sub((g.0.tick_counter)()) as i32)
+                .wrapping_add((g.0.economy_fraction)() as i32)
                 / 74,
         );
-        let max_date = g.service_maximum_date() as i32;
+        let max_date = (g.0.maximum_date)() as i32;
         if start_date < 0 || start_date > max_date {
             return g.command_error(output, 0);
         }
-        if start_date.wrapping_sub(date) > g.service_timetable_year_limit() as i32
+        if start_date.wrapping_sub(date) > (g.0.timetable_year_limit)() as i32
             || date.wrapping_sub(start_date) > 366
         {
             return g.command_error(output, 0);
@@ -1813,7 +1481,7 @@ pub unsafe extern "C" fn openttd_rust_timetable_autofill(
     autofill: u8,
     preserve_wait: u8,
     output: *mut c_void,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u32 {
     let g = Game(leaves);
     if !g.primary(v) {
@@ -1861,7 +1529,7 @@ pub unsafe extern "C" fn openttd_rust_timetable_autofill(
 pub unsafe extern "C" fn openttd_rust_timetable_update(
     v: *mut c_void,
     travelling: u8,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u32 {
     let g = Game(leaves);
     g.update_timetable(v, travelling != 0);
@@ -1952,7 +1620,7 @@ impl Game {
                 break;
             }
         }
-        self.service_invalidate_order(v, 0);
+        (self.0.invalidate_order)(v, 0);
     }
     fn increment_real(self, v: *mut c_void) {
         let state = self.consist(v);
@@ -1960,7 +1628,7 @@ impl Game {
             self.increment_implicit(v);
         } else {
             self.skip_real(v);
-            self.service_invalidate_order(v, 0);
+            (self.0.invalidate_order)(v, 0);
         }
     }
     fn any_order(self, v: *mut c_void, predicate: impl Fn(Order) -> bool) -> bool {
@@ -1987,7 +1655,7 @@ impl Game {
             return;
         }
         let state = self.consist(v);
-        let tick = self.service_tick_counter();
+        let tick = (self.0.tick_counter)();
         unsafe {
             (*state).last_departure = tick;
             (*state).lateness = 0;
@@ -1997,7 +1665,7 @@ impl Game {
         let mut time = 0i32;
         let mut u = self.first(v);
         while !u.is_null() {
-            if self.service_stopped_or_crashed(u) == 0 {
+            if (self.0.stopped_or_crashed)(u) == 0 {
                 count = count.wrapping_add(1);
                 time = time.wrapping_add(unsafe { (*self.consist(u)).round_trip });
             }
@@ -2008,11 +1676,11 @@ impl Game {
         let departure = tick.wrapping_add(separation as u64);
         u = self.first(v);
         while !u.is_null() {
-            if self.service_stopped_or_crashed(u) == 0 {
+            if (self.0.stopped_or_crashed)(u) == 0 {
                 unsafe {
                     (*self.consist(u)).next_departure = departure;
                 }
-                self.service_vehicle_dirty(u);
+                (self.0.vehicle_dirty)(u);
             }
             u = self.next(u);
         }
@@ -2022,9 +1690,8 @@ impl Game {
         if self.current(v).action() & 4 == 0 || unsafe { (*state).last_departure == 0 } {
             return;
         }
-        let measured = self
-            .service_tick_counter()
-            .wrapping_sub(unsafe { (*state).last_departure }) as i32;
+        let measured =
+            (self.0.tick_counter)().wrapping_sub(unsafe { (*state).last_departure }) as i32;
         let previous = unsafe { (*state).round_trip };
         // Original int32 product occurs before ClampTo<int32>; preserve native wrap.
         let result = if previous == 0 {
@@ -2033,7 +1700,7 @@ impl Game {
             {
                 let lower = previous / 2;
                 let upper = previous.wrapping_mul(2);
-                self.service_assert_departure_range(lower as u64, upper as u64);
+                (self.0.assert_departure_range)((lower as u64) as i32, (upper as u64) as i32);
                 if measured <= lower {
                     lower
                 } else if measured >= upper {
@@ -2050,14 +1717,14 @@ impl Game {
 }
 /// Scalar vehicle policy, without any persistent state reference or world borrow.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_update_real(v: *mut c_void, leaves: *const Leaves) -> u32 {
+pub unsafe extern "C" fn openttd_rust_update_real(v: *mut c_void, leaves: &'static Leaves) -> u32 {
     let g = Game(leaves);
     g.update_real(v);
     0
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_skip_real(v: *mut c_void, leaves: *const Leaves) -> u32 {
+pub unsafe extern "C" fn openttd_rust_skip_real(v: *mut c_void, leaves: &'static Leaves) -> u32 {
     let g = Game(leaves);
     g.skip_real(v);
     0
@@ -2066,7 +1733,7 @@ pub unsafe extern "C" fn openttd_rust_skip_real(v: *mut c_void, leaves: *const L
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_increment_implicit(
     v: *mut c_void,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u32 {
     let g = Game(leaves);
     g.increment_implicit(v);
@@ -2074,20 +1741,26 @@ pub unsafe extern "C" fn openttd_rust_increment_implicit(
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_increment_real(v: *mut c_void, leaves: *const Leaves) -> u32 {
+pub unsafe extern "C" fn openttd_rust_increment_real(
+    v: *mut c_void,
+    leaves: &'static Leaves,
+) -> u32 {
     let g = Game(leaves);
     g.increment_real(v);
     0
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_has_depot(v: *mut c_void, leaves: *const Leaves) -> u32 {
+pub unsafe extern "C" fn openttd_rust_has_depot(v: *mut c_void, leaves: &'static Leaves) -> u32 {
     let g = Game(leaves);
     u32::from(g.any_order(v, |o| o.kind() == 2))
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_has_full_load(v: *mut c_void, leaves: *const Leaves) -> u32 {
+pub unsafe extern "C" fn openttd_rust_has_full_load(
+    v: *mut c_void,
+    leaves: &'static Leaves,
+) -> u32 {
     let g = Game(leaves);
     u32::from(g.any_order(v, |o| o.kind() == 1 && matches!(o.load(), 2 | 3)))
 }
@@ -2095,14 +1768,17 @@ pub unsafe extern "C" fn openttd_rust_has_full_load(v: *mut c_void, leaves: *con
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_has_conditional(
     v: *mut c_void,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u32 {
     let g = Game(leaves);
     u32::from(g.any_order(v, |o| o.kind() == 7))
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_has_unbunching(v: *mut c_void, leaves: *const Leaves) -> u32 {
+pub unsafe extern "C" fn openttd_rust_has_unbunching(
+    v: *mut c_void,
+    leaves: &'static Leaves,
+) -> u32 {
     let g = Game(leaves);
     u32::from(g.any_order(v, |o| o.kind() == 2 && o.action() & 4 != 0))
 }
@@ -2110,7 +1786,7 @@ pub unsafe extern "C" fn openttd_rust_has_unbunching(v: *mut c_void, leaves: *co
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_leave_unbunching(
     v: *mut c_void,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u32 {
     let g = Game(leaves);
     g.leave_unbunching(v);
@@ -2120,7 +1796,7 @@ pub unsafe extern "C" fn openttd_rust_leave_unbunching(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_wait_unbunching(
     v: *mut c_void,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u32 {
     let g = Game(leaves);
     {
@@ -2129,7 +1805,7 @@ pub unsafe extern "C" fn openttd_rust_wait_unbunching(
                 && unsafe { (*g.list(g.orders(v))).vehicles > 1 }
                 && g.count(v) > 1
                 && g.previous_unbunching(v)
-                && unsafe { (*g.consist(v)).next_departure > g.service_tick_counter() },
+                && unsafe { (*g.consist(v)).next_departure > (g.0.tick_counter)() },
         )
     }
 }
@@ -2137,7 +1813,7 @@ pub unsafe extern "C" fn openttd_rust_wait_unbunching(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_measure_unbunching(
     v: *mut c_void,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u32 {
     let g = Game(leaves);
     g.measure_unbunching(v);
@@ -2392,7 +2068,7 @@ impl Control {
     }
     fn new_list(&self, v: *mut c_void, input: Option<Order>, source: *mut c_void) -> *mut c_void {
         let g = self.g;
-        let list = g.service_allocate_list();
+        let list = (g.0.allocate_list)();
         if let Some(order) = input {
             unsafe {
                 openttd_rust_order_vector_insert(g.vector(list), 0, &raw const order);
@@ -2423,7 +2099,7 @@ impl Control {
             }
         }
         let mut u = g.first(v);
-        g.service_delete_order_news(u);
+        (g.0.delete_order_news)(u);
         while !u.is_null() {
             let state = g.consist(u);
             if index <= unsafe { (*state).real } {
@@ -2434,8 +2110,8 @@ impl Control {
                     }
                 }
             }
-            if index == unsafe { (*state).implicit } && g.service_vehicle_type(u) < 2 {
-                g.service_suppress_implicit_write(u, 1);
+            if index == unsafe { (*state).implicit } && (g.0.vehicle_type)(u) < 2 {
+                (g.0.suppress_implicit_write)(u, 1);
             }
             if index <= unsafe { (*state).implicit } {
                 let next = u16::from(unsafe { (*state).implicit }) + 1;
@@ -2446,7 +2122,7 @@ impl Control {
                 }
             }
             g.reset(u);
-            g.service_invalidate_order(u, u64::from(u16::from(u8::MAX) | (u16::from(index) << 8)));
+            (g.0.invalidate_order)(u, i32::from(u16::from(u8::MAX) | (u16::from(index) << 8)));
             u = g.next(u);
         }
         let list = g.orders(v);
@@ -2463,7 +2139,7 @@ impl Control {
                 g.put_stored(list, i, o);
             }
         }
-        g.service_invalidate_vehicle_list(v);
+        (g.0.invalidate_vehicle_list)(v);
     }
     fn cancel_loading(&self, v: *mut c_void) {
         let mut order = self.g.current(v);
@@ -2479,7 +2155,7 @@ impl Control {
             openttd_rust_list_delete(g.orders(v), u32::from(index), g.0);
         }
         let mut u = g.first(v);
-        g.service_delete_order_news(u);
+        (g.0.delete_order_news)(u);
         while !u.is_null() {
             let state = g.consist(u);
             if index == unsafe { (*state).real } && g.current(u).kind() == 3 {
@@ -2517,7 +2193,7 @@ impl Control {
                 }
             }
             g.reset(u);
-            g.service_invalidate_order(u, u64::from(u16::from(index) | (u16::from(u8::MAX) << 8)));
+            (g.0.invalidate_order)(u, i32::from(u16::from(index) | (u16::from(u8::MAX) << 8)));
             u = g.next(u);
         }
         let list = g.orders(v);
@@ -2535,17 +2211,17 @@ impl Control {
                 g.put_stored(list, i, o);
             }
         }
-        g.service_invalidate_vehicle_list(v);
+        (g.0.invalidate_vehicle_list)(v);
     }
     fn delete_implicit(&self, v: *mut c_void) {
         let g = self.g;
         let state = g.consist(v);
-        if g.service_vehicle_type(v) < 2 && g.service_suppress_implicit(v) != 0 {
-            g.service_suppress_implicit_write(v, 0);
+        if (g.0.vehicle_type)(v) < 2 && (g.0.suppress_implicit)(v) != 0 {
+            (g.0.suppress_implicit_write)(v, 0);
             unsafe {
                 (*state).implicit = (*state).real;
             }
-            g.service_invalidate_order(v, 0);
+            (g.0.invalidate_order)(v, 0);
             return;
         }
         let list = g.orders(v);
@@ -2587,7 +2263,7 @@ impl Control {
             openttd_rust_order_vector_move(g.vector(list), usize::from(from), usize::from(to));
         }
         let mut u = g.first(v);
-        g.service_delete_order_news(u);
+        (g.0.delete_order_news)(u);
         fn remap(index: u8, from: u8, to: u8) -> u8 {
             if index == from {
                 to
@@ -2606,7 +2282,7 @@ impl Control {
                 (*state).implicit = remap((*state).implicit, from, to);
             }
             g.reset(u);
-            g.service_invalidate_order(u, u64::from(u16::from(from) | (u16::from(to) << 8)));
+            (g.0.invalidate_order)(u, i32::from(u16::from(from) | (u16::from(to) << 8)));
             u = g.next(u);
         }
         for i in 0..g.stored_count(list) {
@@ -2616,7 +2292,7 @@ impl Control {
                 g.put_stored(list, i, o);
             }
         }
-        g.service_invalidate_vehicle_list(v);
+        (g.0.invalidate_vehicle_list)(v);
     }
     fn add_shared(&self, v: *mut c_void, shared: *mut c_void) {
         let g = self.g;
@@ -2646,7 +2322,7 @@ impl Control {
         let first = g.first(v);
         let were_first = first == v;
         // Window number is copied before changing the head, as in the original.
-        let identifier = g.service_shared_window(v, first);
+        let identifier = (g.0.shared_window)(v, first);
         let list = g.list(g.orders(v));
         unsafe {
             (*list).vehicles = (*list).vehicles.wrapping_sub(1);
@@ -2667,13 +2343,13 @@ impl Control {
             }
         }
         if unsafe { (*list).vehicles == 1 } {
-            g.service_close_shared_window(v, identifier);
-            g.service_invalidate_order(g.first(v), (-2i64) as u64);
+            (g.0.close_shared_window)(v, identifier as u32);
+            (g.0.invalidate_order)(g.first(v), ((-2i64) as u64) as i32);
         } else if were_first {
-            g.service_invalidate_shared_window(
+            (g.0.invalidate_shared_window)(
                 v,
-                identifier,
-                g.service_vehicle_id(g.first(v)) | (1 << 31),
+                identifier as u32,
+                ((g.0.vehicle_id)(g.first(v)) | (1 << 31)) as i32,
             );
         }
         unsafe {
@@ -2683,7 +2359,7 @@ impl Control {
     }
     fn delete_vehicle_orders(&self, v: *mut c_void, keep: bool, reset: bool) {
         let g = self.g;
-        g.service_delete_order_news(v);
+        (g.0.delete_order_news)(v);
         let list = g.orders(v);
         if !list.is_null() && unsafe { (*g.list(list)).vehicles > 1 } {
             self.remove_shared(v);
@@ -2693,7 +2369,7 @@ impl Control {
         } else if !list.is_null() {
             let remove = unsafe { openttd_rust_list_free(list, (u32::from(keep)) as u8, g.0) };
             if remove != 0 {
-                g.service_delete_list(list);
+                (g.0.delete_list)(list);
             }
             if !keep {
                 unsafe {
@@ -2719,7 +2395,7 @@ pub unsafe extern "C" fn openttd_rust_insert_order(
     v: *mut c_void,
     index: u8,
     input: *const Order,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u64 {
     let control = Control { g: Game(leaves) };
     let input = unsafe { input.read() };
@@ -2731,7 +2407,7 @@ pub unsafe extern "C" fn openttd_rust_insert_order(
 pub unsafe extern "C" fn openttd_rust_delete_order(
     v: *mut c_void,
     index: u8,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u64 {
     let control = Control { g: Game(leaves) };
     control.delete(v, index);
@@ -2743,7 +2419,7 @@ pub unsafe extern "C" fn openttd_rust_delete_vehicle_orders(
     v: *mut c_void,
     keep: u8,
     reset: u8,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u64 {
     let control = Control { g: Game(leaves) };
     control.delete_vehicle_orders(v, keep != 0, reset != 0);
@@ -2754,7 +2430,7 @@ pub unsafe extern "C" fn openttd_rust_delete_vehicle_orders(
 pub unsafe extern "C" fn openttd_rust_add_shared(
     v: *mut c_void,
     shared: *mut c_void,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u64 {
     let control = Control { g: Game(leaves) };
     control.add_shared(v, shared);
@@ -2762,7 +2438,10 @@ pub unsafe extern "C" fn openttd_rust_add_shared(
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_remove_shared(v: *mut c_void, leaves: *const Leaves) -> u64 {
+pub unsafe extern "C" fn openttd_rust_remove_shared(
+    v: *mut c_void,
+    leaves: &'static Leaves,
+) -> u64 {
     let control = Control { g: Game(leaves) };
     control.remove_shared(v);
     0
@@ -2771,7 +2450,7 @@ pub unsafe extern "C" fn openttd_rust_remove_shared(v: *mut c_void, leaves: *con
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_delete_implicit(
     v: *mut c_void,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u64 {
     let control = Control { g: Game(leaves) };
     control.delete_implicit(v);
@@ -2785,7 +2464,7 @@ pub unsafe extern "C" fn openttd_rust_timetable_bulk(
     value: u16,
     execute: u8,
     output: *mut c_void,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u64 {
     let control = Control { g: Game(leaves) };
     let g = control.g;
@@ -2799,12 +2478,7 @@ pub unsafe extern "C" fn openttd_rust_timetable_bulk(
             while index < g.count(v) {
                 let order = g.vehicle_order(v, index);
                 if order.is_some_and(|o| o.kind() != 8) {
-                    g.service_change_timetable_command(
-                        v,
-                        u64::from(index),
-                        u64::from(field),
-                        u64::from(value),
-                    );
+                    (g.0.change_timetable_command)(v, index, field, value);
                 }
                 index = index.wrapping_add(1);
             }
@@ -2819,7 +2493,7 @@ pub unsafe extern "C" fn openttd_rust_order_destination(
     depth: i32,
     look_ahead: u8,
     input: *const Order,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u64 {
     let control = Control { g: Game(leaves) };
     let input = unsafe { input.read() };
@@ -2827,7 +2501,10 @@ pub unsafe extern "C" fn openttd_rust_order_destination(
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_process_orders(v: *mut c_void, leaves: *const Leaves) -> u64 {
+pub unsafe extern "C" fn openttd_rust_process_orders(
+    v: *mut c_void,
+    leaves: &'static Leaves,
+) -> u64 {
     let control = Control { g: Game(leaves) };
     u64::from(control.process(v))
 }
@@ -2836,7 +2513,7 @@ pub unsafe extern "C" fn openttd_rust_process_orders(v: *mut c_void, leaves: *co
 pub unsafe extern "C" fn openttd_rust_order_condition(
     v: *mut c_void,
     input: *const Order,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u64 {
     let g = Game(leaves);
 
@@ -2849,7 +2526,7 @@ pub unsafe extern "C" fn openttd_rust_order_location(
     v: *mut c_void,
     airport: u8,
     input: *const Order,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u64 {
     let g = Game(leaves);
 
@@ -2863,7 +2540,7 @@ pub unsafe extern "C" fn openttd_rust_order_distance(
     previous: u8,
     current: u8,
     depth: i32,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u64 {
     let control = Control { g: Game(leaves) };
     let g = control.g;
@@ -2877,7 +2554,7 @@ pub unsafe extern "C" fn openttd_rust_command_insert(
     execute: u8,
     input: *const Order,
     output: *mut c_void,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u64 {
     let control = Control { g: Game(leaves) };
     let input = unsafe { input.read() };
@@ -2890,7 +2567,7 @@ pub unsafe extern "C" fn openttd_rust_command_delete(
     index: u8,
     execute: u8,
     output: *mut c_void,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u64 {
     let control = Control { g: Game(leaves) };
     control.delete_command(v, index, execute != 0, output)
@@ -2902,7 +2579,7 @@ pub unsafe extern "C" fn openttd_rust_command_skip(
     index: u8,
     execute: u8,
     output: *mut c_void,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u64 {
     let control = Control { g: Game(leaves) };
     control.skip_command(v, index, execute != 0, output)
@@ -2915,7 +2592,7 @@ pub unsafe extern "C" fn openttd_rust_command_move(
     to: u8,
     execute: u8,
     output: *mut c_void,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u64 {
     let control = Control { g: Game(leaves) };
     control.move_command(v, from, to, execute != 0, output)
@@ -2929,7 +2606,7 @@ pub unsafe extern "C" fn openttd_rust_command_modify(
     value: u16,
     execute: u8,
     output: *mut c_void,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u64 {
     let control = Control { g: Game(leaves) };
     control.modify_command(v, index, field, value, execute != 0, output)
@@ -2942,7 +2619,7 @@ pub unsafe extern "C" fn openttd_rust_command_refit(
     cargo: u8,
     execute: u8,
     output: *mut c_void,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u64 {
     let control = Control { g: Game(leaves) };
     control.refit_command(v, index, cargo, execute != 0, output)
@@ -2955,7 +2632,7 @@ pub unsafe extern "C" fn openttd_rust_command_clone(
     action: u8,
     execute: u8,
     output: *mut c_void,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u64 {
     let control = Control { g: Game(leaves) };
     control.clone_command(v, source, action, execute != 0, output)
@@ -2966,7 +2643,7 @@ pub unsafe extern "C" fn openttd_rust_capture_backup(
     v: *mut c_void,
     source: *const c_void,
     user: u32,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u64 {
     let control = Control { g: Game(leaves) };
     control.capture_backup(v, source, user)
@@ -2976,7 +2653,7 @@ pub unsafe extern "C" fn openttd_rust_capture_backup(
 pub unsafe extern "C" fn openttd_rust_backup_create(
     v: *mut c_void,
     user: u32,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u64 {
     let control = Control { g: Game(leaves) };
     control.backup_create(v, u64::from(user))
@@ -2986,7 +2663,7 @@ pub unsafe extern "C" fn openttd_rust_backup_create(
 pub unsafe extern "C" fn openttd_rust_backup_restore(
     v: *mut c_void,
     user: u32,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u64 {
     let control = Control { g: Game(leaves) };
     control.backup_restore(v, u64::from(user))
@@ -2996,14 +2673,14 @@ pub unsafe extern "C" fn openttd_rust_backup_restore(
 pub unsafe extern "C" fn openttd_rust_backup_clear_user(
     tile: u32,
     user: u32,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u64 {
     let control = Control { g: Game(leaves) };
     control.backup_clear_user(u64::from(tile), u64::from(user))
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_backup_reset(user: u32, leaves: *const Leaves) -> u64 {
+pub unsafe extern "C" fn openttd_rust_backup_reset(user: u32, leaves: &'static Leaves) -> u64 {
     let control = Control { g: Game(leaves) };
     control.backup_reset(u64::from(user))
 }
@@ -3012,14 +2689,17 @@ pub unsafe extern "C" fn openttd_rust_backup_reset(user: u32, leaves: *const Lea
 pub unsafe extern "C" fn openttd_rust_backup_tile_clear(
     tile: u32,
     from_gui: u8,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u64 {
     let control = Control { g: Game(leaves) };
     control.backup_tile_clear(u64::from(tile), u64::from(from_gui))
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_backup_group_clear(group: u16, leaves: *const Leaves) -> u64 {
+pub unsafe extern "C" fn openttd_rust_backup_group_clear(
+    group: u16,
+    leaves: &'static Leaves,
+) -> u64 {
     let control = Control { g: Game(leaves) };
     control.backup_group_clear(u64::from(group))
 }
@@ -3027,7 +2707,7 @@ pub unsafe extern "C" fn openttd_rust_backup_group_clear(group: u16, leaves: *co
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_backup_vehicle_clear(
     v: *mut c_void,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u64 {
     let control = Control { g: Game(leaves) };
     control.backup_vehicle_clear(v)
@@ -3038,7 +2718,7 @@ pub unsafe extern "C" fn openttd_rust_backup_destination_clear(
     kind: u8,
     destination: u16,
     hangar: u8,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u64 {
     let control = Control { g: Game(leaves) };
     control.backup_destination_clear(u64::from(kind), u64::from(destination), u64::from(hangar))
@@ -3049,7 +2729,7 @@ pub unsafe extern "C" fn openttd_rust_command_clear_backup(
     tile: u32,
     user: u32,
     execute: u8,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u64 {
     let control = Control { g: Game(leaves) };
     {
@@ -3068,7 +2748,7 @@ pub unsafe extern "C" fn openttd_rust_remove_destination(
     kind: u8,
     destination: u16,
     hangar: u8,
-    leaves: *const Leaves,
+    leaves: &'static Leaves,
 ) -> u64 {
     let control = Control { g: Game(leaves) };
     control.remove_destination(kind, destination, hangar != 0);
@@ -3076,14 +2756,17 @@ pub unsafe extern "C" fn openttd_rust_remove_destination(
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_check_orders(v: *mut c_void, leaves: *const Leaves) -> u64 {
+pub unsafe extern "C" fn openttd_rust_check_orders(v: *mut c_void, leaves: &'static Leaves) -> u64 {
     let control = Control { g: Game(leaves) };
     control.check_orders(v);
     0
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_begin_loading(v: *mut c_void, leaves: *const Leaves) -> u64 {
+pub unsafe extern "C" fn openttd_rust_begin_loading(
+    v: *mut c_void,
+    leaves: &'static Leaves,
+) -> u64 {
     let control = Control { g: Game(leaves) };
     control.begin_loading_orders(v);
     0
@@ -3103,14 +2786,14 @@ impl Game {
             return u8::MAX;
         }
         let variable = match order.variable() {
-            0 => self.service_percent_filled(v) as i32,
-            1 => ((self.service_reliability(v) * 101) >> 16) as i32,
-            7 => ((self.service_engine_reliability(v) * 101) >> 16) as i32,
-            2 => (self.service_display_speed(v) as i32).wrapping_mul(10) / 16,
-            3 => self.service_age_years(v) as i32,
-            4 => self.service_needs_service(v) as i32,
+            0 => (self.0.percent_filled)(v) as i32,
+            1 => (((self.0.reliability)(v) * 101) >> 16) as i32,
+            7 => (((self.0.engine_reliability)(v) * 101) >> 16) as i32,
+            2 => ((self.0.display_speed)(v) as i32).wrapping_mul(10) / 16,
+            3 => (self.0.age_years)(v) as i32,
+            4 => (self.0.needs_service)(v) as i32,
             5 => return order.flags,
-            6 => self.service_remaining_years(v) as i32,
+            6 => (self.0.remaining_years)(v) as i32,
             _ => unreachable!(),
         };
         let value = i32::from(order.value());
@@ -3130,20 +2813,20 @@ impl Game {
     fn location(self, order: Order, v: *mut c_void, airport: bool) -> u32 {
         match order.kind() {
             1 | 6 | 8 => {
-                (if airport && self.service_vehicle_type(v) == 3 {
-                    self.service_airport_tile(u64::from(order.destination))
+                (if airport && (self.0.vehicle_type)(v) == 3 {
+                    (self.0.airport_tile)(order.destination)
                 } else {
-                    self.service_base_station_tile(u64::from(order.destination))
+                    (self.0.base_station_tile)(order.destination)
                 }) as u32
             }
             2 => {
                 if order.destination == u16::MAX {
                     return u32::MAX;
                 }
-                (if self.service_vehicle_type(v) == 3 {
-                    self.service_station_tile(u64::from(order.destination))
+                (if (self.0.vehicle_type)(v) == 3 {
+                    (self.0.station_tile)(order.destination)
                 } else {
-                    self.service_depot_tile(u64::from(order.destination))
+                    (self.0.depot_tile)(order.destination)
                 }) as u32
             }
             _ => u32::MAX,
@@ -3173,11 +2856,7 @@ impl Game {
         if prev == u32::MAX || cur == u32::MAX {
             return 0;
         }
-        self.service_distance(
-            u64::from(prev),
-            u64::from(cur),
-            u64::from(self.service_vehicle_type(v) == 3),
-        ) as u32
+        (self.0.distance)(prev, cur, u8::from((self.0.vehicle_type)(v) == 3)) as u32
     }
 }
 impl Control {
@@ -3190,42 +2869,43 @@ impl Control {
                 current.flags = 0;
                 current.destination = 0;
                 g.put_current(v, current);
-                g.service_set_destination(v, 0);
+                (g.0.set_destination)(v, 0);
                 return false;
             }
             match order.kind() {
                 1 => {
-                    let tile = g.service_station_location(v, u64::from(order.destination));
-                    g.service_set_destination(v, tile);
+                    let tile = (g.0.station_location)(v, order.destination);
+                    (g.0.set_destination)(v, tile as u32);
                     return true;
                 }
                 2 => {
-                    if order.depot_type() & 1 != 0 && g.service_needs_service(v) == 0 {
+                    if order.depot_type() & 1 != 0 && (g.0.needs_service)(v) == 0 {
                         g.update_timetable(v, true);
                         g.increment_real(v);
                     } else if g.current(v).action() & 2 != 0 {
-                        if g.service_destination_tile(v) == 0
-                            && g.service_economy_fraction() != g.service_vehicle_id(v) % 74
+                        if (g.0.destination_tile)(v) == 0
+                            && (g.0.economy_fraction)() != (g.0.vehicle_id)(v) % 74
                         {
                         } else {
                             let mut closest = Closest::default();
-                            g.service_closest_depot(v, ptr::addr_of_mut!(closest));
+                            // SAFETY: The callback writes one result into this live local.
+                            unsafe { (g.0.closest_depot)(v, ptr::addr_of_mut!(closest)) };
                             if closest.found != 0 {
                                 if pbs && closest.reverse != 0 {
                                     return false;
                                 }
-                                g.service_set_destination(v, u64::from(closest.tile));
+                                (g.0.set_destination)(v, closest.tile);
                                 let mut current = g.current(v);
                                 current.destination = closest.destination;
                                 g.put_current(v, current);
-                                if g.service_vehicle_type(v) == 0 && closest.reverse != 0 {
-                                    g.service_reverse_train(v);
+                                if (g.0.vehicle_type)(v) == 0 && closest.reverse != 0 {
+                                    (g.0.reverse_train)(v);
                                 }
-                                if g.service_vehicle_type(v) == 3
-                                    && g.service_aircraft_flying(v) != 0
-                                    && g.service_target_airport(v) != u64::from(closest.destination)
+                                if (g.0.vehicle_type)(v) == 3
+                                    && (g.0.aircraft_flying)(v) != 0
+                                    && (g.0.target_airport)(v) != u64::from(closest.destination)
                                 {
-                                    g.service_next_airport(v);
+                                    (g.0.next_airport)(v);
                                 }
                                 return true;
                             }
@@ -3236,22 +2916,22 @@ impl Control {
                             g.increment_real(v);
                         }
                     } else {
-                        if g.service_vehicle_type(v) != 3 {
-                            let tile = g.service_depot_tile(u64::from(order.destination));
-                            g.service_set_destination(v, tile);
+                        if (g.0.vehicle_type)(v) != 3 {
+                            let tile = (g.0.depot_tile)(order.destination);
+                            (g.0.set_destination)(v, tile as u32);
                         } else {
                             let destination = g.current(v).destination;
-                            if g.service_target_airport(v) != u64::from(destination) {
-                                let tile = g.service_station_location(v, u64::from(destination));
-                                g.service_set_destination(v, tile);
+                            if (g.0.target_airport)(v) != u64::from(destination) {
+                                let tile = (g.0.station_location)(v, destination);
+                                (g.0.set_destination)(v, tile as u32);
                             }
                         }
                         return true;
                     }
                 }
                 6 => {
-                    let tile = g.service_waypoint_tile(u64::from(order.destination));
-                    g.service_set_destination(v, tile);
+                    let tile = (g.0.waypoint_tile)(order.destination);
+                    (g.0.set_destination)(v, tile as u32);
                     return true;
                 }
                 7 => {
@@ -3271,8 +2951,8 @@ impl Control {
                         unsafe {
                             (*state).time = (*state).time.wrapping_add(i32::from(travel));
                         }
-                        if g.service_vehicle_type(v) < 2 {
-                            g.service_suppress_implicit_write(v, 1);
+                        if (g.0.vehicle_type)(v) < 2 {
+                            (g.0.suppress_implicit_write)(v, 1);
                         }
                     } else {
                         g.update_timetable(v, true);
@@ -3280,7 +2960,7 @@ impl Control {
                     }
                 }
                 _ => {
-                    g.service_set_destination(v, 0);
+                    (g.0.set_destination)(v, 0);
                     return false;
                 }
             }
@@ -3292,7 +2972,7 @@ impl Control {
                 current.flags = 0;
                 current.destination = 0;
                 g.put_current(v, current);
-                g.service_set_destination(v, 0);
+                (g.0.set_destination)(v, 0);
                 return false;
             };
             g.put_current(v, next);
@@ -3314,7 +2994,7 @@ impl Control {
             }
             3 => return false,
             4 => {
-                if g.service_vehicle_type(v) != 3 {
+                if (g.0.vehicle_type)(v) != 3 {
                     return false;
                 }
             }
@@ -3323,11 +3003,11 @@ impl Control {
         let reverse = order_kind == 0;
         let current = unsafe { current_ptr.read() };
         if ((order_kind == 1 && current.non_stop() & 2 != 0) || order_kind == 6)
-            && g.service_at_station(v) != 0
-            && u64::from(current.destination) == g.service_tile_station(v)
+            && (g.0.at_station)(v) != 0
+            && u64::from(current.destination) == (g.0.tile_station)(v)
         {
             self.delete_implicit(v);
-            g.service_last_station_write(v, u64::from(current.destination));
+            (g.0.last_station_write)(v, current.destination);
             g.update_timetable(v, true);
             g.increment_implicit(v);
             // Deletion/timetable/index updates may mutate the list or reenter.
@@ -3339,10 +3019,10 @@ impl Control {
         let order = access
             .order(unsafe { (*state).real })
             .filter(|o| o.kind() != 8);
-        let kind = g.service_vehicle_type(v);
+        let kind = (g.0.vehicle_type)(v);
         if order.is_none() || (kind == 3 && !access.valid()) {
             if kind == 3 {
-                g.service_missing_aircraft_orders(v);
+                (g.0.missing_aircraft_orders)(v);
                 return false;
             }
             let mut current = unsafe { (*vehicle).current.as_ptr().read() };
@@ -3352,24 +3032,24 @@ impl Control {
             unsafe {
                 (*vehicle).current.as_mut_ptr().write(current);
             }
-            g.service_set_destination(v, 0);
+            (g.0.set_destination)(v, 0);
             return false;
         }
         let order = order.unwrap();
         if order.equals(unsafe { (*vehicle).current.as_ptr().read() })
-            && (kind == 3 || g.service_destination_tile(v) != 0)
+            && (kind == 3 || (g.0.destination_tile)(v) != 0)
             && (kind != 2
                 || order.kind() != 1
-                || g.service_ship_station_tile(u64::from(order.destination)) != u64::from(u32::MAX))
+                || (g.0.ship_station_tile)(order.destination) != u64::from(u32::MAX))
         {
             return false;
         }
         unsafe {
             (*vehicle).current.as_mut_ptr().write(order);
         }
-        g.service_invalidate_order(v, (-2i64) as u64);
+        (g.0.invalidate_order)(v, ((-2i64) as u64) as i32);
         if kind == 2 || kind == 3 {
-            g.service_dirty_vehicle_windows(v);
+            (g.0.dirty_vehicle_windows)(v);
         }
         self.destination(v, order, 0, false) && reverse
     }
@@ -3377,11 +3057,11 @@ impl Control {
 
 impl Game {
     fn error_with(self, output: *mut c_void, error: u32, detail: u64) -> u64 {
-        self.service_command_error(output, u64::from(error), detail);
+        (self.0.command_error)(output, error, detail as u32);
         0
     }
     fn check_owner(self, owner: u64, output: *mut c_void) -> bool {
-        self.service_owner_check(owner, output) != 0
+        (self.0.owner_check)(owner as u8, output) != 0
     }
     fn error(self, output: *mut c_void, error: u32) -> u64 {
         u64::from(self.command_error(output, error))
@@ -3406,29 +3086,31 @@ impl Control {
         if order.refit != 0xfe || order.wait != 0 || order.travel != 0 || order.speed != u16::MAX {
             return self.g.error(output, 0);
         }
-        let kind = g.service_vehicle_type(v);
+        let kind = (g.0.vehicle_type)(v);
         let destination = u64::from(order.destination);
         match order.kind() {
             1 => {
-                if g.service_valid_station(destination) == 0 {
+                if (g.0.valid_station)(destination as u16) == 0 {
                     return self.g.error(output, 0);
                 }
-                let owner = g.service_station_owner(destination);
+                let owner = (g.0.station_owner)(destination as u16);
                 if owner != 0x10 && !self.g.check_owner(owner, output) {
                     return 0;
                 }
-                if g.service_can_use_station(v, destination) == 0 {
-                    return self
-                        .g
-                        .error_with(output, 5, g.service_station_error(v, destination));
+                if (g.0.can_use_station)(v, destination as u16) == 0 {
+                    return self.g.error_with(
+                        output,
+                        5,
+                        (g.0.station_error)(v, destination as u16),
+                    );
                 }
                 let mut u = g.first(v);
                 while !u.is_null() {
-                    if g.service_can_use_station(u, destination) == 0 {
+                    if (g.0.can_use_station)(u, destination as u16) == 0 {
                         return self.g.error_with(
                             output,
                             6,
-                            g.service_station_error(u, destination),
+                            (g.0.station_error)(u, destination as u16),
                         );
                     }
                     u = g.next(u);
@@ -3461,35 +3143,35 @@ impl Control {
             2 => {
                 if order.action() & 2 == 0 {
                     if kind == 3 {
-                        if g.service_valid_station(destination) == 0 {
+                        if (g.0.valid_station)(destination as u16) == 0 {
                             return self.g.error(output, 0);
                         }
                         if !self
                             .g
-                            .check_owner(g.service_station_owner(destination), output)
+                            .check_owner((g.0.station_owner)(destination as u16), output)
                         {
                             return 0;
                         }
-                        if g.service_can_use_station(v, destination) == 0
-                            || g.service_has_hangar(destination) == 0
+                        if (g.0.can_use_station)(v, destination as u16) == 0
+                            || (g.0.has_hangar)(destination as u16) == 0
                         {
                             return self.g.error(output, 0);
                         }
                     } else {
-                        if g.service_valid_depot(destination) == 0 {
+                        if (g.0.valid_depot)(destination as u16) == 0 {
                             return self.g.error(output, 0);
                         }
                         if !self
                             .g
-                            .check_owner(g.service_depot_owner(destination), output)
+                            .check_owner((g.0.depot_owner)(destination as u16), output)
                         {
                             return 0;
                         }
                         if kind > 2
                             || match kind {
-                                0 => g.service_rail_depot(destination),
-                                1 => g.service_road_depot(destination),
-                                _ => g.service_ship_depot(destination),
+                                0 => (g.0.rail_depot)(destination as u16),
+                                1 => (g.0.road_depot)(destination as u16),
+                                _ => (g.0.ship_depot)(destination as u16),
                             } == 0
                         {
                             return self.g.error(output, 0);
@@ -3523,10 +3205,10 @@ impl Control {
                 }
             }
             6 => {
-                if g.service_valid_waypoint(destination) == 0 {
+                if (g.0.valid_waypoint)(destination as u16) == 0 {
                     return self.g.error(output, 0);
                 }
-                let facilities = g.service_waypoint_facilities(destination);
+                let facilities = (g.0.waypoint_facilities)(destination as u16);
                 match kind {
                     0 => {
                         if facilities & 1 == 0 {
@@ -3534,7 +3216,7 @@ impl Control {
                         }
                         if !self
                             .g
-                            .check_owner(g.service_waypoint_owner(destination), output)
+                            .check_owner((g.0.waypoint_owner)(destination as u16), output)
                         {
                             return 0;
                         }
@@ -3545,7 +3227,7 @@ impl Control {
                         }
                         if !self
                             .g
-                            .check_owner(g.service_waypoint_owner(destination), output)
+                            .check_owner((g.0.waypoint_owner)(destination as u16), output)
                         {
                             return 0;
                         }
@@ -3554,7 +3236,7 @@ impl Control {
                         if facilities & 16 == 0 {
                             return self.g.error(output, 13);
                         }
-                        let owner = g.service_waypoint_owner(destination);
+                        let owner = (g.0.waypoint_owner)(destination as u16);
                         if owner != 0x10 && !self.g.check_owner(owner, output) {
                             return 0;
                         }
@@ -3608,7 +3290,7 @@ impl Control {
         if g.count(v) >= 254 {
             return self.g.error(output, 15);
         }
-        if g.orders(v).is_null() && g.service_list_capacity() == 0 {
+        if g.orders(v).is_null() && (g.0.list_capacity)() == 0 {
             return self.g.error(output, 16);
         }
         if execute {
@@ -3619,8 +3301,8 @@ impl Control {
     fn declone(&self, v: *mut c_void, execute: bool) -> u64 {
         if execute {
             self.delete_vehicle_orders(v, false, true);
-            self.g.service_invalidate_order(v, (-1i64) as u64);
-            self.g.service_invalidate_vehicle_list(v);
+            (self.g.0.invalidate_order)(v, ((-1i64) as u64) as i32);
+            (self.g.0.invalidate_vehicle_list)(v);
         }
         1
     }
@@ -3657,7 +3339,7 @@ impl Control {
         }
         if execute {
             if g.current(v).kind() == 3 {
-                g.service_leave_station(v);
+                (g.0.leave_station)(v);
             }
             unsafe {
                 (*state).implicit = index;
@@ -3665,9 +3347,9 @@ impl Control {
             }
             g.update_real(v);
             g.reset(v);
-            g.service_invalidate_order(v, (-2i64) as u64);
-            if matches!(g.service_vehicle_type(v), 2 | 3) {
-                g.service_dirty_vehicle_windows(v);
+            (g.0.invalidate_order)(v, ((-2i64) as u64) as i32);
+            if matches!((g.0.vehicle_type)(v), 2 | 3) {
+                (g.0.dirty_vehicle_windows)(v);
             }
         }
         1
@@ -3750,12 +3432,12 @@ impl Control {
         let byte = data as u8;
         match field {
             0 => {
-                if g.service_vehicle_type(v) >= 2 || byte == order.non_stop() || byte & !3 != 0 {
+                if (g.0.vehicle_type)(v) >= 2 || byte == order.non_stop() || byte & !3 != 0 {
                     return self.g.error(output, 0);
                 }
             }
             1 => {
-                if g.service_vehicle_type(v) != 0 || data >= 3 {
+                if (g.0.vehicle_type)(v) != 0 || data >= 3 {
                     return self.g.error(output, 0);
                 }
             }
@@ -3907,7 +3589,7 @@ impl Control {
             }
             g.put_order(list, index, order);
             let mut u = g.first(v);
-            g.service_delete_order_news(u);
+            (g.0.delete_order_news)(u);
             while !u.is_null() {
                 let state = g.consist(u);
                 let mut current = g.current(u);
@@ -3919,7 +3601,7 @@ impl Control {
                     g.put_current(u, current);
                 }
                 g.reset(u);
-                g.service_invalidate_order(u, (-2i64) as u64);
+                (g.0.invalidate_order)(u, ((-2i64) as u64) as i32);
                 u = g.next(u);
             }
         }
@@ -3960,7 +3642,7 @@ impl Control {
             g.put_order(g.orders(v), index, order);
             let mut u = g.first(v);
             while !u.is_null() {
-                g.service_invalidate_order(u, (-2i64) as u64);
+                (g.0.invalidate_order)(u, ((-2i64) as u64) as i32);
                 if index == unsafe { (*g.consist(u)).real } && g.current(u).depot_type() & 2 != 0 {
                     let mut current = g.current(u);
                     current.refit = cargo;
@@ -3985,19 +3667,20 @@ impl Vector {
 }
 impl Game {
     fn backup(self, b: *mut c_void) -> *mut Backup {
-        unsafe { ((*self.0).backup)(b) }
+        (self.0.backup)(b)
     }
     fn backup_vector(self, b: *mut c_void) -> *mut Vector {
-        unsafe { ((*self.0).backup_vector)(b) }
+        (self.0.backup_vector)(b)
     }
     fn backup_consist(self, b: *mut c_void) -> *mut Consist {
-        unsafe { ((*self.0).backup_consist)(b) }
+        (self.0.backup_consist)(b)
     }
-    fn next_backup(self, cursor: *mut u32) -> *mut c_void {
-        self.service_next_backup(cursor)
+    fn next_backup(self, cursor: &mut u32) -> *mut c_void {
+        // SAFETY: The callback only advances this exclusive live cursor.
+        unsafe { (self.0.next_backup)(cursor) }
     }
     fn next_vehicle(self, first: u32) -> *mut c_void {
-        self.service_next_vehicle(u64::from(first))
+        (self.0.next_vehicle)(first)
     }
     fn backed_order(self, b: *mut c_void, i: usize) -> Order {
         unsafe { (*self.backup_vector(b)).data().add(i).read() }
@@ -4006,11 +3689,11 @@ impl Game {
         let state = self.backup(backup);
         unsafe {
             (*state).user = user;
-            (*state).tile = self.service_vehicle_tile(v) as u32;
-            (*state).group = self.service_vehicle_group(v) as u16;
+            (*state).tile = (self.0.vehicle_tile)(v) as u32;
+            (*state).group = (self.0.vehicle_group)(v) as u16;
             openttd_rust_consist_copy(self.backup_consist(backup), self.consist(v));
         }
-        self.service_capture_backup_metadata(backup, v);
+        (self.0.capture_backup_metadata)(backup, v);
         let list = self.orders(v);
         if !list.is_null() && unsafe { (*self.list(list)).vehicles > 1 } {
             let first = self.first(v);
@@ -4028,11 +3711,11 @@ impl Game {
         }
     }
     fn aircraft_range(self, dst: *mut c_void, src: *mut c_void) -> bool {
-        if self.service_aircraft_range(dst) == 0 || self.count(src) == 0 {
+        if (self.0.aircraft_range)(dst) == 0 || self.count(src) == 0 {
             return true;
         }
         let list = self.orders(src);
-        let max = self.service_aircraft_range_square(dst) as u32;
+        let max = (self.0.aircraft_range_square)(dst) as u32;
         for i in 0..self.size(list) {
             if matches!(self.order(list, i).unwrap().kind(), 1 | 2 | 6)
                 && self.distance(i, self.next_index(list, i), src, 0) > max
@@ -4065,18 +3748,16 @@ impl Control {
         if action != 0 && action != 1 {
             return self.g.error(output, 0);
         }
-        if !self.g.primary(src)
-            || g.service_vehicle_type(dst) != g.service_vehicle_type(src)
-            || dst == src
+        if !self.g.primary(src) || (g.0.vehicle_type)(dst) != (g.0.vehicle_type)(src) || dst == src
         {
             return self.g.error(output, 0);
         }
         if !self.g.owner_check(src, output) {
             return 0;
         }
-        let kind = g.service_vehicle_type(src);
+        let kind = (g.0.vehicle_type)(src);
         if action == 0 {
-            if kind == 1 && g.service_bus(src) != g.service_bus(dst) {
+            if kind == 1 && (g.0.bus)(src) != (g.0.bus)(dst) {
                 return self.g.error(output, 0);
             }
             if g.first(src) == g.first(dst) {
@@ -4093,13 +3774,13 @@ impl Control {
                     continue;
                 }
                 let destination = u64::from(order.destination);
-                if (action == 1 || g.service_can_use_station(src, destination) != 0)
-                    && g.service_can_use_station(dst, destination) == 0
+                if (action == 1 || (g.0.can_use_station)(src, destination as u16) != 0)
+                    && (g.0.can_use_station)(dst, destination as u16) == 0
                 {
                     return self.g.error_with(
                         output,
                         17,
-                        g.service_station_error(dst, destination),
+                        (g.0.station_error)(dst, destination as u16),
                     );
                 }
             }
@@ -4107,7 +3788,7 @@ impl Control {
         if kind == 3 && !g.aircraft_range(dst, src) {
             return self.g.error(output, 18);
         }
-        if (action == 1 || list.is_null()) && g.service_list_capacity() == 0 {
+        if (action == 1 || list.is_null()) && (g.0.list_capacity)() == 0 {
             return self.g.error(output, 16);
         }
         if execute {
@@ -4117,9 +3798,9 @@ impl Control {
                     (*g.vehicle(dst)).orders = g.orders(src);
                 }
                 self.add_shared(dst, src);
-                g.service_invalidate_order(dst, (-1i64) as u64);
-                g.service_invalidate_order(src, (-2i64) as u64);
-                g.service_invalidate_vehicle_list(dst);
+                (g.0.invalidate_order)(dst, ((-1i64) as u64) as i32);
+                (g.0.invalidate_order)(src, ((-2i64) as u64) as i32);
+                (g.0.invalidate_vehicle_list)(dst);
             } else {
                 // Original copies the source before deleting the kept empty shell.
                 // Rust temporary storage is a scalar copy, never a live mirror.
@@ -4133,7 +3814,7 @@ impl Control {
                 }
                 let old = g.orders(dst);
                 if !old.is_null() {
-                    g.service_delete_list(old);
+                    (g.0.delete_list)(old);
                 }
                 let list = self.new_list(dst, None, ptr::null_mut());
                 unsafe {
@@ -4144,8 +3825,8 @@ impl Control {
                 unsafe {
                     (*g.vehicle(dst)).orders = list;
                 }
-                g.service_invalidate_order(dst, (-1i64) as u64);
-                g.service_invalidate_vehicle_list(dst);
+                (g.0.invalidate_order)(dst, ((-1i64) as u64) as i32);
+                (g.0.invalidate_vehicle_list)(dst);
             }
         }
         1
@@ -4155,10 +3836,9 @@ impl Control {
         let state = g.backup(backup);
         let clone = unsafe { (*state).clone };
         if !clone.is_null() {
-            g.service_share_command(v, clone);
-        } else if unsafe { (*g.backup_vector(backup)).length > 0 } && g.service_list_capacity() != 0
-        {
-            let list = g.service_allocate_list();
+            (g.0.share_command)(v, clone);
+        } else if unsafe { (*g.backup_vector(backup)).length > 0 } && (g.0.list_capacity)() != 0 {
+            let list = (g.0.allocate_list)();
             unsafe {
                 (*g.vector(list)).transfer(g.backup_vector(backup));
             }
@@ -4166,15 +3846,15 @@ impl Control {
             unsafe {
                 (*g.vehicle(v)).orders = list;
             }
-            g.service_invalidate_station_list();
+            (g.0.invalidate_station_list)();
         }
-        if g.service_unique_backup_name(backup) == 0 {
-            g.service_clear_backup_name(backup);
+        if (g.0.unique_backup_name)(backup) == 0 {
+            (g.0.clear_backup_name)(backup);
         }
         unsafe {
             openttd_rust_consist_copy(g.consist(v), g.backup_consist(backup));
         }
-        g.service_restore_backup_metadata(v, backup);
+        (g.0.restore_backup_metadata)(v, backup);
         g.update_real(v);
         let vs = g.consist(v);
         if unsafe { (*vs).implicit >= g.count(v) } {
@@ -4182,7 +3862,7 @@ impl Control {
                 (*vs).implicit = (*vs).real;
             }
         }
-        g.service_group_command(v, u64::from(unsafe { (*state).group }));
+        (g.0.group_command)(v, unsafe { (*state).group });
     }
     fn capture_backup(&self, v: *mut c_void, source: *const c_void, user: u32) -> u64 {
         let g = self.g;
@@ -4192,73 +3872,73 @@ impl Control {
     fn backup_create(&self, v: *mut c_void, a: u64) -> u64 {
         let g = self.g;
         let mut cursor = 0;
-        let mut ob = self.g.next_backup(&raw mut cursor);
+        let mut ob = self.g.next_backup(&mut cursor);
         while !ob.is_null() {
             if unsafe { (*g.backup(ob)).user == a as u32 } {
-                g.service_delete_backup(ob);
+                (g.0.delete_backup)(ob);
             }
-            ob = self.g.next_backup(&raw mut cursor);
+            ob = self.g.next_backup(&mut cursor);
         }
-        if g.service_backup_capacity() != 0 {
-            g.service_create_backup(v, a);
+        if (g.0.backup_capacity)() != 0 {
+            (g.0.create_backup)(v, a as u32);
         }
         0
     }
     fn backup_restore(&self, v: *mut c_void, a: u64) -> u64 {
         let g = self.g;
         let mut cursor = 0;
-        let mut ob = self.g.next_backup(&raw mut cursor);
+        let mut ob = self.g.next_backup(&mut cursor);
         while !ob.is_null() {
             let state = g.backup(ob);
-            if g.service_vehicle_tile(v) as u32 == unsafe { (*state).tile }
+            if (g.0.vehicle_tile)(v) as u32 == unsafe { (*state).tile }
                 && unsafe { (*state).user == a as u32 }
             {
                 self.restore_backup(ob, v);
-                g.service_delete_backup(ob);
+                (g.0.delete_backup)(ob);
             }
-            ob = self.g.next_backup(&raw mut cursor);
+            ob = self.g.next_backup(&mut cursor);
         }
         0
     }
     fn backup_reset(&self, a: u64) -> u64 {
         let g = self.g;
         let mut cursor = 0;
-        let mut ob = self.g.next_backup(&raw mut cursor);
+        let mut ob = self.g.next_backup(&mut cursor);
         while !ob.is_null() {
             if unsafe { (*g.backup(ob)).user == a as u32 } {
-                g.service_clear_backup_post(a);
+                (g.0.clear_backup_post)(a as u32);
                 return 0;
             }
-            ob = self.g.next_backup(&raw mut cursor);
+            ob = self.g.next_backup(&mut cursor);
         }
         0
     }
     fn backup_clear_user(&self, a: u64, b: u64) -> u64 {
         let g = self.g;
         let mut cursor = 0;
-        let mut ob = self.g.next_backup(&raw mut cursor);
+        let mut ob = self.g.next_backup(&mut cursor);
         while !ob.is_null() {
             let state = g.backup(ob);
             {
                 if unsafe {
                     (*state).user == b as u32 && ((*state).tile == a as u32 || a as u32 == u32::MAX)
                 } {
-                    g.service_delete_backup(ob);
+                    (g.0.delete_backup)(ob);
                 }
             }
-            ob = self.g.next_backup(&raw mut cursor);
+            ob = self.g.next_backup(&mut cursor);
         }
         0
     }
     fn backup_tile_clear(&self, a: u64, b: u64) -> u64 {
         let g = self.g;
-        let user = if g.service_networking() != 0 && g.service_network_server() == 0 {
-            g.service_network_client() as u32
+        let user = if (g.0.networking)() != 0 && (g.0.network_server)() == 0 {
+            (g.0.network_client)() as u32
         } else {
-            g.service_server_client() as u32
+            (g.0.server_client)() as u32
         };
         let mut cursor = 0;
-        let mut ob = self.g.next_backup(&raw mut cursor);
+        let mut ob = self.g.next_backup(&mut cursor);
         while !ob.is_null() {
             let state = g.backup(ob);
             {
@@ -4266,40 +3946,37 @@ impl Control {
                     && (a as u32 == u32::MAX || a as u32 == unsafe { (*state).tile })
                 {
                     if b != 0 {
-                        g.service_clear_backup_gui(
-                            u64::from(unsafe { (*state).tile }),
-                            u64::from(user),
-                        );
+                        (g.0.clear_backup_gui)(unsafe { (*state).tile }, user);
                     } else {
-                        g.service_delete_backup(ob);
+                        (g.0.delete_backup)(ob);
                     }
                 }
             }
-            ob = self.g.next_backup(&raw mut cursor);
+            ob = self.g.next_backup(&mut cursor);
         }
         0
     }
     fn backup_group_clear(&self, a: u64) -> u64 {
         let g = self.g;
         let mut cursor = 0;
-        let mut ob = self.g.next_backup(&raw mut cursor);
+        let mut ob = self.g.next_backup(&mut cursor);
         while !ob.is_null() {
             let state = g.backup(ob);
             {
                 if unsafe { (*state).group == a as u16 } {
                     unsafe {
-                        (*state).group = g.service_default_group() as u16;
+                        (*state).group = (g.0.default_group)() as u16;
                     }
                 }
             }
-            ob = self.g.next_backup(&raw mut cursor);
+            ob = self.g.next_backup(&mut cursor);
         }
         0
     }
     fn backup_vehicle_clear(&self, v: *mut c_void) -> u64 {
         let g = self.g;
         let mut cursor = 0;
-        let mut ob = self.g.next_backup(&raw mut cursor);
+        let mut ob = self.g.next_backup(&mut cursor);
         while !ob.is_null() {
             let state = g.backup(ob);
             {
@@ -4310,18 +3987,18 @@ impl Control {
                         (*state).clone = clone;
                     }
                     if clone.is_null() {
-                        g.service_delete_backup(ob);
+                        (g.0.delete_backup)(ob);
                     }
                 }
             }
-            ob = self.g.next_backup(&raw mut cursor);
+            ob = self.g.next_backup(&mut cursor);
         }
         0
     }
     fn backup_destination_clear(&self, a: u64, b: u64, c: u64) -> u64 {
         let g = self.g;
         let mut cursor = 0;
-        let mut ob = self.g.next_backup(&raw mut cursor);
+        let mut ob = self.g.next_backup(&mut cursor);
         while !ob.is_null() {
             {
                 let length = unsafe { (*g.backup_vector(ob)).length };
@@ -4331,7 +4008,7 @@ impl Control {
                     if kind == 2 && order.action() & 2 != 0 {
                         continue;
                     }
-                    let hangar = g.service_backup_hangar(ob) != 0;
+                    let hangar = (g.0.backup_hangar)(ob) != 0;
                     if kind == 2 && c != 0 && !hangar {
                         continue;
                     }
@@ -4339,12 +4016,12 @@ impl Control {
                         kind = 1;
                     }
                     if u64::from(kind) == a && u64::from(order.destination) == b {
-                        g.service_delete_backup(ob);
+                        (g.0.delete_backup)(ob);
                         break;
                     }
                 }
             }
-            ob = self.g.next_backup(&raw mut cursor);
+            ob = self.g.next_backup(&mut cursor);
         }
         0
     }
@@ -4355,8 +4032,8 @@ impl Control {
         let g = self.g;
         let mut v = self.g.next_vehicle(0);
         while !v.is_null() {
-            let next = (g.service_vehicle_id(v) as u32).wrapping_add(1);
-            let aircraft = g.service_vehicle_type(v) == 3;
+            let next = ((g.0.vehicle_id)(v) as u32).wrapping_add(1);
+            let aircraft = (g.0.vehicle_type)(v) == 3;
             let mut current = g.current(v);
             let current_kind = if aircraft && current.kind() == 2 && !hangar {
                 1
@@ -4367,7 +4044,7 @@ impl Control {
                 current.kind = 5;
                 current.flags = 0;
                 g.put_current(v, current);
-                g.service_vehicle_dirty(v);
+                (g.0.vehicle_dirty)(v);
             }
             if !g.orders(v).is_null() {
                 let mut index = 0u8;
@@ -4407,8 +4084,8 @@ impl Control {
                                 let mut shared = g.first(v);
                                 while !shared.is_null() {
                                     let data = u16::from(index) | (u16::from(u8::MAX) << 8);
-                                    g.service_invalidate_order(shared, u64::from(data));
-                                    g.service_invalidate_order(shared, u64::from(data));
+                                    (g.0.invalidate_order)(shared, i32::from(data));
+                                    (g.0.invalidate_order)(shared, i32::from(data));
                                     shared = g.next(shared);
                                 }
                             }
@@ -4423,15 +4100,15 @@ impl Control {
     }
     fn check_orders(&self, v: *mut c_void) {
         let g = self.g;
-        let review = g.service_review_setting();
+        let review = (g.0.review_setting)();
         if review == 0
-            || g.service_vehicle_status(v) & 128 != 0
-            || (review == 1 && g.service_vehicle_status(v) & 2 != 0)
+            || (g.0.vehicle_status)(v) & 128 != 0
+            || (review == 1 && (g.0.vehicle_status)(v) & 2 != 0)
             || g.first(v) != v
         {
             return;
         }
-        if g.service_local_owner(v) == 0 || !g.service_day_counter(v).is_multiple_of(20) {
+        if (g.0.local_owner)(v) == 0 || !(g.0.day_counter)(v).is_multiple_of(20) {
             return;
         }
         let mut message = 0u32;
@@ -4446,12 +4123,12 @@ impl Control {
                 }
                 if order.kind() == 1 {
                     stations = stations.wrapping_add(1);
-                    if g.service_can_use_station(v, u64::from(order.destination)) == 0 {
+                    if (g.0.can_use_station)(v, order.destination) == 0 {
                         message = 2;
-                    } else if g.service_vehicle_type(v) == 3
-                        && g.service_fast_aircraft(v) != 0
-                        && g.service_short_strip(u64::from(order.destination)) != 0
-                        && g.service_no_jet_crash() == 0
+                    } else if (g.0.vehicle_type)(v) == 3
+                        && (g.0.fast_aircraft)(v) != 0
+                        && (g.0.short_strip)(order.destination) != 0
+                        && (g.0.no_jet_crash)() == 0
                         && message == 0
                     {
                         message = 3;
@@ -4468,9 +4145,9 @@ impl Control {
         if stations < 2 && message == 0 {
             message = 5;
         }
-        g.service_debug_list(v);
+        (g.0.debug_list)(v);
         if message != 0 {
-            g.service_order_news(v, u64::from(message));
+            (g.0.order_news)(v, message);
         }
     }
 }
@@ -4479,7 +4156,7 @@ impl Control {
     fn begin_loading_orders(&self, v: *mut c_void) {
         let g = self.g;
         let current = g.current(v);
-        let last = g.service_last_station(v) as u16;
+        let last = (g.0.last_station)(v) as u16;
         if current.kind() == 1 && current.destination == last {
             self.delete_implicit(v);
             let mut current = g.current(v);
@@ -4494,10 +4171,10 @@ impl Control {
         let state = g.consist(v);
         let implicit = unsafe { (*state).implicit };
         let in_list = g.vehicle_order(v, implicit);
-        if g.service_vehicle_type(v) < 2
+        if (g.0.vehicle_type)(v) < 2
             && !in_list.is_some_and(|o| o.kind() == 8 && o.destination == last)
         {
-            let suppress = g.service_suppress_implicit(v) != 0;
+            let suppress = (g.0.suppress_implicit)(v) != 0;
             let previous = if implicit > 0 {
                 g.vehicle_order(v, implicit - 1)
             } else if g.count(v) > 1 {
@@ -4532,7 +4209,7 @@ impl Control {
                         unsafe {
                             (*state).implicit = target as u8;
                         }
-                        g.service_invalidate_order(v, 0);
+                        (g.0.invalidate_order)(v, 0);
                     } else {
                         loop {
                             let order = g.vehicle_order(v, unsafe { (*state).implicit }).unwrap();
@@ -4555,7 +4232,7 @@ impl Control {
                     }
                 } else if !suppress
                     && (if g.orders(v).is_null() {
-                        g.service_list_capacity() != 0
+                        (g.0.list_capacity)() != 0
                     } else {
                         g.count(v) < 254
                     })
@@ -4575,7 +4252,7 @@ impl Control {
                             (*state).implicit = (*state).implicit.wrapping_sub(1);
                         }
                     }
-                    g.service_suppress_implicit_write(v, 0);
+                    (g.0.suppress_implicit_write)(v, 0);
                 }
             }
         }
