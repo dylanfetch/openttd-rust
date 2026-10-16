@@ -27,17 +27,24 @@ TEST_CASE("Base vehicle scheduler - consumed boundary layouts")
 	Layout(741, "OpenTTDVehiclePostTick", {sizeof(OpenTTDVehiclePostTick), alignof(OpenTTDVehiclePostTick), offsetof(OpenTTDVehiclePostTick, type), offsetof(OpenTTDVehiclePostTick, period), offsetof(OpenTTDVehiclePostTick, counter), offsetof(OpenTTDVehiclePostTick, motion), offsetof(OpenTTDVehiclePostTick, speed), offsetof(OpenTTDVehiclePostTick, front_type), offsetof(OpenTTDVehiclePostTick, subtype), offsetof(OpenTTDVehiclePostTick, tick), offsetof(OpenTTDVehiclePostTick, front_status), offsetof(OpenTTDVehiclePostTick, status)});
 	Layout(743, "OpenTTDVehicleDayCallback", {sizeof(OpenTTDVehicleDayCallback), alignof(OpenTTDVehicleDayCallback), offsetof(OpenTTDVehicleDayCallback, day), offsetof(OpenTTDVehicleDayCallback, has_engine)});
 	Layout(748, "OpenTTDVehicleStationLookup", {sizeof(OpenTTDVehicleStationLookup), alignof(OpenTTDVehicleStationLookup), offsetof(OpenTTDVehicleStationLookup, station), offsetof(OpenTTDVehicleStationLookup, id)});
-	Layout(749, "OpenTTDVehicleSchedulerServices", {sizeof(OpenTTDVehicleSchedulerServices), alignof(OpenTTDVehicleSchedulerServices), offsetof(OpenTTDVehicleSchedulerServices, pool), offsetof(OpenTTDVehicleSchedulerServices, assertions), offsetof(OpenTTDVehicleSchedulerServices, tick), offsetof(OpenTTDVehicleSchedulerServices, post_tick), offsetof(OpenTTDVehicleSchedulerServices, calendar_day), offsetof(OpenTTDVehicleSchedulerServices, economy_day), offsetof(OpenTTDVehicleSchedulerServices, day_callback_read), offsetof(OpenTTDVehicleSchedulerServices, day_callback), offsetof(OpenTTDVehicleSchedulerServices, randomise_callback), offsetof(OpenTTDVehicleSchedulerServices, first_dirty), offsetof(OpenTTDVehicleSchedulerServices, unknown_day_callback), offsetof(OpenTTDVehicleSchedulerServices, cargo_owner), offsetof(OpenTTDVehicleSchedulerServices, running_sound), offsetof(OpenTTDVehicleSchedulerServices, periodic_sound), offsetof(OpenTTDVehicleSchedulerServices, next_station), offsetof(OpenTTDVehicleSchedulerServices, with_loading_timer), offsetof(OpenTTDVehicleSchedulerServices, reset_accumulators)});
+	Layout(749, "OpenTTDVehicleSchedulerServices", {sizeof(OpenTTDVehicleSchedulerServices), alignof(OpenTTDVehicleSchedulerServices), offsetof(OpenTTDVehicleSchedulerServices, pool), offsetof(OpenTTDVehicleSchedulerServices, assertions), offsetof(OpenTTDVehicleSchedulerServices, tick), offsetof(OpenTTDVehicleSchedulerServices, calendar_day), offsetof(OpenTTDVehicleSchedulerServices, economy_day), offsetof(OpenTTDVehicleSchedulerServices, day_callback_read), offsetof(OpenTTDVehicleSchedulerServices, day_callback), offsetof(OpenTTDVehicleSchedulerServices, randomise_callback), offsetof(OpenTTDVehicleSchedulerServices, first_dirty), offsetof(OpenTTDVehicleSchedulerServices, unknown_day_callback), offsetof(OpenTTDVehicleSchedulerServices, cargo_owner), offsetof(OpenTTDVehicleSchedulerServices, running_sound), offsetof(OpenTTDVehicleSchedulerServices, periodic_sound), offsetof(OpenTTDVehicleSchedulerServices, next_station), offsetof(OpenTTDVehicleSchedulerServices, with_loading_timer), offsetof(OpenTTDVehicleSchedulerServices, reset_accumulators)});
 	Layout(750, "OpenTTDVehicleSchedulerTables", {sizeof(OpenTTDVehicleSchedulerTables), alignof(OpenTTDVehicleSchedulerTables), offsetof(OpenTTDVehicleSchedulerTables, scheduler), offsetof(OpenTTDVehicleSchedulerTables, cargo), offsetof(OpenTTDVehicleSchedulerTables, station), offsetof(OpenTTDVehicleSchedulerTables, loading), offsetof(OpenTTDVehicleSchedulerTables, pending), offsetof(OpenTTDVehicleSchedulerTables, transaction), offsetof(OpenTTDVehicleSchedulerTables, group)});
+}
+/* Base Vehicle::Tick survives without a controller, so the Tick facade fills
+ * the actual post-Tick member addresses of these road-typed shells. */
+static OpenTTDVehiclePostTick SurvivingPostTick(Vehicle *v)
+{
+	OpenTTDVehiclePostTick post{};
+	REQUIRE(GetRustVehicleSchedulerServices().tick(RustVehicle(v), &post));
+	return post;
 }
 TEST_CASE("Base vehicle scheduler - scalar member identity and lifetime")
 {
 	REQUIRE(Vehicle::CanAllocateItem(2));
-	auto *v = new RoadVehicle();
-	auto *part = new RoadVehicle();
+	auto *v = new Vehicle(VEH_ROAD);
+	auto *part = new Vehicle(VEH_ROAD);
 	v->SetNext(part);
-	const auto &services = GetRustVehicleSchedulerServices();
-	const auto post = services.post_tick(RustVehicle(part));
+	const auto post = SurvivingPostTick(part);
 	static_assert(std::is_same_v<decltype(post.period), const uint16_t *>);
 	static_assert(std::is_same_v<decltype(post.counter), uint16_t *>);
 	static_assert(std::is_same_v<decltype(post.motion), uint32_t *>);
@@ -72,12 +79,12 @@ TEST_CASE("Base vehicle scheduler - scalar member identity and lifetime")
 	const auto grow_id = VehicleID(static_cast<uint32_t>(_vehicle_pool.data.size()));
 	REQUIRE(Vehicle::CanAllocateItem());
 	new (grow_id) RoadVehicle();
-	CHECK(services.post_tick(RustVehicle(part)).counter == post.counter);
-	CHECK(services.post_tick(RustVehicle(part)).front_status == post.front_status);
+	CHECK(SurvivingPostTick(part).counter == post.counter);
+	CHECK(SurvivingPostTick(part).front_status == post.front_status);
 	_vehicle_pool.CleanPool(); // All earlier descriptors are discarded here.
 	REQUIRE(Vehicle::CanAllocateItem());
-	auto *reused = new (old_id) RoadVehicle();
-	const auto fresh = services.post_tick(RustVehicle(reused));
+	auto *reused = new (old_id) Vehicle(VEH_ROAD);
+	const auto fresh = SurvivingPostTick(reused);
 	CHECK(fresh.counter == &reused->cargo_age_counter);
 	CHECK(*fresh.counter == 1);
 	CHECK(*fresh.motion == 0);
@@ -151,8 +158,8 @@ TEST_CASE("Base vehicle scheduler - live cursor equals unchanged PoolIterator")
 	CHECK(within_size == std::vector<uint32_t>{0, 2, 3, 6});
 }
 /* Synthetic virtual Tick on actual pool shells checks the transient ordering
- * saves cannot show: growth before assertion, timing scope return before post,
- * post-Tick type mutation, then deletion with no post access. */
+ * saves cannot show: growth before assertion, timing scope return before the
+ * bundle fill, post-Tick type mutation, then deletion with no bundle write. */
 static bool _scheduler_tick_scope_ended;
 static uint32_t _scheduler_post_visits;
 static uint32_t _scheduler_pool_reads;
@@ -188,18 +195,20 @@ TEST_CASE("Base vehicle scheduler - Tick growth, timing return and fresh type")
 		++_scheduler_pool_reads;
 		return GetRustVehicleSchedulerServices().pool();
 	};
-	services.post_tick = [](OpenTTDVehicle *shell) noexcept {
+	services.tick = [](OpenTTDVehicle *shell, OpenTTDVehiclePostTick *out) noexcept {
+		out->type = VEH_INVALID;
+		const bool survives = GetRustVehicleSchedulerServices().tick(shell, out);
 		CHECK(_scheduler_tick_scope_ended);
-		/* Assertions require refresh before post; otherwise the next traversal
-		 * refreshes after post, at the first cached slot access. */
-		CHECK(_scheduler_pool_reads == (GetRustVehicleSchedulerServices().assertions ? 2u : 1u));
+		if (!survives) {
+			CHECK(out->type == VEH_INVALID); // Deleted shell: no bundle fill.
+			return false;
+		}
 		++_scheduler_post_visits;
-		const auto post = GetRustVehicleSchedulerServices().post_tick(shell);
-		CHECK(post.type == VEH_DISASTER); // Mutable pre-Tick Effect tag must not be reused.
-		CHECK(post.front_type == nullptr);
-		CHECK(post.period == nullptr);
-		CHECK(post.status == nullptr);
-		return post;
+		CHECK(out->type == VEH_DISASTER); // Mutable pre-Tick Effect tag must not be reused.
+		CHECK(out->front_type == nullptr);
+		CHECK(out->period == nullptr);
+		CHECK(out->status == nullptr);
+		return true;
 	};
 	services.next_station = [](uint32_t) noexcept { return OpenTTDVehicleStationLookup{}; };
 	OpenTTDFleetGroupServices group{};

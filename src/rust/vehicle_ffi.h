@@ -236,8 +236,8 @@ struct OpenTTDVehicleSchedulerTables;
 struct OpenTTDVehicleSchedulerServices {
 	OpenTTDVehiclePoolCursor (OPENTTD_VEHICLE_CALL *pool)() noexcept;
 	bool assertions;
-	bool (OPENTTD_VEHICLE_CALL *tick)(OpenTTDVehicle *) noexcept;
-	OpenTTDVehiclePostTick (OPENTTD_VEHICLE_CALL *post_tick)(OpenTTDVehicle *) noexcept;
+	/** Runs the virtual Tick; fills the bundle only when the vehicle survives. */
+	bool (OPENTTD_VEHICLE_CALL *tick)(OpenTTDVehicle *, OpenTTDVehiclePostTick *) noexcept;
 	void (OPENTTD_VEHICLE_CALL *calendar_day)(OpenTTDVehicle *) noexcept;
 	void (OPENTTD_VEHICLE_CALL *economy_day)(OpenTTDVehicle *) noexcept;
 	OpenTTDVehicleDayCallback (OPENTTD_VEHICLE_CALL *day_callback_read)(OpenTTDVehicle *) noexcept;

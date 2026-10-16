@@ -359,18 +359,24 @@ static OpenTTDVehiclePoolCursor OPENTTD_VEHICLE_CALL VehicleSchedulerPool() noex
 	return {.slots = _vehicle_pool.data.data(), .slots_len = _vehicle_pool.data.size(), .first_unused = &_vehicle_pool.first_unused};
 }
 /* Existing virtual facades own the original controller timing scopes. The
- * timing destructor completes before this callback returns to Rust assertions. */
-static bool OPENTTD_VEHICLE_CALL VehicleSchedulerTick(OpenTTDVehicle *shell) noexcept { return VehicleOf(shell)->Tick(); }
-static void OPENTTD_VEHICLE_CALL VehicleSchedulerCalendarDay(OpenTTDVehicle *shell) noexcept { VehicleOf(shell)->OnNewCalendarDay(); }
-static void OPENTTD_VEHICLE_CALL VehicleSchedulerEconomyDay(OpenTTDVehicle *shell) noexcept { VehicleOf(shell)->OnNewEconomyDay(); }
-static OpenTTDVehiclePostTick OPENTTD_VEHICLE_CALL VehicleSchedulerPostTick(OpenTTDVehicle *shell) noexcept
+ * timing destructor completes before this callback returns to Rust assertions.
+ * Only a surviving vehicle fills the post-Tick address bundle; the fill reads
+ * type and First() without side effects, and Rust reads it after its assertion. */
+static bool OPENTTD_VEHICLE_CALL VehicleSchedulerTick(OpenTTDVehicle *shell, OpenTTDVehiclePostTick *out) noexcept
 {
 	Vehicle *v = VehicleOf(shell);
-	const VehicleType type = v->type; // Fresh after Tick survives and its assertion.
-	if (type > VEH_AIRCRAFT) return {.type = type, .period = nullptr, .counter = nullptr, .motion = nullptr, .speed = nullptr, .front_type = nullptr, .subtype = nullptr, .tick = nullptr, .front_status = nullptr, .status = nullptr};
+	if (!v->Tick()) return false;
+	const VehicleType type = v->type; // Fresh after Tick survives.
+	if (type > VEH_AIRCRAFT) {
+		*out = {.type = type, .period = nullptr, .counter = nullptr, .motion = nullptr, .speed = nullptr, .front_type = nullptr, .subtype = nullptr, .tick = nullptr, .front_status = nullptr, .status = nullptr};
+		return true;
+	}
 	Vehicle *front = v->First();
-	return {.type = type, .period = RustVehicleCargoPeriodAddress(v), .counter = RustVehicleCargoCounterAddress(v), .motion = RustVehicleMotionAddress(v), .speed = RustVehicleSpeedAddress(front), .front_type = RustVehicleVehicleTypeAddress(front), .subtype = RustVehicleSubtypeAddress(v), .tick = RustVehicleTickAddress(v), .front_status = RustVehicleStatusAddress(front), .status = RustVehicleStatusAddress(v)};
+	*out = {.type = type, .period = RustVehicleCargoPeriodAddress(v), .counter = RustVehicleCargoCounterAddress(v), .motion = RustVehicleMotionAddress(v), .speed = RustVehicleSpeedAddress(front), .front_type = RustVehicleVehicleTypeAddress(front), .subtype = RustVehicleSubtypeAddress(v), .tick = RustVehicleTickAddress(v), .front_status = RustVehicleStatusAddress(front), .status = RustVehicleStatusAddress(v)};
+	return true;
 }
+static void OPENTTD_VEHICLE_CALL VehicleSchedulerCalendarDay(OpenTTDVehicle *shell) noexcept { VehicleOf(shell)->OnNewCalendarDay(); }
+static void OPENTTD_VEHICLE_CALL VehicleSchedulerEconomyDay(OpenTTDVehicle *shell) noexcept { VehicleOf(shell)->OnNewEconomyDay(); }
 static OpenTTDCargoList *OPENTTD_VEHICLE_CALL VehicleSchedulerCargoOwner(OpenTTDVehicle *shell) noexcept { return VehicleOf(shell)->cargo.RustOwner(); }
 static OpenTTDVehicleDayCallback OPENTTD_VEHICLE_CALL VehicleSchedulerDayCallbackRead(OpenTTDVehicle *shell) noexcept
 {
@@ -424,7 +430,6 @@ const OpenTTDVehicleSchedulerServices &GetRustVehicleSchedulerServices() noexcep
 		.assertions = false,
 #endif
 		.tick = VehicleSchedulerTick,
-		.post_tick = VehicleSchedulerPostTick,
 		.calendar_day = VehicleSchedulerCalendarDay,
 		.economy_day = VehicleSchedulerEconomyDay,
 		.day_callback_read = VehicleSchedulerDayCallbackRead,

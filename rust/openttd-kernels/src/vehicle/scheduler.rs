@@ -55,8 +55,8 @@ pub struct StationLookup {
 pub struct SchedulerServices {
     pub pool: extern "C" fn() -> PoolCursor,
     pub assertions: bool,
-    pub tick: extern "C" fn(VehicleRef) -> bool,
-    pub post_tick: extern "C" fn(VehicleRef) -> PostTick,
+    /// Runs the virtual Tick; fills `out` only when the vehicle survives.
+    pub tick: extern "C" fn(VehicleRef, *mut PostTick) -> bool,
     pub calendar_day: extern "C" fn(VehicleRef),
     pub economy_day: extern "C" fn(VehicleRef),
     pub day_callback_read: extern "C" fn(VehicleRef) -> DayCallback,
@@ -180,7 +180,6 @@ unsafe fn day<const COUNTED: bool>(
     let _ = tables;
 }
 struct PostTickServices {
-    post_tick: extern "C" fn(VehicleRef) -> PostTick,
     cargo_owner: extern "C" fn(VehicleRef) -> *mut cargo_storage::List,
     running_sound: extern "C" fn(VehicleRef),
     periodic_sound: extern "C" fn(VehicleRef, bool),
@@ -220,13 +219,15 @@ macro_rules! post_svc {
 /// yield the game-state mutex. Only addresses survive those audited callbacks;
 /// field loads/stores end before each callback and subsequent values are fresh.
 /// Never retain a descriptor across Tick, traversal, loading, day or fleet work.
-unsafe fn post_tick<const COUNTED: bool>(schedule: &PostTickServices, vehicle: VehicleRef) {
-    let cargo = post_svc!(
-        COUNTED,
-        crate::witness::VEHICLE_POST_TICK,
-        schedule.post_tick,
-        vehicle
-    );
+/// `cargo` is the bundle the surviving Tick filled; it is read only here.
+unsafe fn post_tick<const COUNTED: bool>(
+    schedule: &PostTickServices,
+    vehicle: VehicleRef,
+    cargo: &PostTick,
+) {
+    if COUNTED {
+        crate::witness::hit(crate::witness::VEHICLE_POST_TICK);
+    }
     let vehicle_type = cargo.vehicle_type;
     if COUNTED {
         crate::witness::hit(
@@ -275,7 +276,7 @@ unsafe fn post_tick<const COUNTED: bool>(schedule: &PostTickServices, vehicle: V
     if unsafe { scalar_read::<_, COUNTED>(cargo.status) } & VS_HIDDEN != 0 {
         return;
     }
-    let motion = &cargo;
+    let motion = cargo;
     if unsafe { scalar_read::<_, COUNTED>(cargo.front_status) } & VS_STOPPED != 0
         && (unsafe { scalar_read::<_, COUNTED>(motion.front_type) } != TRAIN
             || unsafe { scalar_read::<_, COUNTED>(motion.speed) } == 0)
@@ -400,7 +401,6 @@ unsafe fn run_ticks<const COUNTED: bool>(
     );
     svc!(COUNTED, s.reset_accumulators);
     let post = PostTickServices {
-        post_tick: s.post_tick,
         cargo_owner: s.cargo_owner,
         running_sound: s.running_sound,
         periodic_sound: s.periodic_sound,
@@ -415,7 +415,9 @@ unsafe fn run_ticks<const COUNTED: bool>(
                 crate::witness::hit(crate::witness::VEHICLE_OUTER_VISITS);
             }
             // Native controller timing completes before the source survival assertion.
-            let survives = svc!(COUNTED, s.tick, vehicle);
+            // The bundle is written only on survival and read only after the assertion.
+            let mut bundle = std::mem::MaybeUninit::<PostTick>::uninit();
+            let survives = svc!(COUNTED, s.tick, vehicle, bundle.as_mut_ptr());
             if s.assertions {
                 let _ = unsafe { extent::<COUNTED>(s, &mut pool) };
                 let actual = unsafe { scalar_read::<_, COUNTED>(pool.slots.add(current_id)) };
@@ -427,7 +429,14 @@ unsafe fn run_ticks<const COUNTED: bool>(
                 }
                 continue;
             }
-            unsafe { post_tick::<COUNTED>(&post, vehicle) };
+            if COUNTED {
+                crate::witness::add(
+                    crate::witness::VEHICLE_OBSERVED_BYTES,
+                    std::mem::size_of::<PostTick>() as u64,
+                );
+            }
+            // SAFETY: a surviving Tick initialized every bundle field.
+            unsafe { post_tick::<COUNTED>(&post, vehicle, bundle.assume_init_ref()) };
         }
     } // Every pool/scalar descriptor is discarded before commands in fleet drain.
     unsafe {
@@ -519,19 +528,20 @@ mod tests {
             let handle = self.handle();
             self.post_type = kind;
             let services = PostTickServices {
-                post_tick: addresses,
                 cargo_owner,
                 running_sound,
                 periodic_sound,
                 cargo: &raw const CARGO_SERVICES,
             };
-            unsafe { post_tick::<false>(&services, handle) };
+            // Stands in for the native survival fill inside the Tick facade.
+            let bundle = addresses(handle);
+            unsafe { post_tick::<false>(&services, handle, &bundle) };
         }
     }
     unsafe fn cells(v: VehicleRef) -> *mut Cells {
         v.0.as_ptr().cast()
     }
-    extern "C" fn addresses(v: VehicleRef) -> PostTick {
+    fn addresses(v: VehicleRef) -> PostTick {
         let c = unsafe { &mut *cells(v) };
         c.events.push("post");
         PostTick {
