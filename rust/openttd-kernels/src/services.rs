@@ -129,9 +129,10 @@ pub struct ByteSpan {
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct TileTypeAllocation {
-    /// Allocation-derived bytes; null selects the original callback backend.
+    /// Allocation-derived bytes; null only together with a zero count.
     pub base: *const u8,
-    /// Actual native `Map::Size()` at acquisition, not a copied tile snapshot.
+    /// Actual native `Map::Size()` at acquisition, not a copied tile snapshot;
+    /// zero selects the original callback backend for every read.
     pub count: u32,
 }
 
@@ -158,7 +159,7 @@ pub(crate) struct TileTypeAccess {
 impl TileTypeAccess {
     /// Resolve the audited allocation once, retaining only descriptor metadata.
     /// # Safety
-    /// A nonnull base must retain provenance for `count * sizeof(TileBase)` live,
+    /// A nonzero count needs a nonnull base that retains provenance for `count * sizeof(TileBase)` live,
     /// initialized bytes, within `isize::MAX`, until this reader is dropped. Map
     /// reset and game-state-mutex yield are excluded throughout the entry. Each
     /// read must be serialized with native writes; native aliases are permitted.
@@ -172,13 +173,25 @@ impl TileTypeAccess {
         }
     }
 
+    /// Reader for entries without an audited allocation: every read uses the
+    /// original noexcept accessor.
+    pub(crate) fn callback(callback: extern "C" fn(u32) -> u8) -> Self {
+        Self {
+            allocation: TileTypeAllocation {
+                base: std::ptr::null(),
+                count: 0,
+            },
+            callback,
+        }
+    }
+
     /// Read the original high nibble at this observation point. Out-of-range
     /// reads go through the original native accessor/assertion policy; no new
     /// rejection, panic or unchecked in-range-only timing shortcut is added.
     #[inline]
     #[allow(clippy::cast_possible_truncation)]
     pub(crate) fn read(&self, tile: u32) -> u8 {
-        if !self.allocation.base.is_null() && tile < self.allocation.count {
+        if tile < self.allocation.count {
             // SAFETY: Constructor contract gives live allocation provenance and
             // serialization. Original map bounds keep the byte offset in isize
             // even on 32-bit targets. Exactly one initialized u8 is read; no
@@ -194,7 +207,7 @@ impl TileTypeAccess {
 
 /// Default native ABI probe of the same shared reader used by every owner.
 /// # Safety
-/// For nonnull allocations, uphold `TileTypeAccess::raw`'s validity/serialization
+/// For nonzero counts, uphold `TileTypeAccess::raw`'s validity/serialization
 /// contract for this call. The callback is the original noexcept accessor or an
 /// equivalent live fixture; it keeps the native out-of-range assertion policy.
 #[unsafe(no_mangle)]
@@ -334,6 +347,28 @@ pub struct Services {
     pub calendar_date: extern "C" fn() -> i32,
     /// Shared live slope observation.
     pub slope: extern "C" fn(i32, i32) -> i32,
+    /// `GetClearGround`.
+    pub clear_ground: extern "C" fn(u32) -> ClearGroundType,
+    /// `GetTreeGround`.
+    pub tree_ground: extern "C" fn(u32) -> TreeGround,
+    /// `MakeSnow(tile, density)`.
+    pub make_snow: extern "C" fn(u32, u32),
+    /// `MakeShore`.
+    pub make_shore: extern "C" fn(u32),
+    /// Native `TileLoop_Water` facade; may reenter Rust owners.
+    pub tile_loop_water: extern "C" fn(u32),
+    /// `SndPlayTileFx(sound, tile)`.
+    pub play_sound: extern "C" fn(u32, u16),
+    /// `GetFoundationSlope`, returning both the foundation slope and its z.
+    pub foundation: extern "C" fn(u32) -> FoundationSlope,
+}
+/// `GetFoundationSlope` result: height and slope after the tile's foundation.
+#[repr(C)]
+pub struct FoundationSlope {
+    /// Height of the foundation.
+    pub z: i32,
+    /// Slope after applying the foundation.
+    pub slope: Slope,
 }
 impl Services {
     /// Draw one shared random word.
@@ -350,6 +385,7 @@ impl Services {
 /// Standalone test table: map predicates return zero and writes do nothing.
 #[cfg(test)]
 #[must_use]
+#[allow(clippy::too_many_lines)]
 pub fn fixture(
     context: *mut c_void,
     random: extern "C" fn(*mut c_void) -> u32,
@@ -392,6 +428,20 @@ pub fn fixture(
     }
     extern "C" fn slope(_: i32, _: i32) -> i32 {
         0
+    }
+    extern "C" fn clear_ground(_: u32) -> ClearGroundType {
+        ClearGroundType(0)
+    }
+    extern "C" fn tree_ground(_: u32) -> TreeGround {
+        TreeGround(0)
+    }
+    extern "C" fn make_snow(_: u32, _: u32) {}
+    extern "C" fn play_sound(_: u32, _: u16) {}
+    extern "C" fn foundation(_: u32) -> FoundationSlope {
+        FoundationSlope {
+            z: 0,
+            slope: Slope(0),
+        }
     }
     Services {
         context,
@@ -454,6 +504,13 @@ pub fn fixture(
         economy_date: zero_year,
         calendar_date: zero_year,
         slope,
+        clear_ground,
+        tree_ground,
+        make_snow,
+        make_shore: tile,
+        tile_loop_water: tile,
+        play_sound,
+        foundation,
     }
 }
 /// Map dimensions read once per entry.

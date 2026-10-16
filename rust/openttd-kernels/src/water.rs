@@ -17,11 +17,12 @@
     clippy::cast_possible_wrap,
     clippy::collapsible_match
 )]
+use crate::services::TileTypeAccess;
 use crate::{
-    ground::{Call, ClearServices, CostServices, FoundationSlope, RailServices},
+    ground::{Call, ClearServices, CostServices, RailServices},
     services::{
-        self, ClearGroundType, FloodingBehaviour, Foundation, RailGroundType, Services, Slope,
-        Track, TrackBits, TreeGround,
+        self, ClearGroundType, FloodingBehaviour, Foundation, FoundationSlope, RailGroundType,
+        Services, Slope, Track, TrackBits, TreeGround,
     },
     vehicle::{VehicleRef, VehicleServices, VehicleType},
 };
@@ -60,23 +61,17 @@ pub struct WaterServices {
     pub clear: *const ClearServices,
     pub vehicles: *const VehicleServices,
     pub costs: *const CostServices,
-    pub ambient: extern "C" fn(u32),
+    pub company: *const crate::company::Services,
     pub non_flooding: extern "C" fn(u32) -> bool,
     pub set_non_flooding: extern "C" fn(u32, bool),
     pub coast: extern "C" fn(u32) -> bool,
-    pub tree_ground: extern "C" fn(u32) -> TreeGround,
     pub set_tree_ground: extern "C" fn(u32, TreeGround, u32),
-    pub make_clear: extern "C" fn(u32, ClearGroundType, u32),
-    pub make_shore: extern "C" fn(u32),
     pub make_sea: extern "C" fn(u32),
-    pub foundation: extern "C" fn(u32) -> FoundationSlope,
     pub buoy_or_dock: extern "C" fn(u32) -> bool,
     pub canal_or_river: extern "C" fn(u32) -> bool,
     pub possible_docking: extern "C" fn(u32) -> bool,
     pub check_docking: extern "C" fn(u32),
     pub invalidate_region: extern "C" fn(u32),
-    pub update_signals: extern "C" fn(),
-    pub set_company: extern "C" fn(u8),
     pub tracks: extern "C" fn(u32) -> TrackBits,
     pub remove_rail: extern "C" fn(*mut services::CommandCost, u32, Track),
     pub apply_foundation: extern "C" fn(Foundation, Slope) -> FoundationSlope,
@@ -153,9 +148,19 @@ struct World<'a> {
     c: &'a ClearServices,
     v: &'a VehicleServices,
     costs: &'a CostServices,
+    co: &'a crate::company::Services,
+    types: &'a TileTypeAccess,
+    size_x: u32,
+    size_y: u32,
 }
-impl World<'_> {
-    unsafe fn new(w: *const WaterServices, s: *const Services) -> Self {
+impl<'a> World<'a> {
+    unsafe fn new(
+        w: *const WaterServices,
+        s: *const Services,
+        types: &'a TileTypeAccess,
+        size_x: u32,
+        size_y: u32,
+    ) -> Self {
         // SAFETY: Entry contract supplies immutable live nested tables.
         unsafe {
             Self {
@@ -165,11 +170,23 @@ impl World<'_> {
                 c: &*(*w).clear,
                 v: &*(*w).vehicles,
                 costs: &*(*w).costs,
+                co: &*(*w).company,
+                types,
+                size_x,
+                size_y,
             }
         }
     }
+    fn tile_type(&self, tile: u32) -> u8 {
+        self.types.read(tile)
+    }
+    /// Original `IsValidTile`: `tile < Map::Size() && !IsTileType(tile, MP_VOID)`.
+    /// Legal map dimensions are powers of two whose product fits in u32.
+    fn valid(&self, tile: u32) -> bool {
+        tile < self.size_x * self.size_y && self.tile_type(tile) != 7
+    }
     fn behaviour(&self, tile: u32) -> u8 {
-        match (self.s.tile_type)(tile) {
+        match self.tile_type(tile) {
             6 => {
                 if (self.w.coast)(tile) {
                     return if one_corner((self.s.tile_slope)(tile)) {
@@ -193,7 +210,7 @@ impl World<'_> {
                 }
             }
             4 => {
-                if (self.w.tree_ground)(tile).0 == 3 {
+                if (self.s.tree_ground)(tile).0 == 3 {
                     3
                 } else {
                     0
@@ -230,18 +247,18 @@ impl World<'_> {
             let remove = lower & tracks;
             if remove != 0 {
                 let company = (self.s.current_company)();
-                (self.w.set_company)(17);
+                (self.co.finance.set_current_company)(17);
                 let out = (self.costs.prepare)(call);
                 (self.w.remove_rail)(out, tile, Track(remove.trailing_zeros() as u8));
                 flooded = self.result(call, out);
-                (self.w.set_company)(company);
+                (self.co.finance.set_current_company)(company);
                 if !flooded {
                     return false;
                 }
                 crate::ground::hit(crate::ground::Witness::HalfRailRemove);
                 tracks &= !remove;
                 if tracks == 0 {
-                    (self.w.make_shore)(tile);
+                    (self.s.make_shore)(tile);
                     (self.s.mark_dirty)(tile);
                     return true;
                 }
@@ -329,12 +346,12 @@ impl World<'_> {
         }
         (self.w.iterator_end)(cursor);
     }
-    fn flood_vehicles(&self, tile: u32, size_x: u32) {
+    fn flood_vehicles(&self, tile: u32) {
         if (self.w.airport_tile)(tile) {
             let airport = (self.w.airport)(tile);
             for y in 0..u32::from(airport.height) {
                 for x in 0..u32::from(airport.width) {
-                    let target = airport.tile.wrapping_add(y * size_x).wrapping_add(x);
+                    let target = airport.tile.wrapping_add(y * self.size_x).wrapping_add(x);
                     if (self.w.airport_member)(airport.station, target) {
                         crate::ground::hit(crate::ground::Witness::AirportMember);
                         self.vehicles_on_tile(target, 0);
@@ -354,26 +371,24 @@ impl World<'_> {
         crate::ground::hit(crate::ground::Witness::BridgeEnd);
         self.vehicles_on_tile(end, z);
     }
-    fn dirty_neighbours(&self, tile: u32, size_x: u32) {
+    fn dirty_neighbours(&self, tile: u32) {
         for direction in 0..8 {
-            let target = offset(tile, direction, size_x);
-            if (self.s.tile_valid)(target)
-                && (self.s.tile_type)(target) == 6
-                && (self.w.canal_or_river)(target)
+            let target = offset(tile, direction, self.size_x);
+            if self.valid(target) && self.tile_type(target) == 6 && (self.w.canal_or_river)(target)
             {
                 (self.s.mark_dirty)(target);
             }
         }
     }
-    fn flood(&self, tile: u32, size_x: u32, call: *mut Call) {
+    fn flood(&self, tile: u32, call: *mut Call) {
         let company = (self.s.current_company)();
-        (self.w.set_company)(17);
+        (self.co.finance.set_current_company)(17);
         let slope = (self.s.tile_slope)(tile);
         let flooded = if slope != 0 {
-            match (self.s.tile_type)(tile) {
+            match self.tile_type(tile) {
                 1 => {
                     if (self.s.is_plain_rail)(tile) {
-                        self.flood_vehicles(tile, size_x);
+                        self.flood_vehicles(tile);
                         self.half_flood(tile, call)
                     } else {
                         false
@@ -386,7 +401,7 @@ impl World<'_> {
                 }
                 0 | 4 => {
                     if self.clear(tile, call) {
-                        (self.w.make_shore)(tile);
+                        (self.s.make_shore)(tile);
                         (self.s.mark_dirty)(tile);
                         true
                     } else {
@@ -396,7 +411,7 @@ impl World<'_> {
                 _ => false,
             }
         } else {
-            self.flood_vehicles(tile, size_x);
+            self.flood_vehicles(tile);
             if self.clear(tile, call) {
                 (self.w.make_sea)(tile);
                 (self.s.mark_dirty)(tile);
@@ -406,8 +421,8 @@ impl World<'_> {
             }
         };
         if flooded {
-            self.dirty_neighbours(tile, size_x);
-            (self.w.update_signals)();
+            self.dirty_neighbours(tile);
+            (self.co.update_signals_in_buffer)();
             if (self.w.possible_docking)(tile) {
                 (self.w.check_docking)(tile);
             }
@@ -416,12 +431,12 @@ impl World<'_> {
         } else {
             crate::ground::hit(crate::ground::Witness::FloodFail);
         }
-        (self.w.set_company)(company);
+        (self.co.finance.set_current_company)(company);
     }
     fn dry(&self, tile: u32, call: *mut Call) {
         let company = (self.s.current_company)();
-        (self.w.set_company)(17);
-        match (self.s.tile_type)(tile) {
+        (self.co.finance.set_current_company)(17);
+        match self.tile_type(tile) {
             1 => {
                 let ground = match (self.w.tracks)(tile).0 {
                     4 => 10,
@@ -441,25 +456,25 @@ impl World<'_> {
             }
             6 => {
                 if self.clear(tile, call) {
-                    (self.w.make_clear)(tile, ClearGroundType(0), 3);
+                    (self.c.make_clear)(tile, ClearGroundType(0), 3);
                     (self.s.mark_dirty)(tile);
                     crate::ground::hit(crate::ground::Witness::DryCoast);
                 }
             }
             _ => unreachable!("original drying tile type"),
         }
-        (self.w.set_company)(company);
+        (self.co.finance.set_current_company)(company);
     }
-    fn tile_loop(&self, tile: u32, size_x: u32, size_y: u32, call: *mut Call) {
+    fn tile_loop(&self, tile: u32, call: *mut Call) {
         match self.behaviour(tile) {
             1 => {
                 let mut continue_flooding = false;
                 for direction in 0..8 {
-                    let target = wrap(tile, direction, size_x, size_y);
-                    if !(self.s.tile_valid)(target) {
+                    let target = wrap(tile, direction, self.size_x, self.size_y);
+                    if !self.valid(target) {
                         continue;
                     }
-                    let kind = (self.s.tile_type)(target);
+                    let kind = self.tile_type(target);
                     if kind == 6 {
                         continue;
                     }
@@ -467,10 +482,10 @@ impl World<'_> {
                         continue;
                     }
                     continue_flooding = true;
-                    if kind == 4 && (self.w.tree_ground)(target).0 == 3 {
+                    if kind == 4 && (self.s.tree_ground)(target).0 == 3 {
                         continue;
                     }
-                    let foundation = (self.w.foundation)(target);
+                    let foundation = (self.s.foundation)(target);
                     if foundation.z > 0 {
                         continue;
                     }
@@ -478,19 +493,19 @@ impl World<'_> {
                     if mask & (1 << ((direction + 4) & 7)) == 0 {
                         continue;
                     }
-                    self.flood(target, size_x, call);
+                    self.flood(target, call);
                 }
-                if !continue_flooding && (self.s.tile_type)(tile) == 6 {
+                if !continue_flooding && self.tile_type(tile) == 6 {
                     (self.w.set_non_flooding)(tile, true);
                 }
             }
             3 => {
-                let mask = FLOOD_FROM[usize::from((self.w.foundation)(tile).slope.0 & 15)];
+                let mask = FLOOD_FROM[usize::from((self.s.foundation)(tile).slope.0 & 15)];
                 for direction in 0..8 {
                     if mask & (1 << direction) == 0 {
                         continue;
                     }
-                    let target = wrap(tile, direction, size_x, size_y);
+                    let target = wrap(tile, direction, self.size_x, self.size_y);
                     if target == u32::MAX {
                         continue;
                     }
@@ -516,32 +531,51 @@ pub unsafe extern "C" fn openttd_rust_water_tile_loop(
     w: *const WaterServices,
     s: *const Services,
 ) {
-    // SAFETY: Same synchronous table contract as the in-crate scheduler entry.
-    unsafe { water_tile_loop(tile, size_x, size_y, ambient_callback, call, w, s) };
+    // SAFETY: Same synchronous table contract as the in-crate scheduler entry;
+    // this native entry keeps the original callback reader.
+    unsafe {
+        let types = TileTypeAccess::callback((*s).tile_type);
+        let tile_type = types.read(tile);
+        water_tile_loop(
+            tile,
+            tile_type,
+            size_x,
+            size_y,
+            ambient_callback,
+            call,
+            w,
+            s,
+            &types,
+        );
+    };
 }
-#[allow(clippy::inline_always)]
+/// Original `TileLoop_Water` after its caller has read `GetTileType(tile)`.
+#[allow(clippy::inline_always, clippy::too_many_arguments)]
 #[inline(always)]
 pub(crate) unsafe fn water_tile_loop(
     tile: u32,
+    tile_type: u8,
     size_x: u32,
     size_y: u32,
     ambient_callback: bool,
     call: *mut Call,
     w: *const WaterServices,
     s: *const Services,
+    types: &TileTypeAccess,
 ) {
-    // SAFETY: Live immutable tables; no owner access spans ambient sound.
-    let (water, shared) = unsafe { (&*w, &*s) };
-    if (shared.tile_type)(tile) == 6 {
+    if tile_type == 6 {
+        // SAFETY: Live immutable tables; no owner access spans ambient sound.
+        let water = unsafe { &*w };
         if ambient_callback {
-            (water.ambient)(tile);
+            // SAFETY: The water table's clear table is live for this entry.
+            (unsafe { &*water.clear }.ambient)(tile);
         }
         if (water.non_flooding)(tile) {
             return;
         }
     }
     // SAFETY: Resolve only the tables reached after the original early return.
-    unsafe { World::new(w, s) }.tile_loop(tile, size_x, size_y, call);
+    unsafe { World::new(w, s, types, size_x, size_y) }.tile_loop(tile, call);
 }
 /// # Safety
 /// Same table/context contract; original native plain-rail assertion is retained.
@@ -552,8 +586,10 @@ pub unsafe extern "C" fn openttd_rust_flood_halftile(
     w: *const WaterServices,
     s: *const Services,
 ) -> bool {
-    // SAFETY: Serialized native entry; no borrowed state crosses commands.
-    unsafe { World::new(w, s) }.half_flood(tile, call)
+    // SAFETY: Serialized native entry; no borrowed state crosses commands. Half
+    // flooding reads neither map size nor tile type.
+    let types = TileTypeAccess::callback(unsafe { (*s).tile_type });
+    unsafe { World::new(w, s, &types, 0, 0) }.half_flood(tile, call)
 }
 /// # Safety
 /// Live immutable service tables; valid original tile argument.
@@ -563,8 +599,10 @@ pub unsafe extern "C" fn openttd_rust_flooding_behaviour(
     w: *const WaterServices,
     s: *const Services,
 ) -> FloodingBehaviour {
-    // SAFETY: Serialized native entry, observations are copied.
-    FloodingBehaviour(unsafe { World::new(w, s) }.behaviour(tile))
+    // SAFETY: Serialized native entry, observations are copied. Behaviour reads
+    // no map size.
+    let types = TileTypeAccess::callback(unsafe { (*s).tile_type });
+    FloodingBehaviour(unsafe { World::new(w, s, &types, 0, 0) }.behaviour(tile))
 }
 /// # Safety
 /// Live immutable service tables for the synchronous no-unwind invocation.
@@ -572,11 +610,13 @@ pub unsafe extern "C" fn openttd_rust_flooding_behaviour(
 pub unsafe extern "C" fn openttd_rust_dirty_water_neighbours(
     tile: u32,
     size_x: u32,
+    size_y: u32,
     w: *const WaterServices,
     s: *const Services,
 ) {
     // SAFETY: Serialized native entry; no map references are formed.
-    unsafe { World::new(w, s) }.dirty_neighbours(tile, size_x);
+    let types = TileTypeAccess::callback(unsafe { (*s).tile_type });
+    unsafe { World::new(w, s, &types, size_x, size_y) }.dirty_neighbours(tile);
 }
 /// # Safety
 /// Live immutable service tables for the synchronous no-unwind invocation.
@@ -584,14 +624,16 @@ pub unsafe extern "C" fn openttd_rust_dirty_water_neighbours(
 pub unsafe extern "C" fn openttd_rust_clear_neighbour_flooding(
     tile: u32,
     size_x: u32,
+    size_y: u32,
     w: *const WaterServices,
     s: *const Services,
 ) {
     // SAFETY: Serialized native entry; no map references are formed.
-    let world = unsafe { World::new(w, s) };
+    let types = TileTypeAccess::callback(unsafe { (*s).tile_type });
+    let world = unsafe { World::new(w, s, &types, size_x, size_y) };
     for direction in 0..8 {
         let target = offset(tile, direction, size_x);
-        if (world.s.tile_valid)(target) && (world.s.tile_type)(target) == 6 {
+        if world.valid(target) && world.tile_type(target) == 6 {
             (world.w.set_non_flooding)(target, false);
             crate::ground::hit(crate::ground::Witness::Wakeup);
         }

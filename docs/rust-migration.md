@@ -520,9 +520,12 @@ legacy loading, reset and zero repair retain their widths/order. Original select
 bodies compile only without `WITH_RUST`; packed map/pool storage remains native.
 
 The in-entry LFSR keeps native unsigned map-log widths and reads each live type
-byte from audited allocation metadata. All seven Rust tile owners dispatch directly;
-only house/station/void/object have native scalar handlers with local strong-index
-construction. Ground boundaries use actual native enums, unrestricted transparent
+byte from audited allocation metadata. All seven Rust tile owners dispatch directly,
+void tiles straight to the water owner, which reuses the dispatched type and reader
+and derives `IsValidTile` from the map size; only house/station/object have native
+scalar handlers with local strong-index construction. Leaves shared by several
+owners (clear/tree ground, snow, shore, water loop, sound, foundation) live in the
+shared table. Ground boundaries use actual native enums, unrestricted transparent
 Rust carriers, exact counters and typed station handles. Legacy protocols adapt
 explicitly. Each native entry owns independent lazy stack command-result storage.
 No hot call allocates a protocol object or copies a complete native tile/vehicle.

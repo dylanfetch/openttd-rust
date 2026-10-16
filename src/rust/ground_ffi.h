@@ -28,15 +28,15 @@ enum class LandscapeType : uint8_t;
 enum VehicleType : uint8_t;
 #include "command_services_ffi.h"
 #include "command_cost_ffi.h"
-/* Post-climate guarded reads only; inactive members contain neutral wire values. */
-struct OpenTTDClearSurface { uint32_t density; ClearGround ground; bool snow; };
+/* Post-climate guarded reads only; inactive members contain neutral wire values.
+ * Three bytes, returned in one register; density is GetClearDensity's two bits. */
+struct OpenTTDClearSurface { ClearGround ground; uint8_t density; bool snow; };
 struct OpenTTDFieldFences { uint32_t ne; uint32_t se; uint32_t sw; uint32_t nw; };
 /* Strong IDs (IndustryID16, Owner/CompanyID8) and VehStates8 retain their
  * established underlying wire values;
  * nontrivial native ID classes are never passed by value across this ABI. */
 struct OpenTTDFieldGround { uint16_t industry; uint32_t type; };
 struct OpenTTDClearServices {
-	ClearGround (*ground)(uint32_t) noexcept;
 	bool (*field_tile)(uint32_t) noexcept;
 	uint32_t (*density)(uint32_t) noexcept;
 	uint32_t (*counter)(uint32_t) noexcept;
@@ -46,7 +46,6 @@ struct OpenTTDClearServices {
 	void (*set_density)(uint32_t, uint32_t) noexcept;
 	void (*set_counter)(uint32_t, uint32_t) noexcept;
 	void (*clear_snow)(uint32_t) noexcept;
-	void (*make_snow)(uint32_t, uint32_t) noexcept;
 	void (*make_clear)(uint32_t, ClearGround, uint32_t) noexcept;
 	OpenTTDFieldFences (*fences)(uint32_t) noexcept;
 	void (*set_fence)(uint32_t, DiagDirection, uint32_t) noexcept;
@@ -58,7 +57,6 @@ struct OpenTTDClearServices {
 };
 struct OpenTTDRailSnowGround { int32_t z; Slope slope; TrackBits tracks; bool plain; };
 struct OpenTTDRailFenceGround { TrackBits tracks; uint8_t owner; bool plain; };
-struct OpenTTDFoundationSlope { int32_t z; Slope slope; };
 struct OpenTTDRailServices {
 	RailGroundType (*ground)(uint32_t) noexcept;
 	void (*set_ground)(uint32_t, RailGroundType) noexcept;
@@ -89,10 +87,8 @@ struct OpenTTDRoadGroundServices {
 	void (*set_roadside)(uint32_t, Roadside) noexcept;
 	uint32_t (*work_counter)(uint32_t) noexcept;
 	void (*set_work_counter)(uint32_t, uint32_t) noexcept;
-	OpenTTDFoundationSlope (*foundation)(uint32_t) noexcept;
 	RoadBits (*all_bits)(uint32_t) noexcept;
 	void (*ensure_no_vehicle)(OpenTTDCommandCost *, uint32_t) noexcept;
-	void (*play_sound)(uint32_t, uint16_t) noexcept;
 	void (*bulldozer)(uint32_t) noexcept;
 	RoadBits (*cleanup)(uint32_t, RoadBits) noexcept;
 	void (*remove)(uint32_t, RoadBits) noexcept;
@@ -120,28 +116,23 @@ struct OpenTTDTileVehicleCursor { uintptr_t storage[2]; };
 struct OpenTTDFloodVictim { uint8_t status; VehicleType type; };
 struct OpenTTDAircraftFloodPose { uint32_t tile; int32_t z; uint8_t subtype; };
 struct OpenTTDGroundFloodPose { int32_t z; OpenTTDVehicle *first; };
+struct OpenTTDCompanyServices;
 struct OpenTTDWaterGroundServices {
 	const OpenTTDRailServices *rail;
 	const OpenTTDClearServices *clear;
 	const OpenTTDVehicleServices *vehicles;
 	const OpenTTDGroundCostServices *costs;
-	void (*ambient)(uint32_t) noexcept;
+	const OpenTTDCompanyServices *company; ///< Current-company exchange and signal-buffer update.
 	bool (*non_flooding)(uint32_t) noexcept;
 	void (*set_non_flooding)(uint32_t, bool) noexcept;
 	bool (*coast)(uint32_t) noexcept;
-	TreeGround (*tree_ground)(uint32_t) noexcept;
 	void (*set_tree_ground)(uint32_t, TreeGround, uint32_t) noexcept;
-	void (*make_clear)(uint32_t, ClearGround, uint32_t) noexcept;
-	void (*make_shore)(uint32_t) noexcept;
 	void (*make_sea)(uint32_t) noexcept;
-	OpenTTDFoundationSlope (*foundation)(uint32_t) noexcept;
 	bool (*buoy_or_dock)(uint32_t) noexcept;
 	bool (*canal_or_river)(uint32_t) noexcept;
 	bool (*possible_docking)(uint32_t) noexcept;
 	void (*check_docking)(uint32_t) noexcept;
 	void (*invalidate_region)(uint32_t) noexcept;
-	void (*update_signals)() noexcept;
-	void (*set_company)(uint8_t) noexcept;
 	TrackBits (*tracks)(uint32_t) noexcept;
 	void (*remove_rail)(OpenTTDCommandCost *, uint32_t, Track) noexcept;
 	OpenTTDFoundationSlope (*apply_foundation)(Foundation, Slope) noexcept;
@@ -167,8 +158,8 @@ extern "C" {
 void openttd_rust_water_tile_loop(uint32_t, uint32_t, uint32_t, bool, OpenTTDGroundCall *, const OpenTTDWaterGroundServices *, const OpenTTDSharedServices *);
 bool openttd_rust_flood_halftile(uint32_t, OpenTTDGroundCall *, const OpenTTDWaterGroundServices *, const OpenTTDSharedServices *);
 FloodingBehaviour openttd_rust_flooding_behaviour(uint32_t, const OpenTTDWaterGroundServices *, const OpenTTDSharedServices *);
-void openttd_rust_clear_neighbour_flooding(uint32_t, uint32_t, const OpenTTDWaterGroundServices *, const OpenTTDSharedServices *);
-void openttd_rust_dirty_water_neighbours(uint32_t, uint32_t, const OpenTTDWaterGroundServices *, const OpenTTDSharedServices *);
+void openttd_rust_clear_neighbour_flooding(uint32_t, uint32_t, uint32_t, const OpenTTDWaterGroundServices *, const OpenTTDSharedServices *);
+void openttd_rust_dirty_water_neighbours(uint32_t, uint32_t, uint32_t, const OpenTTDWaterGroundServices *, const OpenTTDSharedServices *);
 }
 /* Default native and Windows ABI call fixture: actual record returns and enum
  * parameters, including all-byte values, not just size/offset metadata. */

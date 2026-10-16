@@ -374,7 +374,6 @@ typedef struct OpenTTDIndustryTileServices {
 	uint16_t (*industry_index)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
 	uint8_t (*toffee_offset)(uint8_t) OPENTTD_INDUSTRY_NOEXCEPT;
 	bool (*on_water)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
-	void (*water_loop)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
 	bool (*transport)(uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
 	uint16_t (*anim_production)(uint16_t) OPENTTD_INDUSTRY_NOEXCEPT;
 	uint16_t (*anim_next)(uint16_t) OPENTTD_INDUSTRY_NOEXCEPT;

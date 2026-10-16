@@ -47,7 +47,7 @@
 #include "rust/ground_services.h"
 #include "rust/services_landscape.h"
 #include "rust/environment_services.h"
-#include "rust/company_services.h"
+#include "rust/company_adapter.h"
 #include "rust/vehicle_services.h"
 #include "rail_cmd.h"
 #endif
@@ -84,11 +84,11 @@ static const Directions _flood_from_dirs[] = {
 #ifdef WITH_RUST
 static void MarkCanalsAndRiversAroundDirty(TileIndex tile)
 {
-	openttd_rust_dirty_water_neighbours(tile.base(), Map::SizeX(), &GetRustWaterGroundServices(), &GetRustSharedServices());
+	openttd_rust_dirty_water_neighbours(tile.base(), Map::SizeX(), Map::SizeY(), &GetRustWaterGroundServices(), &GetRustSharedServices());
 }
 void ClearNeighbourNonFloodingStates(TileIndex tile)
 {
-	openttd_rust_clear_neighbour_flooding(tile.base(), Map::SizeX(), &GetRustWaterGroundServices(), &GetRustSharedServices());
+	openttd_rust_clear_neighbour_flooding(tile.base(), Map::SizeX(), Map::SizeY(), &GetRustWaterGroundServices(), &GetRustSharedServices());
 }
 #else
 static inline void MarkTileDirtyIfCanalOrRiver(TileIndex tile)
@@ -1060,23 +1060,17 @@ const OpenTTDWaterGroundServices &GetRustWaterGroundServices() noexcept
 	static_assert(alignof(VehiclesOnTile::Iterator) <= alignof(OpenTTDTileVehicleCursor));
 	static_assert(AIR_SHADOW == 4 && to_underlying(VehState::Crashed) == 7 && SND_12_EXPLOSION == 16 && OWNER_WATER.base() == 17 && VEH_AIRCRAFT == 3 && TREE_GROUND_SHORE == 3);
 	static const OpenTTDWaterGroundServices services{
-		.rail = &GetRustRailGroundServices(), .clear = &GetRustClearServices(), .vehicles = &GetRustVehicleServices(), .costs = &GetRustGroundCostServices(),
-		.ambient = RustAmbientSound,
+		.rail = &GetRustRailGroundServices(), .clear = &GetRustClearServices(), .vehicles = &GetRustVehicleServices(), .costs = &GetRustGroundCostServices(), .company = &GetRustCompanyServices(),
 		.non_flooding = [](uint32_t t) noexcept { return IsNonFloodingWaterTile(TileIndex{t}); },
 		.set_non_flooding = [](uint32_t t, bool value) noexcept { SetNonFloodingWaterTile(TileIndex{t}, value); },
 		.coast = RustIsCoast,
-		.tree_ground = OpenTTDTreeGround,
 		.set_tree_ground = RustSetTreeGroundDensity,
-		.make_clear = RustMakeClear, .make_shore = RustMakeShore,
 		.make_sea = [](uint32_t t) noexcept { MakeSea(TileIndex{t}); },
-		.foundation = RustFoundationSlope,
 		.buoy_or_dock = [](uint32_t t) noexcept { return IsBuoy(TileIndex{t}) || IsDock(TileIndex{t}); },
 		.canal_or_river = [](uint32_t t) noexcept { return IsCanal(TileIndex{t}) || IsRiver(TileIndex{t}); },
 		.possible_docking = [](uint32_t t) noexcept { return IsPossibleDockingTile(TileIndex{t}); },
 		.check_docking = [](uint32_t t) noexcept { CheckForDockingTile(TileIndex{t}); },
 		.invalidate_region = [](uint32_t t) noexcept { InvalidateWaterRegion(TileIndex{t}); },
-		.update_signals = RustUpdateSignals,
-		.set_company = RustSetCurrentCompanyID,
 		.tracks = RustRailTracks,
 		.remove_rail = [](OpenTTDCommandCost *out, uint32_t t, Track track) noexcept { *NativeGroundCost(out) = Command<CMD_REMOVE_SINGLE_RAIL>::Do(DoCommandFlag::Execute, TileIndex{t}, track); },
 		.apply_foundation = [](Foundation f, Slope slope) noexcept { Slope s = slope; int z = ApplyFoundationToSlope(f, s); return OpenTTDFoundationSlope{.z = z, .slope = s}; },

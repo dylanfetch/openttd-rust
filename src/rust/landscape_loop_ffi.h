@@ -46,7 +46,6 @@ struct OpenTTDLandscapeLoopServices {
 	OpenTTDGroundLoopServices ground;
 	void (*house_loop)(uint32_t) noexcept;
 	void (*station_loop)(uint32_t) noexcept;
-	void (*void_loop)(uint32_t) noexcept;
 	void (*object_loop)(uint32_t) noexcept;
 };
 const OpenTTDTreeServices &GetRustTreeServices() noexcept;

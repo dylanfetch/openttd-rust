@@ -836,7 +836,6 @@ void RunTileLoop()
 		.ground = {.clear = &GetRustClearServices(), .rail = &GetRustRailGroundServices(), .road = &GetRustRoadGroundServices(), .tunnel = &GetRustTunnelGroundServices(), .water = &GetRustWaterGroundServices(), .costs = &GetRustGroundCostServices(), .call = &call, .climate = OpenTTDLandscape(), .editor = OpenTTDEditor(), .rebuild = _settings_game.economy.mod_road_rebuild, .ambient_callback = RustAmbientSoundEnabled()},
 		.house_loop = _tile_type_town_procs.tile_loop_proc,
 		.station_loop = _tile_type_station_procs.tile_loop_proc,
-		.void_loop = _tile_type_void_procs.tile_loop_proc,
 		.object_loop = _tile_type_object_procs.tile_loop_proc,
 	};
 	/* Preserve the original assertion under the native build assertion policy. */

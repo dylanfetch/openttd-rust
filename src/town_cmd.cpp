@@ -2308,8 +2308,6 @@ const OpenTTDTownFoundingServices &GetRustTownFoundingServices() noexcept
 		.can_allocate = []() noexcept { return Town::CanAllocateItem(); },
 		.close_to_town = [](uint32_t tile, uint distance) noexcept { return IsCloseToTown(TileIndex(tile), distance); },
 		.flat = OpenTTDIsTileFlat,
-		.clear_ground = OpenTTDClearGround,
-		.tree_ground = OpenTTDTreeGround,
 		.water_distance = [](uint32_t tile, bool water) noexcept { return GetClosestWaterDistance(TileIndex(tile), water); },
 		.scale_size = OpenTTDMapScaleSize,
 		.scale_land = OpenTTDMapScaleLandProportion,

@@ -35,10 +35,10 @@ inline bool RustSnowTile(uint32_t index) noexcept { return RustSnowTile(Tile{Til
 inline OpenTTDClearSurface RustClearSurface(uint32_t index) noexcept
 {
 	Tile tile{TileIndex{index}};
-	OpenTTDClearSurface surface{.density = 0, .ground = CLEAR_GRASS, .snow = RustSnowTile(tile)};
+	OpenTTDClearSurface surface{.ground = CLEAR_GRASS, .density = 0, .snow = RustSnowTile(tile)};
 	if (!surface.snow) {
 		surface.ground = RustClearGround(tile);
-		if (surface.ground == CLEAR_GRASS) surface.density = RustClearDensity(tile);
+		if (surface.ground == CLEAR_GRASS) surface.density = static_cast<uint8_t>(RustClearDensity(tile));
 	}
 	return surface;
 }

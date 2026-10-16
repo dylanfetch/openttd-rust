@@ -103,7 +103,6 @@ pub struct Services {
     pub ground: GroundServices,
     pub house_loop: extern "C" fn(u32),
     pub station_loop: extern "C" fn(u32),
-    pub void_loop: extern "C" fn(u32),
     pub object_loop: extern "C" fn(u32),
 }
 
@@ -136,7 +135,7 @@ unsafe fn dispatch(
             );
         },
         1 => unsafe {
-            ground::openttd_rust_rail_tile_loop(
+            ground::rail_tile_loop(
                 tile,
                 g.climate,
                 g.ambient_callback,
@@ -146,6 +145,7 @@ unsafe fn dispatch(
                 g.water,
                 g.rail,
                 s.shared,
+                types,
             );
         },
         2 => unsafe {
@@ -164,18 +164,20 @@ unsafe fn dispatch(
         3 => (s.house_loop)(tile),
         4 => unsafe { trees::openttd_rust_trees_tile_loop(tile, settings, s.trees, s.shared) },
         5 => (s.station_loop)(tile),
-        6 => unsafe {
+        // `TileLoop_Void` is exactly `TileLoop_Water(tile)`.
+        6 | 7 => unsafe {
             water::water_tile_loop(
                 tile,
+                tile_type,
                 settings.size_x,
                 size_y,
                 g.ambient_callback,
                 g.call,
                 g.water,
                 s.shared,
+                types,
             );
         },
-        7 => (s.void_loop)(tile),
         8 => unsafe {
             industry::openttd_rust_industry_tile_loop(
                 tile,

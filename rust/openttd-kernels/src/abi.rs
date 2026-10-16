@@ -95,25 +95,25 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         620 => {
             layout!(crate::services::CommandCostServices, item; zero, error, expense_money, error_param, add, move_cost, amount, success, error_message, money)
         }
-        792 => layout!(crate::ground::FoundationSlope, item; z, slope),
+        792 => layout!(crate::services::FoundationSlope, item; z, slope),
         793 => layout!(crate::ground::CostServices, item; commands, costs, prepare, release),
         794 => layout!(crate::ground::RoadSnowGround, item; z, snow),
         795 => {
-            layout!(crate::ground::RoadServices, item; snow, snow_or_desert, toggle_snow_or_desert, roadside, set_roadside, work_counter, set_work_counter, foundation, all_bits, ensure_no_vehicle, play_sound, bulldozer, cleanup, remove, town_road_type, set_road_type)
+            layout!(crate::ground::RoadServices, item; snow, snow_or_desert, toggle_snow_or_desert, roadside, set_roadside, work_counter, set_work_counter, all_bits, ensure_no_vehicle, bulldozer, cleanup, remove, town_road_type, set_road_type)
         }
         796 => layout!(crate::water::AirportGround, item; station, tile, width, height),
         797 => layout!(crate::water::TileVehicleCursor, item; storage),
         798 => {
-            layout!(crate::water::WaterServices, item; rail, clear, vehicles, costs, ambient, non_flooding, set_non_flooding, coast, tree_ground, set_tree_ground, make_clear, make_shore, make_sea, foundation, buoy_or_dock, canal_or_river, possible_docking, check_docking, invalidate_region, update_signals, set_company, tracks, remove_rail, apply_foundation, iterator_begin, iterator_current, iterator_next, iterator_end, airport_tile, airport, airport_member, airport_z, victim, aircraft_pose, ground_pose, crash, ai_event, game_event, news, bridge_height)
+            layout!(crate::water::WaterServices, item; rail, clear, vehicles, costs, company, non_flooding, set_non_flooding, coast, set_tree_ground, make_sea, buoy_or_dock, canal_or_river, possible_docking, check_docking, invalidate_region, tracks, remove_rail, apply_foundation, iterator_begin, iterator_current, iterator_next, iterator_end, airport_tile, airport, airport_member, airport_z, victim, aircraft_pose, ground_pose, crash, ai_event, game_event, news, bridge_height)
         }
         799 => layout!(crate::water::FloodVictim, item; status, kind),
         800 => layout!(crate::water::AircraftFloodPose, item; tile, z, subtype),
         801 => layout!(crate::water::GroundFloodPose, item; z, first),
-        803 => layout!(crate::ground::ClearSurface, item; density, ground, snow),
+        803 => layout!(crate::ground::ClearSurface, item; ground, density, snow),
         784 => layout!(crate::ground::FieldFences, item; ne, se, sw, nw),
         785 => layout!(crate::ground::FieldGround, item; industry, field_type),
         786 => {
-            layout!(crate::ground::ClearServices, item; ground, field_tile, density, counter, snow, surface, set_ground, set_density, set_counter, clear_snow, make_snow, make_clear, fences, set_fence, field, set_field, has_water_class, water_class, ambient)
+            layout!(crate::ground::ClearServices, item; field_tile, density, counter, snow, surface, set_ground, set_density, set_counter, clear_snow, make_clear, fences, set_fence, field, set_field, has_water_class, water_class, ambient)
         }
         787 => layout!(crate::ground::RailSnowGround, item; z, slope, tracks, plain),
         788 => layout!(crate::ground::RailFenceGround, item; tracks, owner, plain),
@@ -133,7 +133,7 @@ pub fn layout(type_id: u16, item: u8) -> usize {
             layout!(crate::tile_loop::IndustryServices, item; production, construction, lifecycle, tiles, generation)
         }
         781 => {
-            layout!(crate::tile_loop::Services, item; shared, tile_types, trees, industry, ground, house_loop, station_loop, void_loop, object_loop)
+            layout!(crate::tile_loop::Services, item; shared, tile_types, trees, industry, ground, house_loop, station_loop, object_loop)
         }
         210..=214 | 400..=417 => crate::company::abi_layout(type_id, item),
         320 => layout!(crate::ship_control::Position, item; x, y, old_tile, new_tile),
@@ -193,7 +193,7 @@ pub fn layout(type_id: u16, item: u8) -> usize {
             layout!(crate::linkgraph::OutputShare, item; node, origin, via, cumulative, unrestricted, has_share)
         }
         38 => {
-            layout!(crate::trees::TreeServices, item; plant_observation, tree_observation, tree_count, clear_observation, snow_line, sin, cos, make_tree, set_ground_density, add_count, add_growth, set_growth, make_clear, make_shore, make_snow, clear_neighbour_flooding, tile_loop_water, ambient, play_sound, progress, progress_total, clear_square, town_rating, command_begin, command_tile, command_next, command_debit, landscape_clear)
+            layout!(crate::trees::TreeServices, item; plant_observation, tree_observation, tree_count, clear_observation, snow_line, sin, cos, make_tree, set_ground_density, add_count, add_growth, set_growth, make_clear, clear_neighbour_flooding, ambient, progress, progress_total, clear_square, town_rating, command_begin, command_tile, command_next, command_debit, landscape_clear)
         }
         28 => {
             layout!(crate::trees::PlantObservation, item; tile_type, bridge, ground, density, snow, coast, zone)
@@ -222,7 +222,7 @@ pub fn layout(type_id: u16, item: u8) -> usize {
             layout!(crate::effect::Leaves, item; observe, write, viewport, sound, animated)
         }
         42 => {
-            layout!(crate::services::Services, item; context, random, industry, tile_type, bridge_above, tropic_zone, tile_z, tile_slope, mark_dirty, set_tropic_zone, tile_owner, station_index, depot_index, is_level_crossing, tunnel_bridge_direction, bridge_speed, is_water_tile, company_valid, next_company, current_company, closest_town, town_owner, tile_valid, distance_from_edge, tile_max_z, tile_height, bridge_axis, has_water_ground, is_sea, is_plain_rail, is_bridge, tunnel_transport, other_tunnel_end, is_road_depot, road_depot_direction, is_normal_road, disallowed_road_directions, is_bay_stop, bay_stop_direction, is_drive_through_stop, drive_through_axis, is_any_road_stop, road_type, has_road_type, road_owner, town_index, road_bits, snow_line, calendar_year, map_log_x, map_max_x, map_max_y, plane_speed, no_jetcrash, plane_crashes, service_at_helipad, disaster_sound, economy_date, calendar_date, slope)
+            layout!(crate::services::Services, item; context, random, industry, tile_type, bridge_above, tropic_zone, tile_z, tile_slope, mark_dirty, set_tropic_zone, tile_owner, station_index, depot_index, is_level_crossing, tunnel_bridge_direction, bridge_speed, is_water_tile, company_valid, next_company, current_company, closest_town, town_owner, tile_valid, distance_from_edge, tile_max_z, tile_height, bridge_axis, has_water_ground, is_sea, is_plain_rail, is_bridge, tunnel_transport, other_tunnel_end, is_road_depot, road_depot_direction, is_normal_road, disallowed_road_directions, is_bay_stop, bay_stop_direction, is_drive_through_stop, drive_through_axis, is_any_road_stop, road_type, has_road_type, road_owner, town_index, road_bits, snow_line, calendar_year, map_log_x, map_max_x, map_max_y, plane_speed, no_jetcrash, plane_crashes, service_at_helipad, disaster_sound, economy_date, calendar_date, slope, clear_ground, tree_ground, make_snow, make_shore, tile_loop_water, play_sound, foundation)
         }
         // ABI reservations: train 380-385; tree additions 386-389; fleet 390-399; company 400-429; town 430-459; shared vehicle/road 460-499; station 500-559; industry 560-619; shared CommandCost 620-629 (town-owned). Trees retain existing low IDs.
         461 => layout!(crate::vehicle::NewPosition, item; x, y, tile),
@@ -313,7 +313,7 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         }
         632 => layout!(crate::town::founding::Metadata, item; grfid, kind),
         633 => {
-            layout!(crate::town::founding::FoundingServices, item; shared, growth, names, cost, allocate, resolve, can_allocate, close_to_town, flat, clear_ground, tree_ground, water_distance, scale_size, scale_land, found_setting, layout_setting, initial_city_size, town_density, custom_number, larger_towns, parameters, metadata, initialize_counts, insert_town, cargo_effect_exists, prepare_rename, name_changed, update_virt, directory_rebuild, directory_resort, update_noise, rebuild_tree, delete_town, assert_random_context, assert_allocation, initialize_cost, sufficient_money, money_deficit, set_result, exchange_generating, nearest_town_roads, founded_news, founded_events, clear_station_names, clear_industry_names, update_station_coords, cached_name, set_progress, increase_progress, no_town_error, town_count, random, edge_error, close_error, unsuitable_error, unique_error, too_many_error, no_space_error)
+            layout!(crate::town::founding::FoundingServices, item; shared, growth, names, cost, allocate, resolve, can_allocate, close_to_town, flat, water_distance, scale_size, scale_land, found_setting, layout_setting, initial_city_size, town_density, custom_number, larger_towns, parameters, metadata, initialize_counts, insert_town, cargo_effect_exists, prepare_rename, name_changed, update_virt, directory_rebuild, directory_resort, update_noise, rebuild_tree, delete_town, assert_random_context, assert_allocation, initialize_cost, sufficient_money, money_deficit, set_result, exchange_generating, nearest_town_roads, founded_news, founded_events, clear_station_names, clear_industry_names, update_station_coords, cached_name, set_progress, increase_progress, no_town_error, town_count, random, edge_error, close_error, unsuitable_error, unique_error, too_many_error, no_space_error)
         }
         432 => {
             layout!(crate::town::SimulationFields, item; valid_history, xy, num_houses, population, radius, goal, ratings, received, noise_reached, time_until_rebuild, statues, have_ratings, unwanted, exclusivity, exclusive_counter, larger_town, layout, townnamegrfid, townnametype, townnameparts)
@@ -458,7 +458,7 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         }
         573 => layout!(crate::industry::TileIndustry, item; shell, owner),
         574 => {
-            layout!(crate::industry::TileServices, item; gfx, set_gfx, frame, set_frame, animation_loop, set_animation_loop, delete_animated, tick_counter, ambient, animate_new, construction_counter, construction_stage, completed, set_completed, reset_construction, industry, industry_index, toffee_offset, on_water, water_loop, transport, anim_production, anim_next, build_oilrig, pixel_max_z, create_effect, create_effect_above, set_effect_substate, spec, acceptance, callback, cargo_translation)
+            layout!(crate::industry::TileServices, item; gfx, set_gfx, frame, set_frame, animation_loop, set_animation_loop, delete_animated, tick_counter, ambient, animate_new, construction_counter, construction_stage, completed, set_completed, reset_construction, industry, industry_index, toffee_offset, on_water, transport, anim_production, anim_next, build_oilrig, pixel_max_z, create_effect, create_effect_above, set_effect_substate, spec, acceptance, callback, cargo_translation)
         }
         572 => layout!(crate::services::ByteSpan, item; data, size),
         568 => {

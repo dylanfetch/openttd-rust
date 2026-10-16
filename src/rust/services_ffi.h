@@ -32,6 +32,10 @@ OpenTTDTileTypeAllocation GetRustTileTypeAllocation() noexcept;
  * Industry query returns 0 not industry,1 industry,2 bubble catcher and writes
  * TileVirtXY(x,y). It observes only type and industry graphics.
  * An environmental exception terminates rather than unwinding through Rust. */
+enum ClearGround : uint8_t;
+enum TreeGround : uint8_t;
+enum Slope : uint8_t;
+struct OpenTTDFoundationSlope { int32_t z; Slope slope; };
 struct OpenTTDTownHandle; // Opaque native Town shell; never dereferenced in Rust.
 struct OpenTTDTownState;
 struct OpenTTDSharedServices {
@@ -95,10 +99,17 @@ struct OpenTTDSharedServices {
 	int32_t (*economy_date)() noexcept;
 	int32_t (*calendar_date)() noexcept;
 	int32_t (*slope)(int32_t, int32_t) noexcept;
+	ClearGround (*clear_ground)(uint32_t) noexcept;
+	TreeGround (*tree_ground)(uint32_t) noexcept;
+	void (*make_snow)(uint32_t, uint32_t) noexcept;
+	void (*make_shore)(uint32_t) noexcept;
+	void (*tile_loop_water)(uint32_t) noexcept; ///< Native TileLoop_Water; may reenter Rust owners.
+	void (*play_sound)(uint32_t, uint16_t) noexcept;
+	OpenTTDFoundationSlope (*foundation)(uint32_t) noexcept;
 };
 const OpenTTDSharedServices &GetRustSharedServices() noexcept;
 /* Shared reader ABI used by default allocation/layout/oracle tests, not game
- * dispatch. Null base selects the existing callback backend. No pointer retained. */
+ * dispatch. Zero count selects the existing callback backend. No pointer retained. */
 extern "C" uint8_t openttd_rust_shared_tile_type(OpenTTDTileTypeAllocation, uint8_t (*callback)(uint32_t) noexcept, uint32_t tile);
 /** Shared save/reseed/restore of BOTH original RNG streams. */
 struct OpenTTDRandomSeeds { uint32_t random[2], interactive[2]; };
@@ -214,6 +225,13 @@ inline OpenTTDSharedServices OpenTTDFixtureSharedServices(void *context, uint32_
 		.economy_date = OpenTTDFixtureMapService<int32_t>,
 		.calendar_date = OpenTTDFixtureMapService<int32_t>,
 		.slope = OpenTTDFixtureMapService<int32_t, int32_t, int32_t>,
+		.clear_ground = OpenTTDFixtureMapService<ClearGround, uint32_t>,
+		.tree_ground = OpenTTDFixtureMapService<TreeGround, uint32_t>,
+		.make_snow = OpenTTDFixtureMapService<void, uint32_t, uint32_t>,
+		.make_shore = OpenTTDFixtureMapService<void, uint32_t>,
+		.tile_loop_water = OpenTTDFixtureMapService<void, uint32_t>,
+		.play_sound = OpenTTDFixtureMapService<void, uint32_t, uint16_t>,
+		.foundation = OpenTTDFixtureMapService<OpenTTDFoundationSlope, uint32_t>,
 	};
 }
 #endif /* RUST_SERVICES_FFI_H */

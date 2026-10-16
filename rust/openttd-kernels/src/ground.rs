@@ -19,8 +19,8 @@
     clippy::too_many_arguments
 )]
 use crate::services::{
-    ClearGroundType, DiagDirection, Foundation, LandscapeType, RailGroundType, RoadBits, RoadType,
-    Roadside, Services, Slope, TrackBits, WaterClass,
+    ClearGroundType, DiagDirection, Foundation, FoundationSlope, LandscapeType, RailGroundType,
+    RoadBits, RoadType, Roadside, Services, Slope, TrackBits, WaterClass,
 };
 
 #[repr(usize)]
@@ -67,8 +67,8 @@ pub struct FieldFences {
 }
 #[repr(C)]
 pub struct ClearSurface {
-    pub density: u32,
     pub ground: ClearGroundType,
+    pub density: u8,
     pub snow: bool,
 }
 #[repr(C)]
@@ -78,7 +78,6 @@ pub struct FieldGround {
 }
 #[repr(C)]
 pub struct ClearServices {
-    pub ground: extern "C" fn(u32) -> ClearGroundType,
     pub field_tile: extern "C" fn(u32) -> bool,
     pub density: extern "C" fn(u32) -> u32,
     pub counter: extern "C" fn(u32) -> u32,
@@ -88,7 +87,6 @@ pub struct ClearServices {
     pub set_density: extern "C" fn(u32, u32),
     pub set_counter: extern "C" fn(u32, u32),
     pub clear_snow: extern "C" fn(u32),
-    pub make_snow: extern "C" fn(u32, u32),
     pub make_clear: extern "C" fn(u32, ClearGroundType, u32),
     pub fences: extern "C" fn(u32) -> FieldFences,
     pub set_fence: extern "C" fn(u32, DiagDirection, u32),
@@ -202,7 +200,7 @@ pub(crate) unsafe fn clear_tile_loop(
         let k = (s.tile_z)(tile) - i32::from((s.snow_line)()) + 1;
         if !(c.snow)(tile) {
             if k >= 0 {
-                (c.make_snow)(tile, 0);
+                (s.make_snow)(tile, 0);
                 hit(Witness::SnowStart);
                 (s.mark_dirty)(tile);
             }
@@ -229,7 +227,7 @@ pub(crate) unsafe fn clear_tile_loop(
             }
         }
     } else if climate == 2 {
-        let current = if (c.ground)(tile).0 == 5 {
+        let current = if (s.clear_ground)(tile).0 == 5 {
             (c.density)(tile)
         } else {
             0
@@ -260,7 +258,7 @@ pub(crate) unsafe fn clear_tile_loop(
     }
     match surface.ground.0 {
         0 => {
-            let density = surface.density;
+            let density = u32::from(surface.density);
             if density == 3 {
                 return;
             }
@@ -336,6 +334,37 @@ pub unsafe extern "C" fn openttd_rust_rail_tile_loop(
     rail: *const RailServices,
     shared: *const Services,
 ) {
+    // SAFETY: Same synchronous table contract; this native entry keeps the
+    // original callback tile-type reader.
+    unsafe {
+        let types = crate::services::TileTypeAccess::callback((*shared).tile_type);
+        rail_tile_loop(
+            tile,
+            climate,
+            ambient_callback,
+            size_x,
+            size_y,
+            call,
+            water,
+            rail,
+            shared,
+            &types,
+        );
+    }
+}
+/// Original `TileLoop_Track`; `types` is the caller's tile-type reader.
+pub(crate) unsafe fn rail_tile_loop(
+    tile: u32,
+    climate: LandscapeType,
+    ambient_callback: bool,
+    size_x: u32,
+    size_y: u32,
+    call: *mut Call,
+    water: *const crate::water::WaterServices,
+    rail: *const RailServices,
+    shared: *const Services,
+    types: &crate::services::TileTypeAccess,
+) {
     let climate = climate.0;
     // SAFETY: Caller supplies immutable live tables; observations are copied.
     let (r, s) = unsafe { (&*rail, &*shared) };
@@ -343,15 +372,18 @@ pub unsafe extern "C" fn openttd_rust_rail_tile_loop(
     if old == 13 {
         // SAFETY: The same serialized facade/batch owns this independent native
         // result context; no result is live before this source early return.
+        // `TileLoop_Water` observes this railway tile's type.
         unsafe {
             crate::water::water_tile_loop(
                 tile,
+                1,
                 size_x,
                 size_y,
                 ambient_callback,
                 call,
                 water,
                 shared,
+                types,
             );
         };
         return;
@@ -468,11 +500,6 @@ pub unsafe extern "C" fn openttd_rust_tunnel_tile_loop(
 }
 
 #[repr(C)]
-pub struct FoundationSlope {
-    pub z: i32,
-    pub slope: Slope,
-}
-#[repr(C)]
 pub struct Call {
     _private: [u8; 0],
 }
@@ -497,10 +524,8 @@ pub struct RoadServices {
     pub set_roadside: extern "C" fn(u32, Roadside),
     pub work_counter: extern "C" fn(u32) -> u32,
     pub set_work_counter: extern "C" fn(u32, u32),
-    pub foundation: extern "C" fn(u32) -> FoundationSlope,
     pub all_bits: extern "C" fn(u32) -> RoadBits,
     pub ensure_no_vehicle: extern "C" fn(*mut crate::services::CommandCost, u32),
-    pub play_sound: extern "C" fn(u32, u16),
     pub bulldozer: extern "C" fn(u32),
     pub cleanup: extern "C" fn(u32, RoadBits) -> RoadBits,
     pub remove: extern "C" fn(u32, RoadBits),
@@ -552,7 +577,7 @@ pub unsafe extern "C" fn openttd_rust_road_tile_loop(
             zone = group;
             if months != 0 && (distance < 8 || zone != 0) && (s.is_normal_road)(tile) {
                 let bits = (r.all_bits)(tile);
-                if bits.0.count_ones() > 1 && (r.foundation)(tile).slope.0 == 0 {
+                if bits.0.count_ones() > 1 && (s.foundation)(tile).slope.0 == 0 {
                     let out = (c.prepare)(call);
                     (r.ensure_no_vehicle)(out, tile);
                     // SAFETY: The result remains a live native object until release.
@@ -562,7 +587,7 @@ pub unsafe extern "C" fn openttd_rust_road_tile_loop(
                         (r.set_roadside)(tile, Roadside(if side <= 1 { 6 } else { 7 }));
                         hit(Witness::RoadWorkStart);
                         if ambient {
-                            (r.play_sound)(tile, 31);
+                            (s.play_sound)(tile, 31);
                         }
                         (r.bulldozer)(tile);
                         (s.mark_dirty)(tile);
@@ -691,7 +716,7 @@ pub unsafe extern "C" fn openttd_rust_ground_abi_calls(calls: *const ABICalls) -
         && fences.se == 0x89ab_cdef
         && fences.sw == 0x7654_3210
         && fences.nw == 0x1234_5678
-        && surface.density == 0x89ab_cdef
+        && surface.density == 0xcd
         && surface.ground.0 == 240
         && surface.snow
         && field.industry == 0xfedc

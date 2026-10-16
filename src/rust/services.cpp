@@ -239,6 +239,13 @@ const OpenTTDSharedServices &GetRustSharedServices() noexcept
 		.economy_date = SharedEconomyDate,
 		.calendar_date = SharedCalendarDate,
 		.slope = SharedSlope,
+		.clear_ground = OpenTTDClearGround,
+		.tree_ground = OpenTTDTreeGround,
+		.make_snow = RustMakeSnow,
+		.make_shore = RustMakeShore,
+		.tile_loop_water = RustTileLoopWater,
+		.play_sound = RustPlayTileSound,
+		.foundation = RustFoundationSlope,
 	};
 	return services;
 }
