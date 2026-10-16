@@ -329,12 +329,16 @@ class EvidenceTests(unittest.TestCase):
         """Run main() in-process with git and port-metrics stubbed out."""
         stdout, stderr = io.StringIO(), io.StringIO()
         outputs = iter([HEAD + "\n", json.dumps(METRICS)])
+        self.commands = []
+
+        def check_output(command, **_):
+            self.commands.append(command[1:])
+            return next(outputs)
+
         argv = ["evidence.py", *args]
         with (
             mock.patch.object(sys, "argv", argv),
-            mock.patch.object(
-                evidence.subprocess, "check_output", lambda *a, **k: next(outputs)
-            ),
+            mock.patch.object(evidence.subprocess, "check_output", check_output),
             contextlib.redirect_stdout(stdout),
             contextlib.redirect_stderr(stderr),
         ):
@@ -350,7 +354,7 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("--verification", stderr)
         explicit = (
-            *("--base", "HEAD", "--head", "HEAD", "--agent", "/root/test"),
+            *("--base", "BASE", "--head", "HEAD", "--agent", "/root/test"),
             *("--model", "gpt-6.1-sol", "--effort", "high"),
         )
         with tempfile.TemporaryDirectory() as directory:
@@ -361,7 +365,16 @@ class EvidenceTests(unittest.TestCase):
             self.assertEqual(path.read_text(), payload)
             self.assertEqual(list(Path(directory).iterdir()), [path])
             self.assertEqual(code, 0, stderr)
-            self.assertIn("Port metrics", stdout)
+            # The head is resolved once and both revisions reach port-metrics.
+            self.assertEqual(
+                self.commands[0], ["rev-parse", "--verify", "HEAD^{commit}"]
+            )
+            self.assertEqual(
+                self.commands[1][1:], ["--target", "BASE", "--head", HEAD, "--json"]
+            )
+            self.assertIn(
+                "Rust 1 / tooling 2 / C++ glue added 3 / original C++ retired 4", stdout
+            )
             self.assertIn("/root/test", stdout)
             path.write_text(json.dumps({"passed": False}))
             code, _, stderr = self.run_cli("--verification", str(path), *explicit)
