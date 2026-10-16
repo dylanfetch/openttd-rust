@@ -77,11 +77,10 @@ int main()
 				CargoPacket packet{Money(feeder), 250, 45};
 				CargoPayment reference{Money(initial)};
 				auto *candidate = openttd_rust_cargo_payment_new(nullptr, 0xFFFF);
-				OpenTTDCargoPaymentFields state{nullptr, INT64_MIN, INT64_MAX, initial};
-				openttd_rust_cargo_payment_import(candidate, &state);
+				candidate->fields = {nullptr, INT64_MIN, INT64_MAX, initial};
 				auto expected = reference.PayTransfer(0, &packet, 65535, 0);
 				auto actual = openttd_rust_cargo_payment_transfer(candidate, &s, 0, &packet, 65535, 250, 45);
-				openttd_rust_cargo_payment_export(candidate, &state);
+				const auto &state = candidate->fields;
 				if (actual != expected.base() || state.visual_transfer != reference.visual_transfer.base() || state.route_profit != INT64_MIN || state.visual_profit != INT64_MAX) return 2;
 				openttd_rust_cargo_payment_destroy(candidate, nullptr, 1);
 			}

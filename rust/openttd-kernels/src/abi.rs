@@ -255,6 +255,7 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         50 => {
             layout!(crate::cargo_payment::Fields, item; front, route_profit, visual_profit, visual_transfer)
         }
+        60 => layout!(crate::cargo_payment::Payment, item; fields, station),
         51 => {
             layout!(crate::cargo_payment::Services, item; spec, callback, nearby_industry, station_read, industry_read, industry_write, refuses, accept, statistics, monitor, subsidised, industry_effect, vehicle_read, settle, feeder, setting)
         }

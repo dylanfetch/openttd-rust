@@ -10,7 +10,6 @@
 #define RUST_CARGO_STORAGE_FFI_H
 #include <cstdint>
 #include <cstddef>
-struct OpenTTDCargoPacket;
 struct OpenTTDCargoList;
 struct OpenTTDCargoFlow;
 enum class SourceType : uint8_t;
@@ -26,6 +25,9 @@ struct OpenTTDCargoPacketFields {
 	int16_t travelled_x = 0, travelled_y = 0;
 	uint8_t source_type = 0, in_vehicle = 0;
 };
+/* Rust-allocated repr(C) packet with exactly these fields (ABI layout 280);
+ * CAPA save/load addresses them in place between Rust calls. */
+struct OpenTTDCargoPacket : OpenTTDCargoPacketFields {};
 struct OpenTTDCargoListFields {
 	uint64_t cargo_periods_in_transit;
 	int64_t feeder_share;
@@ -36,8 +38,8 @@ struct OpenTTDCargoListFields {
  * never views of C++ objects. Callback tables are synchronous noexcept services;
  * no argument is retained, environmental exceptions terminate, Rust panics abort.
  * Payment callbacks may reenter packet/list getters: Rust ends all owner borrows
- * before payment and writes metadata in source order. Save/load references and
- * errors remain C++ call-local staging; import never dereferences unresolved IDs.
+ * before payment and writes metadata in source order. Packet save/load writes
+ * fields in place; import never dereferences unresolved IDs.
  * Buffers/counts and supplied handles obey original caller validity preconditions.
  * Snapshot callbacks only append to call-local C++ export containers.
  * Next-hop buffers borrow the caller's live StationID span (checked uint16_t
