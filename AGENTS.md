@@ -57,19 +57,25 @@ fork; the remaining upstream documentation explains behavior and architecture.
   the fields it uses: neither a whole-record view nor a call per field. A
   shared accessor (vehicle field, map predicate, setting, constant) has one
   typed definition used by every port, not a per-port copy.
-  `tools/shared-accessors.py` rejects new copies in quick CI (#249); reviewers
-  still search for what it cannot see, such as Rust service-table fields,
-  macros and compound callbacks. A PR that adds a shared accessor deletes the
-  integrated copies, and a PR that removes a caller deletes the export,
-  declaration or callback field it orphans. Services return their real types on
-  both sides and tables use designated initializers. Existing ports convert
+  `tools/shared-accessors.py` rejects new copies in quick CI (#249). It cannot
+  see Rust service-table fields, macros or compound callbacks, so a reviewer
+  greps the callee of every new table-bound wrapper (such as `CheckOwnership`
+  or `GetRoadOwner`) across `src/` and reports each existing wrapper of it as a
+  finding. Command ports share one set of command-check services. A PR that
+  adds a shared accessor deletes the integrated copies, and a PR that removes a
+  caller deletes the export, declaration or callback field it orphans. Services
+  return their real types on both sides and tables use designated initializers. Existing ports convert
   under #168 and #199. Root grants no exceptions at integration: a port whose
   hot path allocates per call, dispatches by opcode or copies whole records is
   fixed before it integrates.
 - A port that misses a speed budget gets a profile-guided fix round before it
   is deferred. Attribute the cost per function (callgrind instruction counts
   work on this host, where hardware counters do not) and fix the attributed
-  overhead. Deferral needs a profile showing the remaining cost is inherent.
+  overhead. Deferral needs a profile showing the remaining cost is inherent,
+  and names an owned issue whose result can lift it. A re-selection condition
+  that waits on another deferred or unscheduled item is circular; fix it before
+  deferring. A core loop (tile loop, vehicle tick) that misses its gate or the
+  retirement ratio gets a boundary fix, not abandonment.
 - Evidence for game-logic ports is the semantic simulation harness (`python3
   tools/migration.py simulate`, #72) plus the existing tests; a new game-logic
   port integrates only after the harness exists and its scenarios exercise the

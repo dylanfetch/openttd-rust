@@ -4,56 +4,61 @@ Root owns selection here; `AGENTS.md` and `docs/rust-migration.md` define proces
 If an issue conflicts, follow this roadmap and report it to root. Keep this
 forward-looking, about 200 lines; completed work is one row, with evidence in PRs.
 
-## Where the fork stands (2026-10-16, `6ffbf8f302`)
+## Where the fork stands (2026-10-16, `cbede7244f`)
 
 - Twenty-seven ownership ports. Whole fork: Rust 60,339 / tooling 31,153 / glue 26,809 / original retired 38,223 of 470,612 `src/` lines (8.12%). Simulation: 30,252 / 102,615 (29.48%).
-- This session integrated #264 (H4, net glue -75), #271 (R1, net glue -405; quick-CI Python tests 47.8 s to 11.2 s) and #272 (two #156 gaps). No new game C++ retired yet.
-- Drafts that would retire game C++: #270 rail commands (1,578 original vs 890 glue+tooling) and #269 house lifecycle (882 vs 495). #212/#213 deferred: speed misses after profiled rounds, and each retired less than it added.
-- Speed: quiet-host caps pass for #268 and #269 at their heads (worst -0.91%). Last integrated calibration is #258.
-- Open #156 gaps: house station removal and NewGRF house callbacks; four rail-command water/PBS branches; TTO/TTD industry load.
-- Unintegrated component branches: two (#269, #270). Maintenance drafts: #268, #273. Post-merge CI on `6ffbf8f302` is green.
+- The last two sessions integrated only maintenance and coverage (#262-#264, #271, #272). No game C++ has been retired since #258.
+- Drafts that retire game C++: #270 rail commands (1,578) and #269 house lifecycle (882).
+- #212/#213 are deferred.
+- Speed at `cbede7244f`: all six caps pass. TGP is at 1.118 (target 1.15) and the play saves at 1.10-1.33.
+- Unintegrated component branches: two (#269, #270). Maintenance drafts: #268, #273.
 
-## Twelfth steering review (2026-10-15, housekeeping)
+## Thirteenth steering review (2026-10-16, unblock the core loops)
 
-Audits of #258, tooling, docs, tests, glue, Rust and repository state found no
-reachable divergence in #258. Debt has built up; #259 and #261 list each item:
+Independent audits of #270, #269, #268 and #273 found **no reachable divergence**. They did find:
 
-- **#258 leftovers.** The Rust branch of `InitializeLayout` and the exports `town_update_rate` and `town_grow` are orphaned. The founding services table re-creates the shared company accessors, and both reviews and #249 missed it because the copy is a Rust table field. Coverage gaps went to #156.
-- **Dead FFI.** About 250 lines across ports: ten exports with no caller, uncalled C++ wrappers, and callback fields Rust never calls. The "call services directly" conversions left them behind.
-- **Preserved state.** 69 merged branches remain on origin and 102 locally. Worktrees for closed or paused work hold 6.2 GB, and `.local/` holds 2.4 GB of stale output. The worktree rule tied removal only to a merge, so root kept these for eleven days. `AGENTS.md` now ties removal to an open PR and orphaned exports to the PR that removes their caller.
-- **Inert CI and duplicated tooling.**
-  - 2,130 lines of workflows that guard nothing the fork relies on, including a nightly run.
-  - 3,337 lines of duplicated comparison scaffolding, which set the native critical path.
-  - 32 of 48 component entries over budget, and about 20 doc citations of opt-in `--soak`/`--self` runs.
-- **Tests and refactoring.** A second round of audits sized cleanup that changes no behaviour, now #261:
-  - 34 s of serial Python tests on every push;
-  - about 330 lines of protocol tests the harness already covers, and duplicated ABI layout lists;
-  - about 600 glue lines of block and header boilerplate;
-  - about 1,165 lines of Rust forwarding functions, and 660 callback fields declared `unsafe` without need;
-  - save staging that the aliases make redundant.
-- **Fidelity.** `ScriptList` rank and modification counts abort on overflow where the compiled original wraps, and a script can reach it (#260).
+- **Deadlocked deferrals.** Neither deferred core loop can return.
+  - #212 waits for a map-read measurement that nobody owns. #255's remaining cost is the per-tile map boundary: `RustClearSurface` alone is 275M Ir.
+  - #213 waits for the #168 conversions, which waited for #213. They also cannot make base `Vehicle` fields inline. Its last miss (6.05 ns against 6) was within its measured spread.
+  - The tile loop and vehicle tick are the centre of the simulation.
+- **Shared-service copies that CI cannot see.**
+  - #270 re-wraps `CheckOwnership` and `EnsureNoVehicleOnGround`, which fleet and industry already wrap, and re-reads road map accessors through compound callbacks.
+  - #269 has three accessors for each of several house spec fields.
+  - Reviewers missed these, as they missed #258's founding table.
+  - #266 and #267 would copy the same command checks again.
+- **Whole-record copies.** #269 copies the 12-field `HouseTile` at 17 sites and the 8-field `HouseBehaviour` at 4.
+- **Unsound types.** #273 makes 113 orders callbacks that take raw pointers safe `extern "C" fn`.
+- **The speed plan is mis-ordered.**
+  - Road costs Opus +3.07G Ir (controller) and +1.31G (YAPF); aircraft costs nothing there.
+  - `ClampTo` calls a Rust utility kernel on a hot path (+0.52G, about 9% of the Opus gap).
+  - Road YAPF allocates and rehashes on every search.
+  - Trees are the largest TGP item (+222M) and appear nowhere in the plan.
 
 Actions, in order:
-1. **#259 H1 first, by root, without a PR.** Change the repository setting, then delete branches, remove worktrees, close #66 and clean `.local/`, exactly as #259 lists. This takes minutes, not a session.
-2. **#260 next.** It is a small fidelity fix.
-3. **Housekeeping PRs, at most three in flight alongside the work order:**
-   - #259 H2 (a docs-only commit by gpt-6-luna at medium effort), H3 (workflows) and H4 (dead code with its checks);
-     H4's re-selected ceiling is 190 added tooling lines, including tests, baseline data and ABI edits (#259); review found two orphan-guard defects needing regressions.
-   - then #261 R1-R4; R1-R3 wait for H4, because they touch the same files;
-   - #259 H5 last.
+1. **Integrate the drafts with the must-change items from their audit comments.**
+   - #268: re-add layout 60 in the resolution.
+   - #273: restore `unsafe` on fields that take pointers, then verify at the head.
+   - #270: shared typed command checks, deleting the fleet and industry copies; road accessors through the shared set; one `IsSafeWaitingPosition`; real return types.
+   - #269: the R1 fix round, extended to `HouseBehaviour`, one accessor per spec field, and the owner resolved once.
+2. **#274, one agent, alongside item 1.** Measure a read-only map view on #255's clear and water reads, and a post-tick vehicle view plus direct controller calls on `vehicle-owner-213`. If a view clears its gate, amend world-state.md, land the view as one shared PR, and re-select #212 or #213.
+3. **#275 cheap items alongside, as maintenance PRs.** Remove the `ClampTo` call to Rust and keep one road YAPF arena. Then fold road `GetCurrentMaxSpeed`, then convert road to a C-layout block, then the TGP items (industry `next_tick`, trees). Aircraft comes last.
+4. **#266 starts after #270 integrates,** on its shared command checks; then #267 and #247.
 
-   These are maintenance PRs. They do not count against the component WIP cap and never block an ownership port.
-4. **Then the Phase 2 work order:** update #255 and #257 from base, profile, re-select; then town.
+`AGENTS.md` now:
+- asks reviewers to grep each new wrapper's callee and report every existing wrapper of it;
+- has command ports share one set of command checks;
+- requires each deferral to name an owned issue that can lift it, and rules out circular conditions;
+- gives a core loop a boundary fix rather than abandonment.
 
 ## Earlier steering, still in force
 
+- **Housekeeping (twelfth):** #259 H1-H4, #260 and #261 R1 are done. R4 (#268) and R3 (#273) are drafts. R2 waits for #269/#270, and H5 comes last. At most three maintenance PRs are in flight. They never count against the component cap or block an ownership port.
 - **Direct shared services and boundaries:** direct shared services (#107/#168/#199) and one definition per shared accessor, enforced in quick CI by #249, whose baseline only shrinks. Use a fixed hasher for lookup-only YAPF maps; ABI blocks stay per component.
-- **Ownership:** prioritize simulation ownership, which comes before the remaining conversions. Keep state at the original's process scope.
-- **Map storage:** the #108 decision retains C++ map arrays with direct bundled services; measure before map changes (#108).
+- **Ownership:** prioritize simulation ownership. Keep state at the original's process scope.
+- **Map storage:** #108 retains C++ map arrays with direct bundled services until #274 measures a read-only view.
 - **Harness evidence:** end moments (#154), default branch witnesses and reference probes (#198/#204/#210/#211), speed ratchets (#155) and documented coverage gaps (#156).
-- **Tooling and WIP:** proportionate tooling (#109) and a stated budget for infrastructure work. Prefer platform defaults to controllers (#233; #243/#244 closed). The WIP cap is six component branches.
+- **Tooling and WIP:** proportionate tooling (#109) and a stated budget for infrastructure work. Prefer platform defaults to controllers (#233). The WIP cap is six component branches.
 - **CI and review:** full CI is exact-head and on demand (#171), with concurrent validation (#233) and no admin bypass. Fresh reviewers fix their findings.
-- **Speed misses:** #212/#213 missed on implementation costs, not FFI cost. A miss gets a callgrind-attributed fix round before deferral. Budgets are about 11 ms on TGP for #212 and 6 ns per vehicle-tick visit on Opus for #213.
 - **Metrics and caps:** original retirement excludes removed fork glue (#223). Caps use three invocation medians and are lowered only beyond measured spread.
 
 ## Completed ownership ports
@@ -92,27 +97,12 @@ Metrics are `tools/port-metrics.py`: Rust / tooling / C++ glue / C++ retired.
 
 Harness and process: #72 harness (#85), #84 play saves (#87), #97 provenance
 freeze (#100), #88 Ruff (#92), #75 partial-pixel fidelity (#91), #90 world-state
-design (`docs/design/world-state.md`). Earlier maintenance PRs keep their
-evidence; rows through #215 use legacy retirement including deleted glue, and
-later rows use original retirement with net glue in the PR (#223).
+design (`docs/design/world-state.md`). Maintenance PRs #209-#254 (shared
+services, CI throughput, disk hygiene, caps, #249 enforcement) keep their
+evidence in their PRs; rows below use original retirement and net glue (#223).
 
 | Issues | Maintenance PRs | Integration | Commit | Metrics |
 | --- | --- | --- | --- | --- |
-| #199 (shared road services) | #215 | direct | `4b130309a5` | 2288 / 565 / 1331 / 1354 |
-| #192 (company direct services) | #209 | direct | `8fe6f5ed56` | 1495 / 159 / 954 / -3; net glue +424 |
-| #224 (disk hygiene) | #225 | direct | `898eb33c17` | 0 / 149 / 0 / 0; net tooling -546 |
-| #227 (loading context fidelity) | #228 | direct | `9ee89f69ad` | 3 / 47 / 0 / 0 |
-| #231 (OpenGFX cache) | #232 | direct | `21e2c9ea60` | 0 / 0 / 0 / 0; workflow net -6 |
-| #223 (original-retirement metric) | #226 | direct | `86322c8422` | 0 / 274 / 0 / 0; net glue 0 |
-| #233 (CI throughput and cache acceptance complete) | #235 | direct | `21eeb445be` | 0 / 1567 / 0 / 0; net glue 0 |
-| #234 (industry water fidelity) | #236 | direct | `b7a1429d38` | 5 / 97 / 32 / 0; net glue +32 |
-| #229 (six calibrated caps) | #230 | direct | `e69df25522` | 0 / 12 / 0 / 0; net glue 0 |
-| #239/#156 (prospect/overlap coverage) | #240 | direct | `62ef446d1e` | 0 / 114 / 0 / 0; net glue 0 |
-| #214/#168 (typed station/loading) | #217 | direct | `3b3b931099` | 1018 / 42 / 1147 / 0; net glue +705 |
-| #250 (CI waiter survives base pushes) | #251 | direct | `409cdb253e` | 0 / 53 / 0 / 0; net glue 0 |
-| #237/#199 (typed aircraft boundary) | #238 | direct | `141e4ce397` | 798 / 420 / 470 / 0; net glue -310 |
-| #252 (Windows runner) | #253 | direct | `cfc98a16a7` | 0 / 0 / 0 / 0 |
-| #249 (shared-accessor enforcement) | #254 | direct | `8f9d4fc906` | 0 / 431 / 0 / 0 |
 | #260 (ScriptList overflow fidelity) | #262 | direct | `c54129895b` | 33 / 3 / 0 / 0; net glue 0 |
 | #259 H3 (inert workflows) | #263 | direct | `7feb00248f` | 0 / 0 / 0 / 0; workflow/comment net -2142 |
 | #259 H4 (dead FFI, orphan guards) | #264 | direct | `af1abf96b4` | 6 / 174 / 12 / 4; net glue -75 |
@@ -135,47 +125,48 @@ go in `KNOWN_FAILURES` with an issue, never in masks (`docs/rust-migration.md`).
    - **Misses:** attribute any miss with callgrind before changing scope (AGENTS.md).
    - **Redraw inflation:** the null driver redraws whenever 1 ms has elapsed, so a slower candidate draws more frames, which inflates play-save ratios. Say so in a PR when it decides a miss.
 3. **#156 coverage, standing capacity.** Random and crash branches come first. These remain:
-   - town generation with `larger_towns == 0` (skips a draw);
    - signal tbd/global propagation overflow and arbitrary mod layouts;
    - town exclusivity, unwanted months and authority refusals;
    - engine external NewGRF/retire_early and legacy save branches;
-   - station stale links;
-   - #218's NewGRF and game-script paths.
+   - #218's NewGRF and game-script paths;
+   - the #268, #269 and #270 audit gaps (#156 comment, 2026-10-16).
 
 ## Phase 2: current work, in order
 
 Integrate reviewed work first, in order of readiness, with at most six
-unintegrated component branches. Housekeeping (#259) and #156 run in parallel.
+unintegrated component branches. Maintenance (#259, #261, #275) and #156 run in parallel.
 
-1. **Housekeeping:** #259 H1-H4, #260 and #261 R1 complete. R4 (#268) and R3 train/orders (#273) are drafts; R2 waits for #269/#270; H5 last; at most three maintenance PRs in flight alongside the items below.
-2. **#212 landscape and #213 vehicle: deferred 2026-10-16.** After base updates and profiled fix rounds, both still missed their gates (landscape +153.8M Ir vs ~122M; vehicle cost is the per-vehicle native Tick plus layout i-cache misses), and both retired fewer original lines than net glue plus tooling (844 vs 1,420; 388 vs 1,430). Drafts closed; branches `landscape-owner-212` (`20cc66dfe5`) and `vehicle-owner-213` (`21b78029c5`) stay on origin. Re-select #212 once a profile shows a clear/water map-read path near native cost (#108 revisit), and #213 once the #168 C-layout vehicle conversions allow inline reads.
-3. **Town:** #256 house lifecycle and tile simulation, then #247 commands, authority and deletion. Reuse the sole town owner and generation unwind contract.
-4. **Next owners (#265-#267, planned 2026-10-15):** #265 rail track/depot/signal commands and procs, then #266 road commands (reuses #265's crossing/track services), then #267 station construction/joining/removal on the #125 owner. Tile loops stay #212's; hot per-vehicle procs stay native. Tunnel/bridge follows once #247 and #212 settle.
-5. **Conversions buy speed headroom** and never block ownership:
-   - aircraft (94 calls per tick);
-   - road vehicles (12.6 per tick);
-   - industry `next_tick` (13.2 ms on TGP);
-   - town `next_town` and state;
-   - the #168 tail, largest first: `order_cmd.cpp` and `economy.cpp` hold 65 of the 198 baseline copies;
-   - the opaque train, road, ship, effect and cargo-packet owners. Convert them to C-layout blocks with aliases (#168 comment): about -850 glue lines, no field selectors, and inline loads. Do train with or after #213.
+1. **Drafts:** #268, #273, #270 and #269 with their 13th-review must-change items (PR comments).
+2. **#274 views,** then re-select #212 landscape and #213 vehicle on a passing view. Branches `landscape-owner-212` (`20cc66dfe5`) and `vehicle-owner-213` (`21b78029c5`) stay on origin.
+3. **#275 speed:**
+   - the cheap items first (`ClampTo`, road YAPF arena);
+   - then road `GetCurrentMaxSpeed` and the road C-layout block;
+   - then industry `next_tick` and the trees facade;
+   - then aircraft.
+4. **Commands:**
+   - #266 road commands after #270, reusing its shared command checks and crossing services;
+   - #267 station construction on the #125 owner;
+   - #247 town commands, authority and deletion.
 
-#108 retains C++ map arrays and integrated typed services. New owners reuse
-integrated services, never draft copies. A Rust-allocated state block with C++
-reference aliases (#216, #248) is acceptable. Keep save staging only for a field
-that a `SaveLoad` descriptor cannot address through the alias.
+   Hot per-vehicle procs stay native. Tunnel/bridge follows once #247 and #212 settle.
+5. **#168 tail, largest first.** `order_cmd.cpp` and `economy.cpp` hold 65 of the 198 baseline copies. Train, ship, effect and cargo-packet C-layout blocks wait for nothing.
+
+New owners reuse integrated services, never draft copies. A Rust-allocated
+state block with C++ reference aliases (#216, #248) is acceptable. Keep save
+staging only for a field a `SaveLoad` descriptor cannot address through the alias.
 
 ## Resume checkpoint
 
-Paused at the user's request. All agents stopped. The work order is unchanged:
-finish the drafts below, then #266, #267, #247, R2 and H5 (all unstarted).
-#212/#213 deferred; older paused work untouched.
+Paused at the user's request; all agents stopped. Each draft's next step
+includes its 13th-review comment. #274, #275, #266, #267, #247, R2 and H5 are
+unstarted. Older paused work is untouched.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #261 R4 / #268 | `save-staging-261`, `3e7b72b8d4` | Reviewed, Full validation and six caps pass. Conflicts with base in `src/tests/cargo_payment.cpp` (#271 layout form). Next: update, fresh reviewer checks the resolution, Full validation, merge. |
-| #256 / #269 | `house-lifecycle-256`, `3f5a9ec707` | Reviewed (5 fixes verified); 315/315 scenarios, verify and six caps pass. Blocker R1: 12-field `OpenTTDHouseTile` copied whole on hot paths. Next: R1 fix round, fresh review, caps, Full validation. |
-| #265 / #270 | `rail-commands-265`, `efc04c0f5b` | Reviewed at `90cf900cf8` (fix verified). Then reservation services shared (targeted checks pass). Next: fresh review of the conversion (and yapf `RailSafe`), full simulation, caps, Full validation. |
-| #261 R3 / #273 | `rust-cleanup-261`, `e95d3518c4` | Train/orders forwarders removed (-878 Rust); 313/313 scenarios. Next: verify at head, independent review, caps, Full validation. |
+| #261 R4 / #268 | `save-staging-261`, `3e7b72b8d4` | Reviewed, Full validation and six caps pass. Conflicts with base in `src/tests/cargo_payment.cpp` (#271 layout form). Next: update (re-add layout 60 in #271's table form), fresh reviewer checks the resolution, Full validation, merge. |
+| #256 / #269 | `house-lifecycle-256`, `3f5a9ec707` | Reviewed (5 fixes verified); 315/315 scenarios, verify and six caps pass. Blockers: whole `HouseTile`/`HouseBehaviour` copies, duplicate spec accessors, repeated owner resolution. Next: fix round, fresh review, caps, Full validation. |
+| #265 / #270 | `rail-commands-265`, `efc04c0f5b` | Reviewed at `90cf900cf8` (fix verified). Then reservation services shared (targeted checks pass). Next: shared command checks and road accessors, one `IsSafeWaitingPosition`, real types; fresh review, full simulation, caps, Full validation. |
+| #261 R3 / #273 | `rust-cleanup-261`, `e95d3518c4` | Train/orders forwarders removed (-878 Rust); 313/313 scenarios. Next: restore `unsafe` on pointer-taking fields, verify at head, independent review, caps, Full validation. |
 | #64 / #66 | remote `issue/64-curve-family`, `aab5211801` | #66 closed unmerged; #64 stays paused. |
 
 #269 and #270 both move `clear_square` to the shared table; whichever integrates
@@ -204,4 +195,6 @@ Deferred behavior improvements stay in `deferred-improvement` issues.
 Every port PR pastes `python3 tools/port-metrics.py`: Rust/tooling/glue added,
 original retired, fork glue removed and net glue; `--whole-fork` gives totals and
 simulation share. Retire more original C++ than net glue plus tooling or explain
-why. Judge game logic owned; data tables inflate retirement. Avoid utility kernels.
+why. A port that misses this ratio gets a boundary fix (shared services, #274
+views) before deferral. Judge game logic owned; data tables inflate retirement.
+Avoid utility kernels.
