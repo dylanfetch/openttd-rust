@@ -3,9 +3,11 @@
 
 import argparse
 import hashlib
+import io
 import json
 import re
 import subprocess
+import tokenize
 from collections import Counter
 from pathlib import Path
 
@@ -128,7 +130,16 @@ def sources(revision=None):
 
 def boundary_hits(files, wrappers, originals):
     hits = collect(wrappers, originals, writes=True)
-    combined = "\n".join(files.values())
+    combined = "\n".join(
+        " ".join(
+            t.string
+            for t in tokenize.generate_tokens(io.StringIO(s).readline)
+            if t.type != tokenize.COMMENT  # Python strings stay generated references.
+        )
+        if p.endswith(".py")
+        else re.sub(r"//[^\n]*|/\*.*?\*/", "", s, flags=re.S)
+        for p, s in files.items()
+    )
     counts = Counter(re.findall(r"\bopenttd_rust_\w+\b", combined))
     prototype = r"(?m)^(?!\s*return\b)[\w *&]+\b(openttd_rust_\w+)\([^{};]*\);"
     declarations = Counter(re.findall(prototype, combined))

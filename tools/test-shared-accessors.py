@@ -84,14 +84,18 @@ with tempfile.TemporaryDirectory() as directory:
     assert "orphan | openttd_rust_dead" in check().stdout
     port.write_text(original + "\nvoid openttd_rust_dead();\n")
     assert "orphan | openttd_rust_dead" in check().stdout
-    for target, call in [
-        (port, "void Call() { openttd_rust_dead(); }"),
-        (owner, "fn call() { openttd_rust_dead(); }"),
-        (caller, "source = 'openttd_rust_dead();'"),
+    for target, call, orphan in [
+        (port, "void Call() { openttd_rust_dead(); }", False),
+        (owner, "fn call() { openttd_rust_dead(); }", False),
+        (caller, "source = 'openttd_rust_dead();'", False),
+        (port, "// openttd_rust_dead\n/* openttd_rust_dead */", True),
+        (owner, "// openttd_rust_dead", True),
+        (caller, "x = 1  # openttd_rust_dead()", True),
     ]:
         before = target.read_text()
-        target.write_text(before + call)
-        assert check().returncode == 0, check().stdout
+        target.write_text(before + "\n" + call + "\n")
+        result = check()
+        assert ("orphan |" in result.stdout) == orphan == bool(result.returncode)
         target.write_text(before)
     caller.write_text("source = 'openttd_rust_dead();'")
     duplicate = "\nvoid Callback() noexcept {}\nOpenTTDFixtureServices one{.a = Callback,\n};\nOpenTTDFixtureServices two{.b = Callback,\n};\n"
