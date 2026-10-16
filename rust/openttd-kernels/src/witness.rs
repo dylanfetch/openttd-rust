@@ -352,101 +352,148 @@ pub const SIGNAL_COMBO_RED: usize = 154;
 /// Signal empty neighbour buffer continue.
 pub const SIGNAL_NEIGHBOUR_CONTINUE: usize = 155;
 
-/// Counter names, grouped by the prefix the harness selects.
+/// `town.services` witness.
+pub const TOWN_SERVICES: usize = 156;
+/// `town.bytes` witness.
+pub const TOWN_BYTES: usize = 157;
+/// `town.placement` witness.
+pub const TOWN_PLACEMENT: usize = 158;
+/// `town.growth` witness.
+pub const TOWN_GROWTH: usize = 159;
+/// `town.generated` witness.
+pub const TOWN_GENERATED: usize = 160;
+/// `town.coast` witness.
+pub const TOWN_COAST: usize = 161;
+/// `town.manual` witness.
+pub const TOWN_MANUAL: usize = 162;
+/// `town.deity` witness.
+pub const TOWN_DEITY: usize = 163;
+/// `town.editor` witness.
+pub const TOWN_EDITOR: usize = 164;
+/// `town.invalid` witness.
+pub const TOWN_INVALID: usize = 165;
+/// `town.duplicate` witness.
+pub const TOWN_DUPLICATE: usize = 166;
+/// `town.money` witness.
+pub const TOWN_MONEY: usize = 167;
+/// `town.zero_growth` witness.
+pub const TOWN_ZERO_GROWTH: usize = 168;
+/// `town.retry` witness.
+pub const TOWN_RETRY: usize = 169;
+/// `town.rename` witness.
+pub const TOWN_RENAME: usize = 170;
+/// `town.name_retry` witness.
+pub const TOWN_NAME_RETRY: usize = 171;
+/// `town.name_exhausted` witness.
+pub const TOWN_NAME_EXHAUSTED: usize = 172;
+/// `town.name_duplicate` witness.
+pub const TOWN_NAME_DUPLICATE: usize = 173;
+/// `town.fallback` witness.
+pub const TOWN_FALLBACK: usize = 174;
+/// `town.cancelled` witness.
+pub const TOWN_CANCELLED: usize = 175;
+/// `town.grid` witness.
+pub const TOWN_GRID: usize = 176;
+/// `town.name_set` witness.
+pub const TOWN_NAME_SET: usize = 177;
+/// `town.entries` witness.
+pub const TOWN_ENTRIES: usize = 178;
+
 /// Scheduler evidence counter.
-pub const VEHICLE_CALLBACK32: usize = 156;
+pub const VEHICLE_CALLBACK32: usize = 179;
 /// Scheduler evidence counter.
-pub const VEHICLE_CARGO_AGES: usize = 157;
+pub const VEHICLE_CARGO_AGES: usize = 180;
 /// Scheduler evidence counter.
-pub const VEHICLE_CARGO_OWNER: usize = 158;
+pub const VEHICLE_CARGO_OWNER: usize = 181;
 /// Scheduler evidence counter.
-pub const VEHICLE_CROSSINGS: usize = 159;
+pub const VEHICLE_CROSSINGS: usize = 182;
 /// Scheduler evidence counter.
-pub const VEHICLE_DAYS: usize = 160;
+pub const VEHICLE_DAYS: usize = 183;
 /// Scheduler evidence counter.
-pub const VEHICLE_DELETED: usize = 161;
+pub const VEHICLE_DELETED: usize = 184;
 /// Scheduler evidence counter.
-pub const VEHICLE_DESCRIPTOR_BYTES: usize = 162;
+pub const VEHICLE_DESCRIPTOR_BYTES: usize = 185;
 /// Scheduler evidence counter.
-pub const VEHICLE_MOTION: usize = 163;
+pub const VEHICLE_MOTION: usize = 186;
 /// Scheduler evidence counter.
-pub const VEHICLE_OBSERVED_BYTES: usize = 164;
+pub const VEHICLE_OBSERVED_BYTES: usize = 187;
 /// Scheduler evidence counter.
-pub const VEHICLE_OUTER_VISITS: usize = 165;
+pub const VEHICLE_OUTER_VISITS: usize = 188;
 /// Scheduler evidence counter.
-pub const VEHICLE_PACKET_LOOKUPS: usize = 166;
+pub const VEHICLE_PACKET_LOOKUPS: usize = 189;
 /// Scheduler evidence counter.
-pub const VEHICLE_PERIODIC_SOUND: usize = 167;
+pub const VEHICLE_PERIODIC_SOUND: usize = 190;
 /// Scheduler evidence counter.
-pub const VEHICLE_POOL_GROWTH: usize = 168;
+pub const VEHICLE_POOL_GROWTH: usize = 191;
 /// Scheduler evidence counter.
-pub const VEHICLE_POST_TICK: usize = 169;
+pub const VEHICLE_POST_TICK: usize = 192;
 /// Scheduler evidence counter.
-pub const VEHICLE_RUNNING_SOUND: usize = 170;
+pub const VEHICLE_RUNNING_SOUND: usize = 193;
 /// Scheduler evidence counter.
-pub const VEHICLE_SCALAR_READ_BYTES: usize = 171;
+pub const VEHICLE_SCALAR_READ_BYTES: usize = 194;
 /// Scheduler evidence counter.
-pub const VEHICLE_SCALAR_WRITE_BYTES: usize = 172;
+pub const VEHICLE_SCALAR_WRITE_BYTES: usize = 195;
 /// Scheduler evidence counter.
-pub const VEHICLE_STATIONS: usize = 173;
+pub const VEHICLE_STATIONS: usize = 196;
 /// Scheduler evidence counter.
-pub const VEHICLE_VISITS: usize = 174;
+pub const VEHICLE_VISITS: usize = 197;
 
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_AGE: usize = 182;
+pub const VEHICLE_MAINT_AGE: usize = 205;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_AIRCRAFT: usize = 183;
+pub const VEHICLE_MAINT_AIRCRAFT: usize = 206;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_BYTES: usize = 184;
+pub const VEHICLE_MAINT_BYTES: usize = 207;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_CHECK: usize = 185;
+pub const VEHICLE_MAINT_CHECK: usize = 208;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_COUNTDOWN: usize = 186;
+pub const VEHICLE_MAINT_COUNTDOWN: usize = 209;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_CROSSINGS: usize = 187;
+pub const VEHICLE_MAINT_CROSSINGS: usize = 210;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_DAYS: usize = 188;
+pub const VEHICLE_MAINT_DAYS: usize = 211;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_DECAY: usize = 189;
+pub const VEHICLE_MAINT_DECAY: usize = 212;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_DELAY: usize = 190;
+pub const VEHICLE_MAINT_DELAY: usize = 213;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_ENDED: usize = 191;
+pub const VEHICLE_MAINT_ENDED: usize = 214;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_LOADING: usize = 192;
+pub const VEHICLE_MAINT_LOADING: usize = 215;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_MAX_AGE: usize = 193;
+pub const VEHICLE_MAINT_MAX_AGE: usize = 216;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_MINUTES: usize = 194;
+pub const VEHICLE_MAINT_MINUTES: usize = 217;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_OLD_NEWS: usize = 195;
+pub const VEHICLE_MAINT_OLD_NEWS: usize = 218;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_PERCENT: usize = 196;
+pub const VEHICLE_MAINT_PERCENT: usize = 219;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_PROFIT_AGE: usize = 197;
+pub const VEHICLE_MAINT_PROFIT_AGE: usize = 220;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_RENEW: usize = 198;
+pub const VEHICLE_MAINT_RENEW: usize = 221;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_REPLACE: usize = 199;
+pub const VEHICLE_MAINT_REPLACE: usize = 222;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_RESET: usize = 200;
+pub const VEHICLE_MAINT_RESET: usize = 223;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_RESET_REDUCED: usize = 201;
+pub const VEHICLE_MAINT_RESET_REDUCED: usize = 224;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_SERVICE: usize = 202;
+pub const VEHICLE_MAINT_SERVICE: usize = 225;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_SMOKE: usize = 203;
+pub const VEHICLE_MAINT_SMOKE: usize = 226;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_STARTED: usize = 204;
+pub const VEHICLE_MAINT_STARTED: usize = 227;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_TRIGGER: usize = 205;
+pub const VEHICLE_MAINT_TRIGGER: usize = 228;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_VALUE: usize = 206;
+pub const VEHICLE_MAINT_VALUE: usize = 229;
 
 /// Native-to-Rust base maintenance entries (separate from outgoing services).
-pub const VEHICLE_MAINT_ENTRIES: usize = 207;
+pub const VEHICLE_MAINT_ENTRIES: usize = 230;
 
-pub const NAMES: [&str; 208] = [
+/// Counter names, grouped by the prefix the harness selects.
+pub const NAMES: [&str; 231] = [
     "train.tick_first",
     "train.tick_second",
     "train.reversal",
@@ -603,6 +650,29 @@ pub const NAMES: [&str; 208] = [
     "signal.multi_green",
     "signal.combo_red",
     "signal.neighbour_continue",
+    "town.services",
+    "town.bytes",
+    "town.placement",
+    "town.growth",
+    "town.generated",
+    "town.coast",
+    "town.manual",
+    "town.deity",
+    "town.editor",
+    "town.invalid",
+    "town.duplicate",
+    "town.money",
+    "town.zero_growth",
+    "town.retry",
+    "town.rename",
+    "town.name_retry",
+    "town.name_exhausted",
+    "town.name_duplicate",
+    "town.fallback",
+    "town.cancelled",
+    "town.grid",
+    "town.name_set",
+    "town.entries",
     "vehicle.callback32",
     "vehicle.cargo_ages",
     "vehicle.cargo_owner",

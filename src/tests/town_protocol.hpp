@@ -35,14 +35,13 @@ static inline uint64_t TownProtocolLeaf(uint32_t op, uint32_t id, uint32_t a, ui
 	return 0;
 }
 static inline OpenTTDTownState *TownProtocolState(uint32_t) noexcept { return town_protocol_world->owner; }
-static inline void TownProtocolStations(uint32_t, uint32_t, void *, void (*)(void *, const void *, uint32_t)) noexcept {}
-static inline OpenTTDTownStationActivity TownProtocolStationActivity(const void *) noexcept { return {}; }
-static inline uint8_t TownProtocolStationOwner(const void *) noexcept { return UINT8_MAX; }
+static inline void TownProtocolStations(uint32_t, uint32_t, void *, void (*)(void *, const OpenTTDStation *, uint32_t)) noexcept {}
+static inline const OpenTTDStationService *TownProtocolStationActivityOwner(const OpenTTDStation *) noexcept { return nullptr; }
+static inline uint8_t TownProtocolStationOwner(const OpenTTDStation *) noexcept { return UINT8_MAX; }
 static inline uint32_t TownProtocolRandom(void *) noexcept { town_protocol_world->draws++; return 0xABCDEF01; }
 static inline uint32_t TownProtocolIndustry(int32_t, int32_t, uint32_t *) noexcept { return 0; }
 
 static inline uint32_t TownProtocol_map_log_x() noexcept { return 6; }
-static inline uint32_t TownProtocol_map_size_y() noexcept { return 64; }
 static inline bool TownProtocol_build_on_slopes() noexcept { return false; }
 static inline uint8_t TownProtocol_growth_rate() noexcept { return 2; }
 static inline uint8_t TownProtocol_snow_line() noexcept { return 0; }
@@ -53,7 +52,6 @@ static inline uint8_t TownProtocol_climate() noexcept { return 0; }
 static inline uint8_t TownProtocol_highest_snow_line() noexcept { return 0; }
 static inline int32_t TownProtocol_calendar_year() noexcept { return 1950; }
 static inline bool TownProtocol_allow_roads() noexcept { return false; }
-static inline int32_t TownProtocol_calendar_date() noexcept { return 0; }
 static inline uint8_t TownProtocol_road_flags(uint8_t) noexcept { return 0; }
 static inline OpenTTDTownHouseAvailability TownProtocol_house_availability(uint16_t) noexcept { return {.zones = 0xFFFF, .override_id = UINT16_MAX, .class_id = town_protocol_world->house_class, .probability = 1, .enabled = true}; }
 static inline uint8_t TownProtocol_house_flags(uint16_t id) noexcept { return id == 0 ? 1 : 16; }
@@ -70,7 +68,7 @@ static inline void TownProtocol_set_road_town(uint32_t tile, uint32_t town) noex
 static inline uint32_t TownProtocol_exchange_company(uint32_t company) noexcept { return static_cast<uint32_t>(TownProtocolLeaf(8, 0, company, 0, 0)); }
 static inline uint16_t TownProtocol_house_class(uint16_t) noexcept { return town_protocol_world->house_class; }
 static inline void TownProtocol_make_house(uint32_t tile, uint32_t town, uint32_t house, uint32_t construction) noexcept { TownProtocolLeaf(10, tile, town, house, construction); }
-static inline void TownProtocol_add_animation(uint32_t tile) noexcept { TownProtocolLeaf(11, tile, 0, 0, 0); }
+static inline void TownProtocol_add_animation(uint32_t tile, bool) noexcept { TownProtocolLeaf(11, tile, 0, 0, 0); }
 static inline void TownProtocol_population_changed(uint32_t) noexcept { town_protocol_world->population = openttd_rust_town_simulation(town_protocol_world->owner)->population; }
 static inline void TownProtocol_nearby_stations(uint32_t town, uint32_t tile, uint32_t size) noexcept { TownProtocolLeaf(15, town, tile, size, 0); }
 static inline uint32_t TownProtocol_house_count() noexcept { return static_cast<uint32_t>(TownProtocolLeaf(17, 0, 0, 0, 0)); }
@@ -95,7 +93,6 @@ static inline OpenTTDTownLeaves TownProtocolServices()
 {
 	return {
 		.map_log_x = TownProtocol_map_log_x,
-		.map_size_y = TownProtocol_map_size_y,
 		.build_on_slopes = TownProtocol_build_on_slopes,
 		.growth_rate = TownProtocol_growth_rate,
 		.snow_line = TownProtocol_snow_line,
@@ -106,7 +103,6 @@ static inline OpenTTDTownLeaves TownProtocolServices()
 		.highest_snow_line = TownProtocol_highest_snow_line,
 		.calendar_year = TownProtocol_calendar_year,
 		.allow_roads = TownProtocol_allow_roads,
-		.calendar_date = TownProtocol_calendar_date,
 		.road_flags = TownProtocol_road_flags,
 		.house_availability = TownProtocol_house_availability,
 		.house_placement = TownProtocol_house_placement,
@@ -117,7 +113,7 @@ static inline OpenTTDTownLeaves TownProtocolServices()
 		.road_info = TownProtocol_road_info,
 		.state = TownProtocolState,
 		.stations = TownProtocolStations,
-		.station_activity = TownProtocolStationActivity,
+		.station_activity_owner = TownProtocolStationActivityOwner,
 		.station_owner = TownProtocolStationOwner,
 		.dirty_authority = TownProtocol_dirty_town,
 		.dirty_town = TownProtocol_dirty_town,

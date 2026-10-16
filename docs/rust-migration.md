@@ -109,12 +109,7 @@ source and configuration digests plus the executable hash. Receipts associate
 that identity only with a matching executable and configuration; external or
 otherwise unrecorded builds retain unknown provenance.
 
-The inherited platform CI also remains in place. Windows CI uses Windows 2022 and
-Visual Studio 2022 because the pinned breakpad dependency uses
-`stdext::checked_array_iterator`, removed by newer Visual Studio. It builds
-dependencies without the inherited GitHub Packages cache and retains
-dependency/configuration failure logs; the dependency manifest and game behavior
-are unchanged.
+Windows Rust linkage is supported for the scoped native MSVC configurations below.
 
 The fork executable is `build-rust/openttd-rust`; Cargo artifacts reside in the
 ignored `build-rust/cargo` directory. CMake tracks the Rust sources, manifests,
@@ -151,9 +146,10 @@ keeps the no-PCH flags without reuse for measurement. The first local trial
 (`07c7134451`) found warm-cache validation 58% shorter than ordinary PCH builds,
 with no code or data differences in the objects.
 
-CI restores both cache roles keyed only by OS, architecture, baseline, compiler
-versions and `ccache.conf`. ccache itself hashes compiler content, arguments and
-every included file. Workflow and driver edits do not change the key (#79).
+CI cache compatibility prefixes use OS, architecture, baseline revision, compiler and ccache
+versions, and the `migration/ccache.conf` hash. The cache action adds the commit SHA to the exact
+key and restores by compatibility prefix. ccache hashes compiler content, arguments and included
+files itself; ordinary workflow/driver edits do not change the prefix (#79).
 Successful `rust-migration` pushes save the cache, and PRs restore it. Windows and
 macOS keep vcpkg binaries in an actions/cache files store keyed by runner image;
 vcpkg's ABI hashes make stale entries miss. Their Rust jobs also compile through
@@ -342,20 +338,13 @@ spawned agents to `gpt-6.1-sol` high by default, with at most five spawned threa
 explicit spawn settings select the required role, and a running host may impose a
 lower limit.
 
-`docs/skills/` holds two user-invoked skills: `/steer`, the user's Claude Code
-steering review, and `/start-development`, root's restart prompt. Steering reviews
-put their corrections in the roadmap and edit `/start-development` only to improve
-it; root follows it and leaves both skills unedited.
+`docs/skills/` holds three user-invoked skills: `/steer`, the user's Claude Code
+steering review; `/start-development`, root's restart prompt; and `/wind-down`,
+which writes the user's message pausing root. Steering reviews put their
+corrections in the roadmap and edit `/start-development` only to improve it;
+root follows these skills and leaves them unedited.
 
-The driver and CI enforce native build/tests, nonempty test inventories, reference
-test-name preservation, and these Cargo checks:
-
-```sh
-cargo fmt --all -- --check
-cargo check --workspace --all-targets --locked
-cargo clippy --workspace --all-targets --locked -- -D warnings
-cargo test --workspace --locked
-```
+The driver and CI enforce native build/tests, nonempty test inventories, reference test-name preservation, and Cargo checks listed in `AGENTS.md`.
 
 Server-side protection on `rust-migration` requires `Full validation`, the cheap
 commit/string/script-mode checks, and resolved conversations. Full validation is
@@ -482,24 +471,9 @@ generic support. Mixed owner files, blank lines, comments and data tables count.
 The diff/guard classification measures source lines, not C++ preprocessing or
 behavioral completion. Historical roadmap rows keep their labelled legacy counts.
 
-After a task's PR merges, remove its worktree with `git worktree remove PATH`
-and its branch with `git branch -d BRANCH`. Nothing under the worktree is
-preserved: evidence lives in the PR or issue, and ignored output is rebuildable.
-Lock a paused worktree with `git worktree lock --reason REASON PATH`.
-
-Preserve OpenTTD copyright notices, credits, and GPLv2. Agent-generated work is welcome
-in this fork; upstream submission policies govern contributions to OpenTTD itself.
-
 ## Selecting components
 
-Selection follows `AGENTS.md` and `docs/roadmap.md`: game code first, ownership
-ports over fragment extraction, and the semantic simulation harness (#72) as the
-default evidence for game logic. Before choosing, inventory dependencies, the
-state the component owns, shared services it calls (`Random`, pools, map
-access), and floating-point or overflow behavior. Retain the pinned original as
-the independent oracle. When the harness finds a divergence, keep the first
-differing snapshot and its inputs. Improvements to original behavior remain
-deferred issues.
+Selection follows [AGENTS.md](../AGENTS.md) and the [roadmap](roadmap.md).
 
 ## Ported components
 
@@ -516,35 +490,25 @@ Unless an entry says otherwise, these properties hold for every port:
 - Borrowed byte spans are initialized, readable bytes in one live allocation with
   length at most `PTRDIFF_MAX`, immutable during the call; empty spans may be
   null; read-only spans may overlap. Rust retains no pointer after returning.
-- Evidence is the unchanged upstream tests first; the named comparison tool covers
-  only listed gaps, and nothing here establishes whole-game equivalence.
+- Evidence is the unchanged upstream tests first; named comparisons cover only listed gaps.
+  C++ sanitizers do not instrument Rust accesses. These checks establish neither whole-game
+  equivalence nor cryptographic security or complete secret erasure.
 
 ### TGP terrain generation
 
-Rust owns the temporary height map and every TerraGenesis generation stage,
-including maximum-height estimation, amplitudes/noise, water histogram, coast
-noise and smoothing, sine redistribution and regional curves. `src/tgp.cpp`
-keeps settings extraction, shared RNG callbacks, progress and final tile writes;
-the original implementation compiles only without `WITH_RUST`.
+Rust owns the temporary height map and every TerraGenesis generation stage, including
+height estimation, noise, water histogram, smoothing and regional curves. `src/tgp.cpp` keeps
+settings extraction, shared RNG callbacks, progress and final tile writes; the original
+implementation compiles only without `WITH_RUST`.
 
-An opaque owner advances through generation and normalization, returning progress
-actions to C++. Abortion frees the owner after Rust returns, so the C++ progress
-exception never crosses a Rust frame. RNG callbacks are leaves in this synchronous
-phase: mode switching clears clients and modal generation suspends networking, so
-`RANDOM_DEBUG`'s live-network logging is unreachable. Live simulation cannot rely
-on that invariant. Settings are copied; no vector view survives a call.
-Fixed-point narrowing/wrapping, random draw order and float/double promotions
-follow the source. Coast noise preserves the low 31 polynomial bits on LP64 and
-Windows alike. Rust panics/allocation failures abort, as for the other ports.
+An opaque owner advances through generation and normalization, returning progress actions to
+C++. Settings are copied; RNG draw order and fixed-point conversions follow the source. Abortion
+frees the owner after Rust returns, so the progress exception never crosses a Rust frame.
 
-Evidence: `python3 tools/migration.py verify --jobs 2`, existing comparisons,
-`python3 tools/migration.py simulate --jobs 2`, and
-`python3 tools/migration.py simulate generate-tgp-settings --soak --jobs 2`.
-Four default and fourteen additional settings cases cover all climates, terrain
-and smoothness selections, variety, sea/border choices, height limits, high-bit
-seeds and non-square maps, including extreme aspect ratios. They compare decoded
-snapshots and plain exit saves. This is sampled evidence; maximum 4096 maps, interactive
-progress cancellation and Windows/macOS runtime parity are not exercised locally.
+Default CI verifies the build and runs `python3 tools/migration.py simulate` with four curated
+settings cases spanning all four climates and selected terrain, smoothness, variety, sea/border,
+height and map-shape values. Maximum-map performance and Windows/macOS runtime parity remain
+untested.
 
 ### Landscape partial-pixel height
 
@@ -571,38 +535,15 @@ all coordinate pairs.
 
 ### StringConsumer integer parsing
 
-C++ keeps the public templates, optional/pair/string-view adapters, cursor updates
-and formatted logging. Rust owns base selection, digit scanning, width-aware
-conversion, overflow/clamping and the independent lexical skip. Inspected types
-are 8/16/32/64-bit signed and unsigned; native `int`, `uint`, `size_t` and used
-enum aliases fall within those widths. Unsigned 64-bit values never pass through a
-signed intermediate. Negative automatic hex converts/clamps to the matching
-unsigned width, then negates/narrows and checks the signed value (the original
-modular conversion). Signed `0x-1` still parses length four but lexically skips
-two bytes; free ParseInteger rejects its remaining suffix.
+C++ keeps the public templates, cursor updates, optional/pair/string-view adapters and formatted
+logging. Rust owns base selection, digit scanning, width-aware conversion, overflow/clamping and
+lexical skipping. The ABI borrows arbitrary bytes and returns scalar parse metadata; C++ formats
+diagnostics and commits the cursor.
 
-The ABI borrows arbitrary bytes (including NUL/non-UTF-8) and returns `repr(C)`
-metadata: zero-extended value bits, matched length and diagnostic kind/byte spans.
-C++ formats the original prefix-relative messages and four-byte previews before
-advancing the cursor; errors stay diagnostic in the game and fatal in generators.
-`WITH_RUST` reaches game, tests, strgen and settingsgen through issue #5's shared
-target. Settingsgen has no integer-template call; it links the archive and uses
-only lexical skipping. Imported `HOST_BINARY_DIR` tools are already-built
-executables; no cross compilation is added.
-
-Evidence: the eleven unchanged StringConsumer cases, then (after `build` or
-`verify`, so the shared reference generators exist):
-
-```sh
-python3 tools/migration.py tools
-python3 tools/compare-integers.py
-```
-
-The probe compiles against unchanged pinned sources and the candidate: 8/16-bit
-extrema, modular negative-hex boundaries, recursive/invalid prefixes, empty/NUL
-input, long overflow runs, both clamp settings, peek/read/try/skip and free
-ParseInteger, fatal logging adapters, malformed strgen diagnostics, and fresh
-settings/string headers plus English/French output.
+Default CI runs the unchanged StringConsumer cases and `python3 tools/run-comparisons.py`, which
+includes the integer parser and builder comparison. Covered inputs include width boundaries,
+negative hexadecimal and malformed prefixes; fatal logging behavior is checked by the existing
+comparison.
 
 ### Alternating-iterator traversal
 
@@ -626,34 +567,24 @@ distinct end Base values, stable-list insertion and typed operation counts.
 
 ### StringConsumer byte algorithms
 
-`consumer.rs` owns exact unsigned little-endian assembly; bounded read/skip lengths
-and shortfall/cursor decisions; byte-prefix matching and conditional consumption;
-substring/character-set search and membership; and separator result/consumption
-decisions. C++ keeps typed optional/default conversions, string_view construction,
-diagnostic formatting, cursor commit and trivial accessors, and preserves empty
-view pointers through the original substring at the current offset.
-In-bounds Peek/Read/Skip are header-visible C++ fast paths; npos and oversized
-requests retain Rust's bounds decisions and logging before cursor commit.
+`consumer.rs` owns exact unsigned little-endian assembly; bounded read/skip lengths and
+shortfall/cursor decisions; byte-prefix matching and conditional consumption;
+substring/character-set search and membership; and separator result/consumption decisions. C++
+keeps typed optional/default conversions, string_view construction, diagnostic formatting,
+cursor commit and trivial accessors, and preserves empty view pointers through the original
+substring at the current offset.
 
-`src/rust/consumer_ffi.h` returns scalar `repr(C)` metadata by value. Rust calls no
-C++ logger while borrowing. C++ logs a shortfall before applying the returned
-position, so fatal generator logging leaves the cursor unchanged. Nonempty
-search/set/separator assertions remain preconditions; release behavior outside
-them (including the original empty-separator loops) is not claimed. Empty prefixes
-still match at end. npos maps to SIZE_MAX/usize::MAX. Bounds subtract remaining
-length before clamping, avoiding position+requested overflow. SKIP separator
-policies return and consume different lengths, repeat whole non-overlapping
-separators, and unknown values default to KEEP.
+`src/rust/consumer_ffi.h` returns scalar `repr(C)` metadata by value. Nonempty
+search/set/separator assertions remain preconditions; release behavior outside them (including
+the original empty-separator loops) is not claimed.
 
-The in-place pair, owning string/container code, allocators, escape parsing and
-encoded-string transformation remain C++. SQFile resizes its own buffer and
-rebuilds the consumer; no Rust borrow survives that boundary.
+The in-place pair, owning string/container code, allocators, escape parsing and encoded-string
+transformation remain C++. SQFile resizes its own buffer and rebuilds the consumer; no Rust
+borrow survives that boundary.
 
-Evidence: the eleven unchanged consumer cases plus four public cases (empty-prefix
-offsets, partial-width TryRead cursor preservation, multi-byte separators with
-offsets/overlap/unknown policy, overlapping byte sets). The `--consumer` mode of
-`python3 tools/compare-integers.py` compares 103 byte/offset/shortfall cases and ten
-fatal-timing checks against pinned C++; the report records `consumer_bytes`.
+Default CI retains the unchanged consumer tests and runs `python3 tools/run-comparisons.py` for
+all registered reference comparisons. The public tests cover byte reads, offsets and shortfalls;
+release behavior outside original preconditions remains unspecified.
 
 ### Spiral tile traversal
 
@@ -682,653 +613,413 @@ not use spiral traversal.
 
 ### StringBuilder numeric byte encoders
 
-Rust extracts the bytes for `PutUint8` and `PutUint16LE`/`32LE`/`64LE`, and formats
-integral `PutIntegerBase` values in bases 2 through 36: lowercase digits, a leading
-minus for signed negatives, no base prefix, one digit for zero. Signed binary
-wrappers keep their modulo-width unsigned casts; the signed magnitude uses unsigned
-negation, including `INT64_MIN`. The original 32-byte scratch buffer (including the
-minus sign) is kept: values needing more produce no `PutBuffer` call (for example
-`INT32_MIN` in base 2), exactly 32 bytes produce one; #12 records a possible
-capacity improvement. `PutUtf8` uses the migrated codec and still makes one
-zero-length sink call for an invalid codepoint.
+Rust extracts the bytes for `PutUint8` and `PutUint16LE`/`32LE`/`64LE`, and formats integral
+`PutIntegerBase` values in bases 2 through 36: lowercase digits, a leading minus for signed
+negatives, no base prefix, one digit for zero. Signed binary wrappers keep their modulo-width
+unsigned casts; the signed magnitude uses unsigned negation, including `INT64_MIN`.
 
-`src/rust/builder_ffi.h` takes scalars and returns `repr(C)` byte arrays by value;
-C++ passes a span of the returned local array synchronously to its virtual
-`PutBuffer`, and sinks must not retain it. Allocation, sink exceptions, raw `Put`,
-InPlaceBuilder copy/overlap handling and cursor updates remain C++. A C++ overload
-adapter preserves integer overload selection, unscoped-enum promotions and implicit
-user-defined conversions; bool stays rejected and widths are checked at compile
-time. Invalid bases are outside the original 2..36 `std::to_chars` precondition.
-Strgen uses the binary encoders and UTF-8 but not `PutIntegerBase`; settingsgen
-has no numeric builder call.
+`src/rust/builder_ffi.h` takes scalars and returns `repr(C)` byte arrays by value; C++ passes a
+span of the returned local array synchronously to its virtual `PutBuffer`, and sinks must not
+retain it. Invalid bases are outside the original 2..36 `std::to_chars` precondition.
 
-Evidence: the three unchanged StringBuilder cases, InPlaceReplacement and
-encoded-string tests, plus the `--builder` mode of `python3
-tools/compare-integers.py`: 1,624 formats (all bases, widths, extrema, zero, the
-32/33-byte boundary), six alias, three unscoped-enum and three implicit-conversion
-cases, and an ordered counting sink checking lengths, order and absent calls.
+Evidence: the three unchanged StringBuilder cases, InPlaceReplacement and encoded-string tests,
+plus `python3 tools/run-comparisons.py`, which runs the integer and builder comparisons in
+default CI. Those comparisons cover base/width boundaries and the synchronous output sink.
 
 ### Encoded-string compatibility and parameter rewriting
 
-Rust owns `FixSCCEncoded`, `FixSCCEncodedNegative`, `EncodedString::ReplaceParam`
-and the shared `GetEncodedStringWithArgs` serialization. C++ keeps the save-version
-dispatch and its order (legacy encoding before version 350, old markers before
-169, negative repair before 353, then sanitation), general decoding, rendering,
-ScriptText encoding and sanitation.
+Rust owns `FixSCCEncoded`, `FixSCCEncodedNegative`, `EncodedString::ReplaceParam` and the shared
+`GetEncodedStringWithArgs` serialization. C++ keeps the save-version dispatch and its order
+(legacy encoding before version 350, old markers before 169, negative repair before 353, then
+sanitation), general decoding, rendering, ScriptText encoding and sanitation.
 
-Retained quirks: legacy conversion is permissive (old E028/E02A normalize only with
-fix_code; markers are recognized inside quotes; quotes toggle and disappear; quoted
-colons stay bytes; numerics are not validated). A valid nonmarker first character
-leaves the string untouched; invalid first UTF-8 yields empty output and later
-invalid UTF-8 truncates. Negative repair accepts only SCC_ENCODED, tries unsigned
-before signed hex, keeps signed modulo bits, canonicalizes positives too, and on a
-failed read logs, defaults to zero and lexically skips. ReplaceParam requires the
-internal marker and uint32 hex ID; empty records and unknown types become
-monostate; a final separator adds no record; out-of-range replacement returns empty
-after the original parsing/diagnostic/assertion work. String parameters stay
-arbitrary bytes (NUL and RS included); public StringParameter construction still
-converts negative integers to uint64 before the boundary.
+Retained quirks: legacy conversion is permissive (old E028/E02A normalize only with fix_code;
+markers are recognized inside quotes; quotes toggle and disappear; quoted colons stay bytes;
+numerics are not validated).
 
-`src/rust/encoded_ffi.h` passes explicit tags (0 monostate, 1 uint64, 2 byte span),
-never C++ string/vector/variant layouts; StringID width and the RS/E000..E003 token
-contract are asserted. Rust returns an opaque Box owning output and diagnostics;
-C++ holds it in a unique_ptr with the Rust destroy deleter, even if copying or
-logging throws. Diagnostic offsets refer to the complete input; one scan stops at
-the first enabled assertion, and C++ replays earlier logs before asserting.
-Numeric assertions follow `!NDEBUG || WITH_ASSERT`; the serializer's string-prefix
-check follows `WITH_ASSERT` alone.
+`src/rust/encoded_ffi.h` passes explicit tags (0 monostate, 1 uint64, 2 byte span), never C++
+string/vector/variant layouts; StringID width and the RS/E000..E003 token contract are asserted.
 
-Evidence: the four unchanged FixSCCEncoded/Negative and ReplaceParam tests, plus
-`python3 tools/encoded-comparison.py` (verbatim pinned functions, Rust and portable
-bodies, four NDEBUG/WITH_ASSERT combinations, ASan/UBSan/LSan on the C++ side; the
-Rust archive is uninstrumented). No generator runtime coverage is claimed.
+Evidence: the four unchanged FixSCCEncoded/Negative and ReplaceParam tests, plus `python3
+tools/encoded-comparison.py` (verbatim pinned functions, Rust and portable bodies, four
+NDEBUG/WITH_ASSERT combinations, ASan/UBSan/LSan on the C++ side; the Rust archive is
+uninstrumented).
 
 ### Byte-string utilities
 
-Issue #21 moved case-insensitive compare/equal/prefix/suffix/contains, lowercase
-conversion, uppercase hex encoding, sequential hex decoding and byte-set trim
-scanning into `byte_strings.rs`. C++ keeps std::string owners, views, erases and the
-installed standard library's equal-prefix length-comparison policy; Rust returns
-that C++-supplied scalar only when the shared prefix is equal. All operations are
-length-delimited, including embedded NUL.
+Issue #21 moved case-insensitive compare/equal/prefix/suffix/contains, lowercase conversion,
+uppercase hex encoding, sequential hex decoding and byte-set trim scanning into
+`byte_strings.rs`. C++ keeps std::string owners, views, erases and the installed standard
+library's equal-prefix length-comparison policy; Rust returns that C++-supplied scalar only when
+the shared prefix is equal.
 
-Rust calls native C `toupper` with the original char promotion (signedness supplied
-by C++) and `tolower` with unsigned-byte promotion, keeping process-locale
-behavior. Negative-char uppercase inputs other than EOF are outside portable C's
-domain; only observed native behavior is matched (#26). Locale must not change
-concurrently.
+Rust calls native C `toupper` with the original char promotion (signedness supplied by C++) and
+`tolower` with unsigned-byte promotion, keeping process-locale behavior. Negative-char uppercase
+inputs other than EOF are outside portable C's domain; only observed native behavior is matched
+(#26).
 
-Lowercase takes an exclusive mutable span with offset at most size. Hex encode
-writes disjoint caller-owned output. Hex decode forms no Rust slices: raw reads of
-both nibbles precede each raw write, so legal input/output overlap works and earlier
-writes survive a later invalid pair; rejected lengths write nothing. Trim returns
-offsets; C++ returns a default null-data view when everything trims, and in-place
-trim keeps the newline-preserving whitespace set. Only the portable natural-contains
-fallback uses these helpers; ICU, Windows/macOS collation, validation, in-place
+Lowercase takes an exclusive mutable span with offset at most size. Only the portable
+natural-contains fallback uses these helpers; ICU, Windows/macOS collation, validation, in-place
 replacement and StringIterator backends remain C++.
 
-Evidence: the twelve unchanged utility tests, plus `python3
-tools/byte-strings-comparison.py` (3,699 records against full pinned string.cpp,
-length-result saturation above INT_MAX via mmap, -funsigned-char builds). Host
-locales are C, C.utf8 and POSIX only, so non-C mappings are untested. ASan/UBSan
-cover the C++ side only.
+Evidence: the twelve unchanged utility tests, plus `python3 tools/byte-strings-comparison.py`
+(3,699 records against full pinned string.cpp, length-result saturation above INT_MAX via mmap,
+-funsigned-char builds).
 
 ### UTF-8 codec and byte positions
 
-The full UTF-8 codec, `IsUtf8Part`, forward/backward iterator stepping and
-`GetIterAtByte` normalization run in Rust. Inline DecodeUtf8/consumer PeekUtf8
-handle leading ASCII (including NUL) without an FFI call. The C++ view keeps its borrowed
-string_view and iterator facade, pair adapters, comparison assertions, postfix
-copying and invalid-data `?` dereference. Native generators use the same codec
-through issue #5's shared target.
+The full UTF-8 codec, `IsUtf8Part`, forward/backward iterator stepping and `GetIterAtByte`
+normalization run in Rust. Inline DecodeUtf8/consumer PeekUtf8 handle leading ASCII (including
+NUL) without an FFI call. The C++ view keeps its borrowed string_view and iterator facade, pair
+adapters, comparison assertions, postfix copying and invalid-data `?` dereference.
 
-Retained behavior: surrogates are accepted; overlong and out-of-range first
-sequences are rejected; malformed trailing data after a valid first sequence is
-ignored; unused encoding bytes are zeroed. View movement scans continuation runs
-rather than decoded lengths. StringConsumer read/skip still advance one byte on
-decode failure; `TryReadUtf8` leaves its position unchanged.
+Retained behavior: surrogates are accepted; overlong and out-of-range first sequences are
+rejected; malformed trailing data after a valid first sequence is ignored; unused encoding bytes
+are zeroed.
 
-`src/rust/utf8_ffi.h` uses 32-bit codepoints and size_t lengths/offsets and returns
-`repr(C)` data by value, with no allocations or output aliases. The C++ facade keeps
-the original position assertions; valid positions bound each step, and
-codepoint/byte conversions are explicitly masked or bounded.
+`src/rust/utf8_ffi.h` uses 32-bit codepoints and size_t lengths/offsets and returns `repr(C)`
+data by value, with no allocations or output aliases.
 
-Evidence: the three unchanged UTF-8 view tests and consumer/builder tests, plus
-`python3 tools/utf8-comparison.py` (assertion and NDEBUG builds; encoding
-boundaries, malformed runs, embedded NUL, empty views, consumer-versus-view
-movement, all single bytes, and the `offset >= size` end branch including SIZE_MAX). Game logging
-and Unicode rendering are outside it.
+Evidence: the three unchanged UTF-8 view tests and consumer/builder tests, plus `python3
+tools/utf8-comparison.py` (assertion and NDEBUG builds; encoding boundaries, malformed runs,
+embedded NUL, empty views, consumer-versus-view movement, all single bytes, and the `offset >=
+size` end branch including SIZE_MAX). Game logging and Unicode rendering are outside it.
 
 ### Rounded square root and runtime integer saturation
 
 `IntSqrt(uint32_t)` and runtime `ClampTo`/`SoftClamp` call `math.rs` through
-`src/rust/math_ffi.h`. `IntSqrt` keeps nearest-integer rounding, including 65536
-for UINT32_MAX. `DivideApprox` remains C++: its potentially overflowing signed
-intermediates need separate work. Constant evaluation keeps the original bodies via
-`std::is_constant_evaluated()`; StrongType and OverflowSafeInt overloads keep their
-unwrap-and-forward behavior.
+`src/rust/math_ffi.h`. `IntSqrt` keeps nearest-integer rounding, including 65536 for UINT32_MAX.
+`DivideApprox` remains C++: its potentially overflowing signed intermediates need separate work.
 
-The ABI is scalar-only: modulo-2^64 value bits plus explicit width and signedness;
-C++20 integral conversion rebuilds the result. ClampTo also accepts 1-bit bool
-descriptors; the original template still decides which bool instantiations are
-well-formed (bool-to-int8 stays ill-formed). Rust compares in a bounded i128 domain
-and never passes uint64 through int64. Accepted wider unsigned destinations use
-Rust's uint64 saturation then C++ widening. Wider sources, wide signed
-destinations, wide SoftClamp and non-builtin integer-like destinations keep the
-original C++ runtime body; strict GCC/libstdc++ rejects some 128-bit cases that
-libc++ accepts. No new width precondition is imposed. The adapter checks 8-bit
-bytes and the 32-bit int promotion model.
+The ABI is scalar-only: modulo-2^64 value bits plus explicit width and signedness; C++20
+integral conversion rebuilds the result.
 
-Reversed signed 8/16-bit SoftClamp intervals convert min to unsigned and then
-promote to int, so `SoftClamp<int8_t>(0, -1, -3)` returns 126. Reversed 32/64-bit
-signed intervals use unsigned subtraction/division and modular conversion; unsigned
-intervals round toward min.
+Reversed signed 8/16-bit SoftClamp intervals convert min to unsigned and then promote to int, so
+`SoftClamp<int8_t>(0, -1, -3)` returns 126.
 
-Evidence: the unchanged IntSqrtTest Zero/FindSqRt, ClampTo and SoftClamp cases,
-plus `python3 tools/math-comparison.py` (every uint32 root square and rounding
-transition, width/signedness extrema, bool and character/size aliases, adapters,
-unsigned 128-bit destinations, SoftClamp intervals, GNU link-wrap call counts)
-and `python3 tools/math-extension-comparison.py` (wide
-templates on the native library; macOS CI runs it with `--build build`). Neither
-covers all inputs or platform ABIs.
+Evidence: the unchanged IntSqrtTest Zero/FindSqRt, ClampTo and SoftClamp cases, plus `python3
+tools/math-comparison.py` (every uint32 root square and rounding transition, width/signedness
+extrema, bool and character/size aliases, adapters, unsigned 128-bit destinations, SoftClamp
+intervals, GNU link-wrap call counts) and `python3 tools/math-extension-comparison.py` (wide
+templates on the native library; macOS CI runs it with `--build build`).
 
 ### Generic history structural engine
 
-Issue #29 moved descriptor-driven validity, rotation scheduling and query traversal
-into `history.rs`. HistoryRange constexpr construction/layout, typed HistoryData
-storage, every SumHistory specialization, graph fillers and
-GetAndResetAccumulatedAverage remain C++; production averaging keeps its literal-0
-int accumulators and nested reduction grouping. Saves are unchanged.
+Issue #29 moved descriptor-driven validity, rotation scheduling and query traversal into
+`history.rs`. HistoryRange constexpr construction/layout, typed HistoryData storage, every
+SumHistory specialization, graph fillers and GetAndResetAccumulatedAverage remain C++;
+production averaging keeps its literal-0 int accumulators and nested reduction grouping.
 
-Rust keeps an arbitrary-depth scalar frame stack and streams staged operations; C++
-describes immutable ranges by value and executes every typed operation after Rust
-returns. Opaque uintptr identity tokens become pointers only in C++. The acyclic
-descriptor chain must stay live and immutable until engine destruction. Unsigned
-index arithmetic wraps at uint32, and GB's uint32 truncation remains for uint64
-validity masks. Typed constructors, reducers and destructors may throw without
-crossing Rust; C++ RAII returns the opaque engine to Rust exactly once.
+Rust keeps an arbitrary-depth scalar frame stack and streams staged operations; C++ describes
+immutable ranges by value and executes every typed operation after Rust returns. Unsigned index
+arithmetic wraps at uint32, and GB's uint32 truncation remains for uint64 validity masks.
 
-Retained quirks: update and rotation use explicit cur_month while queries read the
-live TimerGameEconomy::month; children update/rotate first even for saturated or
-skipped parents; no-prerequisite higher rotations still shift; query validity ORs
-all children while IsValidHistory checks only the first; invalid children still
-contribute data; invalid query ages keep the original fatal dispatch.
+Retained quirks: update and rotation use explicit cur_month while queries read the live
+TimerGameEconomy::month; children update/rotate first even for saturated or skipped parents;
+no-prerequisite higher rotations still shift; query validity ORs all children while
+IsValidHistory checks only the first; invalid children still contribute data; invalid query ages
+keep the original fatal dispatch.
 
-Evidence: the unchanged 288-month test (86 assertions in each standalone run), plus
-`python3 tools/history-comparison.py` (11,133 records at O0/O2: phases, masks,
-arbitrary chains, ages, typed operation order, exceptions, aliasing, graph fillers,
-and the three verbatim production reducers; a nested-year fixture yields 0 where a
-flattened reduction yields 1). ASan/UBSan cover the C++ side only. Fatal stubs
-compare dispatch, not game fatal text.
+Evidence: the unchanged 288-month test (86 assertions in each standalone run), plus `python3
+tools/history-comparison.py` (11,133 records at O0/O2: phases, masks, arbitrary chains, ages,
+typed operation order, exceptions, aliasing, graph fillers, and the three verbatim production
+reducers; a nested-year fixture yields 0 where a flattened reduction yields 1).
 
 ### Authentication and streaming owners
 
-Issue #35 moved X25519 session and encryption-context ownership into Rust behind a
-versioned, primitive-only host function table. Bundled Monocypher algorithms are
-unchanged. Rust owns stable key/session allocations and vendor-context storage; C++
-supplies each vendor context's size/alignment and starts its trivial lifetime, so
-Rust mirrors no vendor struct and other archive consumers gain no vendor symbols.
-Packet, RNG, policy and logging calls run after each Rust call returns.
+Issue #35 moved X25519 session and encryption-context ownership into Rust behind a versioned,
+primitive-only host function table. Bundled Monocypher algorithms are unchanged. Rust owns
+stable key/session allocations and vendor-context storage; C++ supplies each vendor context's
+size/alignment and starts its trivial lifetime, so Rust mirrors no vendor struct and other
+archive consumers gain no vendor symbols.
 
-Secrets are initialized in their final allocation; copies go heap to heap and
-assignment overwrites fixed storage, as in C++; rvalue copies preserve the source.
-Destruction wipes with the bundled volatile wipe before deallocation, in the
-original reverse field order; temporary shared secrets have independently wiped
-storage. Streaming contexts keep the bundled successful-rekey behavior (the counter
-does not advance); failed authentication leaves context and output unchanged.
-Register spills, caller copies and vendor temporaries are not covered; complete
-secret erasure is not claimed.
+Secrets are initialized in their final allocation; copies go heap to heap and assignment
+overwrites fixed storage, as in C++; rvalue copies preserve the source. Streaming contexts keep
+the bundled successful-rekey behavior (the counter does not advance); failed authentication
+leaves context and output unchanged.
 
-Borrowed fixed-width views keep their address until owner destruction; callers
-serialize access. Exchange extra payload may alias derived key bytes. MAC and
-message regions must be disjoint; encryption is in place through raw pointers, and
-Rust never forms overlapping shared and mutable message slices. Views are never read
-during a mutating call. The original short nonempty `Packet::Recv_bytes` path is
-undefined; deferred #41 tracks it.
+Borrowed fixed-width views keep their address until owner destruction; callers serialize access.
 
-Evidence: the five unchanged network cases, plus `python3 tools/auth-comparison.py`:
-pinned and candidate session/Packet/vendor sources as separate endpoints, both mixed
-directions, Rust/Rust and portable C++ against original transcripts (wire bytes,
-derived keys, RNG traces, failure/retry, copies, aliasing, exception cleanup), with
-a C++ sanitizer run that also checks Rust allocator leaks but does not instrument
-Rust memory accesses. Not constant-time or erasure evidence.
+Evidence: the five unchanged network cases, plus `python3 tools/auth-comparison.py`: pinned and
+candidate session/Packet/vendor sources as separate endpoints, both mixed directions, Rust/Rust
+and portable C++ against original transcripts (wire bytes, derived keys, RNG traces,
+failure/retry, copies, aliasing, exception cleanup), with a C++ sanitizer run that also checks
+Rust allocator leaks but does not instrument Rust memory accesses.
 
 ### Paired Script Admin conversion
 
-`ScriptAdminMakeJSON` and `ScriptEventAdminPort::GetObject` keep their C++
-interfaces. Rust selects types, walks both conversion directions, propagates
-results and schedules the original VM and JSON operations; an opaque per-invocation
-handle returns scalar actions that C++ executes after each call returns. C++ keeps
-the bundled Squirrel VM, nlohmann JSON, script logger and network send/framing. No
-JSON tree or byte string crosses the ABI; stable C++ heap frames hold JSON
-temporaries, iterators and copied keys.
+`ScriptAdminMakeJSON` and `ScriptEventAdminPort::GetObject` keep their C++ interfaces. Rust
+selects types, walks both conversion directions, propagates results and schedules the original
+VM and JSON operations; an opaque per-invocation handle returns scalar actions that C++ executes
+after each call returns.
 
-Outgoing: `depth == 25` is checked before reading the VM type or changing JSON
-(also for an explicit initial depth); live iteration, key stringification,
-duplicate-key overwrite order, `index - 1` and `depth + 1` are kept; a failed child
-leaves completed root children, with the original VM and iterator pops before
-cleanup. Incoming: object root only, floats rejected, no depth limit; failure
-restores the stack top before logging and pushing null; malformed input keeps the
-original diagnostic. `SQInteger`/`SQRESULT` are signed 64-bit, `SQBool` unsigned
-64-bit, depth signed 32-bit (also on i686); unsigned JSON still uses
-`get<int64_t>()`. Allocation errors, `Script_FatalError`, nlohmann exceptions and
-reentrant key metamethods occur between Rust calls; RAII destroys owners without
-running pending pops, rollback or logging.
+C++ keeps the bundled VM, JSON objects, network framing and exception cleanup. No VM/JSON
+layout crosses the boundary, and no Rust borrow survives a reentrant host operation.
 
-Evidence: the two unchanged `test_script_admin.cpp` cases (15 outgoing and 27
-incoming checks), plus `python3 tools/admin-conversion-comparison.py`, which uses
-the bundled VM and unchanged pinned bodies at O0/O2: depth 25/26, incoming depth 40,
-integer extrema, byte keys, partial failure, colliding keys, reentrant `_tostring`,
-allocation failures and a script allocation limit. Its GNU link-wrap cleanup checks
-run on native Linux only. Game-log storage, arbitrary depths, network simulation
-and complete script equivalence are outside this evidence.
+Outgoing: `depth == 25` is checked before reading the VM type or changing JSON (also for an
+explicit initial depth); live iteration, key stringification, duplicate-key overwrite order,
+`index - 1` and `depth + 1` are kept; a failed child leaves completed root children, with the
+original VM and iterator pops before cleanup. Incoming: object root only, floats rejected, no
+depth limit; failure restores the stack top before logging and pushing null; malformed input
+keeps the original diagnostic.
+
+Evidence: the two unchanged `test_script_admin.cpp` cases (15 outgoing and 27 incoming checks),
+plus `python3 tools/admin-conversion-comparison.py`, which uses the bundled VM and unchanged
+pinned bodies at O0/O2: depth 25/26, incoming depth 40, integer extrema, byte keys, partial
+failure, colliding keys, reentrant `_tostring`, allocation failures and a script allocation
+limit. Game-log storage, arbitrary depths, network simulation and complete script equivalence
+are outside this evidence.
 
 ### ScriptList storage and iteration
 
-Issue #44 moved both item/value indexes, all four sort modes, live pending-cursor
-and end state, mutation accounting, filters and list algebra into Rust. C++ keeps
-script identity/bindings, pool enumeration, VM/error/operation charging and
-save/load adapters. Valuation and serialization read copied ascending-item scalars;
-every Rust borrow ends before a VM operation can reenter the list. The mutation
-token is checked after the original callback return-type check; SetValue occurs
-before the original pop and five-operation charge; earlier commits and callback
-side effects remain on failure. Clone uses the original sort/initialization flow;
-saving does not reset public iteration; mixed-type load validation is unchanged.
+Issue #44 moved both item/value indexes, all four sort modes, live pending-cursor and end state,
+mutation accounting, filters and list algebra into Rust. C++ keeps script identity/bindings,
+pool enumeration, VM/error/operation charging and save/load adapters.
 
-The scalar/pointer ABI avoids aggregate returns on 32-bit hosts; items/values are
-signed 64-bit and modification tokens signed 32-bit. Two-list operations detect
-self-aliasing before creating references. Outside the reproduced domain: original
-signed modification-counter overflow, nonempty rank decrement overflow,
-overflowing Count()-count, and callbacks that invalidate iterators while evading
-the modification check.
+The scalar/pointer ABI avoids aggregate returns on 32-bit hosts; items/values are signed 64-bit
+and modification tokens signed 32-bit. Rank arithmetic and modification tokens wrap like the
+compiled original (#260). Owner borrows end before VM reentry; callbacks that invalidate
+iterators while evading the modification check remain outside the evidence.
 
-Evidence: unchanged `regression_regression` and `regression_stationlist`, plus
-`python3 tools/script-list-comparison.py` (original, Rust and portable binaries at
-O0/O2 with the bundled VM: cursor swaps and insertions, self operations, pending
-removals, empty-list union, filters, zero/negative ranks, callback failures,
-partial commits, operation charges, List/TileList save/load and clones). It
-substitutes a command-permission bool for the game instance and populates no
-world; it is not VM, savegame or allocation-failure equivalence.
+Evidence: unchanged `regression_regression` and `regression_stationlist`, plus `python3
+tools/script-list-comparison.py` (original, Rust and portable binaries at O0/O2 with the bundled
+VM: cursor swaps and insertions, self operations, pending removals, empty-list union, filters,
+zero/negative/signed-limit ranks, callback failures, partial commits, operation charges,
+List/TileList save/load and clones). A Rust unit test seeds the token-wrap boundary.
 
 ### ScriptList VM control
 
-Issue #65 / PR #70 moves `Valuate`, VM-filtered `FillList`, `SaveObject`,
-`LoadObject`, `_get`, `_set` and `_nexti` control into a scalar Rust controller.
-C++ executes VM actions, live typed pool reads, diagnostics and native command/
-operation-limiter RAII scopes. Non-VM FillList and clone wrappers stay C++.
-Rust borrows end before host operations; no VM/world pointer or exception crosses
-the ABI. Each invocation owns its controller, destroyed by C++ RAII on exit.
-ABI records 29/30 preserve signed values, full SQBool and VM type widths.
+Issue #65 / PR #70 moves `Valuate`, VM-filtered `FillList`, `SaveObject`, `LoadObject`, `_get`,
+`_set` and `_nexti` control into a scalar Rust controller. C++ executes VM actions, live typed
+pool reads, diagnostics and native command/ operation-limiter RAII scopes.
 
-Valuation touches before validation, checks type before modification, and commits
-before pop/charge. Filtering keeps function/scope timing, validity-before-callback,
-live index rereads after callbacks, bool-only results and its original throw type.
-Save preserves ascending order without consuming the cursor. Load merges with
-partial commits, checks surplus entries before final Sort, and retains the AND
-type predicate and both ignored-result getters. Metamethods preserve conversion,
-mutation counts, cursor movement, deletion, bool normalization and diagnostics.
-Original failed-getter undefined values (#67), unrepresentable conversions,
-signed overflow and invalidated iterators remain outside defined evidence.
-Added allocations do not preserve resource-exhaustion timing.
+Valuation touches before validation, checks type before modification, and commits before
+pop/charge. Filtering keeps function/scope timing, validity-before-callback, live index rereads
+after callbacks, bool-only results and its original throw type. Original failed-getter undefined
+values (#67), unrepresentable conversions, signed overflow and invalidated iterators remain
+outside defined evidence.
 
-Evidence: both unchanged scripted suites and `python3
-tools/script-list-comparison.py`: 990 observations per O0/O2 mode against pinned
-and portable C++, preserving the previous 888-record prefix, plus identical
-generated AI/GameScript/template bindings. The fixture uses four typed items;
-production pool/CPU-limit evidence comes from the game regressions. This closes
-the named list algorithms, not Squirrel or generic world queries.
+Evidence: both unchanged scripted suites and `python3 tools/script-list-comparison.py`: 1,118
+observations per O0/O2 mode against pinned and portable C++, plus identical generated
+AI/GameScript/template bindings. The fixture uses four typed
+items; production pool/CPU-limit evidence comes from the game regressions.
 
 ### Nested widget descriptor parser
 
-`MakeNWidgets` and `MakeWindowNWidgetTree` use a widget-specific pull parser. Rust
-owns the descriptor cursor, attribute traversal, container decisions, recursive
-tree control, end markers, complete-consumption policy and first/root/body/shade
-composition. C++ keeps the single-part factory, attribute operations, widget
-classes, RTTI checks, `unique_ptr` owners, Add/GetWidgetOfType, generator callbacks
-(which may run a nested parser), constexpr builders and public signatures.
+`MakeNWidgets` and `MakeWindowNWidgetTree` use a widget-specific pull parser. Rust owns the
+descriptor cursor, attribute traversal, container decisions, recursive tree control, end
+markers, complete-consumption policy and first/root/body/shade composition. C++ keeps the
+single-part factory, attribute operations, widget classes, RTTI checks, `unique_ptr` owners,
+Add/GetWidgetOfType, generator callbacks (which may run a nested parser), constexpr builders and
+public signatures.
 
-The scalar ABI carries uint64 descriptor offsets, owner slots, uint8 widget tags
-and capability observations; no union, virtual object, RTTI layout or function
-pointer enters Rust. Enum widths, range markers, container tags and action offsets
-are asserted in C++. Retained quirks: push-button bits are not masked for container
-classification; function-produced subtrees never adopt following nodes; EOF inside
-a container is accepted; null generator results keep the unconsumed cursor and
-end-marker assertion; the `WITH_ASSERT`-only trailing-parts exception stays
-separate. Window construction clears shade first, queries caption then shade only
-with a remaining body, and writes the shade pointer before building the body; the
-inserted stacked wrapper keeps INVALID_WIDGET and its vertical body container.
-The initial `unique_ptr&&` stays a C++ reference until successful return.
-Exceptions keep already-committed children in the caller's container; stable C++
-slots hold unattached objects and temporaries, and RAII destroys them in reverse
-construction order without running pending parser actions. The shade output is
-not reset. Rust owns only control allocations and their destroy function; no
-descriptor pointer survives completion, and exceptions never unwind through a
-Rust frame. The shared Rust archive imports no widget-library callbacks.
+The scalar ABI carries uint64 descriptor offsets, owner slots, uint8 widget tags and capability
+observations; no union, virtual object, RTTI layout or function pointer enters Rust. Retained
+quirks: push-button bits are not masked for container classification; function-produced subtrees
+never adopt following nodes; EOF inside a container is accepted; null generator results keep the
+unconsumed cursor and end-marker assertion; the `WITH_ASSERT`-only trailing-parts exception
+stays separate.
 
-Evidence: all four unchanged `test_window_desc.cpp` bodies (every registered
-WindowDesc through the production parser), plus `python3
-tools/widget-parser-comparison.py` against unchanged pinned parser bodies with real
-construction primitives (163 registered descs natively): types, order, attributes,
-shade, ownership, callback/cleanup order, exceptions, and null generators under
-three assertion policies. It runs on native Linux; fatal probes compare termination
-category, not assertion text. Rendering, layout, events and arbitrary malformed
-descriptors are outside this evidence.
+Evidence: all four unchanged `test_window_desc.cpp` bodies (every registered WindowDesc through
+the production parser), plus `python3 tools/widget-parser-comparison.py` against unchanged
+pinned parser bodies with real construction primitives (163 registered descs natively): types,
+order, attributes, shade, ownership, callback/cleanup order, exceptions, and null generators
+under three assertion policies. Rendering, layout, events and arbitrary malformed descriptors
+are outside this evidence.
 
 ### ChaCha20, Poly1305 and AEAD primitives
 
-Issue #48 moved the bundled Monocypher 4.0.2 ChaCha20/Poly1305/AEAD family. Its C
-interfaces and caller-owned context types stay. Rust owns cipher rounds, MAC
-arithmetic, incremental buffering, authentication padding and composition. C++
-starts context lifetimes and passes size/alignment/field-offset descriptors; raw
-field access reads only initialized fields, preserves unwritten chunk/padding bytes
-at init and wipes the complete caller context at finalization. Counter access is
-raw and unaligned-capable (no i686 uint64 alignment assumption).
+Issue #48 moved the bundled Monocypher 4.0.2 ChaCha20/Poly1305/AEAD family. Its C interfaces and
+caller-owned context types stay. C++ starts context lifetimes and passes
+size/alignment/field-offset descriptors; raw field access reads only initialized fields,
+preserves unwritten chunk/padding bytes at init and wipes the complete caller context at
+finalization.
 
-The nonthrowing wipe and constant-time verify16 come from a two-function explicit
-cdecl table; Rust has no vendor imports or global callbacks. Cipher input and
-output are disjoint or exactly in place; key/nonce loads precede output (Elligator
-key generation overlaps its key). Unsigned arithmetic wraps; failed reads preserve
-output and context; successful stream operations rekey without incrementing the
-counter. Other Monocypher algorithms and the portable family remain C++. Compiler
-copies and spills are not erased; this is not cryptographic certification.
+The nonthrowing wipe and constant-time verify16 come from a two-function explicit cdecl table;
+Rust has no vendor imports or global callbacks. Other Monocypher algorithms and the portable
+family remain C++.
 
-ABI layout IDs 19 through 21 cover the two-leaf table and two field-layout
-descriptors. Only the native ABI executable adds a vendor object (exercising all 15
-facade/FFI calls); strgen and settingsgen link the archive with no vendor dependency.
+ABI layout IDs 19 through 21 cover the two-leaf table and two field-layout descriptors.
 
-Evidence: `python3 tools/auth-comparison.py` (1,800 transcript records) and its
-`--primitives` mode (484 direct records against pinned vendor functions through Rust
-and portable C++: variants, null keystream, overlap, split Poly1305 updates,
-padding, initializers, rekey, failure/retry), with C++ ASan/UBSan; Rust accesses are
-not instrumented.
+Default CI runs `python3 tools/auth-comparison.py` against pinned vendor functions, Rust and
+portable C++. Existing network tests and the comparison cover the primitive family; C++
+sanitizer coverage does not instrument Rust memory accesses.
 
 ### Station cargo-list queries
 
-Issue #51 reuses the Rust ScriptList owner. Rust owns the four selector/filter
-rules, pending run keys and unsigned 32-bit totals, positive flush decisions,
-add-versus-set merges, per-origin cumulative-share decoding, and query-plan
-selection (waiting/all versus equal_range, planned/all versus find). C++ keeps
-station/cargo validation, pool/GoodsEntry access, HasData checks, packet/flow
-iterators and scalar extraction. All eight specialized constructors and the generic
-facades share the reducer. Non-cargo station lists, routing and packet/flow
-ownership remain C++.
+Issue #51 reuses the Rust ScriptList owner. Rust owns the four selector/filter rules, pending
+run keys and unsigned 32-bit totals, positive flush decisions, add-versus-set merges, per-origin
+cumulative-share decoding, and query-plan selection (waiting/all versus equal_range, planned/all
+versus find). C++ keeps station/cargo validation, pool/GoodsEntry access, HasData checks,
+packet/flow iterators and scalar extraction.
 
-A caller-owned 16-byte collector (uint32 amount/previous, uint16 station IDs
-including 0xFFFF, byte selector/finalized) is asserted in C++ and ABI layout ID 18;
-Windows x86 uses explicit cdecl. Rust borrows the destination only during
-feed/finalize, and the destination outlives the collector; no world pointer, STL/VM
-layout, iterator, callback or C++ exception enters or survives a Rust call. A C++
-RAII finalizer flushes the last positive run on normal exit, early return or
-unwinding; finalization is idempotent, with no rollback. Filtering precedes key
-changes; equal-key totals and share differences wrap modulo 2^32; previous resets
-per origin and advances on every visited share, including filtered and restricted
-ones. Original signed result/modification-counter overflow is outside the defined
-domain.
+A caller-owned 16-byte collector (uint32 amount/previous, uint16 station IDs including 0xFFFF,
+byte selector/finalized) is asserted in C++ and ABI layout ID 18; Windows x86 uses explicit
+cdecl. Rust borrows the destination only during feed/finalize, and the destination outlives the
+collector; no world pointer, STL/VM layout, iterator, callback or C++ exception enters or
+survives a Rust call. Fresh collector totals are bounded by packet-pool/origin limits;
+modification tokens use the shared owner's wrapping arithmetic.
 
-Evidence: the unchanged stationlist script (24 constructions, 41 output rows), both
-scripted suites, the upstream unit inventory, and the bounded cargo mode of `python3
-tools/script-list-comparison.py` (pinned loop bodies, portable and Rust feeds,
-FlowStat origins, wrapping, sentinel keys, repeats, reentry, a C++ exception between
-feeds). The direct fixture bypasses world lookup, so failed station/cargo/company
-policy and missing-data probes are not executed; this is not cargo routing or
-station-storage equivalence.
+Evidence: the unchanged stationlist script (24 constructions, 41 output rows), both scripted
+suites, the upstream unit inventory, and the bounded cargo mode of `python3
+tools/script-list-comparison.py` (pinned loop bodies, portable and Rust feeds, FlowStat origins,
+wrapping, sentinel keys, repeats, reentry, a C++ exception between feeds).
 
 ### BLAKE2b family
 
-Bundled Monocypher BLAKE2b keeps all six public C functions. Rust owns the twelve
-compression rounds, keyed/unkeyed initialization, word/block buffering,
-pending-final-block decisions, digest serialization and final context wiping. C++
-owns the context lifetime and supplies size/alignment/field offsets (ABI descriptor
-ID 22); the archive borrows the existing nonthrowing wipe leaf, imports no vendor
-symbols, reads no context padding and adds no heap allocation. Authentication KDF,
-UID RNG/time sampling, file read/signature policy, Argon2, EdDSA and other vendor
-algorithms stay C++.
+Bundled Monocypher BLAKE2b keeps all six public C functions. Rust owns the twelve compression
+rounds, keyed/unkeyed initialization, word/block buffering, pending-final-block decisions,
+digest serialization and final context wiping. C++ owns the context lifetime and supplies
+size/alignment/field offsets (ABI descriptor ID 22); the archive borrows the existing
+nonthrowing wipe leaf, imports no vendor symbols, reads no context padding and adds no heap
+allocation.
 
-The supplied hash size stays in the initial parameter; final output writes
-`min(hash_size, 64)`, keeping defined source behavior at sizes zero and over 64.
-Keys of 65-128 bytes fit the original padded block and keep source behavior (the
-documented interface limit is 64); keys over 128 overrun original storage and have
-no reproduction guarantee. A pending key block and a full final message block stay
-uncompressed until the original transition. Zero-length updates return before
-context or pointer access. Counter carry wraps as original unsigned arithmetic.
+The supplied hash size stays in the initial parameter; final output writes `min(hash_size, 64)`,
+keeping defined source behavior at sizes zero and over 64. Keys of 65-128 bytes fit the original
+padded block and keep source behavior (the documented interface limit is 64); keys over 128
+overrun original storage and have no reproduction guarantee.
 
-One-shot output may overlap message/key, including partially: all inputs are
-consumed before output writes. Original incremental context/input/output
-preconditions still apply. Raw field/buffer access forms no overlapping Rust
-references; caller extents must fit `isize::MAX`. Finalization wipes the complete
-actual context; original keyed-init and compression temporaries still lack
-explicit wipes. No compiler-copy/spill erasure or cryptographic security is claimed.
+One-shot output may overlap message/key, including partially: all inputs are consumed before
+output writes.
 
-Evidence: the five network tests and `python3 tools/auth-comparison.py` (1,800
-authentication records; 484 cipher/MAC primitive records), whose primitive mode
-adds bounded hash cases against the pinned vendor binary: digest sizes 0/65, keys
-65/128, word/block/file-sized partitions, context state, copies, low-counter carry,
-final wiping, null zero-length output, equal/partial overlap and the Argon2/EdDSA
-callers. C++ sanitizers skip Rust accesses. The native ABI audit runs all six
-functions on real contexts (Windows x86 size/alignment, high counter, wipe).
+Default CI runs `python3 tools/auth-comparison.py` and the unchanged network tests. The
+comparison covers keyed/unkeyed hashes, streaming partitions, context copies and final wiping
+against the pinned vendor implementation.
 
 ### Packet framing, binary serialization and transfer state
 
 Rust owns the native-width limit, the persistently narrowed uint16 cursor, binary
-encoding/decoding, length-prefix sequencing, framing offsets and transfer
-planning/commit decisions. C++ keeps vector/string storage and each original
-allocation operation, direct spans, socket policy, assertions, external
-encryption/transfer callbacks, Send_string/Recv_string collection and sanitation,
-and the exact Recv_bytes callback. Copies and assignments copy scalar state and the
-existing C++ vector. No Rust borrow survives a C++ allocation or callback. ABI IDs
-23 and 24 describe the scalar Packet state and framing outputs.
+encoding/decoding, length-prefix sequencing, framing offsets and transfer planning/commit
+decisions. C++ keeps vector/string storage and each original allocation operation, direct spans,
+socket policy, assertions, external encryption/transfer callbacks, Send_string/Recv_string
+collection and sanitation, and the exact Recv_bytes callback.
 
-The facade keeps the original per-byte append order and advances each received
-result byte before its potentially throwing C++ push; parsing commits position two
-only after resize succeeds. Encryption header writes precede handler queries; send
-reset follows normal encryption return and precedes shrink. Normal false decryption
-still skips its MAC; throwing decryption does not. Transfers commit positive results
-to the live post-callback cursor with uint16 narrowing; native unsigned arithmetic
-wraps as in the original. The historical GetPacketType send-handler offset is kept.
-The nonempty-short Recv_bytes domain is undefined in the original and excluded
-(#41); zero-source and sufficiently large-source cases keep original behavior.
+The facade keeps the original per-byte append order and advances each received result byte
+before its potentially throwing C++ push; parsing commits position two only after resize
+succeeds. Normal false decryption still skips its MAC; throwing decryption does not. Transfers
+commit positive results to the live post-callback cursor with uint16 narrowing; native unsigned
+arithmetic wraps as in the original.
 
-Evidence: the five network/authentication cases, the 1,800-record mixed-endpoint
-corpus of `python3 tools/auth-comparison.py`, both scripted regressions, and
-`python3 tools/packet-comparison.py` at O0/O2 (pinned, portable and Rust Packet
-sources: binary/buffer bytes, suffix identity, copy independence, TCP/UDP framing,
-partial/zero/negative/throwing transfers, reentrant live cursor changes, close
-policy, controlled encryption callbacks, selected C++ allocation failures, and the
-original uint16 per-byte wrap with larger native buffers and prefix narrowing);
-native ABI smoke calls exercise the exports.
-Not covered: real socket delivery, all allocator failure modes, full protocol
-equivalence or full Packet ownership migration.
+Evidence: the five network/authentication cases, the 1,800-record mixed-endpoint corpus of
+`python3 tools/auth-comparison.py`, both scripted regressions, and `python3
+tools/packet-comparison.py` at O0/O2 (pinned, portable and Rust Packet sources: binary/buffer
+bytes, suffix identity, copy independence, TCP/UDP framing, partial/zero/negative/throwing
+transfers, reentrant live cursor changes, close policy, controlled encryption callbacks,
+selected C++ allocation failures, and the original uint16 per-byte wrap with larger native
+buffers and prefix narrowing); native ABI smoke calls exercise the exports.
 
 ### Normal X25519 and Montgomery ladder
 
-`crypto_x25519`, `crypto_x25519_public_key` and `crypto_eddsa_trim_scalar` keep
-their public interfaces; one coarse `scalarmult` adapter serves the unchanged
-dirty-small/inverse callers. Rust owns the complete 255/256-bit ladder and its
-private ten-limb field decode, encode, add/subtract, masked swap/copy,
-multiplication, squaring, carry, inverse-square-root and inversion. C++
-shared-field helpers remain for untouched Edwards, conversions, Elligator and other
-families; that internal duplicate is unfinished migration, not shared-field closure.
+`crypto_x25519`, `crypto_x25519_public_key` and `crypto_eddsa_trim_scalar` keep their public
+interfaces; one coarse `scalarmult` adapter serves the unchanged dirty-small/inverse callers.
+Rust owns the complete 255/256-bit ladder and its private ten-limb field decode, encode,
+add/subtract, masked swap/copy, multiplication, squaring, carry, inverse-square-root and
+inversion. C++ shared-field helpers remain for untouched Edwards, conversions, Elligator and
+other families; that internal duplicate is unfinished migration, not shared-field closure.
 
-The original carry schedule bounds even limbs below `1.1 * 2^25` and odd limbs
-below `1.1 * 2^24`; ladder add/subtract stay within the original multiply bounds
-`1.65 * 2^26/25`; unrolled products/sums stay below `0.67 * 2^61`, small products
-below `2^58`, and serialization's signed intermediates below `2^29`. Signed helpers
-use unchecked arithmetic only under these closed source-derived bounds, so valid
-fixed-byte inputs gain no overflow branches or signed wrapping. Arithmetic shifts
-keep the supported C++ sign extension; unsigned serialization keeps the original
-bit packing and narrowing. Native width and calling conventions are explicit.
+A separate synchronous immutable cdecl table (ABI ID 25) holds only the original nonthrowing
+wipe and constant-time verify32 leaves; no field object, callback registration, application
+operation, vendor import or heap crosses the ABI. Original explicit wipe points and order
+remain; compiler spills/copies are not erased.
 
-A separate synchronous immutable cdecl table (ABI ID 25) holds only the original
-nonthrowing wipe and constant-time verify32 leaves; no field object, callback
-registration, application operation, vendor import or heap crosses the ABI.
-Private arrays are initialized in their final stack storage and accessed raw,
-permitting original internal aliasing without whole-array moves or overlapping
-Rust references. Original explicit wipe points and order remain; compiler
-spills/copies are not erased.
+The fixed 32-byte output may overlap secret/scalar/point, including partially: inputs are
+consumed before serialization. The public-key top bit is ignored, noncanonical field encodings
+are accepted and raw zero outputs remain primitive outputs; authentication rejection policy and
+RNG/protocol behavior are unchanged.
 
-The fixed 32-byte output may overlap secret/scalar/point, including partially:
-inputs are consumed before serialization. Scalar trim keeps literal forward
-byte-copy behavior, including overlapping propagation. The public-key top bit is
-ignored, noncanonical field encodings are accepted and raw zero outputs remain
-primitive outputs; authentication rejection policy and RNG/protocol behavior are
-unchanged. Coarse callers keep both bit counts, including the original 256-bit
-inverse/dirty-small path.
-
-Evidence: the five network tests and `python3 tools/auth-comparison.py`, whose
-direct fixture compiles the vendor's actual private ladder with one coarse wrapper
-as the oracle: scalar clamp bits, zero/one/base/noncanonical/top-bit points,
-output/input overlap, forward trim, both raw ladder bit counts with bit 255 set,
-and deterministic dirty-small/fast/inverse callers. Native ABI calls run all four
-exports and the cdecl table, checking four verifies and original wipe counts/sizes
-per ladder. Neither these nor C++ sanitizers (which skip Rust accesses) prove spill
-erasure or cryptographic security.
+Evidence: the five network tests and `python3 tools/auth-comparison.py`, whose direct fixture
+compiles the vendor's actual private ladder with one coarse wrapper as the oracle: scalar clamp
+bits, zero/one/base/noncanonical/top-bit points, output/input overlap, forward trim, both raw
+ladder bit counts with bit 255 set, and deterministic dirty-small/fast/inverse callers.
 
 ### Coupled string validation and borrowed in-place replacement
 
-Rust owns the shared StrMakeValid scan/policy decisions, the StrValid fixed-span
-scan and InPlaceBuilder write progression/copy. Each sanitation decision carries a
-consumed count and at most one existing UTF-8 encoded character; C++ advances the
-actual StringConsumer before its original output operation. String append, erase,
-C-string strlen/tail termination, spans, reference rebinding, fatal dispatch,
-containers and borrowed lifetimes stay C++, as do other string algorithms and
-Packet text collection/Recv_bytes. There is no Rust heap owner or whole-result
-preallocation. Trivial facade getters stay local; the write operation receives the
-live consumer count, not a cached cursor. InPlaceReplacement copies share borrowed
-storage but keep independent progress and builders bound to their own copied
-consumers. ABI IDs 26/27 describe scan/write results.
+Rust owns the shared StrMakeValid scan/policy decisions, the StrValid fixed-span scan and
+InPlaceBuilder write progression/copy. Each sanitation decision carries a consumed count and at
+most one existing UTF-8 encoded character; C++ advances the actual StringConsumer before its
+original output operation.
 
-The historical codec stays authoritative, including accepted surrogate values.
-Malformed decoding skips one byte without replacement, decoded NUL consumes its
-byte then stops, and unknown settings bits are ignored. Rust keeps the exact
-printable/private-use/sprite rules, five allowed SCC codes, all four flags and
-CRLF/newline/space/question-mark precedence; C++ checks flag positions and SCC
-constants at compile time. Native unsigned capacity subtraction keeps wrapping when
-the public consumer is reassigned; overtake failure changes neither bytes nor
-position before C++ NOT_REACHED. Valid copying reads then writes forward through
-raw pointers, without overlapping Rust slices or retained borrows. The original
-ranges::copy precondition excludes a destination inside nonempty input, including
-exact/right overlap; defined disjoint/left overlap is the compatibility domain
-(https://eel.is/c++draft/alg.copy).
+The historical codec stays authoritative, including accepted surrogate values. The default UTF-8
+comparison covers malformed sequences and byte offsets; game logging and Unicode rendering
+remain outside its scope.
 
-Evidence: the unchanged InPlaceReplacement case (26 assertions) and the UTF-8,
-consumer and builder tests, plus `python3 tools/utf8-comparison.py` in its O2
-assertions/NDEBUG modes against unchanged pinned string.cpp bodies, portable and
-Rust candidates: all 16 flags with ignored unknown bits, malformed/truncated/
-overlong sequences, surrogates, printable/SCC boundaries, NUL and C-string suffix
-bytes, missing terminators, empty/unchanged inputs, copy/assignment/self/rvalue
-copies, live consumer rewinding, defined left overlap and overtake fatal state. A
-fixed observation builder checks consumption before C++ append allocation failure
-and reentrant validation; native ABI calls check byte flags, surrogate/NUL policy
-and copy state. Not covered: exhaustive
-malformed sanitation/settings input, every allocator failure, out-of-domain
-overlap or text rendering.
+C++ keeps allocation, string owners, cursor commit and fatal dispatch. Rust retains no buffer
+pointer; raw forward reads/writes preserve defined left overlap without overlapping references.
+
+Evidence: the unchanged InPlaceReplacement case (26 assertions) and the UTF-8, consumer and
+builder tests, plus `python3 tools/utf8-comparison.py` in its O2 assertions/NDEBUG modes against
+unchanged pinned string.cpp bodies, portable and Rust candidates: all 16 flags with ignored
+unknown bits, malformed/truncated/ overlong sequences, surrogates, printable/SCC boundaries, NUL
+and C-string suffix bytes, missing terminators, empty/unchanged inputs,
+copy/assignment/self/rvalue copies, live consumer rewinding, defined left overlap and overtake
+fatal state.
 
 ### Link graph job computation
 
-Issue #74 moves demands, both MCF passes, cycle elimination, path lifetime and
-flow mapping into Rust. Rust owns copied graph/settings, private demand/edge
-annotations, a reusable path arena and ordered cumulative-share maps. C++ keeps
-job scheduling/thread/abort flags, LGRP/LGRJ save/load and the existing station
-flow join. The three original algorithm files and Path bodies compile only in
-the portable build; job facades materialize completed shares and edge flows.
+Issue #74 moves demands, both MCF passes, cycle elimination, path lifetime and flow mapping into
+Rust. Rust owns copied graph/settings, private demand/edge annotations, a reusable path arena
+and ordered cumulative-share maps. C++ keeps job scheduling/thread/abort flags, LGRP/LGRJ
+save/load and the existing station flow join.
 
-ABI IDs 34-37 cover scalar node/edge/settings/share records. Immutable inputs are
-borrowed only while copied; one opaque result owns returned arrays and is destroyed
-by C++ RAII after materialization. Its sole callback reads the job's atomic abort
-flag and cannot throw/reenter. C++ allocations happen outside Rust. Panics abort.
-Unsigned arithmetic, signed-to-unsigned capacity division, queue/comparator ties,
-recursive path/cycle order and cumulative-share update/rounding stay explicit.
+ABI IDs 34-37 cover scalar node/edge/settings/share records. Its sole callback reads the job's
+atomic abort flag and cannot throw/reenter. C++ allocations happen outside Rust.
 
-Evidence: the unchanged regressions/comparisons and `python3 tools/migration.py
-simulate` with manual/cargodist road saves, symmetric/asymmetric scalers, boundary
-distance/size/accuracy/saturation settings and reload from a reference snapshot
-with outstanding LGRJ records (GLOG history is reset only in prepared road inputs so both
-loaders log their revision). Saves compare STNN/LGRP/LGRJ and all other chunks.
-Native ABI smoke covers snapshot/result/abort ownership; Rust unit cases retain
-negative capacity promotion and wrapped/empty shares. No armoured network is in
-the road corpus. Graphs, allocator failures and abort timing are not exhaustive;
-resource exhaustion timing differs with the allocation strategy.
+Evidence: the unchanged regressions/comparisons and `python3 tools/migration.py simulate` with
+manual/cargodist road saves, symmetric/asymmetric scalers, boundary
+distance/size/accuracy/saturation settings and reload from a reference snapshot with outstanding
+LGRJ records (GLOG history is reset only in prepared road inputs so both loaders log their
+revision). Graphs, allocator failures and abort timing are not exhaustive; resource exhaustion
+timing differs with the allocation strategy.
 
 ### Built-in town-name generation
 
-Issue #96 moves all 21 built-in generators, seed selection, English replacements,
-Finnish vowel handling, Czech grammatical matching and private constants into Rust.
-C++ keeps NewGRF routing, town-name retries/uniqueness, settings and save/load.
-Original bodies and unshared tables compile only in portable builds; four
-French/Spanish/Silly tables remain in C++ for unchanged legacy save remapping and
-are duplicated privately in Rust. This does not migrate town growth or storage.
+Issue #96 moves all 21 built-in generators, seed selection, English replacements, Finnish vowel
+handling, Czech grammatical matching and private constants into Rust. C++ keeps NewGRF routing,
+settings and save/load; #246 owns retries/uniqueness.
 
-One coarse call owns complete output behind an opaque result. C++ appends the
-immutable byte view with RAII destruction, including on append exceptions; no
-builder/world pointer, callback or shared RNG enters Rust. All u32 seeds and
-original language IDs retain explicit arithmetic, exact UTF-8 bytes and dispatch
-order. English replacement and Finnish vowel scans start at the generated suffix,
-so existing builder bytes do not influence them. Panics/OOM abort; allocation and
-partial-output failure timing differ with the owned-output strategy.
+One coarse call owns complete output behind an opaque result. C++ appends the immutable byte
+view with RAII destruction, including on append exceptions; no builder/world pointer, callback
+or shared RNG enters Rust.
 
-Evidence: the semantic harness observes actual built-in rendered names through
-read-only AI logs and compares every saved field in plain/desync modes. Identical
-reference-derived inputs patch only intended CITY type/parts; all 21 styles cover
-bit/complement seeds and source-derived English/Finnish/Czech branch witnesses.
-Focused CTest covers both u32 endpoints for every style, arbitrary UTF-8/NUL
-prefixes, repeated appends, Finnish prefix-vowel isolation and the actual company
-string-ID renderer. Native ABI smoke checks owned-output lifetime/UTF-8 bytes.
-This samples seeds; it is not exhaustive coverage of 21 * 2^32 combinations,
-every allocator failure or NewGRF town-name behavior.
+Evidence: the semantic harness observes actual built-in rendered names through read-only AI logs
+and compares every saved field in plain/desync modes. This samples seeds; it is not exhaustive
+coverage of 21 * 2^32 combinations, every allocator failure or NewGRF town-name behavior.
 
 ### Tree generation, simulation and planting
 
-Rust owns generation/scattering/grove geometry, placement policy, tile growth,
-climate loops, tick seeding and the persisted byte counter, plus command traversal,
-limits, costs and errors (#99/#107). Original bodies compile only in portable
-builds. Map/pools, rendering and the editor forest-brush loop remain C++; the brush
-calls Rust placement.
+Rust owns generation/scattering/grove geometry, placement policy, tile growth, climate loops,
+tick seeding and the persisted byte counter, plus command traversal, limits, costs and errors
+(#99/#107). Original bodies compile only in portable builds. Map/pools, rendering and the editor
+forest-brush loop remain C++; the brush calls Rust placement.
 
-Each entry (tile loop, tick, generate, scatter, place, plant, command, clear) is one
-plain call with a by-value settings record (#202). It reads typed plant/tree records
-and calls typed `noexcept` services from a designated `OpenTTDTreeServices` table and
-the shared map predicates (`GetTileZ` only where the original calls it) at the
-original points. Water flooding, the NewGRF ambient callback and nested landscape
-clears may reenter; no Rust borrow survives them and the tile is read again
-afterwards. World-generation abort is the only handoff: the progress wrapper keeps
-the exception, Rust returns with no further draw or write, and the facade rethrows.
-Save/load reaches only counter-address/reset exports; DATE/TTD/TTO keep the
-original byte and DATE LoadCheck omission.
+Each entry (tile loop, tick, generate, scatter, place, plant, command, clear) is one plain call
+with a by-value settings record (#202). It reads typed plant/tree records and calls typed
+`noexcept` services from a designated `OpenTTDTreeServices` table and the shared map predicates
+(`GetTileZ` only where the original calls it) at the original points. Water flooding, the NewGRF
+ambient callback and nested landscape clears may reenter; no Rust borrow survives them and the
+tile is read again afterwards. World-generation abort is the only handoff: the progress wrapper
+keeps the exception, Rust returns with no further draw or write, and the facade rethrows.
+Save/load reaches only counter-address/reset exports; DATE/TTD/TTO keep the original byte and
+DATE LoadCheck omission.
 
-`python3 tools/migration.py simulate trees` covers four climates, tree placers,
-extra-placement modes, growth/ground/count states, counter reloads and commands;
-`--self` and `--soak` check reproducibility and longer runs. Cargo tests and the
-native ABI probe cover explicit/editor policy, Money bounds, bitpattern 7, abort
-return order, reentry and `GetTileZ` call points. Editor interaction, diagonal
-traversal, legacy saves, NewGRF ambient callbacks and the abort rethrow are unreached.
+`python3 tools/migration.py simulate trees` covers climates, tree placement, growth and counter
+reloads. Cargo tests and the native ABI probe cover explicit/editor policy, Money bounds,
+bitpattern 7, abort return order, reentry and `GetTileZ` call points. Editor interaction,
+diagonal traversal, legacy saves, NewGRF ambient callbacks and the abort rethrow are unreached.
 
 ### Effect vehicles
 
-Rust owns all twelve controllers, movement tables and private animation bytes
-(#101/#107). Each C++ EffectVehicle shell
-owns one zero-created opaque state, also on indexed load; RAII destroys it on
-ordinary deletion and pool cleanup. Original controllers compile only in the
-portable build. Vehicle fields, pools, factories, tick dispatch, bounds,
-transparency, viewport/hash updates and rendering stay canonical C++.
+Rust owns all twelve controllers, movement tables and private animation bytes (#101/#107). Each
+C++ EffectVehicle shell owns one zero-created opaque state, also on indexed load; RAII destroys
+it on ordinary deletion and pool cleanup.
 
-Copied call-scoped observations and immediate scalar writes keep original
-mutation order. Rust calls common Random/map and effect-specific sound,
-viewport and animated-tile noexcept wrappers directly; none can reenter Rust.
-Private-owner access scopes end before every service. Expiry returns false
-before C++ deletion, Vehicle::~Vehicle and Pool::FreeItem/PostDestructor.
-SaveOrLoad/AfterLoadGame do not invoke controllers: modern/FixPointers and
-legacy loading call separate get/set exports through existing nested staging,
-which commits partial loads on unwind. No save operation crosses Rust frames.
-Explicit byte/word narrowing/wrapping and RNG short circuit retain source quirks.
+Copied call-scoped observations and immediate scalar writes keep original mutation order. Rust
+calls common Random/map and effect-specific sound, viewport and animated-tile noexcept wrappers
+directly; none can reenter Rust.
 
-`python3 tools/migration.py simulate effects` compares every save chunk across
-all subtypes, expiry, reload, natural creation and callers; `--self`/`--soak`
-check reproducibility/longer runs. Native ABI/CTest fixtures cover immediate
-writes, transient service order, RNG thresholds, state lifetime and save staging;
-factory tests cover Above/Rel coordinates. Viewport pixels, audible output,
-full legacy fixtures and every caller remain limits. Environmental exceptions
-terminate inside noexcept wrappers; Rust panics/OOM abort.
-RANDOM_DEBUG source locations name the common wrapper.
+`python3 tools/migration.py simulate effects` compares save chunks across subtypes, expiry,
+reload and natural creation. Viewport pixels, audible output, full legacy fixtures and every
+caller remain limits.
 
 ### Water-region cache and graph service
 
@@ -1349,7 +1040,7 @@ Map replacement during a visitor violates original reference lifetimes.
 `python3 tools/migration.py simulate water --jobs 2` compares every semantic
 chunk in plain/desync runs: manual/cargodist cargo, paid delivery, lock/canal
 closure and recovery, cross-region aqueduct, nearest depot, and reference-built
-live-path reload. `--self` and `--soak` retain the same witnesses. Native ABI
+live-path reload. Native ABI
 probes cover visitor invalidation and owner replacement that ordinary YAPF
 visitors cannot trigger. `tools/water-scenario-ai/README.md` gives preparation,
 negative-probe and optional crossing/timing measurement commands. Arbitrary
@@ -1358,141 +1049,103 @@ maps/NewGRFs and exhaustive region/path limits remain evidence limits.
 ### Disaster scheduling and vehicles
 
 Issue #103 moves all fifteen subtype controllers, eight initializers, eligibility,
-countdown/reset, industry construction reset and square-clearing policy, movement,
-shadow/rotor updates and both target-release hooks into Rust. Rust owns each
-shell's state, flags, image override and destroyer target, plus the persisted
-global delay. Original bodies compile only in portable builds. Canonical Vehicle
-fields, pools, map storage, save/load adapters, timer registration and rendering
-remain C++.
+countdown/reset, industry construction reset and square-clearing policy, movement, shadow/rotor
+updates and both target-release hooks into Rust. Rust owns each shell's state, flags, image
+override and destroyer target, plus the persisted global delay. Original bodies compile only in
+portable builds.
 
-Copied observations and direct noexcept shared services preserve original ordering
-and shared RNG draws. Private scalar addresses remain stable through modern and
-legacy save staging; flight helpers borrow only the flags scalar for their call.
-Returned actions are limited to vehicle deletion, RoadVehicle::Crash's window
-invalidation callbacks and landscape-clear command callbacks/nested release
-hooks; no world/private-state reference survives them. Per-call continuations
-hold copied IDs and observations; panics and environmental failures abort.
+Copied observations and direct noexcept shared services preserve original ordering and shared
+RNG draws. Private scalar addresses remain stable through modern and legacy save staging; flight
+helpers borrow only the flags scalar for their call.
 
-`python3 tools/migration.py simulate disasters` checks naturally scheduled families,
-countdown boundaries, small/large airport crash/block/clear and queued events,
-real human-train UFO selection/landing/nearby breakdown/area clearing, road UFO
-crash/removal, industry reset/removal, submarine movement/expiry and live-target
-reload. `--self` checks the original against itself; `--soak` extends completion
-runs. Every saved chunk and debug log compares, with declared typed input edits.
-Native ABI/Rust tests exercise stable owners, width/wrap behavior, direct services
-and deletion cancellation. Legacy save fixtures, viewport pixels, sound output,
-allocator failure timing and exhaustive NewGRF combinations remain limits.
+The default `disasters` simulation checks scheduling, crashes, removal, industry reset,
+submarine movement and reload. Legacy save fixtures, viewport pixels, sound output, allocator
+failure timing and exhaustive NewGRF combinations remain limits.
 
 ### Cargo payment and delivery
 
-Issue #117 moves CargoPayment state/lifetime, final/transfer payment and settlement,
-industry acceptance, statistics/payment ordering, destination deduplication and the
-complete production flush into Rust. C++ retains pool shells, canonical world and
-packet storage, loading/reservation, subsidy checks, NewGRF resolution and UI.
-Original component bodies compile only in the portable build. CAPY adapters stage
-only call-local fields; Rust owns the front association and three Money values.
+Issue #117 moves CargoPayment state/lifetime, final/transfer payment and settlement, industry
+acceptance, statistics/payment ordering, destination deduplication and the complete production
+flush into Rust. C++ retains pool shells, canonical world and packet storage,
+loading/reservation, subsidy checks, NewGRF resolution and UI.
 
 ABI IDs 49-51 describe cargo observations, saved fields and synchronous services.
-No world reference survives a leaf. Cargo/refusal/production/randomisation/animation
-and vehicle-sound resolution uses the NewGRF evaluator, without script VM entry or
-payment/destination reentry; wrappers are noexcept. Save/load errors stay in C++.
-Money saturates arithmetic but retains native shifts; callback unsigned products,
-BigMulS narrowing, stockpile limits and ordered randomisation/animation are explicit.
+Cargo/refusal/production/randomisation/animation and vehicle-sound resolution uses the NewGRF
+evaluator, without script VM entry or payment/destination reentry; wrappers are noexcept. Money
+saturates arithmetic but retains native shifts; callback unsigned products, BigMulS narrowing,
+stockpile limits and ordered randomisation/animation are explicit.
 
-`python3 tools/migration.py simulate economy` compares all semantic chunks during
-real road delivery/transfer, active CAPY reload and a five-unit partial acceptance
-followed by stockpile production. `--self` and `--soak` reuse these cases. Existing
-road saves have no station catching two accepting industries; `python3 -m
-tools.simulation.economy` checks ordered multi-destination dedup/flush and income/
-transfer arithmetic against unchanged pinned bodies at this concrete corpus gap.
-The focused cargodist case drains overdue reference jobs, then uses interval 90
-and recalc time 9000; existing play scenarios retain frequent link-graph jobs.
-CTest/Windows ABI evidence checks owner settlement/cleanup and layouts.
-NewGRF resolver execution, legacy CAPY files and every industry layout are not
+The default `economy` simulation compares delivery, transfer, active CAPY reload and partial
+acceptance. NewGRF resolver execution, legacy CAPY files and every industry layout are not
 exhaustive in the semantic corpus; the narrow fixture supplies callback results.
 
 ### Ship YAPF searches and canonical path cache
 
-Rust owns both region and track searches, arena indices/parent chains, open and
-closed membership, the original binary-heap tie/removal rules, destination
-estimates, region corridor, two attempts, random lost paths and cache extraction
-(#119). Each Ship owns one opaque Rust path with copied controller access;
-modern VEHS stages one byte across C++ load errors and commits it on unwind,
-while the pre-struct-list loader retains its reversed path order. Original search
-bodies and vector ownership compile only in portable builds.
+Rust owns both region and track searches, arena indices/parent chains, open and closed
+membership, the original binary-heap tie/removal rules, destination estimates, region corridor,
+two attempts, random lost paths and cache extraction (#119). Each Ship owns one opaque Rust path
+with copied controller access; modern VEHS stages one byte across C++ load errors and commits it
+on unwind, while the pre-struct-list loader retains its reversed path order.
 
-C++ keeps ship/world pools, track following, station/dock queries, engine/settings
-observations and canonical map arrays. Direct noexcept leaves return copied
-records; water-neighbour cursors enter the distinct #104 cache owner without
-search reentry. Destination-only reads never query water class on a blocked
-origin. No ordinary throwing/reentrant world callback occurs in this search;
-save errors remain outside Rust frames. Panics/OOM/environmental failures abort.
-ABI IDs 52-56 describe input, leaves, follower/tile records and chosen results.
+C++ keeps ship/world pools, track following, station/dock queries, engine/settings observations
+and canonical map arrays. No ordinary throwing/reentrant world callback occurs in this search;
+save errors remain outside Rust frames.
 
-The existing `python3 tools/migration.py simulate water --jobs 2` corpus compares
-all chunks for ferry manual/cargodist, canal/lock loss and recovery, aqueducts,
-depot reversals and reference-produced live-path reload. Native checks compare
-2,000 heap operations to unchanged CBinaryHeapT and check path copy/lifetime and
-reversal and fixed/map-derived limit control against unchanged CYapfBaseT.
-Each candidate run requires alternate docking, retries and cache/reversal
-witnesses (`ship_yapf.*` counters); node limits use injected graphs, not
-reachable-map claims. Arbitrary maps/NewGRFs and complete legacy saves are not
+The existing `python3 tools/migration.py simulate water --jobs 2` corpus compares all chunks for
+ferry manual/cargodist, canal/lock loss and recovery, aqueducts, depot reversals and
+reference-produced live-path reload. Arbitrary maps/NewGRFs and complete legacy saves are not
 exhaustive.
 
 ### Town growth and lifecycle state
 
-Issue #120 owns town tick traversal, road walking/build choices,
-bridge/tunnel/terraform retries, house selection/layout/placement and expansion.
-The partial #148 extension owns metadata, population/house counts, radii, ratings,
-masks, goals, received/supplied histories, rebuild counters and building counts.
-Population/radius, monthly histories, yearly aging, authority and rating policy
-run in Rust. Founding/generation, house tile loops and commands remain in C++.
-Original globals are process-wide under the game-state mutex, including GUI commands.
-C++ shells expose native field aliases to the single Rust owner; scoped save
-staging preserves modern/legacy formats, nested loads and partial load commits.
-Growth entries call named synchronous `noexcept` services; fixed probability
-scratch preserves original candidate order without per-attempt heap allocation.
-Native stack CommandCost services preserve full errors/params/expense/move state;
-owner accesses end before commands and NewGRF callbacks that may reenter.
-Portable original bodies remain under the non-Rust branches. Panics and
-exceptional environmental failures abort; save/load errors stay native.
-`python3 tools/migration.py simulate town-growth --jobs 2` compares house/road,
-bridge/terrain, growth state, funding expiry, cargo goals, layouts/climates and
-modern reload; the default buildings case requires a saved yearly-age witness.
-`--self`/`--soak` extend these scenarios. Native and Cargo tests
-cover expansion modes, first-road failures, reentry, multi-tile writes, canonical
-aliases, count reuse, cross-thread globals and partial staging. Default CI rejects
-production thread-local state except per-call depot scratch. Mandatory reference
-probes compare unchanged tunnels, full-width histories/radii and nested rating
-scratch/authority thresholds and transported-percent overflow.
-Natural tunnel construction, real custom NewGRF callbacks and complete historical
-saves remain evidence limits; #148 is not yet a complete lifecycle ownership port.
+Issue #120 moves town tick traversal, road/build choices, terrain retries, house
+selection/placement and expansion into Rust. The partial #148 extension owns town metadata,
+histories, ratings and building counts; C++ retains house tile loops and remaining
+authority/deletion commands. Native field aliases expose one Rust owner, with process-wide state
+under the game-state mutex.
+
+Rust ends owner borrows before commands or NewGRF callbacks that can reenter. The default
+`town-growth` simulation and native tests cover growth, layouts, reload, reentry and aliases.
+Natural tunnel construction, custom NewGRF callbacks and complete historical saves remain
+evidence limits; #148 is not a complete lifecycle port.
+
+### Town founding, generation and names
+
+#246 extends the sole town owner with canonical custom-name bytes and owns founding,
+placement/coastal/grid search, initial growth, generation counts/retries, layout, rename and
+automatic/custom-name uniqueness. C++ keeps map/pool shells, house specs, rendering/NewGRF
+resolvers, spatial/noise/news services and native save decoding. A separate native custom-name
+presentation string retains the original `GetCachedName()` reference identity through
+rename/reset/re-rename; commands, validation and save authority read Rust bytes. Generated-name
+cache stays separate. All descriptor-addressable town scalars/growth fields load directly
+through their aliases. Only the opaque Rust name uses scoped native string staging, committing
+partial decoded state on unwind. Legacy compatibility scratch remains native. Named typed
+services return native enum/scalar widths; allocation resolves the canonical owner once. Borrows
+end before growth, rendering, deletion and reentry. Only
+`SetGeneratingWorldProgress`/`IncreaseGeneratingWorldProgress` return cancellation to a native
+frame; Rust drops uniqueness scratch before native rethrow. Portable original bodies remain
+unchanged in non-Rust branches. `python3 tools/migration.py simulate town-founding- --jobs 2`
+compares climate/layout, coastal generation, manual/deity/editor commands, exact
+cost/error/extra-money/ID, zero-growth deletion/reuse, rename/cache lifetime, name exhaustion
+and reload. Default module-owned adapters also compare cancellation against unchanged source,
+full-width count clamps/RNG and otherwise unreachable name bytes; missing markers fail. Real
+NewGRF, historical saves, GUI threading and final 10,000-attempt fallback remain coverage limits
+tracked in #156; house lifecycle belongs to #256.
 
 ### Road vehicle control and private state
 
-#121 moves tick/day control, movement, blocking/overtaking, reversal, station/depot
-transitions, crash expiry, servicing and cache policy to Rust. Each shell owns
-seven scalars and the canonical path; #124 YAPF writes that same path. Modern,
-split-vector and TTD/TTO adapters retain field widths through C++ staging.
-Original bodies remain portable; C++ keeps physics, map/pools, orders/loading,
-construction, NewGRF callbacks and rendering.
+#121 moves tick/day control, movement, blocking/overtaking, reversal, station/depot transitions,
+crash expiry, servicing and cache policy to Rust. Each shell owns seven scalars and the
+canonical path; #124 YAPF writes that same path. Modern, split-vector and TTD/TTO adapters
+retain field widths through C++ staging.
 
-#199 adds shared typed vehicle and GroundVehicle services (`vehicle.rs`,
-`vehicle_ffi.h`, `vehicle_services.{h,cpp}`). Entries take an opaque vehicle handle
-and owner; links carry both. Designated tables return only consumed fields and
-bundle consecutive original calls. One `OpenTTDSharedServices` supplies map
-predicates; `services::Map` provides arithmetic over entry dimensions. No owner,
-path or world borrow spans callbacks, reentry or deletion. Wrappers are noexcept;
-panics/escaping exceptions abort; ProcessOrders plus loading stays road-specific.
+#199 adds shared typed vehicle and GroundVehicle services (`vehicle.rs`, `vehicle_ffi.h`,
+`vehicle_services.{h,cpp}`). No owner, path or world borrow spans callbacks, reentry or
+deletion.
 
-`simulate roads-`, `--self` and `--soak` compare acceleration, servicing,
-blocking/overtaking, path, RNG, crossing/flooding, crash expiry and reload.
-Native checks cover typed ABI, nested cache/destination/path mutation,
-destruction, movement data and save staging. Default player saves count actual
-outgoing services plus native visitor callbacks; plain Padhattan-2000 budgets
-13 per tick. Selected controller ingress and snapshot cache checks are reported
-separately; benchmarks disable counters. Legacy saves, custom NewGRFs,
-articulated/tram turns, sounds and viewport pixels remain limits tracked by #156.
+The default `roads-` simulation compares acceleration, servicing, path, RNG, crash expiry and
+reload. Legacy saves, custom NewGRFs, articulated/tram turns, sounds and viewport pixels remain
+limits tracked by #156.
 
 ### Company finances and economy lifecycle
 
@@ -1515,10 +1168,10 @@ service-interval command, the bankruptcy Post and `StopAI` run directly. Only
 the `CCA_NEW_AI` Post return through caller-owned stack frames (startup, control,
 tick, competitor timeout). ABI 210-214 and 400-417 check layouts.
 `python3 tools/migration.py simulate companies economy` compares all chunks/RNG;
-`python3 -m tools.simulation.companies` runs 40,320 unchanged-reference financial
-command cases. Native CTest covers lifetimes, network deferred deletion, posting
+Native CTest covers lifetimes, network deferred deletion, posting
 order and abandoned startup frames. Subsidies, exclusive rights, goals/story
 pages, hostile purchase, multiplayer runtime and NewGRFs remain evidence limits.
+
 ### Rail YAPF search, caches and reservation
 
 [#133](https://github.com/fetch-laboratories/openttd-rust/pull/133) moves all four searches,
@@ -1532,9 +1185,9 @@ triggers while search/reservation borrows remain active, before its second trigg
 Original search bodies remain portable-only; diagnostic dumps use temporary
 views and the original format, with no canonical C++ search mirror.
 
-`python3 tools/migration.py simulate padhattan rail-reservation` and its self/soak
-variants exercise cache reuse, reversal, depot/safe-tile search, reservation,
-busy targets, rollback and active-state reload under both 90-degree policies.
+The default `padhattan` and `rail-reservation` simulations exercise cache reuse, reversal,
+depot/safe-tile search, reservation, busy targets, rollback and reload under both 90-degree
+policies.
 Native unchanged-base/heap probes cover finite limits, live cost invalidation
 and ordered opposing PBS signal restoration absent from the supplied network.
 They do not prove full rail-cost semantics for arbitrary maps, NewGRFs, legacy
@@ -1556,9 +1209,8 @@ follow-before-limit timing retain source behavior. Panics/OOM abort.
 
 `python3 tools/migration.py simulate roads` covers the controller's original eight
 cases, actual station-area prefix trimming and a forced cache miss with competing
-penalties; original road plays and Padhattan traffic run in `--soak`. Paired/self runs
-compare every saved field in plain/desync modes. Native tests compare actual heap
-and origin masks with unchanged C++ and actual depot-search transcript/counters
+penalties; paired reference/candidate runs compare saved fields in plain/desync modes. Native
+tests compare actual heap and origin masks with unchanged C++ and depot-search transcript/counters
 with `CYapfBaseT` at node limits 0/1/2/7 and depot cost bounds 0/70/71/100
 (loaded node settings clamp to >=500). Native ABI checks
 cover every field on supported hosts. Arbitrary maps/NewGRFs, articulated/tram,
@@ -1567,177 +1219,101 @@ legacy saves remain limits; shared follower logic is deliberately unported.
 
 ### Orders lifecycle ownership
 
-Issue #138 / PR #176 moves order vectors, list counts/durations, current orders,
-shared links, backups and consist timetable/unbunching state into Rust. Rust owns
-traversal, command validation/edit/copy/share/unshare, conditional/depot execution,
-implicit maintenance, backup capture/restoration/cleanup and timetable/unbunching
-policy. Original bodies remain portable-only. C++ retains pool shells, typed
-construction, format conversion and save/load errors, world access and GUI/news.
-ORDL/BKOR/VEHS address canonical storage; ancient ORDR uses load-only staging.
-Named synchronous entries borrow an immutable typed noexcept service table;
-there is no per-entry allocation or task/future/action protocol. Owner borrows end
-before callbacks, including nested commands and destruction. No selected service
-unwinds during ordinary play; environmental failures and Rust panics abort.
-ABI IDs 260-266 describe crossing records. Native checks cover layouts,
-full consist copies, typed defaults, overlapping edits, allocation invalidation
-and ordinary/indexed pool retirement and reuse.
-`simulate orders-` runs commands, initialized shared-depot departure, offline
-backup clearing, client-policy unique/shared restoration and conditional/implicit
-active reload. The identical orders-only console/AfterLoadGame adapter exposes
-original commands and declared typed inputs; executed adapters, frozen runtimes,
-link/compile inputs and actual BKOR saves have reproducible provenance.
-Unmasked 3000/6000-tick peer samples supplement #83's general round-trip mask.
-Network transport, historical saves and exhaustive NewGRF/error domains remain
-limits in #156. A retained pinned-original multi-row BKOR load failure requires
-separate index-zero serialized fixtures; the original source stays unchanged.
+Issue #138 / PR #176 moves order storage, links, backups and consist timetable/unbunching state
+into Rust, including traversal, command edits, sharing, depot execution and backup lifecycle.
+C++ retains pool identity, vehicle shells, command execution, VM callbacks and save/load
+adapters; original bodies remain in portable builds.
+
+Typed synchronous services preserve source ordering. Rust releases owner borrows before
+callbacks, commands or deletion, and native exceptions remain in C++. The default orders
+simulation and existing tests cover commands, sharing, backups, reload and reentry. NewGRF
+callback variants and legacy saves remain coverage limits tracked in #156.
 
 ### Station cargo service
 
-Issue #125 moves the ordered loading queue, station service counters, acceptance
-mask and cargo rating/pickup/speed/age/waiting/fraction metadata into one opaque
-Rust owner per BaseStation. Native scalar references and the queue facade share
-it; ordinary/indexed construction, retirement, reuse,
-STNN/STNS and legacy fixups share it without persistent native mirrors. Rust owns
-PrepareUnload, complete station/vehicle loading, refit/reservation/completion,
-acceptance, ratings/truncation, admission/distribution and periodic/stale-link
-control. Packet, flow, link-graph, map and geometry storage remain C++.
+Issue #125 moves the ordered loading queue, station service counters, acceptance mask and cargo
+rating/pickup/speed/age/waiting/fraction metadata into one opaque Rust owner per BaseStation.
+Native scalar references and the queue facade share it; ordinary/indexed construction,
+retirement, reuse, STNN/STNS and legacy fixups share it without persistent native mirrors.
+Packet, flow, link-graph, map and geometry storage remain C++.
 
-Issue #214 replaces numeric dispatch with borrowed typed noexcept tables (ABI
-110-115), narrow observations (500-515), and caller-owned native iterator/container
-frames. Raw field access ends before callbacks; refit and payment/industry reentry
-see current state. Empty station ticks enter Rust with the queue owner directly; per-vehicle
-lookup precedes next-station discovery. Cargo remaining counts read their Rust
-owner at each original observation. Stable queue nodes preserve iterator identity. Native save
-scopes retain partial changes on failure. #117 production flush remains once at
-the original end of LoadUnloadStation. Portable bodies remain unchanged.
+Issue #214 replaces numeric dispatch with borrowed typed noexcept tables (ABI 110-115), narrow
+observations (500-515), and caller-owned native iterator/container frames. Portable bodies
+remain unchanged.
 
-`python3 tools/migration.py simulate stations economy` uses the existing road/CAPY
-inputs for loading queues, fractional admission, acceptance loss, full/gradual
-loading, rating expiry/decay/capping, stale-link refresh/removal and active reload.
-`stations-loading-context` checks an accepted modern save with a distinct valid
-last-visited station, preserving the outer queue and staged cargo (#227/#75).
-`--self` and `--soak` reuse these cases. Required named station branches use the
-shared witness facility, disabled during timing. Native tests cover
-ABI, aliases, queue/reentry order, save failure and retirement/indexed reuse.
-Acceptance-loss precedes acceptance polling; full-gradual proves reservation and
-unloading, not a positive load. Legacy, NewGRF and refit gaps remain in #156.
+`python3 tools/migration.py simulate stations economy` uses the existing road/CAPY inputs for
+loading queues, fractional admission, acceptance loss, full/gradual loading, rating
+expiry/decay/capping, stale-link refresh/removal and active reload. Legacy, NewGRF and refit
+gaps remain in #156.
 
 ### Ship controller and private state (#146)
 
 Rust owns the complete ship tick/movement, locks, acceleration, rotation/reversal,
-track/depot/destination policy, economy-day/service/cache/build initialization,
-and nearest-depot region BFS with ordered pool selection. Four canonical scalars
-belong to each Rust ship owner; #119 remains the sole path/search owner. Original
-selected bodies compile only portably. C++ keeps shared Vehicle/map/pool storage,
+track/depot/destination policy, economy-day/service/cache/build initialization, and
+nearest-depot region BFS with ordered pool selection. Four canonical scalars belong to each Rust
+ship owner; #119 remains the sole path/search owner. C++ keeps shared Vehicle/map/pool storage,
 renderer bounds/sprites, allocation, Money accounting and modern/legacy save staging.
-NOSAVE signed-16-bit rotation coordinates reconstruct at the original afterload phase.
 
-Entries are synchronous typed calls without task/future/mailbox allocation or
-operation dispatch. Services are individually named `noexcept` functions; narrow
-getters fetch only used fields, typed results carry positions and search choices,
-and one reusable game-thread Rust set/deque owns depot scratch. Rust resolves its
-raw scalar owner once per entry and ends every borrow before callbacks. Tile/depot,
-orders/loading, viewport, breakdown, effect/sound, cache/YAPF and NewGRF callbacks
-remain direct: none can unwind a script VM or save/load error during ordinary play.
-Unexpected environmental exceptions terminate inside their wrappers; Rust panics abort.
+Entries are synchronous typed calls without task/future/mailbox allocation or operation
+dispatch. Services are individually named `noexcept` functions; narrow getters fetch only used
+fields, typed results carry positions and search choices, and one reusable game-thread Rust
+set/deque owns depot scratch. Tile/depot, orders/loading, viewport, breakdown, effect/sound,
+cache/YAPF and NewGRF callbacks remain direct: none can unwind a script VM or save/load error
+during ordinary play.
 
-`python3 tools/migration.py verify --jobs 2` includes the four Cargo checks and
-native ABI checks for scalar widths, native C++ transient coordinate narrowing,
-direct callback order and nested owner mutation. `python3 tools/migration.py
-simulate water --jobs 2` (also `--soak`; `--self` counts nothing) requires the
-candidate's `ship.*` witness branches in the water corpus for locks,
-aqueducts, rotation/reload, service, buoy/loading, depot restart, and moving
-build/sell/ID-reuse owners. The class case changes one existing clear
-canal input byte to `MakeRiver` class/owner encoding for both games and requires an
-actual cache-update branch. Legacy save versions, viewport pixels and arbitrary
-custom NewGRF combinations remain coverage limits; final independent review and CI gate integration.
+`python3 tools/migration.py verify --jobs 2` includes the four Cargo checks and native ABI
+checks for scalar widths, native C++ transient coordinate narrowing, direct callback order and
+nested owner mutation. `python3 tools/migration.py simulate water --jobs 2` requires the
+candidate's `ship.*` witness branches in the water corpus for locks, aqueducts, rotation/reload,
+service, buoy/loading, depot restart, and moving build/sell/ID-reuse owners. Legacy save
+versions, viewport pixels and arbitrary custom NewGRF combinations remain coverage limits.
 
 ### Rail vehicles and controller state (#130)
 
-Rust owns train consist/cache/curve/speed policy, both tick passes and movement,
-reversal, crossing control, crash/deletion, servicing and day handling. It also
-owns controller reservation extension/rollback, freeing, track choice and temporary
-order lookahead/restoration; #122 retains complete YAPF search ownership.
-Each C++ train shell owns one Rust allocation for flags, track, force-proceed,
-wait/crash counters, railtype masks and scalar TrainCache fields. Shared Vehicle/
-GroundVehicle fields, pools/links, sprite override references, rendering,
-construction/arrangement and generic orders/loading stay in C++. External writes,
-modern VEHS staging, legacy loading and afterload use canonical scalar adapters.
-Original selected bodies compile only in portable builds. Typed synchronous
-entries borrow immutable noexcept service tables. Resolved shell/state handles and
-narrow reads remove repeated pool lookups and ordinary Last walks; native visitors
-filter trains and preserve order without nearby Vecs. Owner accesses end before
-direct tile/depot, orders/loading, station and deletion callbacks. Nested native
-stack snapshots restore temporary orders once; ordered signal rollback scratch
-remains local. No ordinary-play service unwinds here.
-Validation uses the existing Padhattan manual/cargodist, realistic acceleration,
-90-degree reservation, live reload and real command-built controller scenarios;
-each candidate run requires its `rails.TRAIN_BRANCHES` `train.*` witness counts
-(extension rollback is distinct from #122's search rollback).
-Unreached branches (wormhole swap, unequal/articulated moves, red two-way,
-force-signal, free-wagon deletion, depot re-entry, opposing PBS restore) are #156.
-A narrow unchanged-source comparison covers variable-length curve/reversal inputs
-unavailable in the stock fixture. The PR records commands and branch/NewGRF limits; passing these inputs does not prove
-exhaustive train equivalence.
+Rust owns train consist/cache/curve/speed policy, both tick passes, movement, reversal, crossing
+control, crash/deletion, servicing and day handling. It also owns reservation extension/rollback
+and temporary order lookahead; #122 retains YAPF search ownership. C++ train shells hold one
+Rust allocation for the controller state, while pools, map storage and shared services remain
+native.
+
+Typed calls preserve the original callback and RNG order, and no owner borrow crosses reentry or
+deletion. The default rail simulation and native checks cover movement, reservations, signals,
+service, commands and reload. Arbitrary NewGRFs, legacy saves and unexercised controller
+branches remain limits tracked in #156.
 
 ### Rail signal blocks and fixed work sets (#219)
 
-Rust owns complete signal-block exploration, immediate signal update/propagation,
-first-segment classification and all three fixed 64/256/128 work sets, including
-counts, sticky overflow flags, private direction tables and last owner. State has
-process lifetime under the game-state mutex; loading adds no new reset. Duplicate
-Add, first-match/swap-last Remove, LIFO Get, the 64-item forced flush and distinct
-public/private owner invalidation rules retain the original behavior.
+Rust owns complete signal-block exploration, immediate signal update/propagation, first-segment
+classification and all three fixed 64/256/128 work sets, including counts, sticky overflow
+flags, private direction tables and last owner. State has process lifetime under the game-state
+mutex; loading adds no new reset.
 
-C++ keeps public signal constants, shared map/pools/spatial queries, commands and
-rendering. Guarded typed observations read only the consumed branch fields;
-occupancy separates rail geometry from signal reads, and combo/state reads stay
-live. Train and reservation callers enter Rust directly through an immutable,
-call-scoped context. No owner borrow crosses native callbacks; no signal entry
-allocates or draws Random. Native assertion configuration remains authoritative.
+C++ keeps public signal constants, shared map/pools/spatial queries, commands and rendering.
+Native assertion configuration remains authoritative.
 
-`python3 tools/migration.py simulate signals --jobs 2` (also `--self`, `--soak`)
-compares real 1996/2000/2006 train movement, signal commands, return states,
-ordered pending prefixes, PBS/presignal updates, stations/crossings/wormholes,
-reload, command-built signal overflow/reset/follow-up, combo red/multiple exits,
-empty-neighbour continuation and ownership barriers. Default witnesses fail when missing. A bounded unchanged-SmallSet-body probe
-covers otherwise-unreached Add failure, sticky drain/reset and duplicate removal
-at all capacities. ABI checks cover consumed tables/records; counters distinguish
-world services, facade/context calls and actual nested occupancy accessors counted
-only in the relinked scenario adapter; native occupancy signatures stay original.
-Real tbd/global propagation overflow, threaded play and arbitrary mod layouts
-remain #156 limits; the PR records validation and all six timing ratchets.
+The default `signals` simulation compares movement, commands, pending state, reservations,
+reload and ownership barriers. Real tbd/global propagation overflow, threaded play and arbitrary
+mod layouts remain #156 limits.
 
 ### Industry periodic production and builder ownership (#129)
 
-Rust owns the produced/accepted slots, optional accepted histories, production
-fields, sound countdown and industry-builder records. C++ industry shells expose
-nonowning views of these allocations; INDY, IBLD, ITBL, ECMY and TTO/TTD load
-adapters preserve the original names, widths, version gates and ordering.
-Rust controls production/transport ticks, farm fields/fences, lumber harvesting,
-NewGRF production repeats/application, production commands and trimming,
-monthly statistics/change/closure, daily changes and builder targets/retries.
-The original selected bodies remain in the portable C++ path.
+Rust owns the produced/accepted slots, optional accepted histories, production fields, sound
+countdown and industry-builder records. C++ industry shells expose nonowning views of these
+allocations; INDY, IBLD, ITBL, ECMY and TTO/TTD load adapters preserve the original names,
+widths, version gates and ordering.
 
-Pool/map/spec storage, construction and landscape-clear transactions, presentation
-and bounded NewGRF resolution stay in C++ behind typed `noexcept` slots (#203).
-The tick passes one record (counter, map, scaled callback interval, ambient,
-editor); `next_tick` returns industry, owner, ID and callbacks; sound count,
-behaviour, location and `GetTileZ` are read only on original branches. Rust keeps
-no owner reference across reentrant construction, clearing, distribution or
-destruction; script events only enqueue and save/load errors stay native.
-CargoPayment delivery remains #117. ABI IDs 130–145 cover records and services.
+Rust runs production/transport ticks, farm and lumber updates, NewGRF production application,
+monthly statistics/closure, daily changes and builder targets/retries. Borrows end before reentry.
 
-`python3 tools/migration.py simulate industry-` reuses real cargo saves, generated
-climates/economies and disaster reset/release, with explicit production-control,
-closure and builder inputs. A committed reference setup AI funds a tropical lumber
-mill; checks witness harvesting, farm growth, history and builder backoff. `--self`
-and `--soak` add determinism and yearly history evidence. `python3 -m
-tools.simulation.industries` checks absent NewGRF versions/repeat/arithmetic against
-the unchanged pinned callback body. The corpus does not exhaust legacy saves,
-NewGRF resolver programs or every industry layout; native tests check ABI/lifetimes.
+Pool/map/spec storage, construction and landscape-clear transactions, presentation and bounded
+NewGRF resolution stay in C++ behind typed `noexcept` slots (#203). CargoPayment delivery
+remains #117.
 
-### Industry construction and tile lifecycle (#150, in progress)
+The default `industry-` scenarios exercise production, closure, builder retries and resets. The
+corpus does not exhaust legacy saves, NewGRF resolver programs or every industry layout; native
+tests check ABI/lifetimes.
+
+### Industry construction and tile lifecycle (#150)
 
 Rust owns industry metadata/text, ordered type registries, builder scratch,
 destruction, initial generation, full validation/funding/prospecting transactions,
@@ -1759,112 +1335,82 @@ native tests check cancellation/restoration, callback policy and borrowed lifeti
 Default `industry-water-check-*` scenarios require oil-rig funding refusal over
 real depots/lower lock parts and acceptance after removal (#234).
 Shared map/RNG leaves use the canonical typed services; stable dimensions are
-captured once per consuming entry. Independent review and exact-head full CI remain required. Legacy saves, resolver
-programs and exhaustive industry layouts remain corpus limits tracked by #156.
+captured once per consuming entry. [PR #218](https://github.com/fetch-laboratories/openttd-rust/pull/218) records integration evidence.
+Legacy saves, resolver programs and exhaustive industry layouts remain #156 corpus limits.
 
 ### Aircraft controllers and airport movement
 
-#136 owns both tick passes, movement/speed/flight, shadow/rotor, FTA traversal,
-terminal/helipad reservations, service/range, crash cleanup and airport lifecycle
-in Rust. Fixed allocations own private counters/cache and airport masks; trivial
-C++ save aliases preserve their addresses. Portable bodies remain unchanged.
+#136 owns both tick passes, movement/speed/flight, shadow/rotor, FTA traversal, terminal/helipad
+reservations, service/range, crash cleanup and airport lifecycle in Rust. Fixed allocations own
+private counters/cache and airport masks; trivial C++ save aliases preserve their addresses.
 
-#237 borrows shared vehicle/map/settings/RNG services directly. Entries resolve
-live shells/State once; consumed speed, motion, tick, cost, altitude, geometry,
-FTA and hangar projections retain source phases. Typed station access intervals
-share short live-mask accesses and refresh after reentrant movement. No owner
-borrow crosses ProcessOrders/loading, depot/refit, animation, crash or deletion.
-PreDestructor releases blocks while state is live; deletion returns immediately.
-Disaster flight helpers retain actual Vehicle identity and independent flags.
-Runtime dimensions are captured per entry; wrapping arithmetic/RNG order remain.
+#237 borrows shared vehicle/map/settings/RNG services directly. No owner borrow crosses
+ProcessOrders/loading, depot/refit, animation, crash or deletion. Runtime dimensions are
+captured per entry; wrapping arithmetic/RNG order remain.
 
-`python3 tools/migration.py simulate aircraft disasters --jobs 2` (also `--self`
-and `--soak`) exercises traffic, cargo, service, closure, zeppelin abort, removal,
-ownerless oilrig landing, crash and reload. Default hooks require aircraft
-crossing/lookup/observation-byte counts and enforce measured plain caps; timing
-disables them. The unchanged-reference probe covers 800 finite-range cases.
-Native ABI checks cover every layout, nested mutation, rotor/order/loading phases,
-post-dirty motion reads, live block release/deletion and ownerless flight flags.
-Real NewGRF/refit/airport rotations, threaded GUI, legacy-save fixtures and
-presentation remain gaps tracked on #156; these checks do not establish full
-subsystem equivalence.
+The default `aircraft` and `disasters` scenarios exercise traffic, service, removal, crash and
+reload. Real NewGRF/refit/airport rotations, threaded GUI, legacy-save fixtures and presentation
+remain gaps tracked on #156; these checks do not establish full subsystem equivalence.
 
 ### Cargo storage and movement (#139)
 
-Rust owns packet fields, ordered station/vehicle lists, count/age/feeder/action/
-reservation caches, cumulative flow shares and origin maps. It runs packet
-operations, cargo movement/staging/rerouting, live-flow reconciliation, capacity
-redistribution and autoreplace cargo transfer. Stable arena slots and linked
-ordering give constant-time list operations; destination endpoints bound station
-lookups to the selected queue. Freed slots are reused; arena capacity is retained.
-C++ retains packet pool identity/allocation/hooks, payment/delivery (#117),
-loading policy (#125), link-graph computation (#74), world access and thread join.
-CAPA/STNN/VEHS/flow adapters export call-local containers or scalar-key readers;
-pointer fixups and save errors finish outside Rust. Payment getters reenter after
-owner borrows end; ConsistChanged runs after Rust returns. Portable bodies stay.
+Rust owns packet fields, ordered station/vehicle lists, count/age/feeder/action/ reservation
+caches, cumulative flow shares and origin maps. It runs packet operations, cargo
+movement/staging/rerouting, live-flow reconciliation, capacity redistribution and autoreplace
+cargo transfer. Stable arena slots and linked ordering give constant-time list operations;
+destination endpoints bound station lookups to the selected queue. Freed slots are reused; arena
+capacity is retained. C++ retains packet pool identity/allocation/hooks, payment/delivery
+(#117), loading policy (#125), link-graph computation (#74), world access and thread join.
+CAPA/STNN/VEHS/flow adapters export call-local containers or scalar-key readers; pointer fixups
+and save errors finish outside Rust. Payment getters reenter after owner borrows end;
+ConsistChanged runs after Rust returns. Portable bodies stay.
 
-Checks: `python3 tools/migration.py verify --jobs 2`,
-`python3 tools/migration.py simulate cargo-storage economy stations play-padhattan aircraft --jobs 2`,
-`python3 tools/migration.py simulate cargo-storage --self --jobs 2`, and
-`python3 tools/migration.py simulate cargo-storage --soak --jobs 2`.
-Active CAPY scenarios check saved packet references/actions, aging, feeder credits
-and forced policies. Rust tests cover partial movement, payment getter reentry,
-same-list rerouting and capacity changes. `python3 tools/cargo-storage-comparison.py`
-checks unreachable pool-limit Split failure against the unchanged pinned body.
-After building, `python3 -m tools.simulation.cargo_storage` probes 1k-64k queues,
-identity/order/cache preservation and bounded reads for first-hit append/keyed load;
-its synthetic timings are not whole-game speed ratios. Legacy conversions and
-complete refit/autoreplace transactions lack additional play witnesses (#156).
+Checks: `python3 tools/migration.py verify --jobs 2`, and the default cargo-storage, economy,
+station, Padhattan and aircraft scenarios. Active CAPY scenarios check saved packet
+references/actions, aging, feeder credits and forced policies. Rust tests cover partial
+movement, payment getter reentry, same-list rerouting and capacity changes. `python3
+tools/cargo-storage-comparison.py` checks unreachable pool-limit Split failure against the
+unchanged pinned body. Legacy conversions and complete refit/autoreplace transactions lack
+additional play witnesses (#156).
 
 ### Fleet grouping and replacement lifecycle (#147)
 
-Rust owns group metadata/names/ordered children, group/company statistics and
-engine counts, renewal rules/links and company renewal heads, plus the pending
-tick-end map. It runs every group command, traversal/statistics/livery update,
-renewal-rule command, replacement eligibility/refit choice, speculative build,
-rearrangement, rollback, execution and the ascending-VehicleID drain. Original
-bodies compile only in portable builds. C++ keeps pool identity/allocation, group
-numbers, GUI folding, save adapters and `Vehicle::group_id`, which stays shell
-storage that Rust reads/writes through typed services at the original points;
-company-merge rewriting (economy.cpp), train/vehicle construction and save/load
-writes of `group_id` remain C++.
+Rust owns group metadata/names/ordered children, group/company statistics and engine counts,
+renewal rules/links and company renewal heads, plus the pending tick-end map. It runs every
+group command, traversal/statistics/livery update, renewal-rule command, replacement
+eligibility/refit choice, speculative build, rearrangement, rollback, execution and the
+ascending-VehicleID drain. Original bodies compile only in portable builds.
 
-Three named-slot noexcept tables (ABI 393-396, with owner prefixes 390-392)
-serve Rust; native stack CommandCost objects keep AddCost first-error and Money
-saturation, and original assertion sites run in assertion builds. No owner borrow
-spans a callback; nested commands reenter directly.
+C++ keeps pool identities, group numbers, GUI folding, save adapters and `Vehicle::group_id`.
+Rust reads/writes that shell field through services; no owner borrow spans a nested command.
 
-Checks: `python3 tools/migration.py verify --jobs 2`, `python3 tools/migration.py
-simulate fleet- --jobs 2` (also `--self`, `--soak`). Scenarios cover hierarchy,
-rules/protection, list-based NEW_GROUP and veh_id 0xFFFFFFFF, renewals for four
-transports, free-unit and different-engine wagon-removal replacement, cash and
-length rollback, reload, and the tick-end drain in play (renewal with restart;
-money-limit failure with reserve and news). Native tests cover layouts, slots, CommandCost and
-drain reentry. NewGRF refit/attach callbacks and articulated parts remain #156.
+Three named-slot noexcept tables (ABI 393-396, with owner prefixes 390-392) serve Rust; native
+stack CommandCost objects keep AddCost first-error and Money saturation, and original assertion
+sites run in assertion builds.
+
+Checks: `python3 tools/migration.py verify --jobs 2` and the default `fleet-` simulation. NewGRF
+refit/attach callbacks and articulated parts remain #156.
 
 ### Engine lifecycle and availability (#220)
 
-Rust owns each engine's lifecycle scalars and name, the process-wide aging-stop
-state, startup/reliability, daily/monthly preview and availability policy,
-variant synchronization and control/name/visibility commands. Native Engine
-shells expose canonical scalar aliases; temporary owners survive relocation and
-TTO replacement. Original bodies compile only portably. Pool/configuration/spec,
-NewGRF/articulated, company/type availability and presentation remain native
-through typed synchronous noexcept services shared with fleet/company consumers.
-No owner borrow spans a callback; script events enqueue without running a VM.
-RNG draws, narrowing and command/effect order retain the original behavior.
+Rust owns each engine's lifecycle scalars and name, the process-wide aging-stop state,
+startup/reliability, daily/monthly preview and availability policy, variant synchronization and
+control/name/visibility commands. Native Engine shells expose canonical scalar aliases;
+temporary owners survive relocation and TTO replacement. Original bodies compile only portably.
+Pool/configuration/spec, NewGRF/articulated, company/type availability and presentation remain
+native through typed synchronous noexcept services shared with fleet/company consumers. No owner
+borrow spans a callback; script events enqueue without running a VM. RNG draws, narrowing and
+command/effect order retain the original behavior.
 
-Modern ENGN scalar descriptors address aliases directly; only opaque names use a
-native string scope, preserving partial decoding on failure. Historical loaders
-address canonical prefixes without live mirrors. Panics/environmental exceptions
-abort; native save/load errors remain outside Rust.
-`python3 tools/migration.py verify --jobs 2` checks Cargo and native ABI/lifetimes.
-`python3 tools/migration.py simulate engines- --jobs 2` (also `--self`, `--soak`)
-requires default preview/acceptance/join/no-build, commands, retirement/sync,
-never-expire and 2050-cutoff witnesses and compares modern reload. The identical
-adapter declares variant and cutoff spec inputs for unchanged reference bodies;
-branch results, command costs and semantic saves must match. Counters record
-native entries, service crossings and returned bytes, disabled for timing.
-External NewGRF programs/retire_early, ENGS and TTO/TTD fixtures, legacy preview
-conversion and threaded GUI/presentation remain #156 gaps. #248 records the
-fixing reviews, source comparisons and final-head CI/speed results.
+Modern ENGN scalar descriptors address aliases directly; only opaque names use a native string
+scope, preserving partial decoding on failure. Historical loaders address canonical prefixes
+without live mirrors. Panics/environmental exceptions abort; native save/load errors remain
+outside Rust. `python3 tools/migration.py verify --jobs 2` checks Cargo and native
+ABI/lifetimes. `python3 tools/migration.py simulate engines- --jobs 2` requires default
+preview/acceptance/join/no-build, commands, retirement/sync, never-expire and 2050-cutoff
+witnesses and compares modern reload. The identical adapter declares variant and cutoff spec
+inputs for unchanged reference bodies; branch results, command costs and semantic saves must
+match. Counters record native entries, service crossings and returned bytes, disabled for
+timing. External NewGRF programs/retire_early, ENGS and TTO/TTD fixtures, legacy preview
+conversion and threaded GUI/presentation remain #156 gaps. #248 records the fixing reviews,
+source comparisons and final-head CI/speed results.

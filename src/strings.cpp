@@ -1803,7 +1803,13 @@ static void FormatString(StringBuilder &builder, std::string_view str_arg, Strin
 						AutoRestoreBackup cache_backup(use_cache, false);
 						builder += t->GetCachedName();
 					} else if (!t->name.empty()) {
-						auto tmp_params = MakeParameters(t->name);
+						auto tmp_params = MakeParameters(
+#ifdef WITH_RUST
+							t->name.View()
+#else
+							t->name
+#endif
+						);
 						GetStringWithArgs(builder, STR_JUST_RAW_STRING, tmp_params);
 					} else {
 						GetTownName(builder, t);

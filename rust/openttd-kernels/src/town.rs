@@ -22,7 +22,21 @@
     clippy::collapsible_match,
     clippy::decimal_bitwise_operands
 )]
+pub mod founding;
+pub mod names;
+
 use crate::services::{Map, Services, chance16_i};
+
+#[repr(transparent)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct TownId(pub u16);
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct TownRef {
+    pub shell: *mut crate::services::TownHandle,
+    pub state: *mut State,
+    pub id: TownId,
+}
 use std::{
     cell::{OnceCell, UnsafeCell},
     ffi::c_void,
@@ -137,6 +151,7 @@ pub struct GrowthFields {
 }
 #[derive(Default)]
 pub struct State {
+    name: Vec<u8>,
     simulation: SimulationFields,
     supplied: Vec<Supplied>,
     id_counts: Vec<u16>,
@@ -163,6 +178,11 @@ pub extern "C" fn openttd_rust_town_generating_exchange(generating: bool) -> boo
         unsafe { std::ptr::replace(flag.get(), generating) }
     })
 }
+/// Convert original town tick counters, including tick zero, to game ticks.
+fn town_ticks_to_game_ticks(ticks: u16) -> u16 {
+    ((u32::from(ticks.min(930)) + 1) * 70 - 1) as u16
+}
+
 unsafe fn update_radius(state: *mut State) {
     const RADII: [[u32; 5]; 23] = [
         [4, 0, 0, 0, 0],
@@ -646,7 +666,6 @@ pub unsafe extern "C" fn openttd_rust_town_authority_remove(
 #[derive(Clone, Copy)]
 pub struct Leaves {
     pub map_log_x: extern "C" fn() -> u32,
-    pub map_size_y: extern "C" fn() -> u32,
     pub build_on_slopes: extern "C" fn() -> bool,
     pub growth_rate: extern "C" fn() -> u8,
     pub snow_line: extern "C" fn() -> u8,
@@ -657,7 +676,6 @@ pub struct Leaves {
     pub highest_snow_line: extern "C" fn() -> u8,
     pub calendar_year: extern "C" fn() -> i32,
     pub allow_roads: extern "C" fn() -> bool,
-    pub calendar_date: extern "C" fn() -> i32,
     pub road_flags: extern "C" fn(u8) -> u8,
     pub house_availability: extern "C" fn(u16) -> HouseAvailability,
     pub house_placement: extern "C" fn(u16) -> HousePlacement,
@@ -667,10 +685,15 @@ pub struct Leaves {
     pub house_allows_callback: extern "C" fn(u16) -> bool,
     pub road_info: extern "C" fn(u8) -> RoadChoice,
     pub state: extern "C" fn(u32) -> *mut State,
-    pub stations:
-        extern "C" fn(u32, u32, *mut c_void, extern "C" fn(*mut c_void, *const c_void, u32)),
-    pub station_activity: extern "C" fn(*const c_void) -> StationActivity,
-    pub station_owner: extern "C" fn(*const c_void) -> u8,
+    pub stations: extern "C" fn(
+        u32,
+        u32,
+        *mut c_void,
+        extern "C" fn(*mut c_void, *const crate::station::Station, u32),
+    ),
+    pub station_activity_owner:
+        extern "C" fn(*const crate::station::Station) -> *const crate::station_service::Service,
+    pub station_owner: extern "C" fn(*const crate::station::Station) -> u8,
     pub dirty_authority: extern "C" fn(u32),
     pub dirty_town: extern "C" fn(u32),
     pub foundation_slope: extern "C" fn(u32) -> u32,
@@ -680,7 +703,7 @@ pub struct Leaves {
     pub exchange_company: extern "C" fn(u32) -> u32,
     pub house_class: extern "C" fn(u16) -> u16,
     pub make_house: extern "C" fn(u32, u32, u32, u32),
-    pub add_animation: extern "C" fn(u32),
+    pub add_animation: extern "C" fn(u32, bool),
     pub population_changed: extern "C" fn(u32),
     pub nearby_stations: extern "C" fn(u32, u32, u32),
     pub house_count: extern "C" fn() -> u32,
@@ -851,11 +874,16 @@ impl Engine<'_> {
             radius: u32,
             count: u32,
         }
-        extern "C" fn visit(ctx: *mut c_void, station: *const c_void, xy: u32) {
+        extern "C" fn visit(ctx: *mut c_void, station: *const crate::station::Station, xy: u32) {
             // SAFETY: Synchronous non-reentrant visitor; context lives on this stack.
             let count = unsafe { &mut *ctx.cast::<StationCount>() };
             if count.engine.distance(xy, count.center) <= count.radius {
-                let activity = (count.engine.leaves.station_activity)(station);
+                // SAFETY: Synchronous radius visitor supplies a live station owner.
+                let activity = unsafe {
+                    crate::station_service::activity((count.engine.leaves.station_activity_owner)(
+                        station,
+                    ))
+                };
                 if activity.time_since_load <= 20 || activity.time_since_unload <= 20 {
                     count.count = count.count.wrapping_add(1);
                 }
@@ -864,7 +892,10 @@ impl Engine<'_> {
         let center = self.position();
         let radius = self.radius()[0];
         let mut count = StationCount {
-            engine: self.clone(),
+            engine: {
+                let _ = self.map();
+                self.clone()
+            },
             center,
             radius,
             count: 0,
@@ -891,9 +922,7 @@ impl Engine<'_> {
         if self.is_city() {
             m /= 2;
         }
-        let rate = ((m / (self.num_houses() / 50 + 1)).min(930) + 1)
-            .wrapping_mul(70)
-            .wrapping_sub(1) as u16;
+        let rate = town_ticks_to_game_ticks((m / (self.num_houses() / 50 + 1)) as u16);
         self.set_rate(rate);
         if rate != u16::MAX {
             let counter = self.counter();
@@ -998,7 +1027,7 @@ impl Engine<'_> {
                 continue;
             }
             let date = rti.introduction_date;
-            if (0..1_826_212_865).contains(&date) && date > (self.leaves.calendar_date)() {
+            if (0..1_826_212_865).contains(&date) && date > (self.services.calendar_date)() {
                 continue;
             }
             let speed = if rti.max_speed == 0 {
@@ -1210,7 +1239,7 @@ impl Engine<'_> {
                 0,
                 0,
                 self.size_x(),
-                (self.leaves.map_size_y)(),
+                (self.services.map_max_y)().wrapping_add(1),
             );
             while !spiral.is_end() {
                 let at = spiral.x + spiral.y * self.size_x();
@@ -1220,7 +1249,7 @@ impl Engine<'_> {
                 {
                     return false;
                 }
-                spiral = spiral.advance(self.size_x(), (self.leaves.map_size_y)());
+                spiral = spiral.advance(self.size_x(), (self.services.map_max_y)().wrapping_add(1));
             }
         }
         for _ in 0..=22 {
@@ -1689,7 +1718,7 @@ impl Engine<'_> {
             counter | (stage << 8) | (random << 16) | (u32::from(protected) << 24),
         );
         if u32::from((self.leaves.house_flags)(house as u16)) & 32 != 0 {
-            (self.leaves.add_animation)(tile);
+            (self.leaves.add_animation)(tile, false);
         }
         (self.services.mark_dirty)(tile);
     }
@@ -2176,7 +2205,11 @@ impl Engine<'_> {
             center: u32,
             radius: u32,
         }
-        extern "C" fn visit(context: *mut c_void, station: *const c_void, xy: u32) {
+        extern "C" fn visit(
+            context: *mut c_void,
+            station: *const crate::station::Station,
+            xy: u32,
+        ) {
             // SAFETY: Synchronous stack visitor; no reference survives reentry.
             let context = unsafe { &*context.cast::<RatingContext>() };
             let engine = context.engine.clone();
@@ -2185,7 +2218,10 @@ impl Engine<'_> {
             if engine.distance(xy, center) > radius {
                 return;
             }
-            let activity = (engine.leaves.station_activity)(station);
+            // SAFETY: Synchronous radius visitor supplies a live station owner.
+            let activity = unsafe {
+                crate::station_service::activity((engine.leaves.station_activity_owner)(station))
+            };
             let active = activity.time_since_load <= 20 || activity.time_since_unload <= 20;
             let owner = (engine.leaves.station_owner)(station);
             if !(engine.services.company_valid)(owner) {
@@ -2215,7 +2251,10 @@ impl Engine<'_> {
         let center = self.position();
         let radius = self.radius()[0];
         let mut context = RatingContext {
-            engine: self.clone(),
+            engine: {
+                let _ = self.map();
+                self.clone()
+            },
             center,
             radius,
         };

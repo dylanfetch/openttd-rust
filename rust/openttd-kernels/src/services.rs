@@ -85,6 +85,7 @@ pub const MP_HOUSE: u8 = 3;
 /// Synchronous borrowed bytes, including embedded NULs. The producing entry
 /// specifies lifetime; no native callback may retain this view after mutation.
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct ByteSpan {
     /// Readable bytes for the producing entry's specified lifetime.
     pub data: *const u8,

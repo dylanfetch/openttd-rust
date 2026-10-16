@@ -8,17 +8,10 @@
 /** @file industry_generation_adapter.hpp Named generation abort handoff. */
 #ifndef RUST_INDUSTRY_GENERATION_ADAPTER_HPP
 #define RUST_INDUSTRY_GENERATION_ADAPTER_HPP
-#include "../genworld.h"
+#include "generation_services.hpp"
 #include <exception>
 
 /** Invocation-local exception shell. The exception never enters Rust. */
 struct OpenTTDIndustryGenerationContext { std::exception_ptr cancellation; };
 
-template <typename F>
-inline bool RunIndustryGenerationProgress(OpenTTDIndustryGenerationContext *context, F &&progress) noexcept
-{
-	try { progress(); }
-	catch (AbortGenerateWorldSignal &) { context->cancellation = std::current_exception(); return false; }
-	return true;
-}
 #endif
