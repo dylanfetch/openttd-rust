@@ -47,9 +47,6 @@ void OPENTTD_LIST_CALL openttd_rust_list_rank(struct OpenTTDScriptList *, uint8_
 /* Combine: Add/Swap/Remove/Keep/CopyContents=0..4. CopyContents retains target's
  * original sort/init flow; it is used on freshly constructed clone targets. */
 void OPENTTD_LIST_CALL openttd_rust_list_combine(struct OpenTTDScriptList *, struct OpenTTDScriptList *, uint8_t);
-/* Ascending item read for valuation/save, independent of public iteration.
- * Returns absent/present; copies key/value/modification token and retains none.
- * has_after is 0/1. This does not reset or mutate the public live cursor. */
 /* ScriptList-specific resumable control. Operations: valuation/filter/save/load/
  * get/set/nexti = 0..6. Controllers own only scalar phase state, and never retain
  * list/VM/world pointers. Every host operation executes after step returns.
