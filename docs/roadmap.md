@@ -165,21 +165,19 @@ that a `SaveLoad` descriptor cannot address through the alias.
 
 ## Resume checkpoint
 
-Paused at the user's request. #262 and #263 integrated; #259 H1-H3 are done.
-#264 gates: implementation PASS (native and 24 semantic scenarios), review FAIL
-(two unfixed guard defects), tooling PASS (155/160), full validation FAIL
-(cancelled after review failed). No fix commits or further review round.
-All agents stopped; the retained H4 worktree is clean. Requested scratch cleanup
-is complete; CI_ON_DEMAND is true and post-merge CI is green. H5/#261 unstarted.
-Root recorded a 190-line selection before wind-down; the user's 160-line stop
-gate prevented integration. Decide the guard budget/scope before another fix.
+Resumed 2026-10-15 by the user (Claude Code root, claude-opus-5-5, high). The
+160-line gate was the wind-down's; H4 keeps the steering review's 190-line ceiling.
+Five agents run; root verifies fixes, selects the #255/#257 fix rounds from their
+profiles, and times caps on a quiet host.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #259 H4 / #264 | `cleanup-dead-ffi-259`, `2c65620788` | Stopped draft: comments hide orphans; indented calls look like declarations. User budget/scope decision, fixes, fresh review and final-head full CI needed. |
-| #212 / #255 | `landscape-owner-212`, `63c67959ee` | Stopped: TGP gate missed (see PR). Conflicts with town base. Next: update, profile, root re-selection. |
-| #213 / #257 | `vehicle-owner-213`, `67611082f7` | Stopped: CPU gate missed (see PR). Conflicts with town base. Next: update, profile, root re-selection. |
-| #64 / #66 | remote `issue/64-curve-family`, `aab5211801` | #66 closed unmerged; #64 stays paused. Local curve worktrees/branches removed; remote head retained. |
+| #259 H4 / #264 | `cleanup-dead-ffi-259`, `2c65620788` | `/root/fix_review_264` fixes the two guard defects within 190 lines; then root verifies, full CI, integrate. |
+| #212 / #255 | `landscape-owner-212`, `63c67959ee` | `/root/landscape_update_profile_255`: base update, callgrind attribution, one proposed fix; root selects. Resolution needs a fresh reviewer. |
+| #213 / #257 | `vehicle-owner-213`, `67611082f7` | `/root/vehicle_update_profile_257`: same as #255. |
+| #256 | `house-lifecycle-256` (new) | `/root/house_lifecycle_256` implementing; draft PR pending. |
+| #261 R4 | `save-staging-261` (new) | `/root/save_staging_261_r4` implementing; R1-R3 wait for H4. |
+| #64 / #66 | remote `issue/64-curve-family`, `aab5211801` | #66 closed unmerged; #64 stays paused. |
 
 ABI blocks:
 - train through 385, tree additions 386-389, fleet 390-399
