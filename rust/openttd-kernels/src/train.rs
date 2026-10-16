@@ -718,6 +718,13 @@ impl Game<'_> {
         (self.leaves.visit_near)(x, y, std::ptr::from_mut(&mut visitor).cast(), visit::<F>) != 0
     }
 
+    fn svc_free_reservation(&self, id: Handle) -> u64 {
+        (self.leaves.free_reservation)(id);
+        0
+    }
+    fn svc_try_path(&self, id: Handle, a: u64, b: u64) -> u64 {
+        (self.leaves.try_path)(id, a as u8, b as u8)
+    }
     fn signal_context(&self) -> crate::signal::Context {
         crate::signal::acquire_context(self.leaves.signal_context)
     }
@@ -1446,7 +1453,7 @@ impl Game<'_> {
             (self.leaves.depot_dirty)(id);
         }
         if !id.flag(8) {
-            (self.leaves.free_reservation)(id);
+            self.svc_free_reservation(id);
         }
         let crossing = self.approaching_crossing(id);
         let mut r = (self.leaves.count_chain)(id) as i32 - 1;
@@ -1517,7 +1524,7 @@ impl Game<'_> {
                     1,
                 );
             }
-            if (self.leaves.try_path)(id, 0, u8::from(okay)) != 0 {
+            if self.svc_try_path(id, 0, u64::from(okay)) != 0 {
                 (self.leaves.check_next)(id);
             } else if (self.leaves.read_order)(id) != 3 {
                 self.mark_stuck(id);
@@ -1929,7 +1936,7 @@ impl Game<'_> {
             if (self.leaves.read_front)(id) != 0 && self.moved_signals(id, new, entered) {
                 if ((self.leaves.has_reserved)(id, new, id.track()) == 0
                     && self.reserve_track(id, new, u64::from(id.track().trailing_zeros())) == 0)
-                    || (self.leaves.try_path)(id, 0, 0) == 0
+                    || self.svc_try_path(id, 0, 0) == 0
                 {
                     self.mark_stuck(id);
                 }
@@ -1990,7 +1997,7 @@ impl Game<'_> {
         if (self.leaves.read_front)(id) != 0 {
             victims += 2;
             if !id.flag(8) {
-                (self.leaves.free_reservation)(id);
+                self.svc_free_reservation(id);
             }
             let mut u = id;
             while u != Handle::NONE {
@@ -2278,7 +2285,7 @@ impl Game<'_> {
             return true;
         }
         if segment == (self.leaves.sigseg_pbs)(id)
-            && (self.leaves.try_path)(id, 0, 0) == 0
+            && self.svc_try_path(id, 0, 0) == 0
             && id.get_force_proceed() == 0
         {
             (self.leaves.train_list)(id);
@@ -2350,7 +2357,7 @@ impl Game<'_> {
             if self.signal_segment(id, tile, dir) == (self.leaves.sigseg_pbs)(id)
                 || (self.leaves.reserve_paths)(id) != 0
             {
-                (self.leaves.try_path)(id, 1, 1);
+                self.svc_try_path(id, 1, 1);
             }
             id.set_flag(9, false);
         }
@@ -2372,7 +2379,7 @@ impl Game<'_> {
             if !turn && wait % (self.leaves.backoff)(id) != 0 && id.get_force_proceed() == 0 {
                 return true;
             }
-            if (self.leaves.try_path)(id, 0, 0) == 0 {
+            if self.svc_try_path(id, 0, 0) == 0 {
                 if turn {
                     crate::witness::hit(crate::witness::TRAIN_STUCK_REVERSE);
                     self.reverse(id);
