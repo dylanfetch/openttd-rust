@@ -398,9 +398,15 @@ pub const TOWN_GRID: usize = 176;
 pub const TOWN_NAME_SET: usize = 177;
 /// `town.entries` witness.
 pub const TOWN_ENTRIES: usize = 178;
+/// `town.no_cities` witness: generation with `larger_towns == 0`.
+pub const TOWN_NO_CITIES: usize = 179;
+/// `station.stale_restrict` branch.
+pub const STATION_STALE_RESTRICT: usize = 180;
+/// `station.stale_release` branch.
+pub const STATION_STALE_RELEASE: usize = 181;
 
 /// Counter names, grouped by the prefix the harness selects.
-pub const NAMES: [&str; 179] = [
+pub const NAMES: [&str; 182] = [
     "train.tick_first",
     "train.tick_second",
     "train.reversal",
@@ -580,6 +586,9 @@ pub const NAMES: [&str; 179] = [
     "town.grid",
     "town.name_set",
     "town.entries",
+    "town.no_cities",
+    "station.stale_restrict",
+    "station.stale_release",
 ];
 
 static ENABLED: AtomicBool = AtomicBool::new(false);
