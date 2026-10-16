@@ -200,19 +200,17 @@ void Town::PostDestructor(size_t)
  * Assign the town layout.
  * @param layout The desired layout. If TL_RANDOM, we pick one based on TileHash.
  */
+#ifndef WITH_RUST
 void Town::InitializeLayout(TownLayout layout)
 {
-#ifdef WITH_RUST
-	openttd_rust_town_initialize_layout(this->growth_owner.get(), layout, &GetRustSharedServices());
-#else
 	if (layout != TL_RANDOM) {
 		this->layout = layout;
 		return;
 	}
 
 	this->layout = static_cast<TownLayout>(TileHash(TileX(this->xy), TileY(this->xy)) % (NUM_TLS - 1));
-#endif
 }
+#endif
 
 /**
  * Return a random valid town.
@@ -2311,8 +2309,6 @@ const OpenTTDTownFoundingServices &GetRustTownFoundingServices() noexcept
 		.water_distance = [](uint32_t tile, bool water) noexcept { return GetClosestWaterDistance(TileIndex(tile), water); },
 		.scale_size = OpenTTDMapScaleSize,
 		.scale_land = OpenTTDMapScaleLandProportion,
-		.current_company = RustCurrentCompanyID,
-		.set_company = RustSetCurrentCompanyID,
 		.found_setting = OpenTTDTownFoundingSetting,
 		.layout_setting = OpenTTDTownLayoutSetting,
 		.initial_city_size = OpenTTDInitialCitySize,

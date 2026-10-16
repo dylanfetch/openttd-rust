@@ -568,14 +568,6 @@ pub struct RailMapServices {
     pub is_rail_depot: extern "C" fn(u32) -> bool,
     /// Native `rail_depot_direction` map operation at the original observation point.
     pub rail_depot_direction: extern "C" fn(u32) -> DiagDirection,
-    /// Native `rail_tracks` map operation at the original observation point.
-    pub rail_tracks: extern "C" fn(u32) -> TrackBits,
-    /// Native `has_signals` map operation at the original observation point.
-    pub has_signals: extern "C" fn(u32) -> bool,
-    /// Native `has_signal_track` map operation at the original observation point.
-    pub has_signal_track: extern "C" fn(u32, u8) -> bool,
-    /// Native `signal_type` map operation at the original observation point.
-    pub signal_type: extern "C" fn(u32, u8) -> SignalType,
     /// Native `has_signal_trackdir` map operation at the original observation point.
     pub has_signal_trackdir: extern "C" fn(u32, u8) -> bool,
     /// Native `signal_state` map operation at the original observation point.

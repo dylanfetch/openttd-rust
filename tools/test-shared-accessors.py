@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Run the real #249 CLI for every seeded category, upstream scope and ratchet."""
 
+import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -72,6 +73,62 @@ with tempfile.TemporaryDirectory() as directory:
         port.write_text(changed)
         assert "new shared accessor:" in check().stdout and check().returncode == 1
     port.write_text(original)
+    assert "remove retired" in check().stdout
+    baseline.write_text("")
+    assert check().returncode == 0
+    owner = root / "src/owner.rs"
+    owner.write_text('#[unsafe(no_mangle)] pub extern "C" fn openttd_rust_dead() {}')
+    caller = root / "tools/caller.py"
+    caller.write_text("")
+    git("add", ".")
+    assert "orphan | openttd_rust_dead" in check().stdout
+    port.write_text(original + "\nvoid openttd_rust_dead();\n")
+    assert "orphan | openttd_rust_dead" in check().stdout
+    for target, call, orphan in [
+        (port, "void Call() { openttd_rust_dead(); }", False),
+        (owner, "fn call() { openttd_rust_dead(); }", False),
+        (caller, "source = 'openttd_rust_dead();'", False),
+        (port, "void Call() {\n    openttd_rust_dead();\n}", False),
+        (port, "void Call() {\n    openttd_rust_dead(\n        1);\n}", False),
+        (port, "// openttd_rust_dead\n/* openttd_rust_dead */", True),
+        (owner, "// openttd_rust_dead", True),
+        (caller, "x = 1  # openttd_rust_dead()", True),
+    ]:
+        before = target.read_text()
+        target.write_text(before + "\n" + call + "\n")
+        result = check()
+        assert ("orphan |" in result.stdout) == orphan == bool(result.returncode)
+        target.write_text(before)
+    caller.write_text("source = 'openttd_rust_dead();'")
+    duplicate = "\nvoid Callback() noexcept {}\nOpenTTDFixtureServices one{.a = Callback,\n};\nOpenTTDFixtureServices two{.b = Callback,\n};\n"
+    write = "\nvoid Write(uint8_t value) { _current_company = value; }\n"
+    port.write_text(port.read_text() + duplicate + write)
+    result = check()
+    assert "binding | Callback | 2" in result.stdout and "write |" in result.stdout
+    fingerprints = re.findall(r"new shared accessor: (.*)", result.stdout)
+    baseline.write_text("\n".join(fingerprints) + "\n")
+    assert "addition forbidden" in check().stdout
+    baseline.write_text("")
+    extra = "\nOpenTTDFixtureServices extra{.c = Callback,\n};\n"
+    port.write_text(port.read_text() + extra)
+    git("commit", "-qam", "Add: Actual boundary seed source")
+    base = git("rev-parse", "HEAD")
+    port.write_text(port.read_text().removesuffix(extra))
+    baseline.write_text("\n".join(fingerprints) + "\n")
+    assert check().returncode == 0, check().stdout
+    baseline.write_text(baseline.read_text() + "binding | Invented | 2\n")
+    assert "addition forbidden" in check().stdout
+    baseline.write_text("\n".join(fingerprints) + "\n")
+    git("commit", "-qam", "Add: Boundary baseline")
+    base = git("rev-parse", "HEAD")
+    port.write_text(port.read_text() + extra)
+    result = check()
+    assert "new shared accessor:" in result.stdout
+    added = result.stdout.split("new shared accessor: ")[1].splitlines()[0]
+    baseline.write_text(baseline.read_text() + added + "\n")
+    assert "addition forbidden" in check().stdout
+    port.write_text(original)
+    owner.write_text("")
     assert "remove retired" in check().stdout
     baseline.write_text("")
     assert check().returncode == 0

@@ -282,12 +282,10 @@ typedef struct OpenTTDIndustryConstructionServices {
 	void (*stations_around)(void *, void *, OpenTTDIndustryStationVisit) OPENTTD_INDUSTRY_NOEXCEPT;
 	void (*add_delivery)(OpenTTDIndustryStationHandle *, void *, uint32_t) OPENTTD_INDUSTRY_NOEXCEPT;
 } OpenTTDIndustryConstructionServices;
-void openttd_rust_industry_initialize(void *, OpenTTDIndustry *, OpenTTDIndustryBuilder *, const OpenTTDIndustryConstructionRequest *, const OpenTTDIndustryServices *, const OpenTTDIndustryGenerationServices *, const OpenTTDIndustryLifecycleServices *, const OpenTTDIndustryConstructionServices *);
 void openttd_rust_industry_tick(OpenTTDIndustryBuilder *builder, const OpenTTDIndustryTickRecord *record, const OpenTTDIndustryServices *services);
 bool openttd_rust_industry_transport(void *industry, OpenTTDIndustry *owner, uint8_t minimal_cargo, bool recession, const OpenTTDIndustryServices *services);
 void openttd_rust_industry_farm(void *industry, uint16_t id, OpenTTDIndustryMap map, const OpenTTDIndustryServices *services);
 void openttd_rust_industry_recompute(void *industry, OpenTTDIndustry *owner, const OpenTTDIndustryServices *services);
-void openttd_rust_industry_change(void *industry, uint8_t monthly, const OpenTTDIndustryServices *services);
 void openttd_rust_industry_daily_start(OpenTTDIndustryBuilder *builder, uint32_t map_bits, uint8_t init_counter);
 void openttd_rust_industry_daily(OpenTTDIndustryBuilder *builder, const OpenTTDIndustryServices *services);
 void openttd_rust_industry_monthly(OpenTTDIndustryBuilder *builder, const OpenTTDIndustryServices *services);

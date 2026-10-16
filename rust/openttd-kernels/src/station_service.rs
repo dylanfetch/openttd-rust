@@ -559,7 +559,6 @@ pub unsafe extern "C" fn openttd_rust_station_watched(st: *mut BaseStation, worl
     let (context, callback) = scope_context(&mut body);
     (w.with_tiles)(st, context, callback);
 }
-#[unsafe(no_mangle)]
 // Preserve the complete source rating loop and its immediate mutation order.
 #[allow(clippy::too_many_lines)]
 pub unsafe extern "C" fn openttd_rust_station_rating(st: *mut BaseStation, world: *const World) {
