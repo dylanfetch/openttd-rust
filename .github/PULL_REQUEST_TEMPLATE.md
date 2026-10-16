@@ -33,5 +33,7 @@ Review report (reviewer posts it as a separate comment, about 20 lines):
 Agent: <path> | Model: <exact model> | Reasoning effort: <effort>
 Reviewed commit: <sha>
 Findings and fixing commits: <finding -> commit, or why it went to root; or "none">
+Compared against the original body: <functions or files>
+New callbacks duplicating a shared accessor: <each one is a finding; or "none">
 Shared credentials require an attributed report, not a GitHub platform approval.
 -->

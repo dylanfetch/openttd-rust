@@ -46,6 +46,7 @@
 #ifdef WITH_RUST
 #include "rust/ground_services.h"
 #include "rust/services_landscape.h"
+#include "rust/environment_services.h"
 #include "rust/company_services.h"
 #include "rust/vehicle_services.h"
 #include "rail_cmd.h"
@@ -1064,7 +1065,7 @@ const OpenTTDWaterGroundServices &GetRustWaterGroundServices() noexcept
 		.non_flooding = [](uint32_t t) noexcept { return IsNonFloodingWaterTile(TileIndex{t}); },
 		.set_non_flooding = [](uint32_t t, bool value) noexcept { SetNonFloodingWaterTile(TileIndex{t}, value); },
 		.coast = RustIsCoast,
-		.tree_ground = RustTreeGround,
+		.tree_ground = OpenTTDTreeGround,
 		.set_tree_ground = RustSetTreeGroundDensity,
 		.make_clear = RustMakeClear, .make_shore = RustMakeShore,
 		.make_sea = [](uint32_t t) noexcept { MakeSea(TileIndex{t}); },
@@ -1075,7 +1076,7 @@ const OpenTTDWaterGroundServices &GetRustWaterGroundServices() noexcept
 		.check_docking = [](uint32_t t) noexcept { CheckForDockingTile(TileIndex{t}); },
 		.invalidate_region = [](uint32_t t) noexcept { InvalidateWaterRegion(TileIndex{t}); },
 		.update_signals = RustUpdateSignals,
-		.set_company = RustSetCurrentCompanyValue,
+		.set_company = RustSetCurrentCompanyID,
 		.tracks = RustRailTracks,
 		.remove_rail = [](OpenTTDCommandCost *out, uint32_t t, Track track) noexcept { *NativeGroundCost(out) = Command<CMD_REMOVE_SINGLE_RAIL>::Do(DoCommandFlag::Execute, TileIndex{t}, track); },
 		.apply_foundation = [](Foundation f, Slope slope) noexcept { Slope s = slope; int z = ApplyFoundationToSlope(f, s); return OpenTTDFoundationSlope{.z = z, .slope = s}; },

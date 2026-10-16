@@ -101,19 +101,10 @@ raw tile-type read did not cause its budget miss. The eleventh steering review
 traced that miss to an uninlined dispatch closure and to lambda trampolines.
 New owners use integrated typed services; no transfer is selected.
 
-For the 256x512 tree soak, generation uses 191,315 (temperate) / 321,489 (tropic)
-map-service calls. Tree updates average 204--245 map calls per 512-tile batch
-(including generation warm-up where applicable), around one third of tree-facing
-FFI calls; copied tree tile-loop observation/settings records total 321--389 MB over a run.
-Water plain soak uses 9,302--169,534 map-service calls and 18--88 region rebuilds:
-281--1,995 track/follower calls per 16x16-region rebuild; aqueduct-neighbour
-queries are counted separately from flood fill.
-Plain tree reference/candidate process times were 0.214--0.315 / 0.264--0.365 s;
-counted, counter-disabled and uninstrumented-parent times were indistinguishable
-within the subprocess wait granularity (up to 50 ms). This does not establish
-zero profiling overhead or performance equivalence. Elapsed time includes
-startup, other ports, save I/O and profiling overhead;
-these runs do not compare raw-array alternatives or establish a whole-game gain.
+Historical tree and water measurements, with their limits, are recorded in
+[PR #114](https://github.com/fetch-laboratories/openttd-rust/pull/114) and
+[PR #116](https://github.com/fetch-laboratories/openttd-rust/pull/116). They establish callback
+density; they do not establish a whole-game performance gain or compare raw-array alternatives.
 
 A future raw view must retain one canonical allocation, pin both C++ and Rust
 size/alignment/offsets, use field-sized raw `ptr::read`/`write` with no Rust
@@ -149,8 +140,8 @@ owner moves, adapt its reads/writes and load lifecycle without changing the form
 Rust-owned persistent state must be visible to saving before the call returns.
 
 Extend the component module under `tools/simulation/` for save/load and
-mutation/reuse paths. Run `python3 tools/migration.py simulate` and `--soak`/`--self`
-as needed. Keep desync snapshots and plain runs: cache rebuilding can conceal
+mutation/reuse paths. Run `python3 tools/migration.py simulate` with default scenarios.
+Keep desync snapshots and plain runs: cache rebuilding can conceal
 faults. The existing semantic decoder remains unchanged. Port divergences belong in `KNOWN_FAILURES` with an issue, never new
 `MASKS`; #83's masked `round_trip_time` needs separate evidence if touched. Saves
 do not expose every transient state: add a narrow direct check only for a named

@@ -165,9 +165,9 @@ TEST_CASE("Industry - construction owner and ascending type registry")
 TEST_CASE("Industry - native generation handoff retains named cancellation")
 {
 	OpenTTDIndustryGenerationContext context;
-	CHECK(RunIndustryGenerationProgress(&context, [] { }));
+	CHECK(RunGenerationProgress(&context, [] { }));
 	CHECK(context.cancellation == nullptr);
-	CHECK_FALSE(RunIndustryGenerationProgress(&context, [] { throw AbortGenerateWorldSignal(); }));
+	CHECK_FALSE(RunGenerationProgress(&context, [] { throw AbortGenerateWorldSignal(); }));
 	REQUIRE(context.cancellation != nullptr);
 	bool aborted = false;
 	try { std::rethrow_exception(context.cancellation); }

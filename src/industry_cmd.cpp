@@ -3640,8 +3640,8 @@ static const OpenTTDIndustryServices _industry_services = {
 	.farm_tile = [](uint32_t index) noexcept -> OpenTTDIndustryFarmTile {
 		TileIndex tile(index);
 		switch (GetTileType(tile)) {
-			case MP_CLEAR: return {MP_CLEAR, RustSnowTile(index), static_cast<uint8_t>(RustClearGround(index)), 0};
-			case MP_TREES: return {MP_TREES, 0, static_cast<uint8_t>(RustTreeGround(index)), GetTreeGrowth(tile) >= TreeGrowthStage::Grown};
+			case MP_CLEAR: return {MP_CLEAR, RustSnowTile(index), static_cast<uint8_t>(GetClearGround(tile)), 0};
+			case MP_TREES: return {MP_TREES, 0, static_cast<uint8_t>(GetTreeGround(tile)), GetTreeGrowth(tile) >= TreeGrowthStage::Grown};
 			default: return {static_cast<uint8_t>(GetTileType(tile)), 0, 0, 0};
 		}
 	},
@@ -3703,7 +3703,7 @@ static const OpenTTDIndustryServices _industry_services = {
 		return {spec->behaviour.base(), spec->enabled, !spec->layouts.empty(), spec->appear_ingame[to_underlying(_settings_game.game_creation.landscape)]};
 	},
 	.probability_callback = [](uint8_t type, uint8_t creation, uint32_t chance) noexcept -> uint32_t { return GetIndustryProbabilityCallback(type, static_cast<IndustryAvailabilityCallType>(creation), chance); },
-	.scale_by_map_size = [](uint32_t n) noexcept -> uint32_t { return Map::ScaleBySize(n); },
+	.scale_by_map_size = OpenTTDMapScaleSize,
 	.company_none = []() noexcept -> uint8_t {
 		CompanyID old = OpenTTDCurrentCompany();
 		OpenTTDSetCurrentCompany(OWNER_NONE);
@@ -3786,14 +3786,14 @@ static const OpenTTDIndustryGenerationServices &GetIndustryGenerationServices()
 		.density = []() noexcept -> uint8_t { return _settings_game.difficulty.industry_density; },
 		.custom_number = []() noexcept -> uint32_t { return _settings_game.game_creation.custom_industry_number; },
 		.scale_by_size_1d = [](uint32_t n) noexcept -> uint32_t { return Map::ScaleBySize1D(n); },
-		.scale_by_land_proportion = [](uint32_t n) noexcept -> uint32_t { return Map::ScaleByLandProportion(n); },
+		.scale_by_land_proportion = OpenTTDMapScaleLandProportion,
 		/* Only AbortGenerateWorldSignal is ordinary here. Retain the native
 		 * exception on this stack frame and rethrow after the Rust entry returns. */
 		.set_progress = [](OpenTTDIndustryGenerationContext *context, bool water, uint32_t total) noexcept -> bool {
-			return RunIndustryGenerationProgress(context, [&] { SetGeneratingWorldProgress(water ? GWP_WATER_INDUSTRY : GWP_LAND_INDUSTRY, total); });
+			return RunGenerationProgress(context, [&] { SetGeneratingWorldProgress(water ? GWP_WATER_INDUSTRY : GWP_LAND_INDUSTRY, total); });
 		},
 		.increase_progress = [](OpenTTDIndustryGenerationContext *context, bool water) noexcept -> bool {
-			return RunIndustryGenerationProgress(context, [&] { IncreaseGeneratingWorldProgress(water ? GWP_WATER_INDUSTRY : GWP_LAND_INDUSTRY); });
+			return RunGenerationProgress(context, [&] { IncreaseGeneratingWorldProgress(water ? GWP_WATER_INDUSTRY : GWP_LAND_INDUSTRY); });
 		},
 		.missing_warning = [](const OpenTTDIndustrySpecHandle *handle) noexcept {
 			const auto *spec = reinterpret_cast<const IndustrySpec *>(handle);
@@ -3818,7 +3818,7 @@ static const OpenTTDIndustryConstructionServices &GetIndustryConstructionService
 		},
 		.callback_mask = [](const OpenTTDIndustrySpecHandle *handle) noexcept -> uint16_t { return reinterpret_cast<const IndustrySpec *>(handle)->callback_mask.base(); },
 		.set_town = [](void *shell, const OpenTTDTownHandle *town) noexcept { RustIndustry(shell)->town = const_cast<Town *>(reinterpret_cast<const Town *>(town)); },
-		.calendar_date = []() noexcept -> int32_t { return TimerGameCalendar::date.base(); },
+		.calendar_date = GetRustSharedServices().calendar_date,
 		.generating = OpenTTDGeneratingWorld,
 		.callback = [](void *shell, uint16_t callback, uint32_t parameter, uint32_t random) noexcept -> uint16_t {
 			Industry *i = RustIndustry(shell);
@@ -3965,7 +3965,7 @@ static const OpenTTDIndustryTransactionServices &GetIndustryTransactionServices(
 		.population = [](const OpenTTDTownHandle *town) noexcept -> uint32_t { return reinterpret_cast<const Town *>(town)->cache.population; },
 		.town_position = [](const OpenTTDTownHandle *town) noexcept -> uint32_t { return reinterpret_cast<const Town *>(town)->xy.base(); },
 		.industry = [](uint16_t id) noexcept -> Industry * { return Industry::Get(IndustryID(id)); },
-		.highest_snow_line = []() noexcept -> uint8_t { return HighestSnowLine(); },
+		.highest_snow_line = OpenTTDHighestSnowLine,
 		.edge_distance = [](uint32_t tile, uint8_t direction) noexcept -> uint32_t { return DistanceFromEdgeDir(TileIndex(tile), static_cast<DiagDirection>(direction)); },
 		.refinery_limit = []() noexcept -> uint8_t { return _settings_game.game_creation.oil_refinery_limit; },
 		.tile_height = [](uint32_t tile) noexcept -> uint32_t { return TileHeight(TileIndex(tile)); },

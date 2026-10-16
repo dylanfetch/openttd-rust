@@ -93,7 +93,6 @@ template <typename T, typename F> static uint32_t NextOwned(uint8_t owner, uint3
 }
 
 /* Finance services. */
-static uint8_t Fin_current_company() noexcept { return OpenTTDCurrentCompany().base(); }
 static bool Fin_networking() noexcept { return _networking; }
 static CompanyFinances *Fin_company_finances(uint8_t id) noexcept
 {
@@ -412,7 +411,7 @@ static void Co_change_window_owner(uint8_t old_owner, uint8_t new_owner) noexcep
 const OpenTTDCompanyFinanceServices &GetRustCompanyFinanceServices() noexcept
 {
 	static const OpenTTDCompanyFinanceServices services{
-		.current_company = Fin_current_company, .set_current_company = RustSetCurrentCompanyValue,
+		.current_company = RustCurrentCompanyID, .set_current_company = RustSetCurrentCompanyID,
 		.networking = Fin_networking, .company_finances = Fin_company_finances,
 		.invalidate_company_windows = Fin_invalidate_company_windows,
 		.give_money_message = Fin_give_money_message, .money_animation = Fin_money_animation,

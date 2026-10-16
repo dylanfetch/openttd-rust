@@ -352,11 +352,58 @@ pub const SIGNAL_COMBO_RED: usize = 154;
 /// Signal empty neighbour buffer continue.
 pub const SIGNAL_NEIGHBOUR_CONTINUE: usize = 155;
 
+/// `town.services` witness.
+pub const TOWN_SERVICES: usize = 156;
+/// `town.bytes` witness.
+pub const TOWN_BYTES: usize = 157;
+/// `town.placement` witness.
+pub const TOWN_PLACEMENT: usize = 158;
+/// `town.growth` witness.
+pub const TOWN_GROWTH: usize = 159;
+/// `town.generated` witness.
+pub const TOWN_GENERATED: usize = 160;
+/// `town.coast` witness.
+pub const TOWN_COAST: usize = 161;
+/// `town.manual` witness.
+pub const TOWN_MANUAL: usize = 162;
+/// `town.deity` witness.
+pub const TOWN_DEITY: usize = 163;
+/// `town.editor` witness.
+pub const TOWN_EDITOR: usize = 164;
+/// `town.invalid` witness.
+pub const TOWN_INVALID: usize = 165;
+/// `town.duplicate` witness.
+pub const TOWN_DUPLICATE: usize = 166;
+/// `town.money` witness.
+pub const TOWN_MONEY: usize = 167;
+/// `town.zero_growth` witness.
+pub const TOWN_ZERO_GROWTH: usize = 168;
+/// `town.retry` witness.
+pub const TOWN_RETRY: usize = 169;
+/// `town.rename` witness.
+pub const TOWN_RENAME: usize = 170;
+/// `town.name_retry` witness.
+pub const TOWN_NAME_RETRY: usize = 171;
+/// `town.name_exhausted` witness.
+pub const TOWN_NAME_EXHAUSTED: usize = 172;
+/// `town.name_duplicate` witness.
+pub const TOWN_NAME_DUPLICATE: usize = 173;
+/// `town.fallback` witness.
+pub const TOWN_FALLBACK: usize = 174;
+/// `town.cancelled` witness.
+pub const TOWN_CANCELLED: usize = 175;
+/// `town.grid` witness.
+pub const TOWN_GRID: usize = 176;
+/// `town.name_set` witness.
+pub const TOWN_NAME_SET: usize = 177;
+/// `town.entries` witness.
+pub const TOWN_ENTRIES: usize = 178;
+
 /// First landscape ownership branch counter.
-pub const LANDSCAPE: usize = 156;
+pub const LANDSCAPE: usize = 179;
 
 /// Counter names, grouped by the prefix the harness selects.
-pub const NAMES: [&str; 182] = [
+pub const NAMES: [&str; 205] = [
     "train.tick_first",
     "train.tick_second",
     "train.reversal",
@@ -513,6 +560,29 @@ pub const NAMES: [&str; 182] = [
     "signal.multi_green",
     "signal.combo_red",
     "signal.neighbour_continue",
+    "town.services",
+    "town.bytes",
+    "town.placement",
+    "town.growth",
+    "town.generated",
+    "town.coast",
+    "town.manual",
+    "town.deity",
+    "town.editor",
+    "town.invalid",
+    "town.duplicate",
+    "town.money",
+    "town.zero_growth",
+    "town.retry",
+    "town.rename",
+    "town.name_retry",
+    "town.name_exhausted",
+    "town.name_duplicate",
+    "town.fallback",
+    "town.cancelled",
+    "town.grid",
+    "town.name_set",
+    "town.entries",
     "landscape.snow_start",
     "landscape.snow_change",
     "landscape.snow_clear",

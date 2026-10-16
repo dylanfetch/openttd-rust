@@ -5,11 +5,12 @@ progressively replacing C++ components with Rust while preserving game behavior.
 The migration starts from OpenTTD 15.3 and keeps the complete original game as a
 working host and comparison baseline. This is not an official OpenTTD release.
 
-Built with `OPTION_RUST=ON` (supported native Linux, macOS arm64 and Windows
-MSVC configurations; see the guide for the exact list), the fork runs a growing set of components in Rust behind their original C++
-interfaces. The rest of the game remains C++, and portable builds keep the
-original code. The [roadmap](docs/roadmap.md) lists current priorities, starting
-with a semantic simulation harness and then the first game-logic ports.
+With `OPTION_RUST=ON`, the fork runs an increasing set of components in Rust
+behind their original C++ interfaces. Native Rust linkage currently supports
+Linux, macOS arm64, and the scoped Windows MSVC configurations documented in
+the [migration guide](docs/rust-migration.md). Other components and portable
+builds retain the original C++ implementation. The [roadmap](docs/roadmap.md)
+lists current priorities.
 
 See [the migration guide](docs/rust-migration.md) for setup, verification, scope,
 and team process. The original game documentation follows below.

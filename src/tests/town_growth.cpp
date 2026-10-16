@@ -10,7 +10,6 @@
 #include "../3rdparty/catch2/catch.hpp"
 #include "../town.h"
 #ifdef WITH_RUST
-#include "../rust/town_save.hpp"
 #include "town_protocol.hpp"
 #endif
 #include "../safeguards.h"
@@ -21,11 +20,11 @@ TEST_CASE("Town growth - command boundaries and callback reentry")
 	CheckTownProtocol([](bool result) { CHECK(result); });
 }
 
-TEST_CASE("Town lifecycle - canonical metadata, histories and partial staging")
+TEST_CASE("Town lifecycle - canonical metadata, histories and descriptor aliases")
 {
 	REQUIRE(Town::GetNumItems() == 0);
 	auto *a = new (TownID(17)) Town(TileIndex{41});
-	auto *b = new (TownID(19)) Town();
+	new (TownID(19)) Town();
 	CHECK(a->xy == TileIndex{41});
 	CHECK(a->exclusivity == CompanyID::Invalid());
 	a->cache.population = 999;
@@ -37,24 +36,10 @@ TEST_CASE("Town lifecycle - canonical metadata, histories and partial staging")
 	CHECK(openttd_rust_town_simulation(a->growth_owner.get())->townnameparts == 0x80000001);
 	CHECK(openttd_rust_town_simulation(a->growth_owner.get())->population == 999);
 	CHECK(openttd_rust_town_simulation(a->growth_owner.get())->ratings[2] == -123);
-	{
-		TownSimulationSaveScope saving(a, false);
-		CHECK(TownSimulationSaveScope::current.received[TAE_FOOD].old_act == 65535);
-		{
-			TownSimulationSaveScope loading(b, true);
-			TownSimulationSaveScope::current.population = 3;
-			TownSimulationSaveScope::current.townnameparts = 7;
-			TownSimulationSaveScope::current.ratings[CompanyID(2)] = 456;
-		}
-		CHECK((b->cache.population == 3 && b->ratings[CompanyID(2)] == 456 && b->townnameparts == 7));
-		CHECK(TownSimulationSaveScope::current.population == 999);
-	}
-	try {
-		TownSimulationSaveScope loading(a, true);
-		TownSimulationSaveScope::current.noise_reached = 19;
-		throw 7;
-	} catch (int) {}
-	CHECK(a->noise_reached == 19);
+	CHECK(std::addressof(a->xy) == std::addressof(a->simulation.xy));
+	CHECK(std::addressof(a->ratings) == std::addressof(a->simulation.ratings));
+	CHECK(std::addressof(a->received) == std::addressof(a->simulation.received));
+	CHECK(std::addressof(a->townnameparts) == std::addressof(a->simulation.townnameparts));
 	a->GetOrCreateCargoSupplied(5).history[THIS_MONTH].production = 123;
 	a->GetOrCreateCargoSupplied(2).history[LAST_MONTH].transported = 77;
 	const auto view = openttd_rust_town_supplied_view(a->growth_owner.get());
@@ -75,7 +60,7 @@ TEST_CASE("Town lifecycle - canonical metadata, histories and partial staging")
 	_town_pool.CleanPool();
 }
 
-TEST_CASE("Town growth - indexed construction, partial staging and pool reuse")
+TEST_CASE("Town growth - indexed construction, descriptor aliases and pool reuse")
 {
 	REQUIRE(Town::GetNumItems() == 0);
 	auto *a = new (TownID(17)) Town();
@@ -85,25 +70,14 @@ TEST_CASE("Town growth - indexed construction, partial staging and pool reuse")
 	CHECK(a->flags.base() == 0);
 	a->grow_counter = 65535; a->growth_rate = 0x8005;
 	a->flags.Set(TownFlag::HasChurch);
-	{
-		TownGrowthSaveScope saving(a, false);
-		CHECK(TownGrowthSaveScope::current.rate == 0x8005);
-		{
-			TownGrowthSaveScope loading(b, true);
-			TownGrowthSaveScope::current = {37, 65535, 255, 254, 0xFA};
-			CHECK(static_cast<uint16_t>(b->grow_counter) == 0);
-		}
-		CHECK(static_cast<uint16_t>(b->grow_counter) == 37);
-		CHECK(b->flags.base() == 0xFA);
-		CHECK(TownGrowthSaveScope::current.counter == 65535);
-	}
-	try {
-		TownGrowthSaveScope loading(a, true);
-		TownGrowthSaveScope::current.counter = 61;
-		throw 1;
-	} catch (int) {}
-	CHECK(static_cast<uint16_t>(a->grow_counter) == 61);
-	CHECK(static_cast<uint16_t>(a->growth_rate) == 0x8005);
+	CHECK(std::addressof(a->grow_counter) == std::addressof(a->growth.counter));
+	CHECK(std::addressof(a->growth_rate) == std::addressof(a->growth.rate));
+	CHECK(std::addressof(a->flags) == std::addressof(a->growth.flags));
+	b->grow_counter = 37;
+	b->flags = TownFlags(0xFA);
+	CHECK(openttd_rust_town_growth(b->growth_owner.get())->counter == 37);
+	CHECK(openttd_rust_town_growth(b->growth_owner.get())->flags == 0xFA);
+	a->grow_counter = 61;
 	/* The pre-SLV165 adapter's high bit is preserved before conversion, including
 	 * the disabled sentinel. Widths/narrowing are the original CITY/TTD descriptors. */
 	if (a->growth_rate & 0x8000) a->flags.Set(TownFlag::CustomGrowth);

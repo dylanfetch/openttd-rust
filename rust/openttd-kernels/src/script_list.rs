@@ -44,6 +44,7 @@ impl Default for List {
 impl List {
     pub(crate) fn cargo_merge(&mut self, key: i64, amount: i64) {
         if let Some(value) = self.items.get(&key).copied() {
+            // Fresh public collector: <2^24 u16 packets or <=2^16 u32 origin totals fit i64.
             self.set(
                 key,
                 value.checked_add(amount).expect("defined cargo list value"),
@@ -54,11 +55,8 @@ impl List {
     }
 
     fn touch(&mut self) {
-        // Original signed int overflow is undefined; only representable counts are in contract.
-        self.modifications = self
-            .modifications
-            .checked_add(1)
-            .expect("defined modification count");
+        // Match the compiled original's signed int wrap; tokens are compared for equality.
+        self.modifications = self.modifications.wrapping_add(1);
     }
     fn first(&self, ascending: bool) -> Option<i64> {
         if self.sort_by_item {
@@ -221,8 +219,8 @@ impl List {
             return;
         }
         while let Some(key) = self.first(top) {
-            // --count is evaluated only for a present element. Original i64 overflow is undefined.
-            count = count.checked_sub(1).expect("defined rank count");
+            // --count runs only for a present element and wraps in the compiled original.
+            count = count.wrapping_sub(1);
             if count < 0 {
                 return;
             }
@@ -231,8 +229,10 @@ impl List {
     }
     fn keep_rank(&mut self, top: bool, count: i64) {
         self.touch();
+        // Allocated map nodes bound the entry count below i64::MAX.
         let size = i64::try_from(self.items.len()).expect("representable list count");
-        self.remove_rank(!top, size.checked_sub(count).expect("defined keep count"));
+        // Count() - count wraps in the compiled original, including count == i64::MIN.
+        self.remove_rank(!top, size.wrapping_sub(count));
     }
     fn copy_contents(&mut self, source: &Self) {
         self.sort(i32::from(source.sort_by_item), source.ascending);
@@ -280,6 +280,23 @@ impl List {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::List;
+
+    #[test]
+    fn modification_token_wraps() {
+        let mut list = List {
+            modifications: i32::MAX,
+            ..List::default()
+        };
+        list.add(1, 0);
+        assert_eq!(list.modifications, i32::MIN);
+        assert!(list.set(1, 1));
+        assert_eq!(list.modifications, i32::MIN + 1);
+    }
+}
+
 // Opaque exclusive owners, no foreign allocation/VM/layout crosses these calls.
 // Pointers must be live, aligned, initialized; operations serialized; output
 // scalars valid writable/disjoint. All borrows end at return. Panics abort.
@@ -311,6 +328,7 @@ mod ffi {
     }
     #[unsafe(no_mangle)]
     pub(crate) unsafe extern "C" fn openttd_rust_list_count(owner: *const List) -> i64 {
+        // Allocated map nodes bound the entry count below i64::MAX.
         unsafe { i64::try_from((*owner).items.len()).expect("representable list count") }
     }
     #[unsafe(no_mangle)]

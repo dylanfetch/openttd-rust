@@ -22,6 +22,7 @@ inline OpenTTDStationActivity OpenTTDStationActivityOf(const Station *station) n
 {
 	return openttd_rust_station_activity(station->rust_service.get());
 }
+const OpenTTDStationService *OpenTTDStationActivityOwner(const OpenTTDStation *station) noexcept;
 inline bool RustStationHasAirport(const Station *s) noexcept { return s->facilities.Test(StationFacility::Airport); }
 inline bool RustStationHasHangar(const Station *s) noexcept { return s->airport.HasHangar(); }
 #endif /* RUST_STATION_SERVICES_H */

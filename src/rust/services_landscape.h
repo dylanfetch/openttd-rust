@@ -25,7 +25,6 @@ inline RoadBits RustCleanRoadBits(TileIndex tile, RoadBits bits) noexcept { retu
 inline uint8_t RustTileOwnerValue(uint32_t tile) noexcept { return GetTileOwner(TileIndex{tile}).base(); }
 inline bool RustPlainRailTile(uint32_t tile) noexcept { return IsPlainRailTile(TileIndex{tile}); }
 inline ClearGround RustClearGround(Tile tile) noexcept { return GetClearGround(tile); }
-inline ClearGround RustClearGround(uint32_t index) noexcept { return RustClearGround(Tile{TileIndex{index}}); }
 inline bool RustClearFieldTile(Tile tile) noexcept { return IsTileType(tile, MP_CLEAR) && RustClearGround(tile) == CLEAR_FIELDS; }
 inline bool RustClearFieldTile(uint32_t index) noexcept { return RustClearFieldTile(Tile{TileIndex{index}}); }
 inline uint32_t RustClearDensity(Tile tile) noexcept { return GetClearDensity(tile); }
@@ -50,7 +49,6 @@ inline bool RustFieldOfIndustry(Tile tile, IndustryID industry) noexcept { retur
 inline bool RustFieldOfIndustryValue(uint32_t tile, uint16_t industry) noexcept { return RustFieldOfIndustry(Tile{TileIndex{tile}}, IndustryID{industry}); }
 inline bool RustHasWaterClass(uint32_t tile) noexcept { return HasTileWaterClass(TileIndex{tile}); }
 inline WaterClass RustWaterClass(uint32_t tile) noexcept { return GetWaterClass(TileIndex{tile}); }
-inline TreeGround RustTreeGround(uint32_t tile) noexcept { return GetTreeGround(TileIndex{tile}); }
 inline bool RustIsCoast(uint32_t tile) noexcept { return IsCoast(TileIndex{tile}); }
 inline void RustMakeClear(uint32_t tile, ClearGround ground, uint32_t density) noexcept { MakeClear(TileIndex{tile}, ground, density); }
 inline void RustMakeClearValue(uint32_t tile, uint8_t ground, uint32_t density) noexcept { RustMakeClear(tile, static_cast<ClearGround>(ground), density); }

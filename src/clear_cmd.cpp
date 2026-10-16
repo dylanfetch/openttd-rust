@@ -177,7 +177,7 @@ static Foundation GetFoundation_Clear(TileIndex, Slope)
 const OpenTTDClearServices &GetRustClearServices() noexcept
 {
 	static const OpenTTDClearServices services{
-		.ground = RustClearGround, .field_tile = RustClearFieldTile, .density = RustClearDensity, .counter = RustClearCounter, .snow = RustSnowTile, .surface = RustClearSurface,
+		.ground = OpenTTDClearGround, .field_tile = RustClearFieldTile, .density = RustClearDensity, .counter = RustClearCounter, .snow = RustSnowTile, .surface = RustClearSurface,
 		.set_ground = [](uint32_t t, ClearGround g, uint32_t d) noexcept { SetClearGroundDensity(TileIndex{t}, g, d); },
 		.set_density = [](uint32_t t, uint32_t d) noexcept { SetClearDensity(TileIndex{t}, d); },
 		.set_counter = [](uint32_t t, uint32_t c) noexcept { SetClearCounter(TileIndex{t}, c); },

@@ -38,6 +38,9 @@
 #include "settings_services.h"
 #include "environment_services.h"
 #include "services_landscape.h"
+#include "station_services.h"
+#include "../clear_map.h"
+#include "../tree_map.h"
 #include "../cheat_type.h"
 #include "../timer/timer_game_economy.h"
 
@@ -86,6 +89,22 @@ OpenTTDTileTypeAllocation GetRustTileTypeAllocation() noexcept
 }
 
 static uint32_t SharedRandom(void *) noexcept { return Random(); }
+const OpenTTDStationService *OpenTTDStationActivityOwner(const OpenTTDStation *station) noexcept
+{
+	return StationOf(station)->rust_service.get();
+}
+
+OpenTTDTownState *OpenTTDTownOwnerByID(uint32_t id) noexcept
+{
+	return Town::Get(TownID(id))->growth_owner.get();
+}
+
+void OpenTTDAssertTownGenerationContext() noexcept { assert(_game_mode == GM_EDITOR || _generating_world); }
+
+bool OpenTTDIsTileFlat(uint32_t tile) noexcept { return IsTileFlat(TileIndex(tile)); }
+ClearGround OpenTTDClearGround(uint32_t tile) noexcept { return GetClearGround(TileIndex(tile)); }
+TreeGround OpenTTDTreeGround(uint32_t tile) noexcept { return GetTreeGround(TileIndex(tile)); }
+
 static uint8_t SharedTileType(uint32_t tile) noexcept { return GetTileType(TileIndex{tile}); }
 static bool SharedBridgeAbove(uint32_t tile) noexcept { return IsBridgeAbove(TileIndex{tile}); }
 static uint8_t SharedTropicZone(uint32_t tile) noexcept { return GetTropicZone(TileIndex{tile}); }

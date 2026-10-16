@@ -9,12 +9,13 @@ import subprocess
 import threading
 from pathlib import Path
 
-from . import core
+from . import core, orders
 from .core import (
     ROOT,
     SNAPSHOT_TICKS,
     TICKS_PER_DAY,
     Reader,
+    branch_witnesses,
     decode_element,
     field_spans,
     read_save,
@@ -673,6 +674,121 @@ def growth_scenarios(soak):
     return scenarios
 
 
+def adapter(build, folder, env):
+    import migration
+
+    folder.mkdir(parents=True, exist_ok=True)
+    migration.ensure_reference()
+    source = (migration.REFERENCE / "src/town_cmd.cpp").read_text()
+    start = source.index("bool GenerateTowns(")
+    end, depth = source.index("{", start) + 1, 1
+    while depth:
+        depth += (source[end] == "{") - (source[end] == "}")
+        end += 1
+    original = source[start:end] + "\n"
+    (folder / "town-generation-original.hpp").write_text(original)
+    local = folder / "towns-console.cpp"
+    local.write_bytes((ROOT / "tools/simulation/towns-console.cpp").read_bytes())
+    binary, receipt = orders.adapter(
+        build, folder, env, source=local, name="towns", afterload=False
+    )
+    receipt["original_generation_sha256"] = hashlib.sha256(
+        original.encode()
+    ).hexdigest()
+    return binary, receipt
+
+
+def prepare_founding(scenario, binaries, builds, out, timeout, env, result):
+    import migration
+
+    from .runtime import prepared_adapter
+
+    folder = out / scenario["name"] / "input"
+    executables, provenance = {}, {}
+    for role in ("reference", "candidate"):
+        target = folder / role
+        prepared = prepared_adapter("towns", role, binaries, builds, target)
+        if prepared is None:
+            native = (
+                migration.REFERENCE_BUILD
+                if role == "reference" or binaries[role] == binaries["reference"]
+                else ROOT / "build-rust"
+            )
+            lock = (
+                migration.reference_lock(shared=True)
+                if native == migration.REFERENCE_BUILD
+                else migration.candidate_lock(native, shared=True)
+            )
+            with lock:
+                prepared = adapter(native, target, env)
+        executables[role], provenance[role] = prepared
+        if (
+            provenance[role]["ordinary_binary_sha256"]
+            != hashlib.sha256(binaries[role].read_bytes()).hexdigest()
+        ):
+            raise RuntimeError("town adapter differs from frozen build")
+        for name in core.RUNTIME_DIRECTORIES:
+            if (builds[role] / name).is_dir():
+                (target / name).symlink_to(
+                    builds[role] / name, target_is_directory=True
+                )
+    result["town_adapter"] = provenance
+    scenario = dict(scenario, executables=executables)
+    if scenario["town_founding"] != "reload":
+        return dict(scenario, console=["towns_scenario commands", "unpause"])
+    from .rails import normalize
+
+    save = folder / "reference" / "towns.sav"
+    setup = dict(
+        scenario, console=[f'towns_scenario commands "{save}"', "unpause"], ticks=1
+    )
+    run = run_game(
+        setup,
+        executables["reference"],
+        builds["reference"],
+        folder / "capture",
+        timeout,
+        env,
+        False,
+    )
+    if (
+        run["exit"]
+        or not save.is_file()
+        or "TOWN lifetime true true true" not in run["log"]
+    ):
+        raise RuntimeError("town command reload capture failed")
+    save, result["town_reload_input"] = normalize(save, folder / "normalized")
+    return dict(
+        scenario,
+        kind="save",
+        save=str(save),
+        console=["towns_scenario inspect", "unpause"],
+    )
+
+
+def founding_scenarios(soak):
+    cases = growth_scenarios(soak)[:5]
+    for layout, scenario in enumerate(cases):
+        scenario.pop("town_growth")
+        scenario.pop("yearly_age_witness")
+        scenario.update(
+            name=f"town-founding-{layout}",
+            ticks=(3 if soak else 2) * SNAPSHOT_TICKS,
+            town_founding="reload" if layout == 4 else "commands",
+        )
+        scenario["settings"]["game_creation"]["custom_town_number"] = 1
+        scenario["settings"]["economy"]["town_layout"] = layout
+    return cases
+
+
+def game_environment(scenario):
+    return (
+        core.WITNESS_ENVIRONMENT
+        if scenario.get("town_founding") and scenario.get("witnesses")
+        else {}
+    )
+
+
 def scenarios(soak):
     scenarios = []
     for style, label in enumerate(TOWN_STYLES):
@@ -697,10 +813,12 @@ def scenarios(soak):
                     },
                 }
             )
-    return scenarios + growth_scenarios(soak)
+    return scenarios + growth_scenarios(soak) + founding_scenarios(soak)
 
 
 def prepare(scenario, binaries, builds, out, timeout, env, result):
+    if "town_founding" in scenario:
+        return prepare_founding(scenario, binaries, builds, out, timeout, env, result)
     if "town_growth" in scenario:
         if binaries["candidate"] != binaries["reference"]:  # --self stays C++ only.
             with _TUNNEL_LOCK:
@@ -719,7 +837,41 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
     return scenario
 
 
+FOUNDING_BRANCHES = (
+    "placement growth generated coast manual deity editor invalid duplicate money "
+    "zero_growth retry rename name_retry name_exhausted name_duplicate cancelled grid name_set"
+).split()
+
+
 def check(scenario, run, mode, role, result):
+    if "town_founding" in scenario and not run["exit"] and run["snapshots"]:
+        required = () if scenario["town_founding"] == "reload" else FOUNDING_BRANCHES
+        counts = branch_witnesses(scenario, run, role, "town", required)
+        if counts:
+            result[mode + "_town_branches"] = counts
+        expected = (
+            ("reloaded true",)
+            if scenario["town_founding"] == "reload"
+            else (
+                "automatic true true",
+                "deficit true true true",
+                "lifetime true true true",
+                "reuse true",
+                "generate true",
+                "name-retries true",
+                "default 4 65535",
+                "cancellation 0 true true true",
+                "cancellation 1 true true true",
+            )
+        )
+        if any("TOWN " + line not in run["log"] for line in expected):
+            raise RuntimeError("town command/lifetime/cancellation witness missing")
+        lines = [line for line in run["log"] if line.startswith("TOWN ")]
+        key = mode + "_town_commands"
+        if role == "reference":
+            result[key] = lines
+        elif result[key] != lines:
+            raise RuntimeError("town command outcomes differ")
     if "town_growth" in scenario:
         result[f"{mode}_{role}_town_growth"] = check_growth(scenario, run)
     if "town_style" in scenario:
