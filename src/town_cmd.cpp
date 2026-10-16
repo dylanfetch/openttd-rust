@@ -3415,15 +3415,6 @@ static bool TryBuildTownHouse(Town *t, TileIndex tile, TownExpandModes modes)
 
 
 /**
- * Place an individual house.
- * @param flags Type of operation.
- * @param tile Tile on which to place the house.
- * @param HouseID The HouseID of the house spec.
- * @param is_protected Whether the house is protected from the town upgrading it.
- * @param replace Whether to automatically demolish an existing house on this tile, if present.
- * @return Empty cost or an error.
- */
-/**
  * Determines if a given HouseID is part of a multitile house.
  * The given ID is set to the ID of the north tile and the TileDiff to the north tile is returned.
  *
@@ -3450,6 +3441,15 @@ TileIndexDiff GetHouseNorthPart(HouseID &house)
 	return TileDiffXY(0, 0);
 }
 
+/**
+ * Place an individual house.
+ * @param flags Type of operation.
+ * @param tile Tile on which to place the house.
+ * @param HouseID The HouseID of the house spec.
+ * @param is_protected Whether the house is protected from the town upgrading it.
+ * @param replace Whether to automatically demolish an existing house on this tile, if present.
+ * @return Empty cost or an error.
+ */
 #ifdef WITH_RUST
 CommandCost CmdPlaceHouse(DoCommandFlags flags, TileIndex tile, HouseID house, bool is_protected, bool replace)
 {
