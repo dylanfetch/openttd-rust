@@ -286,6 +286,7 @@ static void RailRun(std::string_view name, Args... args)
 {
 	RailPrint(fmt::format("{}-test", name), Command<Tcmd>::Do(DoCommandFlags{}, args...));
 	RailPrint(name, Command<Tcmd>::Do(DoCommandFlag::Execute, args...));
+	UpdateSignalsInBuffer(); // As a posted command does after execution.
 }
 static void RailTerraform(std::string_view name, TileIndex tile, Slope corners, bool up)
 {
@@ -396,12 +397,14 @@ static void RailCommandsLayout(Owner owner)
 	RailRun<CMD_LANDSCAPE_CLEAR>("clear", t(2, 2));
 	RailRun<CMD_LANDSCAPE_CLEAR>("clear-depot", t(20, 12));
 	/* A second company's track: obstacles, ownership, then a merger transfer. */
+	UpdateSignalsInBuffer();
 	CompanyID other = RailCompany();
 	{
 		Backup<CompanyID> as_other(_current_company, other);
 		RailRun<CMD_BUILD_RAILROAD_TRACK>("other", t(7, 7), t(7, 6), RAILTYPE_RAIL, TRACK_Y, false, false);
 		RailRun<CMD_BUILD_SINGLE_SIGNAL>("other-signal", t(7, 6), TRACK_Y, SIGTYPE_BLOCK, SIG_ELECTRIC, false, false, false, SIGTYPE_BLOCK, SIGTYPE_PBS_ONEWAY, 0, 0);
 		RailRun<CMD_BUILD_TRAIN_DEPOT>("other-depot", t(9, 8), RAILTYPE_RAIL, DIAGDIR_NE);
+		as_other.Restore();
 	}
 	RailRun<CMD_BUILD_RAILROAD_TRACK>("obstacle", t(12, 6), t(2, 6), RAILTYPE_RAIL, TRACK_X, false, false);
 	RailRun<CMD_BUILD_RAILROAD_TRACK>("obstacle-strict", t(12, 7), t(2, 7), RAILTYPE_RAIL, TRACK_X, false, true);
@@ -409,10 +412,12 @@ static void RailCommandsLayout(Owner owner)
 	RailPrint("clear-other", Command<CMD_LANDSCAPE_CLEAR>::Do(DoCommandFlag::Auto, t(7, 6)));
 	ChangeOwnershipOfCompanyItems(other, owner);
 	/* A third company's track is cleared when the company is deleted. */
+	UpdateSignalsInBuffer();
 	CompanyID third = RailCompany();
 	{
 		Backup<CompanyID> as_third(_current_company, third);
 		RailRun<CMD_BUILD_RAILROAD_TRACK>("third", t(18, 16), t(14, 16), RAILTYPE_RAIL, TRACK_X, false, false);
+		as_third.Restore();
 	}
 	RailPrint("delete-third", Command<CMD_COMPANY_CTRL>::Do(DoCommandFlag::Execute, CCA_DELETE, third, CRR_MANUAL, INVALID_CLIENT_ID));
 	UpdateSignalsInBuffer();
@@ -431,10 +436,13 @@ static void RailLiveReservations(Owner owner)
 	}
 	fmt::print(stderr, "RAILCMD live-reserved {}\n", reserved.size());
 	if (reserved.size() < 3) return;
-	auto track = [](TileIndex tile) { return FindFirstTrack(GetRailReservationTrackBits(tile)); };
-	RailRun<CMD_BUILD_SINGLE_SIGNAL>("live-signal", reserved[0], track(reserved[0]), SIGTYPE_PBS, SIG_ELECTRIC, false, true, false, SIGTYPE_BLOCK, SIGTYPE_PBS_ONEWAY, 0, 0);
-	RailRun<CMD_CONVERT_RAIL>("live-convert", reserved[1], reserved[1], RAILTYPE_MONO, false);
-	RailRun<CMD_REMOVE_SINGLE_RAIL>("live-remove", reserved[2], track(reserved[2]));
+	Track track[3];
+	for (uint i = 0; i < 3; ++i) track[i] = FindFirstTrack(GetRailReservationTrackBits(reserved[i]));
+	RailRun<CMD_BUILD_SINGLE_SIGNAL>("live-signal", reserved[0], track[0], SIGTYPE_PBS, SIG_ELECTRIC, false, true, false, SIGTYPE_BLOCK, SIGTYPE_PBS_ONEWAY, 0, 0);
+	RailType live = GetRailType(reserved[1]);
+	fmt::print(stderr, "RAILCMD live-type {}\n", live);
+	RailRun<CMD_CONVERT_RAIL>("live-convert", reserved[1], reserved[1], live == RAILTYPE_MONO ? RAILTYPE_RAIL : RAILTYPE_MONO, false);
+	RailRun<CMD_REMOVE_SINGLE_RAIL>("live-remove", reserved[2], track[2]);
 	UpdateSignalsInBuffer();
 }
 static bool SignalsScenario(std::span<std::string_view> args)

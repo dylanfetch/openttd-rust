@@ -70,6 +70,7 @@ def scenarios(soak):
 RAIL_COMMAND_BRANCHES = (
     "build_rail",
     "build_not_plain",
+    "build_convert",
     "build_remove_signals",
     "build_crossing",
     "build_clear",
@@ -89,6 +90,7 @@ RAIL_COMMAND_BRANCHES = (
     "signal_cycle_side",
     "signal_copy",
     "signal_pbs_state",
+    "signal_reserve",
     "signal_drag",
     "signal_drag_remove",
     "signal_minimise",
@@ -99,6 +101,7 @@ RAIL_COMMAND_BRANCHES = (
     "convert_depot",
     "convert_wormhole",
     "convert_station_crossing",
+    "convert_reroute",
     "clear_rail",
     "clear_depot",
     "owner_transfer",
