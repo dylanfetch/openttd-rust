@@ -563,7 +563,7 @@ while a separately constructed end keeps middle; they compare equal by position.
 
 Evidence: the fifteen unchanged fixed sequences, plus public-interface tests for
 empty/singleton, independent copies, postfix/prefix identity, position ordering,
-distinct end Base values, stable-list insertion and typed operation counts.
+distinct end Base values and stable-list insertion.
 
 ### StringConsumer byte algorithms
 
