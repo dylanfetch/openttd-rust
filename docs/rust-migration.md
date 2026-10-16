@@ -1414,3 +1414,35 @@ match. Counters record native entries, service crossings and returned bytes, dis
 timing. External NewGRF programs/retire_early, ENGS and TTO/TTD fixtures, legacy preview
 conversion and threaded GUI/presentation remain #156 gaps. #248 records the fixing reviews,
 source comparisons and final-head CI/speed results.
+
+### Rail track, depot and signal commands (#265)
+
+Rust (`rail_cmd.rs`) owns the following, with test/execute partial effects, error order and costs:
+
+- `CmdBuild/RemoveSingleRail` and the rail drag helper;
+- train depot build and removal;
+- single signal build/remove, autofill and the signal drag helper;
+- `CmdConvertRail`;
+- the rail clear, owner change, terraform/autoslope and build-above tile procs.
+
+No entry draws Random. C++ keeps a thin facade and one typed `noexcept` table (ABI 980-985) for:
+
+- `CommandCost` slots and nested commands;
+- ownership and vehicle checks;
+- PBS reservations;
+- crossing, road and depot map writes;
+- the conversion `TileIterator` and affected-train list.
+
+Rail map leaves extend the shared `OpenTTDRailMapServices`. `build_on_slopes` and `AutoslopeEnabled` live in `OpenTTDSharedServices` for town, industry and rail. `TileLoop_Track`/`FloodHalftile`, track status and drawing stay native.
+
+`python3 tools/migration.py simulate signals-rail-commands --jobs 2` compares every command result, the semantic saves and the required `rail_cmd.*` witnesses. It covers:
+
+- drags with obstacles;
+- crossings, depots and slopes;
+- signal cycle/convert/copy/autofill through a bridge;
+- conversion including stations, bridges, crossings and reroutes;
+- clearing and terraforming;
+- merger transfer and company deletion;
+- live reservations.
+
+Coast/half-tile water and PBS path-end removal remain #156 gaps.
