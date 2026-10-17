@@ -11,6 +11,7 @@
 #include "../newgrf_commons.h"
 #include "../newgrf_debug.h"
 #include "../newgrf_house.h"
+#include "../industrytype.h"
 
 /* Borrowed GRF files remain native and live for the synchronous conversion.
  * A town shell is live for resolution (or null for a prototype); no Rust
@@ -27,4 +28,5 @@ inline void OpenTTDDeleteInspect(GrfSpecFeature feature, uint index) noexcept { 
 inline void OpenTTDDeleteHouseInspect(uint32_t tile) noexcept { OpenTTDDeleteInspect(GSF_HOUSES, tile); }
 inline void OpenTTDDeleteIndustryTileInspect(uint32_t tile) noexcept { OpenTTDDeleteInspect(GSF_INDUSTRYTILES, tile); }
 inline void OpenTTDDeleteIndustryInspect(uint16_t industry) noexcept { OpenTTDDeleteInspect(GSF_INDUSTRIES, industry); }
+inline bool OpenTTDIndustryTileBooleanCallback(const IndustryTileSpec *spec, uint16_t callback, uint16_t result) noexcept { return OpenTTDConvertBooleanCallback(spec->grf_prop.grffile, callback, result); }
 #endif /* RUST_SERVICES_NEWGRF_H */

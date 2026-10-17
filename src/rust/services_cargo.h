@@ -11,6 +11,8 @@
 #include "../cargotype.h"
 #include "../economy_func.h"
 #include "../newgrf_cargo.h"
+#include "../industrytype.h"
+struct OpenTTDIndustrySpecHandle;
 
 /* Keep native types and source observation points. Scaling may draw Random;
  * delivery may reenter owners, so callers end their owner access first.
@@ -27,4 +29,6 @@ inline uint OpenTTDScaleTownCargo(uint amount) noexcept { return OpenTTDScaleCar
 inline uint OpenTTDScaleIndustryCargo(uint amount) noexcept { return OpenTTDScaleCargo(amount, false); }
 inline CargoType OpenTTDFoodCargo() noexcept { return OpenTTDCargoByLabel(CT_FOOD); }
 inline CargoType OpenTTDPassengerCargo() noexcept { return OpenTTDCargoByLabel(CT_PASSENGERS); }
+inline CargoType OpenTTDIndustryCargoTranslation(const OpenTTDIndustrySpecHandle *spec, uint8_t cargo) noexcept { return OpenTTDCargoTranslation(cargo, reinterpret_cast<const IndustrySpec *>(spec)->grf_prop.grffile); }
+inline CargoType OpenTTDIndustryTileCargoTranslation(const IndustryTileSpec *spec, uint8_t cargo) noexcept { return OpenTTDCargoTranslation(cargo, spec->grf_prop.grffile); }
 #endif /* RUST_SERVICES_CARGO_H */

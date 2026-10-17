@@ -3801,7 +3801,7 @@ static const OpenTTDIndustryConstructionServices &GetIndustryConstructionService
 		},
 		.callback_error = [](const OpenTTDIndustrySpecHandle *spec, uint16_t callback, uint16_t result) noexcept { ErrorUnknownCallbackResult(reinterpret_cast<const IndustrySpec *>(spec)->grf_prop.grfid, callback, result); },
 		.grf_version = [](const OpenTTDIndustrySpecHandle *spec) noexcept -> uint8_t { return reinterpret_cast<const IndustrySpec *>(spec)->grf_prop.grffile->grf_version; },
-		.cargo_translation = [](const OpenTTDIndustrySpecHandle *spec, uint8_t cargo) noexcept -> uint8_t { return OpenTTDCargoTranslation(cargo, reinterpret_cast<const IndustrySpec *>(spec)->grf_prop.grffile); },
+		.cargo_translation = OpenTTDIndustryCargoTranslation,
 		.layout_size = [](const OpenTTDIndustryLayoutHandle *layout) noexcept -> size_t { return reinterpret_cast<const IndustryTileLayout *>(layout)->size(); },
 		.layout_tile = [](const OpenTTDIndustryLayoutHandle *layout, size_t index) noexcept -> OpenTTDIndustryLayoutTile {
 			const auto &tile = (*reinterpret_cast<const IndustryTileLayout *>(layout))[index];
@@ -3868,7 +3868,7 @@ static const OpenTTDIndustryTileServices &GetIndustryTileServices()
 			return result;
 		},
 		.callback = [](uint32_t tile, uint16_t gfx, uint16_t callback, uint32_t parameter1, uint32_t parameter2) noexcept -> uint16_t { return GetIndustryTileCallback(static_cast<CallbackID>(callback), parameter1, parameter2, gfx, Industry::GetByTile(TileIndex(tile)), TileIndex(tile)); },
-		.cargo_translation = [](const OpenTTDIndustryTileSpec *spec, uint8_t cargo) noexcept -> uint8_t { return OpenTTDCargoTranslation(cargo, spec->grf_prop.grffile); },
+		.cargo_translation = OpenTTDIndustryTileCargoTranslation,
 	};
 	return services;
 }
@@ -3912,7 +3912,7 @@ static const OpenTTDIndustryTilePolicyServices &GetIndustryTilePolicyServices()
 		.removal_cost = [](const OpenTTDIndustrySpecHandle *spec) noexcept -> int64_t { return reinterpret_cast<const IndustrySpec *>(spec)->GetRemovalCost(); },
 		.tile_max_z = [](uint32_t tile) noexcept -> int32_t { return OpenTTDTileMaxZ(TileIndex(tile)); },
 		.autoslope_callback = [](const OpenTTDIndustryTileSpec *spec) noexcept -> bool { return spec->callback_mask.Test(IndustryTileCallbackMask::Autoslope); },
-		.callback_boolean = [](const OpenTTDIndustryTileSpec *spec, uint16_t callback, uint16_t result) noexcept -> bool { return OpenTTDConvertBooleanCallback(spec->grf_prop.grffile, callback, result); },
+		.callback_boolean = OpenTTDIndustryTileBooleanCallback,
 		.landscape_clear = [](OpenTTDIndustryCost *out, uint32_t tile, uint16_t flags) noexcept { *out = Command<CMD_LANDSCAPE_CLEAR>::Do(DoCommandFlags{flags}, TileIndex(tile)); },
 	};
 	return services;
