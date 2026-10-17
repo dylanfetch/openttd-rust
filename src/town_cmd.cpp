@@ -1147,7 +1147,7 @@ static OpenTTDHouseConstruction RustHouseConstruction(uint32_t tile) noexcept
 }
 static OpenTTDHouseCache RustHouseCache(uint32_t tile) noexcept
 {
-	return {.house = RustHouseType(tile), .town = GetTownIndex(TileIndex{tile}).base(), .completed = RustHouseCompleted(tile)};
+	return {.house = RustHouseType(tile), .town = GetRustSharedServices().town_index(tile), .completed = RustHouseCompleted(tile)};
 }
 static OpenTTDHouseAge RustHouseAgeObservation(uint32_t tile) noexcept
 {
