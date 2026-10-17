@@ -39,30 +39,6 @@ pub fn int_sqrt(mut num: u32) -> u32 {
     res + u32::from(num > res)
 }
 
-pub fn clamp_to(
-    bits: u64,
-    from_width: u8,
-    from_signed: bool,
-    to_width: u8,
-    to_signed: bool,
-) -> u64 {
-    let value = if from_signed {
-        signed_value(bits, from_width)
-    } else {
-        i128::from(bits & mask(from_width))
-    };
-    let (min, max) = if to_signed {
-        let top = 1_i128 << (to_width - 1);
-        (-top, top - 1)
-    } else {
-        (0, i128::from(mask(to_width)))
-    };
-    // The result is within the destination range. Convert negative values to
-    // modulo-2^64 bits explicitly rather than relying on a narrowing cast.
-    let result = value.clamp(min, max);
-    u64::try_from(result.rem_euclid(1_i128 << 64)).expect("bounded destination bits")
-}
-
 pub fn soft_clamp(value: u64, min: u64, max: u64, width: u8, is_signed: bool) -> u64 {
     assert!(matches!(width, 8 | 16 | 32 | 64));
     let narrow_mask = mask(width);
