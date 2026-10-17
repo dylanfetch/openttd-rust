@@ -46,7 +46,7 @@ pub struct CommandCostServices {
     /// Query native `GetCost()`.
     pub money: extern "C" fn(*const CommandCost) -> i64,
     /// Native `MakeError`, keeping owner and encoded message.
-    pub make_error: extern "C" fn(*mut CommandCost, u32),
+    pub make_error: unsafe extern "C" fn(*mut CommandCost, u32),
 }
 
 /// Ordinary direct commands. Native result storage retains complete errors and
@@ -232,9 +232,9 @@ pub struct Services {
     /// `DoClearSquare`.
     pub clear_square: extern "C" fn(u32),
     /// `FreeTrainTrackReservation(v)`.
-    pub free_train_reservation: extern "C" fn(*const Train),
+    pub free_train_reservation: unsafe extern "C" fn(*const Train),
     /// `TryPathReserve(v, mark_as_stuck, first_tile_okay)`.
-    pub try_path_reserve: extern "C" fn(*mut Train, bool, bool) -> bool,
+    pub try_path_reserve: unsafe extern "C" fn(*mut Train, bool, bool) -> bool,
     /// `IsSafeWaitingPosition(v, tile, trackdir, true, forbid_90_deg)`.
     pub safe_waiting_position: unsafe extern "C" fn(*const Train, u32, u8, bool) -> bool,
     /// Original normal-road works predicate.

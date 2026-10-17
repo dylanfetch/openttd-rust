@@ -121,6 +121,10 @@ pub struct Strings {
 /// Immutable native service table. Every function is a direct `noexcept`
 /// call; nested commands, reservations and crossing updates may reenter Rust
 /// owners, which is safe because no Rust borrow of native state exists.
+/// Pointer-taking leaves require live native cost slots, trains and conversion
+/// frames under the entry contract; their function-pointer types are unsafe.
+/// Private policy calls uphold that contract and retain only copied identities,
+/// never native references, through destructive or reentrant services.
 #[repr(C)]
 pub struct RailCommandServices {
     pub shared: *const Services,
@@ -137,7 +141,7 @@ pub struct RailCommandServices {
     /// `HasPowerOnRail(RailType, RailType)`.
     pub powered_rail: extern "C" fn(u8, u8) -> bool,
     /// `HasPowerOnRail(v->GetRailTypes(), RailType)`.
-    pub train_powered: extern "C" fn(*mut Train, u8) -> bool,
+    pub train_powered: unsafe extern "C" fn(*mut Train, u8) -> bool,
     /// `RailNoLevelCrossings`.
     pub rail_no_crossings: extern "C" fn(u8) -> bool,
     /// `RoadNoLevelCrossing`.
@@ -167,16 +171,29 @@ pub struct RailCommandServices {
     /// `HasVehicleOnTile(tile, ship)`.
     pub ship_on_tile: extern "C" fn(u32) -> bool,
     /// `CMD_BUILD_SINGLE_RAIL`.
-    pub build_rail: extern "C" fn(*mut CommandCost, u16, u32, u8, u8, bool),
+    pub build_rail: unsafe extern "C" fn(*mut CommandCost, u16, u32, u8, u8, bool),
     /// `CMD_REMOVE_SINGLE_RAIL`.
-    pub remove_rail: extern "C" fn(*mut CommandCost, u16, u32, u8),
+    pub remove_rail: unsafe extern "C" fn(*mut CommandCost, u16, u32, u8),
     /// `CMD_BUILD_SINGLE_SIGNAL`.
-    pub build_signal:
-        extern "C" fn(*mut CommandCost, u16, u32, u8, u8, u8, bool, bool, bool, u8, u8, u8, u8),
+    pub build_signal: unsafe extern "C" fn(
+        *mut CommandCost,
+        u16,
+        u32,
+        u8,
+        u8,
+        u8,
+        bool,
+        bool,
+        bool,
+        u8,
+        u8,
+        u8,
+        u8,
+    ),
     /// `CMD_REMOVE_SINGLE_SIGNAL`.
-    pub remove_signal: extern "C" fn(*mut CommandCost, u16, u32, u8),
+    pub remove_signal: unsafe extern "C" fn(*mut CommandCost, u16, u32, u8),
     /// `CMD_CONVERT_RAIL`.
-    pub convert_rail: extern "C" fn(*mut CommandCost, u16, u32, u32, u8, bool),
+    pub convert_rail: unsafe extern "C" fn(*mut CommandCost, u16, u32, u32, u8, bool),
     /// `infrastructure.rail[rt] += delta` with uint32 wrap.
     pub rail_infrastructure: extern "C" fn(u8, u8, u32),
     /// `infrastructure.road[rt] += delta` with uint32 wrap.
@@ -188,9 +205,9 @@ pub struct RailCommandServices {
     /// `GetTrainForReservation`.
     pub reserving_train: extern "C" fn(u32, u8) -> *mut Train,
     /// Train fields read at the signal re-reservation branch.
-    pub parking: extern "C" fn(*mut Train) -> TrainParking,
+    pub parking: unsafe extern "C" fn(*mut Train) -> TrainParking,
     /// `v->tile` and `v->GetVehicleTrackdir()`, read only for the safe-waiting check.
-    pub train_position: extern "C" fn(*mut Train) -> TrainPosition,
+    pub train_position: unsafe extern "C" fn(*mut Train) -> TrainPosition,
     /// `YapfNotifyTrackLayoutChange`.
     pub layout_changed: extern "C" fn(u32, u8),
     /// `MarkDirtyAdjacentLevelCrossingTiles`.
@@ -218,17 +235,17 @@ pub struct RailCommandServices {
     /// `IsPossibleDockingTile` then `CheckForDockingTile`.
     pub docking_check: extern "C" fn(u32),
     /// Begin `TileIterator::Create(start, end, diagonal)` in the frame.
-    pub area_begin: extern "C" fn(*mut ConvertFrame, u32, u32, bool),
+    pub area_begin: unsafe extern "C" fn(*mut ConvertFrame, u32, u32, bool),
     /// Current iterator tile (`INVALID_TILE` at end).
-    pub area_tile: extern "C" fn(*mut ConvertFrame) -> u32,
+    pub area_tile: unsafe extern "C" fn(*mut ConvertFrame) -> u32,
     /// Advance the iterator.
-    pub area_next: extern "C" fn(*mut ConvertFrame),
+    pub area_next: unsafe extern "C" fn(*mut ConvertFrame),
     /// `DiagonalTileArea`/`OrthogonalTileArea(start, end).Contains(tile)`.
     pub area_contains: extern "C" fn(u32, u32, bool, u32) -> bool,
     /// `include(affected, first)` for every train on the tile, in iteration order.
-    pub collect_trains: extern "C" fn(*mut ConvertFrame, u32),
+    pub collect_trains: unsafe extern "C" fn(*mut ConvertFrame, u32),
     /// `ConsistChanged(CCF_TRACK)` for each collected train, in insertion order.
-    pub consist_changed: extern "C" fn(*mut ConvertFrame),
+    pub consist_changed: unsafe extern "C" fn(*mut ConvertFrame),
 }
 
 const INVALID_STRING: u32 = 0xFFFF;
@@ -423,7 +440,7 @@ impl Cost<'_> {
         (self.1.move_cost)(self.0, other.0);
     }
     fn make_error(self, message: u32) {
-        (self.1.make_error)(self.0, message);
+        unsafe { (self.1.make_error)(self.0, message) };
     }
     fn ok(self) -> bool {
         (self.1.success)(self.0)
@@ -605,7 +622,7 @@ impl<'a> Ctx<'a> {
                     w::hit(w::RAIL_CMD_BUILD_REMOVE_SIGNALS);
                     for track_it in 0..6 {
                         if self.has_track(tile, track_it) && self.has_signal(tile, track_it) {
-                            (self.s.remove_signal)(other.0, flags, tile, track_it);
+                            unsafe { (self.s.remove_signal)(other.0, flags, tile, track_it) };
                             if !other.ok() {
                                 return cost.take(other);
                             }
@@ -617,7 +634,7 @@ impl<'a> Ctx<'a> {
                 if current != railtype && !(self.s.powered_rail)(railtype, current) {
                     if (self.s.powered_rail)(current, railtype) {
                         w::hit(w::RAIL_CMD_BUILD_CONVERT);
-                        (self.s.convert_rail)(ret.0, flags, tile, tile, railtype, false);
+                        unsafe { (self.s.convert_rail)(ret.0, flags, tile, tile, railtype, false) };
                         if !ret.ok() {
                             return cost.take(ret);
                         }
@@ -860,7 +877,7 @@ impl<'a> Ctx<'a> {
                     if self.reserved(tile) & trackbit != 0 {
                         v = (self.s.reserving_train)(tile, track);
                         if !v.is_null() {
-                            (self.shared.free_train_reservation)(v);
+                            unsafe { (self.shared.free_train_reservation)(v) };
                         }
                     }
                     owner = (self.shared.tile_owner)(tile);
@@ -908,7 +925,7 @@ impl<'a> Ctx<'a> {
                 cost.add_money((self.s.rail_clear_cost)((self.rail.rail_type)(tile).0));
                 if self.has_signal(tile, track) {
                     w::hit(w::RAIL_CMD_REMOVE_SIGNAL_CHARGE);
-                    (self.s.remove_signal)(ret.0, flags, tile, track);
+                    unsafe { (self.s.remove_signal)(ret.0, flags, tile, track) };
                     cost.add(ret);
                 }
                 if flags & EXECUTE != 0 {
@@ -916,7 +933,7 @@ impl<'a> Ctx<'a> {
                     if self.reserved(tile) & trackbit != 0 {
                         v = (self.s.reserving_train)(tile, track);
                         if !v.is_null() {
-                            (self.shared.free_train_reservation)(v);
+                            unsafe { (self.shared.free_train_reservation)(v) };
                         }
                     }
                     owner = (self.shared.tile_owner)(tile);
@@ -961,7 +978,7 @@ impl<'a> Ctx<'a> {
                 (self.s.layout_changed)(tile, track);
             }
             if !v.is_null() {
-                (self.shared.try_path_reserve)(v, true, false);
+                unsafe { (self.shared.try_path_reserve)(v, true, false) };
             }
         }
     }
@@ -1042,16 +1059,18 @@ impl<'a> Ctx<'a> {
         last_error.error(INVALID_STRING);
         loop {
             if remove {
-                (self.s.remove_rail)(ret.0, flags, tile, trackdir & 7);
+                unsafe { (self.s.remove_rail)(ret.0, flags, tile, trackdir & 7) };
             } else {
-                (self.s.build_rail)(
-                    ret.0,
-                    flags,
-                    tile,
-                    railtype,
-                    trackdir & 7,
-                    auto_remove_signals,
-                );
+                unsafe {
+                    (self.s.build_rail)(
+                        ret.0,
+                        flags,
+                        tile,
+                        railtype,
+                        trackdir & 7,
+                        auto_remove_signals,
+                    );
+                };
             }
             if !remove && !fail_on_obstacle && last_error.message() == already {
                 had_success = true;
@@ -1237,7 +1256,7 @@ impl<'a> Ctx<'a> {
         if self.reserved(tile) & (1 << track) != 0 {
             v = (self.s.reserving_train)(tile, track);
             if !v.is_null() {
-                (self.shared.free_train_reservation)(v);
+                unsafe { (self.shared.free_train_reservation)(v) };
             }
         }
         if !(self.rail.has_signals)(tile) {
@@ -1325,11 +1344,11 @@ impl<'a> Ctx<'a> {
         self.add_track(tile, track, self.current());
         (self.s.layout_changed)(tile, track);
         if !v.is_null() {
-            let p = (self.s.parking)(v);
+            let p = unsafe { (self.s.parking)(v) };
             if p.track != BIT_DEPOT {
                 let parked = (p.status & STOPPED != 0 && p.speed == 0) || p.order == OT_LOADING;
                 if !parked || {
-                    let at = (self.s.train_position)(v);
+                    let at = unsafe { (self.s.train_position)(v) };
                     // SAFETY: The reservation train remains live through this synchronous check.
                     !unsafe {
                         (self.shared.safe_waiting_position)(
@@ -1341,7 +1360,7 @@ impl<'a> Ctx<'a> {
                     }
                 } {
                     w::hit(w::RAIL_CMD_SIGNAL_RESERVE);
-                    (self.shared.try_path_reserve)(v, true, false);
+                    unsafe { (self.shared.try_path_reserve)(v, true, false) };
                 }
             }
         }
@@ -1495,23 +1514,25 @@ impl<'a> Ctx<'a> {
             }
             let do_flags = if test_only { flags & !EXECUTE } else { flags };
             if remove {
-                (self.s.remove_signal)(ret.0, do_flags, tile, trackdir & 7);
+                unsafe { (self.s.remove_signal)(ret.0, do_flags, tile, trackdir & 7) };
             } else {
-                (self.s.build_signal)(
-                    ret.0,
-                    do_flags,
-                    tile,
-                    trackdir & 7,
-                    sigtype,
-                    sigvar,
-                    false,
-                    signal_ctr == 0,
-                    mode,
-                    SIGTYPE_BLOCK,
-                    SIGTYPE_BLOCK,
-                    0,
-                    signals,
-                );
+                unsafe {
+                    (self.s.build_signal)(
+                        ret.0,
+                        do_flags,
+                        tile,
+                        trackdir & 7,
+                        sigtype,
+                        sigvar,
+                        false,
+                        signal_ctr == 0,
+                        mode,
+                        SIGTYPE_BLOCK,
+                        SIGTYPE_BLOCK,
+                        0,
+                        signals,
+                    );
+                };
             }
             let succeeded = ret.ok();
             if test_only {
@@ -1685,7 +1706,7 @@ impl<'a> Ctx<'a> {
             self.add_track(tile, track, (self.shared.tile_owner)(tile));
             (self.s.layout_changed)(tile, track);
             if !v.is_null() {
-                (self.shared.try_path_reserve)(v, false, false);
+                unsafe { (self.shared.try_path_reserve)(v, false, false) };
             }
             (self.shared.mark_dirty)(tile);
         }
@@ -1715,9 +1736,9 @@ impl<'a> Ctx<'a> {
         cost.set(0);
         error.error(self.s.strings.no_suitable_track);
         let mut found = false;
-        (self.s.area_begin)(frame, area_start, area_end, diagonal_area);
+        unsafe { (self.s.area_begin)(frame, area_start, area_end, diagonal_area) };
         loop {
-            let tile = (self.s.area_tile)(frame);
+            let tile = unsafe { (self.s.area_tile)(frame) };
             if tile == INVALID_TILE {
                 break;
             }
@@ -1735,10 +1756,10 @@ impl<'a> Ctx<'a> {
             ) {
                 found = true;
             }
-            (self.s.area_next)(frame);
+            unsafe { (self.s.area_next)(frame) };
         }
         if execute {
-            (self.s.consist_changed)(frame);
+            unsafe { (self.s.consist_changed)(frame) };
         }
         if !found {
             cost.take(error);
@@ -1833,7 +1854,7 @@ impl<'a> Ctx<'a> {
                 }
                 (self.rail.set_rail_type)(tile, totype);
                 (self.shared.mark_dirty)(tile);
-                (self.s.collect_trains)(frame, tile);
+                unsafe { (self.s.collect_trains)(frame, tile) };
             }
         }
         let convert = (self.s.rail_convert_cost)(kind, totype);
@@ -1893,8 +1914,8 @@ impl<'a> Ctx<'a> {
                     (self.s.infrastructure_dirty)(owner);
                     (self.rail.set_rail_type)(tile, totype);
                     (self.rail.set_rail_type)(endtile, totype);
-                    (self.s.collect_trains)(frame, tile);
-                    (self.s.collect_trains)(frame, endtile);
+                    unsafe { (self.s.collect_trains)(frame, tile) };
+                    unsafe { (self.s.collect_trains)(frame, endtile) };
                     (self.s.layout_changed)(tile, track);
                     (self.s.layout_changed)(endtile, track);
                     if (self.shared.is_bridge)(tile) {
@@ -1921,16 +1942,16 @@ impl<'a> Ctx<'a> {
             }
         }
         for v in affected {
-            (self.shared.try_path_reserve)(v, true, false);
+            unsafe { (self.shared.try_path_reserve)(v, true, false) };
         }
         true
     }
     /// Free an unpowered reserving train and remember it for re-reservation.
     fn reroute(&self, affected: &mut Vec<*mut Train>, tile: u32, track: u8, totype: u8) {
         let v = (self.s.reserving_train)(tile, track);
-        if !v.is_null() && !(self.s.train_powered)(v, totype) {
+        if !v.is_null() && !unsafe { (self.s.train_powered)(v, totype) } {
             w::hit(w::RAIL_CMD_CONVERT_REROUTE);
-            (self.shared.free_train_reservation)(v);
+            unsafe { (self.shared.free_train_reservation)(v) };
             affected.push(v);
         }
     }
@@ -1957,7 +1978,7 @@ impl<'a> Ctx<'a> {
             if (self.rail.depot_reserved)(tile) {
                 v = (self.s.reserving_train)(tile, dir & 1);
                 if !v.is_null() {
-                    (self.shared.free_train_reservation)(v);
+                    unsafe { (self.shared.free_train_reservation)(v) };
                 }
             }
             self.rail_infra(owner, (self.rail.rail_type)(tile).0, 1_u32.wrapping_neg());
@@ -1967,7 +1988,7 @@ impl<'a> Ctx<'a> {
             self.add_side(tile, dir, owner);
             (self.s.layout_changed)(tile, dir & 1);
             if !v.is_null() {
-                (self.shared.try_path_reserve)(v, true, false);
+                unsafe { (self.shared.try_path_reserve)(v, true, false) };
             }
         }
         cost.set(price(PR_CLEAR_DEPOT_TRAIN));
@@ -1996,7 +2017,7 @@ impl<'a> Ctx<'a> {
                 while tracks != 0 {
                     let track = tracks.trailing_zeros() as u8;
                     tracks &= tracks - 1;
-                    (self.s.remove_rail)(ret.0, flags, tile, track);
+                    unsafe { (self.s.remove_rail)(ret.0, flags, tile, track) };
                     if !ret.ok() {
                         return cost.take(ret);
                     }
