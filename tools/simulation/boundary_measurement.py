@@ -84,6 +84,7 @@ def main():
                 str(valgrind),
                 "--tool=callgrind",
                 "--dump-instr=yes",
+                f"--log-file={output.with_suffix('.log')}",
                 f"--callgrind-out-file={output}",
             ]
             return original(command[:2] + flags + command[2:], env=env, **kwargs)
