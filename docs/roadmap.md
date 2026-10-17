@@ -4,13 +4,13 @@ Root owns selection here; `AGENTS.md` and `docs/rust-migration.md` define proces
 If an issue conflicts, follow this roadmap and report it to root. Keep this
 forward-looking, about 200 lines; completed work is one row, with evidence in PRs.
 
-## Where the fork stands (2026-10-17, `35d872ca3c`)
+## Where the fork stands (2026-10-17, `8bfcbd3abd`)
 
-- Twenty-seven ownership ports. Whole fork: Rust 59,834 / tooling 31,125 / glue 26,572 / original retired 38,179 of 470,612 `src/` lines (8.11%). Simulation: 30,252 / 102,615 (29.48%).
-- This resumption integrated maintenance #268, #273, #277 and #279. No game C++ has been retired since #258; #268 restored 44 original lines while removing save staging.
-- Four ownership drafts retire game C++: #270 rail commands (1,578), #269 houses (891), #255 landscape (844) and #257 vehicles (388). The core loops follow the selected boundary rule.
-- Integrated #277/#279 pass all six caps. #279 ratchets all six limits beyond spread; the combined cheap-fix baseline passes local Cargo/native checks. Four ownership drafts now update from it before fair timing.
-- Coverage gaps remain #156, and map/vehicle boundary measurements are recorded in #274. Unintegrated branches: four components and no maintenance drafts.
+- Twenty-nine ownership ports. Whole fork: Rust 64,552 / tooling 31,760 / glue 28,235 / original retired 40,145 of 470,612 `src/` lines (8.53%). Simulation: 32,218 / 102,615 (31.40%).
+- This resumption integrated #268 save aliases, #273 train/orders cleanup, #277 native inline ClampTo, #279 retained road YAPF scratch, #270 rail commands and #257 vehicle scheduling/maintenance.
+- Rail commands retire 1,578 original C++ lines and vehicles 388. #268 restored 44 original lines while removing save staging. The two remaining ownership drafts are #269 houses (891) and #255 landscape (844).
+- Vehicle CPU evidence passes; root accepted its small 2016 cap overrun within earlier measured spread. Landscape's selected #274 boundary exception and TGP cap 1.1875 remain draft evidence. No production boundary view is adopted.
+- Coverage gaps remain #156. #274 measurements are recorded and paused; two component drafts and no maintenance drafts remain. Development is paused at the user's request.
 
 ## Thirteenth steering review (2026-10-16, unblock the core loops)
 
@@ -43,12 +43,6 @@ Actions, in order:
    **#274, one agent, alongside.** Measure a read-only map view on #255's clear and water reads, and a post-tick vehicle view plus direct controller calls on `vehicle-owner-213`. If a view clears its gate, amend world-state.md and land the view as one shared PR that #212 and #213 adopt.
 3. **#275 cheap items alongside, as maintenance PRs.** Remove the `ClampTo` call to Rust and keep one road YAPF arena. Then fold road `GetCurrentMaxSpeed`, then convert road to a C-layout block, then the TGP items (industry `next_tick`, trees). Aircraft comes last.
 4. **#266 starts after #270 integrates,** on its shared command checks; then #267 and #247.
-
-`AGENTS.md` now:
-- asks reviewers to grep each new wrapper's callee and report every existing wrapper of it;
-- has command ports share one set of command checks;
-- requires each deferral to name an owned issue that can lift it, and rules out circular conditions;
-- gives a core loop a boundary fix rather than abandonment, and lets it integrate over budget when the miss is boundary crossings an owned issue removes (user decision).
 
 ## Earlier steering, still in force
 
@@ -94,6 +88,8 @@ Metrics are `tools/port-metrics.py`: Rust / tooling / C++ glue / C++ retired.
 | #220 | Engine lifecycle and canonical design state | #248 | `d2115d1c3d` | 1218 / 369 / 833 / 579 |
 | #219 | Rail signal blocks and fixed work sets | #245 | `9487f3079f` | 1229 / 812 / 445 / 646 |
 | #246 | Town founding, generation and names | #258 | `09bb0b4df8` | 1123 / 321 / 470 / 492 |
+| #265 | Rail track, depot and signal commands | #270 | `0cb20cec28` | 2965 / 301 / 740 / 1578 |
+| #213 | Vehicle scheduling and base maintenance | #257 | `8bfcbd3abd` | 1833 / 375 / 1160 / 388 |
 
 Harness and process: #72 harness (#85), #84 play saves (#87), #97 provenance
 freeze (#100), #88 Ruff (#92), #75 partial-pixel fidelity (#91), #90 world-state
@@ -140,8 +136,8 @@ go in `KNOWN_FAILURES` with an issue, never in masks (`docs/rust-migration.md`).
 Integrate reviewed work first, in order of readiness, with at most six
 unintegrated component branches. Maintenance (#259, #261, #275) and #156 run in parallel.
 
-1. **Drafts:** #270 and #269 with their 13th-review must-change items (PR comments); #268/#273 are integrated. #269 also removes all remaining newly duplicated generic helpers before integration.
-2. **#213 vehicle and #212 landscape** under the core-loop boundary rule, from branches `vehicle-owner-213` (`21b78029c5`) and `landscape-owner-212` (`20cc66dfe5`); #274 views follow as a shared PR.
+1. **Drafts first:** #269 houses and #255 landscape remain paused at the heads/blockers below. #270 and #257 are integrated. Resume their required base resolution/review/checks before starting another component.
+2. **Core-loop boundary work (#274):** #213 is integrated; #212 remains draft under the selected exception. Measurement branches stay unchanged; no production view, raw-offset vehicle path or base-scalar extraction is selected.
 3. **#275 speed:**
    - the cheap items are integrated (#277 native `ClampTo`, #279 road YAPF arena);
    - then road `GetCurrentMaxSpeed` and the road C-layout block;
@@ -161,24 +157,22 @@ staging only for a field a `SaveLoad` descriptor cannot address through the alia
 
 ## Resume checkpoint
 
-Resumed 2026-10-17 under `start-development`; root is gpt-6.1-sol, xhigh.
-Fresh agents own the rail/orders conflict review and three clean cheap-base updates.
-#255/#257 are reopened; root owns their base updates and integration gates.
-#275's cheap fixes are #276/#277 (ClampTo) and #278/#279 (road YAPF scratch),
-both integrated; other speed items, #266, #267, #247, R2 and H5 remain unstarted.
-Four component drafts and no maintenance drafts are open. Older paused work is untouched.
+Paused at the user's request (2026-10-17). Root is gpt-6.1-sol, xhigh.
+All three scoped reviewers finished. #257 integrated first by readiness; later
+source conflicts stop both remaining drafts. No further fixes, reviews or timing
+start during wind-down. The selected work order above is unchanged; #275's next
+items, #266, #267, #247, R2 and H5 remain unstarted.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #256 / #269 | `house-lifecycle-256`, `b81cf0172f` | Reviewed fixes/root verification pass. Clean cheap-base merge matches prediction; fresh Full requested while native/45-scenario checks finish. Quiet profiles/caps follow. |
-| #265 / #270 | `rail-commands-265`, `da775ad9be` | Root verified nine review fixes; fresh scoped R2 resolves the integrated-orders conflict. Then adopt the integrated cheap base for final validation/timing. |
-| #212 / #255 | `landscape-owner-212`, `5f19f52dea` | Fixing reviews/root verification pass. Clean cheap-base merge matches prediction; fresh Full requested while native/72-scenario checks finish. Fair timing/caps remain. |
-| #213 / #257 | `vehicle-owner-213`, `3578ad5bca` | Reviewed owner and clean cheap-base merge verified. Fresh Full requested while native/25-scenario checks finish. Root retains interleaved CPU/six-cap gates. |
-| #274 | Measurement branches, linked issue | Map timing remains. Astra attributes the vehicle prototype miss; root retains the single timed native Tick boundary and existing handles. No raw-offset production view or base-scalar extraction is selected; core-loop gates proceed independently. |
-| #64 / #66 | remote `issue/64-curve-family`, `aab5211801` | #66 closed unmerged; #64 stays paused. |
+| #256 / #269 | `house-lifecycle-256`, `e65bfcccc9` | R3/root verification and final-head Full pass; later #257 base conflicts in witness.rs. Remains draft. On resumption resolve witness allocation against current base, scoped review/affected checks, fresh Full. |
+| #212 / #255 | `landscape-owner-212`, `13db617a86` | Draft: Windows annotation warnings plus five source/tool base conflicts. On resumption fix conversions/base resolution, review, affected comparisons/semantics and Full. Current-head comparisons/semantics were not launched after the gate stop. |
+| #274 | `measurement-274-vehicle`, `1037723bc7` | Measurement only, unchanged; root owns future boundary work. No production adoption or new timing selected. |
+| #64 / #66 | remote `issue/64-curve-family`, `aab5211801` | #66 closed unmerged; #64 and older paused work remain untouched. |
 
-#269 and #270 both move `clear_square` to the shared table; whichever integrates
-second adopts the first.
+Merged rail/vehicle worktrees and merged leftover `t3/*` branches were removed.
+Unmerged worktrees, branches and `.local` caches are preserved. Post-merge CI
+is green; exact runs and evidence stay on the PRs.
 
 ABI blocks:
 - train through 385, tree additions 386-389, fleet 390-399
@@ -200,9 +194,7 @@ Deferred behavior improvements stay in `deferred-improvement` issues.
 
 ## Progress metric
 
-Every port PR pastes `python3 tools/port-metrics.py`: Rust/tooling/glue added,
-original retired, fork glue removed and net glue; `--whole-fork` gives totals and
-simulation share. Retire more original C++ than net glue plus tooling or explain
-why. A port that misses this ratio gets a boundary fix (shared services, #274
-views) before deferral. Judge game logic owned; data tables inflate retirement.
-Avoid utility kernels.
+Every port PR pastes `python3 tools/port-metrics.py`: Rust/tooling/glue added, original retired, fork glue removed and net glue.
+`--whole-fork` gives totals and simulation share. Retire more original C++ than net glue plus tooling or explain why.
+A port that misses this ratio gets a boundary fix (shared services, #274 views) before deferral.
+Judge game logic owned; data tables inflate retirement. Avoid utility kernels.
