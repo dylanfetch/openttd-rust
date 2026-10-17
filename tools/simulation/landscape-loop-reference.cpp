@@ -65,7 +65,7 @@ static uint32_t Industry(int32_t, int32_t, uint32_t *) noexcept { std::abort(); 
 static OpenTTDSharedServices shared = OpenTTDFixtureSharedServices(nullptr, Random, Industry);
 static OpenTTDLandscapeLoopServices services{
 	.shared = &shared,
-	.tile_types = {nullptr, 0},
+	.tile_types = {nullptr, 0, nullptr},
 	.trees = nullptr,
 	.industry = {},
 	.ground = {},
@@ -84,7 +84,7 @@ static void RustRun()
 	};
 	/* Each nested entry has its own immutable table, like the native facade. */
 	auto batch_services = services;
-	batch_services.tile_types = raw_backend ? OpenTTDTileTypeAllocation{reinterpret_cast<const uint8_t *>(tiles.get()), 1U << (log_x + log_y)} : OpenTTDTileTypeAllocation{nullptr, 0};
+	batch_services.tile_types = raw_backend ? OpenTTDTileTypeAllocation{reinterpret_cast<const uint8_t *>(tiles.get()), 1U << (log_x + log_y), nullptr} : OpenTTDTileTypeAllocation{nullptr, 0, nullptr};
 	openttd_rust_run_tile_loop(log_x, log_y, settings, &batch_services);
 }
 static void NativeVisit(uint32_t tile, uint8_t kind) noexcept

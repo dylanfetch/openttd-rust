@@ -16,6 +16,10 @@
  * descriptor lifetime; other entries retain the original callback reader. */
 struct OpenTTDNativeTileTypeAccess {
 	using BaseTile = Tile::TileBase;
+	using ExtendedTile = Tile::TileExtended;
+	static_assert(std::is_standard_layout_v<ExtendedTile>);
+	static_assert(sizeof(ExtendedTile) == 4 && alignof(ExtendedTile) == 2);
+	static_assert(offsetof(ExtendedTile, m6) == 0 && offsetof(ExtendedTile, m7) == 1 && offsetof(ExtendedTile, m8) == 2);
 	static_assert(std::is_standard_layout_v<BaseTile>);
 	static_assert(sizeof(BaseTile) == 8 && alignof(BaseTile) == 2);
 	static_assert(offsetof(BaseTile, type) == 0 && offsetof(BaseTile, height) == 1 && offsetof(BaseTile, m2) == 2);
@@ -26,7 +30,7 @@ struct OpenTTDNativeTileTypeAccess {
 
 	static OpenTTDTileTypeAllocation Acquire() noexcept
 	{
-		return {.base = reinterpret_cast<const uint8_t *>(Tile::base_tiles.get()), .count = Map::Size()};
+		return {.base = reinterpret_cast<const uint8_t *>(Tile::base_tiles.get()), .count = Map::Size(), .extended = reinterpret_cast<const uint8_t *>(Tile::extended_tiles.get())};
 	}
 };
 #endif /* RUST_TILE_TYPE_ACCESS_HPP */

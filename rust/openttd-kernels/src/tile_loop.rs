@@ -132,6 +132,7 @@ unsafe fn dispatch(
                 settings.size_x,
                 g.clear,
                 s.shared,
+                types,
             );
         },
         1 => unsafe {

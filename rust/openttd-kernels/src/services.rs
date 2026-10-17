@@ -128,13 +128,18 @@ pub struct ByteSpan {
 /// pointer comes from `Tile::base_tiles.get()`, with the full allocation's provenance.
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct TileTypeAllocation {
+pub struct MapReadView {
     /// Allocation-derived bytes; null only together with a zero count.
     pub base: *const u8,
     /// Actual native `Map::Size()` at acquisition, not a copied tile snapshot;
     /// zero selects the original callback backend for every read.
     pub count: u32,
+    /// Actual extended allocation, refreshed with base at each scheduler entry.
+    pub extended: *const u8,
 }
+
+/// Existing tile-type ABI name retained on this throwaway experiment.
+pub type TileTypeAllocation = MapReadView;
 
 /// Layout-only shell for the actual native base tile. Never create a reference,
 /// read or copy a value of this type; it supplies stride/ABI metadata only.
@@ -147,6 +152,14 @@ pub(crate) struct BaseTileLayout {
     pub m3: u8,
     pub m4: u8,
     pub m5: u8,
+}
+
+/// Layout metadata only; no value/reference is formed over native storage.
+#[repr(C)]
+pub(crate) struct ExtendedTileLayout {
+    pub m6: u8,
+    pub m7: u8,
+    pub m8: u16,
 }
 
 /// One shared reader with callback and audited entry-resolved raw backends.
@@ -180,9 +193,81 @@ impl TileTypeAccess {
             allocation: TileTypeAllocation {
                 base: std::ptr::null(),
                 count: 0,
+                extended: std::ptr::null(),
             },
             callback,
         }
+    }
+
+    // #274 experiment: no references or slices over native storage. Each load
+    // completes before the next callback; pointer metadata alone spans calls.
+    // C++ retains all writes. Constructor excludes reset/yield/concurrent writes.
+    #[inline]
+    pub(crate) fn byte(&self, tile: u32, offset: usize) -> Option<u8> {
+        if tile < self.allocation.count {
+            // SAFETY: Same allocation/serialization contract as read(); u8 only.
+            Some(unsafe { self.allocation.base.add(tile as usize * 8 + offset).read() })
+        } else {
+            None
+        }
+    }
+    #[inline]
+    #[allow(clippy::cast_ptr_alignment)] // Native m2 alignment is pinned on both sides.
+    pub(crate) fn word(&self, tile: u32) -> Option<u16> {
+        if tile < self.allocation.count {
+            // SAFETY: m2@2 is aligned u16 in the pinned eight-byte native layout.
+            Some(unsafe {
+                self.allocation
+                    .base
+                    .add(tile as usize * 8 + 2)
+                    .cast::<u16>()
+                    .read()
+            })
+        } else {
+            None
+        }
+    }
+    #[inline]
+    pub(crate) fn has_extended(&self, tile: u32) -> bool {
+        tile < self.allocation.count && !self.allocation.extended.is_null()
+    }
+    #[inline]
+    pub(crate) fn extended_byte(&self, tile: u32) -> Option<u8> {
+        if tile < self.allocation.count && !self.allocation.extended.is_null() {
+            // SAFETY: Acquired together with base; native m6@0, stride four.
+            Some(unsafe {
+                self.allocation
+                    .extended
+                    .add(tile as usize * std::mem::size_of::<ExtendedTileLayout>())
+                    .read()
+            })
+        } else {
+            None
+        }
+    }
+    #[inline]
+    #[allow(clippy::many_single_char_names)] // Same four corners as native GetTileSlopeZ.
+    pub(crate) fn slope(&self, tile: u32, size_x: u32, size_y: u32) -> Option<u8> {
+        if tile >= self.allocation.count {
+            return None;
+        }
+        let x = tile & (size_x - 1);
+        let y = tile >> size_x.trailing_zeros();
+        let x2 = (x + 1).min(size_x - 1);
+        let y2 = (y + 1).min(size_y - 1);
+        let n = self.byte(tile, 1)?;
+        let w = self.byte(y * size_x + x2, 1)?;
+        let e = self.byte(y2 * size_x + x, 1)?;
+        let s = self.byte(y2 * size_x + x2, 1)?;
+        let min = n.min(w).min(e.min(s));
+        let max = n.max(w).max(e.max(s));
+        Some(
+            (u8::from(n != min) << 3)
+                | u8::from(w != min)
+                | (u8::from(e != min) << 2)
+                | (u8::from(s != min) << 1)
+                | (u8::from(max - min == 2) << 4),
+        )
     }
 
     /// Read the original high nibble at this observation point. Out-of-range

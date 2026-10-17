@@ -34,16 +34,24 @@ TEST_CASE("Rust shared tile-type allocation and all native byte values")
 	const std::array<size_t, 9> layout{sizeof(Base), alignof(Base), offsetof(Base, type), offsetof(Base, height), offsetof(Base, m2), offsetof(Base, m1), offsetof(Base, m3), offsetof(Base, m4), offsetof(Base, m5)};
 	for (uint8_t item = 0; item < layout.size(); item++) CHECK(openttd_rust_abi_layout(783, item) == layout[item]);
 	CHECK(openttd_rust_abi_layout(783, layout.size()) == SIZE_MAX);
+	using Extended = OpenTTDNativeTileTypeAccess::ExtendedTile;
+	const std::array<size_t, 5> ext_layout{sizeof(Extended), alignof(Extended), offsetof(Extended, m6), offsetof(Extended, m7), offsetof(Extended, m8)};
+	for (uint8_t item = 0; item < ext_layout.size(); item++) CHECK(openttd_rust_abi_layout(804, item) == ext_layout[item]);
+	CHECK(openttd_rust_abi_layout(804, ext_layout.size()) == SIZE_MAX);
+	const std::array<size_t, 5> view_layout{sizeof(OpenTTDMapReadView), alignof(OpenTTDMapReadView), offsetof(OpenTTDMapReadView, base), offsetof(OpenTTDMapReadView, count), offsetof(OpenTTDMapReadView, extended)};
+	for (uint8_t item = 0; item < view_layout.size(); item++) CHECK(openttd_rust_abi_layout(782, item) == view_layout[item]);
+	CHECK(openttd_rust_abi_layout(782, view_layout.size()) == SIZE_MAX);
 	Map::Allocate(128, 64);
 	const auto allocation = GetRustTileTypeAllocation();
 	const auto &shared = GetRustSharedServices();
 	CHECK(allocation.count == Map::Size());
 	CHECK(allocation.base != nullptr);
+	CHECK(allocation.extended == &Tile(TileIndex{0}).m6());
 	for (const TileIndex tile : {TileIndex{0}, TileIndex{Map::Size() - 1}}) {
 		for (uint byte = 0; byte < 256; byte++) {
 			Tile(tile).type() = byte;
 			CHECK(openttd_rust_shared_tile_type(allocation, shared.tile_type, tile.base()) == static_cast<uint8_t>(GetTileType(tile)));
-			CHECK(openttd_rust_shared_tile_type({nullptr, 0}, shared.tile_type, tile.base()) == static_cast<uint8_t>(GetTileType(tile)));
+			CHECK(openttd_rust_shared_tile_type({nullptr, 0, nullptr}, shared.tile_type, tile.base()) == static_cast<uint8_t>(GetTileType(tile)));
 		}
 	}
 	/* Real native writes between accesses must be observed without a new snapshot. */
@@ -77,7 +85,7 @@ TEST_CASE("Rust shared tile-type out-of-range preserves callback policy")
 	CHECK(openttd_rust_shared_tile_type(allocation, callback, UINT32_MAX) == 231);
 	CHECK(calls == 2);
 	CHECK(observed == UINT32_MAX);
-	CHECK(openttd_rust_shared_tile_type({nullptr, 0}, callback, 0) == 231);
+	CHECK(openttd_rust_shared_tile_type({nullptr, 0, nullptr}, callback, 0) == 231);
 	CHECK(calls == 3);
 	CHECK(observed == 0);
 }

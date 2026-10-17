@@ -146,8 +146,21 @@ fn steep(slope: u8) -> bool {
 
 #[allow(clippy::inline_always)]
 #[inline(always)]
-fn field_fence(tile: u32, size_x: u32, direction: u8, fence: u32, c: &ClearServices) -> bool {
-    if fence != 0 || (c.field_tile)(diagonal(tile, direction, size_x)) {
+fn field_fence(
+    tile: u32,
+    size_x: u32,
+    direction: u8,
+    fence: u32,
+    c: &ClearServices,
+    types: &crate::services::TileTypeAccess,
+) -> bool {
+    if fence != 0 || {
+        let t = diagonal(tile, direction, size_x);
+        types.byte(t, 0).map_or_else(
+            || (c.field_tile)(t),
+            |kind| kind >> 4 == 0 && (types.byte(t, 7).unwrap() >> 2) & 7 == 3,
+        )
+    } {
         return false;
     }
     (c.set_fence)(tile, DiagDirection(direction), 3);
@@ -176,6 +189,7 @@ pub unsafe extern "C" fn openttd_rust_clear_tile_loop(
             size_x,
             clear,
             shared,
+            &crate::services::TileTypeAccess::callback((*shared).tile_type),
         );
     };
 }
@@ -189,6 +203,7 @@ pub(crate) unsafe fn clear_tile_loop(
     size_x: u32,
     clear: *const ClearServices,
     shared: *const Services,
+    types: &crate::services::TileTypeAccess,
 ) {
     let climate = climate.0;
     // SAFETY: Caller supplies immutable live tables. No state borrow crosses a call.
@@ -198,14 +213,19 @@ pub(crate) unsafe fn clear_tile_loop(
     }
     if climate == 1 {
         let k = (s.tile_z)(tile) - i32::from((s.snow_line)()) + 1;
-        if !(c.snow)(tile) {
+        if !types
+            .byte(tile, 5)
+            .map_or_else(|| (c.snow)(tile), |v| v & 16 != 0)
+        {
             if k >= 0 {
                 (s.make_snow)(tile, 0);
                 hit(Witness::SnowStart);
                 (s.mark_dirty)(tile);
             }
         } else {
-            let density = (c.density)(tile);
+            let density = types
+                .byte(tile, 7)
+                .map_or_else(|| (c.density)(tile), |v| u32::from(v & 3));
             let required = k.clamp(0, 3) as u32;
             if density == required {
                 if k < 0 {
@@ -227,8 +247,14 @@ pub(crate) unsafe fn clear_tile_loop(
             }
         }
     } else if climate == 2 {
-        let current = if (s.clear_ground)(tile).0 == 5 {
-            (c.density)(tile)
+        let current = if types
+            .byte(tile, 7)
+            .map_or_else(|| (s.clear_ground)(tile).0, |v| (v >> 2) & 7)
+            == 5
+        {
+            types
+                .byte(tile, 7)
+                .map_or_else(|| (c.density)(tile), |v| u32::from(v & 3))
         } else {
             0
         };
@@ -252,7 +278,26 @@ pub(crate) unsafe fn clear_tile_loop(
             hit(Witness::Desert);
         }
     }
-    let surface = (c.surface)(tile);
+    let surface = if let Some(m3) = types.byte(tile, 5) {
+        let snow = m3 & 16 != 0;
+        let ground = if snow {
+            0
+        } else {
+            (types.byte(tile, 7).unwrap() >> 2) & 7
+        };
+        let density = if !snow && ground == 0 {
+            types.byte(tile, 7).unwrap() & 3
+        } else {
+            0
+        };
+        ClearSurface {
+            ground: ClearGroundType(ground),
+            density,
+            snow,
+        }
+    } else {
+        (c.surface)(tile)
+    };
     if surface.snow {
         return;
     }
@@ -269,7 +314,9 @@ pub(crate) unsafe fn clear_tile_loop(
                     3,
                 );
             } else {
-                let counter = (c.counter)(tile);
+                let counter = types
+                    .byte(tile, 7)
+                    .map_or_else(|| (c.counter)(tile), |v| u32::from(v >> 5));
                 if counter < 7 {
                     (c.set_counter)(tile, counter + 1);
                     return;
@@ -281,11 +328,24 @@ pub(crate) unsafe fn clear_tile_loop(
         3 => {
             // Four ordered steps keep each guarded live neighbour read and write.
             // SetFence's fields are disjoint; dirtying remains after all four.
-            let fences = (c.fences)(tile);
-            let mut dirty = field_fence(tile, size_x, 0, fences.ne, c);
-            dirty |= field_fence(tile, size_x, 1, fences.se, c);
-            dirty |= field_fence(tile, size_x, 2, fences.sw, c);
-            dirty |= field_fence(tile, size_x, 3, fences.nw, c);
+            let fences = if types.has_extended(tile) {
+                // Same NE/SE/SW/NW field observations; no native access survives a write.
+                let m3 = types.byte(tile, 5).unwrap();
+                let m4 = types.byte(tile, 6).unwrap();
+                let m6 = types.extended_byte(tile).unwrap();
+                FieldFences {
+                    ne: u32::from(m3 >> 5),
+                    se: u32::from((m4 >> 2) & 7),
+                    sw: u32::from(m4 >> 5),
+                    nw: u32::from((m6 >> 2) & 7),
+                }
+            } else {
+                (c.fences)(tile)
+            };
+            let mut dirty = field_fence(tile, size_x, 0, fences.ne, c, types);
+            dirty |= field_fence(tile, size_x, 1, fences.se, c, types);
+            dirty |= field_fence(tile, size_x, 2, fences.sw, c, types);
+            dirty |= field_fence(tile, size_x, 3, fences.nw, c, types);
             if dirty {
                 (s.mark_dirty)(tile);
                 hit(Witness::FieldFence);
@@ -293,13 +353,22 @@ pub(crate) unsafe fn clear_tile_loop(
             if editor {
                 return;
             }
-            let counter = (c.counter)(tile);
+            let counter = types
+                .byte(tile, 7)
+                .map_or_else(|| (c.counter)(tile), |v| u32::from(v >> 5));
             if counter < 7 {
                 (c.set_counter)(tile, counter + 1);
                 return;
             }
             (c.set_counter)(tile, 0);
-            let field = (c.field)(tile);
+            let field = if let Some(industry) = types.word(tile) {
+                FieldGround {
+                    industry,
+                    field_type: u32::from(types.byte(tile, 5).unwrap() & 15),
+                }
+            } else {
+                (c.field)(tile)
+            };
             if field.industry == u16::MAX && field.field_type >= 7 {
                 (c.make_clear)(tile, ClearGroundType(0), 2);
                 hit(Witness::FieldOrphan);

@@ -16,10 +16,12 @@
  * Only an audited serialized entry may retain it. It expires before map reset or
  * mutex yield. Raw reads consume only type@0 of each actual eight-byte base tile;
  * C++ owns allocation/construction/reset/destruction and every write. */
-struct OpenTTDTileTypeAllocation {
+struct OpenTTDMapReadView {
 	const uint8_t *base;
 	uint32_t count;
+	const uint8_t *extended; // #274 read-only experiment; actual allocation provenance.
 };
+using OpenTTDTileTypeAllocation = OpenTTDMapReadView;
 OpenTTDTileTypeAllocation GetRustTileTypeAllocation() noexcept;
 
 /* Immutable function table. All functions are noexcept and cannot reenter Rust.

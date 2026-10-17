@@ -124,7 +124,8 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         791 => {
             layout!(crate::ground::TunnelServices, item; snow, snow_or_desert, set_snow_or_desert)
         }
-        782 => layout!(crate::services::TileTypeAllocation, item; base, count),
+        782 => layout!(crate::services::TileTypeAllocation, item; base, count, extended),
+        804 => layout!(crate::services::ExtendedTileLayout, item; m6, m7, m8),
         783 => layout!(crate::services::BaseTileLayout, item; kind, height, m2, m1, m3, m4, m5),
         802 => {
             layout!(crate::tile_loop::GroundServices, item; clear, rail, road, tunnel, water, costs, call, climate, editor, rebuild, ambient_callback)
