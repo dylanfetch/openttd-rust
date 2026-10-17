@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""#274 diagnostic runner; execute only in a root-scheduled quiet-host window.
+"""#274 diagnostic runner; root schedules profiling and quiet-host CPU timing.
 
 cpu: canonical interleaved benchmark invocations plus exact-child wait4 CPU.
 profile: canonical one-pair benchmark with Callgrind inserted after the launcher.
@@ -63,6 +63,9 @@ def cpu_run(command, *, timeout, **kwargs):
 
 def main():
     mode = sys.argv.pop(1) if len(sys.argv) > 1 else ""
+    candidate_only = "--profile-candidate-only" in sys.argv
+    if candidate_only:
+        sys.argv.remove("--profile-candidate-only")
     if mode not in ("cpu", "profile") or "--benchmark" not in sys.argv:
         raise SystemExit(
             "usage: boundary_measurement.py cpu|profile SCENARIO --benchmark N --jobs 1 [--candidate BINARY]"
@@ -77,6 +80,8 @@ def main():
             raise SystemExit(f"missing {valgrind}")
 
         def profile(command, **kwargs):
+            if candidate_only and Path(command[2]).parent.name == "reference-runtime":
+                return original(command, **kwargs)
             output = Path(command[command.index("-c") + 1]).parent / "callgrind.out"
             env = dict(kwargs.pop("env"), VALGRIND_LIB=str(root / "libexec/valgrind"))
             env.pop("OPENTTD_WITNESS", None)
