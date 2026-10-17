@@ -22,7 +22,8 @@ struct OpenTTDTileTypeAllocation {
 };
 OpenTTDTileTypeAllocation GetRustTileTypeAllocation() noexcept;
 
-/* Immutable function table. All functions are noexcept and cannot reenter Rust.
+/* Immutable function table. All functions are noexcept; world operations may
+ * reenter Rust owners after the caller ends its world/owner accesses.
  * Context may be null in the game; test fixtures supply their own world.
  * No Rust references into the map/pools survive calls. Output is call-scoped.
  * Map predicates take a TileIndex value and return the original accessor's

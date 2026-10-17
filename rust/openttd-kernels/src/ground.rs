@@ -512,8 +512,9 @@ pub struct Call {
 pub struct CostServices {
     pub commands: *const crate::services::CommandServices,
     pub costs: *const crate::services::CommandCostServices,
-    pub prepare: extern "C" fn(*mut Call) -> *mut crate::services::CommandCost,
-    pub release: extern "C" fn(*mut Call),
+    // Caller provides the facade's live context; release follows its last result access.
+    pub prepare: unsafe extern "C" fn(*mut Call) -> *mut crate::services::CommandCost,
+    pub release: unsafe extern "C" fn(*mut Call),
 }
 #[repr(C)]
 pub struct RoadSnowGround {
@@ -582,12 +583,14 @@ pub unsafe extern "C" fn openttd_rust_road_tile_loop(
             if months != 0 && (distance < 8 || zone != 0) && (s.is_normal_road)(tile) {
                 let bits = (r.all_bits)(tile);
                 if bits.0.count_ones() > 1 && (s.foundation)(tile).slope.0 == 0 {
-                    let out = (c.prepare)(call);
+                    // SAFETY: The facade owns this live native stack context.
+                    let out = unsafe { (c.prepare)(call) };
                     // SAFETY: prepare provides live native result storage.
                     unsafe { ((*c.commands).ensure_no_vehicle)(out, tile) };
                     // SAFETY: The result remains a live native object until release.
                     let empty = unsafe { ((*c.costs).success)(out) };
-                    (c.release)(call);
+                    // SAFETY: The command/check has returned; no result access follows.
+                    unsafe { (c.release)(call) };
                     if empty && crate::services::chance16_i(1, 40, (s.random)(s.context)) {
                         (r.set_roadside)(tile, Roadside(if side <= 1 { 6 } else { 7 }));
                         hit(Witness::RoadWorkStart);

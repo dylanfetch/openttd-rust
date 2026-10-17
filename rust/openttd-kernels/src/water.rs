@@ -73,15 +73,16 @@ pub struct WaterServices {
     pub check_docking: extern "C" fn(u32),
     pub invalidate_region: extern "C" fn(u32),
     pub tracks: extern "C" fn(u32) -> TrackBits,
-    pub remove_rail: extern "C" fn(*mut services::CommandCost, u32, Track),
+    pub remove_rail: unsafe extern "C" fn(*mut services::CommandCost, u32, Track),
     pub apply_foundation: extern "C" fn(Foundation, Slope) -> FoundationSlope,
-    pub iterator_begin: extern "C" fn(*mut TileVehicleCursor, u32),
-    pub iterator_current: extern "C" fn(*mut TileVehicleCursor) -> Option<VehicleRef>,
-    pub iterator_next: extern "C" fn(*mut TileVehicleCursor),
-    pub iterator_end: extern "C" fn(*mut TileVehicleCursor),
+    // Caller supplies aligned native-iterator storage and follows its construction/lifetime.
+    pub iterator_begin: unsafe extern "C" fn(*mut TileVehicleCursor, u32),
+    pub iterator_current: unsafe extern "C" fn(*mut TileVehicleCursor) -> Option<VehicleRef>,
+    pub iterator_next: unsafe extern "C" fn(*mut TileVehicleCursor),
+    pub iterator_end: unsafe extern "C" fn(*mut TileVehicleCursor),
     pub airport_tile: extern "C" fn(u32) -> bool,
     pub airport: extern "C" fn(u32) -> AirportGround,
-    pub airport_member: extern "C" fn(*const crate::station::Station, u32) -> bool,
+    pub airport_member: unsafe extern "C" fn(*const crate::station::Station, u32) -> bool,
     pub airport_z: extern "C" fn(u32) -> i32,
     pub victim: extern "C" fn(VehicleRef) -> FloodVictim,
     pub aircraft_pose: extern "C" fn(VehicleRef) -> AircraftFloodPose,
@@ -223,11 +224,13 @@ impl<'a> World<'a> {
     fn result(&self, call: *mut Call, out: *const services::CommandCost) -> bool {
         // SAFETY: prepare constructed this result; release ends its native lifetime.
         let success = unsafe { ((*self.costs.costs).success)(out) };
-        (self.costs.release)(call);
+        // SAFETY: The live result is no longer read, ending its native lifetime.
+        unsafe { (self.costs.release)(call) };
         success
     }
     fn clear(&self, tile: u32, call: *mut Call) -> bool {
-        let out = (self.costs.prepare)(call);
+        // SAFETY: Each native entry owns this live independent stack context.
+        let out = unsafe { (self.costs.prepare)(call) };
         // SAFETY: Immutable shared table; native storage outlives command/reentry.
         unsafe {
             ((*self.costs.commands).landscape_clear)(out, tile, 1);
@@ -248,8 +251,10 @@ impl<'a> World<'a> {
             if remove != 0 {
                 let company = (self.s.current_company)();
                 (self.co.finance.set_current_company)(17);
-                let out = (self.costs.prepare)(call);
-                (self.w.remove_rail)(out, tile, Track(remove.trailing_zeros() as u8));
+                // SAFETY: Each native entry owns this live independent stack context.
+                let out = unsafe { (self.costs.prepare)(call) };
+                // SAFETY: prepare constructed out, and no owner borrow spans the command.
+                unsafe { (self.w.remove_rail)(out, tile, Track(remove.trailing_zeros() as u8)) };
                 flooded = self.result(call, out);
                 (self.co.finance.set_current_company)(company);
                 if !flooded {
@@ -337,14 +342,18 @@ impl<'a> World<'a> {
     fn vehicles_on_tile(&self, tile: u32, z: i32) {
         let mut cursor = MaybeUninit::<TileVehicleCursor>::uninit();
         let cursor = cursor.as_mut_ptr();
-        (self.w.iterator_begin)(cursor, tile);
-        while let Some(v) = (self.w.iterator_current)(cursor) {
+        // SAFETY: Aligned uninitialized storage has the native size; begin constructs it.
+        unsafe { (self.w.iterator_begin)(cursor, tile) };
+        // SAFETY: The native iterator remains constructed until iterator_end.
+        while let Some(v) = unsafe { (self.w.iterator_current)(cursor) } {
             self.victim(v, z);
             // Original iterator reads current->hash_tile_next AFTER Crash, both
             // event queues, news and explosion creation have all returned.
-            (self.w.iterator_next)(cursor);
+            // SAFETY: Crash does not delete the current shell; advance only after callbacks.
+            unsafe { (self.w.iterator_next)(cursor) };
         }
-        (self.w.iterator_end)(cursor);
+        // SAFETY: Exactly one destruction follows construction and the last access.
+        unsafe { (self.w.iterator_end)(cursor) };
     }
     fn flood_vehicles(&self, tile: u32) {
         if (self.w.airport_tile)(tile) {
@@ -352,7 +361,8 @@ impl<'a> World<'a> {
             for y in 0..u32::from(airport.height) {
                 for x in 0..u32::from(airport.width) {
                     let target = airport.tile.wrapping_add(y * self.size_x).wrapping_add(x);
-                    if (self.w.airport_member)(airport.station, target) {
+                    // SAFETY: Flood/crash callbacks cannot delete this live station or reset pools.
+                    if unsafe { (self.w.airport_member)(airport.station, target) } {
                         crate::ground::hit(crate::ground::Witness::AirportMember);
                         self.vehicles_on_tile(target, 0);
                     }

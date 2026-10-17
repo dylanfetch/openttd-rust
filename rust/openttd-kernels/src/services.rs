@@ -224,7 +224,8 @@ pub unsafe extern "C" fn openttd_rust_shared_tile_type(
 /// Immutable call table supplied by the game (or isolated test world). No global
 /// registration or game symbol imports are needed by standalone Cargo binaries.
 /// The context and function addresses outlive the component invocation; callbacks
-/// do not throw or reenter, and output pointers are borrowed for that call only.
+/// do not throw; world operations may reenter after owner accesses end. Output
+/// pointers are borrowed for that call only.
 /// Map predicates take a `TileIndex` value and return the accessor's underlying type.
 #[repr(C)]
 #[derive(Clone, Copy)]
