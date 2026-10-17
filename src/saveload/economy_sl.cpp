@@ -46,9 +46,6 @@ struct CAPRChunkHandler : ChunkHandler {
 	}
 };
 
-#ifdef WITH_RUST
-static uint32_t _industry_daily_save;
-#endif
 static const SaveLoad _economy_desc[] = {
 	SLE_CONDVAR(Economy, old_max_loan_unround,          SLE_FILE_I32 | SLE_VAR_I64,  SL_MIN_VERSION, SLV_65),
 	SLE_CONDVAR(Economy, old_max_loan_unround,          SLE_INT64,                  SLV_65, SLV_126),
@@ -60,7 +57,7 @@ static const SaveLoad _economy_desc[] = {
 	    SLE_VAR(Economy, infl_amount,                   SLE_UINT8),
 	    SLE_VAR(Economy, infl_amount_pr,                SLE_UINT8),
 #ifdef WITH_RUST
-	SLEG_CONDVAR("industry_daily_change_counter", _industry_daily_save, SLE_UINT32, SLV_102, SL_MAX_VERSION),
+	SLEG_CONDVAR("industry_daily_change_counter", _industry_builder.daily_counter, SLE_UINT32, SLV_102, SL_MAX_VERSION),
 #else
 	SLE_CONDVAR(Economy, industry_daily_change_counter, SLE_UINT32,                SLV_102, SL_MAX_VERSION),
 #endif
@@ -75,9 +72,6 @@ struct ECMYChunkHandler : ChunkHandler {
 		SlTableHeader(_economy_desc);
 
 		SlSetArrayIndex(0);
-#ifdef WITH_RUST
-		_industry_daily_save = _industry_builder.daily_counter;
-#endif
 		SlObject(&_economy, _economy_desc);
 	}
 
@@ -87,31 +81,18 @@ struct ECMYChunkHandler : ChunkHandler {
 		const std::vector<SaveLoad> slt = SlCompatTableHeader(_economy_desc, _economy_sl_compat);
 
 		if (!IsSavegameVersionBefore(SLV_RIFF_TO_ARRAY) && SlIterateArray() == -1) return;
-#ifdef WITH_RUST
-		_industry_daily_save = _industry_builder.daily_counter;
-#endif
 		SlObject(&_economy, slt);
-#ifdef WITH_RUST
-		_industry_builder.daily_counter = _industry_daily_save;
-#endif
 		if (!IsSavegameVersionBefore(SLV_RIFF_TO_ARRAY) && SlIterateArray() != -1) SlErrorCorrupt("Too many ECMY entries");
 
 		StartupIndustryDailyChanges(IsSavegameVersionBefore(SLV_102));  // old savegames will need to be initialized
 	}
 };
 
-#ifdef WITH_RUST
-// Call-local staging retains the CAPY schema while Rust is the only owner.
-using CargoPaymentSave = OpenTTDCargoPaymentFields;
-#else
-using CargoPaymentSave = CargoPayment;
-#endif
-
 static const SaveLoad _cargopayment_desc[] = {
-	    SLE_REF(CargoPaymentSave, front,           REF_VEHICLE),
-	    SLE_VAR(CargoPaymentSave, route_profit,    SLE_INT64),
-	    SLE_VAR(CargoPaymentSave, visual_profit,   SLE_INT64),
-	SLE_CONDVAR(CargoPaymentSave, visual_transfer, SLE_INT64, SLV_181, SL_MAX_VERSION),
+	    SLE_REF(CargoPayment, front,           REF_VEHICLE),
+	    SLE_VAR(CargoPayment, route_profit,    SLE_INT64),
+	    SLE_VAR(CargoPayment, visual_profit,   SLE_INT64),
+	SLE_CONDVAR(CargoPayment, visual_transfer, SLE_INT64, SLV_181, SL_MAX_VERSION),
 };
 
 struct CAPYChunkHandler : ChunkHandler {
@@ -123,13 +104,7 @@ struct CAPYChunkHandler : ChunkHandler {
 
 		for (CargoPayment *cp : CargoPayment::Iterate()) {
 			SlSetArrayIndex(cp->index);
-#ifdef WITH_RUST
-			CargoPaymentSave state;
-			openttd_rust_cargo_payment_export(cp->rust_state, &state);
-			SlObject(&state, _cargopayment_desc);
-#else
 			SlObject(cp, _cargopayment_desc);
-#endif
 		}
 	}
 
@@ -141,27 +116,14 @@ struct CAPYChunkHandler : ChunkHandler {
 
 		while ((index = SlIterateArray()) != -1) {
 			CargoPayment *cp = new (CargoPaymentID(index)) CargoPayment();
-#ifdef WITH_RUST
-			CargoPaymentSave state{};
-			SlObject(&state, slt);
-			openttd_rust_cargo_payment_import(cp->rust_state, &state);
-#else
 			SlObject(cp, slt);
-#endif
 		}
 	}
 
 	void FixPointers() const override
 	{
 		for (CargoPayment *cp : CargoPayment::Iterate()) {
-#ifdef WITH_RUST
-			CargoPaymentSave state;
-			openttd_rust_cargo_payment_export(cp->rust_state, &state);
-			SlObject(&state, _cargopayment_desc);
-			openttd_rust_cargo_payment_import(cp->rust_state, &state);
-#else
 			SlObject(cp, _cargopayment_desc);
-#endif
 		}
 	}
 };

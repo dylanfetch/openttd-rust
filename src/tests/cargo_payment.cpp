@@ -27,8 +27,7 @@ TEST_CASE("Cargo payment - settlement order, Money boundaries and cleanup")
 		settlement.clear();
 		int front;
 		auto *p = openttd_rust_cargo_payment_new(&front, 42);
-		OpenTTDCargoPaymentFields fields{&front, INT64_MIN, INT64_MIN, transfer ? INT64_MAX : 0};
-		openttd_rust_cargo_payment_import(p, &fields);
+		p->fields = {&front, INT64_MIN, INT64_MIN, transfer ? INT64_MAX : 0};
 		CHECK(openttd_rust_cargo_payment_front(p) == &front);
 		openttd_rust_cargo_payment_destroy(p, &s, cleaning);
 		if (cleaning) { CHECK(settlement.empty()); continue; }
@@ -43,8 +42,7 @@ TEST_CASE("Cargo payment - settlement order, Money boundaries and cleanup")
 	}
 	settlement.clear();
 	auto *p = openttd_rust_cargo_payment_new(nullptr, 0xFFFF);
-	OpenTTDCargoPaymentFields fields{nullptr, INT64_MAX, 0, 0};
-	openttd_rust_cargo_payment_import(p, &fields);
+	p->fields = {nullptr, INT64_MAX, 0, 0};
 	openttd_rust_cargo_payment_destroy(p, &s, 0);
 	CHECK(settlement == std::vector<std::tuple<uint8_t, int64_t, int64_t>>{{0, 0, 0}});
 }
