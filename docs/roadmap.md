@@ -4,13 +4,13 @@ Root owns selection here; `AGENTS.md` and `docs/rust-migration.md` define proces
 If an issue conflicts, follow this roadmap and report it to root. Keep this
 forward-looking, about 200 lines; completed work is one row, with evidence in PRs.
 
-## Where the fork stands (2026-10-17, `bdab12a31b`)
+## Where the fork stands (2026-10-17, `08e5372c8f`)
 
-- Twenty-seven ownership ports. Whole fork: Rust 59,799 / tooling 31,151 / glue 26,605 / original retired 38,179 of 470,612 `src/` lines (8.11%). Simulation: 30,252 / 102,615 (29.48%).
-- This resumption integrated maintenance #268 and #273. No game C++ has been retired since #258; #268 restored 44 original lines while removing save staging.
-- Four ownership drafts retire game C++: #270 rail commands (1,578), #269 houses (882), #255 landscape (844) and #257 vehicles (388). The core loops follow the selected boundary rule.
-- Latest accepted six-cap evidence is reviewed #273: TGP 1.127 and play saves 1.23-1.35; post-merge CI checks the combined tree. #277/#279 also pass all six; #279 ratchets await scoped review and fresh Full validation.
-- Coverage gaps remain #156, and map/vehicle boundary work has an active owner in #274. Unintegrated branches: four components and two maintenance drafts (#277, #279).
+- Twenty-seven ownership ports. Whole fork: Rust 59,755 / tooling 31,126 / glue 26,572 / original retired 38,179 of 470,612 `src/` lines (8.11%). Simulation: 30,252 / 102,615 (29.48%).
+- This resumption integrated maintenance #268, #273 and #277. No game C++ has been retired since #258; #268 restored 44 original lines while removing save staging.
+- Four ownership drafts retire game C++: #270 rail commands (1,578), #269 houses (891), #255 landscape (844) and #257 vehicles (388). The core loops follow the selected boundary rule.
+- Integrated #277 passes all six caps. Reviewed #279 passes 54 pairs and ratchets all six limits beyond spread; its scoped review and exact-head Full validation pass, awaiting protected-base checks.
+- Coverage gaps remain #156, and map/vehicle boundary measurements are recorded in #274. Unintegrated branches: four components and one maintenance draft (#279).
 
 ## Thirteenth steering review (2026-10-16, unblock the core loops)
 
@@ -110,6 +110,7 @@ evidence in their PRs; rows below use original retirement and net glue (#223).
 | #156 (no-city towns, stale-link restrict/release) | #272 | direct | `6ffbf8f302` | 99 / 20 / 0 / 0; net glue 0 |
 | #261 R4 (direct save aliases) | #268 | direct | `5b3c666698` | 7 / 4 / 35 / -44; net glue -204 |
 | #261 R3 part (train/orders forwarders and unsafe contracts) | #273 | direct | `bdab12a31b` | 1571 / 0 / 0 / 0; Rust net -532, net glue 0 |
+| #276 (#275 native inline ClampTo) | #277 | direct | `08e5372c8f` | 0 / 7 / 0 / 0; Rust net -44, net glue -33 |
 
 Paused, not fallbacks: #64 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -160,21 +161,20 @@ staging only for a field a `SaveLoad` descriptor cannot address through the alia
 ## Resume checkpoint
 
 Resumed 2026-10-17 under `start-development`; root is gpt-6.1-sol, xhigh.
-Five fresh high-effort agents own the draft fixes/review and #274 measurement.
+Fresh agents own the rail/orders conflict review and #274 vehicle boundary design.
 #255/#257 are reopened; root owns their base updates and integration gates.
 #275's cheap fixes are #276/#277 (ClampTo) and #278/#279 (road YAPF scratch),
 owned by root; other speed items, #266, #267, #247, R2 and H5 remain unstarted.
-Four component and two maintenance drafts are open. Older paused work is untouched.
+Four component and one maintenance draft are open. Older paused work is untouched.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #256 / #269 | `house-lifecycle-256`, `a61aaf1f1b` | Fresh R2 shares generic helpers and fixes owner/probe adapters. Native/Cargo4 pass; final default probes and 41 affected scenarios remain before evidence, caps and Full validation. |
-| #265 / #270 | `rail-commands-265`, `1d008aca7c` | Shared command checks/road accessors, one `IsSafeWaitingPosition` and typed returns pass native/rail-command checks. `/root/review-rail-commands-270` audits all changes and shared consumers; full simulation, caps and Full validation remain. |
-| #212 / #255 | `landscape-owner-212`, `d28a61f9a2` | Root verified fixing review; native and 72 scenarios/288 snapshots pass. Full CI exposed an assertion-invalid macOS Debug fixture; fresh R2 fixes it. Timings/caps and new-head Full validation remain. |
-| #213 / #257 | `vehicle-owner-213`, `d41768cd89` | Fixing review/root verification pass. Clean update from integrated #273 is in progress; native/semantic checks and new-head Full validation follow. Root retains fair CPU comparison and quiet-host caps. |
-| #274 | Measurement branches, linked issue | `/root/boundary-measurement-274` measures clear/water map reads and post-tick vehicle reads/direct controller calls. Root schedules quiet-host timing and selects any shared-view PR. |
-| #276 / #277 (#275) | `inline-clamp-275`, `218cbff0e0` | Native, math/semantic checks, fresh review, all six caps and exact-head Full validation pass. Ready after protected-base integration checks. |
-| #278 / #279 (#275) | `road-yapf-scratch-275`, `f5134a76af` | Game review/native/semantic checks and six caps pass. Numeric ratchets exceed spread and 2%; fresh scoped cap review and new-head Full validation precede integration. |
+| #256 / #269 | `house-lifecycle-256`, `1a699f945a` | R1/R2 fixes and root verification pass: canonical helpers, owner context and default probe adapters. Cargo4/native and 45 scenarios/439 snapshots pass. Full validation requested; quiet profiles/caps remain. |
+| #265 / #270 | `rail-commands-265`, `da775ad9be` | Root verified nine review fixes; native and 16 scenarios/152 snapshots pass. Fresh scoped R2 resolves the integrated orders conflict in `train.rs`; final Full validation and quiet caps follow. |
+| #212 / #255 | `landscape-owner-212`, `796cb2bbb0` | Root verified fixing reviews, including the assertion-invalid Debug fixture. Game unchanged from passing native/72 scenarios/288 snapshots. New exact-head Full requested; fair CPU/caps remain. |
+| #213 / #257 | `vehicle-owner-213`, `ff03c13f28` | Reviewed owner plus clean integrated-orders merge verified. Cargo4/native and 25 scenarios/158 snapshots pass. Adopt integrated cheap speed fixes on both timing variants before CPU/six-cap gates and final Full validation. |
+| #274 | Measurement branches, linked issue | Map and vehicle prototypes are measured and recorded. Map timing remains; vehicle profile still misses its instruction gate. Astra plans the remaining boundary cost; root owns quiet CPU timing and production design selection. |
+| #278 / #279 (#275) | `road-yapf-scratch-275`, `f5134a76af` | Game/cap reviews, root verification, native/semantic checks, six quiet caps and exact-head Full validation pass. Integrate after protected-base post-merge checks, then update the core-loop timing base. |
 | #64 / #66 | remote `issue/64-curve-family`, `aab5211801` | #66 closed unmerged; #64 stays paused. |
 
 #269 and #270 both move `clear_square` to the shared table; whichever integrates
