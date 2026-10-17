@@ -22,6 +22,7 @@
 #include <unordered_map>
 #include <vector>
 
+namespace TownReference {
 using TileIndex = uint32_t;
 using TileIndexDiff = int32_t;
 /* The shared FFI declares native DiagDirection; fixture scalars convert explicitly. */
@@ -412,8 +413,11 @@ static void ComparePercentTransported()
 	}
 	std::printf("\nPASS %u unchanged-reference percent cases\n", checked);
 }
+} // namespace TownReference
+
 int main()
 {
+	using namespace TownReference;
 	CompareHistories();
 	CompareRatings();
 	CompareRadii();
