@@ -1992,7 +1992,7 @@ const OpenTTDRoadGroundServices &GetRustRoadGroundServices() noexcept
 {
 	static_assert(SND_21_ROAD_WORKS == 31 && OWNER_TOWN.base() == 15);
 	static const OpenTTDRoadGroundServices services{
-		.snow = [](uint32_t index) noexcept { TileIndex t{index}; int z = RustFoundationSlope(index).slope == SLOPE_FLAT ? GetTileMaxZ(t) : GetTileZ(t); return OpenTTDRoadSnowGround{.z = z, .snow = IsOnSnowOrDesert(t)}; },
+		.snow = [](uint32_t index) noexcept { TileIndex t{index}; int z = RustFoundationSlope(index).slope == SLOPE_FLAT ? OpenTTDTileMaxZ(t) : RustTileZ(t); return OpenTTDRoadSnowGround{.z = z, .snow = IsOnSnowOrDesert(t)}; },
 		.snow_or_desert = [](uint32_t t) noexcept { return IsOnSnowOrDesert(TileIndex{t}); },
 		.toggle_snow_or_desert = [](uint32_t t) noexcept { ToggleSnowOrDesert(TileIndex{t}); },
 		.roadside = [](uint32_t t) noexcept { return GetRoadside(TileIndex{t}); },
@@ -2000,8 +2000,7 @@ const OpenTTDRoadGroundServices &GetRustRoadGroundServices() noexcept
 		.work_counter = [](uint32_t t) noexcept { return GB(Tile(TileIndex{t}).m7(), 0, 4); },
 		.set_work_counter = [](uint32_t t, uint32_t counter) noexcept { SB(Tile(TileIndex{t}).m7(), 0, 4, counter); },
 		.all_bits = [](uint32_t t) noexcept { return GetAllRoadBits(TileIndex{t}); },
-		.ensure_no_vehicle = [](OpenTTDCommandCost *out, uint32_t t) noexcept { *NativeGroundCost(out) = EnsureNoVehicleOnGround(TileIndex{t}); },
-		.bulldozer = [](uint32_t t) noexcept { CreateEffectVehicleAbove(TileX(TileIndex{t}) * TILE_SIZE + 7, TileY(TileIndex{t}) * TILE_SIZE + 7, 0, EV_BULLDOZER); },
+		.bulldozer = [](uint32_t t) noexcept { RustCreateEffectAbove(TileX(TileIndex{t}) * TILE_SIZE + 7, TileY(TileIndex{t}) * TILE_SIZE + 7, 0, EV_BULLDOZER); },
 		.cleanup = [](uint32_t t, RoadBits bits) noexcept { return RustCleanRoadBits(TileIndex{t}, bits); },
 		.remove = [](uint32_t t, RoadBits bits) noexcept { RemoveRoad(TileIndex{t}, {DoCommandFlag::Execute, DoCommandFlag::Auto, DoCommandFlag::NoWater}, bits, RTT_ROAD, true); },
 		.town_road_type = []() noexcept { return GetTownRoadType(); },

@@ -78,6 +78,7 @@ static bool IndustryCommandDeity() noexcept { return OpenTTDCurrentCompany() == 
 
 #ifdef WITH_RUST
 #include "rust/services_landscape.h"
+#include "rust/command_services.h"
 #endif
 
 #include "safeguards.h"
@@ -3640,8 +3641,8 @@ static const OpenTTDIndustryServices _industry_services = {
 	.farm_tile = [](uint32_t index) noexcept -> OpenTTDIndustryFarmTile {
 		TileIndex tile(index);
 		switch (GetTileType(tile)) {
-			case MP_CLEAR: return {MP_CLEAR, RustSnowTile(index), static_cast<uint8_t>(GetClearGround(tile)), 0};
-			case MP_TREES: return {MP_TREES, 0, static_cast<uint8_t>(GetTreeGround(tile)), GetTreeGrowth(tile) >= TreeGrowthStage::Grown};
+			case MP_CLEAR: return {MP_CLEAR, RustSnowTile(index), static_cast<uint8_t>(RustClearGround(Tile{tile})), 0};
+			case MP_TREES: return {MP_TREES, 0, static_cast<uint8_t>(RustTreeGround(Tile{tile})), GetTreeGrowth(tile) >= TreeGrowthStage::Grown};
 			default: return {static_cast<uint8_t>(GetTileType(tile)), 0, 0, 0};
 		}
 	},
@@ -3649,7 +3650,7 @@ static const OpenTTDIndustryServices _industry_services = {
 	.make_field = [](uint32_t index, uint8_t field_type, uint8_t counter, uint16_t industry) noexcept {
 		TileIndex tile(index);
 		MakeField(tile, field_type, IndustryID(industry));
-		SetClearCounter(tile, counter);
+		RustSetClearCounter(Tile{tile}, counter);
 		MarkTileDirtyByTile(tile);
 	},
 	.fence_wanted = [](uint32_t index, uint8_t side) noexcept -> bool {
@@ -3658,9 +3659,8 @@ static const OpenTTDIndustryServices _industry_services = {
 		auto dir = static_cast<DiagDirection>(side);
 		if (!RustClearFieldTile(tile)) return false;
 		Tile neighbour{index_tile + TileOffsByDiagDir(dir)};
-		return !RustClearFieldTile(neighbour) || GetFence(neighbour, ReverseDiagDir(dir)) == 0;
+		return !RustClearFieldTile(neighbour) || RustFieldFence(neighbour, ReverseDiagDir(dir)) == 0;
 	},
-	.set_fence = [](uint32_t tile, uint8_t side, uint8_t type) noexcept { SetFence(TileIndex(tile), static_cast<DiagDirection>(side), type); },
 	.tile_completed = [](void *i, uint32_t tile) noexcept -> bool { return !RustIndustry(i)->TileBelongsToIndustry(TileIndex(tile)) || IsIndustryCompleted(TileIndex(tile)); },
 	.harvest = [](uint32_t tile) noexcept {
 		if (_settings_client.sound.ambient) RustPlayTileSound(tile, SND_38_LUMBER_MILL_1);
@@ -3881,7 +3881,7 @@ static const OpenTTDIndustryTileServices &GetIndustryTileServices()
 		.build_oilrig = [](uint32_t tile) noexcept { BuildOilRig(TileIndex(tile)); },
 		.pixel_max_z = OpenTTDTileMaxPixelZ,
 		.create_effect = [](int32_t x, int32_t y, int32_t z, uint8_t type) noexcept -> OpenTTDEffectVehicle * { return CreateEffectVehicle(x, y, z, static_cast<EffectVehicleType>(type)); },
-		.create_effect_above = [](int32_t x, int32_t y, int32_t z, uint8_t type) noexcept -> OpenTTDEffectVehicle * { return CreateEffectVehicleAbove(x, y, z, static_cast<EffectVehicleType>(type)); },
+		.create_effect_above = RustCreateEffectAboveValue,
 		.set_effect_substate = [](OpenTTDEffectVehicle *vehicle, uint8_t state) noexcept { vehicle->SetAnimationSubstate(state); },
 		.spec = [](uint16_t gfx) noexcept -> const OpenTTDIndustryTileSpec * { return GetIndustryTileSpec(gfx); },
 		.acceptance = [](const OpenTTDIndustryTileSpec *spec) noexcept -> OpenTTDIndustryTileAcceptance {
@@ -3968,8 +3968,7 @@ static const OpenTTDIndustryTransactionServices &GetIndustryTransactionServices(
 		.edge_distance = [](uint32_t tile, uint8_t direction) noexcept -> uint32_t { return DistanceFromEdgeDir(TileIndex(tile), static_cast<DiagDirection>(direction)); },
 		.refinery_limit = []() noexcept -> uint8_t { return _settings_game.game_creation.oil_refinery_limit; },
 		.tile_height = [](uint32_t tile) noexcept -> uint32_t { return TileHeight(TileIndex(tile)); },
-		.has_water_class = [](uint32_t tile) noexcept -> bool { return HasTileWaterClass(TileIndex(tile)); },
-		.ensure_no_vehicle = [](OpenTTDIndustryCost *out, uint32_t tile) noexcept { *out = EnsureNoVehicleOnGround(TileIndex(tile)); },
+		.command_checks = &GetRustCommandServices(),
 		.set_company = [](uint8_t company) noexcept { OpenTTDSetCurrentCompany(CompanyID(company)); },
 		.temporary_shell = [](OpenTTDIndustry *owner, void *context, OpenTTDIndustryTemporaryVisit visit) noexcept { Industry industry(owner); industry.index = IndustryID::Invalid(); visit(context, &industry); },
 		.resolve_location = openttd_industry_resolve_location,

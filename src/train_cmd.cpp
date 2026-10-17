@@ -4673,7 +4673,7 @@ static const OpenTTDTrainServices &GetTrainServices()
 		.is_bridge = TrainIsBridge,
 		.is_crossing = TrainSharedMap<uint64_t, &OpenTTDSharedServices::is_level_crossing>,
 		.is_depot = TrainIsDepot,
-		.is_plain_rail = TrainIsPlainRail,
+		.is_plain_rail = OpenTTDLegacyMapQuery<uint64_t, RustPlainRailTile, OpenTTDTrainHandle, uint32_t>,
 		.is_railway = TrainIsRailway,
 		.is_station = TrainIsStation,
 		.is_station_any = TrainIsStationAny,

@@ -46,6 +46,7 @@
 
 #ifdef WITH_RUST
 #include "rust/ground_ffi.h"
+#include "rust/services_landscape.h"
 #include "rust/environment_services.h"
 #endif
 
@@ -1837,7 +1838,7 @@ static void GetTileDesc_TunnelBridge(TileIndex tile, TileDesc &td)
 const OpenTTDTunnelServices &GetRustTunnelGroundServices() noexcept
 {
 	static const OpenTTDTunnelServices services{
-		.snow = [](uint32_t index) noexcept { TileIndex t{index}; return OpenTTDTunnelGround{.z = IsBridge(t) ? GetTileMaxZ(t) : GetTileZ(t), .snow = HasTunnelBridgeSnowOrDesert(t)}; },
+		.snow = [](uint32_t index) noexcept { TileIndex t{index}; return OpenTTDTunnelGround{.z = IsBridge(t) ? OpenTTDTileMaxZ(t) : RustTileZ(t), .snow = HasTunnelBridgeSnowOrDesert(t)}; },
 		.snow_or_desert = [](uint32_t t) noexcept { return HasTunnelBridgeSnowOrDesert(TileIndex{t}); },
 		.set_snow_or_desert = [](uint32_t t, bool value) noexcept { SetTunnelBridgeSnowOrDesert(TileIndex{t}, value); },
 	};

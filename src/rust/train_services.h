@@ -413,10 +413,6 @@ static uint64_t TrainIsDepot(OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	return IsRailDepotTile(TileIndex(a));
 }
-static uint64_t TrainIsPlainRail(OpenTTDTrainHandle, uint32_t a) noexcept
-{
-	return IsPlainRailTile(TileIndex(a));
-}
 static uint64_t TrainIsRailway(OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	return IsTileType(TileIndex(a), MP_RAILWAY);

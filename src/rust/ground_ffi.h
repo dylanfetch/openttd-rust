@@ -48,10 +48,8 @@ struct OpenTTDClearServices {
 	void (*clear_snow)(uint32_t) noexcept;
 	void (*make_clear)(uint32_t, ClearGround, uint32_t) noexcept;
 	OpenTTDFieldFences (*fences)(uint32_t) noexcept;
-	void (*set_fence)(uint32_t, DiagDirection, uint32_t) noexcept;
 	OpenTTDFieldGround (*field)(uint32_t) noexcept;
 	void (*set_field)(uint32_t, uint32_t) noexcept;
-	bool (*has_water_class)(uint32_t) noexcept;
 	WaterClass (*water_class)(uint32_t) noexcept;
 	void (*ambient)(uint32_t) noexcept;
 };
@@ -88,7 +86,6 @@ struct OpenTTDRoadGroundServices {
 	uint32_t (*work_counter)(uint32_t) noexcept;
 	void (*set_work_counter)(uint32_t, uint32_t) noexcept;
 	RoadBits (*all_bits)(uint32_t) noexcept;
-	void (*ensure_no_vehicle)(OpenTTDCommandCost *, uint32_t) noexcept;
 	void (*bulldozer)(uint32_t) noexcept;
 	RoadBits (*cleanup)(uint32_t, RoadBits) noexcept;
 	void (*remove)(uint32_t, RoadBits) noexcept;

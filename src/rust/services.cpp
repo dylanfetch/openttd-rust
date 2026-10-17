@@ -74,9 +74,13 @@ static void LandscapeClear(OpenTTDCommandCost *out, uint32_t tile, uint16_t flag
 {
 	*NativeCost(out) = Command<CMD_LANDSCAPE_CLEAR>::Do(DoCommandFlags(flags), TileIndex{tile});
 }
+static void EnsureNoVehicle(OpenTTDCommandCost *out, uint32_t tile) noexcept
+{
+	*NativeCost(out) = RustEnsureNoVehicleOnGround(tile);
+}
 const OpenTTDCommandServices &GetRustCommandServices() noexcept
 {
-	static const OpenTTDCommandServices services{.landscape_clear = LandscapeClear};
+	static const OpenTTDCommandServices services{.landscape_clear = LandscapeClear, .ensure_no_vehicle = EnsureNoVehicle};
 	return services;
 }
 
@@ -102,13 +106,13 @@ OpenTTDTownState *OpenTTDTownOwnerByID(uint32_t id) noexcept
 void OpenTTDAssertTownGenerationContext() noexcept { assert(_game_mode == GM_EDITOR || _generating_world); }
 
 bool OpenTTDIsTileFlat(uint32_t tile) noexcept { return IsTileFlat(TileIndex(tile)); }
-ClearGround OpenTTDClearGround(uint32_t tile) noexcept { return GetClearGround(TileIndex(tile)); }
-TreeGround OpenTTDTreeGround(uint32_t tile) noexcept { return GetTreeGround(TileIndex(tile)); }
+ClearGround OpenTTDClearGround(uint32_t tile) noexcept { return RustClearGround(Tile{TileIndex{tile}}); }
+TreeGround OpenTTDTreeGround(uint32_t tile) noexcept { return RustTreeGround(Tile{TileIndex{tile}}); }
 
 static uint8_t SharedTileType(uint32_t tile) noexcept { return GetTileType(TileIndex{tile}); }
 static bool SharedBridgeAbove(uint32_t tile) noexcept { return IsBridgeAbove(TileIndex{tile}); }
 static uint8_t SharedTropicZone(uint32_t tile) noexcept { return GetTropicZone(TileIndex{tile}); }
-static int32_t SharedTileZ(uint32_t tile) noexcept { return GetTileZ(TileIndex{tile}); }
+static int32_t SharedTileZ(uint32_t tile) noexcept { return RustTileZ(TileIndex{tile}); }
 static uint8_t SharedTileSlope(uint32_t tile) noexcept { return GetTileSlope(TileIndex{tile}); }
 static void SharedMarkDirty(uint32_t tile) noexcept { MarkTileDirtyByTile(TileIndex{tile}); }
 static void SharedSetTropicZone(uint32_t tile, uint8_t zone) noexcept { SetTropicZone(TileIndex{tile}, static_cast<TropicZone>(zone)); }
@@ -147,7 +151,7 @@ static OpenTTDTownState *SharedTownOwner(const OpenTTDTownHandle *town) noexcept
 
 static bool Shared_tile_valid(uint32_t tile) noexcept { return IsValidTile(TileIndex{tile}); }
 static uint32_t Shared_distance_from_edge(uint32_t tile) noexcept { return DistanceFromEdge(TileIndex{tile}); }
-static int32_t Shared_tile_max_z(uint32_t tile) noexcept { return GetTileMaxZ(TileIndex{tile}); }
+static int32_t Shared_tile_max_z(uint32_t tile) noexcept { return OpenTTDTileMaxZ(TileIndex{tile}); }
 static_assert(TILE_HEIGHT == 8);
 static uint32_t Shared_tile_height(uint32_t tile) noexcept { return TileHeight(TileIndex{tile}); }
 static uint8_t Shared_bridge_axis(uint32_t tile) noexcept { return GetBridgeAxis(TileIndex{tile}); }
@@ -246,6 +250,8 @@ const OpenTTDSharedServices &GetRustSharedServices() noexcept
 		.tile_loop_water = RustTileLoopWater,
 		.play_sound = RustPlayTileSound,
 		.foundation = RustFoundationSlope,
+		.set_fence = RustSetFieldFence,
+		.has_water_class = RustHasWaterClass,
 	};
 	return services;
 }

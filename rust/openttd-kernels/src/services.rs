@@ -103,6 +103,8 @@ pub struct CommandCostServices {
 pub struct CommandServices {
     /// Original `CMD_LANDSCAPE_CLEAR`, with actual `DoCommandFlags` width.
     pub landscape_clear: extern "C" fn(*mut CommandCost, u32, u16),
+    /// Original ground-vehicle command check; output is live native result storage.
+    pub ensure_no_vehicle: unsafe extern "C" fn(*mut CommandCost, u32),
 }
 
 /// Opaque native town shell. Its address identifies the shell, not the Rust owner.
@@ -361,6 +363,10 @@ pub struct Services {
     pub play_sound: extern "C" fn(u32, u16),
     /// `GetFoundationSlope`, returning both the foundation slope and its z.
     pub foundation: extern "C" fn(u32) -> FoundationSlope,
+    /// Canonical clear-field fence write, retaining native enum and integer widths.
+    pub set_fence: extern "C" fn(u32, DiagDirection, u32),
+    /// Original `HasTileWaterClass` predicate.
+    pub has_water_class: extern "C" fn(u32) -> bool,
 }
 /// `GetFoundationSlope` result: height and slope after the tile's foundation.
 #[repr(C)]
@@ -437,6 +443,7 @@ pub fn fixture(
     }
     extern "C" fn make_snow(_: u32, _: u32) {}
     extern "C" fn play_sound(_: u32, _: u16) {}
+    extern "C" fn set_fence(_: u32, _: DiagDirection, _: u32) {}
     extern "C" fn foundation(_: u32) -> FoundationSlope {
         FoundationSlope {
             z: 0,
@@ -511,6 +518,8 @@ pub fn fixture(
         tile_loop_water: tile,
         play_sound,
         foundation,
+        set_fence,
+        has_water_class: flag,
     }
 }
 /// Map dimensions read once per entry.

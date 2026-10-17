@@ -89,10 +89,8 @@ pub struct ClearServices {
     pub clear_snow: extern "C" fn(u32),
     pub make_clear: extern "C" fn(u32, ClearGroundType, u32),
     pub fences: extern "C" fn(u32) -> FieldFences,
-    pub set_fence: extern "C" fn(u32, DiagDirection, u32),
     pub field: extern "C" fn(u32) -> FieldGround,
     pub set_field: extern "C" fn(u32, u32),
-    pub has_water_class: extern "C" fn(u32) -> bool,
     pub water_class: extern "C" fn(u32) -> WaterClass,
     pub ambient: extern "C" fn(u32),
 }
@@ -146,11 +144,18 @@ fn steep(slope: u8) -> bool {
 
 #[allow(clippy::inline_always)]
 #[inline(always)]
-fn field_fence(tile: u32, size_x: u32, direction: u8, fence: u32, c: &ClearServices) -> bool {
+fn field_fence(
+    tile: u32,
+    size_x: u32,
+    direction: u8,
+    fence: u32,
+    c: &ClearServices,
+    s: &Services,
+) -> bool {
     if fence != 0 || (c.field_tile)(diagonal(tile, direction, size_x)) {
         return false;
     }
-    (c.set_fence)(tile, DiagDirection(direction), 3);
+    (s.set_fence)(tile, DiagDirection(direction), 3);
     true
 }
 
@@ -238,7 +243,7 @@ pub(crate) unsafe fn clear_tile_loop(
                 let t = diagonal(tile, direction, size_x);
                 (s.tile_valid)(t)
                     && ((s.tropic_zone)(t) != 1
-                        || ((c.has_water_class)(t) && (c.water_class)(t).0 == 0))
+                        || ((s.has_water_class)(t) && (c.water_class)(t).0 == 0))
             });
             expected = if normal { 1 } else { 3 };
         }
@@ -282,10 +287,10 @@ pub(crate) unsafe fn clear_tile_loop(
             // Four ordered steps keep each guarded live neighbour read and write.
             // SetFence's fields are disjoint; dirtying remains after all four.
             let fences = (c.fences)(tile);
-            let mut dirty = field_fence(tile, size_x, 0, fences.ne, c);
-            dirty |= field_fence(tile, size_x, 1, fences.se, c);
-            dirty |= field_fence(tile, size_x, 2, fences.sw, c);
-            dirty |= field_fence(tile, size_x, 3, fences.nw, c);
+            let mut dirty = field_fence(tile, size_x, 0, fences.ne, c, s);
+            dirty |= field_fence(tile, size_x, 1, fences.se, c, s);
+            dirty |= field_fence(tile, size_x, 2, fences.sw, c, s);
+            dirty |= field_fence(tile, size_x, 3, fences.nw, c, s);
             if dirty {
                 (s.mark_dirty)(tile);
                 hit(Witness::FieldFence);
@@ -525,7 +530,6 @@ pub struct RoadServices {
     pub work_counter: extern "C" fn(u32) -> u32,
     pub set_work_counter: extern "C" fn(u32, u32),
     pub all_bits: extern "C" fn(u32) -> RoadBits,
-    pub ensure_no_vehicle: extern "C" fn(*mut crate::services::CommandCost, u32),
     pub bulldozer: extern "C" fn(u32),
     pub cleanup: extern "C" fn(u32, RoadBits) -> RoadBits,
     pub remove: extern "C" fn(u32, RoadBits),
@@ -579,7 +583,8 @@ pub unsafe extern "C" fn openttd_rust_road_tile_loop(
                 let bits = (r.all_bits)(tile);
                 if bits.0.count_ones() > 1 && (s.foundation)(tile).slope.0 == 0 {
                     let out = (c.prepare)(call);
-                    (r.ensure_no_vehicle)(out, tile);
+                    // SAFETY: prepare provides live native result storage.
+                    unsafe { ((*c.commands).ensure_no_vehicle)(out, tile) };
                     // SAFETY: The result remains a live native object until release.
                     let empty = unsafe { ((*c.costs).success)(out) };
                     (c.release)(call);

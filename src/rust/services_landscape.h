@@ -19,6 +19,8 @@
 #include "../newgrf_generic.h"
 #include "../sound_func.h"
 #include "../signal_func.h"
+#include "../effectvehicle_func.h"
+#include "tile_animation_services.h"
 
 inline OpenTTDFoundationSlope RustFoundationSlope(uint32_t tile) noexcept { auto [slope, z] = GetFoundationSlope(TileIndex{tile}); return {.z = z, .slope = slope}; }
 inline RoadBits RustCleanRoadBits(TileIndex tile, RoadBits bits) noexcept { return CleanUpRoadBits(tile, bits); }
@@ -42,6 +44,14 @@ inline OpenTTDClearSurface RustClearSurface(uint32_t index) noexcept
 	}
 	return surface;
 }
+inline uint32_t RustFieldFence(Tile tile, DiagDirection direction) noexcept { return GetFence(tile, direction); }
+inline void RustSetFieldFence(uint32_t tile, DiagDirection direction, uint32_t fence) noexcept { SetFence(TileIndex{tile}, direction, fence); }
+inline void RustSetClearCounter(Tile tile, uint32_t counter) noexcept { SetClearCounter(tile, counter); }
+inline TreeGround RustTreeGround(Tile tile) noexcept { return GetTreeGround(tile); }
+inline int32_t RustTileZ(TileIndex tile) noexcept { return GetTileZ(tile); }
+inline bool RustAirportTile(uint32_t tile) noexcept { return IsAirportTile(TileIndex{tile}); }
+inline EffectVehicle *RustCreateEffectAbove(int32_t x, int32_t y, int32_t z, EffectVehicleType type) noexcept { return CreateEffectVehicleAbove(x, y, z, type); }
+inline EffectVehicle *RustCreateEffectAboveValue(int32_t x, int32_t y, int32_t z, uint8_t type) noexcept { return RustCreateEffectAbove(x, y, z, static_cast<EffectVehicleType>(type)); }
 inline IndustryID RustFieldIndustry(Tile tile) noexcept { return GetIndustryIndexOfField(tile); }
 inline uint16_t RustFieldIndustryValue(uint32_t index) noexcept { return RustFieldIndustry(Tile{TileIndex{index}}).base(); }
 inline bool RustFieldOfIndustry(Tile tile, IndustryID industry) noexcept { return RustClearFieldTile(tile) && RustFieldIndustry(tile) == industry; }

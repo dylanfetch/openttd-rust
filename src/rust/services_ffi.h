@@ -35,6 +35,7 @@ OpenTTDTileTypeAllocation GetRustTileTypeAllocation() noexcept;
 enum ClearGround : uint8_t;
 enum TreeGround : uint8_t;
 enum Slope : uint8_t;
+enum DiagDirection : uint8_t;
 struct OpenTTDFoundationSlope { int32_t z; Slope slope; };
 struct OpenTTDTownHandle; // Opaque native Town shell; never dereferenced in Rust.
 struct OpenTTDTownState;
@@ -106,6 +107,8 @@ struct OpenTTDSharedServices {
 	void (*tile_loop_water)(uint32_t) noexcept; ///< Native TileLoop_Water; may reenter Rust owners.
 	void (*play_sound)(uint32_t, uint16_t) noexcept;
 	OpenTTDFoundationSlope (*foundation)(uint32_t) noexcept;
+	void (*set_fence)(uint32_t, DiagDirection, uint32_t) noexcept;
+	bool (*has_water_class)(uint32_t) noexcept;
 };
 const OpenTTDSharedServices &GetRustSharedServices() noexcept;
 /* Shared reader ABI used by default allocation/layout/oracle tests, not game
@@ -232,6 +235,8 @@ inline OpenTTDSharedServices OpenTTDFixtureSharedServices(void *context, uint32_
 		.tile_loop_water = OpenTTDFixtureMapService<void, uint32_t>,
 		.play_sound = OpenTTDFixtureMapService<void, uint32_t, uint16_t>,
 		.foundation = OpenTTDFixtureMapService<OpenTTDFoundationSlope, uint32_t>,
+		.set_fence = OpenTTDFixtureMapService<void, uint32_t, DiagDirection, uint32_t>,
+		.has_water_class = OpenTTDFixtureMapService<bool, uint32_t>,
 	};
 }
 #endif /* RUST_SERVICES_FFI_H */

@@ -1078,7 +1078,7 @@ const OpenTTDWaterGroundServices &GetRustWaterGroundServices() noexcept
 		.iterator_current = [](OpenTTDTileVehicleCursor *c) noexcept { return RustVehicle(**WaterIterator(c)); },
 		.iterator_next = [](OpenTTDTileVehicleCursor *c) noexcept { ++*WaterIterator(c); },
 		.iterator_end = [](OpenTTDTileVehicleCursor *c) noexcept { WaterIterator(c)->~Iterator(); },
-		.airport_tile = [](uint32_t t) noexcept { return IsAirportTile(TileIndex{t}); },
+		.airport_tile = RustAirportTile,
 		.airport = [](uint32_t t) noexcept { const Station *st = Station::GetByTile(TileIndex{t}); return OpenTTDAirportGround{.station = st, .tile = st->airport.tile.base(), .width = st->airport.w, .height = st->airport.h}; },
 		.airport_member = [](const OpenTTDStation *st, uint32_t t) noexcept { return st->TileBelongsToAirport(TileIndex{t}); },
 		.airport_z = [](uint32_t t) noexcept { return int32_t{Station::GetByTile(TileIndex{t})->airport.GetFTA()->delta_z} + 1; },
