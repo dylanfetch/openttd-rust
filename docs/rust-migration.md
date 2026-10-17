@@ -1069,7 +1069,8 @@ acceptance, statistics/payment ordering, destination deduplication and the compl
 flush into Rust. C++ retains pool shells, canonical world and packet storage,
 loading/reservation, subsidy checks, NewGRF resolution and UI.
 
-ABI IDs 49-51 describe cargo observations, saved fields and synchronous services.
+ABI IDs 49-51 and 60 describe cargo observations, saved fields, synchronous services and the
+repr(C) payment, which CAPY saves in place through `CargoPayment` reference aliases.
 Cargo/refusal/production/randomisation/animation and vehicle-sound resolution uses the NewGRF
 evaluator, without script VM entry or payment/destination reentry; wrappers are noexcept. Money
 saturates arithmetic but retains native shifts; callback unsigned products, BigMulS narrowing,
@@ -1300,7 +1301,8 @@ mod layouts remain #156 limits.
 Rust owns the produced/accepted slots, optional accepted histories, production fields, sound
 countdown and industry-builder records. C++ industry shells expose nonowning views of these
 allocations; INDY, IBLD, ITBL, ECMY and TTO/TTD load adapters preserve the original names,
-widths, version gates and ordering.
+widths, version gates and ordering. INDY, IBLD, ECMY and TTO/TTD industry scalars load and
+save through the reference aliases; only the Rust-owned industry text is staged.
 
 Rust runs production/transport ticks, farm and lumber updates, NewGRF production application,
 monthly statistics/closure, daily changes and builder targets/retries. Borrows end before reentry.
@@ -1361,7 +1363,8 @@ cargo transfer. Stable arena slots and linked ordering give constant-time list o
 destination endpoints bound station lookups to the selected queue. Freed slots are reused; arena
 capacity is retained. C++ retains packet pool identity/allocation/hooks, payment/delivery
 (#117), loading policy (#125), link-graph computation (#74), world access and thread join.
-CAPA/STNN/VEHS/flow adapters export call-local containers or scalar-key readers; pointer fixups
+CAPA saves the repr(C) packet in place; STNN/VEHS/flow adapters export call-local containers
+or scalar-key readers; pointer fixups
 and save errors finish outside Rust. Payment getters reenter after owner borrows end;
 ConsistChanged runs after Rust returns. Portable bodies stay.
 
