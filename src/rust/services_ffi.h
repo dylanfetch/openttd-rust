@@ -28,7 +28,11 @@ OpenTTDTileTypeAllocation GetRustTileTypeAllocation() noexcept;
  * No Rust references into the map/pools survive calls. Output is call-scoped.
  * Map predicates take a TileIndex value and return the original accessor's
  * underlying type: TileType, TropicZone and Slope are uint8_t, GetTileZ is int.
- * mark_dirty is MarkTileDirtyByTile(tile) and set_tropic_zone is SetTropicZone.
+ * mark_dirty is MarkTileDirtyByTile(tile), set_tropic_zone is SetTropicZone and
+ * clear_square is DoClearSquare(tile). free_train_reservation is
+ * FreeTrainTrackReservation(v), try_path_reserve is TryPathReserve(v, mark_as_stuck,
+ * first_tile_okay) and safe_waiting_position is IsSafeWaitingPosition(v, tile,
+ * trackdir, true, forbid_90_deg); the last two can reenter Rust train owners.
  * Random logging still runs, but its debug source location names this wrapper.
  * Industry query returns 0 not industry,1 industry,2 bubble catcher and writes
  * TileVirtXY(x,y). It observes only type and industry graphics.
@@ -40,6 +44,10 @@ enum DiagDirection : uint8_t;
 struct OpenTTDFoundationSlope { int32_t z; Slope slope; };
 struct OpenTTDTownHandle; // Opaque native Town shell; never dereferenced in Rust.
 struct OpenTTDTownState;
+struct Train; // Native Train shell; never dereferenced in Rust.
+enum RoadType : uint8_t;
+enum RoadBits : uint8_t;
+enum Trackdir : uint8_t;
 struct OpenTTDSharedServices {
 	void *context;
 	uint32_t (*random)(void *) noexcept;
@@ -101,6 +109,22 @@ struct OpenTTDSharedServices {
 	int32_t (*economy_date)() noexcept;
 	int32_t (*calendar_date)() noexcept;
 	int32_t (*slope)(int32_t, int32_t) noexcept;
+	bool (*build_on_slopes)() noexcept;
+	bool (*autoslope)() noexcept;
+	void (*clear_square)(uint32_t) noexcept;
+	void (*free_train_reservation)(const Train *) noexcept;
+	bool (*try_path_reserve)(Train *, bool, bool) noexcept;
+	bool (*safe_waiting_position)(const Train *, uint32_t, uint8_t, bool) noexcept;
+	bool (*has_road_works)(uint32_t) noexcept;
+	RoadType (*tram_type)(uint32_t) noexcept;
+	uint8_t (*tram_owner)(uint32_t) noexcept;
+	RoadBits (*normal_road_bits)(uint32_t, uint8_t) noexcept;
+	RoadBits (*crossing_road_bits)(uint32_t) noexcept;
+	bool (*forbid_90_deg)() noexcept;
+	void (*update_level_crossing)(uint32_t, bool) noexcept;
+	void (*mark_bridge_dirty)(uint32_t) noexcept;
+	Trackdir (*train_trackdir)(const Train *) noexcept;
+
 	ClearGround (*clear_ground)(uint32_t) noexcept;
 	TreeGround (*tree_ground)(uint32_t) noexcept;
 	void (*make_snow)(uint32_t, uint32_t) noexcept;
@@ -131,6 +155,11 @@ enum SignalType : uint8_t;
 enum SignalState : uint8_t;
 enum Axis : uint8_t;
 enum TransportType : uint8_t;
+enum Track : uint8_t;
+enum RailType : uint8_t;
+enum class RailTileType : uint8_t;
+enum class RailGroundType : uint8_t;
+enum SignalVariant : uint8_t;
 
 struct OpenTTDRailTraversal { bool depot; TrackBits tracks; };
 struct OpenTTDRailSignalPresence { bool signals; bool track; SignalType kind; bool forward; bool reverse; };
@@ -157,6 +186,40 @@ struct OpenTTDRailMapServices {
 	void (*set_signal_state)(uint32_t, uint8_t, uint8_t) noexcept;
 	uint32_t (*other_tunnel_bridge_end)(uint32_t) noexcept;
 	uint32_t (*rail_track_status)(uint32_t, uint8_t) noexcept;
+	/* Rail command, depot and level-crossing leaves (#265). */
+	TrackBits (*rail_tracks)(uint32_t) noexcept;
+	bool (*has_signals)(uint32_t) noexcept;
+	SignalType (*signal_type)(uint32_t, uint8_t) noexcept;
+	RailType (*rail_type)(uint32_t) noexcept;
+	void (*set_rail_type)(uint32_t, uint8_t) noexcept;
+	RailTileType (*rail_tile_type)(uint32_t) noexcept;
+	RailGroundType (*rail_ground)(uint32_t) noexcept;
+	void (*set_rail_ground)(uint32_t, uint8_t) noexcept;
+	void (*set_track_bits)(uint32_t, uint8_t) noexcept;
+	unsigned int (*present_signals)(uint32_t) noexcept;
+	void (*set_present_signals)(uint32_t, uint8_t) noexcept;
+	unsigned int (*signal_states)(uint32_t) noexcept;
+	void (*set_signal_states)(uint32_t, uint8_t) noexcept;
+	void (*set_has_signals)(uint32_t, bool) noexcept;
+	void (*set_signal_type)(uint32_t, uint8_t, uint8_t) noexcept;
+	SignalVariant (*signal_variant)(uint32_t, uint8_t) noexcept;
+	void (*set_signal_variant)(uint32_t, uint8_t, uint8_t) noexcept;
+	void (*cycle_signal_side)(uint32_t, uint8_t) noexcept;
+	TrackBits (*reserved_tracks)(uint32_t) noexcept;
+	TrackBits (*rail_reservation)(uint32_t) noexcept;
+	void (*set_track_reservation)(uint32_t, uint8_t) noexcept;
+	bool (*depot_reserved)(uint32_t) noexcept;
+	void (*set_depot_exit)(uint32_t, uint8_t) noexcept;
+	void (*make_rail_normal)(uint32_t, uint8_t, uint8_t, uint8_t) noexcept;
+	void (*make_rail_depot)(uint32_t, uint8_t, uint16_t, uint8_t, uint8_t) noexcept;
+	TrackBits (*crossing_rail_bits)(uint32_t) noexcept;
+	Axis (*crossing_road_axis)(uint32_t) noexcept;
+	bool (*has_station_rail)(uint32_t) noexcept;
+	bool (*is_rail_station)(uint32_t) noexcept;
+	bool (*station_blocked)(uint32_t) noexcept;
+	Track (*station_track)(uint32_t) noexcept;
+	bool (*wormhole_reserved)(uint32_t) noexcept;
+	void (*set_tile_owner)(uint32_t, uint8_t) noexcept;
 };
 const OpenTTDRailMapServices &GetRustRailMapServices() noexcept;
 
@@ -229,6 +292,21 @@ inline OpenTTDSharedServices OpenTTDFixtureSharedServices(void *context, uint32_
 		.economy_date = OpenTTDFixtureMapService<int32_t>,
 		.calendar_date = OpenTTDFixtureMapService<int32_t>,
 		.slope = OpenTTDFixtureMapService<int32_t, int32_t, int32_t>,
+		.build_on_slopes = OpenTTDFixtureMapService<bool>,
+		.autoslope = OpenTTDFixtureMapService<bool>,
+		.clear_square = OpenTTDFixtureMapService<void, uint32_t>,
+		.free_train_reservation = OpenTTDFixtureMapService<void, const Train *>,
+		.try_path_reserve = OpenTTDFixtureMapService<bool, Train *, bool, bool>,
+		.safe_waiting_position = OpenTTDFixtureMapService<bool, const Train *, uint32_t, uint8_t, bool>,
+		.has_road_works = OpenTTDFixtureMapService<bool, uint32_t>,
+		.tram_type = OpenTTDFixtureMapService<RoadType, uint32_t>,
+		.tram_owner = OpenTTDFixtureMapService<uint8_t, uint32_t>,
+		.normal_road_bits = OpenTTDFixtureMapService<RoadBits, uint32_t, uint8_t>,
+		.crossing_road_bits = OpenTTDFixtureMapService<RoadBits, uint32_t>,
+		.forbid_90_deg = OpenTTDFixtureMapService<bool>,
+		.update_level_crossing = OpenTTDFixtureMapService<void, uint32_t, bool>,
+		.mark_bridge_dirty = OpenTTDFixtureMapService<void, uint32_t>,
+		.train_trackdir = OpenTTDFixtureMapService<Trackdir, const Train *>,
 		.clear_ground = OpenTTDFixtureMapService<ClearGround, uint32_t>,
 		.tree_ground = OpenTTDFixtureMapService<TreeGround, uint32_t>,
 		.make_snow = OpenTTDFixtureMapService<void, uint32_t, uint32_t>,

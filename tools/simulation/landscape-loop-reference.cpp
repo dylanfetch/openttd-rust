@@ -46,10 +46,10 @@ using uint = unsigned int;
 static void NativeVisit(uint32_t tile, uint8_t kind) noexcept;
 static uint8_t Type(uint32_t tile) noexcept { return tiles[tile].type >> 4; }
 static void House(uint32_t tile) noexcept { NativeVisit(tile, 3); }
-static void Station(uint32_t tile) noexcept { NativeVisit(tile, 5); }
+static void LandscapeStationLoop(uint32_t tile) noexcept { NativeVisit(tile, 5); }
 static void Object(uint32_t tile) noexcept { NativeVisit(tile, 10); }
 static void ReferenceHouse(TileIndex tile) { House(tile.base()); }
-static void ReferenceStation(TileIndex tile) { Station(tile.base()); }
+static void ReferenceStation(TileIndex tile) { LandscapeStationLoop(tile.base()); }
 static void ReferenceObject(TileIndex tile) { Object(tile.base()); }
 static uint8_t GetTileType(uint32_t tile) { return Type(tile); }
 static uint8_t GetTileType(TileIndex tile) { return Type(tile.base()); }
@@ -70,7 +70,7 @@ static OpenTTDLandscapeLoopServices services{
 	.industry = {},
 	.ground = {},
 	.house_loop = House,
-	.station_loop = Station,
+	.station_loop = LandscapeStationLoop,
 	.object_loop = Object,
 };
 static void RustRun()

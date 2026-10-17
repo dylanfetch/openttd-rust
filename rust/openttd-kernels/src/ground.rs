@@ -586,7 +586,7 @@ pub unsafe extern "C" fn openttd_rust_road_tile_loop(
                     // SAFETY: The facade owns this live native stack context.
                     let out = unsafe { (c.prepare)(call) };
                     // SAFETY: prepare provides live native result storage.
-                    unsafe { ((*c.commands).ensure_no_vehicle)(out, tile) };
+                    unsafe { ((*c.commands).no_vehicle)(out, tile) };
                     // SAFETY: The result remains a live native object until release.
                     let empty = unsafe { ((*c.costs).success)(out) };
                     // SAFETY: The command/check has returned; no result access follows.

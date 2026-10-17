@@ -75,7 +75,6 @@ pub struct TransactionServices {
     pub edge_distance: unsafe extern "C" fn(u32, u8) -> u32,
     pub refinery_limit: unsafe extern "C" fn() -> u8,
     pub tile_height: unsafe extern "C" fn(u32) -> u32,
-    pub command_checks: *const crate::services::CommandServices,
     pub set_company: unsafe extern "C" fn(u8),
     pub temporary_shell: unsafe extern "C" fn(
         *mut Industry,
@@ -114,6 +113,7 @@ pub struct TransactionContext {
     pub tiles: *const TileServices,
     pub tile_policy: *const TilePolicyServices,
     pub commands: *const IndustryCommandServices,
+    pub command_checks: *const crate::services::CommandServices,
     pub costs: *const IndustryCostServices,
     pub transaction: *const TransactionServices,
     pub errors: *const ConstructionErrors,
@@ -312,7 +312,7 @@ impl Engine<'_> {
                     return self.fail(self.e.site);
                 }
             } else {
-                unsafe { ((*self.x.command_checks).ensure_no_vehicle)(self.out.cast(), current) };
+                unsafe { ((*self.context.command_checks).no_vehicle)(self.out.cast(), current) };
                 if !self.succeeded() {
                     return false;
                 }

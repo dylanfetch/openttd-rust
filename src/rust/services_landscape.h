@@ -11,6 +11,7 @@
 #include "ground_ffi.h"
 #include "../clear_map.h"
 #include "services_rail.h"
+#include "services_water.h"
 #include "../road_internal.h"
 #include "../tree_map.h"
 #include "../water_map.h"
@@ -22,6 +23,7 @@
 #include "../effectvehicle_func.h"
 #include "tile_animation_services.h"
 
+inline OpenTTDFoundationSlope RustApplyFoundation(Foundation foundation, Slope slope) noexcept { int z = ApplyFoundationToSlope(foundation, slope); return {.z = z, .slope = slope}; }
 inline OpenTTDFoundationSlope RustFoundationSlope(uint32_t tile) noexcept { auto [slope, z] = GetFoundationSlope(TileIndex{tile}); return {.z = z, .slope = slope}; }
 inline RoadBits RustCleanRoadBits(TileIndex tile, RoadBits bits) noexcept { return CleanUpRoadBits(tile, bits); }
 inline uint8_t RustTileOwnerValue(uint32_t tile) noexcept { return GetTileOwner(TileIndex{tile}).base(); }
@@ -65,7 +67,6 @@ inline WaterClass RustWaterClass(uint32_t tile) noexcept { return GetWaterClass(
 inline bool RustIsCoast(uint32_t tile) noexcept { return IsCoast(TileIndex{tile}); }
 inline void RustMakeClear(uint32_t tile, ClearGround ground, uint32_t density) noexcept { MakeClear(TileIndex{tile}, ground, density); }
 inline void RustMakeClearValue(uint32_t tile, uint8_t ground, uint32_t density) noexcept { RustMakeClear(tile, static_cast<ClearGround>(ground), density); }
-inline void RustMakeShore(uint32_t tile) noexcept { MakeShore(TileIndex{tile}); }
 inline void RustMakeSnow(uint32_t tile, uint32_t density) noexcept { MakeSnow(TileIndex{tile}, density); }
 inline void RustSetTreeGroundDensity(uint32_t tile, TreeGround ground, uint32_t density) noexcept { SetTreeGroundDensity(TileIndex{tile}, ground, density); }
 inline void RustSetTreeGroundDensityValue(uint32_t tile, uint8_t ground, uint32_t density) noexcept { RustSetTreeGroundDensity(tile, static_cast<TreeGround>(ground), density); }
@@ -77,7 +78,6 @@ inline void RustAmbientSound(uint32_t tile) noexcept { AmbientSoundEffect(TileIn
 inline bool RustAmbientSoundLegacy(uint32_t tile) noexcept { RustAmbientSound(tile); return RustAmbientSoundEnabled(); }
 inline void RustPlayTileSound(uint32_t tile, uint16_t sound) noexcept { SndPlayTileFx(sound, TileIndex{tile}); }
 inline void RustPlayTileSoundBySound(uint16_t sound, uint32_t tile) noexcept { RustPlayTileSound(tile, sound); }
-inline void RustClearSquare(uint32_t tile) noexcept { DoClearSquare(TileIndex{tile}); }
 inline void RustUpdateSignals() noexcept { UpdateSignalsInBuffer(); }
 /* Necessary legacy signatures: context handles are unused and scalar return
  * widths are retained. All native work remains in the canonical typed leaves. */
