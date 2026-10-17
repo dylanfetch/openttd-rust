@@ -40,4 +40,6 @@ inline bool RustAutoslopeEnabled() noexcept { return AutoslopeEnabled(); }
 inline bool RustCrossingWithCompetitor() noexcept { return _settings_game.construction.crossing_with_competitor; }
 inline bool RustDisableElrails() noexcept { return _settings_game.vehicle.disable_elrails; }
 inline bool RustForbid90Deg() noexcept { return _settings_game.pf.forbid_90_deg; }
+inline uint8_t OpenTTDTownCargoGenMode() noexcept { return _settings_game.economy.town_cargogen_mode; }
+inline uint8_t OpenTTDPlaceHouses() noexcept { return _settings_game.economy.place_houses; }
 #endif /* RUST_SETTINGS_SERVICES_H */

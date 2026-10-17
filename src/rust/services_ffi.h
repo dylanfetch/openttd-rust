@@ -8,6 +8,7 @@
 /** @file services_ffi.h Synchronous shared game services for Rust owners. */
 #ifndef RUST_SERVICES_FFI_H
 #define RUST_SERVICES_FFI_H
+#include <cstddef>
 #include <cstdint>
 #include <type_traits>
 #include "station_ffi.h"
@@ -109,6 +110,12 @@ struct OpenTTDSharedServices {
 	void (*mark_bridge_dirty)(uint32_t) noexcept;
 	Trackdir (*train_trackdir)(const Train *) noexcept;
 
+	size_t (*town_count)() noexcept;
+	bool (*recession)() noexcept;
+	int64_t (*foundation_price)() noexcept;
+	uint64_t (*tick_counter)() noexcept;
+	void (*delete_animated)(uint32_t) noexcept;
+	void (*rebuild_town_tree)() noexcept;
 };
 const OpenTTDSharedServices &GetRustSharedServices() noexcept;
 /** Shared save/reseed/restore of BOTH original RNG streams. */
@@ -279,6 +286,12 @@ inline OpenTTDSharedServices OpenTTDFixtureSharedServices(void *context, uint32_
 		.update_level_crossing = OpenTTDFixtureMapService<void, uint32_t, bool>,
 		.mark_bridge_dirty = OpenTTDFixtureMapService<void, uint32_t>,
 		.train_trackdir = OpenTTDFixtureMapService<Trackdir, const Train *>,
+		.town_count = OpenTTDFixtureMapService<size_t>,
+		.recession = OpenTTDFixtureMapService<bool>,
+		.foundation_price = OpenTTDFixtureMapService<int64_t>,
+		.tick_counter = OpenTTDFixtureMapService<uint64_t>,
+		.delete_animated = OpenTTDFixtureMapService<void, uint32_t>,
+		.rebuild_town_tree = OpenTTDFixtureMapService<void>,
 	};
 }
 #endif /* RUST_SERVICES_FFI_H */

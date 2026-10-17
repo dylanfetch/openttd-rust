@@ -255,6 +255,18 @@ pub struct Services {
     pub mark_bridge_dirty: extern "C" fn(u32),
     /// Original train track direction, computed lazily at the consuming branch.
     pub train_trackdir: unsafe extern "C" fn(*const Train) -> Trackdir,
+    /// Number of towns in the pool.
+    pub town_count: extern "C" fn() -> usize,
+    /// Whether the economy is in recession.
+    pub recession: extern "C" fn() -> bool,
+    /// Current foundation build price.
+    pub foundation_price: extern "C" fn() -> i64,
+    /// Global game tick counter.
+    pub tick_counter: extern "C" fn() -> u64,
+    /// Remove a tile from the animated tile list.
+    pub delete_animated: extern "C" fn(u32),
+    /// Rebuild the canonical town spatial index.
+    pub rebuild_town_tree: extern "C" fn(),
 }
 impl Services {
     /// Draw one shared random word.
@@ -271,7 +283,7 @@ impl Services {
 /// Standalone test table: map predicates return zero and writes do nothing.
 #[cfg(test)]
 #[must_use]
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // One field per shared service.
 pub fn fixture(
     context: *mut c_void,
     random: extern "C" fn(*mut c_void) -> u32,
@@ -295,6 +307,7 @@ pub fn fixture(
     extern "C" fn height(_: u32) -> i32 {
         0
     }
+    extern "C" fn noop() {}
     extern "C" fn tile(_: u32) {}
     extern "C" fn train(_: *const Train) {}
     extern "C" fn train_path(_: *mut Train, _: bool, _: bool) -> bool {
@@ -320,6 +333,15 @@ pub fn fixture(
         0
     }
     extern "C" fn slope(_: i32, _: i32) -> i32 {
+        0
+    }
+    extern "C" fn count0() -> usize {
+        0
+    }
+    extern "C" fn money0() -> i64 {
+        0
+    }
+    extern "C" fn tick0() -> u64 {
         0
     }
     Services {
@@ -398,6 +420,12 @@ pub fn fixture(
         update_level_crossing: fixture_crossing_update,
         mark_bridge_dirty: tile,
         train_trackdir: fixture_train_trackdir,
+        town_count: count0,
+        recession: flag0,
+        foundation_price: money0,
+        tick_counter: tick0,
+        delete_animated: tile,
+        rebuild_town_tree: noop,
     }
 }
 #[cfg(test)]

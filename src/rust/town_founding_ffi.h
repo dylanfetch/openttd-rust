@@ -62,7 +62,6 @@ struct OpenTTDTownFoundingServices {
 	void (*directory_rebuild)() noexcept;
 	void (*directory_resort)() noexcept;
 	void (*update_noise)() noexcept;
-	void (*rebuild_tree)() noexcept;
 	void (*delete_town)(uint16_t) noexcept;
 	void (*assert_random_context)() noexcept;
 	void (*assert_allocation)() noexcept;
@@ -81,7 +80,6 @@ struct OpenTTDTownFoundingServices {
 	bool (*set_progress)(OpenTTDTownFoundingFrame *, uint) noexcept;
 	bool (*increase_progress)(OpenTTDTownFoundingFrame *) noexcept;
 	void (*no_town_error)() noexcept;
-	size_t (*town_count)() noexcept;
 	Randomizer *random;
 	StringID edge_error, close_error, unsuitable_error, unique_error, too_many_error, no_space_error;
 };
