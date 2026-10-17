@@ -1816,7 +1816,10 @@ impl<'a> Ctx<'a> {
             error.take(ret);
             return false;
         }
-        let mut affected: Vec<*mut Train> = Vec::new();
+        // At most one entry per reserved track (six), or one for a wormhole.
+        // Keep the source insertion order without allocating on each tile.
+        let mut affected = [std::ptr::null_mut(); 6];
+        let mut affected_len = 0;
         if tt != MP_TUNNELBRIDGE {
             if !(self.s.compatible_rail)(kind, totype) {
                 if (self.shared.is_plain_rail)(tile) {
@@ -1836,7 +1839,10 @@ impl<'a> Ctx<'a> {
                 while reserved != 0 {
                     let track = reserved.trailing_zeros() as u8;
                     reserved &= reserved - 1;
-                    self.reroute(&mut affected, tile, track, totype);
+                    if let Some(v) = self.reroute(tile, track, totype) {
+                        affected[affected_len] = v;
+                        affected_len += 1;
+                    }
                 }
                 if !(self.rail.is_rail_station)(tile) || !(self.rail.station_blocked)(tile) {
                     let owner = (self.shared.tile_owner)(tile);
@@ -1901,8 +1907,11 @@ impl<'a> Ctx<'a> {
                 if execute {
                     w::hit(w::RAIL_CMD_CONVERT_WORMHOLE);
                     let track = (self.shared.tunnel_bridge_direction)(tile) & 1;
-                    if (self.rail.wormhole_reserved)(tile) {
-                        self.reroute(&mut affected, tile, track, totype);
+                    if (self.rail.wormhole_reserved)(tile)
+                        && let Some(v) = self.reroute(tile, track, totype)
+                    {
+                        affected[affected_len] = v;
+                        affected_len += 1;
                     }
                     let num = self
                         .tunnel_length(tile, endtile)
@@ -1941,18 +1950,20 @@ impl<'a> Ctx<'a> {
                 cost.add_money(convert);
             }
         }
-        for v in affected {
+        for &v in &affected[..affected_len] {
             unsafe { (self.shared.try_path_reserve)(v, true, false) };
         }
         true
     }
     /// Free an unpowered reserving train and remember it for re-reservation.
-    fn reroute(&self, affected: &mut Vec<*mut Train>, tile: u32, track: u8, totype: u8) {
+    fn reroute(&self, tile: u32, track: u8, totype: u8) -> Option<*mut Train> {
         let v = (self.s.reserving_train)(tile, track);
         if !v.is_null() && !unsafe { (self.s.train_powered)(v, totype) } {
             w::hit(w::RAIL_CMD_CONVERT_REROUTE);
             unsafe { (self.shared.free_train_reservation)(v) };
-            affected.push(v);
+            Some(v)
+        } else {
+            None
         }
     }
 
