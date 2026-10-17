@@ -949,11 +949,6 @@ static uint8_t TrainReadRunning(OpenTTDTrainHandle id) noexcept
 	const Train *v=static_cast<Train *>(id.shell);
 	return v->running_ticks;
 }
-static uint8_t TrainReadDay(OpenTTDTrainHandle id) noexcept
-{
-	const Train *v=static_cast<Train *>(id.shell);
-	return v->day_counter;
-}
 static uint8_t TrainReadFront(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);

@@ -443,12 +443,6 @@ extern "C" uint64_t openttd_orders_local_owner(void *ctx) noexcept
 	return v->owner == _local_company;
 }
 
-extern "C" uint64_t openttd_orders_day_counter(void *ctx) noexcept
-{
-	const Vehicle *v = static_cast<const Vehicle *>(ctx);
-	return v->day_counter;
-}
-
 extern "C" uint64_t openttd_orders_fast_aircraft(void *ctx) noexcept
 {
 	const Vehicle *v = static_cast<const Vehicle *>(ctx);

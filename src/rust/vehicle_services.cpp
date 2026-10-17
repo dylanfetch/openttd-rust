@@ -138,7 +138,7 @@ static uint8_t OPENTTD_VEHICLE_CALL VehicleSvcEconomyAge(OpenTTDVehicle *v) noex
 {
 	Vehicle *u = VehicleOf(v);
 	EconomyAgeVehicle(u);
-	return u->day_counter;
+	return RustVehicleDay(u);
 }
 static void OPENTTD_VEHICLE_CALL VehicleSvcDecreaseValue(OpenTTDVehicle *v) noexcept { DecreaseVehicleValue(VehicleOf(v)); }
 static void OPENTTD_VEHICLE_CALL VehicleSvcCheckBreakdown(OpenTTDVehicle *v) noexcept { CheckVehicleBreakdown(VehicleOf(v)); }
@@ -381,7 +381,7 @@ static OpenTTDCargoList *OPENTTD_VEHICLE_CALL VehicleSchedulerCargoOwner(OpenTTD
 static OpenTTDVehicleDayCallback OPENTTD_VEHICLE_CALL VehicleSchedulerDayCallbackRead(OpenTTDVehicle *shell) noexcept
 {
 	const Vehicle *v = VehicleOf(shell);
-	return {.day = v->day_counter, .has_engine = RustVehicleHasEngine(v)};
+	return {.day = RustVehicleDay(v), .has_engine = RustVehicleHasEngine(v)};
 }
 static uint16_t OPENTTD_VEHICLE_CALL VehicleSchedulerDayCallback(OpenTTDVehicle *shell) noexcept
 {
@@ -661,6 +661,11 @@ const OpenTTDVehicleMaintenanceServices _rust_vehicle_maintenance_services{
 };
 
 /* Existing order ABI adapters share the canonical typed observations here. */
+extern "C" uint64_t openttd_orders_day_counter(void *ctx) noexcept
+{
+	return RustVehicleDay(static_cast<const Vehicle *>(ctx));
+}
+
 extern "C" uint64_t openttd_orders_reliability(void *ctx) noexcept
 {
 	const Vehicle *v = static_cast<const Vehicle *>(ctx);

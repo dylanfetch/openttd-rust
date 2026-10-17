@@ -365,7 +365,6 @@ static uint32_t Ship_tick(uint32_t id) noexcept { const Ship *v = Ship::Get(Vehi
 
 static uint32_t Ship_running(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(v->running_ticks); }
 
-static uint32_t Ship_day(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(v->day_counter); }
 
 static uint32_t Ship_order_time(uint32_t id) noexcept { const Ship *v = Ship::Get(VehicleID(id)); return static_cast<uint32_t>(v->current_order_time); }
 
@@ -470,7 +469,7 @@ static const OpenTTDShipLeaves &GetShipServices()
 		.y = Ship_y, .z = Ship_z,
 		.direction = Ship_direction, .speed = RustIndexedVehicleRead<uint32_t, RustVehicleSpeed>,
 		.tick = Ship_tick, .running = Ship_running,
-		.day = Ship_day, .order_time = Ship_order_time,
+		.day = RustIndexedVehicleRead<uint32_t, RustVehicleDay>, .order_time = Ship_order_time,
 		.progress = Ship_progress, .status = Ship_status,
 		.owner = Ship_owner, .last_station = Ship_last_station,
 		.order_destination = Ship_order_destination, .order_type = Ship_order_type,

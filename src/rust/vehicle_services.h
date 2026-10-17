@@ -30,6 +30,7 @@ inline OpenTTDVehicle *RustNextVehicle(uint32_t from) noexcept
 inline Vehicle *RustVehicleNext(const Vehicle *v) noexcept { return v->Next(); }
 inline OpenTTDCargoList *RustVehicleCargoOwner(Vehicle *v) noexcept { return v->cargo.RustOwner(); }
 inline bool RustVehicleHasEngine(const Vehicle *v) noexcept { return v->HasEngineType(); }
+inline uint8_t RustVehicleDay(const Vehicle *v) noexcept { return v->day_counter; }
 inline uint32_t RustVehicleTile(const Vehicle *v) noexcept { return v->tile.base(); }
 inline uint32_t RustVehicleDestTile(const Vehicle *v) noexcept { return v->dest_tile.base(); }
 inline OrderType RustVehicleOrderType(const Vehicle *v) noexcept { return v->current_order.GetType(); }

@@ -4528,7 +4528,7 @@ static const OpenTTDTrainServices &GetTrainServices()
 		.read_status = TrainVehicleRead<uint8_t, RustVehicleStatus>,
 		.read_tick = TrainVehicleRead<uint8_t, RustVehicleTick>,
 		.read_running = TrainReadRunning,
-		.read_day = TrainReadDay,
+		.read_day = TrainVehicleRead<uint8_t, RustVehicleDay>,
 		.read_progress = TrainVehicleRead<uint8_t, RustVehicleProgress>,
 		.read_order = TrainVehicleRead<uint8_t, RustVehicleOrderType>,
 		.read_front = TrainReadFront,

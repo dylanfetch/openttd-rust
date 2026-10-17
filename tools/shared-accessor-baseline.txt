@@ -54,7 +54,6 @@ src/order_cmd.cpp | openttd_orders_at_station(void *ctx) noexcept | b6dc88afccb1
 src/order_cmd.cpp | openttd_orders_base_station_tile(uint16_t destination) noexcept | f52aefaf0d9f0408 | 1
 src/order_cmd.cpp | openttd_orders_change_timetable_command(void *ctx, uint8_t index, uint8_t field, uint16_t value) noexcept | cf29f5653494b2b0 | 1
 src/order_cmd.cpp | openttd_orders_close_shared_window(void *ctx, uint32_t window) noexcept | 8a2de07e86ed3a46 | 1
-src/order_cmd.cpp | openttd_orders_day_counter(void *ctx) noexcept | c57302a39782096d | 1
 src/order_cmd.cpp | openttd_orders_delete_order_news(void *ctx) noexcept | c1738e0dbc9d4eb4 | 1
 src/order_cmd.cpp | openttd_orders_destination_tile(void *ctx) noexcept | 0b76ca810f4b4e15 | 1
 src/order_cmd.cpp | openttd_orders_dirty_vehicle_windows(void *ctx) noexcept | 8876801f39931566 | 1
