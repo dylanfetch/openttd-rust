@@ -159,7 +159,9 @@ static Town *ClosestTownFromTile(TileIndex tile, uint32_t threshold)
 #include "town-tunnel-original.hpp"
 
 static uint64_t Leaf(uint32_t op, uint32_t, uint32_t, uint32_t, uint32_t) noexcept { assert(op == 21); RoadMask(); return 1; }
-static OpenTTDTownRef ResolveTown(uint32_t id) noexcept { assert(id == world->town.index); return {&world->town, world->owner, static_cast<uint16_t>(id)}; }
+/* Rust retains this fixture shell only as an opaque identity; the native FFI
+ * tag is global Town, while the reference body uses TownReference::Town. */
+static OpenTTDTownRef ResolveTown(uint32_t id) noexcept { assert(id == world->town.index); return {reinterpret_cast<::Town *>(&world->town), world->owner, static_cast<uint16_t>(id)}; }
 static void Stations(uint32_t, uint32_t, void *, void (*)(void *, const OpenTTDStation *, uint32_t)) noexcept {}
 static uint32_t Random(void *) noexcept { world->draws++; return 0; }
 static uint32_t Industry(int32_t, int32_t, uint32_t *) noexcept { return 0; }
