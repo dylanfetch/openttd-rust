@@ -158,16 +158,23 @@ staging only for a field a `SaveLoad` descriptor cannot address through the alia
 
 ## Resume checkpoint
 
-Paused at the user's request; all agents stopped. Each draft's next step
-includes its 13th-review comment. #274, #275, #266, #267, #247, R2 and H5 are
-unstarted. Older paused work is untouched.
+Resumed 2026-10-17 under `start-development`; root is gpt-6.1-sol, xhigh.
+Five fresh high-effort agents own the draft fixes/review and #274 measurement.
+#255/#257 are reopened; root owns their base updates and integration gates.
+#275's ClampTo fix is #276/#277, owned by root; other speed items, #266, #267,
+#247, R2 and H5 remain unstarted. Four component and three maintenance drafts
+are open. Older paused work is untouched.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #261 R4 / #268 | `save-staging-261`, `3e7b72b8d4` | Reviewed, Full validation and six caps pass. Conflicts with base in `src/tests/cargo_payment.cpp` (#271 layout form). Next: update (re-add layout 60 in #271's table form), fresh reviewer checks the resolution, Full validation, merge. |
-| #256 / #269 | `house-lifecycle-256`, `3f5a9ec707` | Reviewed (5 fixes verified); 315/315 scenarios, verify and six caps pass. Blockers: whole `HouseTile`/`HouseBehaviour` copies, duplicate spec accessors, repeated owner resolution. Next: fix round, fresh review, caps, Full validation. |
-| #265 / #270 | `rail-commands-265`, `efc04c0f5b` | Reviewed at `90cf900cf8` (fix verified). Then reservation services shared (targeted checks pass). Next: shared command checks and road accessors, one `IsSafeWaitingPosition`, real types; fresh review, full simulation, caps, Full validation. |
-| #261 R3 / #273 | `rust-cleanup-261`, `e95d3518c4` | Train/orders forwarders removed (-878 Rust); 313/313 scenarios. Next: restore `unsafe` on pointer-taking fields, verify at head, independent review, caps, Full validation. |
+| #261 R4 / #268 | `save-staging-261`, `e5b6c2caf2` | Fresh resolution review, native verify and preflight pass; layout 60 stays in the shared default-CI ABI table. Exact-head Full validation underway. Prior six-cap evidence applies to this test-only resolution. |
+| #256 / #269 | `house-lifecycle-256`, `3f5a9ec707` | `/root/house-boundary-269` fixes whole `HouseTile`/`HouseBehaviour` copies, duplicate spec accessors and repeated owner resolution. Then fresh review, caps, Full validation. |
+| #265 / #270 | `rail-commands-265`, `efc04c0f5b` | `/root/rail-command-services-270` shares command checks/road accessors, retains one `IsSafeWaitingPosition` and real types. Then fresh review, full simulation, caps, Full validation. |
+| #261 R3 / #273 | `rust-cleanup-261`, `e95d3518c4` | `/root/orders-unsafe-273` restores `unsafe` on pointer-taking fields and verifies the updated head. Then independent review, caps, Full validation. |
+| #212 / #255 | `landscape-owner-212`, `1348d8067e` | Base update and Cargo4 pass. Fresh review queued; measured caps and Full validation precede integration under core-loop boundary rule. |
+| #213 / #257 | `vehicle-owner-213`, `a4dcdae4c9` | Base update and Cargo4 pass; `/root/review-vehicle-owner-257` reviews full PR/fold/resolution. Former miss is within spread; measured caps and Full validation remain. |
+| #274 | Measurement branches, linked issue | `/root/boundary-measurement-274` measures clear/water map reads and post-tick vehicle reads/direct controller calls. Root schedules quiet-host timing and selects any shared-view PR. |
+| #276 / #277 (#275) | `inline-clamp-275`, `218cbff0e0` | Root restored original inline ClampTo and removed its Rust boundary. Cargo4/preflight pass; native verify and math comparisons running. Then fresh review, profile/six caps and Full validation. |
 | #64 / #66 | remote `issue/64-curve-family`, `aab5211801` | #66 closed unmerged; #64 stays paused. |
 
 #269 and #270 both move `clear_square` to the shared table; whichever integrates
