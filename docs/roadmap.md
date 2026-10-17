@@ -109,6 +109,7 @@ evidence in their PRs; rows below use original retirement and net glue (#223).
 | #259 H4 (dead FFI, orphan guards) | #264 | direct | `af1abf96b4` | 6 / 174 / 12 / 4; net glue -75 |
 | #261 R1 (tests, one ABI layout table) | #271 | direct | `15e0ae1390` | 3 / 171 / 189 / 0; net glue -405 |
 | #156 (no-city towns, stale-link restrict/release) | #272 | direct | `6ffbf8f302` | 99 / 20 / 0 / 0; net glue 0 |
+| #261 R4 (direct save aliases) | #268 | direct | `5b3c666698` | 7 / 4 / 35 / -44; net glue -204 |
 
 Paused, not fallbacks: #64 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -161,17 +162,20 @@ staging only for a field a `SaveLoad` descriptor cannot address through the alia
 Resumed 2026-10-17 under `start-development`; root is gpt-6.1-sol, xhigh.
 Five fresh high-effort agents own the draft fixes/review and #274 measurement.
 #255/#257 are reopened; root owns their base updates and integration gates.
-#275, #266, #267, #247, R2 and H5 remain unstarted. Older paused work is untouched.
+#275's cheap fixes are #276/#277 (ClampTo) and #278/#279 (road YAPF scratch),
+owned by root; other speed items, #266, #267, #247, R2 and H5 remain unstarted.
+Four component and three maintenance drafts are open. Older paused work is untouched.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #261 R4 / #268 | `save-staging-261`, `e5b6c2caf2` | Root merged base; layout 60 stays in #271's shared default-CI ABI table. Fresh reviewer checks resolution; native verification and exact-head Full validation underway. Prior six-cap evidence applies to this test-only resolution. |
 | #256 / #269 | `house-lifecycle-256`, `3f5a9ec707` | `/root/house-boundary-269` fixes whole `HouseTile`/`HouseBehaviour` copies, duplicate spec accessors and repeated owner resolution. Then fresh review, caps, Full validation. |
 | #265 / #270 | `rail-commands-265`, `efc04c0f5b` | `/root/rail-command-services-270` shares command checks/road accessors, retains one `IsSafeWaitingPosition` and real types. Then fresh review, full simulation, caps, Full validation. |
 | #261 R3 / #273 | `rust-cleanup-261`, `e95d3518c4` | `/root/orders-unsafe-273` restores `unsafe` on pointer-taking fields and verifies the updated head. Then independent review, caps, Full validation. |
-| #212 / #255 | `landscape-owner-212`, `20cc66dfe5` | Reopened under core-loop boundary rule. Root updates base; fresh review, measured caps and Full validation precede integration. |
-| #213 / #257 | `vehicle-owner-213`, `21b78029c5` | Reopened; former miss is within spread. Root updates base; fresh review, measured caps and Full validation precede integration. |
+| #212 / #255 | `landscape-owner-212`, `1348d8067e` | Base update and Cargo4 pass. Fresh review queued; measured caps and Full validation precede integration under core-loop boundary rule. |
+| #213 / #257 | `vehicle-owner-213`, `a4dcdae4c9` | Base update and Cargo4 pass; `/root/review-vehicle-owner-257` reviews full PR/fold/resolution. Former miss is within spread; measured caps and Full validation remain. |
 | #274 | Measurement branches, linked issue | `/root/boundary-measurement-274` measures clear/water map reads and post-tick vehicle reads/direct controller calls. Root schedules quiet-host timing and selects any shared-view PR. |
+| #276 / #277 (#275) | `inline-clamp-275`, `218cbff0e0` | Cargo4, preflight and both existing math comparisons pass. Native verify and exact-head Full validation run; fresh review and profile/six caps remain. |
+| #278 / #279 (#275) | `road-yapf-scratch-275`, `e94b378c0f` | Root retains process-wide search arena/maps/heap without persisting native context. Cargo4/preflight pass; native verify runs. Then fresh review, profile/six caps and Full validation. |
 | #64 / #66 | remote `issue/64-curve-family`, `aab5211801` | #66 closed unmerged; #64 stays paused. |
 
 #269 and #270 both move `clear_square` to the shared table; whichever integrates
