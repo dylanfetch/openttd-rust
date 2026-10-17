@@ -594,10 +594,10 @@ OpenTTDHouseReseed OpenTTDHouseResolveReseed(uint16_t house, uint32_t tile, Town
 	object.ResolveRerandomisation();
 	return {object.GetReseedSum(), object.GetUsedRandomTriggers().base()};
 }
-void OpenTTDHouseChangeFrame(uint16_t callback, uint32_t tile, uint32_t random, uint32_t trigger, uint64_t cargoes) noexcept
+void OpenTTDHouseChangeFrame(uint16_t callback, uint16_t house, Town *town, uint32_t tile, uint32_t random, uint32_t trigger, uint64_t cargoes) noexcept
 {
 	TileIndex index{tile};
-	HouseAnimationBase::ChangeAnimationFrame(static_cast<CallbackID>(callback), HouseSpec::Get(GetHouseType(index)), Town::GetByTile(index), index, random, trigger, cargoes);
+	HouseAnimationBase::ChangeAnimationFrame(static_cast<CallbackID>(callback), HouseSpec::Get(house), town, index, random, trigger, cargoes);
 }
 void TriggerHouseAnimation_WatchedCargoAccepted(TileIndex tile, CargoTypes trigger_cargoes)
 {

@@ -17,15 +17,20 @@ struct Station;
 using OpenTTDStation = Station;
 struct OpenTTDCommandServices;
 
-/** Packed house tile fields copied through the town_map.h getters. */
-struct OpenTTDHouseTile {
-	uint16_t house, town;
-	uint8_t random_bits, triggers, construction_tick, age, processing_time, lift_position, lift_destination;
-	bool completed, is_protected, lift_has_destination;
-};
-struct OpenTTDHouseBehaviour { uint16_t callbacks; uint8_t flags, extra_flags, population, mail, minimum_life, processing_time; bool sprite_groups; };
+/** Narrow observations, acquired only at the phase that uses these fields. */
+struct OpenTTDHouseLoopTile { uint8_t age; bool completed, lift_has_destination; };
+struct OpenTTDHouseLift { uint8_t position, destination; bool has_destination; };
+struct OpenTTDHouseRandom { uint8_t bits, triggers; };
+struct OpenTTDHouseConstruction { uint8_t tick; bool completed; };
+struct OpenTTDHouseCache { uint16_t house, town; bool completed; };
+struct OpenTTDHouseAge { uint8_t age; bool completed; };
+struct OpenTTDHouseEntry { OpenTTDTownRef town; uint16_t house; };
+struct OpenTTDHouseLoopSpec { uint16_t callbacks; uint8_t flags, population, mail, minimum_life; };
+struct OpenTTDHouseAnimationSpec { uint16_t callbacks; uint8_t extra_flags; };
+struct OpenTTDHouseNewSpec { uint16_t callbacks; uint8_t flags, processing_time; };
+struct OpenTTDHouseProduction { uint16_t callbacks; uint8_t population, mail; };
 struct OpenTTDHouseRemoval { int64_t cost; uint16_t rating; };
-struct OpenTTDHouseAcceptance { uint8_t accepts[16], amounts[16]; uint16_t callbacks; };
+struct OpenTTDHouseAcceptance { uint8_t accepts[16], amounts[16]; };
 struct OpenTTDHouseReseed { uint32_t reseed; uint8_t used; };
 struct OpenTTDHouseCargo { uint8_t cargo; uint16_t multiplier; };
 struct OpenTTDHouseErrors { uint32_t demolish, is_protected, refuses, sloped, bridge, flat, no_town; };
@@ -35,11 +40,24 @@ struct OpenTTDHouseServices {
 	const OpenTTDCommandCostServices *cost;
 	const OpenTTDCommandServices *commands;
 	const OpenTTDTownAuthorityServices *authority;
-	OpenTTDHouseTile (*tile)(uint32_t) noexcept;
+	OpenTTDHouseEntry (*entry)(uint32_t) noexcept;
+	OpenTTDHouseLoopTile (*loop_tile)(uint32_t) noexcept;
+	uint16_t (*house_type)(uint32_t) noexcept;
+	bool (*completed)(uint32_t) noexcept;
+	bool (*is_protected)(uint32_t) noexcept;
+	OpenTTDHouseLift (*lift)(uint32_t) noexcept;
+	OpenTTDHouseRandom (*random)(uint32_t) noexcept;
+	OpenTTDHouseConstruction (*construction)(uint32_t) noexcept;
+	OpenTTDHouseCache (*cache)(uint32_t) noexcept;
+	OpenTTDHouseAge (*age)(uint32_t) noexcept;
+	uint8_t (*processing)(uint32_t) noexcept;
 	uint16_t (*clean_type)(uint32_t) noexcept;
 	OpenTTDTownRef (*town)(uint32_t) noexcept;
-	OpenTTDHouseBehaviour (*behaviour)(uint16_t) noexcept;
-	uint16_t (*callbacks)(uint16_t) noexcept;
+	OpenTTDHouseLoopSpec (*loop_spec)(uint16_t) noexcept;
+	OpenTTDHouseAnimationSpec (*animation_spec)(uint16_t) noexcept;
+	OpenTTDHouseNewSpec (*new_spec)(uint16_t) noexcept;
+	OpenTTDHouseProduction (*production)(uint16_t) noexcept;
+	bool (*sprite_groups)(uint16_t) noexcept;
 	OpenTTDHouseRemoval (*removal)(uint16_t) noexcept;
 	OpenTTDHouseAcceptance (*acceptance)(uint16_t) noexcept;
 	uint64_t (*watched)(uint16_t) noexcept;
@@ -62,7 +80,7 @@ struct OpenTTDHouseServices {
 	bool (*convert_boolean)(uint16_t, uint16_t, uint16_t) noexcept;
 	bool (*convert_8bit)(uint16_t, uint16_t, uint16_t) noexcept;
 	OpenTTDHouseReseed (*resolve_reseed)(uint16_t, uint32_t, Town *, uint8_t) noexcept;
-	void (*change_frame)(uint16_t, uint32_t, uint32_t, uint32_t, uint64_t) noexcept;
+	void (*change_frame)(uint16_t, uint16_t, Town *, uint32_t, uint32_t, uint32_t, uint64_t) noexcept;
 	OpenTTDStation *(*next_near_station)(Town *, OpenTTDStation *) noexcept;
 	void (*erase_near_station)(Town *, OpenTTDStation *) noexcept;
 	bool (*station_catchment)(const OpenTTDStation *, uint32_t) noexcept;
@@ -81,7 +99,7 @@ struct OpenTTDHouseServices {
 };
 /* Resolver and AnimationBase services live beside their native templates. */
 OpenTTDHouseReseed OpenTTDHouseResolveReseed(uint16_t house, uint32_t tile, Town *town, uint8_t waiting) noexcept;
-void OpenTTDHouseChangeFrame(uint16_t callback, uint32_t tile, uint32_t random, uint32_t trigger, uint64_t cargoes) noexcept;
+void OpenTTDHouseChangeFrame(uint16_t callback, uint16_t house, Town *town, uint32_t tile, uint32_t random, uint32_t trigger, uint64_t cargoes) noexcept;
 void OpenTTDAnimateNewHouse(uint32_t tile) noexcept;
 
 extern "C" {

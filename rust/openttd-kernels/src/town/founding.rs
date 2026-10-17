@@ -157,6 +157,7 @@ impl<'a> Founding<'a> {
             services: self.shared,
             map,
             owner: town.state,
+            house_town: Some(town),
         }
     }
     fn random(&self) -> u32 {

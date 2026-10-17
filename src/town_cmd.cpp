@@ -983,16 +983,12 @@ static OpenTTDTownHouseAvailability RustTownHouseAvailability(uint16_t id) noexc
 static OpenTTDTownHousePlacement RustTownHousePlacement(uint16_t id) noexcept
 {
 	const auto *hs = HouseSpec::Get(id);
-	return {.min_year = hs->min_year.base(), .max_year = hs->max_year.base(), .flags = hs->building_flags.base(), .extra_flags = hs->extra_flags.base()};
+	return {.min_year = hs->min_year.base(), .max_year = hs->max_year.base()};
 }
-static OpenTTDTownHouseConstruction RustTownHouseConstruction(uint16_t id) noexcept
-{
-	const auto *hs = HouseSpec::Get(id);
-	return {.extra_flags = hs->extra_flags.base(), .population = hs->population};
-}
-static uint8_t RustTownHouseFlags(uint16_t id) noexcept { return HouseSpec::Get(id)->building_flags.base(); }
-static uint8_t RustTownHouseExtraFlags(uint16_t id) noexcept { return HouseSpec::Get(id)->extra_flags.base(); }
-static bool RustTownHouseAllowsCallback(uint16_t id) noexcept { return HouseSpec::Get(id)->callback_mask.Test(HouseCallbackMask::AllowConstruction); }
+static uint8_t RustTownHousePopulation(const HouseSpec *spec) noexcept { return spec->population; }
+static uint8_t RustTownHouseFlags(const HouseSpec *spec) noexcept { return spec->building_flags.base(); }
+static uint8_t RustTownHouseExtraFlags(const HouseSpec *spec) noexcept { return spec->extra_flags.base(); }
+static uint16_t RustTownHouseCallbacks(const HouseSpec *spec) noexcept { return spec->callback_mask.base(); }
 static OpenTTDTownRoadChoice RustTownRoadInfo(uint8_t id) noexcept
 {
 	const auto *rti = GetRoadTypeInfo(static_cast<RoadType>(id));
@@ -1119,25 +1115,73 @@ static_assert(NEW_HOUSE_OFFSET == 110 && HOUSE_NUM_ACCEPTS == 16 && MP_HOUSE == 
 static_assert(OWNER_WATER.base() == 0x11 && CALLBACK_HOUSEPRODCARGO_END == 0x20FF && TOWN_COUNCIL_PERMISSIVE == 3);
 static_assert(RATING_MAXIMUM == 1000 && RATING_HOUSE_MINIMUM == -1000 && PH_ALLOWED_CONSTRUCTED == 2 && EXPENSES_CONSTRUCTION == 0);
 static const OpenTTDTownAuthorityServices &RustTownAuthorityServices() noexcept;
-static OpenTTDHouseTile RustHouseTile(uint32_t index) noexcept
+/* Canonical packed-map readers shared by the narrow phase observations below. */
+static uint16_t RustHouseType(uint32_t tile) noexcept { return GetHouseType(TileIndex{tile}); }
+static bool RustHouseCompleted(uint32_t tile) noexcept { return IsHouseCompleted(TileIndex{tile}); }
+static uint8_t RustHouseAge(uint32_t tile) noexcept { return static_cast<uint8_t>(GetHouseAge(TileIndex{tile}).base()); }
+static bool RustHouseLiftHasDestination(uint32_t tile) noexcept { return LiftHasDestination(TileIndex{tile}); }
+static OpenTTDTownRef RustHouseTown(uint32_t tile) noexcept
 {
-	Tile tile(TileIndex{index});
-	return {.house = GetHouseType(tile), .town = GetTownIndex(tile).base(), .random_bits = GetHouseRandomBits(tile), .triggers = GetHouseRandomTriggers(tile).base(),
-		.construction_tick = GetHouseConstructionTick(tile), .age = static_cast<uint8_t>(GetHouseAge(tile).base()), .processing_time = GetHouseProcessingTime(tile),
-		.lift_position = GetLiftPosition(tile), .lift_destination = GetLiftDestination(tile), .completed = IsHouseCompleted(tile), .is_protected = IsHouseProtected(tile),
-		.lift_has_destination = LiftHasDestination(tile)};
+	Town *t = Town::GetByTile(TileIndex{tile});
+	return {t, t->growth_owner.get(), t->index.base()};
 }
-static OpenTTDHouseBehaviour RustHouseBehaviour(uint16_t house) noexcept
+static OpenTTDHouseEntry RustHouseEntry(uint32_t tile) noexcept
 {
-	const HouseSpec *hs = HouseSpec::Get(house);
-	return {.callbacks = hs->callback_mask.base(), .flags = hs->building_flags.base(), .extra_flags = hs->extra_flags.base(), .population = hs->population,
-		.mail = hs->mail_generation, .minimum_life = hs->minimum_life, .processing_time = hs->processing_time, .sprite_groups = hs->grf_prop.HasSpriteGroups()};
+	return {.town = RustHouseTown(tile), .house = RustHouseType(tile)};
+}
+static OpenTTDHouseLoopTile RustHouseLoopTile(uint32_t tile) noexcept
+{
+	return {.age = RustHouseAge(tile), .completed = RustHouseCompleted(tile), .lift_has_destination = RustHouseLiftHasDestination(tile)};
+}
+static OpenTTDHouseLift RustHouseLift(uint32_t tile) noexcept
+{
+	return {.position = GetLiftPosition(TileIndex{tile}), .destination = GetLiftDestination(TileIndex{tile}), .has_destination = RustHouseLiftHasDestination(tile)};
+}
+static OpenTTDHouseRandom RustHouseRandom(uint32_t tile) noexcept
+{
+	return {.bits = GetHouseRandomBits(TileIndex{tile}), .triggers = GetHouseRandomTriggers(TileIndex{tile}).base()};
+}
+static OpenTTDHouseConstruction RustHouseConstruction(uint32_t tile) noexcept
+{
+	return {.tick = GetHouseConstructionTick(TileIndex{tile}), .completed = RustHouseCompleted(tile)};
+}
+static OpenTTDHouseCache RustHouseCache(uint32_t tile) noexcept
+{
+	return {.house = RustHouseType(tile), .town = GetTownIndex(TileIndex{tile}).base(), .completed = RustHouseCompleted(tile)};
+}
+static OpenTTDHouseAge RustHouseAgeObservation(uint32_t tile) noexcept
+{
+	return {.age = RustHouseAge(tile), .completed = RustHouseCompleted(tile)};
+}
+/* These phase projections call each field's single typed reader. Keep field
+ * definitions here rather than repeating HouseSpec reads in a projection. */
+static uint8_t RustHouseMail(const HouseSpec *spec) noexcept { return spec->mail_generation; }
+static uint8_t RustHouseMinimumLife(const HouseSpec *spec) noexcept { return spec->minimum_life; }
+static uint8_t RustHouseProcessingTime(const HouseSpec *spec) noexcept { return spec->processing_time; }
+static OpenTTDHouseLoopSpec RustHouseLoopSpec(uint16_t house) noexcept
+{
+	const HouseSpec *spec = HouseSpec::Get(house);
+	return {.callbacks = RustTownHouseCallbacks(spec), .flags = RustTownHouseFlags(spec), .population = RustTownHousePopulation(spec), .mail = RustHouseMail(spec), .minimum_life = RustHouseMinimumLife(spec)};
+}
+static OpenTTDHouseAnimationSpec RustHouseAnimationSpec(uint16_t house) noexcept
+{
+	const HouseSpec *spec = HouseSpec::Get(house);
+	return {.callbacks = RustTownHouseCallbacks(spec), .extra_flags = RustTownHouseExtraFlags(spec)};
+}
+static OpenTTDHouseNewSpec RustHouseNewSpec(uint16_t house) noexcept
+{
+	const HouseSpec *spec = HouseSpec::Get(house);
+	return {.callbacks = RustTownHouseCallbacks(spec), .flags = RustTownHouseFlags(spec), .processing_time = RustHouseProcessingTime(spec)};
+}
+static OpenTTDHouseProduction RustHouseProduction(uint16_t house) noexcept
+{
+	const HouseSpec *spec = HouseSpec::Get(house);
+	return {.callbacks = RustTownHouseCallbacks(spec), .population = RustTownHousePopulation(spec), .mail = RustHouseMail(spec)};
 }
 static OpenTTDHouseAcceptance RustHouseAcceptance(uint16_t house) noexcept
 {
 	const HouseSpec *hs = HouseSpec::Get(house);
 	OpenTTDHouseAcceptance result{};
-	result.callbacks = hs->callback_mask.base();
 	std::copy(std::begin(hs->accepts_cargo), std::end(hs->accepts_cargo), result.accepts);
 	std::copy(std::begin(hs->cargo_acceptance), std::end(hs->cargo_acceptance), result.amounts);
 	return result;
@@ -1149,11 +1193,24 @@ static const OpenTTDHouseServices &GetRustHouseServices() noexcept
 		.cost = &GetRustCommandCostServices(),
 		.commands = &GetRustCommandServices(),
 		.authority = &RustTownAuthorityServices(),
-		.tile = RustHouseTile,
+		.entry = RustHouseEntry,
+		.loop_tile = RustHouseLoopTile,
+		.house_type = RustHouseType,
+		.completed = RustHouseCompleted,
+		.is_protected = [](uint32_t tile) noexcept { return IsHouseProtected(TileIndex{tile}); },
+		.lift = RustHouseLift,
+		.random = RustHouseRandom,
+		.construction = RustHouseConstruction,
+		.cache = RustHouseCache,
+		.age = RustHouseAgeObservation,
+		.processing = [](uint32_t tile) noexcept -> uint8_t { return GetHouseProcessingTime(TileIndex{tile}); },
 		.clean_type = [](uint32_t tile) noexcept -> uint16_t { return GetCleanHouseType(TileIndex{tile}); },
-		.town = [](uint32_t tile) noexcept -> OpenTTDTownRef { Town *t = Town::GetByTile(TileIndex{tile}); return {t, t->growth_owner.get(), t->index.base()}; },
-		.behaviour = RustHouseBehaviour,
-		.callbacks = [](uint16_t house) noexcept -> uint16_t { return HouseSpec::Get(house)->callback_mask.base(); },
+		.town = RustHouseTown,
+		.loop_spec = RustHouseLoopSpec,
+		.animation_spec = RustHouseAnimationSpec,
+		.new_spec = RustHouseNewSpec,
+		.production = RustHouseProduction,
+		.sprite_groups = [](uint16_t house) noexcept { return HouseSpec::Get(house)->grf_prop.HasSpriteGroups(); },
 		.removal = [](uint16_t house) noexcept -> OpenTTDHouseRemoval { const HouseSpec *hs = HouseSpec::Get(house); return {static_cast<int64_t>(hs->GetRemovalCost()), hs->remove_rating_decrease}; },
 		.acceptance = RustHouseAcceptance,
 		.watched = [](uint16_t house) noexcept -> uint64_t { return HouseSpec::Get(house)->watched_cargoes; },
@@ -1224,10 +1281,10 @@ const OpenTTDTownLeaves &GetRustTownServices() noexcept
 		.road_flags = RustTownRoadFlags,
 		.house_availability = RustTownHouseAvailability,
 		.house_placement = RustTownHousePlacement,
-		.house_construction = RustTownHouseConstruction,
-		.house_flags = RustTownHouseFlags,
-		.house_extra_flags = RustTownHouseExtraFlags,
-		.house_allows_callback = RustTownHouseAllowsCallback,
+		.house_population = [](uint16_t house) noexcept -> uint8_t { return RustTownHousePopulation(HouseSpec::Get(house)); },
+		.house_flags = [](uint16_t house) noexcept -> uint8_t { return RustTownHouseFlags(HouseSpec::Get(house)); },
+		.house_extra_flags = [](uint16_t house) noexcept -> uint8_t { return RustTownHouseExtraFlags(HouseSpec::Get(house)); },
+		.house_callbacks = [](uint16_t house) noexcept -> uint16_t { return RustTownHouseCallbacks(HouseSpec::Get(house)); },
 		.road_info = RustTownRoadInfo,
 		.state = OpenTTDTownOwnerByID,
 		.stations = RustTownStations,

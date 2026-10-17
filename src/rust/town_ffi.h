@@ -42,8 +42,7 @@ using OpenTTDTownStationActivity = OpenTTDStationActivity;
 struct OpenTTDTownCommandResult { int64_t cost; bool success; };
 struct OpenTTDTownRoadChoice { int32_t introduction_date; uint16_t max_speed; bool town_build; };
 struct OpenTTDTownHouseAvailability { uint16_t zones; uint16_t override_id; uint16_t class_id; uint8_t probability; bool enabled; };
-struct OpenTTDTownHousePlacement { int32_t min_year; int32_t max_year; uint8_t flags; uint8_t extra_flags; };
-struct OpenTTDTownHouseConstruction { uint8_t extra_flags; uint8_t population; };
+struct OpenTTDTownHousePlacement { int32_t min_year; int32_t max_year; };
 struct OpenTTDTownAuthorityServices {
 	uint8_t (*council_tolerance)() noexcept;
 	bool (*bulldozer)() noexcept;
@@ -66,10 +65,10 @@ struct OpenTTDTownLeaves {
 	uint8_t (*road_flags)(uint8_t) noexcept;
 	OpenTTDTownHouseAvailability (*house_availability)(uint16_t) noexcept;
 	OpenTTDTownHousePlacement (*house_placement)(uint16_t) noexcept;
-	OpenTTDTownHouseConstruction (*house_construction)(uint16_t) noexcept;
+	uint8_t (*house_population)(uint16_t) noexcept;
 	uint8_t (*house_flags)(uint16_t) noexcept;
 	uint8_t (*house_extra_flags)(uint16_t) noexcept;
-	bool (*house_allows_callback)(uint16_t) noexcept;
+	uint16_t (*house_callbacks)(uint16_t) noexcept;
 	OpenTTDTownRoadChoice (*road_info)(uint8_t) noexcept;
 	OpenTTDTownState *(*state)(uint32_t) noexcept;
 	void (*stations)(uint32_t, uint32_t, void *, void (*)(void *, const OpenTTDStation *, uint32_t)) noexcept;

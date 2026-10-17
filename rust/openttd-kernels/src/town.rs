@@ -551,14 +551,6 @@ pub struct HouseAvailability {
 pub struct HousePlacement {
     pub min_year: i32,
     pub max_year: i32,
-    pub flags: u8,
-    pub extra_flags: u8,
-}
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct HouseConstruction {
-    pub extra_flags: u8,
-    pub population: u8,
 }
 /// Narrow authority settings are read only at their source short-circuit points.
 #[repr(C)]
@@ -659,10 +651,10 @@ pub struct Leaves {
     pub road_flags: extern "C" fn(u8) -> u8,
     pub house_availability: extern "C" fn(u16) -> HouseAvailability,
     pub house_placement: extern "C" fn(u16) -> HousePlacement,
-    pub house_construction: extern "C" fn(u16) -> HouseConstruction,
+    pub house_population: extern "C" fn(u16) -> u8,
     pub house_flags: extern "C" fn(u16) -> u8,
     pub house_extra_flags: extern "C" fn(u16) -> u8,
-    pub house_allows_callback: extern "C" fn(u16) -> bool,
+    pub house_callbacks: extern "C" fn(u16) -> u16,
     pub road_info: extern "C" fn(u8) -> RoadChoice,
     pub state: extern "C" fn(u32) -> *mut State,
     pub stations: extern "C" fn(
@@ -712,6 +704,7 @@ struct Engine<'a> {
     services: &'a Services,
     map: OnceCell<Map>,
     owner: *mut State,
+    house_town: Option<TownRef>,
 }
 impl Engine<'_> {
     fn map(&self) -> Map {
@@ -984,6 +977,7 @@ fn engine<'a>(leaves: *const Leaves, services: *const Services) -> Engine<'a> {
         services,
         map: OnceCell::new(),
         owner: std::ptr::null_mut(),
+        house_town: None,
     }
 }
 fn round_div(a: i32, b: u32) -> i32 {
@@ -1715,19 +1709,27 @@ impl Engine<'_> {
         unsafe {
             (*self.owner).simulation.num_houses = self.num_houses().wrapping_add(1);
         }
-        let h = (self.leaves.house_construction)(house as u16);
+
         let mut counter = 0;
         let mut stage = 0;
         if (self.leaves.generating_world)() || (self.leaves.editor)() || complete {
             let construction = self.services.random();
             stage = 3;
-            if (self.leaves.generating_world)() && h.extra_flags & 1 == 0 && self.chance(1, 7) {
+            if (self.leaves.generating_world)()
+                && (self.leaves.house_extra_flags)(house as u16) & 1 == 0
+                && self.chance(1, 7)
+            {
                 stage = construction & 3;
             }
             if stage == 3 {
                 // SAFETY: Owner mutation ends before possible presentation reentry.
                 unsafe {
-                    change_population(self.leaves, self.owner, town, i32::from(h.population));
+                    change_population(
+                        self.leaves,
+                        self.owner,
+                        town,
+                        i32::from((self.leaves.house_population)(house as u16)),
+                    );
                 }
             } else {
                 counter = (construction >> 2) & 3;
@@ -1779,15 +1781,39 @@ impl Engine<'_> {
         }
         self.update_rate(town);
         let size = u32::from((self.leaves.house_flags)(house as u16));
-        house::stage_changed(self.leaves, self.services, tile);
+        // Resolve the shell once for all construction-stage triggers. House
+        // lifecycle callers already supplied the entry's town and map context.
+        let town_ref = self.house_town.unwrap_or_else(|| {
+            // SAFETY: Static house table referenced by the town leaves.
+            (unsafe { &*self.leaves.houses }.town)(tile)
+        });
+        house::stage_changed(self.leaves, self.services, town_ref, tile, house as u16);
         if size & 24 != 0 {
-            house::stage_changed(self.leaves, self.services, self.offset(tile, 0, 1));
+            house::stage_changed(
+                self.leaves,
+                self.services,
+                town_ref,
+                self.offset(tile, 0, 1),
+                (house + 1) as u16,
+            );
         }
         if size & 20 != 0 {
-            house::stage_changed(self.leaves, self.services, self.offset(tile, 1, 0));
+            house::stage_changed(
+                self.leaves,
+                self.services,
+                town_ref,
+                self.offset(tile, 1, 0),
+                (house + if size & 16 != 0 { 2 } else { 1 }) as u16,
+            );
         }
         if size & 16 != 0 {
-            house::stage_changed(self.leaves, self.services, self.offset(tile, 1, 1));
+            house::stage_changed(
+                self.leaves,
+                self.services,
+                town_ref,
+                self.offset(tile, 1, 1),
+                (house + 3) as u16,
+            );
         }
     }
     fn try_house(&self, town: u32, base: u32, modes: u32) -> bool {
@@ -1850,7 +1876,7 @@ impl Engine<'_> {
             let h = (self.leaves.house_placement)(house as u16);
             if !(self.leaves.generating_world)()
                 && !(self.leaves.editor)()
-                && h.extra_flags & 1 != 0
+                && (self.leaves.house_extra_flags)(house as u16) & 1 != 0
             {
                 continue;
             }
@@ -1858,9 +1884,10 @@ impl Engine<'_> {
             if year < h.min_year || year > h.max_year {
                 continue;
             }
-            let oneof = if u32::from(h.flags) & 64 != 0 {
+            let flags = (self.leaves.house_flags)(house as u16);
+            let oneof = if u32::from(flags) & 64 != 0 {
                 2
-            } else if u32::from(h.flags) & 128 != 0 {
+            } else if u32::from(flags) & 128 != 0 {
                 4
             } else {
                 0
@@ -1868,15 +1895,15 @@ impl Engine<'_> {
             if self.flags() & oneof != 0 {
                 continue;
             }
-            let noslope = u32::from(h.flags) & 2 != 0;
+            let noslope = u32::from(flags) & 2 != 0;
             if noslope && slope != 0 {
                 continue;
             }
-            if !self.check_house(town, &mut tile, maxz, noslope, u32::from(h.flags), modes) {
+            if !self.check_house(town, &mut tile, maxz, noslope, u32::from(flags), modes) {
                 continue;
             }
             let random = u32::from(self.services.random() as u8);
-            if (self.leaves.house_allows_callback)(house as u16)
+            if (self.leaves.house_callbacks)(house as u16) & 1 != 0
                 && !(self.leaves.allow_construction)(town, tile, house, random)
             {
                 continue;

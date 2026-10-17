@@ -17,6 +17,7 @@ use crate::services::{
 };
 use crate::station::Station;
 use crate::witness;
+use std::cell::OnceCell;
 use std::ffi::c_void;
 
 const NEW_HOUSE_OFFSET: u16 = 110;
@@ -84,36 +85,83 @@ const W_PLACE_ERROR: usize = W_STAGE + 14;
 const W_STATION_REMOVED: usize = W_STAGE + 15;
 const W_PROTECTED: usize = W_STAGE + 16;
 
-/// Copied packed-map observations of one house tile, read through the native
-/// `town_map.h` getters at one source observation point.
+/// Narrow observations at their original map read points. No owner or map
+/// reference survives a service; these contain only fields used by that phase.
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct HouseTile {
-    pub house: u16,
-    pub town: u16,
-    pub random_bits: u8,
-    pub triggers: u8,
-    pub construction_tick: u8,
+pub struct HouseLoopTile {
     pub age: u8,
-    pub processing_time: u8,
-    pub lift_position: u8,
-    pub lift_destination: u8,
     pub completed: bool,
-    pub protected: bool,
     pub lift_has_destination: bool,
 }
-/// Spec fields observed together by tile loops and triggers.
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct HouseBehaviour {
+pub struct HouseLift {
+    pub position: u8,
+    pub destination: u8,
+    pub has_destination: bool,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct HouseRandom {
+    pub bits: u8,
+    pub triggers: u8,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct HouseConstruction {
+    pub tick: u8,
+    pub completed: bool,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct HouseCache {
+    pub house: u16,
+    pub town: u16,
+    pub completed: bool,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct HouseAge {
+    pub age: u8,
+    pub completed: bool,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct HouseEntry {
+    pub town: TownRef,
+    pub house: u16,
+}
+/// Native projections compose the canonical spec readers, so observing a phase
+/// uses one crossing without defining another accessor for any `HouseSpec` field.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct HouseLoopSpec {
     pub callbacks: u16,
     pub flags: u8,
-    pub extra_flags: u8,
     pub population: u8,
     pub mail: u8,
     pub minimum_life: u8,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct HouseAnimationSpec {
+    pub callbacks: u16,
+    pub extra_flags: u8,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct HouseNewSpec {
+    pub callbacks: u16,
+    pub flags: u8,
     pub processing_time: u8,
-    pub sprite_groups: bool,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct HouseProduction {
+    pub callbacks: u16,
+    pub population: u8,
+    pub mail: u8,
 }
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -126,7 +174,6 @@ pub struct HouseRemoval {
 pub struct HouseAcceptance {
     pub accepts: [u8; 16],
     pub amounts: [u8; 16],
-    pub callbacks: u16,
 }
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -157,11 +204,24 @@ pub struct HouseServices {
     pub cost: *const CommandCostServices,
     pub commands: *const CommandServices,
     pub authority: *const AuthorityServices,
-    pub tile: extern "C" fn(u32) -> HouseTile,
+    pub entry: extern "C" fn(u32) -> HouseEntry,
+    pub loop_tile: extern "C" fn(u32) -> HouseLoopTile,
+    pub house_type: extern "C" fn(u32) -> u16,
+    pub completed: extern "C" fn(u32) -> bool,
+    pub protected: extern "C" fn(u32) -> bool,
+    pub lift: extern "C" fn(u32) -> HouseLift,
+    pub random: extern "C" fn(u32) -> HouseRandom,
+    pub construction: extern "C" fn(u32) -> HouseConstruction,
+    pub cache: extern "C" fn(u32) -> HouseCache,
+    pub age: extern "C" fn(u32) -> HouseAge,
+    pub processing: extern "C" fn(u32) -> u8,
     pub clean_type: extern "C" fn(u32) -> u16,
     pub town: extern "C" fn(u32) -> TownRef,
-    pub behaviour: extern "C" fn(u16) -> HouseBehaviour,
-    pub callbacks: extern "C" fn(u16) -> u16,
+    pub loop_spec: extern "C" fn(u16) -> HouseLoopSpec,
+    pub animation_spec: extern "C" fn(u16) -> HouseAnimationSpec,
+    pub new_spec: extern "C" fn(u16) -> HouseNewSpec,
+    pub production: extern "C" fn(u16) -> HouseProduction,
+    pub sprite_groups: extern "C" fn(u16) -> bool,
     pub removal: extern "C" fn(u16) -> HouseRemoval,
     pub acceptance: extern "C" fn(u16) -> HouseAcceptance,
     pub watched: extern "C" fn(u16) -> u64,
@@ -184,7 +244,7 @@ pub struct HouseServices {
     pub convert_boolean: extern "C" fn(u16, u16, u16) -> bool,
     pub convert_8bit: extern "C" fn(u16, u16, u16) -> bool,
     pub resolve_reseed: extern "C" fn(u16, u32, *mut TownHandle, u8) -> HouseReseed,
-    pub change_frame: extern "C" fn(u16, u32, u32, u32, u64),
+    pub change_frame: unsafe extern "C" fn(u16, u16, *mut TownHandle, u32, u32, u32, u64),
     pub next_near_station: extern "C" fn(*mut TownHandle, *mut Station) -> *mut Station,
     pub erase_near_station: extern "C" fn(*mut TownHandle, *mut Station),
     pub station_catchment: extern "C" fn(*const Station, u32) -> bool,
@@ -207,13 +267,19 @@ struct House<'a> {
     l: &'a Leaves,
     s: &'a Services,
     h: &'a HouseServices,
+    map: OnceCell<Map>,
 }
 fn house<'a>(leaves: *const Leaves, services: *const Services) -> House<'a> {
     // SAFETY: Native immutable static tables outlive every synchronous entry.
     let (l, s) = unsafe { (&*leaves, &*services) };
     // SAFETY: The leaves table references the static house table.
     let h = unsafe { &*l.houses };
-    House { l, s, h }
+    House {
+        l,
+        s,
+        h,
+        map: OnceCell::new(),
+    }
 }
 fn slope_max_z(slope: u8) -> i32 {
     if slope == 0 {
@@ -226,9 +292,16 @@ fn slope_max_z(slope: u8) -> i32 {
 }
 impl House<'_> {
     fn map(&self) -> Map {
-        Map {
+        *self.map.get_or_init(|| Map {
             log_x: (self.l.map_log_x)() as u8,
-        }
+        })
+    }
+    fn engine(&self, town: TownRef) -> super::Engine<'_> {
+        let mut engine = engine(self.l, self.s);
+        engine.owner = town.state;
+        engine.house_town = Some(town);
+        engine.map = self.map.clone();
+        engine
     }
     fn costs(&self) -> &CommandCostServices {
         // SAFETY: Static table referenced by the static house table.
@@ -244,10 +317,11 @@ impl House<'_> {
     /// `GetHouseNorthPart`: house IDs 0..2 are single-tile by definition.
     fn north_part(&self, house: &mut u16, map: Map) -> u32 {
         if *house >= 3 {
-            if (self.l.house_flags)(*house - 1) & SIZE_2X1 != 0 {
+            let previous_flags = (self.l.house_flags)(*house - 1);
+            if previous_flags & SIZE_2X1 != 0 {
                 *house -= 1;
                 return map.diff(-1, 0);
-            } else if (self.l.house_flags)(*house - 1) & TILES_Y != 0 {
+            } else if previous_flags & TILES_Y != 0 {
                 *house -= 1;
                 return map.diff(0, -1);
             } else if (self.l.house_flags)(*house - 2) & SIZE_2X2 != 0 {
@@ -261,16 +335,26 @@ impl House<'_> {
         0
     }
     /// `TriggerHouseAnimation_ConstructionStageChanged`.
-    fn stage_changed(&self, tile: u32, first: bool) {
-        let house = (self.h.tile)(tile).house;
-        if (self.h.callbacks)(house) & CBM_ANIM_STAGE != 0 {
+    fn stage_changed(&self, town: TownRef, tile: u32, house: u16, first: bool) {
+        if (self.l.house_callbacks)(house) & CBM_ANIM_STAGE != 0 {
             let random = self.s.random();
-            (self.h.change_frame)(CB_ANIM_STAGE, tile, random, u32::from(first), 0);
+            // SAFETY: The entry resolved this live town shell; no owner borrow
+            // spans the synchronous animation callback.
+            unsafe {
+                (self.h.change_frame)(
+                    CB_ANIM_STAGE,
+                    house,
+                    town.shell,
+                    tile,
+                    random,
+                    u32::from(first),
+                    0,
+                );
+            }
         }
     }
     /// `CanDeleteHouse`.
-    fn can_delete(&self, tile: u32) -> bool {
-        let rec = (self.h.tile)(tile);
+    fn can_delete(&self, town: TownRef, tile: u32, house: u16) -> bool {
         let company = (self.s.current_company)();
         if (self.h.company_human)(company)
             || company == OWNER_WATER
@@ -280,12 +364,11 @@ impl House<'_> {
         {
             return true;
         }
-        if (self.h.callbacks)(rec.house) & CBM_DENY != 0 {
-            let town = (self.h.town)(tile);
-            let res = (self.h.callback)(CB_DENY, 0, 0, rec.house, town.shell, tile, false);
-            res == CALLBACK_FAILED || !(self.h.convert_boolean)(rec.house, CB_DENY, res)
+        if (self.l.house_callbacks)(house) & CBM_DENY != 0 {
+            let res = (self.h.callback)(CB_DENY, 0, 0, house, town.shell, tile, false);
+            res == CALLBACK_FAILED || !(self.h.convert_boolean)(house, CB_DENY, res)
         } else {
-            !rec.protected
+            !(self.h.protected)(tile)
         }
     }
     /// `RemoveNearbyStations`: ordered set traversal; erasure keeps the successor.
@@ -317,19 +400,18 @@ impl House<'_> {
         (self.h.delete_inspect)(tile);
     }
     /// `ClearTownHouse`: population, counts and flags precede the footprint.
-    fn clear_town_house(&self, town: TownRef, tile: u32) {
+    fn clear_town_house(&self, town: TownRef, tile: u32, mut house: u16) {
         let map = self.map();
-        let mut house = (self.h.tile)(tile).house;
         let tile = tile.wrapping_add(self.north_part(&mut house, map));
-        let spec = (self.h.behaviour)(house);
-        if (self.h.tile)(tile).completed {
+        let flags = (self.l.house_flags)(house);
+        if (self.h.completed)(tile) {
             // SAFETY: Live owner; presentation callbacks run after the write.
             unsafe {
                 change_population(
                     self.l,
                     town.state,
                     u32::from(town.id.0),
-                    -i32::from(spec.population),
+                    -i32::from((self.l.house_population)(house)),
                 );
             }
         }
@@ -337,55 +419,59 @@ impl House<'_> {
         unsafe {
             let fields = &raw mut (*town.state).simulation;
             (*fields).num_houses = (*fields).num_houses.wrapping_sub(1);
-            if spec.flags & CHURCH != 0 {
+            if flags & CHURCH != 0 {
                 (*town.state).growth.flags &= !2;
-            } else if spec.flags & STADIUM != 0 {
+            } else if flags & STADIUM != 0 {
                 (*town.state).growth.flags &= !4;
             }
         }
         self.clear_part(town, tile, house);
-        if spec.flags & TILES_Y != 0 {
+        if flags & TILES_Y != 0 {
             house = house.wrapping_add(1);
             self.clear_part(town, tile.wrapping_add(map.diff(0, 1)), house);
         }
-        if spec.flags & TILES_X != 0 {
+        if flags & TILES_X != 0 {
             house = house.wrapping_add(1);
             self.clear_part(town, tile.wrapping_add(map.diff(1, 0)), house);
         }
-        if spec.flags & SIZE_2X2 != 0 {
+        if flags & SIZE_2X2 != 0 {
             house = house.wrapping_add(1);
             self.clear_part(town, tile.wrapping_add(map.diff(1, 1)), house);
         }
-        self.remove_nearby_stations(town, tile, spec.flags, map);
+        self.remove_nearby_stations(town, tile, flags, map);
         // SAFETY: Pure immediate owner mutation, without native callbacks.
         unsafe { update_radius(town.state) };
     }
     /// `TriggerHouseAnimation_TileLoop`.
-    fn animation_loop(&self, tile: u32, sync: bool, random_bits: u32) {
-        let spec = (self.h.behaviour)((self.h.tile)(tile).house);
+    fn animation_loop(&self, town: TownRef, tile: u32, sync: bool, random_bits: u32) {
+        let house = (self.h.house_type)(tile);
+        let spec = (self.h.animation_spec)(house);
         if spec.callbacks & CBM_ANIM_LOOP != 0 && (spec.extra_flags & 4 != 0) == sync {
             let param = if sync {
                 (self.s.random() & 0xFFFF) | (random_bits << 16)
             } else {
                 self.s.random()
             };
-            (self.h.change_frame)(CB_ANIM_LOOP, tile, param, 0, 0);
+            // SAFETY: The entry resolved this live town shell; no owner borrow
+            // spans the synchronous animation callback.
+            unsafe {
+                (self.h.change_frame)(CB_ANIM_LOOP, house, town.shell, tile, param, 0, 0);
+            }
         }
     }
     /// `DoTriggerHouseRandomisation`, including TTDP's scope-ignoring reseed.
-    fn randomise(&self, tile: u32, trigger: u8, base: u8, first: bool) {
-        let rec = (self.h.tile)(tile);
-        let spec = (self.h.behaviour)(rec.house);
-        if !spec.sprite_groups {
+    fn randomise(&self, town: TownRef, tile: u32, trigger: u8, base: u8, first: bool) {
+        let house = (self.h.house_type)(tile);
+        if !(self.h.sprite_groups)(house) {
             return;
         }
-        let town = (self.h.town)(tile);
+        let rec = (self.h.random)(tile);
         let waiting = rec.triggers | (1 << trigger);
         (self.h.set_random_triggers)(tile, waiting);
-        let reseed = (self.h.resolve_reseed)(rec.house, tile, town.shell, waiting);
+        let reseed = (self.h.resolve_reseed)(house, tile, town.shell, waiting);
         (self.h.set_random_triggers)(tile, waiting & !reseed.used);
         let new_random = self.s.random() as u8;
-        let mut bits = (u32::from(rec.random_bits) & !reseed.reseed) as u8;
+        let mut bits = (u32::from(rec.bits) & !reseed.reseed) as u8;
         bits |= (u32::from(if first { new_random } else { base }) & reseed.reseed) as u8;
         (self.h.set_random_bits)(tile, bits);
         if trigger == 1 {
@@ -394,49 +480,68 @@ impl House<'_> {
                 return;
             }
             let map = self.map();
-            if spec.flags & TILES_Y != 0 {
-                self.randomise(tile.wrapping_add(map.diff(0, 1)), trigger, bits, false);
+            let flags = (self.l.house_flags)(house);
+            if flags & TILES_Y != 0 {
+                self.randomise(
+                    town,
+                    tile.wrapping_add(map.diff(0, 1)),
+                    trigger,
+                    bits,
+                    false,
+                );
             }
-            if spec.flags & TILES_X != 0 {
-                self.randomise(tile.wrapping_add(map.diff(1, 0)), trigger, bits, false);
+            if flags & TILES_X != 0 {
+                self.randomise(
+                    town,
+                    tile.wrapping_add(map.diff(1, 0)),
+                    trigger,
+                    bits,
+                    false,
+                );
             }
-            if spec.flags & SIZE_2X2 != 0 {
-                self.randomise(tile.wrapping_add(map.diff(1, 1)), trigger, bits, false);
+            if flags & SIZE_2X2 != 0 {
+                self.randomise(
+                    town,
+                    tile.wrapping_add(map.diff(1, 1)),
+                    trigger,
+                    bits,
+                    false,
+                );
             }
         }
     }
     /// `NewHouseTileLoop`; false when callback 21 destroyed the house.
-    fn new_tile_loop(&self, tile: u32, rec: HouseTile) -> bool {
-        let spec = (self.h.behaviour)(rec.house);
-        if rec.processing_time > 0 {
+    fn new_tile_loop(&self, town: TownRef, tile: u32, house: u16) -> bool {
+        if (self.h.processing)(tile) > 0 {
             (self.h.dec_processing)(tile);
             return true;
         }
-        self.randomise(tile, 0, 0, true);
-        if spec.flags & HAS_1_TILE != 0 {
-            self.randomise(tile, 1, 0, true);
+        let spec = (self.h.new_spec)(house);
+        let flags = spec.flags;
+        self.randomise(town, tile, 0, 0, true);
+        if flags & HAS_1_TILE != 0 {
+            self.randomise(town, tile, 1, 0, true);
         }
-        self.animation_loop(tile, false, 0);
-        if spec.flags & HAS_1_TILE != 0 {
+        self.animation_loop(town, tile, false, 0);
+        if flags & HAS_1_TILE != 0 {
             let map = self.map();
             let random = self.s.random() & 0xFFFF;
-            self.animation_loop(tile, true, random);
-            if spec.flags & TILES_Y != 0 {
-                self.animation_loop(tile.wrapping_add(map.diff(0, 1)), true, random);
+            self.animation_loop(town, tile, true, random);
+            if flags & TILES_Y != 0 {
+                self.animation_loop(town, tile.wrapping_add(map.diff(0, 1)), true, random);
             }
-            if spec.flags & TILES_X != 0 {
-                self.animation_loop(tile.wrapping_add(map.diff(1, 0)), true, random);
+            if flags & TILES_X != 0 {
+                self.animation_loop(town, tile.wrapping_add(map.diff(1, 0)), true, random);
             }
-            if spec.flags & SIZE_2X2 != 0 {
-                self.animation_loop(tile.wrapping_add(map.diff(1, 1)), true, random);
+            if flags & SIZE_2X2 != 0 {
+                self.animation_loop(town, tile.wrapping_add(map.diff(1, 1)), true, random);
             }
         }
         if spec.callbacks & CBM_DESTRUCTION != 0 {
-            let house = (self.h.tile)(tile).house;
-            let town = (self.h.town)(tile);
+            let house = (self.h.house_type)(tile);
             let res = (self.h.callback)(CB_DESTRUCTION, 0, 0, house, town.shell, tile, false);
-            if res != CALLBACK_FAILED && (self.h.convert_8bit)(rec.house, CB_DESTRUCTION, res) {
-                self.clear_town_house((self.h.town)(tile), tile);
+            if res != CALLBACK_FAILED && (self.h.convert_8bit)(house, CB_DESTRUCTION, res) {
+                self.clear_town_house(town, tile, house);
                 return false;
             }
         }
@@ -444,19 +549,18 @@ impl House<'_> {
         self.dirty(tile);
         true
     }
-    fn advance_single(&self, tile: u32) {
+    fn advance_single(&self, town: TownRef, tile: u32, house: u16) {
         (self.h.inc_construction)(tile);
-        let rec = (self.h.tile)(tile);
-        if rec.construction_tick != 0 {
+        let rec = (self.h.construction)(tile);
+        if rec.tick != 0 {
             return;
         }
         witness::hit(W_STAGE);
-        self.stage_changed(tile, false);
+        self.stage_changed(town, tile, house, false);
         // Animation callbacks change frames only; completion is unchanged.
         if rec.completed {
             witness::hit(W_COMPLETE);
-            let town = (self.h.town)(tile);
-            let population = (self.l.house_construction)(rec.house).population;
+            let population = (self.l.house_population)(house);
             // SAFETY: Live owner; presentation callbacks follow the write.
             unsafe {
                 change_population(
@@ -470,20 +574,23 @@ impl House<'_> {
         }
         self.dirty(tile);
     }
-    fn advance_construction(&self, tile: u32, house: u16) {
+    fn advance_construction(&self, town: TownRef, tile: u32, mut house: u16) {
         let flags = (self.l.house_flags)(house);
         let map = self.map();
         if flags & HAS_1_TILE != 0 {
-            self.advance_single(tile);
+            self.advance_single(town, tile, house);
         }
         if flags & TILES_Y != 0 {
-            self.advance_single(tile.wrapping_add(map.diff(0, 1)));
+            house = house.wrapping_add(1);
+            self.advance_single(town, tile.wrapping_add(map.diff(0, 1)), house);
         }
         if flags & TILES_X != 0 {
-            self.advance_single(tile.wrapping_add(map.diff(1, 0)));
+            house = house.wrapping_add(1);
+            self.advance_single(town, tile.wrapping_add(map.diff(1, 0)), house);
         }
         if flags & SIZE_2X2 != 0 {
-            self.advance_single(tile.wrapping_add(map.diff(1, 1)));
+            house = house.wrapping_add(1);
+            self.advance_single(town, tile.wrapping_add(map.diff(1, 1)), house);
         }
     }
     /// `TownGenerateCargo`: production precedes the delivery; transported follows.
@@ -556,27 +663,27 @@ impl House<'_> {
     }
     /// `TileLoop_Town`.
     fn tile_loop(&self, tile: u32, finder: *mut c_void) {
-        let mut rec = (self.h.tile)(tile);
-        let house = rec.house;
-        if house >= NEW_HOUSE_OFFSET {
-            if !self.new_tile_loop(tile, rec) {
-                return;
-            }
-            rec = (self.h.tile)(tile);
-        }
-        if !rec.completed {
-            self.advance_construction(tile, house);
+        let entry = (self.h.entry)(tile);
+        let town = entry.town;
+        let house = entry.house;
+        if house >= NEW_HOUSE_OFFSET && !self.new_tile_loop(town, tile, house) {
             return;
         }
-        let spec = (self.h.behaviour)(house);
-        if spec.flags & ANIMATED != 0
+        // NewGRF callbacks finish before the source observes completion/age.
+        let rec = (self.h.loop_tile)(tile);
+        if !rec.completed {
+            self.advance_construction(town, tile, house);
+            return;
+        }
+        let spec = (self.h.loop_spec)(house);
+        let flags = spec.flags;
+        if flags & ANIMATED != 0
             && house < NEW_HOUSE_OFFSET
             && !rec.lift_has_destination
             && chance16_i(1, 2, self.s.random())
         {
             (self.l.add_animation)(tile, true);
         }
-        let town = (self.h.town)(tile);
         let r = self.s.random();
         if spec.callbacks & CBM_PRODUCE != 0 {
             for i in 0..256 {
@@ -613,9 +720,9 @@ impl House<'_> {
         // SAFETY: Immediate owner reads/writes in source short-circuit order;
         // each access ends before the next service.
         let growing = unsafe { (*town.state).growth.flags } & 1 != 0;
-        if spec.flags & HAS_1_TILE != 0
+        if flags & HAS_1_TILE != 0
             && growing
-            && self.can_delete(tile)
+            && self.can_delete(town, tile, house)
             && rec.age >= spec.minimum_life
             && unsafe {
                 let rebuild = &raw mut (*town.state).simulation.time_until_rebuild;
@@ -628,11 +735,11 @@ impl House<'_> {
             unsafe {
                 (*town.state).simulation.time_until_rebuild = ((r >> 16) & 0xFF) as u16 + 192;
             };
-            self.clear_town_house(town, tile);
+            self.clear_town_house(town, tile, house);
             if r >> 24 >= 12 {
                 witness::hit(W_REPLACE);
                 let mut tile = tile;
-                if spec.flags & HAS_2_TILES != 0 {
+                if flags & HAS_2_TILES != 0 {
                     let map = self.map();
                     // SAFETY: Immediate copied owner read.
                     let center = unsafe { super::position(town.state) };
@@ -642,49 +749,50 @@ impl House<'_> {
                     let y = i32::from(
                         (map.tile_y(center).wrapping_sub(map.tile_y(tile)) as i16).clamp(0, 1),
                     );
-                    if spec.flags & SIZE_2X2 != 0 {
+                    if flags & SIZE_2X2 != 0 {
                         tile = tile.wrapping_add(map.diff(x, y));
-                    } else if spec.flags & SIZE_1X2 != 0 {
+                    } else if flags & SIZE_1X2 != 0 {
                         tile = tile.wrapping_add(map.diff(0, y));
-                    } else if spec.flags & SIZE_2X1 != 0 {
+                    } else if flags & SIZE_2X1 != 0 {
                         tile = tile.wrapping_add(map.diff(x, 0));
                     }
                 }
                 let modes = 1 | if (self.l.allow_roads)() { 2 } else { 0 };
                 let id = u32::from(town.id.0);
-                engine(self.l, self.s).bind(id).try_house(id, tile, modes);
+                self.engine(town).try_house(id, tile, modes);
             }
         }
         (self.l.exchange_company)(company);
     }
     /// `AnimateTile_Town`: builtin lifts; `NewGRF` houses use `AnimationBase`.
     fn animate(&self, tile: u32) {
-        let rec = (self.h.tile)(tile);
-        if rec.house >= NEW_HOUSE_OFFSET {
+        let house = (self.h.house_type)(tile);
+        if house >= NEW_HOUSE_OFFSET {
             (self.h.animate_new)(tile);
             return;
         }
         if (self.s.tick_counter)() & 3 != 0 {
             return;
         }
-        if (self.l.house_flags)(rec.house) & ANIMATED == 0 {
+        if (self.l.house_flags)(house) & ANIMATED == 0 {
             (self.s.delete_animated)(tile);
             return;
         }
-        let mut destination = rec.lift_destination;
-        if !rec.lift_has_destination {
+        let rec = (self.h.lift)(tile);
+        let mut destination = rec.destination;
+        if !rec.has_destination {
             witness::hit(W_LIFT_START);
             let mut i;
             loop {
                 i = self.s.random_range(7);
-                if !(i == 1 || i * 6 == u32::from(rec.lift_position)) {
+                if !(i == 1 || i * 6 == u32::from(rec.position)) {
                     break;
                 }
             }
             (self.h.set_lift_destination)(tile, i as u8);
             destination = i as u8 & 7;
         }
-        let mut pos = i32::from(rec.lift_position);
+        let mut pos = i32::from(rec.position);
         let dest = i32::from(destination) * 6;
         pos += if pos < dest { 1 } else { -1 };
         (self.h.set_lift_position)(tile, pos as u8);
@@ -703,15 +811,17 @@ impl House<'_> {
             (c.error)(result, self.h.errors.demolish);
             return;
         }
-        if !self.can_delete(tile) {
+        let entry = (self.h.entry)(tile);
+        let house = entry.house;
+        let town = entry.town;
+        if !self.can_delete(town, tile, house) {
             witness::hit(W_PROTECTED);
             (c.error)(result, self.h.errors.protected);
             return;
         }
-        let removal = (self.h.removal)((self.h.tile)(tile).house);
+        let removal = (self.h.removal)(house);
         (c.expense_money)(result, 0, removal.cost);
         let rating = i32::from(removal.rating);
-        let town = (self.h.town)(tile);
         let company = (self.s.current_company)();
         let authority = self.authority();
         if (self.s.company_valid)(company)
@@ -748,13 +858,13 @@ impl House<'_> {
         }
         if flags & DC_EXEC != 0 {
             witness::hit(W_CLEAR_EXECUTE);
-            self.clear_town_house(town, tile);
+            self.clear_town_house(town, tile, house);
         }
     }
     /// `TerraformTile_Town`.
     fn terraform(&self, result: *mut CommandCost, tile: u32, flags: u16, z_new: i32, slope: u8) {
         if (self.s.autoslope)() {
-            let house = (self.h.tile)(tile).house;
+            let house = (self.h.house_type)(tile);
             let mut north = house;
             self.north_part(&mut north, self.map());
             if (self.l.house_flags)(north) & NOT_SLOPED == 0
@@ -762,7 +872,7 @@ impl House<'_> {
                 && (self.s.tile_max_z)(tile) == z_new + slope_max_z(slope)
             {
                 let mut allow = true;
-                if (self.h.callbacks)(house) & CBM_AUTOSLOPE != 0 {
+                if (self.l.house_callbacks)(house) & CBM_AUTOSLOPE != 0 {
                     let town = (self.h.town)(tile);
                     let res = (self.h.callback)(CB_AUTOSLOPE, 0, 0, house, town.shell, tile, false);
                     if res != CALLBACK_FAILED && (self.h.convert_boolean)(house, CB_AUTOSLOPE, res)
@@ -858,7 +968,11 @@ impl House<'_> {
                 for (x, y) in area {
                     let subtile = base.wrapping_add(map.diff(x as i32, y as i32));
                     if (self.s.tile_type)(subtile) == MP_HOUSE {
-                        self.clear_town_house((self.h.town)(subtile), subtile);
+                        self.clear_town_house(
+                            (self.h.town)(subtile),
+                            subtile,
+                            (self.h.house_type)(subtile),
+                        );
                     }
                 }
             }
@@ -866,14 +980,14 @@ impl House<'_> {
             let id = u32::from((self.authority().town_index)(town));
             let completed = (self.h.place_houses)() == 2;
             let random = self.s.random() & 0xFF;
-            engine(self.l, self.s).bind(id).build_house(
-                id,
-                tile,
-                u32::from(house),
-                random,
-                completed,
-                protected,
-            );
+            let mut engine = engine(self.l, self.s).bind(id);
+            engine.house_town = Some(TownRef {
+                shell: town.cast_mut(),
+                state: engine.owner,
+                id: super::TownId(id as u16),
+            });
+            engine.map = self.map.clone();
+            engine.build_house(id, tile, u32::from(house), random, completed, protected);
         }
     }
     fn add_acceptance(&self, ctx: *mut c_void, always: *mut u64, cargo: u8, amount: u32) {
@@ -894,9 +1008,10 @@ impl House<'_> {
         always: *mut u64,
     ) {
         let spec = (self.h.acceptance)(house);
+        let callbacks = (self.l.house_callbacks)(house);
         let mut accepts = spec.accepts;
         let prototype = tile == INVALID_TILE;
-        if spec.callbacks & CBM_ACCEPT != 0 {
+        if callbacks & CBM_ACCEPT != 0 {
             let cb = (self.h.callback)(CB_ACCEPT, 0, 0, house, town, tile, prototype);
             if cb != CALLBACK_FAILED {
                 accepts[0] = (self.h.cargo_translation)(house, (cb & 31) as u8);
@@ -904,7 +1019,7 @@ impl House<'_> {
                 accepts[2] = (self.h.cargo_translation)(house, ((cb >> 10) & 31) as u8);
             }
         }
-        if spec.callbacks & CBM_ACCEPTANCE != 0 {
+        if callbacks & CBM_ACCEPTANCE != 0 {
             let cb = (self.h.callback)(CB_ACCEPTANCE, 0, 0, house, town, tile, prototype);
             if cb != CALLBACK_FAILED {
                 self.add_acceptance(ctx, always, accepts[0], u32::from(cb & 15));
@@ -928,9 +1043,10 @@ impl House<'_> {
     }
     /// `AddProducedCargo_Town`.
     fn produced(&self, tile: u32, ctx: *mut c_void) {
-        let house = (self.h.tile)(tile).house;
-        let spec = (self.h.behaviour)(house);
-        let town = (self.h.town)(tile);
+        let entry = (self.h.entry)(tile);
+        let house = entry.house;
+        let spec = (self.h.production)(house);
+        let town = entry.town;
         if spec.callbacks & CBM_PRODUCE != 0 {
             for i in 0..256 {
                 let cb = (self.h.callback)(CB_PRODUCE, i, 0, house, town.shell, tile, false);
@@ -962,7 +1078,7 @@ impl House<'_> {
     }
     /// `TriggerHouseAnimation_WatchedCargoAccepted`.
     fn watched(&self, tile: u32, cargoes: u64) {
-        let mut house = (self.h.tile)(tile).house;
+        let mut house = (self.h.house_type)(tile);
         let cargoes = cargoes & (self.h.watched)(house);
         if cargoes == 0 {
             return;
@@ -971,11 +1087,24 @@ impl House<'_> {
         let map = self.map();
         let north = tile.wrapping_add(self.north_part(&mut house, map));
         let flags = (self.l.house_flags)(house);
+        let town = (self.h.town)(tile);
         let trigger = |part: u32| {
             let x = map.tile_x(tile).wrapping_sub(map.tile_x(part)) as u8;
             let y = map.tile_y(tile).wrapping_sub(map.tile_y(part)) as u8;
             let info = random << 16 | u32::from(y) << 8 | u32::from(x);
-            (self.h.change_frame)(CB_WATCHED, part, 0, info, cargoes);
+            // SAFETY: The entry resolved this live town shell; no owner borrow
+            // spans the synchronous animation callback.
+            unsafe {
+                (self.h.change_frame)(
+                    CB_WATCHED,
+                    (self.h.house_type)(part),
+                    town.shell,
+                    part,
+                    0,
+                    info,
+                    cargoes,
+                );
+            }
         };
         trigger(north);
         if flags & TILES_Y != 0 {
@@ -1014,13 +1143,13 @@ impl House<'_> {
             if (self.s.tile_type)(tile) != MP_HOUSE {
                 continue;
             }
-            let rec = (self.h.tile)(tile);
+            let rec = (self.h.cache)(tile);
             let state = (self.l.state)(u32::from(rec.town));
             let class = (self.l.house_class)(rec.house);
             // SAFETY: Live owner; each access ends before the next spec query.
             unsafe { super::increase_building(state, rec.house, class) };
             if rec.completed {
-                let population = (self.l.house_construction)(rec.house).population;
+                let population = (self.l.house_population)(rec.house);
                 // SAFETY: As above.
                 unsafe {
                     let fields = &raw mut (*state).simulation;
@@ -1045,7 +1174,7 @@ impl House<'_> {
             if (self.s.tile_type)(tile) != MP_HOUSE {
                 continue;
             }
-            let rec = (self.h.tile)(tile);
+            let rec = (self.h.age)(tile);
             if rec.completed && rec.age < u8::MAX {
                 (self.h.set_age)(tile, rec.age + 1);
             }
@@ -1098,8 +1227,14 @@ impl House<'_> {
 }
 
 /// Construction-stage trigger used by town growth's house construction.
-pub(super) fn stage_changed(leaves: &Leaves, services: &Services, tile: u32) {
-    house(leaves, services).stage_changed(tile, true);
+pub(super) fn stage_changed(
+    leaves: &Leaves,
+    services: &Services,
+    town: TownRef,
+    tile: u32,
+    house_id: u16,
+) {
+    house(leaves, services).stage_changed(town, tile, house_id, true);
 }
 
 // Native entries: immutable static tables outlive each synchronous call; native

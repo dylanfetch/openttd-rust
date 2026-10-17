@@ -1425,8 +1425,10 @@ NewGRF house tile loop, `CanDeleteHouse`, animation triggers and rerandomisation
 sole Rust town owner directly and ends each owner access before any callback, command or station
 service. C++ keeps thin facades, the generic `HouseResolverObject`/reseed sum,
 `HouseAnimationBase`, `StationFinder`/`MoveGoodsToStation` and `GetHouseNorthPart` for resolver
-variables; original bodies compile only portably. Town count, recession, autoslope, foundation
-price, tick counter, animated-tile removal and `DoClearSquare` are shared services.
+variables; original bodies compile only portably. Narrow phase observations replace whole
+tile/spec copies; projections compose canonical spec-field readers. Each entry reuses its town
+and map context, including construction triggers and rebuilds. Town count, recession, autoslope,
+foundation price, tick counter, animated-tile removal and `DoClearSquare` are shared services.
 `python3 tools/migration.py simulate town-houses- --jobs 2` places every original house through
 `CmdPlaceHouse`, compares error histograms, occupied/replace, protected clears, autoslope
 terraform, company clearance until refusal and aged-house rebuild in both cargo modes, and

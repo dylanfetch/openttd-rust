@@ -88,20 +88,29 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         }
         444 => layout!(crate::town::SuppliedEntry, item; entry, created),
         920 => {
-            layout!(crate::town::house::HouseTile, item; house, town, random_bits, triggers, construction_tick, age, processing_time, lift_position, lift_destination, completed, protected, lift_has_destination)
+            layout!(crate::town::house::HouseLoopTile, item; age, completed, lift_has_destination)
         }
-        921 => {
-            layout!(crate::town::house::HouseBehaviour, item; callbacks, flags, extra_flags, population, mail, minimum_life, processing_time, sprite_groups)
+        921 => layout!(crate::town::house::HouseLift, item; position, destination, has_destination),
+        928 => layout!(crate::town::house::HouseRandom, item; bits, triggers),
+        929 => layout!(crate::town::house::HouseConstruction, item; tick, completed),
+        930 => layout!(crate::town::house::HouseCache, item; house, town, completed),
+        931 => layout!(crate::town::house::HouseAge, item; age, completed),
+        932 => {
+            layout!(crate::town::house::HouseLoopSpec, item; callbacks, flags, population, mail, minimum_life)
         }
+        933 => layout!(crate::town::house::HouseAnimationSpec, item; callbacks, extra_flags),
+        934 => layout!(crate::town::house::HouseNewSpec, item; callbacks, flags, processing_time),
+        935 => layout!(crate::town::house::HouseProduction, item; callbacks, population, mail),
+        936 => layout!(crate::town::house::HouseEntry, item; town, house),
         922 => layout!(crate::town::house::HouseRemoval, item; cost, rating),
-        923 => layout!(crate::town::house::HouseAcceptance, item; accepts, amounts, callbacks),
+        923 => layout!(crate::town::house::HouseAcceptance, item; accepts, amounts),
         924 => layout!(crate::town::house::HouseReseed, item; reseed, used),
         925 => layout!(crate::town::house::ProductionCargo, item; cargo, multiplier),
         926 => {
             layout!(crate::town::house::HouseErrors, item; demolish, protected, refuses, sloped, bridge, flat, no_town)
         }
         927 => {
-            layout!(crate::town::house::HouseServices, item; cost, commands, authority, tile, clean_type, town, behaviour, callbacks, removal, acceptance, watched, substitute, inc_construction, reset_age, set_age, set_lift_destination, set_lift_position, halt_lift, dec_processing, set_processing, set_random_bits, set_random_triggers, set_type, animate_new, delete_inspect, callback, cargo_translation, convert_boolean, convert_8bit, resolve_reseed, change_frame, next_near_station, erase_near_station, station_catchment, station_covers_town, move_goods, production_cargo, add_cargo, food_cargo, scale_cargo, cargogen_mode, place_houses, company_human, init_counts, rebuild_tree, errors)
+            layout!(crate::town::house::HouseServices, item; cost, commands, authority, entry, loop_tile, house_type, completed, protected, lift, random, construction, cache, age, processing, clean_type, town, loop_spec, animation_spec, new_spec, production, sprite_groups, removal, acceptance, watched, substitute, inc_construction, reset_age, set_age, set_lift_destination, set_lift_position, halt_lift, dec_processing, set_processing, set_random_bits, set_random_triggers, set_type, animate_new, delete_inspect, callback, cargo_translation, convert_boolean, convert_8bit, resolve_reseed, change_frame, next_near_station, erase_near_station, station_catchment, station_covers_town, move_goods, production_cargo, add_cargo, food_cargo, scale_cargo, cargogen_mode, place_houses, company_human, init_counts, rebuild_tree, errors)
         }
         443 => {
             layout!(crate::town::AuthorityServices, item; council_tolerance, bulldozer, authority_distance, town_index, refusal)
@@ -300,14 +309,13 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         440 => {
             layout!(crate::town::HouseAvailability, item; zones, override_id, class_id, probability, enabled)
         }
-        441 => layout!(crate::town::HousePlacement, item; min_year, max_year, flags, extra_flags),
-        442 => layout!(crate::town::HouseConstruction, item; extra_flags, population),
+        441 => layout!(crate::town::HousePlacement, item; min_year, max_year),
         438 => layout!(crate::town::StationActivity, item; time_since_load, time_since_unload),
         437 => layout!(crate::town::GrowthFields, item; counter, rate, funding, road, flags),
         436 => layout!(crate::town::Slots, item; data, size),
         430 => layout!(crate::town::CommandResult, item; cost, success),
         431 => {
-            layout!(crate::town::Leaves, item; map_log_x, build_on_slopes, growth_rate, snow_line, editor, generating_world, allow_crossings, climate, highest_snow_line, calendar_year, allow_roads, road_flags, house_availability, house_placement, house_construction, house_flags, house_extra_flags, house_allows_callback, road_info, state, stations, station_activity_owner, station_owner, dirty_authority, dirty_town, foundation_slope, terraform_price, clean_road_bits, set_road_town, exchange_company, house_class, make_house, add_animation, population_changed, nearby_stations, house_count, update_max_pass, next_town, road_mask, build_road, clear_land, terraform_land, build_bridge, build_tunnel, clear_house_land, allow_construction, houses)
+            layout!(crate::town::Leaves, item; map_log_x, build_on_slopes, growth_rate, snow_line, editor, generating_world, allow_crossings, climate, highest_snow_line, calendar_year, allow_roads, road_flags, house_availability, house_placement, house_population, house_flags, house_extra_flags, house_callbacks, road_info, state, stations, station_activity_owner, station_owner, dirty_authority, dirty_town, foundation_slope, terraform_price, clean_road_bits, set_road_town, exchange_company, house_class, make_house, add_animation, population_changed, nearby_stations, house_count, update_max_pass, next_town, road_mask, build_road, clear_land, terraform_land, build_bridge, build_tunnel, clear_house_land, allow_construction, houses)
         }
         90 => {
             layout!(crate::rail_yapf::Settings, item; max_nodes, firstred, firstred_exit, lastred, lastred_exit, station, slope, curve45, curve90, depot_reverse, crossing, lookahead, p0, p1, p2, pbs_cross, pbs_station, pbs_back, doubleslip, longer, longer_tile, shorter, shorter_tile, firstred_eol)
