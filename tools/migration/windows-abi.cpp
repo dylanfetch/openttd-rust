@@ -283,6 +283,7 @@ static void Layouts()
 	Layout(385, "OpenTTDTrainReservationChoice", {sizeof(OpenTTDTrainReservationChoice),alignof(OpenTTDTrainReservationChoice),offsetof(OpenTTDTrainReservationChoice,track),offsetof(OpenTTDTrainReservationChoice,reserved)});
 	Layout(49, "OpenTTDCargoSpec", {sizeof(OpenTTDCargoSpec), alignof(OpenTTDCargoSpec), offsetof(OpenTTDCargoSpec, payment), offsetof(OpenTTDCargoSpec, valid), offsetof(OpenTTDCargoSpec, callback), offsetof(OpenTTDCargoSpec, periods1), offsetof(OpenTTDCargoSpec, periods2)});
 	Layout(50, "OpenTTDCargoPaymentFields", {sizeof(OpenTTDCargoPaymentFields), alignof(OpenTTDCargoPaymentFields), offsetof(OpenTTDCargoPaymentFields, front), offsetof(OpenTTDCargoPaymentFields, route_profit), offsetof(OpenTTDCargoPaymentFields, visual_profit), offsetof(OpenTTDCargoPaymentFields, visual_transfer)});
+	Layout(60, "OpenTTDCargoPayment", {sizeof(OpenTTDCargoPayment), alignof(OpenTTDCargoPayment), offsetof(OpenTTDCargoPayment, fields), offsetof(OpenTTDCargoPayment, station)});
 	Layout(51, "OpenTTDCargoServices", {sizeof(OpenTTDCargoServices), alignof(OpenTTDCargoServices), offsetof(OpenTTDCargoServices, spec), offsetof(OpenTTDCargoServices, callback), offsetof(OpenTTDCargoServices, nearby_industry), offsetof(OpenTTDCargoServices, station_read), offsetof(OpenTTDCargoServices, industry_read), offsetof(OpenTTDCargoServices, industry_write), offsetof(OpenTTDCargoServices, refuses), offsetof(OpenTTDCargoServices, accept), offsetof(OpenTTDCargoServices, statistics), offsetof(OpenTTDCargoServices, monitor), offsetof(OpenTTDCargoServices, subsidised), offsetof(OpenTTDCargoServices, industry_effect), offsetof(OpenTTDCargoServices, vehicle_read), offsetof(OpenTTDCargoServices, settle), offsetof(OpenTTDCargoServices, feeder), offsetof(OpenTTDCargoServices, setting)});
 	Layout(52, "OpenTTDShipYapfInput", {sizeof(OpenTTDShipYapfInput), alignof(OpenTTDShipYapfInput), offsetof(OpenTTDShipYapfInput, map_x), offsetof(OpenTTDShipYapfInput, map_y), offsetof(OpenTTDShipYapfInput, tile), offsetof(OpenTTDShipYapfInput, dest_tile), offsetof(OpenTTDShipYapfInput, curve90), offsetof(OpenTTDShipYapfInput, curve45), offsetof(OpenTTDShipYapfInput, max_speed), offsetof(OpenTTDShipYapfInput, dest_dirs), offsetof(OpenTTDShipYapfInput, reverse_dirs), offsetof(OpenTTDShipYapfInput, trackdir), offsetof(OpenTTDShipYapfInput, ocean_frac), offsetof(OpenTTDShipYapfInput, canal_frac), offsetof(OpenTTDShipYapfInput, station), offsetof(OpenTTDShipYapfInput, unit_number)});
 	Layout(53, "OpenTTDShipYapfLeaves", {sizeof(OpenTTDShipYapfLeaves), alignof(OpenTTDShipYapfLeaves), offsetof(OpenTTDShipYapfLeaves, destination), offsetof(OpenTTDShipYapfLeaves, follow), offsetof(OpenTTDShipYapfLeaves, tile), offsetof(OpenTTDShipYapfLeaves, patch), offsetof(OpenTTDShipYapfLeaves, visit_new), offsetof(OpenTTDShipYapfLeaves, visit_next), offsetof(OpenTTDShipYapfLeaves, visit_destroy), offsetof(OpenTTDShipYapfLeaves, debug)});
@@ -569,18 +570,6 @@ static void Math()
 	CHECK(openttd_rust_int_sqrt(UINT32_MAX) == 65536);
 	constexpr uint64_t bits = UINT64_C(0xFEDCBA9876543210);
 	constexpr uint64_t high = UINT64_C(0x8000000000000000);
-	CHECK(openttd_rust_clamp_to(bits, 64, 0, 64, 0) == bits);
-	CHECK(openttd_rust_clamp_to(UINT64_MAX, 64, 0, 64, 1) == INT64_MAX);
-	CHECK(openttd_rust_clamp_to(high, 64, 1, 64, 0) == 0);
-	CHECK(openttd_rust_clamp_to(high, 64, 1, 64, 1) == high);
-	CHECK(openttd_rust_clamp_to(UINT64_MAX, 64, 0, 32, 0) == UINT32_MAX);
-	CHECK(openttd_rust_clamp_to(UINT32_MAX, 32, 0, 32, 1) == INT32_MAX);
-	CHECK(openttd_rust_clamp_to(UINT16_MAX, 16, 0, 16, 1) == INT16_MAX);
-	CHECK(openttd_rust_clamp_to(256, 16, 0, 8, 0) == UINT8_MAX);
-	CHECK(openttd_rust_clamp_to(0x80, 8, 1, 64, 1) == static_cast<uint64_t>(INT8_MIN));
-	CHECK(openttd_rust_clamp_to(UINT64_MAX, 64, 1, 8, 1) == UINT64_MAX);
-	CHECK(openttd_rust_clamp_to(2, 8, 0, 1, 0) == 1);
-	CHECK(openttd_rust_clamp_to(1, 1, 0, 64, 1) == 1);
 	/* The narrow signed reversed intervals intentionally retain C++ promotions. */
 	CHECK(openttd_rust_soft_clamp(bits, high, UINT64_MAX, 64, 0) == bits);
 	CHECK(openttd_rust_soft_clamp(0, high, UINT64_MAX, 64, 0) == high);
@@ -590,7 +579,7 @@ static void Math()
 	CHECK(openttd_rust_soft_clamp(0, UINT64_MAX, UINT64_MAX - 2, 16, 1) == 32766);
 	CHECK(openttd_rust_soft_clamp(0, 1500000000, static_cast<uint64_t>(-1500000000), 32, 1) == 0);
 	CHECK(openttd_rust_soft_clamp(high, high, INT64_MAX, 64, 1) == high);
-	std::printf("math int_sqrt, clamp_to and soft_clamp scalar high-bit, width and boundary calls passed\n");
+	std::printf("math int_sqrt and soft_clamp scalar high-bit, width and boundary calls passed\n");
 }
 
 static void CryptoPrimitives()

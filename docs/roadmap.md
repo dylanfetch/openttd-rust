@@ -4,14 +4,13 @@ Root owns selection here; `AGENTS.md` and `docs/rust-migration.md` define proces
 If an issue conflicts, follow this roadmap and report it to root. Keep this
 forward-looking, about 200 lines; completed work is one row, with evidence in PRs.
 
-## Where the fork stands (2026-10-16, `cbede7244f`)
+## Where the fork stands (2026-10-17, `08e5372c8f`)
 
-- Twenty-seven ownership ports. Whole fork: Rust 60,339 / tooling 31,153 / glue 26,809 / original retired 38,223 of 470,612 `src/` lines (8.12%). Simulation: 30,252 / 102,615 (29.48%).
-- The last two sessions integrated only maintenance and coverage (#262-#264, #271, #272). No game C++ has been retired since #258.
-- Drafts that retire game C++: #270 rail commands (1,578) and #269 house lifecycle (882).
-- #212/#213 are re-selected under the core-loop boundary rule (user decision, 2026-10-16).
-- Speed at `cbede7244f`: all six caps pass. TGP is at 1.118 (target 1.15) and the play saves at 1.10-1.33.
-- Unintegrated component branches: two (#269, #270). Maintenance drafts: #268, #273.
+- Twenty-seven ownership ports. Whole fork: Rust 59,755 / tooling 31,126 / glue 26,572 / original retired 38,179 of 470,612 `src/` lines (8.11%). Simulation: 30,252 / 102,615 (29.48%).
+- This resumption integrated maintenance #268, #273 and #277. No game C++ has been retired since #258; #268 restored 44 original lines while removing save staging.
+- Four ownership drafts retire game C++: #270 rail commands (1,578), #269 houses (891), #255 landscape (844) and #257 vehicles (388). The core loops follow the selected boundary rule.
+- Integrated #277 passes all six caps. Reviewed #279 passes 54 pairs and ratchets all six limits beyond spread; its scoped review and exact-head Full validation pass, awaiting protected-base checks.
+- Coverage gaps remain #156, and map/vehicle boundary measurements are recorded in #274. Unintegrated branches: four components and one maintenance draft (#279).
 
 ## Thirteenth steering review (2026-10-16, unblock the core loops)
 
@@ -53,7 +52,7 @@ Actions, in order:
 
 ## Earlier steering, still in force
 
-- **Housekeeping (twelfth):** #259 H1-H4, #260 and #261 R1 are done. R4 (#268) and R3 (#273) are drafts. R2 waits for #269/#270, and H5 comes last. At most three maintenance PRs are in flight. They never count against the component cap or block an ownership port.
+- **Housekeeping (twelfth):** #259 H1-H4, #260 and #261 R1/R4 (#268) are done. The reviewed R3 train/orders cleanup (#273) is integrated. Remaining R2 waits for #269/#270, and H5 comes last. At most three maintenance PRs are in flight. They never count against the component cap or block an ownership port.
 - **Direct shared services and boundaries:** direct shared services (#107/#168/#199) and one definition per shared accessor, enforced in quick CI by #249, whose baseline only shrinks. Use a fixed hasher for lookup-only YAPF maps; ABI blocks stay per component.
 - **Ownership:** prioritize simulation ownership. Keep state at the original's process scope.
 - **Map storage:** #108 retains C++ map arrays with direct bundled services until #274 measures a read-only view.
@@ -109,6 +108,9 @@ evidence in their PRs; rows below use original retirement and net glue (#223).
 | #259 H4 (dead FFI, orphan guards) | #264 | direct | `af1abf96b4` | 6 / 174 / 12 / 4; net glue -75 |
 | #261 R1 (tests, one ABI layout table) | #271 | direct | `15e0ae1390` | 3 / 171 / 189 / 0; net glue -405 |
 | #156 (no-city towns, stale-link restrict/release) | #272 | direct | `6ffbf8f302` | 99 / 20 / 0 / 0; net glue 0 |
+| #261 R4 (direct save aliases) | #268 | direct | `5b3c666698` | 7 / 4 / 35 / -44; net glue -204 |
+| #261 R3 part (train/orders forwarders and unsafe contracts) | #273 | direct | `bdab12a31b` | 1571 / 0 / 0 / 0; Rust net -532, net glue 0 |
+| #276 (#275 native inline ClampTo) | #277 | direct | `08e5372c8f` | 0 / 7 / 0 / 0; Rust net -44, net glue -33 |
 
 Paused, not fallbacks: #64 curve family, #68 SHA-512/Ed25519, #69 tile areas.
 
@@ -137,7 +139,7 @@ go in `KNOWN_FAILURES` with an issue, never in masks (`docs/rust-migration.md`).
 Integrate reviewed work first, in order of readiness, with at most six
 unintegrated component branches. Maintenance (#259, #261, #275) and #156 run in parallel.
 
-1. **Drafts:** #268, #273, #270 and #269 with their 13th-review must-change items (PR comments).
+1. **Drafts:** #270 and #269 with their 13th-review must-change items (PR comments); #268/#273 are integrated. #269 also removes all remaining newly duplicated generic helpers before integration.
 2. **#213 vehicle and #212 landscape** under the core-loop boundary rule, from branches `vehicle-owner-213` (`21b78029c5`) and `landscape-owner-212` (`20cc66dfe5`); #274 views follow as a shared PR.
 3. **#275 speed:**
    - the cheap items first (`ClampTo`, road YAPF arena);
@@ -158,16 +160,21 @@ staging only for a field a `SaveLoad` descriptor cannot address through the alia
 
 ## Resume checkpoint
 
-Paused at the user's request; all agents stopped. Each draft's next step
-includes its 13th-review comment. #274, #275, #266, #267, #247, R2 and H5 are
-unstarted. Older paused work is untouched.
+Resumed 2026-10-17 under `start-development`; root is gpt-6.1-sol, xhigh.
+Fresh agents own the rail/orders conflict review and #274 vehicle boundary design.
+#255/#257 are reopened; root owns their base updates and integration gates.
+#275's cheap fixes are #276/#277 (ClampTo) and #278/#279 (road YAPF scratch),
+owned by root; other speed items, #266, #267, #247, R2 and H5 remain unstarted.
+Four component and one maintenance draft are open. Older paused work is untouched.
 
 | Issue / PR | Branch, head | State and next step |
 | --- | --- | --- |
-| #261 R4 / #268 | `save-staging-261`, `3e7b72b8d4` | Reviewed, Full validation and six caps pass. Conflicts with base in `src/tests/cargo_payment.cpp` (#271 layout form). Next: update (re-add layout 60 in #271's table form), fresh reviewer checks the resolution, Full validation, merge. |
-| #256 / #269 | `house-lifecycle-256`, `3f5a9ec707` | Reviewed (5 fixes verified); 315/315 scenarios, verify and six caps pass. Blockers: whole `HouseTile`/`HouseBehaviour` copies, duplicate spec accessors, repeated owner resolution. Next: fix round, fresh review, caps, Full validation. |
-| #265 / #270 | `rail-commands-265`, `efc04c0f5b` | Reviewed at `90cf900cf8` (fix verified). Then reservation services shared (targeted checks pass). Next: shared command checks and road accessors, one `IsSafeWaitingPosition`, real types; fresh review, full simulation, caps, Full validation. |
-| #261 R3 / #273 | `rust-cleanup-261`, `e95d3518c4` | Train/orders forwarders removed (-878 Rust); 313/313 scenarios. Next: restore `unsafe` on pointer-taking fields, verify at head, independent review, caps, Full validation. |
+| #256 / #269 | `house-lifecycle-256`, `1a699f945a` | R1/R2 fixes and root verification pass: canonical helpers, owner context and default probe adapters. Cargo4/native and 45 scenarios/439 snapshots pass. Full validation requested; quiet profiles/caps remain. |
+| #265 / #270 | `rail-commands-265`, `da775ad9be` | Root verified nine review fixes; native and 16 scenarios/152 snapshots pass. Fresh scoped R2 resolves the integrated orders conflict in `train.rs`; final Full validation and quiet caps follow. |
+| #212 / #255 | `landscape-owner-212`, `796cb2bbb0` | Root verified fixing reviews, including the assertion-invalid Debug fixture. Game unchanged from passing native/72 scenarios/288 snapshots. New exact-head Full requested; fair CPU/caps remain. |
+| #213 / #257 | `vehicle-owner-213`, `ff03c13f28` | Reviewed owner plus clean integrated-orders merge verified. Cargo4/native and 25 scenarios/158 snapshots pass. Adopt integrated cheap speed fixes on both timing variants before CPU/six-cap gates and final Full validation. |
+| #274 | Measurement branches, linked issue | Map and vehicle prototypes are measured and recorded. Map timing remains; vehicle profile still misses its instruction gate. Astra plans the remaining boundary cost; root owns quiet CPU timing and production design selection. |
+| #278 / #279 (#275) | `road-yapf-scratch-275`, `f5134a76af` | Game/cap reviews, root verification, native/semantic checks, six quiet caps and exact-head Full validation pass. Integrate after protected-base post-merge checks, then update the core-loop timing base. |
 | #64 / #66 | remote `issue/64-curve-family`, `aab5211801` | #66 closed unmerged; #64 stays paused. |
 
 #269 and #270 both move `clear_square` to the shared table; whichever integrates
