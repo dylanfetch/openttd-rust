@@ -11,6 +11,7 @@ from .play_saves import DISTRIBUTIONS
 PREPARE_ORDER = 5
 PREFIX = "normal[0]/"
 VEHICLE = "roadveh[0]/common[0]/"
+CARGODIST = ("cargodist", "stale-refresh", "stale-restrict", "stale-release")
 
 
 def game_environment(scenario):
@@ -24,11 +25,9 @@ def scenarios(soak):
             "name": f"stations-{mode}",
             "kind": "save",
             "save": str(ROOT / "migration/saves/grok-159-001.sav"),
-            "console": DISTRIBUTIONS[
-                "cargodist" if mode in ("cargodist", "stale-refresh") else "manual"
-            ],
+            "console": DISTRIBUTIONS["cargodist" if mode in CARGODIST else "manual"],
             "economy": "cargodist"
-            if mode in ("cargodist", "stale-refresh")
+            if mode in CARGODIST
             else "stockpile"
             if mode in ("acceptance-loss", "full-gradual", "loading-context")
             else "manual",
@@ -52,6 +51,8 @@ def scenarios(soak):
             "rating-cap",
             "stale-refresh",
             "stale-remove",
+            "stale-restrict",
+            "stale-release",
         )
     ]
 
@@ -146,15 +147,19 @@ def prepare(scenario, binaries, builds, out, timeout, env, result):
     if mode.startswith("stale-"):
         date = economy.rows(original, "DATE")[0]["economy_date"]
         old = date - 2000
+        # Remove/refresh age the whole edge. Restrict ages only the
+        # unrestricted update under a fresh restricted one; release the reverse.
+        stamps = {"stale-restrict": (old, date), "stale-release": (date, old)}
+        unrestricted, restricted = stamps.get(mode, (old, -1))
         edges = 0
         for index, row in economy.rows(original, "LGRP").items():
             for field in row:
                 if field.endswith("/last_unrestricted_update"):
-                    patch("LGRP", index, field, old)
-                    restricted = field.replace(
+                    patch("LGRP", index, field, unrestricted)
+                    other = field.replace(
                         "last_unrestricted_update", "last_restricted_update"
                     )
-                    patch("LGRP", index, restricted, -1)
+                    patch("LGRP", index, other, restricted)
                     edges += 1
         if not edges:
             raise RuntimeError("station input lacks real stale-link edges")
@@ -210,6 +215,8 @@ def check(scenario, run, mode, role, result):
         "cargodist": ["unload_cargo"],
         "stale-remove": ["stale_remove"],
         "stale-refresh": ["stale_refresh"],
+        "stale-restrict": ["stale_restrict"],
+        "stale-release": ["stale_release"],
     }.get(kind, [])
     if counts := core.branch_witnesses(scenario, run, role, "station", required):
         result[f"{mode}_{role}_station_branches"] = counts

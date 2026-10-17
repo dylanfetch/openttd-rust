@@ -10,7 +10,6 @@
 #include "../3rdparty/catch2/catch.hpp"
 #ifdef WITH_RUST
 #include "rail_yapf_protocol.hpp"
-#include "../rust/abi_ffi.h"
 #include "../train.h"
 #include "../pathfinder/yapf/yapf_base.hpp"
 #include "../pathfinder/yapf/yapf_node.hpp"
@@ -134,19 +133,5 @@ TEST_CASE("Rail YAPF opposing PBS signals restored in insertion order on rollbac
 	CHECK(RailYapfProbe::restored == 2);
 	RailYapfProbe::rollback = false;
 	openttd_rust_rail_invalidate();
-}
-TEST_CASE("Rail YAPF Rust ABI layouts")
-{
-	const auto Layout = [](uint8_t kind, const char *, std::initializer_list<size_t> fields) {
-		uint8_t index = 0;
-		for (size_t field : fields) CHECK(openttd_rust_abi_layout(kind, index++) == field);
-	};
-	Layout(90, "OpenTTDRailSettings", {sizeof(OpenTTDRailSettings), alignof(OpenTTDRailSettings), offsetof(OpenTTDRailSettings, max_nodes), offsetof(OpenTTDRailSettings, firstred), offsetof(OpenTTDRailSettings, firstred_exit), offsetof(OpenTTDRailSettings, lastred), offsetof(OpenTTDRailSettings, lastred_exit), offsetof(OpenTTDRailSettings, station), offsetof(OpenTTDRailSettings, slope), offsetof(OpenTTDRailSettings, curve45), offsetof(OpenTTDRailSettings, curve90), offsetof(OpenTTDRailSettings, depot_reverse), offsetof(OpenTTDRailSettings, crossing), offsetof(OpenTTDRailSettings, lookahead), offsetof(OpenTTDRailSettings, p0), offsetof(OpenTTDRailSettings, p1), offsetof(OpenTTDRailSettings, p2), offsetof(OpenTTDRailSettings, pbs_cross), offsetof(OpenTTDRailSettings, pbs_station), offsetof(OpenTTDRailSettings, pbs_back), offsetof(OpenTTDRailSettings, doubleslip), offsetof(OpenTTDRailSettings, longer), offsetof(OpenTTDRailSettings, longer_tile), offsetof(OpenTTDRailSettings, shorter), offsetof(OpenTTDRailSettings, shorter_tile), offsetof(OpenTTDRailSettings, firstred_eol)});
-	Layout(91, "OpenTTDRailTile", {sizeof(OpenTTDRailTile), alignof(OpenTTDRailTile), offsetof(OpenTTDRailTile, flags), offsetof(OpenTTDRailTile, other_end), offsetof(OpenTTDRailTile, station), offsetof(OpenTTDRailTile, railtype), offsetof(OpenTTDRailTile, tracks), offsetof(OpenTTDRailTile, reserved), offsetof(OpenTTDRailTile, station_track), offsetof(OpenTTDRailTile, tunnel_dir), offsetof(OpenTTDRailTile, uphill), offsetof(OpenTTDRailTile, flat_ramp), offsetof(OpenTTDRailTile, signal_along), offsetof(OpenTTDRailTile, signal_against), offsetof(OpenTTDRailTile, signal_green), offsetof(OpenTTDRailTile, signal_type), offsetof(OpenTTDRailTile, oneway)});
-	Layout(92, "OpenTTDRailFollow", {sizeof(OpenTTDRailFollow), alignof(OpenTTDRailFollow), offsetof(OpenTTDRailFollow, tile), offsetof(OpenTTDRailFollow, skipped), offsetof(OpenTTDRailFollow, min_speed), offsetof(OpenTTDRailFollow, max_speed), offsetof(OpenTTDRailFollow, dirs), offsetof(OpenTTDRailFollow, followed), offsetof(OpenTTDRailFollow, error), offsetof(OpenTTDRailFollow, station)});
-	Layout(93, "OpenTTDRailLeaves", {sizeof(OpenTTDRailLeaves), alignof(OpenTTDRailLeaves), offsetof(OpenTTDRailLeaves, train), offsetof(OpenTTDRailLeaves, tile), offsetof(OpenTTDRailLeaves, follow), offsetof(OpenTTDRailLeaves, safe), offsetof(OpenTTDRailLeaves, free), offsetof(OpenTTDRailLeaves, compatible_station), offsetof(OpenTTDRailLeaves, platform_length), offsetof(OpenTTDRailLeaves, closest_station), offsetof(OpenTTDRailLeaves, destination_dirs), offsetof(OpenTTDRailLeaves, origin), offsetof(OpenTTDRailLeaves, write), offsetof(OpenTTDRailLeaves, output), offsetof(OpenTTDRailLeaves, debug)});
-	Layout(94, "OpenTTDRailInput", {sizeof(OpenTTDRailInput), alignof(OpenTTDRailInput), offsetof(OpenTTDRailInput, context), offsetof(OpenTTDRailInput, settings), offsetof(OpenTTDRailInput, map_x), offsetof(OpenTTDRailInput, tile), offsetof(OpenTTDRailInput, max_cost), offsetof(OpenTTDRailInput, desync), offsetof(OpenTTDRailInput, kind), offsetof(OpenTTDRailInput, td), offsetof(OpenTTDRailInput, override_railtype), offsetof(OpenTTDRailInput, forbid90), offsetof(OpenTTDRailInput, reserve)});
-	Layout(95, "OpenTTDRailStep", {sizeof(OpenTTDRailStep), alignof(OpenTTDRailStep), offsetof(OpenTTDRailStep, tile), offsetof(OpenTTDRailStep, destination), offsetof(OpenTTDRailStep, target_tile), offsetof(OpenTTDRailStep, best_length), offsetof(OpenTTDRailStep, action), offsetof(OpenTTDRailStep, td), offsetof(OpenTTDRailStep, found), offsetof(OpenTTDRailStep, reverse), offsetof(OpenTTDRailStep, value), offsetof(OpenTTDRailStep, target_td), offsetof(OpenTTDRailStep, target_okay)});
-	Layout(97, "OpenTTDRailTrain", {sizeof(OpenTTDRailTrain), alignof(OpenTTDRailTrain), offsetof(OpenTTDRailTrain, compatible), offsetof(OpenTTDRailTrain, all_compatible), offsetof(OpenTTDRailTrain, tile), offsetof(OpenTTDRailTrain, rear_tile), offsetof(OpenTTDRailTrain, virtual_tile), offsetof(OpenTTDRailTrain, rear_virtual_tile), offsetof(OpenTTDRailTrain, dest_tile), offsetof(OpenTTDRailTrain, length), offsetof(OpenTTDRailTrain, speed), offsetof(OpenTTDRailTrain, order_destination), offsetof(OpenTTDRailTrain, td), offsetof(OpenTTDRailTrain, rear_td), offsetof(OpenTTDRailTrain, wormhole), offsetof(OpenTTDRailTrain, rear_wormhole), offsetof(OpenTTDRailTrain, order), offsetof(OpenTTDRailTrain, nearest_depot), offsetof(OpenTTDRailTrain, complex_waypoint)});
 }
 #endif

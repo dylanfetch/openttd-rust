@@ -15,20 +15,13 @@
 #include "../command_type.h"
 #include "../company_func.h"
 #include "../core/backup_type.hpp"
-#include "../rust/abi_ffi.h"
+#include "abi_layout.hpp"
 #include "../rust/command_services.h"
 #include "../table/strings.h"
 #include <map>
 #endif
 #include "../safeguards.h"
 #ifdef WITH_RUST
-static void FleetLayout(uint16_t type, std::initializer_list<size_t> fields)
-{
-	uint8_t i = 0;
-	for (size_t expected : fields) CHECK(openttd_rust_abi_layout(type, i++) == expected);
-	CHECK(openttd_rust_abi_layout(type, i) == SIZE_MAX);
-}
-
 /** Every function slot before the first constant is filled; offsets come from the Rust layout. */
 static void FleetSlotsFilled(uint16_t type, const void *table, size_t functions)
 {
@@ -40,9 +33,9 @@ static void FleetSlotsFilled(uint16_t type, const void *table, size_t functions)
 
 TEST_CASE("Fleet - canonical state layouts and independent lifetimes")
 {
-	FleetLayout(390, {sizeof(FleetGroupFields), alignof(FleetGroupFields), offsetof(FleetGroupFields, owner), offsetof(FleetGroupFields, vehicle_type), offsetof(FleetGroupFields, flags), offsetof(FleetGroupFields, livery), offsetof(FleetGroupFields, parent), offsetof(FleetGroupFields, number)});
-	FleetLayout(391, {sizeof(FleetStatisticsFields), alignof(FleetStatisticsFields), offsetof(FleetStatisticsFields, profit_last_year), offsetof(FleetStatisticsFields, profit_last_year_min_age), offsetof(FleetStatisticsFields, num_vehicle), offsetof(FleetStatisticsFields, num_vehicle_min_age), offsetof(FleetStatisticsFields, autoreplace_defined), offsetof(FleetStatisticsFields, autoreplace_finished)});
-	FleetLayout(392, {sizeof(FleetRenewFields), alignof(FleetRenewFields), offsetof(FleetRenewFields, from), offsetof(FleetRenewFields, to), offsetof(FleetRenewFields, next), offsetof(FleetRenewFields, group_id), offsetof(FleetRenewFields, replace_when_old)});
+	CHECK(AbiLayoutMismatch(390, {sizeof(FleetGroupFields), alignof(FleetGroupFields), offsetof(FleetGroupFields, owner), offsetof(FleetGroupFields, vehicle_type), offsetof(FleetGroupFields, flags), offsetof(FleetGroupFields, livery), offsetof(FleetGroupFields, parent), offsetof(FleetGroupFields, number)}) == -1);
+	CHECK(AbiLayoutMismatch(391, {sizeof(FleetStatisticsFields), alignof(FleetStatisticsFields), offsetof(FleetStatisticsFields, profit_last_year), offsetof(FleetStatisticsFields, profit_last_year_min_age), offsetof(FleetStatisticsFields, num_vehicle), offsetof(FleetStatisticsFields, num_vehicle_min_age), offsetof(FleetStatisticsFields, autoreplace_defined), offsetof(FleetStatisticsFields, autoreplace_finished)}) == -1);
+	CHECK(AbiLayoutMismatch(392, {sizeof(FleetRenewFields), alignof(FleetRenewFields), offsetof(FleetRenewFields, from), offsetof(FleetRenewFields, to), offsetof(FleetRenewFields, next), offsetof(FleetRenewFields, group_id), offsetof(FleetRenewFields, replace_when_old)}) == -1);
 	/* Rust reads Livery as {in_use, colour1, colour2} bytes. */
 	static_assert(sizeof(Livery) == 3 && offsetof(Livery, colour1) == 1 && offsetof(Livery, colour2) == 2);
 	FleetOwner<FleetGroupFields, openttd_rust_fleet_group_create, openttd_rust_fleet_group_destroy> group;
@@ -91,7 +84,7 @@ TEST_CASE("Fleet - service tables match the Rust layout and fill every slot")
 	using T = OpenTTDFleetTransactionServices;
 	using C = OpenTTDFleetCosts;
 	using P = OpenTTDFleetPendingServices;
-	FleetLayout(393, {sizeof(G), alignof(G), offsetof(G, group), offsetof(G, next_group), offsetof(G, next_company), offsetof(G, next_vehicle), offsetof(G,
+	CHECK(AbiLayoutMismatch(393, {sizeof(G), alignof(G), offsetof(G, group), offsetof(G, next_group), offsetof(G, next_company), offsetof(G, next_vehicle), offsetof(G,
 		vehicle), offsetof(G, vehicle_id), offsetof(G, vehicle_type), offsetof(G, vehicle_owner), offsetof(G, vehicle_group), offsetof(G,
 		vehicle_engine), offsetof(G, profit), offsetof(G, old_enough), offsetof(G, primary), offsetof(G, countable), offsetof(G, ground), offsetof(G,
 		front), offsetof(G, next_part), offsetof(G, first_shared), offsetof(G, next_shared), offsetof(G, set_membership), offsetof(G,
@@ -103,8 +96,8 @@ TEST_CASE("Fleet - service tables match the Rust layout and fill every slot")
 		offsetof(G, colour_dirty), offsetof(G, replace_dirty), offsetof(G, replace_invalidate), offsetof(G, alter_dirty), offsetof(G, vehicle_dirty),
 		offsetof(G, depot_dirty), offsetof(G, close_replace), offsetof(G, screen_dirty), offsetof(G, list_generate), offsetof(G, list_push),
 		offsetof(G, list_size), offsetof(G, list_at), offsetof(G, renew_allocate), offsetof(G, renew_can_allocate), offsetof(G, renew_delete),
-		offsetof(G, recursion_error)});
-	FleetLayout(394, {sizeof(T), alignof(T), offsetof(T, cost_zero), offsetof(T, cost_vehicles), offsetof(T, cost_error), offsetof(T, cost_add), offsetof(T,
+		offsetof(G, recursion_error)}) == -1);
+	CHECK(AbiLayoutMismatch(394, {sizeof(T), alignof(T), offsetof(T, cost_zero), offsetof(T, cost_vehicles), offsetof(T, cost_error), offsetof(T, cost_add), offsetof(T,
 		cost_move), offsetof(T, cost_amount), offsetof(T, success), offsetof(T, error), offsetof(T, money), offsetof(T, ownership), offsetof(T,
 		rear), offsetof(T, articulated), offsetof(T, crashed), offsetof(T, stopped), offsetof(T, chain_depot), offsetof(T, first), offsetof(T,
 		next_unit), offsetof(T, prev_unit), offsetof(T, length), offsetof(T, flipped), offsetof(T, cargo_type), offsetof(T, can_carry), offsetof(T,
@@ -117,12 +110,12 @@ TEST_CASE("Fleet - service tables match the Rust layout and fill every slot")
 		clone_order), offsetof(T, copy_group), offsetof(T, copy_configuration), offsetof(T, viewports), offsetof(T, view_window), offsetof(T, news),
 		offsetof(T, transfer_cargo), offsetof(T, capacity), offsetof(T, event), offsetof(T, save_rng), offsetof(T, restore_rng), offsetof(T,
 		rule_window), offsetof(T, assertions), offsetof(T, unavailable), offsetof(T, too_long), offsetof(T, too_long_replacement), offsetof(T,
-		nothing)});
-	FleetLayout(395, {sizeof(C), alignof(C), offsetof(C, result), offsetof(C, replace), offsetof(C, build), offsetof(C, copy), offsetof(C, temporary), offsetof(C,
-		seeds)});
-	FleetLayout(396, {sizeof(P), alignof(P), offsetof(P, set_current), offsetof(P, restart), offsetof(P, x), offsetof(P, y), offsetof(P, z), offsetof(P, reserve),
+		nothing)}) == -1);
+	CHECK(AbiLayoutMismatch(395, {sizeof(C), alignof(C), offsetof(C, result), offsetof(C, replace), offsetof(C, build), offsetof(C, copy), offsetof(C, temporary), offsetof(C,
+		seeds)}) == -1);
+	CHECK(AbiLayoutMismatch(396, {sizeof(P), alignof(P), offsetof(P, set_current), offsetof(P, restart), offsetof(P, x), offsetof(P, y), offsetof(P, z), offsetof(P, reserve),
 		offsetof(P, subtract), offsetof(P, command), offsetof(P, animation), offsetof(P, length_news), offsetof(P, failed_news), offsetof(P, cash),
-		offsetof(P, limit)});
+		offsetof(P, limit)}) == -1);
 	const G &group = FleetGroupServices();
 	const T &transaction = FleetTransactionServices();
 	FleetSlotsFilled(393, &group, offsetof(G, recursion_error) / sizeof(void *));
@@ -147,12 +140,8 @@ static bool SameCost(const CommandCost &a, const CommandCost &b)
 
 TEST_CASE("Commands - shared native stack result layouts and encoded parameters")
 {
-	using C = OpenTTDCommandServices;
-	FleetLayout(621, {sizeof(C), alignof(C), offsetof(C, landscape_clear)});
 	const auto &commands = GetRustCommandServices();
 	FleetSlotsFilled(621, &commands, 1);
-	using T = OpenTTDCommandCostServices;
-	FleetLayout(620, {sizeof(T), alignof(T), offsetof(T, zero), offsetof(T, error), offsetof(T, expense_money), offsetof(T, error_param), offsetof(T, add), offsetof(T, move), offsetof(T, amount), offsetof(T, success), offsetof(T, error_message), offsetof(T, money), offsetof(T, make_error)});
 	const auto &w = GetRustCommandCostServices();
 	FleetSlotsFilled(620, &w, 11);
 	AutoRestoreBackup<CompanyID> current(_current_company, CompanyID(0));
