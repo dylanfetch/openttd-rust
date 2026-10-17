@@ -104,9 +104,11 @@ static inline OpenTTDCommandCostServices TownProtocolCosts()
 	return costs;
 }
 static inline const OpenTTDCommandCostServices town_protocol_costs = TownProtocolCosts();
-static inline const OpenTTDCommandServices town_protocol_commands{
-	.landscape_clear = [](OpenTTDCommandCost *cost, uint32_t, uint16_t) noexcept { town_protocol_world->landscape_clears++; TownProtocolCostOf(cost)->ok = true; },
-};
+static inline const OpenTTDCommandServices town_protocol_commands = [] {
+	auto commands = OpenTTDCommandServices{};
+	commands.landscape_clear = [](OpenTTDCommandCost *cost, uint32_t, uint16_t) noexcept { town_protocol_world->landscape_clears++; TownProtocolCostOf(cost)->ok = true; };
+	return commands;
+}();
 static inline const OpenTTDTownAuthorityServices town_protocol_authority{
 	.council_tolerance = nullptr,
 	.bulldozer = nullptr,

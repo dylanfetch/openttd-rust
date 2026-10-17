@@ -405,7 +405,7 @@ pub const TOWN_ENTRIES: usize = 180;
 /// `town.no_cities` witness: generation with `larger_towns == 0`.
 pub const TOWN_NO_CITIES: usize = 181;
 /// First house lifecycle counter; `town/house.rs` names the offsets.
-pub const HOUSE: usize = 182;
+pub const HOUSE: usize = 228;
 
 /// `rail_cmd.entries` witness.
 pub const RAIL_CMD_ENTRIES: usize = 182;
@@ -812,6 +812,7 @@ mod tests {
             (SHIP_YAPF, "ship_yapf."),
             (RAIL, "rail."),
             (WATER, "water."),
+            (RAIL_CMD_ENTRIES, "rail_cmd."),
             (HOUSE, "house."),
         ] {
             assert!(NAMES[base].starts_with(prefix));
