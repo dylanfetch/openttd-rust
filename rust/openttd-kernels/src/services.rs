@@ -579,6 +579,10 @@ pub struct RoadBits(pub u8);
 #[repr(transparent)]
 #[derive(Clone, Copy)]
 pub struct Trackdir(pub u8);
+/// Native `Track` with its unchanged uint8 representation.
+#[repr(transparent)]
+#[derive(Clone, Copy)]
+pub struct Track(pub u8);
 /// Native `TrackBits` with its unchanged uint8 representation.
 #[repr(transparent)]
 #[derive(Clone, Copy)]
@@ -718,11 +722,11 @@ pub struct RailMapServices {
     /// Native `SetTrackBits`.
     pub set_track_bits: extern "C" fn(u32, u8),
     /// Native `GetPresentSignals`.
-    pub present_signals: extern "C" fn(u32) -> u8,
+    pub present_signals: extern "C" fn(u32) -> std::ffi::c_uint,
     /// Native `SetPresentSignals`.
     pub set_present_signals: extern "C" fn(u32, u8),
     /// Native `GetSignalStates`.
-    pub signal_states: extern "C" fn(u32) -> u8,
+    pub signal_states: extern "C" fn(u32) -> std::ffi::c_uint,
     /// Native `SetSignalStates`.
     pub set_signal_states: extern "C" fn(u32, u8),
     /// Native `SetHasSignals`.
@@ -760,7 +764,7 @@ pub struct RailMapServices {
     /// Native `IsStationTileBlocked`.
     pub station_blocked: extern "C" fn(u32) -> bool,
     /// Native `GetRailStationTrack`.
-    pub station_track: extern "C" fn(u32) -> u8,
+    pub station_track: extern "C" fn(u32) -> Track,
     /// Native `HasTunnelBridgeReservation`.
     pub wormhole_reserved: extern "C" fn(u32) -> bool,
     /// Native `SetTileOwner`.

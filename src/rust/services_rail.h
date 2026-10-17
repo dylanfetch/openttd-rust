@@ -25,7 +25,7 @@ inline bool RustRailIsDepot(uint32_t tile) noexcept { return IsRailDepot(TileInd
 inline DiagDirection RustRailDepotDirection(uint32_t tile) noexcept { return GetRailDepotDirection(TileIndex(tile)); }
 inline TrackBits RustRailTracks(uint32_t tile) noexcept { return GetTrackBits(TileIndex(tile)); }
 inline bool RustRailHasSignals(uint32_t tile) noexcept { return HasSignals(TileIndex(tile)); }
-inline uint8_t RustRailPresentSignals(uint32_t tile) noexcept { return GetPresentSignals(TileIndex(tile)); }
+inline uint RustRailPresentSignals(uint32_t tile) noexcept { return GetPresentSignals(TileIndex(tile)); }
 inline bool RustRailHasSignalTrack(uint32_t tile, uint8_t track) noexcept { return HasSignalOnTrack(TileIndex(tile), static_cast<Track>(track)); }
 inline SignalType RustRailSignalType(uint32_t tile, uint8_t track) noexcept { return GetSignalType(TileIndex(tile), static_cast<Track>(track)); }
 inline bool RustRailHasSignalTrackdir(uint32_t tile, uint8_t td) noexcept { return HasSignalOnTrackdir(TileIndex(tile), static_cast<Trackdir>(td)); }
@@ -47,7 +47,7 @@ inline RailGroundType RustRailGround(uint32_t tile) noexcept { return GetRailGro
 inline void RustSetRailGround(uint32_t tile, uint8_t ground) noexcept { SetRailGroundType(TileIndex(tile), static_cast<RailGroundType>(ground)); }
 inline void RustSetTrackBits(uint32_t tile, uint8_t bits) noexcept { SetTrackBits(TileIndex(tile), static_cast<TrackBits>(bits)); }
 inline void RustSetPresentSignals(uint32_t tile, uint8_t signals) noexcept { SetPresentSignals(TileIndex(tile), signals); }
-inline uint8_t RustSignalStates(uint32_t tile) noexcept { return GetSignalStates(TileIndex(tile)); }
+inline uint RustSignalStates(uint32_t tile) noexcept { return GetSignalStates(TileIndex(tile)); }
 inline void RustSetSignalStates(uint32_t tile, uint8_t states) noexcept { SetSignalStates(TileIndex(tile), states); }
 inline void RustSetHasSignals(uint32_t tile, bool signals) noexcept { SetHasSignals(TileIndex(tile), signals); }
 inline void RustSetSignalType(uint32_t tile, uint8_t track, uint8_t type) noexcept { SetSignalType(TileIndex(tile), static_cast<Track>(track), static_cast<SignalType>(type)); }
@@ -65,7 +65,7 @@ inline TrackBits RustCrossingRailBits(uint32_t tile) noexcept { return GetCrossi
 inline bool RustHasStationRail(uint32_t tile) noexcept { return HasStationRail(TileIndex(tile)); }
 inline bool RustIsRailStation(uint32_t tile) noexcept { return IsRailStationTile(TileIndex(tile)); }
 inline bool RustStationBlocked(uint32_t tile) noexcept { return IsStationTileBlocked(TileIndex(tile)); }
-inline uint8_t RustRailStationTrack(uint32_t tile) noexcept { return GetRailStationTrack(TileIndex(tile)); }
+inline Track RustRailStationTrack(uint32_t tile) noexcept { return GetRailStationTrack(TileIndex(tile)); }
 inline bool RustWormholeReserved(uint32_t tile) noexcept { return HasTunnelBridgeReservation(TileIndex(tile)); }
 inline void RustSetTileOwner(uint32_t tile, uint8_t owner) noexcept { SetTileOwner(TileIndex(tile), Owner(owner)); }
 

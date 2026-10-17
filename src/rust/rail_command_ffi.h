@@ -18,6 +18,8 @@
  * reenter Rust; Rust holds no borrow of native state across any call.
  * Strong IDs cross as TileIndex uint32_t, CompanyID uint8_t, DepotID uint16_t,
  * TownID uint16_t; enums as their uint8_t value. No entry draws Random. */
+enum Foundation : uint8_t;
+enum FloodingBehaviour : uint8_t;
 struct Train;
 struct OpenTTDRailConvertFrame; ///< Caller-owned TileIterator and ordered affected-train list.
 struct OpenTTDSlopeZ { int32_t z; uint8_t slope; };
@@ -49,10 +51,10 @@ struct OpenTTDRailCommandServices {
 	int64_t (*road_build_cost)(uint8_t) noexcept;
 	bool (*crossing_with_competitor)() noexcept;
 	bool (*disable_elrails)() noexcept;
-	uint8_t (*rail_foundation)(uint8_t, uint8_t) noexcept;
+	Foundation (*rail_foundation)(uint8_t, uint8_t) noexcept;
 	OpenTTDSlopeZ (*apply_foundation)(uint8_t, uint8_t) noexcept;
 	int32_t (*slope_z_in_corner)(uint8_t, uint8_t) noexcept;
-	uint8_t (*flooding)(uint32_t) noexcept;
+	FloodingBehaviour (*flooding)(uint32_t) noexcept;
 	bool (*entrance_edge)(uint32_t, int32_t, uint8_t, uint8_t) noexcept;
 	bool (*ship_on_tile)(uint32_t) noexcept;
 	void (*build_rail)(OpenTTDCommandCost *, uint16_t, uint32_t, uint8_t, uint8_t, bool) noexcept;

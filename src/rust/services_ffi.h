@@ -127,6 +127,7 @@ enum SignalType : uint8_t;
 enum SignalState : uint8_t;
 enum Axis : uint8_t;
 enum TransportType : uint8_t;
+enum Track : uint8_t;
 enum RailType : uint8_t;
 enum class RailTileType : uint8_t;
 enum class RailGroundType : uint8_t;
@@ -167,9 +168,9 @@ struct OpenTTDRailMapServices {
 	RailGroundType (*rail_ground)(uint32_t) noexcept;
 	void (*set_rail_ground)(uint32_t, uint8_t) noexcept;
 	void (*set_track_bits)(uint32_t, uint8_t) noexcept;
-	uint8_t (*present_signals)(uint32_t) noexcept;
+	unsigned int (*present_signals)(uint32_t) noexcept;
 	void (*set_present_signals)(uint32_t, uint8_t) noexcept;
-	uint8_t (*signal_states)(uint32_t) noexcept;
+	unsigned int (*signal_states)(uint32_t) noexcept;
 	void (*set_signal_states)(uint32_t, uint8_t) noexcept;
 	void (*set_has_signals)(uint32_t, bool) noexcept;
 	void (*set_signal_type)(uint32_t, uint8_t, uint8_t) noexcept;
@@ -188,7 +189,7 @@ struct OpenTTDRailMapServices {
 	bool (*has_station_rail)(uint32_t) noexcept;
 	bool (*is_rail_station)(uint32_t) noexcept;
 	bool (*station_blocked)(uint32_t) noexcept;
-	uint8_t (*station_track)(uint32_t) noexcept;
+	Track (*station_track)(uint32_t) noexcept;
 	bool (*wormhole_reserved)(uint32_t) noexcept;
 	void (*set_tile_owner)(uint32_t, uint8_t) noexcept;
 };

@@ -33,6 +33,15 @@ pub struct ConvertFrame {
     _private: [u8; 0],
 }
 
+/// Native `Foundation` with its unchanged uint8 representation.
+#[repr(transparent)]
+#[derive(Clone, Copy)]
+pub struct Foundation(pub u8);
+/// Native `FloodingBehaviour` with its unchanged uint8 representation.
+#[repr(transparent)]
+#[derive(Clone, Copy)]
+pub struct FloodingBehaviour(pub u8);
+
 /// `ApplyFoundationToSlope` result: height increase and the modified slope.
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -159,13 +168,13 @@ pub struct RailCommandServices {
     /// `vehicle.disable_elrails`.
     pub disable_elrails: extern "C" fn() -> bool,
     /// `GetRailFoundation`.
-    pub rail_foundation: extern "C" fn(u8, u8) -> u8,
+    pub rail_foundation: extern "C" fn(u8, u8) -> Foundation,
     /// `ApplyFoundationToSlope`.
     pub apply_foundation: extern "C" fn(u8, u8) -> SlopeZ,
     /// `GetSlopeZInCorner`.
     pub slope_z_in_corner: extern "C" fn(u8, u8) -> i32,
     /// `GetFloodingBehaviour`.
-    pub flooding: extern "C" fn(u32) -> u8,
+    pub flooding: extern "C" fn(u32) -> FloodingBehaviour,
     /// `AutoslopeCheckForEntranceEdge`.
     pub entrance_edge: extern "C" fn(u32, i32, u8, u8) -> bool,
     /// `HasVehicleOnTile(tile, ship)`.
@@ -495,13 +504,17 @@ impl<'a> Ctx<'a> {
     fn tracks(&self, tile: u32) -> u8 {
         (self.rail.rail_tracks)(tile).0
     }
+    /// The native uint query contains only the four signal-presence bits.
+    fn present_signals(&self, tile: u32) -> u8 {
+        (self.rail.present_signals)(tile) as u8
+    }
     fn has_track(&self, tile: u32, track: u8) -> bool {
         self.tracks(tile) >> track & 1 != 0
     }
     /// `HasSignalOnTrack`: signal tile type and a present signal on the track.
     fn has_signal(&self, tile: u32, track: u8) -> bool {
         (self.rail.has_signals)(tile)
-            && (self.rail.present_signals)(tile) & SIGNAL_ON_TRACK[usize::from(track)] != 0
+            && self.present_signals(tile) & SIGNAL_ON_TRACK[usize::from(track)] != 0
     }
     fn reserved(&self, tile: u32) -> u8 {
         (self.rail.reserved_tracks)(tile).0
@@ -540,21 +553,21 @@ impl<'a> Ctx<'a> {
 
     /// `CheckRailSlope`.
     fn check_rail_slope(&self, out: Cost<'_>, tileh: u8, bits: u8, existing: u8, tile: u32) {
-        if (self.s.flooding)(tile) != 0
+        if (self.s.flooding)(tile).0 != 0
             && !steep(tileh)
             && !LEVELED_TRACKS[usize::from(tileh)] & (bits | existing) != 0
         {
             out.error(self.s.strings.build_on_water);
             return;
         }
-        let f_new = (self.s.rail_foundation)(tileh, bits | existing);
+        let f_new = (self.s.rail_foundation)(tileh, bits | existing).0;
         if f_new == FOUNDATION_INVALID
             || (f_new != FOUNDATION_NONE && !(self.shared.build_on_slopes)())
         {
             out.error(self.s.strings.sloped_wrong);
             return;
         }
-        let f_old = (self.s.rail_foundation)(tileh, existing);
+        let f_old = (self.s.rail_foundation)(tileh, existing).0;
         out.set(if f_new == f_old {
             0
         } else {
@@ -1266,7 +1279,7 @@ impl<'a> Ctx<'a> {
             (self.rail.set_signal_type)(tile, track, sigtype);
             (self.rail.set_signal_variant)(tile, track, sigvar);
         }
-        let present = (self.rail.present_signals)(tile);
+        let present = self.present_signals(tile);
         (self.s.signal_infrastructure)(
             (self.shared.tile_owner)(tile),
             present.count_ones().wrapping_neg(),
@@ -1279,7 +1292,7 @@ impl<'a> Ctx<'a> {
                 } else {
                     on_track
                 };
-                (self.rail.set_present_signals)(tile, (self.rail.present_signals)(tile) | added);
+                (self.rail.set_present_signals)(tile, self.present_signals(tile) | added);
                 (self.rail.set_signal_type)(tile, track, sigtype);
                 (self.rail.set_signal_variant)(tile, track, sigvar);
                 while num_dir_cycle > 0 {
@@ -1317,7 +1330,7 @@ impl<'a> Ctx<'a> {
             }
         } else {
             w::hit(w::RAIL_CMD_SIGNAL_COPY);
-            let present = (self.rail.present_signals)(tile);
+            let present = self.present_signals(tile);
             (self.rail.set_present_signals)(
                 tile,
                 (present & !on_track) | (signals_copy & on_track),
@@ -1325,18 +1338,18 @@ impl<'a> Ctx<'a> {
             (self.rail.set_signal_variant)(tile, track, sigvar);
             (self.rail.set_signal_type)(tile, track, sigtype);
         }
-        let present = (self.rail.present_signals)(tile);
+        let present = self.present_signals(tile);
         (self.s.signal_infrastructure)((self.shared.tile_owner)(tile), present.count_ones());
         (self.s.infrastructure_dirty)((self.shared.tile_owner)(tile));
         if is_pbs(sigtype) {
             w::hit(w::RAIL_CMD_SIGNAL_PBS_STATE);
-            let mask = u32::from((self.rail.present_signals)(tile) & on_track);
+            let mask = u32::from(self.present_signals(tile) & on_track);
             let reserved = (self.rail.rail_reservation)(tile).0 >> track & 1 != 0 && {
                 // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.
                 unsafe { (self.command.no_vehicle)(ret.0, tile) };
                 ret.ok()
             };
-            let states = u32::from((self.rail.signal_states)(tile));
+            let states = (self.rail.signal_states)(tile);
             let value = (states & !mask) | (if reserved { u32::MAX } else { 0 } & mask);
             (self.rail.set_signal_states)(tile, value as u8);
         }
@@ -1367,9 +1380,9 @@ impl<'a> Ctx<'a> {
     }
     /// Shared one-way PBS presence rewrite of the convert and cycle branches.
     fn pbs_one_way(&self, tile: u32, sigtype: u8, on_track: u8) {
-        let present = (self.rail.present_signals)(tile);
+        let present = self.present_signals(tile);
         if is_pbs(sigtype) && present & on_track == on_track {
-            let present = (self.rail.present_signals)(tile);
+            let present = self.present_signals(tile);
             (self.rail.set_present_signals)(tile, (present & !on_track) | kill_first_bit(on_track));
         }
     }
@@ -1472,7 +1485,7 @@ impl<'a> Ctx<'a> {
             return total.error(INVALID_STRING);
         }
         let signals = if self.has_signal(tile, track) {
-            let signals = (self.rail.present_signals)(tile) & SIGNAL_ON_TRACK[usize::from(track)];
+            let signals = self.present_signals(tile) & SIGNAL_ON_TRACK[usize::from(track)];
             sigvar = (self.rail.signal_variant)(tile, track).0;
             sigtype = self.signal_type(tile, track);
             if sigtype == SIGTYPE_ENTRY || sigtype == SIGTYPE_EXIT {
@@ -1688,17 +1701,17 @@ impl<'a> Ctx<'a> {
                     td ^= 8;
                 }
             }
-            let present = (self.rail.present_signals)(tile);
+            let present = self.present_signals(tile);
             (self.s.signal_infrastructure)(
                 (self.shared.tile_owner)(tile),
                 present.count_ones().wrapping_neg(),
             );
             let on_track = SIGNAL_ON_TRACK[usize::from(track)];
-            (self.rail.set_present_signals)(tile, (self.rail.present_signals)(tile) & !on_track);
-            let present = (self.rail.present_signals)(tile);
+            (self.rail.set_present_signals)(tile, self.present_signals(tile) & !on_track);
+            let present = self.present_signals(tile);
             (self.s.signal_infrastructure)((self.shared.tile_owner)(tile), present.count_ones());
             (self.s.infrastructure_dirty)((self.shared.tile_owner)(tile));
-            if (self.rail.present_signals)(tile) == 0 {
+            if self.present_signals(tile) == 0 {
                 (self.rail.set_signal_states)(tile, 0);
                 (self.rail.set_has_signals)(tile, false);
                 (self.rail.set_signal_variant)(tile, INVALID_TRACK, SIG_ELECTRIC);
@@ -1941,7 +1954,7 @@ impl<'a> Ctx<'a> {
                 if execute {
                     w::hit(w::RAIL_CMD_CONVERT_STATION_CROSSING);
                     let track = if tt == MP_STATION {
-                        (self.rail.station_track)(tile)
+                        (self.rail.station_track)(tile).0
                     } else {
                         (self.rail.crossing_road_axis)(tile).0 ^ 1
                     };
@@ -2074,7 +2087,7 @@ impl<'a> Ctx<'a> {
         self.rail_infra(old_owner, railtype, num.wrapping_neg());
         self.rail_infra(new_owner, railtype, num);
         if (self.rail.has_signals)(tile) {
-            let signals = (self.rail.present_signals)(tile).count_ones();
+            let signals = self.present_signals(tile).count_ones();
             (self.s.signal_infrastructure)(old_owner, signals.wrapping_neg());
             (self.s.signal_infrastructure)(new_owner, signals);
         }
@@ -2102,10 +2115,10 @@ impl<'a> Ctx<'a> {
             return cost.error(remove_track);
         }
         // ApplyFoundationToSlope also rewrites the slope in place.
-        let top = (self.s.apply_foundation)((self.s.rail_foundation)(tileh_old, bits), tileh_old);
+        let top = (self.s.apply_foundation)((self.s.rail_foundation)(tileh_old, bits).0, tileh_old);
         z_old += top.z;
         tileh_old = top.slope;
-        let top = (self.s.apply_foundation)((self.s.rail_foundation)(tileh_new, bits), tileh_new);
+        let top = (self.s.apply_foundation)((self.s.rail_foundation)(tileh_new, bits).0, tileh_new);
         z_new += top.z;
         tileh_new = top.slope;
         let corner = match bits {
@@ -2156,7 +2169,7 @@ impl<'a> Ctx<'a> {
                 BIT_LOWER => 3,
                 _ => return,
             };
-            let f_old = (self.s.rail_foundation)(tileh_old, bits);
+            let f_old = (self.s.rail_foundation)(tileh_old, bits).0;
             if tileh_old != SLOPE_NS
                 && tileh_old != SLOPE_EW
                 && (FOUNDATION_RAIL_W..=FOUNDATION_RAIL_N).contains(&f_old)
