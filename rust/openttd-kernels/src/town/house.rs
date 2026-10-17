@@ -240,19 +240,19 @@ pub struct HouseServices {
     pub set_type: extern "C" fn(u32, u16),
     pub animate_new: extern "C" fn(u32),
     pub delete_inspect: extern "C" fn(u32),
-    pub callback: extern "C" fn(u16, u32, u32, u16, *mut TownHandle, u32, bool) -> u16,
+    pub callback: unsafe extern "C" fn(u16, u32, u32, u16, *mut TownHandle, u32, bool) -> u16,
     pub cargo_translation: extern "C" fn(u16, u8) -> u8,
     pub convert_boolean: extern "C" fn(u16, u16, u16) -> bool,
     pub convert_8bit: extern "C" fn(u16, u16, u16) -> bool,
-    pub resolve_reseed: extern "C" fn(u16, u32, *mut TownHandle, u8) -> HouseReseed,
+    pub resolve_reseed: unsafe extern "C" fn(u16, u32, *mut TownHandle, u8) -> HouseReseed,
     pub change_frame: unsafe extern "C" fn(u16, u16, *mut TownHandle, u32, u32, u32, u64),
-    pub next_near_station: extern "C" fn(*mut TownHandle, *mut Station) -> *mut Station,
-    pub erase_near_station: extern "C" fn(*mut TownHandle, *mut Station),
-    pub station_catchment: extern "C" fn(*const Station, u32) -> bool,
-    pub station_covers_town: extern "C" fn(*const Station, u16) -> bool,
-    pub move_goods: extern "C" fn(*mut c_void, u8, u32, u16) -> u32,
+    pub next_near_station: unsafe extern "C" fn(*mut TownHandle, *mut Station) -> *mut Station,
+    pub erase_near_station: unsafe extern "C" fn(*mut TownHandle, *mut Station),
+    pub station_catchment: unsafe extern "C" fn(*const Station, u32) -> bool,
+    pub station_covers_town: unsafe extern "C" fn(*const Station, u16) -> bool,
+    pub move_goods: unsafe extern "C" fn(*mut c_void, u8, u32, u16) -> u32,
     pub production_cargo: extern "C" fn(u8, u32) -> ProductionCargo,
-    pub add_cargo: extern "C" fn(*mut c_void, u8, u32),
+    pub add_cargo: unsafe extern "C" fn(*mut c_void, u8, u32),
     pub food_cargo: extern "C" fn() -> u8,
     pub scale_cargo: extern "C" fn(u32) -> u32,
     pub cargogen_mode: extern "C" fn() -> u8,
@@ -366,7 +366,8 @@ impl House<'_> {
             return true;
         }
         if (self.l.house_callbacks)(house) & CBM_DENY != 0 {
-            let res = (self.h.callback)(CB_DENY, 0, 0, house, town.shell, tile, false);
+            // SAFETY: The entry resolved the live town; no owner borrow spans resolution.
+            let res = unsafe { (self.h.callback)(CB_DENY, 0, 0, house, town.shell, tile, false) };
             res == CALLBACK_FAILED || !(self.h.convert_boolean)(house, CB_DENY, res)
         } else {
             !(self.h.protected)(tile)
@@ -374,23 +375,31 @@ impl House<'_> {
     }
     /// `RemoveNearbyStations`: ordered set traversal; erasure keeps the successor.
     fn remove_nearby_stations(&self, town: TownRef, tile: u32, flags: u8, map: Map) {
-        let mut station = (self.h.next_near_station)(town.shell, std::ptr::null_mut());
-        while !station.is_null() {
-            let mut covers = (self.h.station_catchment)(station, tile);
-            if flags & TILES_Y != 0 {
-                covers |= (self.h.station_catchment)(station, tile.wrapping_add(map.diff(0, 1)));
+        // SAFETY: The entry resolved the live town. The services return live
+        // stations; erasure removes only set membership, leaving each shell
+        // valid for upper_bound. No owner borrow spans any service.
+        unsafe {
+            let mut station = (self.h.next_near_station)(town.shell, std::ptr::null_mut());
+            while !station.is_null() {
+                let mut covers = (self.h.station_catchment)(station, tile);
+                if flags & TILES_Y != 0 {
+                    covers |=
+                        (self.h.station_catchment)(station, tile.wrapping_add(map.diff(0, 1)));
+                }
+                if flags & TILES_X != 0 {
+                    covers |=
+                        (self.h.station_catchment)(station, tile.wrapping_add(map.diff(1, 0)));
+                }
+                if flags & SIZE_2X2 != 0 {
+                    covers |=
+                        (self.h.station_catchment)(station, tile.wrapping_add(map.diff(1, 1)));
+                }
+                if covers && !(self.h.station_covers_town)(station, town.id.0) {
+                    witness::hit(W_STATION_REMOVED);
+                    (self.h.erase_near_station)(town.shell, station);
+                }
+                station = (self.h.next_near_station)(town.shell, station);
             }
-            if flags & TILES_X != 0 {
-                covers |= (self.h.station_catchment)(station, tile.wrapping_add(map.diff(1, 0)));
-            }
-            if flags & SIZE_2X2 != 0 {
-                covers |= (self.h.station_catchment)(station, tile.wrapping_add(map.diff(1, 1)));
-            }
-            if covers && !(self.h.station_covers_town)(station, town.id.0) {
-                witness::hit(W_STATION_REMOVED);
-                (self.h.erase_near_station)(town.shell, station);
-            }
-            station = (self.h.next_near_station)(town.shell, station);
         }
     }
     fn clear_part(&self, town: TownRef, tile: u32, house: u16) {
@@ -469,7 +478,8 @@ impl House<'_> {
         let rec = (self.h.random)(tile);
         let waiting = rec.triggers | (1 << trigger);
         (self.h.set_random_triggers)(tile, waiting);
-        let reseed = (self.h.resolve_reseed)(house, tile, town.shell, waiting);
+        // SAFETY: The entry resolved the live town; no owner borrow spans resolution.
+        let reseed = unsafe { (self.h.resolve_reseed)(house, tile, town.shell, waiting) };
         (self.h.set_random_triggers)(tile, waiting & !reseed.used);
         let new_random = self.s.random() as u8;
         let mut bits = (u32::from(rec.bits) & !reseed.reseed) as u8;
@@ -540,7 +550,9 @@ impl House<'_> {
         }
         if spec.callbacks & CBM_DESTRUCTION != 0 {
             let house = (self.h.house_type)(tile);
-            let res = (self.h.callback)(CB_DESTRUCTION, 0, 0, house, town.shell, tile, false);
+            // SAFETY: Live town; the destruction command follows resolution.
+            let res =
+                unsafe { (self.h.callback)(CB_DESTRUCTION, 0, 0, house, town.shell, tile, false) };
             if res != CALLBACK_FAILED && (self.h.convert_8bit)(house, CB_DESTRUCTION, res) {
                 self.clear_town_house(town, tile, house);
                 return false;
@@ -617,7 +629,8 @@ impl House<'_> {
         unsafe {
             (*row).history[0].production = (*row).history[0].production.wrapping_add(amount);
         }
-        let moved = (self.h.move_goods)(finder, cargo, amount, town.id.0);
+        // SAFETY: The native entry's stack-owned StationFinder remains live.
+        let moved = unsafe { (self.h.move_goods)(finder, cargo, amount, town.id.0) };
         // SAFETY: As above; the row is still the live canonical entry.
         unsafe {
             (*row).history[0].transported = (*row).history[0].transported.wrapping_add(moved);
@@ -685,7 +698,9 @@ impl House<'_> {
         let r = self.s.random();
         if spec.callbacks & CBM_PRODUCE != 0 {
             for i in 0..256 {
-                let cb = (self.h.callback)(CB_PRODUCE, i, r, house, town.shell, tile, false);
+                // SAFETY: Live town; no owner borrow spans the callback.
+                let cb =
+                    unsafe { (self.h.callback)(CB_PRODUCE, i, r, house, town.shell, tile, false) };
                 if cb == CALLBACK_FAILED || cb == PRODUCE_END {
                     break;
                 }
@@ -872,7 +887,10 @@ impl House<'_> {
                 let mut allow = true;
                 if (self.l.house_callbacks)(house) & CBM_AUTOSLOPE != 0 {
                     let town = (self.h.town)(tile);
-                    let res = (self.h.callback)(CB_AUTOSLOPE, 0, 0, house, town.shell, tile, false);
+                    // SAFETY: Live town; no owner borrow spans the callback.
+                    let res = unsafe {
+                        (self.h.callback)(CB_AUTOSLOPE, 0, 0, house, town.shell, tile, false)
+                    };
                     if res != CALLBACK_FAILED && (self.h.convert_boolean)(house, CB_AUTOSLOPE, res)
                     {
                         allow = false;
@@ -992,7 +1010,8 @@ impl House<'_> {
         if cargo == INVALID_CARGO || amount == 0 {
             return;
         }
-        (self.h.add_cargo)(ctx, cargo, amount);
+        // SAFETY: Native stack-owned CargoArray outlives this synchronous entry.
+        unsafe { (self.h.add_cargo)(ctx, cargo, amount) };
         // SAFETY: Native stack-owned mask outlives this synchronous entry.
         unsafe { *always |= 1 << cargo };
     }
@@ -1010,7 +1029,8 @@ impl House<'_> {
         let mut accepts = spec.accepts;
         let prototype = tile == INVALID_TILE;
         if callbacks & CBM_ACCEPT != 0 {
-            let cb = (self.h.callback)(CB_ACCEPT, 0, 0, house, town, tile, prototype);
+            // SAFETY: The caller supplies a live town, or null for a prototype.
+            let cb = unsafe { (self.h.callback)(CB_ACCEPT, 0, 0, house, town, tile, prototype) };
             if cb != CALLBACK_FAILED {
                 accepts[0] = (self.h.cargo_translation)(house, (cb & 31) as u8);
                 accepts[1] = (self.h.cargo_translation)(house, ((cb >> 5) & 31) as u8);
@@ -1018,7 +1038,9 @@ impl House<'_> {
             }
         }
         if callbacks & CBM_ACCEPTANCE != 0 {
-            let cb = (self.h.callback)(CB_ACCEPTANCE, 0, 0, house, town, tile, prototype);
+            // SAFETY: The caller supplies a live town, or null for a prototype.
+            let cb =
+                unsafe { (self.h.callback)(CB_ACCEPTANCE, 0, 0, house, town, tile, prototype) };
             if cb != CALLBACK_FAILED {
                 self.add_acceptance(ctx, always, accepts[0], u32::from(cb & 15));
                 self.add_acceptance(ctx, always, accepts[1], u32::from((cb >> 4) & 15));
@@ -1047,7 +1069,9 @@ impl House<'_> {
         let town = entry.town;
         if spec.callbacks & CBM_PRODUCE != 0 {
             for i in 0..256 {
-                let cb = (self.h.callback)(CB_PRODUCE, i, 0, house, town.shell, tile, false);
+                // SAFETY: Live town; no owner borrow spans the callback.
+                let cb =
+                    unsafe { (self.h.callback)(CB_PRODUCE, i, 0, house, town.shell, tile, false) };
                 if cb == CALLBACK_FAILED || cb == PRODUCE_END {
                     break;
                 }
@@ -1055,7 +1079,8 @@ impl House<'_> {
                 if cargo == INVALID_CARGO {
                     continue;
                 }
-                (self.h.add_cargo)(ctx, cargo, 1);
+                // SAFETY: Native stack-owned CargoArray outlives this entry.
+                unsafe { (self.h.add_cargo)(ctx, cargo, 1) };
             }
         } else {
             for (effect, rate) in [(1, spec.population), (2, spec.mail)] {
@@ -1068,7 +1093,8 @@ impl House<'_> {
                     if cargo.cargo == INVALID_CARGO {
                         break;
                     }
-                    (self.h.add_cargo)(ctx, cargo.cargo, 1);
+                    // SAFETY: Native stack-owned CargoArray outlives this entry.
+                    unsafe { (self.h.add_cargo)(ctx, cargo.cargo, 1) };
                     at += 1;
                 }
             }
