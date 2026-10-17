@@ -1773,6 +1773,9 @@ Money RoadVehicle::GetRunningCost() const
 #endif
 }
 
+#ifdef WITH_RUST
+const OpenTTDRoadLeaves &GetRustSchedulerRoadServices() noexcept { return GetRoadLeaves(); }
+#endif
 bool RoadVehicle::Tick()
 {
 #ifdef WITH_RUST

@@ -262,6 +262,31 @@ struct OpenTTDVehicleRawServices {
 	void (OPENTTD_VEHICLE_CALL *write_motion)(OpenTTDVehicle *, uint32_t) noexcept;
 };
 const OpenTTDVehicleRawServices &GetRustVehicleRawServices() noexcept;
+struct OpenTTDTrainServices;
+struct OpenTTDRoadLeaves;
+struct OpenTTDShipLeaves;
+struct OpenTTDAircraftLeaves;
+struct OpenTTDTrainHandle;
+struct OpenTTDRoadState;
+struct OpenTTDAircraftVehicle;
+struct alignas(8) OpenTTDVehicleControllerTimer { uint64_t storage[2]; };
+struct OpenTTDVehicleControllers {
+	const OpenTTDSharedServices *shared;
+	const OpenTTDTrainServices *train;
+	const OpenTTDRoadLeaves *road;
+	const OpenTTDShipLeaves *ship;
+	const OpenTTDAircraftLeaves *aircraft;
+	OpenTTDTrainHandle (OPENTTD_VEHICLE_CALL *prepare_train)(OpenTTDVehicle *, bool, OpenTTDVehicleControllerTimer *) noexcept;
+	OpenTTDRoadState *(OPENTTD_VEHICLE_CALL *prepare_road)(OpenTTDVehicle *, OpenTTDVehicleControllerTimer *) noexcept;
+	OpenTTDAircraftVehicle (OPENTTD_VEHICLE_CALL *prepare_aircraft)(OpenTTDVehicle *, OpenTTDVehicleControllerTimer *) noexcept;
+	uint32_t (OPENTTD_VEHICLE_CALL *prepare_ship)(OpenTTDVehicle *, OpenTTDVehicleControllerTimer *) noexcept;
+	void (OPENTTD_VEHICLE_CALL *finish_timer)(OpenTTDVehicleControllerTimer *) noexcept;
+};
+const OpenTTDVehicleControllers &GetRustVehicleControllers() noexcept;
+const OpenTTDTrainServices &GetRustSchedulerTrainServices() noexcept;
+const OpenTTDRoadLeaves &GetRustSchedulerRoadServices() noexcept;
+const OpenTTDShipLeaves &GetRustSchedulerShipServices() noexcept;
+const OpenTTDAircraftLeaves &GetRustSchedulerAircraftServices() noexcept;
 struct OpenTTDVehicleSchedulerTables {
 	const OpenTTDVehicleSchedulerServices *scheduler;
 	const OpenTTDCargoStorageServices *cargo;
@@ -271,6 +296,7 @@ struct OpenTTDVehicleSchedulerTables {
 	const OpenTTDFleetTransactionServices *transaction;
 	const OpenTTDFleetGroupServices *group;
 	const OpenTTDVehicleRawServices *raw;
+	const OpenTTDVehicleControllers *controllers;
 };
 const OpenTTDVehicleSchedulerServices &GetRustVehicleSchedulerServices() noexcept;
 extern "C" {

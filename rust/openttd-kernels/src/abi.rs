@@ -612,6 +612,10 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         677 => layout!(crate::aircraft::LayoutRoute, item; node, next, next_position, heading),
         678 => layout!(crate::vehicle::AltitudeInputs, item; max_speed, direction),
         679 => layout!(crate::aircraft::HangarCandidate, item; owner, airport, hangar),
+        779 => layout!(crate::vehicle::scheduler::ControllerTimer, item; storage),
+        778 => {
+            layout!(crate::vehicle::scheduler::Controllers, item; shared, train, road, ship, aircraft, prepare_train, prepare_road, prepare_aircraft, prepare_ship, finish_timer)
+        }
         776 => {
             layout!(crate::vehicle::scheduler::ReadLayout, item; period, counter, motion, speed, kind, subtype, tick, status, first)
         }
@@ -628,7 +632,7 @@ pub fn layout(type_id: u16, item: u8) -> usize {
             layout!(crate::vehicle::scheduler::SchedulerServices, item; pool, assertions, tick, calendar_day, economy_day, day_callback_read, day_callback, randomise_callback, first_dirty, unknown_day_callback, cargo_owner, running_sound, periodic_sound, next_station, with_loading_timer, reset_accumulators)
         }
         750 => {
-            layout!(crate::vehicle::scheduler::Tables, item; scheduler, cargo, station, loading, pending, transaction, group, raw)
+            layout!(crate::vehicle::scheduler::Tables, item; scheduler, cargo, station, loading, pending, transaction, group, raw, controllers)
         }
         751 => {
             layout!(crate::vehicle::maintenance::Renewal, item; age, max_age, months, enabled, kind, subtype)

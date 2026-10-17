@@ -872,6 +872,9 @@ static void ShipController(Ship *v)
 bool IsShipDestinationTile(TileIndex tile, StationID station) { return openttd_rust_ship_is_destination( tile.base(), station.base(), &GetShipServices(), &GetRustSharedServices()); }
 #endif
 
+#ifdef WITH_RUST
+const OpenTTDShipLeaves &GetRustSchedulerShipServices() noexcept { return GetShipServices(); }
+#endif
 bool Ship::Tick()
 {
 #ifdef WITH_RUST

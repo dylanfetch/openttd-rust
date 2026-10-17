@@ -4326,6 +4326,9 @@ Money Train::GetRunningCost() const
  * Update train vehicle data for a tick.
  * @return True if the vehicle still exists, false if it has ceased to exist (front of consists only).
  */
+#ifdef WITH_RUST
+const OpenTTDTrainServices &GetRustSchedulerTrainServices() noexcept { return GetTrainServices(); }
+#endif
 bool Train::Tick()
 {
 #ifdef WITH_RUST

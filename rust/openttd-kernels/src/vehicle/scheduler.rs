@@ -89,6 +89,7 @@ pub struct Tables {
     pub transaction: *const fleet::transactions::Services,
     pub group: *const fleet::GroupServices,
     pub raw: *const RawServices,
+    pub controllers: *const Controllers,
 }
 // Select counted/plain implementations once at entry. In the plain monomorph,
 // COUNTED=false erases every new per-visit witness branch/load/update.
@@ -484,6 +485,97 @@ unsafe fn raw_post_tick<const COUNTED: bool>(
     }
 }
 
+#[repr(C, align(8))]
+pub struct ControllerTimer {
+    pub storage: [u64; 2],
+}
+#[repr(C)]
+pub struct Controllers {
+    pub shared: *const crate::services::Services,
+    pub train: *const crate::train::Leaves,
+    pub road: *const crate::road::Leaves,
+    pub ship: *const crate::ship_control::Leaves,
+    pub aircraft: *const crate::aircraft::Leaves,
+    pub prepare_train:
+        unsafe extern "C" fn(VehicleRef, bool, *mut ControllerTimer) -> crate::train::Handle,
+    pub prepare_road:
+        unsafe extern "C" fn(VehicleRef, *mut ControllerTimer) -> *mut crate::road::State,
+    pub prepare_aircraft:
+        unsafe extern "C" fn(VehicleRef, *mut ControllerTimer) -> crate::aircraft::Vehicle,
+    pub prepare_ship: unsafe extern "C" fn(VehicleRef, *mut ControllerTimer) -> u32,
+    pub finish_timer: unsafe extern "C" fn(*mut ControllerTimer),
+}
+/// Dispatch owner kernels in Rust; native services supply canonical owner handles
+/// and the exact original performance-accumulator scopes. No shell/owner borrow
+/// survives a callback or controller call; deletion precedes the survival assertion.
+unsafe fn direct_tick<const COUNTED: bool>(
+    tables: &Tables,
+    raw: &RawServices,
+    vehicle: VehicleRef,
+) -> bool {
+    let control = unsafe { &*tables.controllers };
+    let layout = &raw.layout;
+    let kind = unsafe { raw_read::<VehicleType, COUNTED>(vehicle, layout.kind) };
+    let mut timer = std::mem::MaybeUninit::<ControllerTimer>::uninit();
+    let has_timer;
+    let survives;
+    unsafe {
+        match kind.0 {
+            0 => {
+                has_timer = raw_read::<u8, COUNTED>(vehicle, layout.subtype) & FRONT != 0;
+                let handle = svc!(
+                    COUNTED,
+                    control.prepare_train,
+                    vehicle,
+                    has_timer,
+                    timer.as_mut_ptr()
+                );
+                survives =
+                    crate::train::openttd_rust_train_tick(handle, control.train, control.shared)
+                        != 0;
+            }
+            1 => {
+                has_timer = true;
+                let owner = svc!(COUNTED, control.prepare_road, vehicle, timer.as_mut_ptr());
+                let read = crate::road::TickRead {
+                    tick: raw_read::<u8, COUNTED>(vehicle, layout.tick),
+                    front: raw_read::<u8, COUNTED>(vehicle, layout.subtype) & FRONT != 0,
+                };
+                survives = crate::road::openttd_rust_road_tick(
+                    vehicle,
+                    owner,
+                    &raw const read,
+                    control.road,
+                );
+            }
+            2 => {
+                has_timer = true;
+                let id = svc!(COUNTED, control.prepare_ship, vehicle, timer.as_mut_ptr());
+                survives =
+                    crate::ship_control::openttd_rust_ship_tick(id, control.ship, control.shared);
+            }
+            3 => {
+                if raw_read::<u8, COUNTED>(vehicle, layout.subtype) > NORMAL_AIRCRAFT {
+                    return true;
+                }
+                has_timer = true;
+                let handle = svc!(
+                    COUNTED,
+                    control.prepare_aircraft,
+                    vehicle,
+                    timer.as_mut_ptr()
+                );
+                survives = crate::aircraft::openttd_rust_aircraft_tick(control.aircraft, handle);
+            }
+            _ => return svc!(COUNTED, raw.tick, vehicle),
+        }
+        if has_timer {
+            svc!(COUNTED, control.finish_timer, timer.as_mut_ptr());
+        }
+    }
+    survives
+}
+
 /// # Safety
 /// Immutable native tables and serialized pools remain valid until return.
 /// No selected callback resets pools, loads a game or yields the game-state mutex.
@@ -512,22 +604,33 @@ pub unsafe extern "C" fn openttd_rust_vehicle_ticks(
     date_fract: usize,
     cost: *mut (),
 ) {
-    if crate::witness::enabled() {
-        unsafe {
-            if (*tables).raw.is_null() {
-                run_ticks::<true, false>(&*tables, normal, date_fract, cost);
-            } else {
-                run_ticks::<true, true>(&*tables, normal, date_fract, cost);
+    // SAFETY: Caller supplies immutable entry-live metadata and serialized pools.
+    unsafe {
+        let tables = &*tables;
+        match (
+            crate::witness::enabled(),
+            tables.raw.is_null(),
+            tables.controllers.is_null(),
+        ) {
+            (true, true, _) => {
+                run_ticks::<true, false, false>(tables, normal, date_fract, cost);
             }
-        };
-    } else {
-        unsafe {
-            if (*tables).raw.is_null() {
-                run_ticks::<false, false>(&*tables, normal, date_fract, cost);
-            } else {
-                run_ticks::<false, true>(&*tables, normal, date_fract, cost);
+            (false, true, _) => {
+                run_ticks::<false, false, false>(tables, normal, date_fract, cost);
             }
-        };
+            (true, false, true) => {
+                run_ticks::<true, true, false>(tables, normal, date_fract, cost);
+            }
+            (false, false, true) => {
+                run_ticks::<false, true, false>(tables, normal, date_fract, cost);
+            }
+            (true, false, false) => {
+                run_ticks::<true, true, true>(tables, normal, date_fract, cost);
+            }
+            (false, false, false) => {
+                run_ticks::<false, true, true>(tables, normal, date_fract, cost);
+            }
+        }
     }
 }
 // The native RAII scope invokes this synchronous callback without retaining it.
@@ -555,7 +658,7 @@ unsafe extern "C" fn load_stations<const COUNTED: bool>(tables: *const Tables) {
         };
     }
 }
-unsafe fn run_ticks<const COUNTED: bool, const RAW: bool>(
+unsafe fn run_ticks<const COUNTED: bool, const RAW: bool, const DIRECT: bool>(
     tables: &Tables,
     normal: bool,
     date_fract: usize,
@@ -594,7 +697,9 @@ unsafe fn run_ticks<const COUNTED: bool, const RAW: bool>(
             // The bundle is written only on survival and read only after the assertion.
             let mut bundle = std::mem::MaybeUninit::<PostTick>::uninit();
             // SAFETY: bundle is aligned writable storage, unused until success.
-            let survives = if RAW {
+            let survives = if DIRECT {
+                unsafe { direct_tick::<COUNTED>(tables, &*tables.raw, vehicle) }
+            } else if RAW {
                 // SAFETY: Entry-live table, no shell reference spans Tick.
                 unsafe { svc!(COUNTED, (*tables.raw).tick, vehicle) }
             } else {

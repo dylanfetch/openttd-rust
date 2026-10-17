@@ -10,6 +10,10 @@
 #include "vehicle_ffi.h"
 #ifdef WITH_RUST
 #include "vehicle_services.h"
+#include "train_ffi.h"
+#include "../train.h"
+#include "../roadveh.h"
+#include "aircraft_ffi.h"
 #include "../vehicle_func.h"
 #include "../order_func.h"
 #include "../newgrf_engine.h"
@@ -397,6 +401,43 @@ static void OPENTTD_VEHICLE_CALL VehicleRawWriteMotion(OpenTTDVehicle *shell, ui
 const OpenTTDVehicleRawServices &GetRustVehicleRawServices() noexcept
 {
 	static const OpenTTDVehicleRawServices services{.layout = OpenTTDVehicleReadOffsets::Acquire(), .tick = VehicleRawTick, .write_counter = VehicleRawWriteCounter, .write_motion = VehicleRawWriteMotion};
+	return services;
+}
+static_assert(GVSF_FRONT == 0);
+static void BeginControllerTimer(OpenTTDVehicleControllerTimer *timer, PerformanceElement element) noexcept
+{
+	static_assert(sizeof(PerformanceAccumulator) <= sizeof(*timer));
+	static_assert(alignof(PerformanceAccumulator) <= alignof(OpenTTDVehicleControllerTimer));
+	new (timer) PerformanceAccumulator(element);
+}
+static void OPENTTD_VEHICLE_CALL FinishControllerTimer(OpenTTDVehicleControllerTimer *timer) noexcept
+{
+	std::launder(reinterpret_cast<PerformanceAccumulator *>(timer))->~PerformanceAccumulator();
+}
+static OpenTTDTrainHandle OPENTTD_VEHICLE_CALL PrepareTrainController(OpenTTDVehicle *shell, bool front, OpenTTDVehicleControllerTimer *timer) noexcept
+{
+	Train *v = Train::From(VehicleOf(shell));
+	if (front) BeginControllerTimer(timer, PFE_GL_TRAINS);
+	return {v, v->GetRustState()};
+}
+static OpenTTDRoadState *OPENTTD_VEHICLE_CALL PrepareRoadController(OpenTTDVehicle *shell, OpenTTDVehicleControllerTimer *timer) noexcept
+{
+	BeginControllerTimer(timer, PFE_GL_ROADVEHS);
+	return RoadVehicle::From(VehicleOf(shell))->GetRustState();
+}
+static OpenTTDAircraftVehicle OPENTTD_VEHICLE_CALL PrepareAircraftController(OpenTTDVehicle *shell, OpenTTDVehicleControllerTimer *timer) noexcept
+{
+	BeginControllerTimer(timer, PFE_GL_AIRCRAFT);
+	Aircraft *v = Aircraft::From(VehicleOf(shell));
+	return {shell, v->rust_state.get(), v->index.base()};
+}
+static uint32_t OPENTTD_VEHICLE_CALL PrepareShipController(OpenTTDVehicle *shell, OpenTTDVehicleControllerTimer *timer) noexcept { BeginControllerTimer(timer, PFE_GL_SHIPS); return VehicleOf(shell)->index.base(); }
+const OpenTTDVehicleControllers &GetRustVehicleControllers() noexcept
+{
+	static const OpenTTDVehicleControllers services{
+		.shared = &GetRustSharedServices(), .train = &GetRustSchedulerTrainServices(), .road = &GetRustSchedulerRoadServices(), .ship = &GetRustSchedulerShipServices(), .aircraft = &GetRustSchedulerAircraftServices(),
+		.prepare_train = PrepareTrainController, .prepare_road = PrepareRoadController, .prepare_aircraft = PrepareAircraftController, .prepare_ship = PrepareShipController, .finish_timer = FinishControllerTimer,
+	};
 	return services;
 }
 static void OPENTTD_VEHICLE_CALL VehicleSchedulerCalendarDay(OpenTTDVehicle *shell) noexcept { VehicleOf(shell)->OnNewCalendarDay(); }

@@ -23,12 +23,16 @@ TEST_CASE("Base vehicle scheduler - consumed boundary layouts")
 		for (size_t expected : fields) CHECK(openttd_rust_abi_layout(type, item++) == expected);
 		CHECK(openttd_rust_abi_layout(type, item) == SIZE_MAX);
 	};
+	Layout(776, "OpenTTDVehicleReadLayout", {sizeof(OpenTTDVehicleReadLayout), alignof(OpenTTDVehicleReadLayout), offsetof(OpenTTDVehicleReadLayout, period), offsetof(OpenTTDVehicleReadLayout, counter), offsetof(OpenTTDVehicleReadLayout, motion), offsetof(OpenTTDVehicleReadLayout, speed), offsetof(OpenTTDVehicleReadLayout, kind), offsetof(OpenTTDVehicleReadLayout, subtype), offsetof(OpenTTDVehicleReadLayout, tick), offsetof(OpenTTDVehicleReadLayout, status), offsetof(OpenTTDVehicleReadLayout, first)});
+	Layout(777, "OpenTTDVehicleRawServices", {sizeof(OpenTTDVehicleRawServices), alignof(OpenTTDVehicleRawServices), offsetof(OpenTTDVehicleRawServices, layout), offsetof(OpenTTDVehicleRawServices, tick), offsetof(OpenTTDVehicleRawServices, write_counter), offsetof(OpenTTDVehicleRawServices, write_motion)});
+	Layout(779, "OpenTTDVehicleControllerTimer", {sizeof(OpenTTDVehicleControllerTimer), alignof(OpenTTDVehicleControllerTimer), offsetof(OpenTTDVehicleControllerTimer, storage)});
+	Layout(778, "OpenTTDVehicleControllers", {sizeof(OpenTTDVehicleControllers), alignof(OpenTTDVehicleControllers), offsetof(OpenTTDVehicleControllers, shared), offsetof(OpenTTDVehicleControllers, train), offsetof(OpenTTDVehicleControllers, road), offsetof(OpenTTDVehicleControllers, ship), offsetof(OpenTTDVehicleControllers, aircraft), offsetof(OpenTTDVehicleControllers, prepare_train), offsetof(OpenTTDVehicleControllers, prepare_road), offsetof(OpenTTDVehicleControllers, prepare_aircraft), offsetof(OpenTTDVehicleControllers, prepare_ship), offsetof(OpenTTDVehicleControllers, finish_timer)});
 	Layout(740, "OpenTTDVehiclePoolCursor", {sizeof(OpenTTDVehiclePoolCursor), alignof(OpenTTDVehiclePoolCursor), offsetof(OpenTTDVehiclePoolCursor, slots), offsetof(OpenTTDVehiclePoolCursor, slots_len), offsetof(OpenTTDVehiclePoolCursor, first_unused)});
 	Layout(741, "OpenTTDVehiclePostTick", {sizeof(OpenTTDVehiclePostTick), alignof(OpenTTDVehiclePostTick), offsetof(OpenTTDVehiclePostTick, type), offsetof(OpenTTDVehiclePostTick, period), offsetof(OpenTTDVehiclePostTick, counter), offsetof(OpenTTDVehiclePostTick, motion), offsetof(OpenTTDVehiclePostTick, speed), offsetof(OpenTTDVehiclePostTick, front_type), offsetof(OpenTTDVehiclePostTick, subtype), offsetof(OpenTTDVehiclePostTick, tick), offsetof(OpenTTDVehiclePostTick, front_status), offsetof(OpenTTDVehiclePostTick, status)});
 	Layout(743, "OpenTTDVehicleDayCallback", {sizeof(OpenTTDVehicleDayCallback), alignof(OpenTTDVehicleDayCallback), offsetof(OpenTTDVehicleDayCallback, day), offsetof(OpenTTDVehicleDayCallback, has_engine)});
 	Layout(748, "OpenTTDVehicleStationLookup", {sizeof(OpenTTDVehicleStationLookup), alignof(OpenTTDVehicleStationLookup), offsetof(OpenTTDVehicleStationLookup, station), offsetof(OpenTTDVehicleStationLookup, id)});
 	Layout(749, "OpenTTDVehicleSchedulerServices", {sizeof(OpenTTDVehicleSchedulerServices), alignof(OpenTTDVehicleSchedulerServices), offsetof(OpenTTDVehicleSchedulerServices, pool), offsetof(OpenTTDVehicleSchedulerServices, assertions), offsetof(OpenTTDVehicleSchedulerServices, tick), offsetof(OpenTTDVehicleSchedulerServices, calendar_day), offsetof(OpenTTDVehicleSchedulerServices, economy_day), offsetof(OpenTTDVehicleSchedulerServices, day_callback_read), offsetof(OpenTTDVehicleSchedulerServices, day_callback), offsetof(OpenTTDVehicleSchedulerServices, randomise_callback), offsetof(OpenTTDVehicleSchedulerServices, first_dirty), offsetof(OpenTTDVehicleSchedulerServices, unknown_day_callback), offsetof(OpenTTDVehicleSchedulerServices, cargo_owner), offsetof(OpenTTDVehicleSchedulerServices, running_sound), offsetof(OpenTTDVehicleSchedulerServices, periodic_sound), offsetof(OpenTTDVehicleSchedulerServices, next_station), offsetof(OpenTTDVehicleSchedulerServices, with_loading_timer), offsetof(OpenTTDVehicleSchedulerServices, reset_accumulators)});
-	Layout(750, "OpenTTDVehicleSchedulerTables", {sizeof(OpenTTDVehicleSchedulerTables), alignof(OpenTTDVehicleSchedulerTables), offsetof(OpenTTDVehicleSchedulerTables, scheduler), offsetof(OpenTTDVehicleSchedulerTables, cargo), offsetof(OpenTTDVehicleSchedulerTables, station), offsetof(OpenTTDVehicleSchedulerTables, loading), offsetof(OpenTTDVehicleSchedulerTables, pending), offsetof(OpenTTDVehicleSchedulerTables, transaction), offsetof(OpenTTDVehicleSchedulerTables, group), offsetof(OpenTTDVehicleSchedulerTables, raw)});
+	Layout(750, "OpenTTDVehicleSchedulerTables", {sizeof(OpenTTDVehicleSchedulerTables), alignof(OpenTTDVehicleSchedulerTables), offsetof(OpenTTDVehicleSchedulerTables, scheduler), offsetof(OpenTTDVehicleSchedulerTables, cargo), offsetof(OpenTTDVehicleSchedulerTables, station), offsetof(OpenTTDVehicleSchedulerTables, loading), offsetof(OpenTTDVehicleSchedulerTables, pending), offsetof(OpenTTDVehicleSchedulerTables, transaction), offsetof(OpenTTDVehicleSchedulerTables, group), offsetof(OpenTTDVehicleSchedulerTables, raw), offsetof(OpenTTDVehicleSchedulerTables, controllers)});
 }
 /* Base Vehicle::Tick survives without a controller, so the Tick facade fills
  * the actual post-Tick member addresses of these road-typed shells. */
@@ -65,6 +69,24 @@ TEST_CASE("Base vehicle scheduler - scalar member identity and lifetime")
 	CHECK(post.front_status == v->vehstatus.base_address());
 	CHECK(post.status == part->vehstatus.base_address());
 	CHECK(post.front_status != post.status);
+	const auto &raw = GetRustVehicleRawServices();
+	const auto *base = reinterpret_cast<const uint8_t *>(part);
+	const auto *front = reinterpret_cast<const uint8_t *>(v);
+	CHECK(base + raw.layout.period == reinterpret_cast<const uint8_t *>(post.period));
+	CHECK(base + raw.layout.counter == reinterpret_cast<const uint8_t *>(post.counter));
+	CHECK(base + raw.layout.motion == reinterpret_cast<const uint8_t *>(post.motion));
+	CHECK(front + raw.layout.speed == reinterpret_cast<const uint8_t *>(post.speed));
+	CHECK(front + raw.layout.kind == reinterpret_cast<const uint8_t *>(post.front_type));
+	CHECK(base + raw.layout.subtype == post.subtype);
+	CHECK(base + raw.layout.tick == post.tick);
+	CHECK(front + raw.layout.status == post.front_status);
+	CHECK(base + raw.layout.status == post.status);
+	CHECK(*reinterpret_cast<Vehicle *const *>(base + raw.layout.first) == part->First());
+	raw.write_counter(RustVehicle(part), UINT16_MAX);
+	raw.write_motion(RustVehicle(part), UINT32_MAX);
+	CHECK(part->cargo_age_counter == UINT16_MAX);
+	CHECK(part->motion_counter == UINT32_MAX);
+
 	v->vehstatus.Set(VehState::Stopped);
 	part->vehstatus.Set(VehState::Hidden);
 	CHECK(*post.front_status == RustVehicleStatus(v));

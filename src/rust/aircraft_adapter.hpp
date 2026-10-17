@@ -559,6 +559,9 @@ static const OpenTTDAircraftLeaves _aircraft_leaves{
 	.route_node = Aircraft_route_node,
 	.block_choice = Aircraft_block_choice,
 };
+#ifdef WITH_RUST
+const OpenTTDAircraftLeaves &GetRustSchedulerAircraftServices() noexcept { return _aircraft_leaves; }
+#endif
 bool Aircraft::Tick()
 {
 	if (!this->IsNormalAircraft()) return true;
