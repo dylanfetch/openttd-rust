@@ -377,11 +377,11 @@ static bool OPENTTD_VEHICLE_CALL VehicleSchedulerTick(OpenTTDVehicle *shell, Ope
 }
 static void OPENTTD_VEHICLE_CALL VehicleSchedulerCalendarDay(OpenTTDVehicle *shell) noexcept { VehicleOf(shell)->OnNewCalendarDay(); }
 static void OPENTTD_VEHICLE_CALL VehicleSchedulerEconomyDay(OpenTTDVehicle *shell) noexcept { VehicleOf(shell)->OnNewEconomyDay(); }
-static OpenTTDCargoList *OPENTTD_VEHICLE_CALL VehicleSchedulerCargoOwner(OpenTTDVehicle *shell) noexcept { return VehicleOf(shell)->cargo.RustOwner(); }
+static OpenTTDCargoList *OPENTTD_VEHICLE_CALL VehicleSchedulerCargoOwner(OpenTTDVehicle *shell) noexcept { return RustVehicleCargoOwner(VehicleOf(shell)); }
 static OpenTTDVehicleDayCallback OPENTTD_VEHICLE_CALL VehicleSchedulerDayCallbackRead(OpenTTDVehicle *shell) noexcept
 {
 	const Vehicle *v = VehicleOf(shell);
-	return {.day = v->day_counter, .has_engine = v->HasEngineType()};
+	return {.day = v->day_counter, .has_engine = RustVehicleHasEngine(v)};
 }
 static uint16_t OPENTTD_VEHICLE_CALL VehicleSchedulerDayCallback(OpenTTDVehicle *shell) noexcept
 {
@@ -471,7 +471,7 @@ static void OPENTTD_VEHICLE_CALL MaintenanceResetWrite(OpenTTDVehicle *handle, O
 	v->reliability = value.reliability;
 	v->breakdown_chance = value.chance;
 }
-static bool OPENTTD_VEHICLE_CALL MaintenanceHasEngine(OpenTTDVehicle *handle) noexcept { return VehicleOf(handle)->HasEngineType(); }
+static bool OPENTTD_VEHICLE_CALL MaintenanceHasEngine(OpenTTDVehicle *handle) noexcept { return RustVehicleHasEngine(VehicleOf(handle)); }
 static OpenTTDVehicleMaintenanceInterval OPENTTD_VEHICLE_CALL MaintenanceInterval(OpenTTDVehicle *handle) noexcept
 {
 	const Vehicle *v = VehicleOf(handle);

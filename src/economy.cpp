@@ -1586,7 +1586,7 @@ static const OpenTTDStationLoading _rust_station_loading = {
 	.cargo_capacity = [](OpenTTDVehicle *handle) noexcept -> OpenTTDCargoCapacity {
 		Vehicle *v = VehicleOf(handle);
 		return {
-			v->cargo.RustOwner(), v->cargo_cap, v->cargo_type
+			RustVehicleCargoOwner(v), v->cargo_cap, v->cargo_type
 		};
 	},
 	.vehicle_type = [](OpenTTDVehicle *handle) noexcept -> uint8_t {

@@ -28,6 +28,8 @@ inline OpenTTDVehicle *RustNextVehicle(uint32_t from) noexcept
 
 /** Shared native field definitions, also used by bundled observations. */
 inline Vehicle *RustVehicleNext(const Vehicle *v) noexcept { return v->Next(); }
+inline OpenTTDCargoList *RustVehicleCargoOwner(Vehicle *v) noexcept { return v->cargo.RustOwner(); }
+inline bool RustVehicleHasEngine(const Vehicle *v) noexcept { return v->HasEngineType(); }
 inline uint32_t RustVehicleTile(const Vehicle *v) noexcept { return v->tile.base(); }
 inline uint32_t RustVehicleDestTile(const Vehicle *v) noexcept { return v->dest_tile.base(); }
 inline OrderType RustVehicleOrderType(const Vehicle *v) noexcept { return v->current_order.GetType(); }
@@ -51,6 +53,7 @@ inline TimerGameCalendar::Date RustVehicleAge(const Vehicle *v) noexcept { retur
 inline TimerGameCalendar::Date RustVehicleMaxAge(const Vehicle *v) noexcept { return v->max_age; }
 inline TimerGameEconomy::Date RustVehicleEconomyAge(const Vehicle *v) noexcept { return v->economy_age; }
 inline TimerGameEconomy::Date RustVehicleLastService(const Vehicle *v) noexcept { return v->date_of_last_service; }
+inline int32_t RustVehicleLastServiceOf(OpenTTDVehicle *v) noexcept { return RustVehicleLastService(VehicleOf(v)).base(); }
 inline uint8_t RustVehicleBreakdownCounter(const Vehicle *v) noexcept { return v->breakdown_ctr; }
 inline int64_t RustVehicleValue(const Vehicle *v) noexcept { return v->value.base(); }
 inline uint16_t RustEngineReliability(const Engine *e) noexcept { return e->reliability; }

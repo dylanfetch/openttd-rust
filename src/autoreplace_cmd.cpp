@@ -104,7 +104,7 @@ bool CheckAutoreplaceValidity(EngineID from, EngineID to, CompanyID company)
 static void CargoCapacityRead(void *shell, OpenTTDCargoCapacityVehicle *out) noexcept
 {
 	Vehicle *v = static_cast<Vehicle *>(shell);
-	*out = {v->cargo.RustOwner(), v->cargo_cap, v->cargo_type, static_cast<uint8_t>(v->type == VEH_TRAIN), static_cast<uint8_t>(v->IsArticulatedPart())};
+	*out = {RustVehicleCargoOwner(v), v->cargo_cap, v->cargo_type, static_cast<uint8_t>(v->type == VEH_TRAIN), static_cast<uint8_t>(v->IsArticulatedPart())};
 }
 void *CargoCapacityNextPart(void *shell) noexcept
 {
