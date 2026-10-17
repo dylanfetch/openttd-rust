@@ -156,16 +156,17 @@ pub struct Services {
     pub shared: *const services::Services,
     pub transaction: *const fleet::transactions::Services,
     pub group: *const fleet::GroupServices,
-    pub renewal: extern "C" fn(VehicleRef, *const OpenTTDCompany) -> Renewal,
+    /// Company pointers must name the live owner for the synchronous call.
+    pub renewal: unsafe extern "C" fn(VehicleRef, *const OpenTTDCompany) -> Renewal,
     pub reset: extern "C" fn(VehicleRef) -> Reset,
     pub reset_write: extern "C" fn(VehicleRef, ResetWrite),
     pub has_engine: extern "C" fn(VehicleRef) -> bool,
     pub interval: extern "C" fn(VehicleRef) -> Interval,
     pub engine_reliability: extern "C" fn(VehicleRef) -> u16,
-    pub budget: extern "C" fn(*const OpenTTDCompany) -> Budget,
-    pub replacement: extern "C" fn(VehicleRef, *const OpenTTDCompany) -> Replacement,
+    pub budget: unsafe extern "C" fn(*const OpenTTDCompany) -> Budget,
+    pub replacement: unsafe extern "C" fn(VehicleRef, *const OpenTTDCompany) -> Replacement,
     pub replacement_available: extern "C" fn(VehicleRef, u16) -> bool,
-    pub replacement_cost: extern "C" fn(*const OpenTTDCompany, u16) -> ReplacementCost,
+    pub replacement_cost: unsafe extern "C" fn(*const OpenTTDCompany, u16) -> ReplacementCost,
     pub automatic: extern "C" fn(VehicleRef) -> Automatic,
     pub depot_service: extern "C" fn(VehicleRef) -> bool,
     pub check_breakdown: extern "C" fn(VehicleRef) -> CheckBreakdown,
@@ -195,7 +196,7 @@ pub struct Services {
     pub warning: extern "C" fn(VehicleRef) -> Warning,
     pub warning_company: extern "C" fn(VehicleRef) -> WarningCompany,
     pub engine_available_any: extern "C" fn(VehicleRef) -> bool,
-    pub replacement_active: extern "C" fn(VehicleRef, *const OpenTTDCompany) -> bool,
+    pub replacement_active: unsafe extern "C" fn(VehicleRef, *const OpenTTDCompany) -> bool,
     pub old_news: extern "C" fn(VehicleRef, u32),
     pub economy_age: extern "C" fn(VehicleRef) -> EconomyDate,
     pub economy_age_write: extern "C" fn(VehicleRef, EconomyDate),
@@ -237,7 +238,8 @@ unsafe fn renew<const C: bool>(
     use_setting: bool,
 ) -> bool {
     let s = unsafe { &*base.maintenance };
-    let r = svc!(C, s.renewal, v, company);
+    // SAFETY: the native entry supplies the live vehicle owner.
+    let r = unsafe { svc!(C, s.renewal, v, company) };
     branch!(C, VEHICLE_MAINT_RENEW);
     if use_setting && !r.enabled {
         return false;
@@ -311,7 +313,8 @@ unsafe fn needs_service<const C: bool>(v: VehicleRef, base: &VehicleServices) ->
     if !r.no_service || r.breakdowns != 0 {
         return true;
     }
-    let budget = svc!(C, s.budget, r.company);
+    // SAFETY: interval resolved the live owner; no callback can destroy it here.
+    let budget = unsafe { svc!(C, s.budget, r.company) };
     if budget.needed > budget.available {
         return false;
     }
@@ -340,7 +343,8 @@ unsafe fn replacement_needed<const C: bool>(
     pending: &mut bool,
 ) -> bool {
     let s = unsafe { &*base.maintenance };
-    let replacement = svc!(C, s.replacement, v, company);
+    // SAFETY: needs_service retains the live native owner through this decision.
+    let replacement = unsafe { svc!(C, s.replacement, v, company) };
     if replacement.engine == super::INVALID_ENGINE
         || !svc!(C, s.replacement_available, v, replacement.engine)
     {
@@ -385,7 +389,8 @@ unsafe fn replacement_needed<const C: bool>(
         }
     }
     *pending = true;
-    let money = svc!(C, s.replacement_cost, company, replacement.engine);
+    // SAFETY: the same live owner remains valid after the bounded refit queries.
+    let money = unsafe { svc!(C, s.replacement_cost, company, replacement.engine) };
     *needed = needed.saturating_add(money.cost.saturating_mul(2));
     branch!(C, VEHICLE_MAINT_REPLACE);
     *needed > money.available
@@ -616,7 +621,8 @@ unsafe fn age<const C: bool>(v: VehicleRef, base: &VehicleServices) {
     if company.renewal && svc!(C, s.engine_available_any, v) {
         return;
     }
-    if svc!(C, s.replacement_active, v, company.company) {
+    // SAFETY: warning_company supplies the live owner; availability only reads.
+    if unsafe { svc!(C, s.replacement_active, v, company.company) } {
         return;
     }
     let news = if difference == s.before_zero.0 {

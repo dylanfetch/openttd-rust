@@ -56,7 +56,8 @@ pub struct SchedulerServices {
     pub pool: extern "C" fn() -> PoolCursor,
     pub assertions: bool,
     /// Runs the virtual Tick; fills `out` only when the vehicle survives.
-    pub tick: extern "C" fn(VehicleRef, *mut PostTick) -> bool,
+    /// Caller supplies writable, aligned stack storage for one `PostTick`.
+    pub tick: unsafe extern "C" fn(VehicleRef, *mut PostTick) -> bool,
     pub calendar_day: extern "C" fn(VehicleRef),
     pub economy_day: extern "C" fn(VehicleRef),
     pub day_callback_read: extern "C" fn(VehicleRef) -> DayCallback,
@@ -68,7 +69,9 @@ pub struct SchedulerServices {
     pub running_sound: extern "C" fn(VehicleRef),
     pub periodic_sound: extern "C" fn(VehicleRef, bool),
     pub next_station: extern "C" fn(u32) -> StationLookup,
-    pub with_loading_timer: extern "C" fn(*const Tables, extern "C" fn(*const Tables)),
+    /// Tables remain live through the synchronous loading callback.
+    pub with_loading_timer:
+        unsafe extern "C" fn(*const Tables, unsafe extern "C" fn(*const Tables)),
     pub reset_accumulators: extern "C" fn(),
 }
 #[repr(C)]
@@ -360,7 +363,8 @@ pub unsafe extern "C" fn openttd_rust_vehicle_ticks(
 }
 // The native RAII scope invokes this synchronous callback without retaining it.
 // No world/owner borrow spans any station loading service.
-extern "C" fn load_stations<const COUNTED: bool>(tables: *const Tables) {
+// SAFETY: the caller supplies immutable live tables for this call.
+unsafe extern "C" fn load_stations<const COUNTED: bool>(tables: *const Tables) {
     let tables = unsafe { &*tables };
     let s = unsafe { &*tables.scheduler };
     let mut station_from = 0;
@@ -393,12 +397,15 @@ unsafe fn run_ticks<const COUNTED: bool>(
     if normal {
         unsafe { day::<COUNTED>(tables, s, false, date_fract) };
     }
-    svc!(
-        COUNTED,
-        s.with_loading_timer,
-        std::ptr::from_ref(tables),
-        load_stations::<COUNTED>
-    );
+    // SAFETY: tables and their services outlive the synchronous callback.
+    unsafe {
+        svc!(
+            COUNTED,
+            s.with_loading_timer,
+            std::ptr::from_ref(tables),
+            load_stations::<COUNTED>
+        );
+    }
     svc!(COUNTED, s.reset_accumulators);
     let post = PostTickServices {
         cargo_owner: s.cargo_owner,
@@ -417,7 +424,8 @@ unsafe fn run_ticks<const COUNTED: bool>(
             // Native controller timing completes before the source survival assertion.
             // The bundle is written only on survival and read only after the assertion.
             let mut bundle = std::mem::MaybeUninit::<PostTick>::uninit();
-            let survives = svc!(COUNTED, s.tick, vehicle, bundle.as_mut_ptr());
+            // SAFETY: bundle is aligned writable storage, unused until success.
+            let survives = unsafe { svc!(COUNTED, s.tick, vehicle, bundle.as_mut_ptr()) };
             if s.assertions {
                 let _ = unsafe { extent::<COUNTED>(s, &mut pool) };
                 let actual = unsafe { scalar_read::<_, COUNTED>(pool.slots.add(current_id)) };
