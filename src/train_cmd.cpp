@@ -4711,7 +4711,7 @@ static const OpenTTDTrainServices &GetTrainServices()
 		.property = TrainProperty,
 		.railveh_wagon = TrainRailvehWagon,
 		.rail_tilt = TrainRailTilt,
-		.rail_type = TrainRailType,
+		.rail_type = OpenTTDLegacyMapQuery<uint64_t, RustRailType, OpenTTDTrainHandle, uint32_t>,
 		.rail_types = TrainRailTypes,
 		.reserve_paths = TrainReservePaths,
 		.reserve_under = TrainReserveUnder,

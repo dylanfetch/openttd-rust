@@ -320,11 +320,10 @@ static OpenTTDRailSignalPresence SharedRail_signal_presence(uint32_t tile, uint8
 }
 static OpenTTDRailSignalUpdate SharedRail_signal_update(uint32_t tile, uint8_t td) noexcept
 {
-	TileIndex t(tile);
 	assert(RustRailHasSignalTrackdir(tile, td));
 	SignalType kind = RustRailSignalType(tile, TrackdirToTrack(static_cast<Trackdir>(td)));
 	OpenTTDRailSignalUpdate r{.kind = kind, .reservations = TRACK_BIT_NONE};
-	if (IsPbsSignal(kind)) r.reservations = GetRailReservationTrackBits(t);
+	if (IsPbsSignal(kind)) r.reservations = RustRailReservation(tile);
 	return r;
 }
 static OpenTTDRailStationAdmission SharedRail_station_admission(uint32_t tile, uint8_t owner, uint8_t dir) noexcept

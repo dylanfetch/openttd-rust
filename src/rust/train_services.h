@@ -580,10 +580,6 @@ static uint64_t TrainRailTilt(OpenTTDTrainHandle id) noexcept
 	Train *v = static_cast<Train *>(id.shell);
 	return v->GetEngine()->info.misc_flags.Test(EngineMiscFlag::RailTilts);
 }
-static uint64_t TrainRailType(OpenTTDTrainHandle, uint32_t a) noexcept
-{
-	return GetRailType(TileIndex(a));
-}
 static uint64_t TrainRailTypes(OpenTTDTrainHandle id) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
