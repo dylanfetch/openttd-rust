@@ -563,7 +563,7 @@ while a separately constructed end keeps middle; they compare equal by position.
 
 Evidence: the fifteen unchanged fixed sequences, plus public-interface tests for
 empty/singleton, independent copies, postfix/prefix identity, position ordering,
-distinct end Base values, stable-list insertion and typed operation counts.
+distinct end Base values and stable-list insertion.
 
 ### StringConsumer byte algorithms
 
@@ -1125,7 +1125,7 @@ end before growth, rendering, deletion and reentry. Only
 `SetGeneratingWorldProgress`/`IncreaseGeneratingWorldProgress` return cancellation to a native
 frame; Rust drops uniqueness scratch before native rethrow. Portable original bodies remain
 unchanged in non-Rust branches. `python3 tools/migration.py simulate town-founding- --jobs 2`
-compares climate/layout, coastal generation, manual/deity/editor commands, exact
+compares climate/layout, no-city generation, coastal generation, manual/deity/editor commands, exact
 cost/error/extra-money/ID, zero-growth deletion/reuse, rename/cache lifetime, name exhaustion
 and reload. Default module-owned adapters also compare cancellation against unchanged source,
 full-width count clamps/RNG and otherwise unreachable name bytes; missing markers fail. Real
@@ -1243,7 +1243,7 @@ remain unchanged.
 
 `python3 tools/migration.py simulate stations economy` uses the existing road/CAPY inputs for
 loading queues, fractional admission, acceptance loss, full/gradual loading, rating
-expiry/decay/capping, stale-link refresh/removal and active reload. Legacy, NewGRF and refit
+expiry/decay/capping, stale-link refresh/removal/restriction/release and active reload. Legacy, NewGRF and refit
 gaps remain in #156.
 
 ### Ship controller and private state (#146)
