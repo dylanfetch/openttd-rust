@@ -1125,7 +1125,8 @@ static bool RustHouseLiftHasDestination(uint32_t tile) noexcept { return LiftHas
 static OpenTTDTownRef RustHouseTown(uint32_t tile) noexcept
 {
 	Town *t = Town::GetByTile(TileIndex{tile});
-	return {t, GetRustSharedServices().town_owner(reinterpret_cast<const OpenTTDTownHandle *>(t)), t->index.base()};
+	const auto *town = reinterpret_cast<const OpenTTDTownHandle *>(t);
+	return {t, GetRustSharedServices().town_owner(town), RustTownAuthorityServices().town_index(town)};
 }
 static OpenTTDHouseEntry RustHouseEntry(uint32_t tile) noexcept
 {
