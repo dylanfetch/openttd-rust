@@ -109,7 +109,11 @@ static inline const OpenTTDCommandServices town_protocol_commands{
 	.landscape_clear = [](OpenTTDCommandCost *cost, uint32_t, uint16_t) noexcept { town_protocol_world->landscape_clears++; TownProtocolCostOf(cost)->ok = true; },
 };
 static inline const OpenTTDTownAuthorityServices town_protocol_authority{
+	.council_tolerance = nullptr,
+	.bulldozer = nullptr,
+	.authority_distance = nullptr,
 	.town_index = [](const OpenTTDTownHandle *) noexcept -> uint16_t { return 0; },
+	.refusal = 0,
 };
 /* Services reached by the house tile-loop rebuild and CmdPlaceHouse; the rest stay null. */
 static inline OpenTTDHouseServices TownProtocolHouses()
