@@ -1143,7 +1143,7 @@ static OpenTTDHouseRandom RustHouseRandom(uint32_t tile) noexcept
 }
 static OpenTTDHouseConstruction RustHouseConstruction(uint32_t tile) noexcept
 {
-	return {.tick = GetHouseConstructionTick(TileIndex{tile}), .completed = RustHouseCompleted(tile)};
+	return {.house = RustHouseType(tile), .tick = GetHouseConstructionTick(TileIndex{tile}), .completed = RustHouseCompleted(tile)};
 }
 static OpenTTDHouseCache RustHouseCache(uint32_t tile) noexcept
 {

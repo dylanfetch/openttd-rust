@@ -21,7 +21,7 @@ struct OpenTTDCommandServices;
 struct OpenTTDHouseLoopTile { uint8_t age; bool completed, lift_has_destination; };
 struct OpenTTDHouseLift { uint8_t position, destination; bool has_destination; };
 struct OpenTTDHouseRandom { uint8_t bits, triggers; };
-struct OpenTTDHouseConstruction { uint8_t tick; bool completed; };
+struct OpenTTDHouseConstruction { uint16_t house; uint8_t tick; bool completed; };
 struct OpenTTDHouseCache { uint16_t house, town; bool completed; };
 struct OpenTTDHouseAge { uint8_t age; bool completed; };
 struct OpenTTDHouseEntry { OpenTTDTownRef town; uint16_t house; };

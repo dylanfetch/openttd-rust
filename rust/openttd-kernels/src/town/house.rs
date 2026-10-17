@@ -110,6 +110,7 @@ pub struct HouseRandom {
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct HouseConstruction {
+    pub house: u16,
     pub tick: u8,
     pub completed: bool,
 }
@@ -549,18 +550,18 @@ impl House<'_> {
         self.dirty(tile);
         true
     }
-    fn advance_single(&self, town: TownRef, tile: u32, house: u16) {
+    fn advance_single(&self, town: TownRef, tile: u32) {
         (self.h.inc_construction)(tile);
         let rec = (self.h.construction)(tile);
         if rec.tick != 0 {
             return;
         }
         witness::hit(W_STAGE);
-        self.stage_changed(town, tile, house, false);
+        self.stage_changed(town, tile, rec.house, false);
         // Animation callbacks change frames only; completion is unchanged.
         if rec.completed {
             witness::hit(W_COMPLETE);
-            let population = (self.l.house_population)(house);
+            let population = (self.l.house_population)(rec.house);
             // SAFETY: Live owner; presentation callbacks follow the write.
             unsafe {
                 change_population(
@@ -574,23 +575,20 @@ impl House<'_> {
         }
         self.dirty(tile);
     }
-    fn advance_construction(&self, town: TownRef, tile: u32, mut house: u16) {
+    fn advance_construction(&self, town: TownRef, tile: u32, house: u16) {
         let flags = (self.l.house_flags)(house);
         let map = self.map();
         if flags & HAS_1_TILE != 0 {
-            self.advance_single(town, tile, house);
+            self.advance_single(town, tile);
         }
         if flags & TILES_Y != 0 {
-            house = house.wrapping_add(1);
-            self.advance_single(town, tile.wrapping_add(map.diff(0, 1)), house);
+            self.advance_single(town, tile.wrapping_add(map.diff(0, 1)));
         }
         if flags & TILES_X != 0 {
-            house = house.wrapping_add(1);
-            self.advance_single(town, tile.wrapping_add(map.diff(1, 0)), house);
+            self.advance_single(town, tile.wrapping_add(map.diff(1, 0)));
         }
         if flags & SIZE_2X2 != 0 {
-            house = house.wrapping_add(1);
-            self.advance_single(town, tile.wrapping_add(map.diff(1, 1)), house);
+            self.advance_single(town, tile.wrapping_add(map.diff(1, 1)));
         }
     }
     /// `TownGenerateCargo`: production precedes the delivery; transported follows.

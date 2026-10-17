@@ -305,7 +305,7 @@ static void Layouts()
 	Layout(920, "OpenTTDHouseLoopTile", {sizeof(OpenTTDHouseLoopTile), alignof(OpenTTDHouseLoopTile), offsetof(OpenTTDHouseLoopTile, age), offsetof(OpenTTDHouseLoopTile, completed), offsetof(OpenTTDHouseLoopTile, lift_has_destination)});
 	Layout(921, "OpenTTDHouseLift", {sizeof(OpenTTDHouseLift), alignof(OpenTTDHouseLift), offsetof(OpenTTDHouseLift, position), offsetof(OpenTTDHouseLift, destination), offsetof(OpenTTDHouseLift, has_destination)});
 	Layout(928, "OpenTTDHouseRandom", {sizeof(OpenTTDHouseRandom), alignof(OpenTTDHouseRandom), offsetof(OpenTTDHouseRandom, bits), offsetof(OpenTTDHouseRandom, triggers)});
-	Layout(929, "OpenTTDHouseConstruction", {sizeof(OpenTTDHouseConstruction), alignof(OpenTTDHouseConstruction), offsetof(OpenTTDHouseConstruction, tick), offsetof(OpenTTDHouseConstruction, completed)});
+	Layout(929, "OpenTTDHouseConstruction", {sizeof(OpenTTDHouseConstruction), alignof(OpenTTDHouseConstruction), offsetof(OpenTTDHouseConstruction, house), offsetof(OpenTTDHouseConstruction, tick), offsetof(OpenTTDHouseConstruction, completed)});
 	Layout(930, "OpenTTDHouseCache", {sizeof(OpenTTDHouseCache), alignof(OpenTTDHouseCache), offsetof(OpenTTDHouseCache, house), offsetof(OpenTTDHouseCache, town), offsetof(OpenTTDHouseCache, completed)});
 	Layout(931, "OpenTTDHouseAge", {sizeof(OpenTTDHouseAge), alignof(OpenTTDHouseAge), offsetof(OpenTTDHouseAge, age), offsetof(OpenTTDHouseAge, completed)});
 	Layout(932, "OpenTTDHouseLoopSpec", {sizeof(OpenTTDHouseLoopSpec), alignof(OpenTTDHouseLoopSpec), offsetof(OpenTTDHouseLoopSpec, callbacks), offsetof(OpenTTDHouseLoopSpec, flags), offsetof(OpenTTDHouseLoopSpec, population), offsetof(OpenTTDHouseLoopSpec, mail), offsetof(OpenTTDHouseLoopSpec, minimum_life)});

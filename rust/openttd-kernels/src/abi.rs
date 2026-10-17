@@ -92,7 +92,7 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         }
         921 => layout!(crate::town::house::HouseLift, item; position, destination, has_destination),
         928 => layout!(crate::town::house::HouseRandom, item; bits, triggers),
-        929 => layout!(crate::town::house::HouseConstruction, item; tick, completed),
+        929 => layout!(crate::town::house::HouseConstruction, item; house, tick, completed),
         930 => layout!(crate::town::house::HouseCache, item; house, town, completed),
         931 => layout!(crate::town::house::HouseAge, item; age, completed),
         932 => {
