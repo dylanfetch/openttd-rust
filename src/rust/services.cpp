@@ -91,9 +91,10 @@ const OpenTTDStationService *OpenTTDStationActivityOwner(const OpenTTDStation *s
 	return StationOf(station)->rust_service.get();
 }
 
-OpenTTDTownState *OpenTTDTownOwnerByID(uint32_t id) noexcept
+OpenTTDTownRef OpenTTDTownResolveByID(uint32_t id) noexcept
 {
-	return Town::Get(TownID(id))->growth_owner.get();
+	Town *t = Town::Get(TownID(id));
+	return {.shell = t, .state = GetRustSharedServices().town_owner(reinterpret_cast<const OpenTTDTownHandle *>(t)), .id = static_cast<uint16_t>(id)};
 }
 
 void OpenTTDAssertTownGenerationContext() noexcept { assert(_game_mode == GM_EDITOR || _generating_world); }

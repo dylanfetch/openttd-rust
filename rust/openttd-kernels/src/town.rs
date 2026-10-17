@@ -255,7 +255,7 @@ pub unsafe extern "C" fn openttd_rust_town_world_population(leaves: *const Leave
     let mut total = 0_u32;
     let mut town = (leaves.next_town)(0);
     while town != u32::MAX {
-        let owner = (leaves.state)(town);
+        let owner = (leaves.resolve_town)(town).state;
         // SAFETY: Iterator supplied a live shell; copy read ends before next callback.
         total = total.wrapping_add(unsafe { population(owner) });
         town = (leaves.next_town)(town.wrapping_add(1));
@@ -656,7 +656,7 @@ pub struct Leaves {
     pub house_extra_flags: extern "C" fn(u16) -> u8,
     pub house_callbacks: extern "C" fn(u16) -> u16,
     pub road_info: extern "C" fn(u8) -> RoadChoice,
-    pub state: extern "C" fn(u32) -> *mut State,
+    pub resolve_town: extern "C" fn(u32) -> TownRef,
     pub stations: extern "C" fn(
         u32,
         u32,
@@ -754,7 +754,9 @@ impl Engine<'_> {
         unsafe { u32::from((*self.owner).simulation.received[at].old_act) }
     }
     fn bind(mut self, town: u32) -> Self {
-        self.owner = (self.leaves.state)(town);
+        let resolved = (self.leaves.resolve_town)(town);
+        self.owner = resolved.state;
+        self.house_town = Some(resolved);
         self
     }
     fn modify_flags(&self, clear: u16, set: u16) {

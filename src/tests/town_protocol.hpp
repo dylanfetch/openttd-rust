@@ -37,7 +37,7 @@ static inline uint64_t TownProtocolLeaf(uint32_t op, uint32_t id, uint32_t a, ui
 	}
 	return 0;
 }
-static inline OpenTTDTownState *TownProtocolState(uint32_t) noexcept { town_protocol_world->owner_reads++; return town_protocol_world->owner; }
+static inline OpenTTDTownRef TownProtocolResolveTown(uint32_t id) noexcept { town_protocol_world->owner_reads++; return {nullptr, town_protocol_world->owner, static_cast<uint16_t>(id)}; }
 static inline void TownProtocolStations(uint32_t, uint32_t, void *, void (*)(void *, const OpenTTDStation *, uint32_t)) noexcept {}
 static inline const OpenTTDStationService *TownProtocolStationActivityOwner(const OpenTTDStation *) noexcept { return nullptr; }
 static inline uint8_t TownProtocolStationOwner(const OpenTTDStation *) noexcept { return UINT8_MAX; }
@@ -160,7 +160,7 @@ static inline OpenTTDTownLeaves TownProtocolServices()
 		.house_extra_flags = TownProtocol_house_extra_flags,
 		.house_callbacks = TownProtocol_house_callbacks,
 		.road_info = TownProtocol_road_info,
-		.state = TownProtocolState,
+		.resolve_town = TownProtocolResolveTown,
 		.stations = TownProtocolStations,
 		.station_activity_owner = TownProtocolStationActivityOwner,
 		.station_owner = TownProtocolStationOwner,
@@ -245,6 +245,7 @@ template <typename Check> void CheckTownProtocol(Check check)
 	w.writes.clear(); w.house_callback = false; w.clears = 0; w.animations = 0; w.house_count = 5;
 	TownProtocolCost cost{};
 	services.town_count = []() noexcept -> size_t { return 1; };
+	services.town_owner = [](const OpenTTDTownHandle *) noexcept { town_protocol_world->owner_reads++; return town_protocol_world->owner; };
 	w.owner_reads = 0; w.map_reads = 0;
 	openttd_rust_house_place(&leaves, &services, reinterpret_cast<OpenTTDCommandCost *>(&cost), 1, 2080, 1, true, false);
 	check(w.owner_reads == 1 && w.map_reads == 1);
@@ -261,6 +262,15 @@ template <typename Check> void CheckTownProtocol(Check check)
 	w.owner_reads = 0; w.map_reads = 0;
 	openttd_rust_house_animate(&leaves, &services, 2080);
 	check(w.owner_reads == 0 && w.map_reads == 0);
+	/* Ordinary growth binds its town before walking the road; construction
+	 * triggers must reuse that context rather than resolve the owner again. */
+	services.road_bits = [](uint32_t tile, uint8_t, bool) noexcept -> uint8_t { return tile == 2080 ? 1 : 0; };
+	services.tile_type = [](uint32_t tile) noexcept -> uint8_t { return tile == 2080 ? 2 : 0; };
+	services.road_type = [](uint32_t tile) noexcept -> uint8_t { return tile == 2080 ? 0 : 63; };
+	w.writes.clear(); w.animations = 0; w.house_count = 1;
+	w.owner_reads = 0; w.map_reads = 0;
+	openttd_rust_town_expand(&leaves, &services, 0, 1, 1);
+	check(w.writes.size() == 1 && w.animations == 1 && w.owner_reads == 1 && w.map_reads == 1);
 	openttd_rust_town_global_id_counts_resize(saved_ids.size());
 	openttd_rust_town_global_class_counts_resize(saved_classes.size());
 	std::copy(saved_ids.begin(), saved_ids.end(), static_cast<uint32_t *>(openttd_rust_town_global_id_counts().data));

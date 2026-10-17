@@ -1123,7 +1123,7 @@ static bool RustHouseLiftHasDestination(uint32_t tile) noexcept { return LiftHas
 static OpenTTDTownRef RustHouseTown(uint32_t tile) noexcept
 {
 	Town *t = Town::GetByTile(TileIndex{tile});
-	return {t, t->growth_owner.get(), t->index.base()};
+	return {t, GetRustSharedServices().town_owner(reinterpret_cast<const OpenTTDTownHandle *>(t)), t->index.base()};
 }
 static OpenTTDHouseEntry RustHouseEntry(uint32_t tile) noexcept
 {
@@ -1286,7 +1286,7 @@ const OpenTTDTownLeaves &GetRustTownServices() noexcept
 		.house_extra_flags = [](uint16_t house) noexcept -> uint8_t { return RustTownHouseExtraFlags(HouseSpec::Get(house)); },
 		.house_callbacks = [](uint16_t house) noexcept -> uint16_t { return RustTownHouseCallbacks(HouseSpec::Get(house)); },
 		.road_info = RustTownRoadInfo,
-		.state = OpenTTDTownOwnerByID,
+		.resolve_town = OpenTTDTownResolveByID,
 		.stations = RustTownStations,
 		.station_activity_owner = OpenTTDStationActivityOwner,
 		.station_owner = RustTownStationOwner,

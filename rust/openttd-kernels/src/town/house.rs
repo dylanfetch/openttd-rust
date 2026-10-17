@@ -996,14 +996,13 @@ impl House<'_> {
             let id = u32::from((self.authority().town_index)(town));
             let completed = (self.h.place_houses)() == 2;
             let random = self.s.random() & 0xFF;
-            let mut engine = engine(self.l, self.s).bind(id);
-            engine.house_town = Some(TownRef {
+            let town = TownRef {
                 shell: town.cast_mut(),
-                state: engine.owner,
+                state: (self.s.town_owner)(town),
                 id: super::TownId(id as u16),
-            });
-            engine.map = self.map.clone();
-            engine.build_house(id, tile, u32::from(house), random, completed, protected);
+            };
+            self.engine(town)
+                .build_house(id, tile, u32::from(house), random, completed, protected);
         }
     }
     fn add_acceptance(&self, ctx: *mut c_void, always: *mut u64, cargo: u8, amount: u32) {
@@ -1149,7 +1148,7 @@ impl House<'_> {
     fn towns(&self, mut visit: impl FnMut(*mut State)) {
         let mut town = (self.l.next_town)(0);
         while town != u32::MAX {
-            visit((self.l.state)(town));
+            visit((self.l.resolve_town)(town).state);
             town = (self.l.next_town)(town.wrapping_add(1));
         }
     }
@@ -1168,7 +1167,7 @@ impl House<'_> {
                 continue;
             }
             let rec = (self.h.cache)(tile);
-            let state = (self.l.state)(u32::from(rec.town));
+            let state = (self.l.resolve_town)(u32::from(rec.town)).state;
             let class = (self.l.house_class)(rec.house);
             // SAFETY: Live owner; each access ends before the next spec query.
             unsafe { super::increase_building(state, rec.house, class) };
