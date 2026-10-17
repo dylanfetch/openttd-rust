@@ -28,7 +28,9 @@ inline OpenTTDVehicle *RustNextVehicle(uint32_t from) noexcept
 
 /** Shared native field definitions, also used by bundled observations. */
 inline Vehicle *RustVehicleNext(const Vehicle *v) noexcept { return v->Next(); }
+#ifdef WITH_RUST
 inline OpenTTDCargoList *RustVehicleCargoOwner(Vehicle *v) noexcept { return v->cargo.RustOwner(); }
+#endif
 inline bool RustVehicleHasEngine(const Vehicle *v) noexcept { return v->HasEngineType(); }
 inline uint8_t RustVehicleDay(const Vehicle *v) noexcept { return v->day_counter; }
 inline uint32_t RustVehicleTile(const Vehicle *v) noexcept { return v->tile.base(); }
