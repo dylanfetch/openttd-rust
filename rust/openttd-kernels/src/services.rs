@@ -176,6 +176,10 @@ impl TileTypeAccess {
     /// initialized bytes, within `isize::MAX`, until this reader is dropped. Map
     /// reset and game-state-mutex yield are excluded throughout the entry. Each
     /// read must be serialized with native writes; native aliases are permitted.
+    /// Nonnull extended retains the same provenance for count initialized four-byte
+    /// `ExtendedTileLayout` records. Null extended is used only by synthetic fixtures
+    /// without extended-field consumers. No reference/slice or raw access spans a
+    /// callback: retained pointers are metadata, subsequent reads observe live writes.
     pub(crate) unsafe fn raw(
         allocation: TileTypeAllocation,
         callback: extern "C" fn(u32) -> u8,

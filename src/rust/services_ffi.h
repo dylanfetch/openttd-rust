@@ -12,10 +12,10 @@
 #include <type_traits>
 #include "station_ffi.h"
 
-/* Allocation-derived base array address, never a reference to tile zero's byte.
- * Only an audited serialized entry may retain it. It expires before map reset or
- * mutex yield. Raw reads consume only type@0 of each actual eight-byte base tile;
- * C++ owns allocation/construction/reset/destruction and every write. */
+/* #274 throwaway read-only view of the actual base and extended allocations.
+ * An audited serialized entry may retain metadata until return, excluding map
+ * reset or mutex yield. Each field-sized read ends before every callback; no
+ * Rust reference/slice is formed. C++ keeps allocation/reset and every write. */
 struct OpenTTDMapReadView {
 	const uint8_t *base;
 	uint32_t count;

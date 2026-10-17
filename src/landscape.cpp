@@ -830,6 +830,10 @@ void RunTileLoop()
 	OpenTTDGroundCall call;
 	const OpenTTDLandscapeLoopServices services{
 		.shared = &GetRustSharedServices(),
+		/* Call-scoped #274 read-only metadata. StateGameLoop holds the game-state
+		 * mutex. No tile handler or ambient/command/event callback loads/resets the
+		 * map or yields the mutex; generation runs this same batch serially.
+		 * Link-graph workers have private graphs and do not access tile storage. */
 		.tile_types = GetRustTileTypeAllocation(),
 		.trees = &GetRustTreeServices(),
 		.industry = GetRustIndustryLoopServices(),
