@@ -1429,6 +1429,8 @@ variables; original bodies compile only portably. Narrow phase observations repl
 tile/spec copies; projections compose canonical spec-field readers. Each entry reuses its town
 and map context, including construction triggers and rebuilds. Town count, recession, autoslope,
 foundation price, tick counter, animated-tile removal and `DoClearSquare` are shared services.
+Cargo scaling, translation, label lookup and delivery, plus NewGRF boolean conversion and
+inspect-window deletion, share canonical typed native leaves with industry consumers.
 `python3 tools/migration.py simulate town-houses- --jobs 2` places every original house through
 `CmdPlaceHouse`, compares error histograms, occupied/replace, protected clears, autoslope
 terraform, company clearance until refusal and aged-house rebuild in both cargo modes, and

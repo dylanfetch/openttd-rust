@@ -45,6 +45,8 @@
 #include "rust/command_services.h"
 #include "rust/company_services.h"
 #include "rust/environment_services.h"
+#include "rust/services_cargo.h"
+#include "rust/services_newgrf.h"
 #include "rust/tile_animation_services.h"
 #include "rust/station_services.h"
 #include "rust/settings_services.h"
@@ -1227,12 +1229,12 @@ static const OpenTTDHouseServices &GetRustHouseServices() noexcept
 		.set_random_triggers = [](uint32_t tile, uint8_t triggers) noexcept { SetHouseRandomTriggers(TileIndex{tile}, HouseRandomTriggers{triggers}); },
 		.set_type = [](uint32_t tile, uint16_t house) noexcept { SetHouseType(TileIndex{tile}, house); },
 		.animate_new = OpenTTDAnimateNewHouse,
-		.delete_inspect = [](uint32_t tile) noexcept { DeleteNewGRFInspectWindow(GSF_HOUSES, tile); },
+		.delete_inspect = OpenTTDDeleteHouseInspect,
 		.callback = [](uint16_t callback, uint32_t param1, uint32_t param2, uint16_t house, Town *town, uint32_t tile, bool not_yet_constructed) noexcept -> uint16_t {
 			return GetHouseCallback(static_cast<CallbackID>(callback), param1, param2, house, town, TileIndex{tile}, {}, not_yet_constructed);
 		},
-		.cargo_translation = [](uint16_t house, uint8_t cargo) noexcept -> uint8_t { return GetCargoTranslation(cargo, RustHouseGrf(house)); },
-		.convert_boolean = [](uint16_t house, uint16_t callback, uint16_t result) noexcept { return ConvertBooleanCallback(RustHouseGrf(house), callback, result); },
+		.cargo_translation = [](uint16_t house, uint8_t cargo) noexcept -> uint8_t { return OpenTTDCargoTranslation(cargo, RustHouseGrf(house)); },
+		.convert_boolean = [](uint16_t house, uint16_t callback, uint16_t result) noexcept { return OpenTTDConvertBooleanCallback(RustHouseGrf(house), callback, result); },
 		.convert_8bit = [](uint16_t house, uint16_t callback, uint16_t result) noexcept { return Convert8bitBooleanCallback(RustHouseGrf(house), callback, result); },
 		.resolve_reseed = OpenTTDHouseResolveReseed,
 		.change_frame = OpenTTDHouseChangeFrame,
@@ -1244,7 +1246,7 @@ static const OpenTTDHouseServices &GetRustHouseServices() noexcept
 		.station_catchment = [](const Station *st, uint32_t tile) noexcept { return st->TileIsInCatchment(TileIndex{tile}); },
 		.station_covers_town = [](const Station *st, uint16_t town) noexcept { return st->CatchmentCoversTown(TownID(town)); },
 		.move_goods = [](void *finder, uint8_t cargo, uint32_t amount, uint16_t town) noexcept -> uint32_t {
-			return MoveGoodsToStation(cargo, amount, {TownID(town), SourceType::Town}, static_cast<StationFinder *>(finder)->GetStations());
+			return OpenTTDMoveGoodsToStation(cargo, amount, {TownID(town), SourceType::Town}, static_cast<StationFinder *>(finder)->GetStations());
 		},
 		.production_cargo = [](uint8_t effect, uint32_t at) noexcept -> OpenTTDHouseCargo {
 			const auto &cargoes = CargoSpec::town_production_cargoes[effect];
@@ -1252,8 +1254,8 @@ static const OpenTTDHouseServices &GetRustHouseServices() noexcept
 			return {cargoes[at]->Index(), cargoes[at]->town_production_multiplier};
 		},
 		.add_cargo = [](void *cargoes, uint8_t cargo, uint32_t amount) noexcept { (*static_cast<CargoArray *>(cargoes))[cargo] += amount; },
-		.food_cargo = []() noexcept -> uint8_t { return GetCargoTypeByLabel(CT_FOOD); },
-		.scale_cargo = [](uint32_t amount) noexcept -> uint32_t { return ScaleByCargoScale(amount, true); },
+		.food_cargo = OpenTTDFoodCargo,
+		.scale_cargo = OpenTTDScaleTownCargo,
 		.cargogen_mode = OpenTTDTownCargoGenMode,
 		.place_houses = OpenTTDPlaceHouses,
 		.company_human = OpenTTDCompanyIsValidHuman,
