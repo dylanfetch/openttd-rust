@@ -498,8 +498,11 @@ pub const RAIL_CMD_TERRAFORM_DEPOT: usize = 226;
 /// `rail_cmd.build_above_clear` witness.
 pub const RAIL_CMD_BUILD_ABOVE_CLEAR: usize = 227;
 
+/// First landscape ownership branch counter, after integrated rail commands.
+pub const LANDSCAPE: usize = 228;
+
 /// Counter names, grouped by the prefix the harness selects.
-pub const NAMES: [&str; 228] = [
+pub const NAMES: [&str; 254] = [
     "train.tick_first",
     "train.tick_second",
     "train.reversal",
@@ -728,6 +731,32 @@ pub const NAMES: [&str; 228] = [
     "rail_cmd.terraform_corner",
     "rail_cmd.terraform_depot",
     "rail_cmd.build_above_clear",
+    "landscape.snow_start",
+    "landscape.snow_change",
+    "landscape.snow_clear",
+    "landscape.desert",
+    "landscape.field_fence",
+    "landscape.field_cycle",
+    "landscape.field_orphan",
+    "landscape.rail_ground",
+    "landscape.roadside",
+    "landscape.road_work_start",
+    "landscape.road_work_end",
+    "landscape.road_remove",
+    "landscape.tunnel_ground",
+    "landscape.flood_success",
+    "landscape.flood_fail",
+    "landscape.dry_coast",
+    "landscape.dry_rail",
+    "landscape.dry_tree",
+    "landscape.wakeup",
+    "landscape.half_rail_remove",
+    "landscape.half_rail",
+    "landscape.bridge_start",
+    "landscape.bridge_end",
+    "landscape.airport_member",
+    "landscape.vehicle_crash",
+    "landscape.crashed_skip",
 ];
 
 static ENABLED: AtomicBool = AtomicBool::new(false);

@@ -20,10 +20,10 @@
     clippy::too_many_lines,
     clippy::fn_params_excessive_bools
 )]
-pub use crate::services::Train;
 use crate::services::{
     CommandCost, CommandCostServices, CommandServices, Map, RailMapServices, Services,
 };
+pub use crate::services::{FloodingBehaviour, Foundation, Train};
 use crate::witness as w;
 
 /// Opaque caller-owned native frame holding the conversion area iterator and
@@ -32,15 +32,6 @@ use crate::witness as w;
 pub struct ConvertFrame {
     _private: [u8; 0],
 }
-
-/// Native `Foundation` with its unchanged uint8 representation.
-#[repr(transparent)]
-#[derive(Clone, Copy)]
-pub struct Foundation(pub u8);
-/// Native `FloodingBehaviour` with its unchanged uint8 representation.
-#[repr(transparent)]
-#[derive(Clone, Copy)]
-pub struct FloodingBehaviour(pub u8);
 
 /// `ApplyFoundationToSlope` result: height increase and the modified slope.
 #[repr(C)]

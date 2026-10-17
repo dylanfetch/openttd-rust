@@ -38,6 +38,12 @@
 #include "table/railtypes.h"
 #include "table/track_land.h"
 
+#ifdef WITH_RUST
+#include "rust/ground_services.h"
+#include "rust/services_landscape.h"
+#include "rust/environment_services.h"
+#endif
+
 #include "safeguards.h"
 
 /** Helper type for lists/vectors of trains */
@@ -760,6 +766,14 @@ CommandCost CmdRemoveSingleRail(DoCommandFlags flags, TileIndex tile, Track trac
  * @param t The tile to flood.
  * @return true if something was flooded.
  */
+#ifdef WITH_RUST
+bool FloodHalftile(TileIndex tile)
+{
+	assert(IsPlainRailTile(tile));
+	OpenTTDGroundCall call;
+	return openttd_rust_flood_halftile(tile.base(), &call, &GetRustWaterGroundServices(), &GetRustSharedServices());
+}
+#else
 bool FloodHalftile(TileIndex t)
 {
 	assert(IsPlainRailTile(t));
@@ -804,6 +818,8 @@ bool FloodHalftile(TileIndex t)
 	}
 	return flooded;
 }
+
+#endif
 
 #ifndef WITH_RUST
 static const TileIndexDiffC _trackdelta[] = {
@@ -2598,6 +2614,26 @@ static Foundation GetFoundation_Track(TileIndex tile, Slope tileh)
 	return IsPlainRail(tile) ? GetRailFoundation(tileh, GetTrackBits(tile)) : FlatteningFoundation(tileh);
 }
 
+#ifdef WITH_RUST
+const OpenTTDRailServices &GetRustRailGroundServices() noexcept
+{
+	static const OpenTTDRailServices services{
+		.ground = [](uint32_t t) noexcept { return GetRustRailMapServices().rail_ground(t); },
+		.set_ground = RustSetRailGroundTyped,
+		.snow = [](uint32_t index) noexcept { TileIndex t{index}; auto [slope, z] = GetTileSlopeZ(t); bool plain = RustPlainRailTile(index); return OpenTTDRailSnowGround{.z = z, .slope = slope, .tracks = plain ? RustRailTracks(index) : TRACK_BIT_NONE, .plain = plain}; },
+		.fences = [](uint32_t index) noexcept { bool plain = RustPlainRailTile(index); return OpenTTDRailFenceGround{.tracks = plain ? RustRailTracks(index) : TRACK_BIT_NONE, .owner = plain ? RustTileOwnerValue(index) : uint8_t{}, .plain = plain}; },
+		.foundation = RustRailFoundation,
+		.owned_land = [](uint32_t t) noexcept { return IsObjectType(TileIndex{t}, OBJECT_OWNED_LAND); },
+	};
+	return services;
+}
+static void TileLoop_Track(uint32_t tile) noexcept
+{
+	const uint32_t size_x = Map::SizeX();
+	OpenTTDGroundCall call;
+	openttd_rust_rail_tile_loop(tile, OpenTTDLandscape(), RustAmbientSoundEnabled(), size_x, Map::SizeY(), &call, &GetRustWaterGroundServices(), &GetRustRailGroundServices(), &GetRustSharedServices());
+}
+#else
 static void TileLoop_Track(TileIndex tile)
 {
 	RailGroundType old_ground = GetRailGroundType(tile);
@@ -2722,6 +2758,8 @@ set_ground:
 		MarkTileDirtyByTile(tile);
 	}
 }
+
+#endif
 
 
 static TrackStatus GetTileTrackStatus_Track(TileIndex tile, TransportType mode, uint, DiagDirection side)
@@ -3166,9 +3204,8 @@ static bool RailShipOnTile(uint32_t tile) noexcept
 
 static OpenTTDSlopeZ RailApplyFoundation(uint8_t f, uint8_t tileh) noexcept
 {
-	Slope s = static_cast<Slope>(tileh);
-	int32_t z = ApplyFoundationToSlope(static_cast<Foundation>(f), s);
-	return {.z = z, .slope = s};
+	auto result = RustApplyFoundation(static_cast<Foundation>(f), static_cast<Slope>(tileh));
+	return {.z = result.z, .slope = result.slope};
 }
 static OpenTTDRailTrainParking RailParking(Train *v) noexcept
 {
@@ -3191,7 +3228,7 @@ static void RailMakeShore(uint32_t tile) noexcept
 }
 static void RailDockingCheck(uint32_t tile) noexcept
 {
-	if (IsPossibleDockingTile(TileIndex{tile})) CheckForDockingTile(TileIndex{tile});
+	if (RustPossibleDocking(tile)) RustCheckDocking(tile);
 }
 static void RailDepotWindows(uint32_t tile) noexcept
 {
@@ -3252,7 +3289,7 @@ const OpenTTDRailCommandServices &GetRustRailCommandServices() noexcept
 		.road_build_cost = [](uint8_t rt) noexcept { return RoadBuildCost(static_cast<RoadType>(rt)).base(); },
 		.crossing_with_competitor = RustCrossingWithCompetitor,
 		.disable_elrails = RustDisableElrails,
-		.rail_foundation = [](uint8_t tileh, uint8_t bits) noexcept -> Foundation { return GetRailFoundation(static_cast<Slope>(tileh), static_cast<TrackBits>(bits)); },
+		.rail_foundation = OpenTTDEnumMapQuery<RustRailFoundation, Slope, TrackBits>,
 		.apply_foundation = RailApplyFoundation,
 		.slope_z_in_corner = [](uint8_t tileh, uint8_t corner) noexcept -> int32_t { return GetSlopeZInCorner(static_cast<Slope>(tileh), static_cast<Corner>(corner)); },
 		.flooding = [](uint32_t tile) noexcept -> FloodingBehaviour { return GetFloodingBehaviour(TileIndex{tile}); },
