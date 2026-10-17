@@ -18,6 +18,7 @@
 )]
 use crate::node_hash::NodeMap;
 use crate::road::{PathElement, State};
+use std::cell::UnsafeCell;
 use std::ffi::c_void;
 
 #[repr(C)]
@@ -138,6 +139,24 @@ impl Node {
         }
     }
 }
+
+/// Only value nodes and indices persist; vehicle pointers and input descriptors
+/// remain in the call-local Search. Capacity grows only for a larger search.
+#[derive(Default)]
+struct Scratch {
+    arena: Vec<Node>,
+    open: NodeMap<(u32, u8), usize>,
+    closed: NodeMap<(u32, u8), usize>,
+    heap: Vec<usize>,
+}
+struct SerializedScratch(UnsafeCell<Option<Scratch>>);
+// SAFETY: Production searches run under the native game-state mutex. Taking or
+// returning scratch ends its global borrow before any callback; active searches
+// own their storage, so a nested call cannot alias it. Native heap probes keep
+// local storage and do not access this process-wide cache.
+unsafe impl Sync for SerializedScratch {}
+static SCRATCH: SerializedScratch = SerializedScratch(UnsafeCell::new(None));
+
 struct Search {
     input: Input,
     leaves: Leaves,
@@ -157,6 +176,7 @@ struct Search {
     best_dest: Option<usize>,
     rounds: i32,
     calcs: i32,
+    reuse_scratch: bool,
 }
 impl Search {
     fn new(
@@ -166,6 +186,44 @@ impl Search {
         depot: bool,
         max_cost: i32,
     ) -> Self {
+        Self::with_scratch(
+            input,
+            leaves,
+            context,
+            depot,
+            max_cost,
+            Scratch::default(),
+            false,
+        )
+    }
+    /// The caller holds the game-state mutex for the complete search. No global
+    /// borrow survives this acquisition or any of the search's native queries.
+    unsafe fn reused(
+        input: Input,
+        leaves: Leaves,
+        context: *const c_void,
+        depot: bool,
+        max_cost: i32,
+    ) -> Self {
+        // SAFETY: Native production entries serialize access. Ownership moves
+        // out of the slot before any query; first use has no allocation yet.
+        let scratch = unsafe { (*SCRATCH.0.get()).take().unwrap_or_default() };
+        Self::with_scratch(input, leaves, context, depot, max_cost, scratch, true)
+    }
+    fn with_scratch(
+        input: Input,
+        leaves: Leaves,
+        context: *const c_void,
+        depot: bool,
+        max_cost: i32,
+        mut scratch: Scratch,
+        reuse_scratch: bool,
+    ) -> Self {
+        scratch.arena.clear();
+        scratch.open.clear();
+        scratch.closed.clear();
+        scratch.heap.clear();
+        scratch.heap.push(usize::MAX);
         Self {
             input,
             leaves,
@@ -176,14 +234,15 @@ impl Search {
             dest_dirs: 0,
             dest_station: None,
             station_type: 0,
-            arena: Vec::new(),
-            open: NodeMap::default(),
-            closed: NodeMap::default(),
-            heap: vec![usize::MAX],
+            arena: scratch.arena,
+            open: scratch.open,
+            closed: scratch.closed,
+            heap: scratch.heap,
             intermediate: None,
             best_dest: None,
             rounds: 0,
             calcs: 0,
+            reuse_scratch,
         }
     }
     fn tracks(&self, tile: u32, status: u8) -> u16 {
@@ -527,8 +586,26 @@ impl Search {
     }
 }
 
+impl Drop for Search {
+    fn drop(&mut self) {
+        if self.reuse_scratch {
+            let scratch = Scratch {
+                arena: std::mem::take(&mut self.arena),
+                open: std::mem::take(&mut self.open),
+                closed: std::mem::take(&mut self.closed),
+                heap: std::mem::take(&mut self.heap),
+            };
+            // SAFETY: Only serialized production entries set reuse_scratch.
+            // No borrow of the slot spans callbacks, and no native pointer is
+            // stored here. An outer search can replace a nested call's cache.
+            unsafe { *SCRATCH.0.get() = Some(scratch) };
+        }
+    }
+}
+
 /// Caller supplies initialized descriptors, live opaque vehicle and sole road
-/// owner; services cannot reenter either owner. No pointer escapes. Panics abort.
+/// owner under the game-state mutex; services cannot reenter either owner.
+/// No pointer escapes. Panics abort.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_road_yapf_choose(
     state: *mut State,
@@ -555,7 +632,8 @@ pub unsafe extern "C" fn openttd_rust_road_yapf_choose(
             distance: 0,
         };
     }
-    let mut search = Search::new(input, leaves, context, false, 0);
+    // SAFETY: The production caller serializes searches with the game-state mutex.
+    let mut search = unsafe { Search::reused(input, leaves, context, false, 0) };
     search.startup(tile, search.tracks(tile, 0) & REACHES[usize::from(entry)]);
     search.destination();
     let found = u8::from(search.find());
@@ -576,7 +654,8 @@ pub unsafe extern "C" fn openttd_rust_road_yapf_depot(
 ) -> Result {
     // SAFETY: Caller supplies live initialized immutable scalar descriptors.
     let (input, leaves) = unsafe { (*input, *leaves) };
-    let mut search = Search::new(input, leaves, context, true, max_cost);
+    // SAFETY: Same serialized production entry contract as choose.
+    let mut search = unsafe { Search::reused(input, leaves, context, true, max_cost) };
     let dirs = search.tracks(input.tile, 0);
     // HasTrackdir has the original valid trackdir precondition.
     if dirs & (1 << input.trackdir) == 0 {
