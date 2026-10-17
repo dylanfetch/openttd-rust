@@ -1248,14 +1248,13 @@ impl<'a> Ctx<'a> {
         if convert_signal && !self.has_signal(tile, track) {
             return cost.error(self.s.strings.no_signals);
         }
-        let both = price(PR_BUILD_SIGNALS).saturating_add(price(PR_CLEAR_SIGNALS));
         if !self.has_signal(tile, track) {
             cost.set(price(PR_BUILD_SIGNALS));
         } else if signals_copy != 0 && sigvar != (self.rail.signal_variant)(tile, track).0 {
-            cost.set(both);
+            cost.set(price(PR_BUILD_SIGNALS).saturating_add(price(PR_CLEAR_SIGNALS)));
         } else if convert_signal {
             if ctrl_pressed || (self.rail.signal_variant)(tile, track).0 != sigvar {
-                cost.set(both);
+                cost.set(price(PR_BUILD_SIGNALS).saturating_add(price(PR_CLEAR_SIGNALS)));
             } else {
                 cost.zero();
             }
@@ -1876,7 +1875,6 @@ impl<'a> Ctx<'a> {
                 unsafe { (self.s.collect_trains)(frame, tile) };
             }
         }
-        let convert = (self.s.rail_convert_cost)(kind, totype);
         match tt {
             MP_RAILWAY => {
                 if (self.rail.rail_tile_type)(tile).0 == RAIL_TILE_DEPOT {
@@ -1886,7 +1884,7 @@ impl<'a> Ctx<'a> {
                         (self.s.layout_changed)(tile, dir & 1);
                         (self.s.depot_windows)(tile);
                     }
-                    cost.add_money(convert);
+                    cost.add_money((self.s.rail_convert_cost)(kind, totype));
                 } else {
                     if execute {
                         w::hit(w::RAIL_CMD_CONVERT_RAIL);
@@ -1898,7 +1896,8 @@ impl<'a> Ctx<'a> {
                         }
                     }
                     cost.add_money(
-                        convert.saturating_mul(i64::from(self.tracks(tile).count_ones())),
+                        (self.s.rail_convert_cost)(kind, totype)
+                            .saturating_mul(i64::from(self.tracks(tile).count_ones())),
                     );
                 }
             }
@@ -1948,7 +1947,9 @@ impl<'a> Ctx<'a> {
                     }
                 }
                 let length = self.tunnel_length(tile, endtile).wrapping_add(2);
-                cost.add_money(convert.saturating_mul(i64::from(length)));
+                cost.add_money(
+                    (self.s.rail_convert_cost)(kind, totype).saturating_mul(i64::from(length)),
+                );
             }
             _ => {
                 if execute {
@@ -1960,7 +1961,7 @@ impl<'a> Ctx<'a> {
                     };
                     (self.s.layout_changed)(tile, track);
                 }
-                cost.add_money(convert);
+                cost.add_money((self.s.rail_convert_cost)(kind, totype));
             }
         }
         for &v in &affected[..affected_len] {
