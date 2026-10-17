@@ -1978,7 +1978,9 @@ static void VehicleMaintenanceBoundary()
 	maintenance.renewal = [](OpenTTDVehicle *, const Company *) noexcept {
 		return OpenTTDVehicleMaintenanceRenewal{.age = OpenTTDCalendarDate{100}, .max_age = OpenTTDCalendarDate{100}, .months = -4, .enabled = false, .kind = static_cast<VehicleType>(254), .subtype = 0};
 	};
-	OpenTTDVehicleServices base{};
+	const auto shared = OpenTTDFixtureSharedServices(nullptr, TreeRandom, EffectTestIndustry);
+	RoadTestTables tables(&shared);
+	auto &base = tables.vehicle;
 	base.maintenance = &maintenance;
 	base.next = [](OpenTTDVehicle *) noexcept -> OpenTTDVehicle * { return nullptr; };
 	uint8_t opaque;
