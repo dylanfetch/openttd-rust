@@ -439,141 +439,157 @@ pub unsafe extern "C" fn openttd_rust_order_vector_assign(
 
 /// Shared accessors expose typed world shells; all pointed-to fields are accessed
 /// only as raw scalars. The immutable C++ table outlives each synchronous entry;
-/// callbacks read one field at a time and keep no owner reference across reentry.
+/// callbacks keep no Rust owner reference across reentry.
 /// Services are typed noexcept calls; commands and destruction may reenter Rust.
+///
+/// Pointer-taking callbacks require the live native pointee type used by their
+/// C++ body, with writable output storage where applicable. Deletion consumes
+/// the detached shell; no access to its owner may remain. Destination lookups
+/// also require a live station/depot/waypoint of the source branch's type even
+/// though their arguments are scalar IDs. No Rust owner borrow spans a callback.
+/// Scalar-only settings, checked lookups and pool iteration need no such pointer
+/// precondition. These safety contracts do not change the C ABI or table layout.
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct Leaves {
-    pub vehicle: extern "C" fn(*mut c_void) -> *mut VehicleOrders,
-    pub consist: extern "C" fn(*mut c_void) -> *mut Consist,
-    pub list: extern "C" fn(*mut c_void) -> *mut List,
-    pub vector: extern "C" fn(*mut c_void) -> *mut Vector,
-    pub backup: extern "C" fn(*mut c_void) -> *mut Backup,
-    pub backup_vector: extern "C" fn(*mut c_void) -> *mut Vector,
-    pub backup_consist: extern "C" fn(*mut c_void) -> *mut Consist,
-    pub first_vehicle: extern "C" fn(ctx: *mut c_void) -> *mut c_void,
-    pub last_station: extern "C" fn(ctx: *mut c_void) -> u64,
-    pub ownerless_station: extern "C" fn(station: u16, if_valid: u8) -> u64,
-    pub vehicle_type: extern "C" fn(ctx: *mut c_void) -> u64,
-    pub vehicle_status: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub vehicle: unsafe extern "C" fn(*mut c_void) -> *mut VehicleOrders,
+    pub consist: unsafe extern "C" fn(*mut c_void) -> *mut Consist,
+    pub list: unsafe extern "C" fn(*mut c_void) -> *mut List,
+    pub vector: unsafe extern "C" fn(*mut c_void) -> *mut Vector,
+    pub backup: unsafe extern "C" fn(*mut c_void) -> *mut Backup,
+    pub backup_vector: unsafe extern "C" fn(*mut c_void) -> *mut Vector,
+    pub backup_consist: unsafe extern "C" fn(*mut c_void) -> *mut Consist,
+    pub first_vehicle: unsafe extern "C" fn(ctx: *mut c_void) -> *mut c_void,
+    pub last_station: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
+    pub ownerless_station: unsafe extern "C" fn(station: u16, if_valid: u8) -> u64,
+    pub vehicle_type: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
+    pub vehicle_status: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
     pub tick_counter: extern "C" fn() -> u64,
-    pub primary_vehicle: extern "C" fn(ctx: *mut c_void) -> u64,
-    pub vehicle_ownership: extern "C" fn(ctx: *mut c_void, result: *mut c_void) -> u64,
+    pub primary_vehicle: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
+    pub vehicle_ownership: unsafe extern "C" fn(ctx: *mut c_void, result: *mut c_void) -> u64,
     pub ticks_per_second: extern "C" fn() -> u64,
-    pub unit_number: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub unit_number: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
     pub economy_date: extern "C" fn() -> u64,
     pub economy_fraction: extern "C" fn() -> u64,
     pub maximum_date: extern "C" fn() -> u64,
     pub timetable_year_limit: extern "C" fn() -> u64,
-    pub stopped_or_crashed: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub stopped_or_crashed: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
     pub allocate_list: extern "C" fn() -> *mut c_void,
-    pub suppress_implicit: extern "C" fn(ctx: *mut c_void) -> u64,
-    pub shared_window: extern "C" fn(ctx: *mut c_void, first: *mut c_void) -> u64,
-    pub vehicle_id: extern "C" fn(ctx: *mut c_void) -> u64,
-    pub percent_filled: extern "C" fn(ctx: *mut c_void) -> u64,
-    pub reliability: extern "C" fn(ctx: *mut c_void) -> u64,
-    pub engine_reliability: extern "C" fn(ctx: *mut c_void) -> u64,
-    pub display_speed: extern "C" fn(ctx: *mut c_void) -> u64,
-    pub age_years: extern "C" fn(ctx: *mut c_void) -> u64,
-    pub needs_service: extern "C" fn(ctx: *mut c_void) -> u64,
-    pub remaining_years: extern "C" fn(ctx: *mut c_void) -> u64,
-    pub airport_tile: extern "C" fn(destination: u16) -> u64,
-    pub base_station_tile: extern "C" fn(destination: u16) -> u64,
-    pub station_tile: extern "C" fn(destination: u16) -> u64,
-    pub depot_tile: extern "C" fn(destination: u16) -> u64,
+    pub suppress_implicit: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
+    pub shared_window: unsafe extern "C" fn(ctx: *mut c_void, first: *mut c_void) -> u64,
+    pub vehicle_id: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
+    pub percent_filled: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
+    pub reliability: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
+    pub engine_reliability: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
+    pub display_speed: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
+    pub age_years: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
+    pub needs_service: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
+    pub remaining_years: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
+    pub airport_tile: unsafe extern "C" fn(destination: u16) -> u64,
+    pub base_station_tile: unsafe extern "C" fn(destination: u16) -> u64,
+    pub station_tile: unsafe extern "C" fn(destination: u16) -> u64,
+    pub depot_tile: unsafe extern "C" fn(destination: u16) -> u64,
     pub distance: extern "C" fn(first: u32, second: u32, square: u8) -> u64,
-    pub station_location: extern "C" fn(ctx: *mut c_void, destination: u16) -> u64,
-    pub destination_tile: extern "C" fn(ctx: *mut c_void) -> u64,
-    pub aircraft_flying: extern "C" fn(ctx: *mut c_void) -> u64,
-    pub target_airport: extern "C" fn(ctx: *mut c_void) -> u64,
-    pub waypoint_tile: extern "C" fn(destination: u16) -> u64,
-    pub at_station: extern "C" fn(ctx: *mut c_void) -> u64,
-    pub tile_station: extern "C" fn(ctx: *mut c_void) -> u64,
-    pub ship_station_tile: extern "C" fn(destination: u16) -> u64,
+    pub station_location: unsafe extern "C" fn(ctx: *mut c_void, destination: u16) -> u64,
+    pub destination_tile: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
+    pub aircraft_flying: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
+    pub target_airport: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
+    pub waypoint_tile: unsafe extern "C" fn(destination: u16) -> u64,
+    pub at_station: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
+    pub tile_station: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
+    pub ship_station_tile: unsafe extern "C" fn(destination: u16) -> u64,
     pub valid_station: extern "C" fn(destination: u16) -> u64,
-    pub station_owner: extern "C" fn(destination: u16) -> u64,
-    pub can_use_station: extern "C" fn(ctx: *mut c_void, destination: u16) -> u64,
-    pub owner_check: extern "C" fn(owner: u8, result: *mut c_void) -> u64,
-    pub station_error: extern "C" fn(ctx: *mut c_void, destination: u16) -> u64,
-    pub has_hangar: extern "C" fn(destination: u16) -> u64,
+    pub station_owner: unsafe extern "C" fn(destination: u16) -> u64,
+    pub can_use_station: unsafe extern "C" fn(ctx: *mut c_void, destination: u16) -> u64,
+    pub owner_check: unsafe extern "C" fn(owner: u8, result: *mut c_void) -> u64,
+    pub station_error: unsafe extern "C" fn(ctx: *mut c_void, destination: u16) -> u64,
+    pub has_hangar: unsafe extern "C" fn(destination: u16) -> u64,
     pub valid_depot: extern "C" fn(destination: u16) -> u64,
-    pub depot_owner: extern "C" fn(destination: u16) -> u64,
-    pub rail_depot: extern "C" fn(destination: u16) -> u64,
-    pub road_depot: extern "C" fn(destination: u16) -> u64,
-    pub ship_depot: extern "C" fn(destination: u16) -> u64,
+    pub depot_owner: unsafe extern "C" fn(destination: u16) -> u64,
+    pub rail_depot: unsafe extern "C" fn(destination: u16) -> u64,
+    pub road_depot: unsafe extern "C" fn(destination: u16) -> u64,
+    pub ship_depot: unsafe extern "C" fn(destination: u16) -> u64,
     pub valid_waypoint: extern "C" fn(destination: u16) -> u64,
-    pub waypoint_facilities: extern "C" fn(destination: u16) -> u64,
-    pub waypoint_owner: extern "C" fn(destination: u16) -> u64,
+    pub waypoint_facilities: unsafe extern "C" fn(destination: u16) -> u64,
+    pub waypoint_owner: unsafe extern "C" fn(destination: u16) -> u64,
     pub list_capacity: extern "C" fn() -> u64,
     pub next_backup: unsafe extern "C" fn(cursor: *mut u32) -> *mut c_void,
     pub next_vehicle: extern "C" fn(first: u32) -> *mut c_void,
-    pub aircraft_range: extern "C" fn(ctx: *mut c_void) -> u64,
-    pub aircraft_range_square: extern "C" fn(ctx: *mut c_void) -> u64,
-    pub bus: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub aircraft_range: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
+    pub aircraft_range_square: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
+    pub bus: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
     pub backup_capacity: extern "C" fn() -> u64,
-    pub create_backup: extern "C" fn(ctx: *mut c_void, user: u32) -> *mut c_void,
+    pub create_backup: unsafe extern "C" fn(ctx: *mut c_void, user: u32) -> *mut c_void,
     pub networking: extern "C" fn() -> u64,
     pub network_server: extern "C" fn() -> u64,
     pub network_client: extern "C" fn() -> u64,
     pub server_client: extern "C" fn() -> u64,
     pub default_group: extern "C" fn() -> u64,
-    pub vehicle_tile: extern "C" fn(ctx: *mut c_void) -> u64,
-    pub vehicle_group: extern "C" fn(ctx: *mut c_void) -> u64,
-    pub unique_backup_name: extern "C" fn(ctx: *mut c_void) -> u64,
-    pub backup_hangar: extern "C" fn(ctx: *mut c_void) -> u64,
+    pub vehicle_tile: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
+    pub vehicle_group: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
+    pub unique_backup_name: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
+    pub backup_hangar: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
     pub review_setting: extern "C" fn() -> u64,
-    pub local_owner: extern "C" fn(ctx: *mut c_void) -> u64,
-    pub day_counter: extern "C" fn(ctx: *mut c_void) -> u64,
-    pub fast_aircraft: extern "C" fn(ctx: *mut c_void) -> u64,
-    pub short_strip: extern "C" fn(destination: u16) -> u64,
+    pub local_owner: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
+    pub day_counter: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
+    pub fast_aircraft: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
+    pub short_strip: unsafe extern "C" fn(destination: u16) -> u64,
     pub no_jet_crash: extern "C" fn() -> u64,
-    pub append_station: extern "C" fn(ctx: *mut c_void, station: u16),
+    pub append_station: unsafe extern "C" fn(ctx: *mut c_void, station: u16),
     pub invalidate_station_list: extern "C" fn(),
-    pub command_error: extern "C" fn(ctx: *mut c_void, error: u32, detail: u32),
-    pub timetable_dirty: extern "C" fn(ctx: *mut c_void),
-    pub invalidate_order: extern "C" fn(ctx: *mut c_void, data: i32),
-    pub vehicle_dirty: extern "C" fn(ctx: *mut c_void),
-    pub delete_order_news: extern "C" fn(ctx: *mut c_void),
-    pub suppress_implicit_write: extern "C" fn(ctx: *mut c_void, suppress: u8),
-    pub invalidate_vehicle_list: extern "C" fn(ctx: *mut c_void),
-    pub close_shared_window: extern "C" fn(ctx: *mut c_void, window: u32),
-    pub invalidate_shared_window: extern "C" fn(ctx: *mut c_void, window: u32, data: i32),
-    pub last_station_write: extern "C" fn(ctx: *mut c_void, station: u16),
-    pub dirty_vehicle_windows: extern "C" fn(ctx: *mut c_void),
-    pub capture_backup_metadata: extern "C" fn(ctx: *mut c_void, source: *mut c_void),
-    pub clear_backup_name: extern "C" fn(ctx: *mut c_void),
-    pub restore_backup_metadata: extern "C" fn(ctx: *mut c_void, backup: *mut c_void),
-    pub order_news: extern "C" fn(ctx: *mut c_void, message: u32),
-    pub debug_list: extern "C" fn(ctx: *mut c_void),
+    pub command_error: unsafe extern "C" fn(ctx: *mut c_void, error: u32, detail: u32),
+    pub timetable_dirty: unsafe extern "C" fn(ctx: *mut c_void),
+    pub invalidate_order: unsafe extern "C" fn(ctx: *mut c_void, data: i32),
+    pub vehicle_dirty: unsafe extern "C" fn(ctx: *mut c_void),
+    pub delete_order_news: unsafe extern "C" fn(ctx: *mut c_void),
+    pub suppress_implicit_write: unsafe extern "C" fn(ctx: *mut c_void, suppress: u8),
+    pub invalidate_vehicle_list: unsafe extern "C" fn(ctx: *mut c_void),
+    pub close_shared_window: unsafe extern "C" fn(ctx: *mut c_void, window: u32),
+    pub invalidate_shared_window: unsafe extern "C" fn(ctx: *mut c_void, window: u32, data: i32),
+    pub last_station_write: unsafe extern "C" fn(ctx: *mut c_void, station: u16),
+    pub dirty_vehicle_windows: unsafe extern "C" fn(ctx: *mut c_void),
+    pub capture_backup_metadata: unsafe extern "C" fn(ctx: *mut c_void, source: *mut c_void),
+    pub clear_backup_name: unsafe extern "C" fn(ctx: *mut c_void),
+    pub restore_backup_metadata: unsafe extern "C" fn(ctx: *mut c_void, backup: *mut c_void),
+    pub order_news: unsafe extern "C" fn(ctx: *mut c_void, message: u32),
+    pub debug_list: unsafe extern "C" fn(ctx: *mut c_void),
     pub assert_departure_range: extern "C" fn(lower: i32, upper: i32),
-    pub delete_list: extern "C" fn(ctx: *mut c_void),
-    pub leave_station: extern "C" fn(ctx: *mut c_void),
-    pub reverse_train: extern "C" fn(ctx: *mut c_void),
-    pub next_airport: extern "C" fn(ctx: *mut c_void),
-    pub set_destination: extern "C" fn(ctx: *mut c_void, tile: u32),
+    pub delete_list: unsafe extern "C" fn(ctx: *mut c_void),
+    pub leave_station: unsafe extern "C" fn(ctx: *mut c_void),
+    pub reverse_train: unsafe extern "C" fn(ctx: *mut c_void),
+    pub next_airport: unsafe extern "C" fn(ctx: *mut c_void),
+    pub set_destination: unsafe extern "C" fn(ctx: *mut c_void, tile: u32),
     pub closest_depot: unsafe extern "C" fn(ctx: *mut c_void, result: *mut Closest),
-    pub share_command: extern "C" fn(ctx: *mut c_void, source: *const c_void),
-    pub group_command: extern "C" fn(ctx: *mut c_void, group: u16),
-    pub delete_backup: extern "C" fn(ctx: *mut c_void),
+    pub share_command: unsafe extern "C" fn(ctx: *mut c_void, source: *const c_void),
+    pub group_command: unsafe extern "C" fn(ctx: *mut c_void, group: u16),
+    pub delete_backup: unsafe extern "C" fn(ctx: *mut c_void),
     pub clear_backup_gui: extern "C" fn(tile: u32, user: u32),
     pub clear_backup_post: extern "C" fn(user: u32),
-    pub missing_aircraft_orders: extern "C" fn(ctx: *mut c_void),
-    pub change_timetable_command: extern "C" fn(ctx: *mut c_void, index: u8, field: u8, value: u16),
+    pub missing_aircraft_orders: unsafe extern "C" fn(ctx: *mut c_void),
+    pub change_timetable_command:
+        unsafe extern "C" fn(ctx: *mut c_void, index: u8, field: u8, value: u16),
 }
+// Private helpers inherit the native entry's live-shell/output contracts and
+// the source branches' vehicle/destination types; they never expose safe calls
+// accepting arbitrary native pointers outside this module.
 #[derive(Clone, Copy)]
 struct Game(&'static Leaves);
 impl Game {
     fn vehicle(self, v: *mut c_void) -> *mut VehicleOrders {
-        (self.0.vehicle)(v)
+        // SAFETY: The entry supplies a live Vehicle shell whose orders owner remains allocated.
+        unsafe { (self.0.vehicle)(v) }
     }
     fn consist(self, v: *mut c_void) -> *mut Consist {
-        (self.0.consist)(v)
+        // SAFETY: The entry supplies a live Vehicle shell whose consist owner remains allocated.
+        unsafe { (self.0.consist)(v) }
     }
     fn list(self, list: *mut c_void) -> *mut List {
-        (self.0.list)(list)
+        // SAFETY: The shell is a live OrderList; the callback only returns its owner pointer.
+        unsafe { (self.0.list)(list) }
     }
     fn vector(self, list: *mut c_void) -> *mut Vector {
-        (self.0.vector)(list)
+        // SAFETY: The shell is a live OrderList; the callback only returns its storage owner.
+        unsafe { (self.0.vector)(list) }
     }
     fn order_access(self, vehicle: *mut VehicleOrders) -> OrderAccess {
         // SAFETY: Scalar read of a live serialized owner; no borrow survives the statement.
@@ -605,7 +621,8 @@ impl Game {
     fn first(self, v: *mut c_void) -> *mut c_void {
         let list = self.orders(v);
         if list.is_null() {
-            (self.0.first_vehicle)(v)
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            unsafe { (self.0.first_vehicle)(v) }
         } else {
             // SAFETY: Scalar read of a live serialized owner; no borrow survives the statement.
             unsafe { (*self.list(list)).first }
@@ -732,7 +749,8 @@ impl Game {
                 return;
             }
             let order = self.order(list, next).unwrap();
-            let last = (self.0.last_station)(v) as u16;
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            let last = (unsafe { (self.0.last_station)(v) }) as u16;
             if (order.kind() == 1 || order.kind() == 8)
                 && order.destination == last
                 && matches!(order.unload(), 1 | 2)
@@ -742,7 +760,10 @@ impl Game {
             if order.kind() == 2 || order.destination == last {
                 continue;
             }
-            (self.0.append_station)(output, order.destination);
+            // SAFETY: Output is the entry's live native station vector; no borrow crosses its mutation.
+            unsafe {
+                (self.0.append_station)(output, order.destination);
+            }
             return;
         }
     }
@@ -908,7 +929,10 @@ pub unsafe extern "C" fn openttd_rust_list_free(
     {
         for index in 0..g.stored_count(list) {
             let order = g.stored_order(list, index);
-            if matches!(order.kind(), 1 | 6) && (g.0.ownerless_station)(order.destination, 1) != 0 {
+            if matches!(order.kind(), 1 | 6)
+                // SAFETY: This mode uses GetIfValid and accepts missing stations.
+                && unsafe { (g.0.ownerless_station)(order.destination, 1) } != 0
+            {
                 (g.0.invalidate_station_list)();
                 break;
             }
@@ -976,7 +1000,10 @@ pub unsafe extern "C" fn openttd_rust_list_insert(
                 .total
                 .wrapping_add(i32::from(order.wait) + i32::from(order.travel));
         }
-        if matches!(order.kind(), 1 | 6) && (g.0.ownerless_station)(order.destination, 0) != 0 {
+        if matches!(order.kind(), 1 | 6)
+            // SAFETY: List insertion supplies a live station/waypoint for these order kinds.
+            && unsafe { (g.0.ownerless_station)(order.destination, 0) } != 0
+        {
             (g.0.invalidate_station_list)();
         }
     };
@@ -1108,7 +1135,10 @@ impl Game {
         }
     }
     fn dirty(self, v: *mut c_void) {
-        (self.0.timetable_dirty)(v);
+        // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+        unsafe {
+            (self.0.timetable_dirty)(v);
+        }
     }
     fn change_timetable(self, v: *mut c_void, index: u8, val: u16, field: u8, timetabled: bool) {
         let list = self.orders(v);
@@ -1282,14 +1312,19 @@ impl Game {
         }
     }
     fn owner_check(self, v: *mut c_void, output: *mut c_void) -> bool {
-        (self.0.vehicle_ownership)(v, output) != 0
+        // SAFETY: The vehicle is live and output is the entry's writable native CommandCost.
+        (unsafe { (self.0.vehicle_ownership)(v, output) }) != 0
     }
     fn command_error(self, output: *mut c_void, error: u32) -> u32 {
-        (self.0.command_error)(output, error, 0);
+        // SAFETY: Output is the entry's live, writable native CommandCost.
+        unsafe {
+            (self.0.command_error)(output, error, 0);
+        }
         0
     }
     fn primary(self, v: *mut c_void) -> bool {
-        !v.is_null() && (self.0.primary_vehicle)(v) != 0
+        // SAFETY: The entry supplies a live shell or null; short-circuiting excludes null.
+        !v.is_null() && unsafe { (self.0.primary_vehicle)(v) } != 0
     }
     fn timetable_sort(self, a: *mut c_void, b: *mut c_void) -> std::cmp::Ordering {
         let sa = self.consist(a);
@@ -1319,7 +1354,8 @@ impl Game {
         if time != 0 {
             return time.cmp(&0);
         }
-        (self.0.unit_number)(b).cmp(&(self.0.unit_number)(a))
+        // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+        unsafe { (self.0.unit_number)(b) }.cmp(&unsafe { (self.0.unit_number)(a) })
     }
 }
 
@@ -1372,7 +1408,8 @@ pub unsafe extern "C" fn openttd_rust_timetable_change(
         if travel != order.travel && order.kind() == 7 {
             return g.command_error(output, 0);
         }
-        if speed != order.speed && (order.kind() == 7 || (g.0.vehicle_type)(v) == 3) {
+        // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+        if speed != order.speed && (order.kind() == 7 || unsafe { (g.0.vehicle_type)(v) } == 3) {
             return g.command_error(output, 0);
         }
         if execute != 0 {
@@ -1721,7 +1758,10 @@ impl Game {
                 break;
             }
         }
-        (self.0.invalidate_order)(v, 0);
+        // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+        unsafe {
+            (self.0.invalidate_order)(v, 0);
+        }
     }
     fn increment_real(self, v: *mut c_void) {
         let state = self.consist(v);
@@ -1730,7 +1770,10 @@ impl Game {
             self.increment_implicit(v);
         } else {
             self.skip_real(v);
-            (self.0.invalidate_order)(v, 0);
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            unsafe {
+                (self.0.invalidate_order)(v, 0);
+            }
         }
     }
     fn any_order(self, v: *mut c_void, predicate: impl Fn(Order) -> bool) -> bool {
@@ -1769,7 +1812,8 @@ impl Game {
         let mut time = 0i32;
         let mut u = self.first(v);
         while !u.is_null() {
-            if (self.0.stopped_or_crashed)(u) == 0 {
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            if unsafe { (self.0.stopped_or_crashed)(u) } == 0 {
                 count = count.wrapping_add(1);
                 // SAFETY: Scalar read of a live serialized owner; no borrow survives the statement.
                 time = time.wrapping_add(unsafe { (*self.consist(u)).round_trip });
@@ -1781,12 +1825,16 @@ impl Game {
         let departure = tick.wrapping_add(separation as u64);
         u = self.first(v);
         while !u.is_null() {
-            if (self.0.stopped_or_crashed)(u) == 0 {
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            if unsafe { (self.0.stopped_or_crashed)(u) } == 0 {
                 // SAFETY: Exclusive serialized scalar write to a live owner; no borrow survives the statement.
                 unsafe {
                     (*self.consist(u)).next_departure = departure;
                 }
-                (self.0.vehicle_dirty)(u);
+                // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                unsafe {
+                    (self.0.vehicle_dirty)(u);
+                }
             }
             u = self.next(u);
         }
@@ -2246,7 +2294,10 @@ impl Control {
             }
         }
         let mut u = g.first(v);
-        (g.0.delete_order_news)(u);
+        // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+        unsafe {
+            (g.0.delete_order_news)(u);
+        }
         while !u.is_null() {
             let state = g.consist(u);
             // SAFETY: Scalar read of a live serialized owner; no borrow survives the statement.
@@ -2261,8 +2312,12 @@ impl Control {
                 }
             }
             // SAFETY: Scalar read of a live serialized owner; no borrow survives the statement.
-            if index == unsafe { (*state).implicit } && (g.0.vehicle_type)(u) < 2 {
-                (g.0.suppress_implicit_write)(u, 1);
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            if index == unsafe { (*state).implicit } && unsafe { (g.0.vehicle_type)(u) } < 2 {
+                // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                unsafe {
+                    (g.0.suppress_implicit_write)(u, 1);
+                }
             }
             // SAFETY: Scalar read of a live serialized owner; no borrow survives the statement.
             if index <= unsafe { (*state).implicit } {
@@ -2276,7 +2331,10 @@ impl Control {
                 }
             }
             g.reset(u);
-            (g.0.invalidate_order)(u, i32::from(u16::from(u8::MAX) | (u16::from(index) << 8)));
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            unsafe {
+                (g.0.invalidate_order)(u, i32::from(u16::from(u8::MAX) | (u16::from(index) << 8)));
+            }
             u = g.next(u);
         }
         let list = g.orders(v);
@@ -2293,7 +2351,10 @@ impl Control {
                 g.put_stored(list, i, o);
             }
         }
-        (g.0.invalidate_vehicle_list)(v);
+        // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+        unsafe {
+            (g.0.invalidate_vehicle_list)(v);
+        }
     }
     fn cancel_loading(&self, v: *mut c_void) {
         let mut order = self.g.current(v);
@@ -2310,7 +2371,10 @@ impl Control {
             openttd_rust_list_delete(g.orders(v), u32::from(index), g.0);
         }
         let mut u = g.first(v);
-        (g.0.delete_order_news)(u);
+        // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+        unsafe {
+            (g.0.delete_order_news)(u);
+        }
         while !u.is_null() {
             let state = g.consist(u);
             // SAFETY: Scalar read of a live serialized owner; no borrow survives the statement.
@@ -2360,7 +2424,10 @@ impl Control {
                 }
             }
             g.reset(u);
-            (g.0.invalidate_order)(u, i32::from(u16::from(index) | (u16::from(u8::MAX) << 8)));
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            unsafe {
+                (g.0.invalidate_order)(u, i32::from(u16::from(index) | (u16::from(u8::MAX) << 8)));
+            }
             u = g.next(u);
         }
         let list = g.orders(v);
@@ -2378,18 +2445,28 @@ impl Control {
                 g.put_stored(list, i, o);
             }
         }
-        (g.0.invalidate_vehicle_list)(v);
+        // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+        unsafe {
+            (g.0.invalidate_vehicle_list)(v);
+        }
     }
     fn delete_implicit(&self, v: *mut c_void) {
         let g = self.g;
         let state = g.consist(v);
-        if (g.0.vehicle_type)(v) < 2 && (g.0.suppress_implicit)(v) != 0 {
-            (g.0.suppress_implicit_write)(v, 0);
+        // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+        if unsafe { (g.0.vehicle_type)(v) } < 2 && unsafe { (g.0.suppress_implicit)(v) } != 0 {
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            unsafe {
+                (g.0.suppress_implicit_write)(v, 0);
+            }
             // SAFETY: Exclusive serialized scalar write to a live owner; no borrow survives the statement.
             unsafe {
                 (*state).implicit = (*state).real;
             }
-            (g.0.invalidate_order)(v, 0);
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            unsafe {
+                (g.0.invalidate_order)(v, 0);
+            }
             return;
         }
         let list = g.orders(v);
@@ -2439,7 +2516,10 @@ impl Control {
             openttd_rust_order_vector_move(g.vector(list), usize::from(from), usize::from(to));
         }
         let mut u = g.first(v);
-        (g.0.delete_order_news)(u);
+        // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+        unsafe {
+            (g.0.delete_order_news)(u);
+        }
         fn remap(index: u8, from: u8, to: u8) -> u8 {
             if index == from {
                 to
@@ -2459,7 +2539,10 @@ impl Control {
                 (*state).implicit = remap((*state).implicit, from, to);
             }
             g.reset(u);
-            (g.0.invalidate_order)(u, i32::from(u16::from(from) | (u16::from(to) << 8)));
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            unsafe {
+                (g.0.invalidate_order)(u, i32::from(u16::from(from) | (u16::from(to) << 8)));
+            }
             u = g.next(u);
         }
         for i in 0..g.stored_count(list) {
@@ -2469,7 +2552,10 @@ impl Control {
                 g.put_stored(list, i, o);
             }
         }
-        (g.0.invalidate_vehicle_list)(v);
+        // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+        unsafe {
+            (g.0.invalidate_vehicle_list)(v);
+        }
     }
     fn add_shared(&self, v: *mut c_void, shared: *mut c_void) {
         let g = self.g;
@@ -2502,7 +2588,8 @@ impl Control {
         let first = g.first(v);
         let were_first = first == v;
         // Window number is copied before changing the head, as in the original.
-        let identifier = (g.0.shared_window)(v, first);
+        // SAFETY: Both vehicles belong to the live shared-order chain.
+        let identifier = unsafe { (g.0.shared_window)(v, first) };
         let list = g.list(g.orders(v));
         // SAFETY: Exclusive serialized scalar write to a live owner; no borrow survives the statement.
         unsafe {
@@ -2527,14 +2614,23 @@ impl Control {
         }
         // SAFETY: Scalar read of a live serialized owner; no borrow survives the statement.
         if unsafe { (*list).vehicles == 1 } {
-            (g.0.close_shared_window)(v, identifier as u32);
-            (g.0.invalidate_order)(g.first(v), ((-2i64) as u64) as i32);
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            unsafe {
+                (g.0.close_shared_window)(v, identifier as u32);
+            }
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            unsafe {
+                (g.0.invalidate_order)(g.first(v), ((-2i64) as u64) as i32);
+            }
         } else if were_first {
-            (g.0.invalidate_shared_window)(
-                v,
-                identifier as u32,
-                ((g.0.vehicle_id)(g.first(v)) | (1 << 31)) as i32,
-            );
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            unsafe {
+                (g.0.invalidate_shared_window)(
+                    v,
+                    identifier as u32,
+                    ((g.0.vehicle_id)(g.first(v)) | (1 << 31)) as i32,
+                );
+            }
         }
         // SAFETY: Exclusive serialized scalar write to a live owner; no borrow survives the statement.
         unsafe {
@@ -2544,7 +2640,10 @@ impl Control {
     }
     fn delete_vehicle_orders(&self, v: *mut c_void, keep: bool, reset: bool) {
         let g = self.g;
-        (g.0.delete_order_news)(v);
+        // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+        unsafe {
+            (g.0.delete_order_news)(v);
+        }
         let list = g.orders(v);
         // SAFETY: Scalar read of a live serialized owner; no borrow survives the statement.
         if !list.is_null() && unsafe { (*g.list(list)).vehicles > 1 } {
@@ -2557,7 +2656,10 @@ impl Control {
             // SAFETY: Reentry with this entry's live shell, outputs and static table.
             let remove = unsafe { openttd_rust_list_free(list, (u32::from(keep)) as u8, g.0) };
             if remove != 0 {
-                (g.0.delete_list)(list);
+                // SAFETY: The detached list is deleted once; no owner borrow or subsequent access remains.
+                unsafe {
+                    (g.0.delete_list)(list);
+                }
             }
             if !keep {
                 // SAFETY: Exclusive serialized scalar write to a live owner; no borrow survives the statement.
@@ -2670,7 +2772,10 @@ pub unsafe extern "C" fn openttd_rust_timetable_bulk(
             while index < g.count(v) {
                 let order = g.vehicle_order(v, index);
                 if order.is_some_and(|o| o.kind() != 8) {
-                    (g.0.change_timetable_command)(v, index, field, value);
+                    // SAFETY: The vehicle is live; no owner borrow spans the nested timetable command.
+                    unsafe {
+                        (g.0.change_timetable_command)(v, index, field, value);
+                    }
                 }
                 index = index.wrapping_add(1);
             }
@@ -2982,14 +3087,21 @@ impl Game {
             return u8::MAX;
         }
         let variable = match order.variable() {
-            0 => (self.0.percent_filled)(v) as i32,
-            1 => (((self.0.reliability)(v) * 101) >> 16) as i32,
-            7 => (((self.0.engine_reliability)(v) * 101) >> 16) as i32,
-            2 => ((self.0.display_speed)(v) as i32).wrapping_mul(10) / 16,
-            3 => (self.0.age_years)(v) as i32,
-            4 => (self.0.needs_service)(v) as i32,
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            0 => (unsafe { (self.0.percent_filled)(v) }) as i32,
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            1 => ((unsafe { (self.0.reliability)(v) } * 101) >> 16) as i32,
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            7 => ((unsafe { (self.0.engine_reliability)(v) } * 101) >> 16) as i32,
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            2 => ((unsafe { (self.0.display_speed)(v) }) as i32).wrapping_mul(10) / 16,
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            3 => (unsafe { (self.0.age_years)(v) }) as i32,
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            4 => (unsafe { (self.0.needs_service)(v) }) as i32,
             5 => return order.flags,
-            6 => (self.0.remaining_years)(v) as i32,
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            6 => (unsafe { (self.0.remaining_years)(v) }) as i32,
             _ => unreachable!(),
         };
         let value = i32::from(order.value());
@@ -3009,20 +3121,26 @@ impl Game {
     fn location(self, order: Order, v: *mut c_void, airport: bool) -> u32 {
         match order.kind() {
             1 | 6 | 8 => {
-                (if airport && (self.0.vehicle_type)(v) == 3 {
-                    (self.0.airport_tile)(order.destination)
+                // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                (if airport && unsafe { (self.0.vehicle_type)(v) } == 3 {
+                    // SAFETY: The source branch supplies a live destination of the required pool type.
+                    unsafe { (self.0.airport_tile)(order.destination) }
                 } else {
-                    (self.0.base_station_tile)(order.destination)
+                    // SAFETY: The source branch supplies a live destination of the required pool type.
+                    unsafe { (self.0.base_station_tile)(order.destination) }
                 }) as u32
             }
             2 => {
                 if order.destination == u16::MAX {
                     return u32::MAX;
                 }
-                (if (self.0.vehicle_type)(v) == 3 {
-                    (self.0.station_tile)(order.destination)
+                // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                (if unsafe { (self.0.vehicle_type)(v) } == 3 {
+                    // SAFETY: The source branch supplies a live destination of the required pool type.
+                    unsafe { (self.0.station_tile)(order.destination) }
                 } else {
-                    (self.0.depot_tile)(order.destination)
+                    // SAFETY: The source branch supplies a live destination of the required pool type.
+                    unsafe { (self.0.depot_tile)(order.destination) }
                 }) as u32
             }
             _ => u32::MAX,
@@ -3052,7 +3170,12 @@ impl Game {
         if prev == u32::MAX || cur == u32::MAX {
             return 0;
         }
-        (self.0.distance)(prev, cur, u8::from((self.0.vehicle_type)(v) == 3)) as u32
+        // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+        (self.0.distance)(
+            prev,
+            cur,
+            u8::from(unsafe { (self.0.vehicle_type)(v) } == 3),
+        ) as u32
     }
 }
 impl Control {
@@ -3065,22 +3188,32 @@ impl Control {
                 current.flags = 0;
                 current.destination = 0;
                 g.put_current(v, current);
-                (g.0.set_destination)(v, 0);
+                // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                unsafe {
+                    (g.0.set_destination)(v, 0);
+                }
                 return false;
             }
             match order.kind() {
                 1 => {
-                    let tile = (g.0.station_location)(v, order.destination);
-                    (g.0.set_destination)(v, tile as u32);
+                    // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                    let tile = unsafe { (g.0.station_location)(v, order.destination) };
+                    // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                    unsafe {
+                        (g.0.set_destination)(v, tile as u32);
+                    }
                     return true;
                 }
                 2 => {
-                    if order.depot_type() & 1 != 0 && (g.0.needs_service)(v) == 0 {
+                    // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                    if order.depot_type() & 1 != 0 && unsafe { (g.0.needs_service)(v) } == 0 {
                         g.update_timetable(v, true);
                         g.increment_real(v);
                     } else if g.current(v).action() & 2 != 0 {
-                        if (g.0.destination_tile)(v) == 0
-                            && (g.0.economy_fraction)() != (g.0.vehicle_id)(v) % 74
+                        // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                        if unsafe { (g.0.destination_tile)(v) } == 0
+                            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                            && (g.0.economy_fraction)() != unsafe { (g.0.vehicle_id)(v) } % 74
                         {
                         } else {
                             let mut closest = Closest::default();
@@ -3090,18 +3223,31 @@ impl Control {
                                 if pbs && closest.reverse != 0 {
                                     return false;
                                 }
-                                (g.0.set_destination)(v, closest.tile);
+                                // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                                unsafe {
+                                    (g.0.set_destination)(v, closest.tile);
+                                }
                                 let mut current = g.current(v);
                                 current.destination = closest.destination;
                                 g.put_current(v, current);
-                                if (g.0.vehicle_type)(v) == 0 && closest.reverse != 0 {
-                                    (g.0.reverse_train)(v);
+                                // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                                if unsafe { (g.0.vehicle_type)(v) } == 0 && closest.reverse != 0 {
+                                    // SAFETY: The vehicle is a live train; no owner borrow spans the nested reverse command.
+                                    unsafe {
+                                        (g.0.reverse_train)(v);
+                                    }
                                 }
-                                if (g.0.vehicle_type)(v) == 3
-                                    && (g.0.aircraft_flying)(v) != 0
-                                    && (g.0.target_airport)(v) != u64::from(closest.destination)
+                                // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                                if unsafe { (g.0.vehicle_type)(v) } == 3
+                                    // SAFETY: The source branch has established that this live vehicle is an aircraft.
+                                    && unsafe { (g.0.aircraft_flying)(v) } != 0
+                                    // SAFETY: The source branch has established that this live vehicle is an aircraft.
+                                    && unsafe { (g.0.target_airport)(v) } != u64::from(closest.destination)
                                 {
-                                    (g.0.next_airport)(v);
+                                    // SAFETY: The vehicle is a live aircraft; no owner borrow spans airport movement.
+                                    unsafe {
+                                        (g.0.next_airport)(v);
+                                    }
                                 }
                                 return true;
                             }
@@ -3112,22 +3258,36 @@ impl Control {
                             g.increment_real(v);
                         }
                     } else {
-                        if (g.0.vehicle_type)(v) != 3 {
-                            let tile = (g.0.depot_tile)(order.destination);
-                            (g.0.set_destination)(v, tile as u32);
+                        // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                        if unsafe { (g.0.vehicle_type)(v) } != 3 {
+                            // SAFETY: The source branch supplies a live destination of the required pool type.
+                            let tile = unsafe { (g.0.depot_tile)(order.destination) };
+                            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                            unsafe {
+                                (g.0.set_destination)(v, tile as u32);
+                            }
                         } else {
                             let destination = g.current(v).destination;
-                            if (g.0.target_airport)(v) != u64::from(destination) {
-                                let tile = (g.0.station_location)(v, destination);
-                                (g.0.set_destination)(v, tile as u32);
+                            // SAFETY: The source branch has established that this live vehicle is an aircraft.
+                            if unsafe { (g.0.target_airport)(v) } != u64::from(destination) {
+                                // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                                let tile = unsafe { (g.0.station_location)(v, destination) };
+                                // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                                unsafe {
+                                    (g.0.set_destination)(v, tile as u32);
+                                }
                             }
                         }
                         return true;
                     }
                 }
                 6 => {
-                    let tile = (g.0.waypoint_tile)(order.destination);
-                    (g.0.set_destination)(v, tile as u32);
+                    // SAFETY: The source branch supplies a live destination of the required pool type.
+                    let tile = unsafe { (g.0.waypoint_tile)(order.destination) };
+                    // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                    unsafe {
+                        (g.0.set_destination)(v, tile as u32);
+                    }
                     return true;
                 }
                 7 => {
@@ -3150,8 +3310,12 @@ impl Control {
                         unsafe {
                             (*state).time = (*state).time.wrapping_add(i32::from(travel));
                         }
-                        if (g.0.vehicle_type)(v) < 2 {
-                            (g.0.suppress_implicit_write)(v, 1);
+                        // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                        if unsafe { (g.0.vehicle_type)(v) } < 2 {
+                            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                            unsafe {
+                                (g.0.suppress_implicit_write)(v, 1);
+                            }
                         }
                     } else {
                         g.update_timetable(v, true);
@@ -3159,7 +3323,10 @@ impl Control {
                     }
                 }
                 _ => {
-                    (g.0.set_destination)(v, 0);
+                    // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                    unsafe {
+                        (g.0.set_destination)(v, 0);
+                    }
                     return false;
                 }
             }
@@ -3172,7 +3339,10 @@ impl Control {
                 current.flags = 0;
                 current.destination = 0;
                 g.put_current(v, current);
-                (g.0.set_destination)(v, 0);
+                // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                unsafe {
+                    (g.0.set_destination)(v, 0);
+                }
                 return false;
             };
             g.put_current(v, next);
@@ -3197,7 +3367,8 @@ impl Control {
             }
             3 => return false,
             4 => {
-                if (g.0.vehicle_type)(v) != 3 {
+                // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                if unsafe { (g.0.vehicle_type)(v) } != 3 {
                     return false;
                 }
             }
@@ -3207,11 +3378,16 @@ impl Control {
         // SAFETY: Reads one Order from live storage; the source is valid and no reference survives.
         let current = unsafe { current_ptr.read() };
         if ((order_kind == 1 && current.non_stop() & 2 != 0) || order_kind == 6)
-            && (g.0.at_station)(v) != 0
-            && u64::from(current.destination) == (g.0.tile_station)(v)
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            && unsafe { (g.0.at_station)(v) } != 0
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            && u64::from(current.destination) == unsafe { (g.0.tile_station)(v) }
         {
             self.delete_implicit(v);
-            (g.0.last_station_write)(v, current.destination);
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            unsafe {
+                (g.0.last_station_write)(v, current.destination);
+            }
             g.update_timetable(v, true);
             g.increment_implicit(v);
             // Deletion/timetable/index updates may mutate the list or reenter.
@@ -3224,10 +3400,14 @@ impl Control {
             // SAFETY: Scalar read of a live serialized owner; no borrow survives the statement.
             .order(unsafe { (*state).real })
             .filter(|o| o.kind() != 8);
-        let kind = (g.0.vehicle_type)(v);
+        // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+        let kind = unsafe { (g.0.vehicle_type)(v) };
         if order.is_none() || (kind == 3 && !access.valid()) {
             if kind == 3 {
-                (g.0.missing_aircraft_orders)(v);
+                // SAFETY: The vehicle is a live aircraft; no owner borrow spans order mutation.
+                unsafe {
+                    (g.0.missing_aircraft_orders)(v);
+                }
                 return false;
             }
             // SAFETY: Reads one Order from live storage; the source is valid and no reference survives.
@@ -3239,16 +3419,21 @@ impl Control {
             unsafe {
                 (*vehicle).current.as_mut_ptr().write(current);
             }
-            (g.0.set_destination)(v, 0);
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            unsafe {
+                (g.0.set_destination)(v, 0);
+            }
             return false;
         }
         let order = order.unwrap();
         // SAFETY: Reads one Order from live storage; the source is valid and no reference survives.
         if order.equals(unsafe { (*vehicle).current.as_ptr().read() })
-            && (kind == 3 || (g.0.destination_tile)(v) != 0)
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            && (kind == 3 || unsafe { (g.0.destination_tile)(v) } != 0)
             && (kind != 2
                 || order.kind() != 1
-                || (g.0.ship_station_tile)(order.destination) != u64::from(u32::MAX))
+                // SAFETY: The source branch supplies a live destination of the required pool type.
+                || unsafe { (g.0.ship_station_tile)(order.destination) } != u64::from(u32::MAX))
         {
             return false;
         }
@@ -3256,9 +3441,15 @@ impl Control {
         unsafe {
             (*vehicle).current.as_mut_ptr().write(order);
         }
-        (g.0.invalidate_order)(v, ((-2i64) as u64) as i32);
+        // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+        unsafe {
+            (g.0.invalidate_order)(v, ((-2i64) as u64) as i32);
+        }
         if kind == 2 || kind == 3 {
-            (g.0.dirty_vehicle_windows)(v);
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            unsafe {
+                (g.0.dirty_vehicle_windows)(v);
+            }
         }
         self.destination(v, order, 0, false) && reverse
     }
@@ -3266,11 +3457,15 @@ impl Control {
 
 impl Game {
     fn error_with(self, output: *mut c_void, error: u32, detail: u64) -> u64 {
-        (self.0.command_error)(output, error, detail as u32);
+        // SAFETY: Output is the entry's live, writable native CommandCost.
+        unsafe {
+            (self.0.command_error)(output, error, detail as u32);
+        }
         0
     }
     fn check_owner(self, owner: u64, output: *mut c_void) -> bool {
-        (self.0.owner_check)(owner as u8, output) != 0
+        // SAFETY: Output is the entry's live, writable native CommandCost.
+        (unsafe { (self.0.owner_check)(owner as u8, output) }) != 0
     }
     fn error(self, output: *mut c_void, error: u32) -> u64 {
         u64::from(self.command_error(output, error))
@@ -3295,31 +3490,37 @@ impl Control {
         if order.refit != 0xfe || order.wait != 0 || order.travel != 0 || order.speed != u16::MAX {
             return self.g.error(output, 0);
         }
-        let kind = (g.0.vehicle_type)(v);
+        // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+        let kind = unsafe { (g.0.vehicle_type)(v) };
         let destination = u64::from(order.destination);
         match order.kind() {
             1 => {
                 if (g.0.valid_station)(destination as u16) == 0 {
                     return self.g.error(output, 0);
                 }
-                let owner = (g.0.station_owner)(destination as u16);
+                // SAFETY: The source branch supplies a live destination of the required pool type.
+                let owner = unsafe { (g.0.station_owner)(destination as u16) };
                 if owner != 0x10 && !self.g.check_owner(owner, output) {
                     return 0;
                 }
-                if (g.0.can_use_station)(v, destination as u16) == 0 {
+                // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                if unsafe { (g.0.can_use_station)(v, destination as u16) } == 0 {
                     return self.g.error_with(
                         output,
                         5,
-                        (g.0.station_error)(v, destination as u16),
+                        // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                        unsafe { (g.0.station_error)(v, destination as u16) },
                     );
                 }
                 let mut u = g.first(v);
                 while !u.is_null() {
-                    if (g.0.can_use_station)(u, destination as u16) == 0 {
+                    // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                    if unsafe { (g.0.can_use_station)(u, destination as u16) } == 0 {
                         return self.g.error_with(
                             output,
                             6,
-                            (g.0.station_error)(u, destination as u16),
+                            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                            unsafe { (g.0.station_error)(u, destination as u16) },
                         );
                     }
                     u = g.next(u);
@@ -3357,12 +3558,15 @@ impl Control {
                         }
                         if !self
                             .g
-                            .check_owner((g.0.station_owner)(destination as u16), output)
+                            // SAFETY: The source branch supplies a live destination of the required pool type.
+                            .check_owner(unsafe { (g.0.station_owner)(destination as u16) }, output)
                         {
                             return 0;
                         }
-                        if (g.0.can_use_station)(v, destination as u16) == 0
-                            || (g.0.has_hangar)(destination as u16) == 0
+                        // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                        if unsafe { (g.0.can_use_station)(v, destination as u16) } == 0
+                            // SAFETY: The source branch supplies a live destination of the required pool type.
+                            || unsafe { (g.0.has_hangar)(destination as u16) } == 0
                         {
                             return self.g.error(output, 0);
                         }
@@ -3372,15 +3576,19 @@ impl Control {
                         }
                         if !self
                             .g
-                            .check_owner((g.0.depot_owner)(destination as u16), output)
+                            // SAFETY: The source branch supplies a live destination of the required pool type.
+                            .check_owner(unsafe { (g.0.depot_owner)(destination as u16) }, output)
                         {
                             return 0;
                         }
                         if kind > 2
                             || match kind {
-                                0 => (g.0.rail_depot)(destination as u16),
-                                1 => (g.0.road_depot)(destination as u16),
-                                _ => (g.0.ship_depot)(destination as u16),
+                                // SAFETY: The source branch supplies a live destination of the required pool type.
+                                0 => unsafe { (g.0.rail_depot)(destination as u16) },
+                                // SAFETY: The source branch supplies a live destination of the required pool type.
+                                1 => unsafe { (g.0.road_depot)(destination as u16) },
+                                // SAFETY: The source branch supplies a live destination of the required pool type.
+                                _ => unsafe { (g.0.ship_depot)(destination as u16) },
                             } == 0
                         {
                             return self.g.error(output, 0);
@@ -3417,16 +3625,18 @@ impl Control {
                 if (g.0.valid_waypoint)(destination as u16) == 0 {
                     return self.g.error(output, 0);
                 }
-                let facilities = (g.0.waypoint_facilities)(destination as u16);
+                // SAFETY: The source branch supplies a live destination of the required pool type.
+                let facilities = unsafe { (g.0.waypoint_facilities)(destination as u16) };
                 match kind {
                     0 => {
                         if facilities & 1 == 0 {
                             return self.g.error(output, 11);
                         }
-                        if !self
-                            .g
-                            .check_owner((g.0.waypoint_owner)(destination as u16), output)
-                        {
+                        if !self.g.check_owner(
+                            // SAFETY: valid_waypoint above established a live pool entry.
+                            unsafe { (g.0.waypoint_owner)(destination as u16) },
+                            output,
+                        ) {
                             return 0;
                         }
                     }
@@ -3434,10 +3644,11 @@ impl Control {
                         if facilities & 6 == 0 {
                             return self.g.error(output, 12);
                         }
-                        if !self
-                            .g
-                            .check_owner((g.0.waypoint_owner)(destination as u16), output)
-                        {
+                        if !self.g.check_owner(
+                            // SAFETY: valid_waypoint above established a live pool entry.
+                            unsafe { (g.0.waypoint_owner)(destination as u16) },
+                            output,
+                        ) {
                             return 0;
                         }
                     }
@@ -3445,7 +3656,8 @@ impl Control {
                         if facilities & 16 == 0 {
                             return self.g.error(output, 13);
                         }
-                        let owner = (g.0.waypoint_owner)(destination as u16);
+                        // SAFETY: The source branch supplies a live destination of the required pool type.
+                        let owner = unsafe { (g.0.waypoint_owner)(destination as u16) };
                         if owner != 0x10 && !self.g.check_owner(owner, output) {
                             return 0;
                         }
@@ -3510,8 +3722,14 @@ impl Control {
     fn declone(&self, v: *mut c_void, execute: bool) -> u64 {
         if execute {
             self.delete_vehicle_orders(v, false, true);
-            (self.g.0.invalidate_order)(v, ((-1i64) as u64) as i32);
-            (self.g.0.invalidate_vehicle_list)(v);
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            unsafe {
+                (self.g.0.invalidate_order)(v, ((-1i64) as u64) as i32);
+            }
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            unsafe {
+                (self.g.0.invalidate_vehicle_list)(v);
+            }
         }
         1
     }
@@ -3549,7 +3767,10 @@ impl Control {
         }
         if execute {
             if g.current(v).kind() == 3 {
-                (g.0.leave_station)(v);
+                // SAFETY: The vehicle is live; no owner borrow spans station departure.
+                unsafe {
+                    (g.0.leave_station)(v);
+                }
             }
             // SAFETY: Exclusive serialized scalar write to a live owner; no borrow survives the statement.
             unsafe {
@@ -3558,9 +3779,16 @@ impl Control {
             }
             g.update_real(v);
             g.reset(v);
-            (g.0.invalidate_order)(v, ((-2i64) as u64) as i32);
-            if matches!((g.0.vehicle_type)(v), 2 | 3) {
-                (g.0.dirty_vehicle_windows)(v);
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            unsafe {
+                (g.0.invalidate_order)(v, ((-2i64) as u64) as i32);
+            }
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            if matches!(unsafe { (g.0.vehicle_type)(v) }, 2 | 3) {
+                // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                unsafe {
+                    (g.0.dirty_vehicle_windows)(v);
+                }
             }
         }
         1
@@ -3643,12 +3871,17 @@ impl Control {
         let byte = data as u8;
         match field {
             0 => {
-                if (g.0.vehicle_type)(v) >= 2 || byte == order.non_stop() || byte & !3 != 0 {
+                // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                if unsafe { (g.0.vehicle_type)(v) } >= 2
+                    || byte == order.non_stop()
+                    || byte & !3 != 0
+                {
                     return self.g.error(output, 0);
                 }
             }
             1 => {
-                if (g.0.vehicle_type)(v) != 0 || data >= 3 {
+                // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                if unsafe { (g.0.vehicle_type)(v) } != 0 || data >= 3 {
                     return self.g.error(output, 0);
                 }
             }
@@ -3800,7 +4033,10 @@ impl Control {
             }
             g.put_order(list, index, order);
             let mut u = g.first(v);
-            (g.0.delete_order_news)(u);
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            unsafe {
+                (g.0.delete_order_news)(u);
+            }
             while !u.is_null() {
                 let state = g.consist(u);
                 let mut current = g.current(u);
@@ -3813,7 +4049,10 @@ impl Control {
                     g.put_current(u, current);
                 }
                 g.reset(u);
-                (g.0.invalidate_order)(u, ((-2i64) as u64) as i32);
+                // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                unsafe {
+                    (g.0.invalidate_order)(u, ((-2i64) as u64) as i32);
+                }
                 u = g.next(u);
             }
         }
@@ -3854,7 +4093,10 @@ impl Control {
             g.put_order(g.orders(v), index, order);
             let mut u = g.first(v);
             while !u.is_null() {
-                (g.0.invalidate_order)(u, ((-2i64) as u64) as i32);
+                // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                unsafe {
+                    (g.0.invalidate_order)(u, ((-2i64) as u64) as i32);
+                }
                 // SAFETY: Scalar read of a live serialized owner; no borrow survives the statement.
                 if index == unsafe { (*g.consist(u)).real } && g.current(u).depot_type() & 2 != 0 {
                     let mut current = g.current(u);
@@ -3881,13 +4123,16 @@ impl Vector {
 }
 impl Game {
     fn backup(self, b: *mut c_void) -> *mut Backup {
-        (self.0.backup)(b)
+        // SAFETY: The pool traversal supplies a live OrderBackup shell.
+        unsafe { (self.0.backup)(b) }
     }
     fn backup_vector(self, b: *mut c_void) -> *mut Vector {
-        (self.0.backup_vector)(b)
+        // SAFETY: The pool traversal supplies a live OrderBackup shell and its storage owner.
+        unsafe { (self.0.backup_vector)(b) }
     }
     fn backup_consist(self, b: *mut c_void) -> *mut Consist {
-        (self.0.backup_consist)(b)
+        // SAFETY: The pool traversal supplies a live OrderBackup shell and its consist owner.
+        unsafe { (self.0.backup_consist)(b) }
     }
     fn next_backup(self, cursor: &mut u32) -> *mut c_void {
         // SAFETY: The callback only advances this exclusive live cursor.
@@ -3909,7 +4154,10 @@ impl Game {
             (*state).group = (self.0.vehicle_group)(v) as u16;
             openttd_rust_consist_copy(self.backup_consist(backup), self.consist(v));
         }
-        (self.0.capture_backup_metadata)(backup, v);
+        // SAFETY: The new backup and source vehicle are live; neither owner is borrowed.
+        unsafe {
+            (self.0.capture_backup_metadata)(backup, v);
+        }
         let list = self.orders(v);
         // SAFETY: Scalar read of a live serialized owner; no borrow survives the statement.
         if !list.is_null() && unsafe { (*self.list(list)).vehicles > 1 } {
@@ -3932,11 +4180,13 @@ impl Game {
         }
     }
     fn aircraft_range(self, dst: *mut c_void, src: *mut c_void) -> bool {
-        if (self.0.aircraft_range)(dst) == 0 || self.count(src) == 0 {
+        // SAFETY: The range check receives a live aircraft shell.
+        if unsafe { (self.0.aircraft_range)(dst) } == 0 || self.count(src) == 0 {
             return true;
         }
         let list = self.orders(src);
-        let max = (self.0.aircraft_range_square)(dst) as u32;
+        // SAFETY: The range check receives a live aircraft shell.
+        let max = (unsafe { (self.0.aircraft_range_square)(dst) }) as u32;
         for i in 0..self.size(list) {
             if matches!(self.order(list, i).unwrap().kind(), 1 | 2 | 6)
                 && self.distance(i, self.next_index(list, i), src, 0) > max
@@ -3969,16 +4219,21 @@ impl Control {
         if action != 0 && action != 1 {
             return self.g.error(output, 0);
         }
-        if !self.g.primary(src) || (g.0.vehicle_type)(dst) != (g.0.vehicle_type)(src) || dst == src
+        if !self.g.primary(src)
+            // SAFETY: Both primary checks succeeded, so both native vehicle shells are live.
+            || unsafe { (g.0.vehicle_type)(dst) } != unsafe { (g.0.vehicle_type)(src) }
+            || dst == src
         {
             return self.g.error(output, 0);
         }
         if !self.g.owner_check(src, output) {
             return 0;
         }
-        let kind = (g.0.vehicle_type)(src);
+        // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+        let kind = unsafe { (g.0.vehicle_type)(src) };
         if action == 0 {
-            if kind == 1 && (g.0.bus)(src) != (g.0.bus)(dst) {
+            // SAFETY: The source branch has established that both live vehicles are road vehicles.
+            if kind == 1 && unsafe { (g.0.bus)(src) } != unsafe { (g.0.bus)(dst) } {
                 return self.g.error(output, 0);
             }
             if g.first(src) == g.first(dst) {
@@ -3995,13 +4250,16 @@ impl Control {
                     continue;
                 }
                 let destination = u64::from(order.destination);
-                if (action == 1 || (g.0.can_use_station)(src, destination as u16) != 0)
-                    && (g.0.can_use_station)(dst, destination as u16) == 0
+                // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                if (action == 1 || unsafe { (g.0.can_use_station)(src, destination as u16) } != 0)
+                    // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                    && unsafe { (g.0.can_use_station)(dst, destination as u16) } == 0
                 {
                     return self.g.error_with(
                         output,
                         17,
-                        (g.0.station_error)(dst, destination as u16),
+                        // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                        unsafe { (g.0.station_error)(dst, destination as u16) },
                     );
                 }
             }
@@ -4020,9 +4278,18 @@ impl Control {
                     (*g.vehicle(dst)).orders = g.orders(src);
                 }
                 self.add_shared(dst, src);
-                (g.0.invalidate_order)(dst, ((-1i64) as u64) as i32);
-                (g.0.invalidate_order)(src, ((-2i64) as u64) as i32);
-                (g.0.invalidate_vehicle_list)(dst);
+                // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                unsafe {
+                    (g.0.invalidate_order)(dst, ((-1i64) as u64) as i32);
+                }
+                // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                unsafe {
+                    (g.0.invalidate_order)(src, ((-2i64) as u64) as i32);
+                }
+                // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                unsafe {
+                    (g.0.invalidate_vehicle_list)(dst);
+                }
             } else {
                 // Original copies the source before deleting the kept empty shell.
                 // Rust temporary storage is a scalar copy, never a live mirror.
@@ -4038,7 +4305,10 @@ impl Control {
                 }
                 let old = g.orders(dst);
                 if !old.is_null() {
-                    (g.0.delete_list)(old);
+                    // SAFETY: The detached list is deleted once; no owner borrow or subsequent access remains.
+                    unsafe {
+                        (g.0.delete_list)(old);
+                    }
                 }
                 let list = self.new_list(dst, None, ptr::null_mut());
                 // SAFETY: Reentry with this entry's live shell, outputs and static table.
@@ -4051,8 +4321,14 @@ impl Control {
                 unsafe {
                     (*g.vehicle(dst)).orders = list;
                 }
-                (g.0.invalidate_order)(dst, ((-1i64) as u64) as i32);
-                (g.0.invalidate_vehicle_list)(dst);
+                // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                unsafe {
+                    (g.0.invalidate_order)(dst, ((-1i64) as u64) as i32);
+                }
+                // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                unsafe {
+                    (g.0.invalidate_vehicle_list)(dst);
+                }
             }
         }
         1
@@ -4063,7 +4339,10 @@ impl Control {
         // SAFETY: Scalar read of a live serialized owner; no borrow survives the statement.
         let clone = unsafe { (*state).clone };
         if !clone.is_null() {
-            (g.0.share_command)(v, clone);
+            // SAFETY: Both vehicles are live; no owner borrow spans the nested share command.
+            unsafe {
+                (g.0.share_command)(v, clone);
+            }
         // SAFETY: Scalar read of a live serialized owner; no borrow survives the statement.
         } else if unsafe { (*g.backup_vector(backup)).length > 0 } && (g.0.list_capacity)() != 0 {
             let list = (g.0.allocate_list)();
@@ -4078,14 +4357,21 @@ impl Control {
             }
             (g.0.invalidate_station_list)();
         }
-        if (g.0.unique_backup_name)(backup) == 0 {
-            (g.0.clear_backup_name)(backup);
+        // SAFETY: The pool traversal supplies a live OrderBackup shell and its native name.
+        if unsafe { (g.0.unique_backup_name)(backup) } == 0 {
+            // SAFETY: The backup remains allocated throughout this native string mutation.
+            unsafe {
+                (g.0.clear_backup_name)(backup);
+            }
         }
         // SAFETY: Reentry with this entry's live shell, outputs and static table.
         unsafe {
             openttd_rust_consist_copy(g.consist(v), g.backup_consist(backup));
         }
-        (g.0.restore_backup_metadata)(v, backup);
+        // SAFETY: The vehicle and backup are live; neither owner is borrowed across the copy.
+        unsafe {
+            (g.0.restore_backup_metadata)(v, backup);
+        }
         g.update_real(v);
         let vs = g.consist(v);
         // SAFETY: Scalar read of a live serialized owner; no borrow survives the statement.
@@ -4096,7 +4382,10 @@ impl Control {
             }
         }
         // SAFETY: Scalar read of a live serialized owner; no borrow survives the statement.
-        (g.0.group_command)(v, unsafe { (*state).group });
+        // SAFETY: The vehicle is live; no owner borrow spans the nested group command.
+        unsafe {
+            (g.0.group_command)(v, (*state).group);
+        }
     }
     fn capture_backup(&self, v: *mut c_void, source: *const c_void, user: u32) -> u64 {
         let g = self.g;
@@ -4110,12 +4399,18 @@ impl Control {
         while !ob.is_null() {
             // SAFETY: Scalar read of a live serialized owner; no borrow survives the statement.
             if unsafe { (*g.backup(ob)).user == a as u32 } {
-                (g.0.delete_backup)(ob);
+                // SAFETY: The pool entry is deleted once; no owner borrow or subsequent access remains.
+                unsafe {
+                    (g.0.delete_backup)(ob);
+                }
             }
             ob = self.g.next_backup(&mut cursor);
         }
         if (g.0.backup_capacity)() != 0 {
-            (g.0.create_backup)(v, a as u32);
+            // SAFETY: The source vehicle is live; no owner borrow spans allocation or reentry.
+            unsafe {
+                (g.0.create_backup)(v, a as u32);
+            }
         }
         0
     }
@@ -4126,12 +4421,16 @@ impl Control {
         while !ob.is_null() {
             let state = g.backup(ob);
             // SAFETY: Scalar read of a live serialized owner; no borrow survives the statement.
-            if (g.0.vehicle_tile)(v) as u32 == unsafe { (*state).tile }
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            if (unsafe { (g.0.vehicle_tile)(v) }) as u32 == unsafe { (*state).tile }
                 // SAFETY: Scalar read of a live serialized owner; no borrow survives the statement.
                 && unsafe { (*state).user == a as u32 }
             {
                 self.restore_backup(ob, v);
-                (g.0.delete_backup)(ob);
+                // SAFETY: The pool entry is deleted once; no owner borrow or subsequent access remains.
+                unsafe {
+                    (g.0.delete_backup)(ob);
+                }
             }
             ob = self.g.next_backup(&mut cursor);
         }
@@ -4162,7 +4461,10 @@ impl Control {
                 if unsafe {
                     (*state).user == b as u32 && ((*state).tile == a as u32 || a as u32 == u32::MAX)
                 } {
-                    (g.0.delete_backup)(ob);
+                    // SAFETY: The pool entry is deleted once; no owner borrow or subsequent access remains.
+                    unsafe {
+                        (g.0.delete_backup)(ob);
+                    }
                 }
             }
             ob = self.g.next_backup(&mut cursor);
@@ -4190,7 +4492,10 @@ impl Control {
                         // SAFETY: Scalar read of a live serialized owner; no borrow survives the statement.
                         (g.0.clear_backup_gui)(unsafe { (*state).tile }, user);
                     } else {
-                        (g.0.delete_backup)(ob);
+                        // SAFETY: The pool entry is deleted once; no owner borrow or subsequent access remains.
+                        unsafe {
+                            (g.0.delete_backup)(ob);
+                        }
                     }
                 }
             }
@@ -4233,7 +4538,10 @@ impl Control {
                         (*state).clone = clone;
                     }
                     if clone.is_null() {
-                        (g.0.delete_backup)(ob);
+                        // SAFETY: The pool entry is deleted once; no owner borrow or subsequent access remains.
+                        unsafe {
+                            (g.0.delete_backup)(ob);
+                        }
                     }
                 }
             }
@@ -4255,7 +4563,8 @@ impl Control {
                     if kind == 2 && order.action() & 2 != 0 {
                         continue;
                     }
-                    let hangar = (g.0.backup_hangar)(ob) != 0;
+                    // SAFETY: The pool traversal supplies a live OrderBackup shell and its saved tile.
+                    let hangar = unsafe { (g.0.backup_hangar)(ob) } != 0;
                     if kind == 2 && c != 0 && !hangar {
                         continue;
                     }
@@ -4263,7 +4572,10 @@ impl Control {
                         kind = 1;
                     }
                     if u64::from(kind) == a && u64::from(order.destination) == b {
-                        (g.0.delete_backup)(ob);
+                        // SAFETY: The pool entry is deleted once; no owner borrow or subsequent access remains.
+                        unsafe {
+                            (g.0.delete_backup)(ob);
+                        }
                         break;
                     }
                 }
@@ -4279,8 +4591,10 @@ impl Control {
         let g = self.g;
         let mut v = self.g.next_vehicle(0);
         while !v.is_null() {
-            let next = ((g.0.vehicle_id)(v) as u32).wrapping_add(1);
-            let aircraft = (g.0.vehicle_type)(v) == 3;
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            let next = ((unsafe { (g.0.vehicle_id)(v) }) as u32).wrapping_add(1);
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            let aircraft = unsafe { (g.0.vehicle_type)(v) } == 3;
             let mut current = g.current(v);
             let current_kind = if aircraft && current.kind() == 2 && !hangar {
                 1
@@ -4291,7 +4605,10 @@ impl Control {
                 current.kind = 5;
                 current.flags = 0;
                 g.put_current(v, current);
-                (g.0.vehicle_dirty)(v);
+                // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                unsafe {
+                    (g.0.vehicle_dirty)(v);
+                }
             }
             if !g.orders(v).is_null() {
                 let mut index = 0u8;
@@ -4333,8 +4650,14 @@ impl Control {
                                 let mut shared = g.first(v);
                                 while !shared.is_null() {
                                     let data = u16::from(index) | (u16::from(u8::MAX) << 8);
-                                    (g.0.invalidate_order)(shared, i32::from(data));
-                                    (g.0.invalidate_order)(shared, i32::from(data));
+                                    // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                                    unsafe {
+                                        (g.0.invalidate_order)(shared, i32::from(data));
+                                    }
+                                    // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                                    unsafe {
+                                        (g.0.invalidate_order)(shared, i32::from(data));
+                                    }
                                     shared = g.next(shared);
                                 }
                             }
@@ -4351,13 +4674,19 @@ impl Control {
         let g = self.g;
         let review = (g.0.review_setting)();
         if review == 0
-            || (g.0.vehicle_status)(v) & 128 != 0
-            || (review == 1 && (g.0.vehicle_status)(v) & 2 != 0)
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            || unsafe { (g.0.vehicle_status)(v) } & 128 != 0
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            || (review == 1 && unsafe { (g.0.vehicle_status)(v) } & 2 != 0)
             || g.first(v) != v
         {
             return;
         }
-        if (g.0.local_owner)(v) == 0 || !(g.0.day_counter)(v).is_multiple_of(20) {
+        // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+        if unsafe { (g.0.local_owner)(v) } == 0
+            // SAFETY: The same live vehicle shell supplies its day counter.
+            || !unsafe { (g.0.day_counter)(v) }.is_multiple_of(20)
+        {
             return;
         }
         let mut message = 0u32;
@@ -4372,11 +4701,15 @@ impl Control {
                 }
                 if order.kind() == 1 {
                     stations = stations.wrapping_add(1);
-                    if (g.0.can_use_station)(v, order.destination) == 0 {
+                    // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                    if unsafe { (g.0.can_use_station)(v, order.destination) } == 0 {
                         message = 2;
-                    } else if (g.0.vehicle_type)(v) == 3
-                        && (g.0.fast_aircraft)(v) != 0
-                        && (g.0.short_strip)(order.destination) != 0
+                    // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                    } else if unsafe { (g.0.vehicle_type)(v) } == 3
+                        // SAFETY: The source branch has established that this live vehicle is an aircraft.
+                        && unsafe { (g.0.fast_aircraft)(v) } != 0
+                        // SAFETY: The source branch supplies a live destination of the required pool type.
+                        && unsafe { (g.0.short_strip)(order.destination) } != 0
                         && (g.0.no_jet_crash)() == 0
                         && message == 0
                     {
@@ -4394,9 +4727,15 @@ impl Control {
         if stations < 2 && message == 0 {
             message = 5;
         }
-        (g.0.debug_list)(v);
+        // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+        unsafe {
+            (g.0.debug_list)(v);
+        }
         if message != 0 {
-            (g.0.order_news)(v, message);
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            unsafe {
+                (g.0.order_news)(v, message);
+            }
         }
     }
 }
@@ -4405,7 +4744,8 @@ impl Control {
     fn begin_loading_orders(&self, v: *mut c_void) {
         let g = self.g;
         let current = g.current(v);
-        let last = (g.0.last_station)(v) as u16;
+        // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+        let last = (unsafe { (g.0.last_station)(v) }) as u16;
         if current.kind() == 1 && current.destination == last {
             self.delete_implicit(v);
             let mut current = g.current(v);
@@ -4421,10 +4761,12 @@ impl Control {
         // SAFETY: Scalar read of a live serialized owner; no borrow survives the statement.
         let implicit = unsafe { (*state).implicit };
         let in_list = g.vehicle_order(v, implicit);
-        if (g.0.vehicle_type)(v) < 2
+        // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+        if unsafe { (g.0.vehicle_type)(v) } < 2
             && !in_list.is_some_and(|o| o.kind() == 8 && o.destination == last)
         {
-            let suppress = (g.0.suppress_implicit)(v) != 0;
+            // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+            let suppress = unsafe { (g.0.suppress_implicit)(v) } != 0;
             let previous = if implicit > 0 {
                 g.vehicle_order(v, implicit - 1)
             } else if g.count(v) > 1 {
@@ -4462,7 +4804,10 @@ impl Control {
                         unsafe {
                             (*state).implicit = target as u8;
                         }
-                        (g.0.invalidate_order)(v, 0);
+                        // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                        unsafe {
+                            (g.0.invalidate_order)(v, 0);
+                        }
                     } else {
                         loop {
                             // SAFETY: Scalar read of a live serialized owner; no borrow survives the statement.
@@ -4513,7 +4858,10 @@ impl Control {
                             (*state).implicit = (*state).implicit.wrapping_sub(1);
                         }
                     }
-                    (g.0.suppress_implicit_write)(v, 0);
+                    // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
+                    unsafe {
+                        (g.0.suppress_implicit_write)(v, 0);
+                    }
                 }
             }
         }
