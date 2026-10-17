@@ -446,8 +446,9 @@ pub unsafe extern "C" fn openttd_rust_order_vector_assign(
 /// C++ body, with writable output storage where applicable. Deletion consumes
 /// the detached shell; no access to its owner may remain. Destination lookups
 /// also require a live station/depot/waypoint of the source branch's type even
-/// though their arguments are scalar IDs. No Rust owner borrow spans a callback.
-/// Scalar-only settings, checked lookups and pool iteration need no such pointer
+/// though their arguments are scalar IDs. Distance inputs must be live map tiles
+/// so the native signed square cannot overflow. No Rust owner borrow spans a callback.
+/// Scalar-only settings, checked lookups and pool iteration need no such input
 /// precondition. These safety contracts do not change the C ABI or table layout.
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -489,7 +490,7 @@ pub struct Leaves {
     pub base_station_tile: unsafe extern "C" fn(destination: u16) -> u64,
     pub station_tile: unsafe extern "C" fn(destination: u16) -> u64,
     pub depot_tile: unsafe extern "C" fn(destination: u16) -> u64,
-    pub distance: extern "C" fn(first: u32, second: u32, square: u8) -> u64,
+    pub distance: unsafe extern "C" fn(first: u32, second: u32, square: u8) -> u64,
     pub station_location: unsafe extern "C" fn(ctx: *mut c_void, destination: u16) -> u64,
     pub destination_tile: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
     pub aircraft_flying: unsafe extern "C" fn(ctx: *mut c_void) -> u64,
@@ -3170,12 +3171,9 @@ impl Game {
         if prev == u32::MAX || cur == u32::MAX {
             return 0;
         }
-        // SAFETY: The entry supplies a live Vehicle shell; no owner borrow crosses this call.
-        (self.0.distance)(
-            prev,
-            cur,
-            u8::from(unsafe { (self.0.vehicle_type)(v) } == 3),
-        ) as u32
+        // SAFETY: location resolved live destination tiles and the invalid sentinel
+        // was excluded above. The vehicle shell is live; no owner borrow spans either call.
+        unsafe { (self.0.distance)(prev, cur, u8::from((self.0.vehicle_type)(v) == 3)) as u32 }
     }
 }
 impl Control {
