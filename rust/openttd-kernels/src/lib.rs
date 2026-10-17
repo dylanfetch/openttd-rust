@@ -634,26 +634,6 @@ pub extern "C" fn openttd_rust_int_sqrt(value: u32) -> u32 {
     math::int_sqrt(value)
 }
 
-/// Saturate integer bits using audited widths/signs from `math_ffi.h`.
-/// No allocations, pointers, state, or ownership; panic aborts, never unwinds.
-#[allow(unsafe_code)] // Only the export symbol attribute.
-#[unsafe(no_mangle)]
-pub extern "C" fn openttd_rust_clamp_to(
-    value: u64,
-    from_width: u8,
-    from_signed: u8,
-    to_width: u8,
-    to_signed: u8,
-) -> u64 {
-    math::clamp_to(
-        value,
-        from_width,
-        from_signed != 0,
-        to_width,
-        to_signed != 0,
-    )
-}
-
 /// Soft clamp integer bits, preserving narrow promotions and unsigned wrapping.
 /// No allocations, pointers, state, or ownership; panic aborts, never unwinds.
 #[allow(unsafe_code)] // Only the export symbol attribute.

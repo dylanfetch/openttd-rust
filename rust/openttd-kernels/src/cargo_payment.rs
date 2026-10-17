@@ -8,7 +8,8 @@
 //! Payment state, delivery acceptance and the complete production flush.
 //! C++ retains canonical world/pool storage and `NewGRF` resolvers. Leaves
 //! cannot reenter these owners or invalidate handles. No world references cross
-//! calls; save staging and pointer fixing occur entirely on the C++ stack.
+//! calls; C++ save/load and pointer fixing write `Payment::fields` in place
+//! through reference aliases between Rust calls.
 //! Exported pointer operations require the live allocations, exclusive access
 //! and call-scoped buffers documented in `cargo_payment_ffi.h`; no function
 //! retains a buffer or reference. Only cleaning destruction accepts a null table.
@@ -65,9 +66,11 @@ pub struct Services {
     pub(crate) feeder: extern "C" fn(*const c_void, u32) -> i64,
     pub(crate) setting: extern "C" fn(u8) -> u32,
 }
+/// Rust-allocated payment with the `OpenTTDCargoPayment` C layout (ABI layout 60).
+#[repr(C)]
 pub struct Payment {
-    fields: Fields,
-    station: u16,
+    pub(crate) fields: Fields,
+    pub(crate) station: u16,
 }
 #[derive(Default)]
 pub struct Delivery {
@@ -242,18 +245,6 @@ pub extern "C" fn openttd_rust_cargo_payment_new(front: *mut c_void, station: u1
         },
         station,
     }))
-}
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_cargo_payment_export(p: *const Payment, out: *mut Fields) {
-    unsafe {
-        out.write((*p).fields);
-    }
-}
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_cargo_payment_import(p: *mut Payment, fields: *const Fields) {
-    unsafe {
-        (*p).fields = fields.read();
-    }
 }
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_cargo_payment_front(p: *const Payment) -> *mut c_void {
