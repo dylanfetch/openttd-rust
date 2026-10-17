@@ -237,11 +237,28 @@ TEST_CASE("Base vehicle scheduler - Tick growth, timing return and fresh type")
 		return true;
 	};
 	services.next_station = [](uint32_t) noexcept { return OpenTTDVehicleStationLookup{}; };
-	OpenTTDFleetGroupServices group{};
+	/* Rust borrows complete service values even when the pending map is empty.
+	 * Every function-pointer slot must be non-null, including unused callbacks. */
+	auto group = FleetGroupServices();
 	group.current_company = []() noexcept -> uint8_t { return 0; };
-	OpenTTDFleetPendingServices pending{};
-	pending.set_current = [](uint8_t) noexcept {};
-	OpenTTDFleetTransactionServices transaction{};
+	const auto unused = [](auto...) noexcept { FAIL_CHECK("Unexpected pending fleet operation"); };
+	const auto unused_position = [](void *) noexcept -> int32_t { FAIL_CHECK("Unexpected pending fleet position"); return 0; };
+	OpenTTDFleetPendingServices pending{
+		.set_current = [](uint8_t) noexcept {},
+		.restart = unused,
+		.x = unused_position,
+		.y = unused_position,
+		.z = unused_position,
+		.reserve = [](uint8_t) noexcept -> uint32_t { FAIL_CHECK("Unexpected pending fleet reserve"); return 0; },
+		.subtract = unused,
+		.command = unused,
+		.animation = unused,
+		.length_news = unused,
+		.failed_news = unused,
+		.cash = 0,
+		.limit = 0,
+	};
+	auto transaction = FleetTransactionServices();
 	OpenTTDVehicleSchedulerTables tables{};
 	tables.scheduler = &services;
 	tables.pending = &pending;
