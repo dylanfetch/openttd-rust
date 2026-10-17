@@ -39,6 +39,8 @@ TEST_CASE("Rust shared tile-type allocation and all native byte values")
 	const auto &shared = GetRustSharedServices();
 	CHECK(allocation.count == Map::Size());
 	CHECK(allocation.base != nullptr);
+	/* Raw storage covers every byte, including values that semantic setters
+	 * cannot assign to these edge tiles. */
 	for (const TileIndex tile : {TileIndex{0}, TileIndex{Map::Size() - 1}}) {
 		for (uint byte = 0; byte < 256; byte++) {
 			Tile(tile).type() = byte;
@@ -46,18 +48,21 @@ TEST_CASE("Rust shared tile-type allocation and all native byte values")
 			CHECK(openttd_rust_shared_tile_type({nullptr, 0}, shared.tile_type, tile.base()) == static_cast<uint8_t>(GetTileType(tile)));
 		}
 	}
-	/* Real native writes between accesses must be observed without a new snapshot. */
-	SetTileType(TileIndex{1}, MP_ROAD);
-	CHECK(openttd_rust_shared_tile_type(allocation, shared.tile_type, 1) == MP_ROAD);
-	SetTileType(TileIndex{1}, MP_CLEAR);
-	CHECK(openttd_rust_shared_tile_type(allocation, shared.tile_type, 1) == MP_CLEAR);
+	/* Real native writes between accesses must be observed without a new snapshot.
+	 * Use an interior tile so these setters are valid with either edge setting. */
+	const TileIndex live_tile = TileXY(1, 1);
+	SetTileType(live_tile, MP_ROAD);
+	CHECK(openttd_rust_shared_tile_type(allocation, shared.tile_type, live_tile.base()) == MP_ROAD);
+	SetTileType(live_tile, MP_CLEAR);
+	CHECK(openttd_rust_shared_tile_type(allocation, shared.tile_type, live_tile.base()) == MP_CLEAR);
 	/* Reset between reader entries; the next entry acquires a live allocation. */
 	Map::Allocate(64, 64);
 	const auto next = GetRustTileTypeAllocation();
 	CHECK(next.count == Map::Size());
 	CHECK(next.count != allocation.count);
-	SetTileType(TileIndex{Map::Size() - 1}, MP_INDUSTRY);
-	CHECK(openttd_rust_shared_tile_type(next, shared.tile_type, Map::Size() - 1) == MP_INDUSTRY);
+	const TileIndex next_tile = TileXY(Map::MaxX() - 1, Map::MaxY() - 1);
+	SetTileType(next_tile, MP_INDUSTRY);
+	CHECK(openttd_rust_shared_tile_type(next, shared.tile_type, next_tile.base()) == MP_INDUSTRY);
 	Map::Allocate(64, 64);
 }
 
