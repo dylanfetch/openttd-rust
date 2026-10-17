@@ -49,6 +49,10 @@ inline void RustSetFieldFence(uint32_t tile, DiagDirection direction, uint32_t f
 inline void RustSetClearCounter(Tile tile, uint32_t counter) noexcept { SetClearCounter(tile, counter); }
 inline TreeGround RustTreeGround(Tile tile) noexcept { return GetTreeGround(tile); }
 inline int32_t RustTileZ(TileIndex tile) noexcept { return GetTileZ(tile); }
+inline bool RustRoadSnowOrDesert(Tile tile) noexcept { return IsOnSnowOrDesert(tile); }
+inline bool RustRoadSnowOrDesert(uint32_t tile) noexcept { return RustRoadSnowOrDesert(Tile{TileIndex{tile}}); }
+inline bool RustTunnelSnowOrDesert(Tile tile) noexcept { return HasTunnelBridgeSnowOrDesert(tile); }
+inline bool RustTunnelSnowOrDesert(uint32_t tile) noexcept { return RustTunnelSnowOrDesert(Tile{TileIndex{tile}}); }
 inline bool RustAirportTile(uint32_t tile) noexcept { return IsAirportTile(TileIndex{tile}); }
 inline EffectVehicle *RustCreateEffectAbove(int32_t x, int32_t y, int32_t z, EffectVehicleType type) noexcept { return CreateEffectVehicleAbove(x, y, z, type); }
 inline EffectVehicle *RustCreateEffectAboveValue(int32_t x, int32_t y, int32_t z, uint8_t type) noexcept { return RustCreateEffectAbove(x, y, z, static_cast<EffectVehicleType>(type)); }
