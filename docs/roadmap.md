@@ -170,12 +170,12 @@ Four component and three maintenance drafts are open. Older paused work is untou
 | --- | --- | --- |
 | #256 / #269 | `house-lifecycle-256`, `3f5a9ec707` | `/root/house-boundary-269` fixes whole `HouseTile`/`HouseBehaviour` copies, duplicate spec accessors and repeated owner resolution. Then fresh review, caps, Full validation. |
 | #265 / #270 | `rail-commands-265`, `efc04c0f5b` | `/root/rail-command-services-270` shares command checks/road accessors, retains one `IsSafeWaitingPosition` and real types. Then fresh review, full simulation, caps, Full validation. |
-| #261 R3 / #273 | `rust-cleanup-261`, `ae699d5f9e` | Unsafe contracts restored; exact-head verify and 29 scenarios/326 snapshots pass. `/root/review-orders-273` reviews the full cleanup/fix. Caps and Full validation remain. |
-| #212 / #255 | `landscape-owner-212`, `1348d8067e` | Base update and Cargo4 pass. Fresh review queued; measured caps and Full validation precede integration under core-loop boundary rule. |
+| #261 R3 / #273 | `rust-cleanup-261`, `ae699d5f9e` | Fresh full review has no findings; verify and 29 scenarios/326 snapshots pass. Exact-head Full validation requested; quiet-host caps remain. |
+| #212 / #255 | `landscape-owner-212`, `1348d8067e` | Base update/Cargo4 pass; `/root/review-landscape-owner-255` reviews the whole owner and resolution. Measured caps and Full validation precede integration under core-loop boundary rule. |
 | #213 / #257 | `vehicle-owner-213`, `a4dcdae4c9` | Base update and Cargo4 pass; `/root/review-vehicle-owner-257` reviews full PR/fold/resolution. Former miss is within spread; measured caps and Full validation remain. |
 | #274 | Measurement branches, linked issue | `/root/boundary-measurement-274` measures clear/water map reads and post-tick vehicle reads/direct controller calls. Root schedules quiet-host timing and selects any shared-view PR. |
-| #276 / #277 (#275) | `inline-clamp-275`, `218cbff0e0` | Native verify, preflight and both math comparisons pass. Semantic/profile runs and exact-head Full validation underway; fresh review and quiet-host caps remain. |
-| #278 / #279 (#275) | `road-yapf-scratch-275`, `e94b378c0f` | Native verify/probes and preflight pass for retained arena/maps/heap. Semantic/profile runs underway; fresh review, quiet-host caps and Full validation remain. |
+| #276 / #277 (#275) | `inline-clamp-275`, `218cbff0e0` | Native verify, both math comparisons and 22 scenarios/106 snapshots pass. Profile and exact-head Full validation run; fresh review/quiet-host caps remain. |
+| #278 / #279 (#275) | `road-yapf-scratch-275`, `e94b378c0f` | Native verify/probes and 22 scenarios/106 snapshots pass for retained scratch. Profile runs; fresh review, quiet-host caps and Full validation remain. |
 | #64 / #66 | remote `issue/64-curve-family`, `aab5211801` | #66 closed unmerged; #64 stays paused. |
 
 #269 and #270 both move `clear_square` to the shared table; whichever integrates
