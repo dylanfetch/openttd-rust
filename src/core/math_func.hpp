@@ -183,26 +183,6 @@ constexpr To ClampTo(From value)
 	static_assert(std::numeric_limits<To>::is_integer, "Do not clamp from non-integer values");
 	static_assert(std::numeric_limits<From>::is_integer, "Do not clamp to non-integer values");
 
-#ifdef WITH_RUST
-	static_assert(std::numeric_limits<unsigned char>::digits == 8);
-	/* A wider unsigned destination only widens/clamps the <=64-bit source.
-	 * Rust returns all result bits, then C++ reconstructs the destination type.
-	 * Wider sources and signed destinations retain the original extension path. */
-	constexpr bool scalar_destination = std::is_integral_v<To>
-#ifdef __SIZEOF_INT128__
-			|| std::is_same_v<std::remove_cv_t<To>, unsigned __int128>
-#endif
-			;
-	if constexpr (scalar_destination && sizeof(From) <= sizeof(uint64_t) && (sizeof(To) <= sizeof(uint64_t) || !std::numeric_limits<To>::is_signed)) {
-		constexpr int destination_width = std::min(64, std::numeric_limits<To>::digits + std::numeric_limits<To>::is_signed);
-		if (!std::is_constant_evaluated()) {
-			return static_cast<To>(openttd_rust_clamp_to(static_cast<uint64_t>(value),
-					std::numeric_limits<From>::digits + std::numeric_limits<From>::is_signed, std::numeric_limits<From>::is_signed,
-					destination_width, std::numeric_limits<To>::is_signed));
-		}
-	}
-#endif
-
 	if constexpr (sizeof(To) >= sizeof(From) && std::numeric_limits<To>::is_signed == std::numeric_limits<From>::is_signed) {
 		/* Same signedness and To type is larger or equal than From type, no clamping is required. */
 		return static_cast<To>(value);

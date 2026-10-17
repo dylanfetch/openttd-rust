@@ -145,7 +145,6 @@ def main():
                             "-lpthread",
                             "-lm",
                             "-Wl,--wrap=openttd_rust_int_sqrt",
-                            "-Wl,--wrap=openttd_rust_clamp_to",
                             "-Wl,--wrap=openttd_rust_soft_clamp",
                         ]
                     )

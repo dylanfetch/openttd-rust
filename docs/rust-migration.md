@@ -687,8 +687,9 @@ size` end branch including SIZE_MAX). Game logging and Unicode rendering are out
 
 ### Rounded square root and runtime integer saturation
 
-`IntSqrt(uint32_t)` and runtime `ClampTo`/`SoftClamp` call `math.rs` through
+`IntSqrt(uint32_t)` and runtime `SoftClamp` call `math.rs` through
 `src/rust/math_ffi.h`. `IntSqrt` keeps nearest-integer rounding, including 65536 for UINT32_MAX.
+`ClampTo` uses the original inline C++ template (#276); its hot callers avoid an ABI crossing.
 `DivideApprox` remains C++: its potentially overflowing signed intermediates need separate work.
 
 The ABI is scalar-only: modulo-2^64 value bits plus explicit width and signedness; C++20
