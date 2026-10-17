@@ -1105,7 +1105,7 @@ pub unsafe extern "C" fn openttd_rust_trees_clear_tile(
     shared: *const Services,
 ) -> i64 {
     // SAFETY: Guaranteed by the caller.
-    let (t, shared) = unsafe { (&*services, &*shared) };
+    let (t, s) = unsafe { (&*services, &*shared) };
     if company_valid {
         (t.town_rating)(ctx, tile, false);
     }
@@ -1115,7 +1115,7 @@ pub unsafe extern "C" fn openttd_rust_trees_clear_tile(
         num = num.wrapping_mul(4);
     }
     if execute {
-        (shared.clear_square)(tile);
+        (s.clear_square)(tile);
     }
     price.saturating_mul(i64::from(num))
 }
@@ -1773,6 +1773,7 @@ mod tests {
             assert!(!events().contains(&Event::Tree));
             WORLD.with_borrow_mut(|w| w.tree.count = 4);
             // SAFETY: The test table is a live constant.
+            let shared = shared();
             let cost = unsafe {
                 openttd_rust_trees_clear_tile(
                     std::ptr::null_mut(),
@@ -1781,7 +1782,7 @@ mod tests {
                     true,
                     true,
                     &SERVICES,
-                    &shared(),
+                    &raw const shared,
                 )
             };
             assert_eq!(cost, price);
