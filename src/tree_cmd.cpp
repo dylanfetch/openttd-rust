@@ -43,6 +43,7 @@ enum ExtraTreePlacement : uint8_t {
 
 #ifdef WITH_RUST
 #include "rust/trees_ffi.h"
+#include "rust/services_water.h"
 #include "rust/services_ffi.h"
 #include <exception>
 #include <utility>
@@ -159,7 +160,7 @@ static const OpenTTDTreeServices _tree_services{
 	.add_growth = [](uint32_t tile, int32_t growth) noexcept { AddTreeGrowth(TileIndex{tile}, growth); },
 	.set_growth = [](uint32_t tile, uint8_t growth) noexcept { SetTreeGrowth(TileIndex{tile}, static_cast<TreeGrowthStage>(growth)); },
 	.make_clear = [](uint32_t tile, uint8_t ground, uint32_t density) noexcept { MakeClear(TileIndex{tile}, static_cast<ClearGround>(ground), density); },
-	.make_shore = [](uint32_t tile) noexcept { MakeShore(TileIndex{tile}); },
+	.make_shore = OpenTTDMakeShore,
 	.make_snow = [](uint32_t tile, uint32_t density) noexcept { MakeSnow(TileIndex{tile}, density); },
 	.clear_neighbour_flooding = [](uint32_t tile) noexcept { ClearNeighbourNonFloodingStates(TileIndex{tile}); },
 	.tile_loop_water = [](uint32_t tile) noexcept { TileLoop_Water(TileIndex{tile}); },

@@ -157,7 +157,7 @@ static int64_t OPENTTD_DISASTER_CALL DisasterService(void *, const OpenTTDDisast
 			break;
 		}
 		case 18: UpdateSignalsInBuffer(); break;
-		case 19: DoClearSquare(TileIndex{step.id}); break;
+		case 19: GetRustSharedServices().clear_square(step.id); break;
 		case 20: ResetIndustryConstructionStage(TileIndex{step.id}); MarkTileDirtyByTile(TileIndex{step.id}); break;
 		case 21: response = ClosestTownFromTile(TileIndex{step.id}, UINT_MAX)->index.base(); break;
 		case 23: response = TrackStatusToTrackBits(GetTileTrackStatus(TileIndex{step.id}, TRANSPORT_WATER, 0)); break;

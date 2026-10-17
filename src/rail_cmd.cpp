@@ -3186,7 +3186,7 @@ static void RailMakeShore(uint32_t tile) noexcept
 {
 	TileIndex t{tile};
 	bool docking = OpenTTDIsDockingTile(tile);
-	MakeShore(t);
+	OpenTTDMakeShore(tile);
 	SetDockingTile(t, docking);
 }
 static void RailDockingCheck(uint32_t tile) noexcept
