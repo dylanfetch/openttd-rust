@@ -349,11 +349,22 @@ pub struct ReadLayout {
     pub first: usize,
 }
 #[repr(C)]
+#[derive(Clone, Copy)]
+pub struct WriteAddresses {
+    pub counter: *mut u16,
+    pub motion: *mut u32,
+}
+impl WriteAddresses {
+    const NONE: Self = Self {
+        counter: std::ptr::null_mut(),
+        motion: std::ptr::null_mut(),
+    };
+}
+#[repr(C)]
 pub struct RawServices {
     pub layout: ReadLayout,
     pub tick: unsafe extern "C" fn(VehicleRef) -> bool,
-    pub write_counter: unsafe extern "C" fn(VehicleRef, u16),
-    pub write_motion: unsafe extern "C" fn(VehicleRef, u32),
+    pub write_addresses: unsafe extern "C" fn(VehicleRef) -> WriteAddresses,
 }
 /// Constructor is the surviving Tick and its original native lifetime rules.
 /// C++ pins offset, width, alignment and bitset storage identity. A field access
@@ -362,10 +373,11 @@ unsafe fn raw_read<T: Copy, const COUNTED: bool>(v: VehicleRef, offset: usize) -
     unsafe { scalar_read::<T, COUNTED>(v.0.as_ptr().cast::<u8>().add(offset).cast::<T>()) }
 }
 
-unsafe fn raw_post_tick<const COUNTED: bool>(
+unsafe fn raw_post_tick<const COUNTED: bool, const DIRECT: bool>(
     schedule: &PostTickServices,
     raw: &RawServices,
     vehicle: VehicleRef,
+    writes: WriteAddresses,
 ) {
     if COUNTED {
         crate::witness::hit(crate::witness::VEHICLE_POST_TICK);
@@ -384,21 +396,28 @@ unsafe fn raw_post_tick<const COUNTED: bool>(
     if vehicle_type.0 > AIRCRAFT.0 {
         return;
     }
+    let writes = if DIRECT {
+        writes
+    } else {
+        unsafe { svc!(COUNTED, raw.write_addresses, vehicle) }
+    };
+    if COUNTED {
+        crate::witness::add(
+            crate::witness::VEHICLE_DESCRIPTOR_BYTES,
+            std::mem::size_of::<WriteAddresses>() as u64,
+        );
+    }
     // As the previous named bundle, First is acquired only after Tick survives.
     let front = unsafe { raw_read::<VehicleRef, COUNTED>(vehicle, layout.first) };
     let period = unsafe { raw_read::<u16, COUNTED>(vehicle, layout.period) };
     if period != 0 {
         let counter = unsafe { raw_read::<u16, COUNTED>(vehicle, layout.counter) }.min(period);
         unsafe {
-            (raw.write_counter)(vehicle, counter);
+            scalar_write::<_, COUNTED>(writes.counter, counter);
         }
         let counter = counter.wrapping_sub(1);
         unsafe {
-            (raw.write_counter)(vehicle, counter);
-        }
-        if COUNTED {
-            crate::witness::add(crate::witness::VEHICLE_CROSSINGS, 2);
-            crate::witness::add(crate::witness::VEHICLE_SCALAR_WRITE_BYTES, 4);
+            scalar_write::<_, COUNTED>(writes.counter, counter);
         }
         if counter == 0 {
             let owner = post_svc!(
@@ -415,11 +434,7 @@ unsafe fn raw_post_tick<const COUNTED: bool>(
             }
             let period = unsafe { raw_read::<u16, COUNTED>(vehicle, layout.period) };
             unsafe {
-                (raw.write_counter)(vehicle, period);
-            }
-            if COUNTED {
-                crate::witness::hit(crate::witness::VEHICLE_CROSSINGS);
-                crate::witness::add(crate::witness::VEHICLE_SCALAR_WRITE_BYTES, 2);
+                scalar_write::<_, COUNTED>(writes.counter, period);
             }
         }
     }
@@ -443,11 +458,7 @@ unsafe fn raw_post_tick<const COUNTED: bool>(
     let counter =
         unsafe { raw_read::<u32, COUNTED>(vehicle, layout.motion) }.wrapping_add(u32::from(speed));
     unsafe {
-        (raw.write_motion)(vehicle, counter);
-    }
-    if COUNTED {
-        crate::witness::hit(crate::witness::VEHICLE_CROSSINGS);
-        crate::witness::add(crate::witness::VEHICLE_SCALAR_WRITE_BYTES, 4);
+        scalar_write::<_, COUNTED>(writes.motion, counter);
     }
     match vehicle_type {
         TRAIN if unsafe { raw_read::<u8, COUNTED>(vehicle, layout.subtype) } & ENGINE == 0 => {
@@ -503,7 +514,8 @@ pub struct Controllers {
     pub prepare_aircraft:
         unsafe extern "C" fn(VehicleRef, *mut ControllerTimer) -> crate::aircraft::Vehicle,
     pub prepare_ship: unsafe extern "C" fn(VehicleRef, *mut ControllerTimer) -> u32,
-    pub finish_timer: unsafe extern "C" fn(*mut ControllerTimer),
+    pub finish_tick:
+        unsafe extern "C" fn(*mut ControllerTimer, bool, VehicleRef, bool) -> WriteAddresses,
 }
 /// Dispatch owner kernels in Rust; native services supply canonical owner handles
 /// and the exact original performance-accumulator scopes. No shell/owner borrow
@@ -512,7 +524,7 @@ unsafe fn direct_tick<const COUNTED: bool>(
     tables: &Tables,
     raw: &RawServices,
     vehicle: VehicleRef,
-) -> bool {
+) -> (bool, WriteAddresses) {
     let control = unsafe { &*tables.controllers };
     let layout = &raw.layout;
     let kind = unsafe { raw_read::<VehicleType, COUNTED>(vehicle, layout.kind) };
@@ -556,7 +568,15 @@ unsafe fn direct_tick<const COUNTED: bool>(
             }
             3 => {
                 if raw_read::<u8, COUNTED>(vehicle, layout.subtype) > NORMAL_AIRCRAFT {
-                    return true;
+                    let writes = svc!(
+                        COUNTED,
+                        control.finish_tick,
+                        timer.as_mut_ptr(),
+                        false,
+                        vehicle,
+                        true
+                    );
+                    return (true, writes);
                 }
                 has_timer = true;
                 let handle = svc!(
@@ -567,13 +587,40 @@ unsafe fn direct_tick<const COUNTED: bool>(
                 );
                 survives = crate::aircraft::openttd_rust_aircraft_tick(control.aircraft, handle);
             }
-            _ => return svc!(COUNTED, raw.tick, vehicle),
+            _ => {
+                // Preserve the original virtual facade for effects/disasters.
+                let native = &*tables.scheduler;
+                let mut bundle = std::mem::MaybeUninit::<PostTick>::uninit();
+                let alive = svc!(COUNTED, native.tick, vehicle, bundle.as_mut_ptr());
+                if alive {
+                    if COUNTED {
+                        crate::witness::add(
+                            crate::witness::VEHICLE_OBSERVED_BYTES,
+                            std::mem::size_of::<PostTick>() as u64,
+                        );
+                    }
+                    let bundle = bundle.assume_init();
+                    return (
+                        true,
+                        WriteAddresses {
+                            counter: bundle.counter,
+                            motion: bundle.motion,
+                        },
+                    );
+                }
+                return (false, WriteAddresses::NONE);
+            }
         }
-        if has_timer {
-            svc!(COUNTED, control.finish_timer, timer.as_mut_ptr());
-        }
+        let writes = svc!(
+            COUNTED,
+            control.finish_tick,
+            timer.as_mut_ptr(),
+            has_timer,
+            vehicle,
+            survives
+        );
+        (survives, writes)
     }
-    survives
 }
 
 /// # Safety
@@ -697,13 +744,19 @@ unsafe fn run_ticks<const COUNTED: bool, const RAW: bool, const DIRECT: bool>(
             // The bundle is written only on survival and read only after the assertion.
             let mut bundle = std::mem::MaybeUninit::<PostTick>::uninit();
             // SAFETY: bundle is aligned writable storage, unused until success.
-            let survives = if DIRECT {
+            let (survives, writes) = if DIRECT {
                 unsafe { direct_tick::<COUNTED>(tables, &*tables.raw, vehicle) }
             } else if RAW {
                 // SAFETY: Entry-live table, no shell reference spans Tick.
-                unsafe { svc!(COUNTED, (*tables.raw).tick, vehicle) }
+                (
+                    unsafe { svc!(COUNTED, (*tables.raw).tick, vehicle) },
+                    WriteAddresses::NONE,
+                )
             } else {
-                unsafe { svc!(COUNTED, s.tick, vehicle, bundle.as_mut_ptr()) }
+                (
+                    unsafe { svc!(COUNTED, s.tick, vehicle, bundle.as_mut_ptr()) },
+                    WriteAddresses::NONE,
+                )
             };
             if s.assertions {
                 let _ = unsafe { extent::<COUNTED>(s, &mut pool) };
@@ -717,7 +770,7 @@ unsafe fn run_ticks<const COUNTED: bool, const RAW: bool, const DIRECT: bool>(
                 continue;
             }
             if RAW {
-                unsafe { raw_post_tick::<COUNTED>(&post, &*tables.raw, vehicle) };
+                unsafe { raw_post_tick::<COUNTED, DIRECT>(&post, &*tables.raw, vehicle, writes) };
             } else {
                 if COUNTED {
                     crate::witness::add(

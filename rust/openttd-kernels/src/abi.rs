@@ -614,13 +614,14 @@ pub fn layout(type_id: u16, item: u8) -> usize {
         679 => layout!(crate::aircraft::HangarCandidate, item; owner, airport, hangar),
         779 => layout!(crate::vehicle::scheduler::ControllerTimer, item; storage),
         778 => {
-            layout!(crate::vehicle::scheduler::Controllers, item; shared, train, road, ship, aircraft, prepare_train, prepare_road, prepare_aircraft, prepare_ship, finish_timer)
+            layout!(crate::vehicle::scheduler::Controllers, item; shared, train, road, ship, aircraft, prepare_train, prepare_road, prepare_aircraft, prepare_ship, finish_tick)
         }
+        742 => layout!(crate::vehicle::scheduler::WriteAddresses, item; counter, motion),
         776 => {
             layout!(crate::vehicle::scheduler::ReadLayout, item; period, counter, motion, speed, kind, subtype, tick, status, first)
         }
         777 => {
-            layout!(crate::vehicle::scheduler::RawServices, item; layout, tick, write_counter, write_motion)
+            layout!(crate::vehicle::scheduler::RawServices, item; layout, tick, write_addresses)
         }
         740 => layout!(crate::vehicle::scheduler::PoolCursor, item; slots, slots_len, first_unused),
         741 => {

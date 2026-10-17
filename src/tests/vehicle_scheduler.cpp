@@ -23,10 +23,11 @@ TEST_CASE("Base vehicle scheduler - consumed boundary layouts")
 		for (size_t expected : fields) CHECK(openttd_rust_abi_layout(type, item++) == expected);
 		CHECK(openttd_rust_abi_layout(type, item) == SIZE_MAX);
 	};
+	Layout(742, "OpenTTDVehicleWriteAddresses", {sizeof(OpenTTDVehicleWriteAddresses), alignof(OpenTTDVehicleWriteAddresses), offsetof(OpenTTDVehicleWriteAddresses, counter), offsetof(OpenTTDVehicleWriteAddresses, motion)});
 	Layout(776, "OpenTTDVehicleReadLayout", {sizeof(OpenTTDVehicleReadLayout), alignof(OpenTTDVehicleReadLayout), offsetof(OpenTTDVehicleReadLayout, period), offsetof(OpenTTDVehicleReadLayout, counter), offsetof(OpenTTDVehicleReadLayout, motion), offsetof(OpenTTDVehicleReadLayout, speed), offsetof(OpenTTDVehicleReadLayout, kind), offsetof(OpenTTDVehicleReadLayout, subtype), offsetof(OpenTTDVehicleReadLayout, tick), offsetof(OpenTTDVehicleReadLayout, status), offsetof(OpenTTDVehicleReadLayout, first)});
-	Layout(777, "OpenTTDVehicleRawServices", {sizeof(OpenTTDVehicleRawServices), alignof(OpenTTDVehicleRawServices), offsetof(OpenTTDVehicleRawServices, layout), offsetof(OpenTTDVehicleRawServices, tick), offsetof(OpenTTDVehicleRawServices, write_counter), offsetof(OpenTTDVehicleRawServices, write_motion)});
+	Layout(777, "OpenTTDVehicleRawServices", {sizeof(OpenTTDVehicleRawServices), alignof(OpenTTDVehicleRawServices), offsetof(OpenTTDVehicleRawServices, layout), offsetof(OpenTTDVehicleRawServices, tick), offsetof(OpenTTDVehicleRawServices, write_addresses)});
 	Layout(779, "OpenTTDVehicleControllerTimer", {sizeof(OpenTTDVehicleControllerTimer), alignof(OpenTTDVehicleControllerTimer), offsetof(OpenTTDVehicleControllerTimer, storage)});
-	Layout(778, "OpenTTDVehicleControllers", {sizeof(OpenTTDVehicleControllers), alignof(OpenTTDVehicleControllers), offsetof(OpenTTDVehicleControllers, shared), offsetof(OpenTTDVehicleControllers, train), offsetof(OpenTTDVehicleControllers, road), offsetof(OpenTTDVehicleControllers, ship), offsetof(OpenTTDVehicleControllers, aircraft), offsetof(OpenTTDVehicleControllers, prepare_train), offsetof(OpenTTDVehicleControllers, prepare_road), offsetof(OpenTTDVehicleControllers, prepare_aircraft), offsetof(OpenTTDVehicleControllers, prepare_ship), offsetof(OpenTTDVehicleControllers, finish_timer)});
+	Layout(778, "OpenTTDVehicleControllers", {sizeof(OpenTTDVehicleControllers), alignof(OpenTTDVehicleControllers), offsetof(OpenTTDVehicleControllers, shared), offsetof(OpenTTDVehicleControllers, train), offsetof(OpenTTDVehicleControllers, road), offsetof(OpenTTDVehicleControllers, ship), offsetof(OpenTTDVehicleControllers, aircraft), offsetof(OpenTTDVehicleControllers, prepare_train), offsetof(OpenTTDVehicleControllers, prepare_road), offsetof(OpenTTDVehicleControllers, prepare_aircraft), offsetof(OpenTTDVehicleControllers, prepare_ship), offsetof(OpenTTDVehicleControllers, finish_tick)});
 	Layout(740, "OpenTTDVehiclePoolCursor", {sizeof(OpenTTDVehiclePoolCursor), alignof(OpenTTDVehiclePoolCursor), offsetof(OpenTTDVehiclePoolCursor, slots), offsetof(OpenTTDVehiclePoolCursor, slots_len), offsetof(OpenTTDVehiclePoolCursor, first_unused)});
 	Layout(741, "OpenTTDVehiclePostTick", {sizeof(OpenTTDVehiclePostTick), alignof(OpenTTDVehiclePostTick), offsetof(OpenTTDVehiclePostTick, type), offsetof(OpenTTDVehiclePostTick, period), offsetof(OpenTTDVehiclePostTick, counter), offsetof(OpenTTDVehiclePostTick, motion), offsetof(OpenTTDVehiclePostTick, speed), offsetof(OpenTTDVehiclePostTick, front_type), offsetof(OpenTTDVehiclePostTick, subtype), offsetof(OpenTTDVehiclePostTick, tick), offsetof(OpenTTDVehiclePostTick, front_status), offsetof(OpenTTDVehiclePostTick, status)});
 	Layout(743, "OpenTTDVehicleDayCallback", {sizeof(OpenTTDVehicleDayCallback), alignof(OpenTTDVehicleDayCallback), offsetof(OpenTTDVehicleDayCallback, day), offsetof(OpenTTDVehicleDayCallback, has_engine)});
@@ -82,8 +83,11 @@ TEST_CASE("Base vehicle scheduler - scalar member identity and lifetime")
 	CHECK(front + raw.layout.status == post.front_status);
 	CHECK(base + raw.layout.status == post.status);
 	CHECK(*reinterpret_cast<Vehicle *const *>(base + raw.layout.first) == part->First());
-	raw.write_counter(RustVehicle(part), UINT16_MAX);
-	raw.write_motion(RustVehicle(part), UINT32_MAX);
+	const auto writable = raw.write_addresses(RustVehicle(part));
+	CHECK(writable.counter == post.counter);
+	CHECK(writable.motion == post.motion);
+	*writable.counter = UINT16_MAX;
+	*writable.motion = UINT32_MAX;
 	CHECK(part->cargo_age_counter == UINT16_MAX);
 	CHECK(part->motion_counter == UINT32_MAX);
 

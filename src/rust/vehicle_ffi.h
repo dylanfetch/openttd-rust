@@ -255,13 +255,14 @@ struct OpenTTDVehicleSchedulerServices {
 struct OpenTTDVehicleReadLayout {
 	size_t period, counter, motion, speed, kind, subtype, tick, status, first;
 };
+struct OpenTTDVehicleWriteAddresses { uint16_t *counter; uint32_t *motion; };
 struct OpenTTDVehicleRawServices {
 	OpenTTDVehicleReadLayout layout;
 	bool (OPENTTD_VEHICLE_CALL *tick)(OpenTTDVehicle *) noexcept;
-	void (OPENTTD_VEHICLE_CALL *write_counter)(OpenTTDVehicle *, uint16_t) noexcept;
-	void (OPENTTD_VEHICLE_CALL *write_motion)(OpenTTDVehicle *, uint32_t) noexcept;
+	OpenTTDVehicleWriteAddresses (OPENTTD_VEHICLE_CALL *write_addresses)(OpenTTDVehicle *) noexcept;
 };
 const OpenTTDVehicleRawServices &GetRustVehicleRawServices() noexcept;
+struct OpenTTDSharedServices;
 struct OpenTTDTrainServices;
 struct OpenTTDRoadLeaves;
 struct OpenTTDShipLeaves;
@@ -280,7 +281,7 @@ struct OpenTTDVehicleControllers {
 	OpenTTDRoadState *(OPENTTD_VEHICLE_CALL *prepare_road)(OpenTTDVehicle *, OpenTTDVehicleControllerTimer *) noexcept;
 	OpenTTDAircraftVehicle (OPENTTD_VEHICLE_CALL *prepare_aircraft)(OpenTTDVehicle *, OpenTTDVehicleControllerTimer *) noexcept;
 	uint32_t (OPENTTD_VEHICLE_CALL *prepare_ship)(OpenTTDVehicle *, OpenTTDVehicleControllerTimer *) noexcept;
-	void (OPENTTD_VEHICLE_CALL *finish_timer)(OpenTTDVehicleControllerTimer *) noexcept;
+	OpenTTDVehicleWriteAddresses (OPENTTD_VEHICLE_CALL *finish_tick)(OpenTTDVehicleControllerTimer *, bool, OpenTTDVehicle *, bool) noexcept;
 };
 const OpenTTDVehicleControllers &GetRustVehicleControllers() noexcept;
 const OpenTTDTrainServices &GetRustSchedulerTrainServices() noexcept;

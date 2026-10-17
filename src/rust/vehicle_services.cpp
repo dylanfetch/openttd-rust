@@ -366,6 +366,11 @@ static OpenTTDVehiclePoolCursor OPENTTD_VEHICLE_CALL VehicleSchedulerPool() noex
  * timing destructor completes before this callback returns to Rust assertions.
  * Only a surviving vehicle fills the post-Tick address bundle; the fill reads
  * type and First() without side effects, and Rust reads it after its assertion. */
+static OpenTTDVehicleWriteAddresses VehicleWriteAddresses(Vehicle *v) noexcept
+{
+	if (v->type > VEH_AIRCRAFT) return {};
+	return {.counter = RustVehicleCargoCounterAddress(v), .motion = RustVehicleMotionAddress(v)};
+}
 static bool OPENTTD_VEHICLE_CALL VehicleSchedulerTick(OpenTTDVehicle *shell, OpenTTDVehiclePostTick *out) noexcept
 {
 	Vehicle *v = VehicleOf(shell);
@@ -376,7 +381,8 @@ static bool OPENTTD_VEHICLE_CALL VehicleSchedulerTick(OpenTTDVehicle *shell, Ope
 		return true;
 	}
 	Vehicle *front = v->First();
-	*out = {.type = type, .period = RustVehicleCargoPeriodAddress(v), .counter = RustVehicleCargoCounterAddress(v), .motion = RustVehicleMotionAddress(v), .speed = RustVehicleSpeedAddress(front), .front_type = RustVehicleVehicleTypeAddress(front), .subtype = RustVehicleSubtypeAddress(v), .tick = RustVehicleTickAddress(v), .front_status = RustVehicleStatusAddress(front), .status = RustVehicleStatusAddress(v)};
+	const auto writes = VehicleWriteAddresses(v);
+	*out = {.type = type, .period = RustVehicleCargoPeriodAddress(v), .counter = writes.counter, .motion = writes.motion, .speed = RustVehicleSpeedAddress(front), .front_type = RustVehicleVehicleTypeAddress(front), .subtype = RustVehicleSubtypeAddress(v), .tick = RustVehicleTickAddress(v), .front_status = RustVehicleStatusAddress(front), .status = RustVehicleStatusAddress(v)};
 	return true;
 }
 // GCC/Clang's supported non-standard-layout offsetof extension is deliberately
@@ -396,11 +402,10 @@ struct OpenTTDVehicleReadOffsets {
 };
 #pragma GCC diagnostic pop
 static bool OPENTTD_VEHICLE_CALL VehicleRawTick(OpenTTDVehicle *shell) noexcept { return VehicleOf(shell)->Tick(); }
-static void OPENTTD_VEHICLE_CALL VehicleRawWriteCounter(OpenTTDVehicle *shell, uint16_t value) noexcept { *RustVehicleCargoCounterAddress(VehicleOf(shell)) = value; }
-static void OPENTTD_VEHICLE_CALL VehicleRawWriteMotion(OpenTTDVehicle *shell, uint32_t value) noexcept { *RustVehicleMotionAddress(VehicleOf(shell)) = value; }
+static OpenTTDVehicleWriteAddresses OPENTTD_VEHICLE_CALL VehicleRawWriteAddresses(OpenTTDVehicle *shell) noexcept { return VehicleWriteAddresses(VehicleOf(shell)); }
 const OpenTTDVehicleRawServices &GetRustVehicleRawServices() noexcept
 {
-	static const OpenTTDVehicleRawServices services{.layout = OpenTTDVehicleReadOffsets::Acquire(), .tick = VehicleRawTick, .write_counter = VehicleRawWriteCounter, .write_motion = VehicleRawWriteMotion};
+	static const OpenTTDVehicleRawServices services{.layout = OpenTTDVehicleReadOffsets::Acquire(), .tick = VehicleRawTick, .write_addresses = VehicleRawWriteAddresses};
 	return services;
 }
 static_assert(GVSF_FRONT == 0);
@@ -410,9 +415,13 @@ static void BeginControllerTimer(OpenTTDVehicleControllerTimer *timer, Performan
 	static_assert(alignof(PerformanceAccumulator) <= alignof(OpenTTDVehicleControllerTimer));
 	new (timer) PerformanceAccumulator(element);
 }
-static void OPENTTD_VEHICLE_CALL FinishControllerTimer(OpenTTDVehicleControllerTimer *timer) noexcept
+static OpenTTDVehicleWriteAddresses OPENTTD_VEHICLE_CALL FinishControllerTick(OpenTTDVehicleControllerTimer *timer, bool has_timer, OpenTTDVehicle *shell, bool survives) noexcept
 {
-	std::launder(reinterpret_cast<PerformanceAccumulator *>(timer))->~PerformanceAccumulator();
+	if (has_timer) std::launder(reinterpret_cast<PerformanceAccumulator *>(timer))->~PerformanceAccumulator();
+	/* Deletion is already decided by the Rust controller; never dereference a
+	 * deleted shell. These are the two existing permitted writable addresses,
+	 * not a writable Vehicle layout view. All other view access is read-only. */
+	return survives ? VehicleWriteAddresses(VehicleOf(shell)) : OpenTTDVehicleWriteAddresses{};
 }
 static OpenTTDTrainHandle OPENTTD_VEHICLE_CALL PrepareTrainController(OpenTTDVehicle *shell, bool front, OpenTTDVehicleControllerTimer *timer) noexcept
 {
@@ -436,7 +445,7 @@ const OpenTTDVehicleControllers &GetRustVehicleControllers() noexcept
 {
 	static const OpenTTDVehicleControllers services{
 		.shared = &GetRustSharedServices(), .train = &GetRustSchedulerTrainServices(), .road = &GetRustSchedulerRoadServices(), .ship = &GetRustSchedulerShipServices(), .aircraft = &GetRustSchedulerAircraftServices(),
-		.prepare_train = PrepareTrainController, .prepare_road = PrepareRoadController, .prepare_aircraft = PrepareAircraftController, .prepare_ship = PrepareShipController, .finish_timer = FinishControllerTimer,
+		.prepare_train = PrepareTrainController, .prepare_road = PrepareRoadController, .prepare_aircraft = PrepareAircraftController, .prepare_ship = PrepareShipController, .finish_tick = FinishControllerTick,
 	};
 	return services;
 }
