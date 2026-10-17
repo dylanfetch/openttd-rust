@@ -207,6 +207,7 @@ static int32_t SharedCalendarDate() noexcept { return TimerGameCalendar::date.ba
 static int32_t SharedSlope(int32_t x, int32_t y) noexcept { return GetSlopePixelZ(x, y); }
 static size_t SharedTownCount() noexcept { return Town::GetNumItems(); }
 static bool SharedRecession() noexcept { return EconomyIsInRecession(); }
+static void SharedRebuildTownTree() noexcept { RebuildTownKdtree(); }
 static int64_t SharedFoundationPrice() noexcept { return _price[PR_BUILD_FOUNDATION]; }
 
 const OpenTTDSharedServices &GetRustSharedServices() noexcept
@@ -289,6 +290,7 @@ const OpenTTDSharedServices &GetRustSharedServices() noexcept
 		.foundation_price = SharedFoundationPrice,
 		.tick_counter = openttd_orders_tick_counter,
 		.delete_animated = OpenTTDDeleteAnimatedTile,
+		.rebuild_town_tree = SharedRebuildTownTree,
 	};
 	return services;
 }

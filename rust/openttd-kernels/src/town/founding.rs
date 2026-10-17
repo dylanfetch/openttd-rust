@@ -88,7 +88,6 @@ pub struct FoundingServices {
     pub directory_rebuild: extern "C" fn(),
     pub directory_resort: extern "C" fn(),
     pub update_noise: extern "C" fn(),
-    pub rebuild_tree: extern "C" fn(),
     pub delete_town: extern "C" fn(TownId),
     pub assert_random_context: extern "C" fn(),
     pub assert_allocation: extern "C" fn(),
@@ -661,7 +660,7 @@ pub unsafe extern "C" fn openttd_rust_town_generate(
         }
     }
     scratch.clear();
-    observed!((f.s.rebuild_tree)());
+    observed!((f.shared.rebuild_town_tree)());
     if current != 0 {
         unsafe {
             result.write(true);

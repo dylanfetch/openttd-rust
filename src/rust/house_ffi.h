@@ -94,7 +94,6 @@ struct OpenTTDHouseServices {
 	uint8_t (*place_houses)() noexcept;
 	bool (*company_human)(uint8_t) noexcept;
 	void (*init_counts)() noexcept;
-	void (*rebuild_tree)() noexcept;
 	OpenTTDHouseErrors errors;
 };
 /* Resolver and AnimationBase services live beside their native templates. */

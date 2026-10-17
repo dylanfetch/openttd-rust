@@ -115,6 +115,7 @@ struct OpenTTDSharedServices {
 	int64_t (*foundation_price)() noexcept;
 	uint64_t (*tick_counter)() noexcept;
 	void (*delete_animated)(uint32_t) noexcept;
+	void (*rebuild_town_tree)() noexcept;
 };
 const OpenTTDSharedServices &GetRustSharedServices() noexcept;
 /** Shared save/reseed/restore of BOTH original RNG streams. */
@@ -290,6 +291,7 @@ inline OpenTTDSharedServices OpenTTDFixtureSharedServices(void *context, uint32_
 		.foundation_price = OpenTTDFixtureMapService<int64_t>,
 		.tick_counter = OpenTTDFixtureMapService<uint64_t>,
 		.delete_animated = OpenTTDFixtureMapService<void, uint32_t>,
+		.rebuild_town_tree = OpenTTDFixtureMapService<void>,
 	};
 }
 #endif /* RUST_SERVICES_FFI_H */

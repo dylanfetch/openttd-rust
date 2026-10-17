@@ -265,6 +265,8 @@ pub struct Services {
     pub tick_counter: extern "C" fn() -> u64,
     /// Remove a tile from the animated tile list.
     pub delete_animated: extern "C" fn(u32),
+    /// Rebuild the canonical town spatial index.
+    pub rebuild_town_tree: extern "C" fn(),
 }
 impl Services {
     /// Draw one shared random word.
@@ -305,6 +307,7 @@ pub fn fixture(
     extern "C" fn height(_: u32) -> i32 {
         0
     }
+    extern "C" fn noop() {}
     extern "C" fn tile(_: u32) {}
     extern "C" fn train(_: *const Train) {}
     extern "C" fn train_path(_: *mut Train, _: bool, _: bool) -> bool {
@@ -422,6 +425,7 @@ pub fn fixture(
         foundation_price: money0,
         tick_counter: tick0,
         delete_animated: tile,
+        rebuild_town_tree: noop,
     }
 }
 #[cfg(test)]

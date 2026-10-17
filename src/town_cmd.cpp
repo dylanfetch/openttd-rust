@@ -1260,7 +1260,6 @@ static const OpenTTDHouseServices &GetRustHouseServices() noexcept
 		.place_houses = OpenTTDPlaceHouses,
 		.company_human = OpenTTDCompanyIsValidHuman,
 		.init_counts = []() noexcept { InitializeBuildingCounts(); },
-		.rebuild_tree = []() noexcept { RebuildTownKdtree(); },
 		.errors = {STR_ERROR_BUILDING_MUST_BE_DEMOLISHED, STR_ERROR_BUILDING_IS_PROTECTED, STR_ERROR_LOCAL_AUTHORITY_REFUSES_TO_ALLOW_THIS,
 			STR_ERROR_LAND_SLOPED_IN_WRONG_DIRECTION, STR_ERROR_MUST_DEMOLISH_BRIDGE_FIRST, STR_ERROR_FLAT_LAND_REQUIRED, STR_ERROR_MUST_FOUND_TOWN_FIRST},
 	};
@@ -2500,7 +2499,6 @@ const OpenTTDTownFoundingServices &GetRustTownFoundingServices() noexcept
 		.directory_rebuild = []() noexcept { InvalidateWindowData(WC_TOWN_DIRECTORY, 0, TDIWD_FORCE_REBUILD); },
 		.directory_resort = []() noexcept { InvalidateWindowData(WC_TOWN_DIRECTORY, 0, TDIWD_FORCE_RESORT); },
 		.update_noise = []() noexcept { UpdateAirportsNoise(); },
-		.rebuild_tree = []() noexcept { RebuildTownKdtree(); },
 		.delete_town = [](uint16_t id) noexcept { [[maybe_unused]] CommandCost rc = Command<CMD_DELETE_TOWN>::Do(DoCommandFlag::Execute, TownID(id)); assert(rc.Succeeded()); },
 		.assert_random_context = OpenTTDAssertTownGenerationContext,
 		.assert_allocation = []() noexcept { assert(Town::CanAllocateItem()); },

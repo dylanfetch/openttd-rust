@@ -259,7 +259,6 @@ pub struct HouseServices {
     pub place_houses: extern "C" fn() -> u8,
     pub company_human: extern "C" fn(u8) -> bool,
     pub init_counts: extern "C" fn(),
-    pub rebuild_tree: extern "C" fn(),
     pub errors: HouseErrors,
 }
 
@@ -1155,7 +1154,7 @@ impl House<'_> {
     /// `RebuildTownCaches`: canonical counts, population and houses in map order.
     fn rebuild_caches(&self) {
         (self.h.init_counts)();
-        (self.h.rebuild_tree)();
+        (self.s.rebuild_town_tree)();
         // SAFETY: Immediate owner writes; no service runs while accessed.
         self.towns(|state| unsafe {
             (*state).simulation.population = 0;

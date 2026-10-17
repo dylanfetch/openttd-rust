@@ -62,7 +62,6 @@ struct OpenTTDTownFoundingServices {
 	void (*directory_rebuild)() noexcept;
 	void (*directory_resort)() noexcept;
 	void (*update_noise)() noexcept;
-	void (*rebuild_tree)() noexcept;
 	void (*delete_town)(uint16_t) noexcept;
 	void (*assert_random_context)() noexcept;
 	void (*assert_allocation)() noexcept;
