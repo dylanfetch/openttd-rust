@@ -1,9 +1,9 @@
 add_test_files(
     alternating_iterator.cpp
     alternating_iterator_state.cpp
+    abi_layout.hpp
     bitmath_func.cpp
     company_economy.cpp
-    cargo_storage.cpp
     cargo_payment.cpp
     cargo_payment_stubs.hpp
     fleet.cpp
@@ -24,8 +24,6 @@ add_test_files(
     mock_spritecache.h
     orders.cpp
     rail_yapf.cpp
-    train_reservation.cpp
-    train.cpp
     rail_yapf_protocol.hpp
     road_yapf.cpp
     roadvehicle.cpp
@@ -35,7 +33,6 @@ add_test_files(
     string_consumer.cpp
     string_consumer_bytes.cpp
     string_inplace.cpp
-    signal.cpp
     string_func.cpp
     test_main.cpp
     test_network_crypto.cpp

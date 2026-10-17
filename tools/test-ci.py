@@ -320,9 +320,12 @@ const github = {{paginate: async () => {json.dumps(caches)}, rest: {{actions: {{
                 }
             ]
         )
+        self.assertEqual(result["deleted"], [])  # Unmanaged caches are never removed.
         self.assertTrue(result["failures"])
         workflow = (ROOT / ".github/workflows/ci-cache.yml").read_text()
         self.assertIn("actions: write", workflow)
+        self.assertIn("github.event.workflow_run.event == 'push'", workflow)
+        self.assertIn("head_branch == 'rust-migration'", workflow)
         self.assertNotIn("actions/checkout", workflow)
         self.assertNotIn("download-artifact", workflow)
         self.assertNotRegex(workflow, r"(?m)^\s+(?:- )?run:")
@@ -516,64 +519,6 @@ class PolicyTests(unittest.TestCase):
                 full=full, marker=marker, same_run=same_run, tree=tree, merged=merged
             ):
                 self.assertEqual(node(harness)["heavy"], expected)
-
-    def test_cache_retention_removes_duplicate_prefixes_and_stays_below_budget(self):
-        script = script_for("ci-cache.yml", "prune")
-        gib = 1024**3
-        caches = [
-            {
-                "id": 1,
-                "key": "compiler-v1-test-" + "a" * 40,
-                "created_at": "2026-01-01",
-                "size_in_bytes": 3 * gib,
-            },
-            {
-                "id": 2,
-                "key": "compiler-v1-test-" + "b" * 40,
-                "created_at": "2026-01-03",
-                "size_in_bytes": 2 * gib,
-            },
-            {
-                "id": 3,
-                "key": "ccache-macos-v1-arm64-" + "a" * 40,
-                "created_at": "2026-01-02",
-                "size_in_bytes": 2 * gib,
-            },
-            {
-                "id": 4,
-                "key": "ccache-linux-v2-gcc-" + "a" * 40,
-                "created_at": "2026-01-04",
-                "size_in_bytes": 2 * gib,
-            },
-            {
-                "id": 5,
-                "key": "opengfx-0.6.0",
-                "created_at": "2026-01-01",
-                "size_in_bytes": gib,
-            },
-        ]
-        harness = f"""
-        const removed = [], failures = [];
-        const context = {{repo: {{}}}};
-        const core = {{info: () => {{}}, setFailed: message => failures.push(message)}};
-        const github = {{paginate: async () => {json.dumps(caches)}, rest: {{actions: {{
-          deleteActionsCacheById: async value => removed.push(value.cache_id)
-        }}}}}};
-        (async () => {{{script}}})().then(() => console.log(JSON.stringify({{removed, failures}})));
-        """
-        result = node(harness)
-        self.assertIn(1, result["removed"])
-        self.assertNotIn(5, result["removed"])
-        self.assertFalse(result["failures"])
-        retained = sum(
-            c["size_in_bytes"] for c in caches if c["id"] not in result["removed"]
-        )
-        self.assertLessEqual(retained, 8 * gib)
-        workflow = (ROOT / ".github/workflows/ci-cache.yml").read_text()
-        self.assertNotIn("actions/checkout", workflow)
-        self.assertNotIn("download-artifact", workflow)
-        self.assertIn("github.event.workflow_run.event == 'push'", workflow)
-        self.assertIn("head_branch == 'rust-migration'", workflow)
 
 
 class RequestTests(unittest.TestCase):

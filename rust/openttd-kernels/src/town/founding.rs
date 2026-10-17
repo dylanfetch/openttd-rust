@@ -634,6 +634,7 @@ pub unsafe extern "C" fn openttd_rust_town_generate(
     }
     let larger_towns = observed!((f.s.larger_towns)());
     let offset = if larger_towns == 0 {
+        w::hit(w::TOWN_NO_CITIES);
         0
     } else {
         f.random() % u32::from(larger_towns)
