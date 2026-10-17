@@ -3159,7 +3159,7 @@ static void RailConvert(OpenTTDCommandCost *out, uint16_t flags, uint32_t tile, 
 static bool RailShipOnTile(uint32_t tile) noexcept
 {
 	for (const Vehicle *v : VehiclesOnTile(TileIndex{tile})) {
-		if (v->type == VEH_SHIP) return true;
+		if (RustVehicleVehicleType(v) == VEH_SHIP) return true;
 	}
 	return false;
 }
@@ -3201,7 +3201,7 @@ static void RailDepotWindows(uint32_t tile) noexcept
 static void RailCollectTrains(OpenTTDRailConvertFrame *frame, uint32_t tile) noexcept
 {
 	for (Vehicle *v : VehiclesOnTile(TileIndex{tile})) {
-		if (v->type == VEH_TRAIN) include(frame->affected, Train::From(v)->First());
+		if (RustVehicleVehicleType(v) == VEH_TRAIN) include(frame->affected, RustVehicleFirst(Train::From(v)));
 	}
 }
 static void RailConsistChanged(OpenTTDRailConvertFrame *frame) noexcept

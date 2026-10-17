@@ -870,7 +870,7 @@ static uint8_t TrainVisitNear(int32_t x, int32_t y, void *context, uint8_t (*vis
 static OpenTTDTrainHandle TrainReadFirst(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return TrainHandle(v->First());
+	return TrainHandle(RustVehicleFirst(v));
 }
 static OpenTTDTrainHandle TrainReadNext(OpenTTDTrainHandle id) noexcept
 {
@@ -1060,7 +1060,7 @@ static OpenTTDTrainMoveVehicle20Read TrainReadMoveVehicle20(OpenTTDTrainHandle i
 static OpenTTDTrainCollisionOneRead TrainReadCollisionOne(OpenTTDTrainHandle id) noexcept
 {
 	const Train *v=static_cast<Train *>(id.shell);
-	return {TrainHandle(v->First()), v->x_pos, v->y_pos, v->z_pos, RustGroundCachedLength(v), v->owner.base()};
+	return {TrainHandle(RustVehicleFirst(v)), v->x_pos, v->y_pos, v->z_pos, RustGroundCachedLength(v), v->owner.base()};
 }
 static OpenTTDTrainCollisionOne22Read TrainReadCollisionOne22(OpenTTDTrainHandle id) noexcept
 {
