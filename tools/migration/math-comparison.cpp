@@ -34,19 +34,13 @@ static_assert(ClampTo<WideUnsigned>(true) == 1);
 #endif
 
 #ifdef MATH_ROUTE_PROBE
-static uint64_t sqrt_calls = 0, clamp_calls = 0, soft_calls = 0;
+static uint64_t sqrt_calls = 0, soft_calls = 0;
 extern "C" uint32_t __real_openttd_rust_int_sqrt(uint32_t);
-extern "C" uint64_t __real_openttd_rust_clamp_to(uint64_t, uint8_t, uint8_t, uint8_t, uint8_t);
 extern "C" uint64_t __real_openttd_rust_soft_clamp(uint64_t, uint64_t, uint64_t, uint8_t, uint8_t);
 extern "C" uint32_t __wrap_openttd_rust_int_sqrt(uint32_t value)
 {
 	sqrt_calls++;
 	return __real_openttd_rust_int_sqrt(value);
-}
-extern "C" uint64_t __wrap_openttd_rust_clamp_to(uint64_t value, uint8_t fw, uint8_t fs, uint8_t tw, uint8_t ts)
-{
-	clamp_calls++;
-	return __real_openttd_rust_clamp_to(value, fw, fs, tw, ts);
 }
 extern "C" uint64_t __wrap_openttd_rust_soft_clamp(uint64_t value, uint64_t min, uint64_t max, uint8_t width, uint8_t sign)
 {
@@ -181,23 +175,17 @@ static void HeightCases()
 int main()
 {
 #ifdef MATH_ROUTE_PROBE
-	/* Literal runtime calls must cross Rust even under -O2. */
+	/* The retained Rust math calls must cross the ABI even under -O2. */
 	Emit(IntSqrt(25)); Emit(ClampTo<uint8_t>(256)); Emit(SoftClamp(0, 1500, 1000));
-	if (sqrt_calls != 1 || clamp_calls != 1 || soft_calls != 1) return 2;
+	if (sqrt_calls != 1 || soft_calls != 1) return 2;
 #else
 	Emit(IntSqrt(25)); Emit(ClampTo<uint8_t>(256)); Emit(SoftClamp(0, 1500, 1000));
 #endif
 #ifdef __SIZEOF_INT128__
-#ifdef MATH_ROUTE_PROBE
-	const uint64_t wide_calls_before = clamp_calls;
-#endif
 	WideUnsignedCases<uint8_t>(); WideUnsignedCases<uint16_t>();
 	WideUnsignedCases<uint32_t>(); WideUnsignedCases<uint64_t>(); WideUnsignedCases<bool>();
 	WideUnsignedCases<char8_t>(); WideUnsignedCases<char16_t>(); WideUnsignedCases<char32_t>();
 	WideUnsignedCases<size_t>();
-#ifdef MATH_ROUTE_PROBE
-	if (clamp_calls != wide_calls_before + 45) return 4;
-#endif
 #endif
 	HeightCases();
 	uint64_t roots = 0;
@@ -225,8 +213,8 @@ int main()
 			static_cast<unsigned long long>(cases), static_cast<unsigned long long>(digest));
 #ifdef MATH_ROUTE_PROBE
 	std::fflush(stdout);
-	std::fprintf(stderr, "Rust routing: sqrt=%llu clamp=%llu soft=%llu\n", static_cast<unsigned long long>(sqrt_calls),
-			static_cast<unsigned long long>(clamp_calls), static_cast<unsigned long long>(soft_calls));
-	if (!sqrt_calls || !clamp_calls || !soft_calls) return 3;
+	std::fprintf(stderr, "Rust routing: sqrt=%llu soft=%llu\n", static_cast<unsigned long long>(sqrt_calls),
+			static_cast<unsigned long long>(soft_calls));
+	if (!sqrt_calls || !soft_calls) return 3;
 #endif
 }

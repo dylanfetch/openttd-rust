@@ -554,18 +554,6 @@ static void Math()
 	CHECK(openttd_rust_int_sqrt(UINT32_MAX) == 65536);
 	constexpr uint64_t bits = UINT64_C(0xFEDCBA9876543210);
 	constexpr uint64_t high = UINT64_C(0x8000000000000000);
-	CHECK(openttd_rust_clamp_to(bits, 64, 0, 64, 0) == bits);
-	CHECK(openttd_rust_clamp_to(UINT64_MAX, 64, 0, 64, 1) == INT64_MAX);
-	CHECK(openttd_rust_clamp_to(high, 64, 1, 64, 0) == 0);
-	CHECK(openttd_rust_clamp_to(high, 64, 1, 64, 1) == high);
-	CHECK(openttd_rust_clamp_to(UINT64_MAX, 64, 0, 32, 0) == UINT32_MAX);
-	CHECK(openttd_rust_clamp_to(UINT32_MAX, 32, 0, 32, 1) == INT32_MAX);
-	CHECK(openttd_rust_clamp_to(UINT16_MAX, 16, 0, 16, 1) == INT16_MAX);
-	CHECK(openttd_rust_clamp_to(256, 16, 0, 8, 0) == UINT8_MAX);
-	CHECK(openttd_rust_clamp_to(0x80, 8, 1, 64, 1) == static_cast<uint64_t>(INT8_MIN));
-	CHECK(openttd_rust_clamp_to(UINT64_MAX, 64, 1, 8, 1) == UINT64_MAX);
-	CHECK(openttd_rust_clamp_to(2, 8, 0, 1, 0) == 1);
-	CHECK(openttd_rust_clamp_to(1, 1, 0, 64, 1) == 1);
 	/* The narrow signed reversed intervals intentionally retain C++ promotions. */
 	CHECK(openttd_rust_soft_clamp(bits, high, UINT64_MAX, 64, 0) == bits);
 	CHECK(openttd_rust_soft_clamp(0, high, UINT64_MAX, 64, 0) == high);
@@ -575,7 +563,7 @@ static void Math()
 	CHECK(openttd_rust_soft_clamp(0, UINT64_MAX, UINT64_MAX - 2, 16, 1) == 32766);
 	CHECK(openttd_rust_soft_clamp(0, 1500000000, static_cast<uint64_t>(-1500000000), 32, 1) == 0);
 	CHECK(openttd_rust_soft_clamp(high, high, INT64_MAX, 64, 1) == high);
-	std::printf("math int_sqrt, clamp_to and soft_clamp scalar high-bit, width and boundary calls passed\n");
+	std::printf("math int_sqrt and soft_clamp scalar high-bit, width and boundary calls passed\n");
 }
 
 static void CryptoPrimitives()
