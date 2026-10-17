@@ -31,6 +31,9 @@
 
 #include "table/strings.h"
 
+#ifdef WITH_RUST
+#include "rust/vehicle_services.h"
+#endif
 #include "safeguards.h"
 
 extern void ChangeVehicleViewports(VehicleID from_index, VehicleID to_index);
