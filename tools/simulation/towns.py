@@ -1,5 +1,6 @@
 """towns scenario evidence."""
 
+import copy
 import hashlib
 import json
 import re
@@ -788,6 +789,10 @@ def founding_scenarios(soak):
         )
         scenario["settings"]["game_creation"]["custom_town_number"] = 1
         scenario["settings"]["economy"]["town_layout"] = layout
+    # larger_towns 0 makes GenerateTowns skip its city-offset Random() draw.
+    cases.append(copy.deepcopy(cases[0]))
+    cases[-1].update(name="town-founding-no-cities", town_branches=["no_cities"])
+    cases[-1]["settings"]["economy"]["larger_towns"] = 0
     return cases
 
 
@@ -887,6 +892,7 @@ def check(scenario, run, mode, role, result):
             raise RuntimeError("house command witness missing")
     elif "town_founding" in scenario and not run["exit"] and run["snapshots"]:
         required = () if scenario["town_founding"] == "reload" else FOUNDING_BRANCHES
+        required = [*required, *scenario.get("town_branches", ())]
         counts = branch_witnesses(scenario, run, role, "town", required)
         if counts:
             result[mode + "_town_branches"] = counts
