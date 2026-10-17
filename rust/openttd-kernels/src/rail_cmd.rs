@@ -568,7 +568,8 @@ impl<'a> Ctx<'a> {
         let mut fall_through = false;
         match self.tile_type(tile) {
             MP_RAILWAY => {
-                // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.                unsafe { (self.command.tile_ownership)(ret.0, tile) };
+                // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.
+                unsafe { (self.command.tile_ownership)(ret.0, tile) };
                 if !ret.ok() {
                     return cost.take(ret);
                 }
@@ -586,7 +587,8 @@ impl<'a> Ctx<'a> {
                     ret.zero();
                 }
                 if ret.ok() {
-                    // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.                    unsafe { (self.command.no_train)(ret.0, tile, trackbit) };
+                    // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.
+                    unsafe { (self.command.no_train)(ret.0, tile, trackbit) };
                 }
                 if !ret.ok() {
                     return cost.take(ret);
@@ -649,12 +651,14 @@ impl<'a> Ctx<'a> {
                     return cost.error(strings.sloped_wrong);
                 }
                 if !(self.s.crossing_with_competitor)() && self.current() != OWNER_DEITY {
-                    // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.                    unsafe { (self.command.tile_ownership)(ret.0, tile) };
+                    // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.
+                    unsafe { (self.command.tile_ownership)(ret.0, tile) };
                     if !ret.ok() {
                         return cost.take(ret);
                     }
                 }
-                // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.                unsafe { (self.command.no_vehicle)(ret.0, tile) };
+                // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.
+                unsafe { (self.command.no_vehicle)(ret.0, tile) };
                 if !ret.ok() {
                     return cost.take(ret);
                 }
@@ -758,7 +762,8 @@ impl<'a> Ctx<'a> {
         let road_owner = (self.shared.road_owner)(tile);
         let tram_owner = (self.shared.tram_owner)(tile);
         if (self.shared.company_valid)(tram_owner) && road.tram_bits.is_power_of_two() {
-            // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.            unsafe { (self.command.ownership)(ret.0, tram_owner) };
+            // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.
+            unsafe { (self.command.ownership)(ret.0, tram_owner) };
             if !ret.ok() {
                 cost.take(ret);
                 return None;
@@ -835,13 +840,15 @@ impl<'a> Ctx<'a> {
                     return cost.error(no_track);
                 }
                 if self.current() != OWNER_WATER {
-                    // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.                    unsafe { (self.command.tile_ownership)(ret.0, tile) };
+                    // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.
+                    unsafe { (self.command.tile_ownership)(ret.0, tile) };
                     if !ret.ok() {
                         return cost.take(ret);
                     }
                 }
                 if flags & BANKRUPT == 0 {
-                    // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.                    unsafe { (self.command.no_vehicle)(ret.0, tile) };
+                    // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.
+                    unsafe { (self.command.no_vehicle)(ret.0, tile) };
                     if !ret.ok() {
                         return cost.take(ret);
                     }
@@ -880,12 +887,14 @@ impl<'a> Ctx<'a> {
                     return cost.error(no_track);
                 }
                 if self.current() != OWNER_WATER {
-                    // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.                    unsafe { (self.command.tile_ownership)(ret.0, tile) };
+                    // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.
+                    unsafe { (self.command.tile_ownership)(ret.0, tile) };
                     if !ret.ok() {
                         return cost.take(ret);
                     }
                 }
-                // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.                unsafe { (self.command.no_train)(ret.0, tile, trackbit) };
+                // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.
+                unsafe { (self.command.no_train)(ret.0, tile, trackbit) };
                 if !ret.ok() {
                     return cost.take(ret);
                 }
@@ -1111,14 +1120,16 @@ impl<'a> Ctx<'a> {
             && (self.rail.is_rail_depot)(tile)
             && railtype == (self.rail.rail_type)(tile).0
         {
-            // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.            unsafe { (self.command.tile_ownership)(ret.0, tile) };
+            // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.
+            unsafe { (self.command.tile_ownership)(ret.0, tile) };
             if !ret.ok() {
                 return cost.take(ret);
             }
             if dir == (self.rail.rail_depot_direction)(tile).0 {
                 return cost.zero();
             }
-            // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.            unsafe { (self.command.no_vehicle)(ret.0, tile) };
+            // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.
+            unsafe { (self.command.no_vehicle)(ret.0, tile) };
             if !ret.ok() {
                 return cost.take(ret);
             }
@@ -1191,7 +1202,8 @@ impl<'a> Ctx<'a> {
         if signals_copy != 0 && signals_copy & on_track == 0 {
             return cost.error(INVALID_STRING);
         }
-        // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.        unsafe { (self.command.tile_ownership)(cost.0, tile) };
+        // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.
+        unsafe { (self.command.tile_ownership)(cost.0, tile) };
         if !cost.ok() {
             return;
         }
@@ -1301,7 +1313,8 @@ impl<'a> Ctx<'a> {
             w::hit(w::RAIL_CMD_SIGNAL_PBS_STATE);
             let mask = u32::from((self.rail.present_signals)(tile) & on_track);
             let reserved = (self.rail.rail_reservation)(tile).0 >> track & 1 != 0 && {
-                // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.                unsafe { (self.command.no_vehicle)(ret.0, tile) };
+                // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.
+                unsafe { (self.command.no_vehicle)(ret.0, tile) };
                 ret.ok()
             };
             let states = u32::from((self.rail.signal_states)(tile));
@@ -1624,7 +1637,8 @@ impl<'a> Ctx<'a> {
             return cost.error(self.s.strings.no_signals);
         }
         if self.current() != OWNER_WATER {
-            // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.            unsafe { (self.command.tile_ownership)(cost.0, tile) };
+            // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.
+            unsafe { (self.command.tile_ownership)(cost.0, tile) };
             if !cost.ok() {
                 return;
             }
@@ -1775,7 +1789,8 @@ impl<'a> Ctx<'a> {
         {
             return false;
         }
-        // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.        unsafe { (self.command.tile_ownership)(ret.0, tile) };
+        // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.
+        unsafe { (self.command.tile_ownership)(ret.0, tile) };
         if !ret.ok() {
             error.take(ret);
             return false;
@@ -1784,9 +1799,11 @@ impl<'a> Ctx<'a> {
         if tt != MP_TUNNELBRIDGE {
             if !(self.s.compatible_rail)(kind, totype) {
                 if (self.shared.is_plain_rail)(tile) {
-                    // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.                    unsafe { (self.command.no_train)(ret.0, tile, self.tracks(tile)) };
+                    // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.
+                    unsafe { (self.command.no_train)(ret.0, tile, self.tracks(tile)) };
                 } else {
-                    // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.                    unsafe { (self.command.no_vehicle)(ret.0, tile) };
+                    // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.
+                    unsafe { (self.command.no_vehicle)(ret.0, tile) };
                 }
                 if !ret.ok() {
                     error.take(ret);
@@ -1853,7 +1870,8 @@ impl<'a> Ctx<'a> {
                     return false;
                 }
                 if !(self.s.compatible_rail)((self.rail.rail_type)(tile).0, totype) {
-                    // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.                    unsafe { (self.command.wormhole_free)(ret.0, tile, endtile, std::ptr::null()) };
+                    // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.
+                    unsafe { (self.command.wormhole_free)(ret.0, tile, endtile, std::ptr::null()) };
                     if !ret.ok() {
                         error.take(ret);
                         return false;
@@ -1920,12 +1938,14 @@ impl<'a> Ctx<'a> {
     /// `RemoveTrainDepot`.
     fn remove_depot(&self, cost: Cost<'_>, flags: u16, tile: u32) {
         if self.current() != OWNER_WATER {
-            // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.            unsafe { (self.command.tile_ownership)(cost.0, tile) };
+            // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.
+            unsafe { (self.command.tile_ownership)(cost.0, tile) };
             if !cost.ok() {
                 return;
             }
         }
-        // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.        unsafe { (self.command.no_vehicle)(cost.0, tile) };
+        // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.
+        unsafe { (self.command.no_vehicle)(cost.0, tile) };
         if !cost.ok() {
             return;
         }
@@ -1986,7 +2006,8 @@ impl<'a> Ctx<'a> {
                     && flags & BANKRUPT == 0
                     && (self.shared.company_valid)(self.current())
                 {
-                    // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.                    unsafe { (self.command.no_vehicle)(ret.0, tile) };
+                    // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.
+                    unsafe { (self.command.no_vehicle)(ret.0, tile) };
                     if !ret.ok() {
                         return cost.take(ret);
                     }

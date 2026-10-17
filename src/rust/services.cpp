@@ -330,12 +330,12 @@ static OpenTTDRailSignalUpdate SharedRail_signal_update(uint32_t tile, uint8_t t
 static OpenTTDRailStationAdmission SharedRail_station_admission(uint32_t tile, uint8_t owner, uint8_t dir) noexcept
 {
 	TileIndex t(tile);
-	OpenTTDRailStationAdmission r{.rail = HasStationRail(t), .owner = INVALID_OWNER.base(), .axis = AXIS_X, .blocked = false};
+	OpenTTDRailStationAdmission r{.rail = RustHasStationRail(tile), .owner = INVALID_OWNER.base(), .axis = AXIS_X, .blocked = false};
 	if (r.rail) {
 		r.owner = MapSvcTileOwner(tile);
 		if (r.owner == owner) {
 			r.axis = RustRailStationAxis(tile);
-			if (DiagDirToAxis(static_cast<DiagDirection>(dir)) == r.axis) r.blocked = IsStationTileBlocked(t);
+			if (DiagDirToAxis(static_cast<DiagDirection>(dir)) == r.axis) r.blocked = RustStationBlocked(tile);
 		}
 	}
 	return r;

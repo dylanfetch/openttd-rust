@@ -63,11 +63,6 @@ static uint64_t TrainReservationCrossTracks(void *, OpenTTDTrainHandle, uint8_t 
 {
 	return TrackCrossesTracks(static_cast<Track>(a));
 }
-static uint64_t TrainReservationDepotReserved(void *, OpenTTDTrainHandle, uint32_t a) noexcept
-{
-	TileIndex t(static_cast<uint32_t>(a));
-	return HasDepotReservation(t);
-}
 static uint64_t TrainReservationDiagReachDirs(void *, OpenTTDTrainHandle, uint8_t a) noexcept
 {
 	return DiagdirReachesTrackdirs(static_cast<DiagDirection>(a));
@@ -129,11 +124,6 @@ static uint64_t TrainReservationIsRailway(void *, OpenTTDTrainHandle, uint32_t a
 	TileIndex t(static_cast<uint32_t>(a));
 	return IsTileType(t, MP_RAILWAY);
 }
-static uint64_t TrainReservationIsStation(void *, OpenTTDTrainHandle, uint32_t a) noexcept
-{
-	TileIndex t(static_cast<uint32_t>(a));
-	return IsRailStationTile(t);
-}
 static uint64_t TrainReservationIsTunnel(void *, OpenTTDTrainHandle, uint32_t a) noexcept
 {
 	TileIndex t(static_cast<uint32_t>(a));
@@ -194,11 +184,6 @@ static uint64_t TrainReservationReachDirs(void *, OpenTTDTrainHandle, uint8_t a)
 static uint64_t TrainReservationReachTracks(void *, OpenTTDTrainHandle, uint8_t a) noexcept
 {
 	return DiagdirReachesTracks(static_cast<DiagDirection>(a));
-}
-static uint64_t TrainReservationReserved(void *, OpenTTDTrainHandle, uint32_t a) noexcept
-{
-	TileIndex t(static_cast<uint32_t>(a));
-	return GetReservedTrackbits(t);
 }
 static uint64_t TrainReservationReservePaths(void *, OpenTTDTrainHandle) noexcept
 {

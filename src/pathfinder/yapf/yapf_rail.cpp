@@ -48,17 +48,17 @@ static OpenTTDRailTile RailTile(uint32_t tile, uint8_t direction) noexcept
 	const Trackdir td = static_cast<Trackdir>(direction);
 	OpenTTDRailTile result{};
 	result.flags = (IsTileType(t, MP_RAILWAY) ? 1U : 0U) | (IsTileType(t, MP_ROAD) ? 2U : 0U)
-		| (HasStationTileRail(t) ? 4U : 0U) | (IsRailStationTile(t) ? 8U : 0U)
+		| (HasStationTileRail(t) ? 4U : 0U) | (RustIsRailStation(tile) ? 8U : 0U)
 		| (IsRailWaypointTile(t) ? 16U : 0U) | (IsRailDepotTile(t) ? 32U : 0U)
 		| (IsPlainRailTile(t) ? 64U : 0U) | (IsLevelCrossingTile(t) ? 128U : 0U)
 		| (IsBridgeTile(t) ? 256U : 0U) | (IsTunnelTile(t) ? 512U : 0U);
 	result.railtype = GetTileRailType(t);
-	result.reserved = GetReservedTrackbits(t);
+	result.reserved = RustReservedTracks(tile);
 	if (IsPlainRailTile(t)) result.tracks = RustRailTracks(tile);
 	if (HasStationTileRail(t)) {
 		result.station = GetStationIndex(t).base();
-		result.station_track = GetRailStationTrack(t);
-		if (IsRailStationTile(t) && HasStationReservation(t)) result.flags |= 1024U;
+		result.station_track = RustRailStationTrack(tile);
+		if (RustIsRailStation(tile) && HasStationReservation(t)) result.flags |= 1024U;
 	}
 	if (IsTileType(t, MP_TUNNELBRIDGE)) {
 		result.tunnel_dir = GetTunnelBridgeDirection(t);
