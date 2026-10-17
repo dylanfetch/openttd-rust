@@ -10,10 +10,18 @@
 #define RUST_SERVICES_NEWGRF_H
 #include "../newgrf_commons.h"
 #include "../newgrf_debug.h"
+#include "../newgrf_house.h"
 
 /* Borrowed GRF files remain native and live for the synchronous conversion.
- * No C++ exception crosses Rust; environmental failures terminate. */
+ * A town shell is live for resolution (or null for a prototype); no Rust
+ * owner borrow spans it. No C++ exception crosses Rust; environmental
+ * failures terminate. */
 inline bool OpenTTDConvertBooleanCallback(const GRFFile *grf, uint16_t callback, uint16_t result) noexcept { return ConvertBooleanCallback(grf, callback, result); }
+inline bool OpenTTDConvert8bitBooleanCallback(const GRFFile *grf, uint16_t callback, uint16_t result) noexcept { return Convert8bitBooleanCallback(grf, callback, result); }
+inline uint16_t OpenTTDHouseCallback(CallbackID callback, uint32_t param1, uint32_t param2, HouseID house, Town *town, TileIndex tile, bool not_yet_constructed, uint8_t initial_random = 0) noexcept
+{
+	return GetHouseCallback(callback, param1, param2, house, town, tile, {}, not_yet_constructed, initial_random);
+}
 inline void OpenTTDDeleteInspect(GrfSpecFeature feature, uint index) noexcept { DeleteNewGRFInspectWindow(feature, index); }
 /* Typed adapters retain the existing per-component table signatures. */
 inline void OpenTTDDeleteHouseInspect(uint32_t tile) noexcept { OpenTTDDeleteInspect(GSF_HOUSES, tile); }
