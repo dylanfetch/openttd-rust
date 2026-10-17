@@ -405,101 +405,194 @@ pub const TOWN_ENTRIES: usize = 180;
 /// `town.no_cities` witness: generation with `larger_towns == 0`.
 pub const TOWN_NO_CITIES: usize = 181;
 
+/// `rail_cmd.entries` witness.
+pub const RAIL_CMD_ENTRIES: usize = 182;
+/// `rail_cmd.build_rail` witness.
+pub const RAIL_CMD_BUILD_RAIL: usize = 183;
+/// `rail_cmd.build_not_plain` witness.
+pub const RAIL_CMD_BUILD_NOT_PLAIN: usize = 184;
+/// `rail_cmd.build_remove_signals` witness.
+pub const RAIL_CMD_BUILD_REMOVE_SIGNALS: usize = 185;
+/// `rail_cmd.build_convert` witness.
+pub const RAIL_CMD_BUILD_CONVERT: usize = 186;
+/// `rail_cmd.build_crossing` witness.
+pub const RAIL_CMD_BUILD_CROSSING: usize = 187;
+/// `rail_cmd.build_clear` witness.
+pub const RAIL_CMD_BUILD_CLEAR: usize = 188;
+/// `rail_cmd.build_half_water` witness.
+pub const RAIL_CMD_BUILD_HALF_WATER: usize = 189;
+/// `rail_cmd.remove_rail` witness.
+pub const RAIL_CMD_REMOVE_RAIL: usize = 190;
+/// `rail_cmd.remove_crossing` witness.
+pub const RAIL_CMD_REMOVE_CROSSING: usize = 191;
+/// `rail_cmd.remove_shore` witness.
+pub const RAIL_CMD_REMOVE_SHORE: usize = 192;
+/// `rail_cmd.remove_signal_charge` witness.
+pub const RAIL_CMD_REMOVE_SIGNAL_CHARGE: usize = 193;
+/// `rail_cmd.remove_diagonal_crossing` witness.
+pub const RAIL_CMD_REMOVE_DIAGONAL_CROSSING: usize = 194;
+/// `rail_cmd.drag_build` witness.
+pub const RAIL_CMD_DRAG_BUILD: usize = 195;
+/// `rail_cmd.drag_remove` witness.
+pub const RAIL_CMD_DRAG_REMOVE: usize = 196;
+/// `rail_cmd.drag_obstacle` witness.
+pub const RAIL_CMD_DRAG_OBSTACLE: usize = 197;
+/// `rail_cmd.depot_build` witness.
+pub const RAIL_CMD_DEPOT_BUILD: usize = 198;
+/// `rail_cmd.depot_rotate` witness.
+pub const RAIL_CMD_DEPOT_ROTATE: usize = 199;
+/// `rail_cmd.signal_build` witness.
+pub const RAIL_CMD_SIGNAL_BUILD: usize = 200;
+/// `rail_cmd.signal_convert` witness.
+pub const RAIL_CMD_SIGNAL_CONVERT: usize = 201;
+/// `rail_cmd.signal_variant` witness.
+pub const RAIL_CMD_SIGNAL_VARIANT: usize = 202;
+/// `rail_cmd.signal_cycle_type` witness.
+pub const RAIL_CMD_SIGNAL_CYCLE_TYPE: usize = 203;
+/// `rail_cmd.signal_cycle_side` witness.
+pub const RAIL_CMD_SIGNAL_CYCLE_SIDE: usize = 204;
+/// `rail_cmd.signal_copy` witness.
+pub const RAIL_CMD_SIGNAL_COPY: usize = 205;
+/// `rail_cmd.signal_pbs_state` witness.
+pub const RAIL_CMD_SIGNAL_PBS_STATE: usize = 206;
+/// `rail_cmd.signal_reserve` witness.
+pub const RAIL_CMD_SIGNAL_RESERVE: usize = 207;
+/// `rail_cmd.signal_drag` witness.
+pub const RAIL_CMD_SIGNAL_DRAG: usize = 208;
+/// `rail_cmd.signal_drag_remove` witness.
+pub const RAIL_CMD_SIGNAL_DRAG_REMOVE: usize = 209;
+/// `rail_cmd.signal_minimise` witness.
+pub const RAIL_CMD_SIGNAL_MINIMISE: usize = 210;
+/// `rail_cmd.signal_autofill` witness.
+pub const RAIL_CMD_SIGNAL_AUTOFILL: usize = 211;
+/// `rail_cmd.signal_wormhole` witness.
+pub const RAIL_CMD_SIGNAL_WORMHOLE: usize = 212;
+/// `rail_cmd.signal_remove` witness.
+pub const RAIL_CMD_SIGNAL_REMOVE: usize = 213;
+/// `rail_cmd.signal_remove_path_end` witness.
+pub const RAIL_CMD_SIGNAL_REMOVE_PATH_END: usize = 214;
+/// `rail_cmd.convert_rail` witness.
+pub const RAIL_CMD_CONVERT_RAIL: usize = 215;
+/// `rail_cmd.convert_depot` witness.
+pub const RAIL_CMD_CONVERT_DEPOT: usize = 216;
+/// `rail_cmd.convert_wormhole` witness.
+pub const RAIL_CMD_CONVERT_WORMHOLE: usize = 217;
+/// `rail_cmd.convert_station_crossing` witness.
+pub const RAIL_CMD_CONVERT_STATION_CROSSING: usize = 218;
+/// `rail_cmd.convert_reroute` witness.
+pub const RAIL_CMD_CONVERT_REROUTE: usize = 219;
+/// `rail_cmd.clear_rail` witness.
+pub const RAIL_CMD_CLEAR_RAIL: usize = 220;
+/// `rail_cmd.clear_water` witness.
+pub const RAIL_CMD_CLEAR_WATER: usize = 221;
+/// `rail_cmd.clear_depot` witness.
+pub const RAIL_CMD_CLEAR_DEPOT: usize = 222;
+/// `rail_cmd.owner_transfer` witness.
+pub const RAIL_CMD_OWNER_TRANSFER: usize = 223;
+/// `rail_cmd.owner_clear` witness.
+pub const RAIL_CMD_OWNER_CLEAR: usize = 224;
+/// `rail_cmd.terraform_corner` witness.
+pub const RAIL_CMD_TERRAFORM_CORNER: usize = 225;
+/// `rail_cmd.terraform_depot` witness.
+pub const RAIL_CMD_TERRAFORM_DEPOT: usize = 226;
+/// `rail_cmd.build_above_clear` witness.
+pub const RAIL_CMD_BUILD_ABOVE_CLEAR: usize = 227;
+
 /// Scheduler evidence counter.
-pub const VEHICLE_CALLBACK32: usize = 182;
+pub const VEHICLE_CALLBACK32: usize = 228;
 /// Scheduler evidence counter.
-pub const VEHICLE_CARGO_AGES: usize = 183;
+pub const VEHICLE_CARGO_AGES: usize = 229;
 /// Scheduler evidence counter.
-pub const VEHICLE_CARGO_OWNER: usize = 184;
+pub const VEHICLE_CARGO_OWNER: usize = 230;
 /// Scheduler evidence counter.
-pub const VEHICLE_CROSSINGS: usize = 185;
+pub const VEHICLE_CROSSINGS: usize = 231;
 /// Scheduler evidence counter.
-pub const VEHICLE_DAYS: usize = 186;
+pub const VEHICLE_DAYS: usize = 232;
 /// Scheduler evidence counter.
-pub const VEHICLE_DELETED: usize = 187;
+pub const VEHICLE_DELETED: usize = 233;
 /// Scheduler evidence counter.
-pub const VEHICLE_DESCRIPTOR_BYTES: usize = 188;
+pub const VEHICLE_DESCRIPTOR_BYTES: usize = 234;
 /// Scheduler evidence counter.
-pub const VEHICLE_MOTION: usize = 189;
+pub const VEHICLE_MOTION: usize = 235;
 /// Scheduler evidence counter.
-pub const VEHICLE_OBSERVED_BYTES: usize = 190;
+pub const VEHICLE_OBSERVED_BYTES: usize = 236;
 /// Scheduler evidence counter.
-pub const VEHICLE_OUTER_VISITS: usize = 191;
+pub const VEHICLE_OUTER_VISITS: usize = 237;
 /// Scheduler evidence counter.
-pub const VEHICLE_PACKET_LOOKUPS: usize = 192;
+pub const VEHICLE_PACKET_LOOKUPS: usize = 238;
 /// Scheduler evidence counter.
-pub const VEHICLE_PERIODIC_SOUND: usize = 193;
+pub const VEHICLE_PERIODIC_SOUND: usize = 239;
 /// Scheduler evidence counter.
-pub const VEHICLE_POOL_GROWTH: usize = 194;
+pub const VEHICLE_POOL_GROWTH: usize = 240;
 /// Scheduler evidence counter.
-pub const VEHICLE_POST_TICK: usize = 195;
+pub const VEHICLE_POST_TICK: usize = 241;
 /// Scheduler evidence counter.
-pub const VEHICLE_RUNNING_SOUND: usize = 196;
+pub const VEHICLE_RUNNING_SOUND: usize = 242;
 /// Scheduler evidence counter.
-pub const VEHICLE_SCALAR_READ_BYTES: usize = 197;
+pub const VEHICLE_SCALAR_READ_BYTES: usize = 243;
 /// Scheduler evidence counter.
-pub const VEHICLE_SCALAR_WRITE_BYTES: usize = 198;
+pub const VEHICLE_SCALAR_WRITE_BYTES: usize = 244;
 /// Scheduler evidence counter.
-pub const VEHICLE_STATIONS: usize = 199;
+pub const VEHICLE_STATIONS: usize = 245;
 /// Scheduler evidence counter.
-pub const VEHICLE_VISITS: usize = 200;
+pub const VEHICLE_VISITS: usize = 246;
 
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_AGE: usize = 208;
+pub const VEHICLE_MAINT_AGE: usize = 254;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_AIRCRAFT: usize = 209;
+pub const VEHICLE_MAINT_AIRCRAFT: usize = 255;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_BYTES: usize = 210;
+pub const VEHICLE_MAINT_BYTES: usize = 256;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_CHECK: usize = 211;
+pub const VEHICLE_MAINT_CHECK: usize = 257;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_COUNTDOWN: usize = 212;
+pub const VEHICLE_MAINT_COUNTDOWN: usize = 258;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_CROSSINGS: usize = 213;
+pub const VEHICLE_MAINT_CROSSINGS: usize = 259;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_DAYS: usize = 214;
+pub const VEHICLE_MAINT_DAYS: usize = 260;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_DECAY: usize = 215;
+pub const VEHICLE_MAINT_DECAY: usize = 261;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_DELAY: usize = 216;
+pub const VEHICLE_MAINT_DELAY: usize = 262;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_ENDED: usize = 217;
+pub const VEHICLE_MAINT_ENDED: usize = 263;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_LOADING: usize = 218;
+pub const VEHICLE_MAINT_LOADING: usize = 264;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_MAX_AGE: usize = 219;
+pub const VEHICLE_MAINT_MAX_AGE: usize = 265;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_MINUTES: usize = 220;
+pub const VEHICLE_MAINT_MINUTES: usize = 266;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_OLD_NEWS: usize = 221;
+pub const VEHICLE_MAINT_OLD_NEWS: usize = 267;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_PERCENT: usize = 222;
+pub const VEHICLE_MAINT_PERCENT: usize = 268;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_PROFIT_AGE: usize = 223;
+pub const VEHICLE_MAINT_PROFIT_AGE: usize = 269;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_RENEW: usize = 224;
+pub const VEHICLE_MAINT_RENEW: usize = 270;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_REPLACE: usize = 225;
+pub const VEHICLE_MAINT_REPLACE: usize = 271;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_RESET: usize = 226;
+pub const VEHICLE_MAINT_RESET: usize = 272;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_RESET_REDUCED: usize = 227;
+pub const VEHICLE_MAINT_RESET_REDUCED: usize = 273;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_SERVICE: usize = 228;
+pub const VEHICLE_MAINT_SERVICE: usize = 274;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_SMOKE: usize = 229;
+pub const VEHICLE_MAINT_SMOKE: usize = 275;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_STARTED: usize = 230;
+pub const VEHICLE_MAINT_STARTED: usize = 276;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_TRIGGER: usize = 231;
+pub const VEHICLE_MAINT_TRIGGER: usize = 277;
 /// Base vehicle maintenance witness.
-pub const VEHICLE_MAINT_VALUE: usize = 232;
+pub const VEHICLE_MAINT_VALUE: usize = 278;
 
 /// Native-to-Rust base maintenance entries (separate from outgoing services).
-pub const VEHICLE_MAINT_ENTRIES: usize = 233;
+pub const VEHICLE_MAINT_ENTRIES: usize = 279;
 
 /// Counter names, grouped by the prefix the harness selects.
-pub const NAMES: [&str; 234] = [
+pub const NAMES: [&str; 280] = [
     "train.tick_first",
     "train.tick_second",
     "train.reversal",
@@ -682,6 +775,52 @@ pub const NAMES: [&str; 234] = [
     "town.name_set",
     "town.entries",
     "town.no_cities",
+    "rail_cmd.entries",
+    "rail_cmd.build_rail",
+    "rail_cmd.build_not_plain",
+    "rail_cmd.build_remove_signals",
+    "rail_cmd.build_convert",
+    "rail_cmd.build_crossing",
+    "rail_cmd.build_clear",
+    "rail_cmd.build_half_water",
+    "rail_cmd.remove_rail",
+    "rail_cmd.remove_crossing",
+    "rail_cmd.remove_shore",
+    "rail_cmd.remove_signal_charge",
+    "rail_cmd.remove_diagonal_crossing",
+    "rail_cmd.drag_build",
+    "rail_cmd.drag_remove",
+    "rail_cmd.drag_obstacle",
+    "rail_cmd.depot_build",
+    "rail_cmd.depot_rotate",
+    "rail_cmd.signal_build",
+    "rail_cmd.signal_convert",
+    "rail_cmd.signal_variant",
+    "rail_cmd.signal_cycle_type",
+    "rail_cmd.signal_cycle_side",
+    "rail_cmd.signal_copy",
+    "rail_cmd.signal_pbs_state",
+    "rail_cmd.signal_reserve",
+    "rail_cmd.signal_drag",
+    "rail_cmd.signal_drag_remove",
+    "rail_cmd.signal_minimise",
+    "rail_cmd.signal_autofill",
+    "rail_cmd.signal_wormhole",
+    "rail_cmd.signal_remove",
+    "rail_cmd.signal_remove_path_end",
+    "rail_cmd.convert_rail",
+    "rail_cmd.convert_depot",
+    "rail_cmd.convert_wormhole",
+    "rail_cmd.convert_station_crossing",
+    "rail_cmd.convert_reroute",
+    "rail_cmd.clear_rail",
+    "rail_cmd.clear_water",
+    "rail_cmd.clear_depot",
+    "rail_cmd.owner_transfer",
+    "rail_cmd.owner_clear",
+    "rail_cmd.terraform_corner",
+    "rail_cmd.terraform_depot",
+    "rail_cmd.build_above_clear",
     "vehicle.callback32",
     "vehicle.cargo_ages",
     "vehicle.cargo_owner",
