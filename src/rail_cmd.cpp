@@ -3111,6 +3111,7 @@ static CommandCost CheckBuildAbove_Track(TileIndex tile, DoCommandFlags flags, A
  * counters and every CommandCost stay native; the original bodies remain
  * under #ifndef WITH_RUST above. */
 #include "rust/rail_command_ffi.h"
+#include "rust/services_water.h"
 #include "rust/command_cost_services.h"
 #include "rust/company_services.h"
 #include "rust/settings_services.h"
@@ -3184,7 +3185,7 @@ static void RailMakeCrossing(uint32_t tile, uint8_t road, uint8_t tram, uint8_t 
 static void RailMakeShore(uint32_t tile) noexcept
 {
 	TileIndex t{tile};
-	bool docking = IsDockingTile(t);
+	bool docking = OpenTTDIsDockingTile(tile);
 	MakeShore(t);
 	SetDockingTile(t, docking);
 }
