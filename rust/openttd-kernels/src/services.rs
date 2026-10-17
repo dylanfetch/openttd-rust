@@ -51,11 +51,23 @@ pub struct CommandCostServices {
 
 /// Ordinary direct commands. Native result storage retains complete errors and
 /// parameters; owner accesses must end before a command can reenter Rust.
+/// Pointer callbacks require live caller-owned costs and, when nonnull, a live
+/// native train. They neither retain nor free those pointers.
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct CommandServices {
     /// Original `CMD_LANDSCAPE_CLEAR`, with actual `DoCommandFlags` width.
     pub landscape_clear: extern "C" fn(*mut CommandCost, u32, u16),
+    /// Original `CheckTileOwnership`, preserving native encoded errors.
+    pub tile_ownership: unsafe extern "C" fn(*mut CommandCost, u32),
+    /// Original `CheckOwnership`.
+    pub ownership: unsafe extern "C" fn(*mut CommandCost, u8),
+    /// Original `EnsureNoVehicleOnGround`.
+    pub no_vehicle: unsafe extern "C" fn(*mut CommandCost, u32),
+    /// Original `EnsureNoTrainOnTrackBits`.
+    pub no_train: unsafe extern "C" fn(*mut CommandCost, u32, u8),
+    /// Original `TunnelBridgeIsFree`, with the source optional ignored train.
+    pub wormhole_free: unsafe extern "C" fn(*mut CommandCost, u32, u32, *const Train),
 }
 
 /// Opaque native town shell. Its address identifies the shell, not the Rust owner.
@@ -224,7 +236,25 @@ pub struct Services {
     /// `TryPathReserve(v, mark_as_stuck, first_tile_okay)`.
     pub try_path_reserve: extern "C" fn(*mut Train, bool, bool) -> bool,
     /// `IsSafeWaitingPosition(v, tile, trackdir, true, forbid_90_deg)`.
-    pub safe_waiting_position: extern "C" fn(*const Train, u32, u8) -> bool,
+    pub safe_waiting_position: unsafe extern "C" fn(*const Train, u32, u8, bool) -> bool,
+    /// Original normal-road works predicate.
+    pub has_road_works: extern "C" fn(u32) -> bool,
+    /// Original tram road type (including `INVALID_ROADTYPE`).
+    pub tram_type: extern "C" fn(u32) -> RoadType,
+    /// Original tram owner.
+    pub tram_owner: extern "C" fn(u32) -> u8,
+    /// Original `GetRoadBits`; only called for a normal road tile.
+    pub normal_road_bits: extern "C" fn(u32, u8) -> RoadBits,
+    /// Original `GetCrossingRoadBits`.
+    pub crossing_road_bits: extern "C" fn(u32) -> RoadBits,
+    /// Original pathfinding setting, observed at the calling branch.
+    pub forbid_90_deg: extern "C" fn() -> bool,
+    /// Original `UpdateLevelCrossing`; callers retain their original sound argument.
+    pub update_level_crossing: extern "C" fn(u32, bool),
+    /// Original `MarkBridgeDirty`.
+    pub mark_bridge_dirty: extern "C" fn(u32),
+    /// Original train track direction, computed lazily at the consuming branch.
+    pub train_trackdir: unsafe extern "C" fn(*const Train) -> Trackdir,
 }
 impl Services {
     /// Draw one shared random word.
@@ -270,7 +300,7 @@ pub fn fixture(
     extern "C" fn train_path(_: *mut Train, _: bool, _: bool) -> bool {
         false
     }
-    extern "C" fn train_safe(_: *const Train, _: u32, _: u8) -> bool {
+    extern "C" fn train_safe(_: *const Train, _: u32, _: u8, _: bool) -> bool {
         false
     }
     extern "C" fn zone(_: u32, _: u8) {}
@@ -359,7 +389,34 @@ pub fn fixture(
         free_train_reservation: train,
         try_path_reserve: train_path,
         safe_waiting_position: train_safe,
+        has_road_works: flag,
+        tram_type: fixture_tram_type,
+        tram_owner: byte,
+        normal_road_bits: fixture_normal_road_bits,
+        crossing_road_bits: fixture_crossing_road_bits,
+        forbid_90_deg: flag0,
+        update_level_crossing: fixture_crossing_update,
+        mark_bridge_dirty: tile,
+        train_trackdir: fixture_train_trackdir,
     }
+}
+#[cfg(test)]
+extern "C" fn fixture_tram_type(_: u32) -> RoadType {
+    RoadType(0)
+}
+#[cfg(test)]
+extern "C" fn fixture_normal_road_bits(_: u32, _: u8) -> RoadBits {
+    RoadBits(0)
+}
+#[cfg(test)]
+extern "C" fn fixture_crossing_road_bits(_: u32) -> RoadBits {
+    RoadBits(0)
+}
+#[cfg(test)]
+extern "C" fn fixture_crossing_update(_: u32, _: bool) {}
+#[cfg(test)]
+extern "C" fn fixture_train_trackdir(_: *const Train) -> Trackdir {
+    Trackdir(0)
 }
 /// Map dimensions read once per entry.
 #[derive(Clone, Copy)]
@@ -494,6 +551,34 @@ pub struct RandomServices {
 #[repr(transparent)]
 #[derive(Clone, Copy)]
 pub struct DiagDirection(pub u8);
+/// Native `RailType` with its unchanged uint8 representation.
+#[repr(transparent)]
+#[derive(Clone, Copy)]
+pub struct RailType(pub u8);
+/// Native `RailTileType` with its unchanged uint8 representation.
+#[repr(transparent)]
+#[derive(Clone, Copy)]
+pub struct RailTileType(pub u8);
+/// Native `RailGroundType` with its unchanged uint8 representation.
+#[repr(transparent)]
+#[derive(Clone, Copy)]
+pub struct RailGroundType(pub u8);
+/// Native `SignalVariant` with its unchanged uint8 representation.
+#[repr(transparent)]
+#[derive(Clone, Copy)]
+pub struct SignalVariant(pub u8);
+/// Native `RoadType` with its unchanged uint8 representation.
+#[repr(transparent)]
+#[derive(Clone, Copy)]
+pub struct RoadType(pub u8);
+/// Native `RoadBits` with its unchanged uint8 representation.
+#[repr(transparent)]
+#[derive(Clone, Copy)]
+pub struct RoadBits(pub u8);
+/// Native `Trackdir` with its unchanged uint8 representation.
+#[repr(transparent)]
+#[derive(Clone, Copy)]
+pub struct Trackdir(pub u8);
 /// Native `TrackBits` with its unchanged uint8 representation.
 #[repr(transparent)]
 #[derive(Clone, Copy)]
@@ -621,13 +706,13 @@ pub struct RailMapServices {
     /// Native `GetSignalType`.
     pub signal_type: extern "C" fn(u32, u8) -> SignalType,
     /// Native `GetRailType`.
-    pub rail_type: extern "C" fn(u32) -> u8,
+    pub rail_type: extern "C" fn(u32) -> RailType,
     /// Native `SetRailType`.
     pub set_rail_type: extern "C" fn(u32, u8),
     /// Native `GetRailTileType`.
-    pub rail_tile_type: extern "C" fn(u32) -> u8,
+    pub rail_tile_type: extern "C" fn(u32) -> RailTileType,
     /// Native `GetRailGroundType`.
-    pub rail_ground: extern "C" fn(u32) -> u8,
+    pub rail_ground: extern "C" fn(u32) -> RailGroundType,
     /// Native `SetRailGroundType`.
     pub set_rail_ground: extern "C" fn(u32, u8),
     /// Native `SetTrackBits`.
@@ -645,7 +730,7 @@ pub struct RailMapServices {
     /// Native `SetSignalType`.
     pub set_signal_type: extern "C" fn(u32, u8, u8),
     /// Native `GetSignalVariant`.
-    pub signal_variant: extern "C" fn(u32, u8) -> u8,
+    pub signal_variant: extern "C" fn(u32, u8) -> SignalVariant,
     /// Native `SetSignalVariant`.
     pub set_signal_variant: extern "C" fn(u32, u8, u8),
     /// Native `CycleSignalSide`.

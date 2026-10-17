@@ -12,7 +12,7 @@
 #include <type_traits>
 #include "station_ffi.h"
 
-/* Immutable function table. All functions are noexcept and cannot reenter Rust.
+/* Immutable function table. All functions are noexcept; command/PBS/viewport effects may reenter Rust.
  * Context may be null in the game; test fixtures supply their own world.
  * No Rust references into the map/pools survive calls. Output is call-scoped.
  * Map predicates take a TileIndex value and return the original accessor's
@@ -29,6 +29,9 @@
 struct OpenTTDTownHandle; // Opaque native Town shell; never dereferenced in Rust.
 struct OpenTTDTownState;
 struct Train; // Native Train shell; never dereferenced in Rust.
+enum RoadType : uint8_t;
+enum RoadBits : uint8_t;
+enum Trackdir : uint8_t;
 struct OpenTTDSharedServices {
 	void *context;
 	uint32_t (*random)(void *) noexcept;
@@ -95,7 +98,17 @@ struct OpenTTDSharedServices {
 	void (*clear_square)(uint32_t) noexcept;
 	void (*free_train_reservation)(const Train *) noexcept;
 	bool (*try_path_reserve)(Train *, bool, bool) noexcept;
-	bool (*safe_waiting_position)(const Train *, uint32_t, uint8_t) noexcept;
+	bool (*safe_waiting_position)(const Train *, uint32_t, uint8_t, bool) noexcept;
+	bool (*has_road_works)(uint32_t) noexcept;
+	RoadType (*tram_type)(uint32_t) noexcept;
+	uint8_t (*tram_owner)(uint32_t) noexcept;
+	RoadBits (*normal_road_bits)(uint32_t, uint8_t) noexcept;
+	RoadBits (*crossing_road_bits)(uint32_t) noexcept;
+	bool (*forbid_90_deg)() noexcept;
+	void (*update_level_crossing)(uint32_t, bool) noexcept;
+	void (*mark_bridge_dirty)(uint32_t) noexcept;
+	Trackdir (*train_trackdir)(const Train *) noexcept;
+
 };
 const OpenTTDSharedServices &GetRustSharedServices() noexcept;
 /** Shared save/reseed/restore of BOTH original RNG streams. */
@@ -114,6 +127,10 @@ enum SignalType : uint8_t;
 enum SignalState : uint8_t;
 enum Axis : uint8_t;
 enum TransportType : uint8_t;
+enum RailType : uint8_t;
+enum class RailTileType : uint8_t;
+enum class RailGroundType : uint8_t;
+enum SignalVariant : uint8_t;
 
 struct OpenTTDRailTraversal { bool depot; TrackBits tracks; };
 struct OpenTTDRailSignalPresence { bool signals; bool track; SignalType kind; bool forward; bool reverse; };
@@ -144,10 +161,10 @@ struct OpenTTDRailMapServices {
 	TrackBits (*rail_tracks)(uint32_t) noexcept;
 	bool (*has_signals)(uint32_t) noexcept;
 	SignalType (*signal_type)(uint32_t, uint8_t) noexcept;
-	uint8_t (*rail_type)(uint32_t) noexcept;
+	RailType (*rail_type)(uint32_t) noexcept;
 	void (*set_rail_type)(uint32_t, uint8_t) noexcept;
-	uint8_t (*rail_tile_type)(uint32_t) noexcept;
-	uint8_t (*rail_ground)(uint32_t) noexcept;
+	RailTileType (*rail_tile_type)(uint32_t) noexcept;
+	RailGroundType (*rail_ground)(uint32_t) noexcept;
 	void (*set_rail_ground)(uint32_t, uint8_t) noexcept;
 	void (*set_track_bits)(uint32_t, uint8_t) noexcept;
 	uint8_t (*present_signals)(uint32_t) noexcept;
@@ -156,7 +173,7 @@ struct OpenTTDRailMapServices {
 	void (*set_signal_states)(uint32_t, uint8_t) noexcept;
 	void (*set_has_signals)(uint32_t, bool) noexcept;
 	void (*set_signal_type)(uint32_t, uint8_t, uint8_t) noexcept;
-	uint8_t (*signal_variant)(uint32_t, uint8_t) noexcept;
+	SignalVariant (*signal_variant)(uint32_t, uint8_t) noexcept;
 	void (*set_signal_variant)(uint32_t, uint8_t, uint8_t) noexcept;
 	void (*cycle_signal_side)(uint32_t, uint8_t) noexcept;
 	TrackBits (*reserved_tracks)(uint32_t) noexcept;
@@ -251,7 +268,16 @@ inline OpenTTDSharedServices OpenTTDFixtureSharedServices(void *context, uint32_
 		.clear_square = OpenTTDFixtureMapService<void, uint32_t>,
 		.free_train_reservation = OpenTTDFixtureMapService<void, const Train *>,
 		.try_path_reserve = OpenTTDFixtureMapService<bool, Train *, bool, bool>,
-		.safe_waiting_position = OpenTTDFixtureMapService<bool, const Train *, uint32_t, uint8_t>,
+		.safe_waiting_position = OpenTTDFixtureMapService<bool, const Train *, uint32_t, uint8_t, bool>,
+		.has_road_works = OpenTTDFixtureMapService<bool, uint32_t>,
+		.tram_type = OpenTTDFixtureMapService<RoadType, uint32_t>,
+		.tram_owner = OpenTTDFixtureMapService<uint8_t, uint32_t>,
+		.normal_road_bits = OpenTTDFixtureMapService<RoadBits, uint32_t, uint8_t>,
+		.crossing_road_bits = OpenTTDFixtureMapService<RoadBits, uint32_t>,
+		.forbid_90_deg = OpenTTDFixtureMapService<bool>,
+		.update_level_crossing = OpenTTDFixtureMapService<void, uint32_t, bool>,
+		.mark_bridge_dirty = OpenTTDFixtureMapService<void, uint32_t>,
+		.train_trackdir = OpenTTDFixtureMapService<Trackdir, const Train *>,
 	};
 }
 #endif /* RUST_SERVICES_FFI_H */

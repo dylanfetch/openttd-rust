@@ -4834,7 +4834,6 @@ static const OpenTTDTrainReservationLeaves &GetTrainReservationServices()
 		.is_tunnel = TrainReservationIsTunnel,
 		.is_waypoint = TrainReservationIsWaypoint,
 		.line_reverse = TrainReservationLineReverse,
-		.mark_bridge = TrainReservationMarkBridge,
 		.mark_tile = TrainReservationSharedMap<void, &OpenTTDSharedServices::mark_dirty>,
 		.needs_service = TrainReservationNeedsService,
 		.oneway = TrainReservationOneway,

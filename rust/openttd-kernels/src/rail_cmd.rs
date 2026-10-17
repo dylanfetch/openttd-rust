@@ -64,14 +64,9 @@ pub struct TrainParking {
     /// `current_order` type.
     pub order: u8,
 }
-/// Normal road fields read together once `IsNormalRoad` holds.
-#[repr(C)]
+/// Call-local normal road observations, read at their original guards.
 #[derive(Clone, Copy)]
 pub struct NormalRoad {
-    /// `HasRoadWorks`.
-    pub works: bool,
-    /// `GetDisallowedRoadDirections`.
-    pub disallowed: u8,
     /// `GetRoadTypeRoad`.
     pub road_type: u8,
     /// `GetRoadTypeTram`.
@@ -169,16 +164,6 @@ pub struct RailCommandServices {
     pub flooding: extern "C" fn(u32) -> u8,
     /// `AutoslopeCheckForEntranceEdge`.
     pub entrance_edge: extern "C" fn(u32, i32, u8, u8) -> bool,
-    /// `CheckTileOwnership`.
-    pub tile_ownership: extern "C" fn(*mut CommandCost, u32),
-    /// `CheckOwnership`.
-    pub ownership: extern "C" fn(*mut CommandCost, u8),
-    /// `EnsureNoVehicleOnGround`.
-    pub no_vehicle: extern "C" fn(*mut CommandCost, u32),
-    /// `EnsureNoTrainOnTrackBits`.
-    pub no_train: extern "C" fn(*mut CommandCost, u32, u8),
-    /// `TunnelBridgeIsFree`.
-    pub wormhole_free: extern "C" fn(*mut CommandCost, u32, u32),
     /// `HasVehicleOnTile(tile, ship)`.
     pub ship_on_tile: extern "C" fn(u32) -> bool,
     /// `CMD_BUILD_SINGLE_RAIL`.
@@ -208,18 +193,10 @@ pub struct RailCommandServices {
     pub train_position: extern "C" fn(*mut Train) -> TrainPosition,
     /// `YapfNotifyTrackLayoutChange`.
     pub layout_changed: extern "C" fn(u32, u8),
-    /// `UpdateLevelCrossing(tile, false)`.
-    pub update_crossing: extern "C" fn(u32),
     /// `MarkDirtyAdjacentLevelCrossingTiles`.
     pub mark_crossings: extern "C" fn(u32, u8),
     /// `UpdateAdjacentLevelCrossingTilesOnLevelCrossingRemoval`.
     pub crossing_removed: extern "C" fn(u32, u8),
-    /// Normal road fields once `IsNormalRoad` holds.
-    pub normal_road: extern "C" fn(u32) -> NormalRoad,
-    /// `GetRoadOwner(RTT_TRAM)`.
-    pub tram_owner: extern "C" fn(u32) -> u8,
-    /// Crossing road fields before `MakeRoadNormal`.
-    pub crossing_road: extern "C" fn(u32) -> CrossingRoad,
     /// `MakeRoadCrossing(tile, road, tram, rail, road_axis, railtype, road_rt, tram_rt, town)`.
     pub make_crossing: extern "C" fn(u32, u8, u8, u8, u8, u8, u8, u8, u16),
     /// `MakeRoadNormal(tile, bits, road_rt, tram_rt, town, road_owner, tram_owner)`.
@@ -240,8 +217,6 @@ pub struct RailCommandServices {
     pub make_shore: extern "C" fn(u32),
     /// `IsPossibleDockingTile` then `CheckForDockingTile`.
     pub docking_check: extern "C" fn(u32),
-    /// `MarkBridgeDirty(tile)`.
-    pub bridge_dirty: extern "C" fn(u32),
     /// Begin `TileIterator::Create(start, end, diagonal)` in the frame.
     pub area_begin: extern "C" fn(*mut ConvertFrame, u32, u32, bool),
     /// Current iterator tile (`INVALID_TILE` at end).
@@ -593,7 +568,7 @@ impl<'a> Ctx<'a> {
         let mut fall_through = false;
         match self.tile_type(tile) {
             MP_RAILWAY => {
-                (self.s.tile_ownership)(ret.0, tile);
+                // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.                unsafe { (self.command.tile_ownership)(ret.0, tile) };
                 if !ret.ok() {
                     return cost.take(ret);
                 }
@@ -601,7 +576,7 @@ impl<'a> Ctx<'a> {
                     w::hit(w::RAIL_CMD_BUILD_NOT_PLAIN);
                     return (self.command.landscape_clear)(cost.0, tile, flags);
                 }
-                if !(self.s.compatible_rail)((self.rail.rail_type)(tile), railtype) {
+                if !(self.s.compatible_rail)((self.rail.rail_type)(tile).0, railtype) {
                     return cost.error(strings.impossible_combination);
                 }
                 // CheckTrackCombination, then EnsureNoTrainOnTrack.
@@ -611,7 +586,7 @@ impl<'a> Ctx<'a> {
                     ret.zero();
                 }
                 if ret.ok() {
-                    (self.s.no_train)(ret.0, tile, trackbit);
+                    // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.                    unsafe { (self.command.no_train)(ret.0, tile, trackbit) };
                 }
                 if !ret.ok() {
                     return cost.take(ret);
@@ -636,7 +611,7 @@ impl<'a> Ctx<'a> {
                         }
                     }
                 }
-                let current = (self.rail.rail_type)(tile);
+                let current = (self.rail.rail_type)(tile).0;
                 if current != railtype && !(self.s.powered_rail)(railtype, current) {
                     if (self.s.powered_rail)(current, railtype) {
                         w::hit(w::RAIL_CMD_BUILD_CONVERT);
@@ -657,11 +632,15 @@ impl<'a> Ctx<'a> {
                     let owner = (self.shared.tile_owner)(tile);
                     self.rail_infra(
                         owner,
-                        (self.rail.rail_type)(tile),
+                        (self.rail.rail_type)(tile).0,
                         pieces(bits).wrapping_neg(),
                     );
                     let owner = (self.shared.tile_owner)(tile);
-                    self.rail_infra(owner, (self.rail.rail_type)(tile), pieces(bits | trackbit));
+                    self.rail_infra(
+                        owner,
+                        (self.rail.rail_type)(tile).0,
+                        pieces(bits | trackbit),
+                    );
                     (self.s.infrastructure_dirty)((self.shared.tile_owner)(tile));
                 }
             }
@@ -670,37 +649,40 @@ impl<'a> Ctx<'a> {
                     return cost.error(strings.sloped_wrong);
                 }
                 if !(self.s.crossing_with_competitor)() && self.current() != OWNER_DEITY {
-                    (self.s.tile_ownership)(ret.0, tile);
+                    // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.                    unsafe { (self.command.tile_ownership)(ret.0, tile) };
                     if !ret.ok() {
                         return cost.take(ret);
                     }
                 }
-                (self.s.no_vehicle)(ret.0, tile);
+                // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.                unsafe { (self.command.no_vehicle)(ret.0, tile) };
                 if !ret.ok() {
                     return cost.take(ret);
                 }
                 let mut built = false;
                 if (self.shared.is_normal_road)(tile) {
-                    let road = (self.s.normal_road)(tile);
-                    if road.works {
+                    if (self.shared.has_road_works)(tile) {
                         return cost.error(strings.road_works);
                     }
-                    if road.disallowed != 0 {
+                    if (self.shared.disallowed_road_directions)(tile) != 0 {
                         return cost.error(strings.oneway_road);
                     }
                     if (self.s.rail_no_crossings)(railtype) {
                         return cost.error(strings.crossing_rail);
                     }
-                    if road.road_type != INVALID_ROADTYPE
-                        && (self.s.road_no_crossing)(road.road_type)
-                    {
+                    let road_type = (self.shared.road_type)(tile);
+                    let tram_type = (self.shared.tram_type)(tile).0;
+                    if road_type != INVALID_ROADTYPE && (self.s.road_no_crossing)(road_type) {
                         return cost.error(strings.crossing_road);
                     }
-                    if road.tram_type != INVALID_ROADTYPE
-                        && (self.s.road_no_crossing)(road.tram_type)
-                    {
+                    if tram_type != INVALID_ROADTYPE && (self.s.road_no_crossing)(tram_type) {
                         return cost.error(strings.crossing_road);
                     }
+                    let road = NormalRoad {
+                        road_type,
+                        tram_type,
+                        road_bits: (self.shared.normal_road_bits)(tile, 0).0,
+                        tram_bits: (self.shared.normal_road_bits)(tile, 1).0,
+                    };
                     let bits = road.road_bits | road.tram_bits;
                     if (track == TRACK_X && bits & ROAD_X == 0)
                         || (track == TRACK_Y && bits & ROAD_Y == 0)
@@ -774,9 +756,9 @@ impl<'a> Ctx<'a> {
         road: NormalRoad,
     ) -> Option<()> {
         let road_owner = (self.shared.road_owner)(tile);
-        let tram_owner = (self.s.tram_owner)(tile);
+        let tram_owner = (self.shared.tram_owner)(tile);
         if (self.shared.company_valid)(tram_owner) && road.tram_bits.is_power_of_two() {
-            (self.s.ownership)(ret.0, tram_owner);
+            // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.            unsafe { (self.command.ownership)(ret.0, tram_owner) };
             if !ret.ok() {
                 cost.take(ret);
                 return None;
@@ -818,7 +800,7 @@ impl<'a> Ctx<'a> {
                 road.tram_type,
                 town,
             );
-            (self.s.update_crossing)(tile);
+            (self.shared.update_level_crossing)(tile, false);
             (self.s.mark_crossings)(tile, (self.rail.crossing_road_axis)(tile).0);
             self.rail_infra(self.current(), railtype, LEVELCROSSING_TRACKBIT_FACTOR);
             (self.s.infrastructure_dirty)(self.current());
@@ -853,18 +835,18 @@ impl<'a> Ctx<'a> {
                     return cost.error(no_track);
                 }
                 if self.current() != OWNER_WATER {
-                    (self.s.tile_ownership)(ret.0, tile);
+                    // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.                    unsafe { (self.command.tile_ownership)(ret.0, tile) };
                     if !ret.ok() {
                         return cost.take(ret);
                     }
                 }
                 if flags & BANKRUPT == 0 {
-                    (self.s.no_vehicle)(ret.0, tile);
+                    // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.                    unsafe { (self.command.no_vehicle)(ret.0, tile) };
                     if !ret.ok() {
                         return cost.take(ret);
                     }
                 }
-                cost.add_money((self.s.rail_clear_cost)((self.rail.rail_type)(tile)));
+                cost.add_money((self.s.rail_clear_cost)((self.rail.rail_type)(tile).0));
                 if flags & EXECUTE != 0 {
                     w::hit(w::RAIL_CMD_REMOVE_CROSSING);
                     (self.s.crossing_removed)(tile, (self.rail.crossing_road_axis)(tile).0);
@@ -877,11 +859,19 @@ impl<'a> Ctx<'a> {
                     owner = (self.shared.tile_owner)(tile);
                     self.rail_infra(
                         owner,
-                        (self.rail.rail_type)(tile),
+                        (self.rail.rail_type)(tile).0,
                         LEVELCROSSING_TRACKBIT_FACTOR.wrapping_neg(),
                     );
                     (self.s.infrastructure_dirty)(owner);
-                    (self.s.make_road)(tile, (self.s.crossing_road)(tile));
+                    let road = CrossingRoad {
+                        bits: (self.shared.crossing_road_bits)(tile).0,
+                        road_type: (self.shared.road_type)(tile),
+                        tram_type: (self.shared.tram_type)(tile).0,
+                        town: (self.shared.town_index)(tile),
+                        road_owner: (self.shared.road_owner)(tile),
+                        tram_owner: (self.shared.tram_owner)(tile),
+                    };
+                    (self.s.make_road)(tile, road);
                     (self.s.close_inspect)(tile);
                 }
             }
@@ -890,12 +880,12 @@ impl<'a> Ctx<'a> {
                     return cost.error(no_track);
                 }
                 if self.current() != OWNER_WATER {
-                    (self.s.tile_ownership)(ret.0, tile);
+                    // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.                    unsafe { (self.command.tile_ownership)(ret.0, tile) };
                     if !ret.ok() {
                         return cost.take(ret);
                     }
                 }
-                (self.s.no_train)(ret.0, tile, trackbit);
+                // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.                unsafe { (self.command.no_train)(ret.0, tile, trackbit) };
                 if !ret.ok() {
                     return cost.take(ret);
                 }
@@ -906,7 +896,7 @@ impl<'a> Ctx<'a> {
                 if present == BIT_X | BIT_Y {
                     crossing = true;
                 }
-                cost.add_money((self.s.rail_clear_cost)((self.rail.rail_type)(tile)));
+                cost.add_money((self.s.rail_clear_cost)((self.rail.rail_type)(tile).0));
                 if self.has_signal(tile, track) {
                     w::hit(w::RAIL_CMD_REMOVE_SIGNAL_CHARGE);
                     (self.s.remove_signal)(ret.0, flags, tile, track);
@@ -923,15 +913,15 @@ impl<'a> Ctx<'a> {
                     owner = (self.shared.tile_owner)(tile);
                     self.rail_infra(
                         owner,
-                        (self.rail.rail_type)(tile),
+                        (self.rail.rail_type)(tile).0,
                         pieces(present).wrapping_neg(),
                     );
                     present ^= trackbit;
-                    self.rail_infra(owner, (self.rail.rail_type)(tile), pieces(present));
+                    self.rail_infra(owner, (self.rail.rail_type)(tile).0, pieces(present));
                     (self.s.infrastructure_dirty)(owner);
                     if present == 0 {
                         let tileh = (self.shared.tile_slope)(tile);
-                        if (self.rail.rail_ground)(tile) == GROUND_HALF_WATER
+                        if (self.rail.rail_ground)(tile).0 == GROUND_HALF_WATER
                             && one_corner_raised(tileh)
                         {
                             w::hit(w::RAIL_CMD_REMOVE_SHORE);
@@ -1119,16 +1109,16 @@ impl<'a> Ctx<'a> {
         let mut rotate = false;
         if self.tile_type(tile) == MP_RAILWAY
             && (self.rail.is_rail_depot)(tile)
-            && railtype == (self.rail.rail_type)(tile)
+            && railtype == (self.rail.rail_type)(tile).0
         {
-            (self.s.tile_ownership)(ret.0, tile);
+            // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.            unsafe { (self.command.tile_ownership)(ret.0, tile) };
             if !ret.ok() {
                 return cost.take(ret);
             }
             if dir == (self.rail.rail_depot_direction)(tile).0 {
                 return cost.zero();
             }
-            (self.s.no_vehicle)(ret.0, tile);
+            // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.            unsafe { (self.command.no_vehicle)(ret.0, tile) };
             if !ret.ok() {
                 return cost.take(ret);
             }
@@ -1201,7 +1191,7 @@ impl<'a> Ctx<'a> {
         if signals_copy != 0 && signals_copy & on_track == 0 {
             return cost.error(INVALID_STRING);
         }
-        (self.s.tile_ownership)(cost.0, tile);
+        // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.        unsafe { (self.command.tile_ownership)(cost.0, tile) };
         if !cost.ok() {
             return;
         }
@@ -1217,10 +1207,10 @@ impl<'a> Ctx<'a> {
         let both = price(PR_BUILD_SIGNALS).saturating_add(price(PR_CLEAR_SIGNALS));
         if !self.has_signal(tile, track) {
             cost.set(price(PR_BUILD_SIGNALS));
-        } else if signals_copy != 0 && sigvar != (self.rail.signal_variant)(tile, track) {
+        } else if signals_copy != 0 && sigvar != (self.rail.signal_variant)(tile, track).0 {
             cost.set(both);
         } else if convert_signal {
-            if ctrl_pressed || (self.rail.signal_variant)(tile, track) != sigvar {
+            if ctrl_pressed || (self.rail.signal_variant)(tile, track).0 != sigvar {
                 cost.set(both);
             } else {
                 cost.zero();
@@ -1268,7 +1258,7 @@ impl<'a> Ctx<'a> {
             } else if convert_signal {
                 if ctrl_pressed {
                     w::hit(w::RAIL_CMD_SIGNAL_VARIANT);
-                    let variant = if (self.rail.signal_variant)(tile, track) == SIG_ELECTRIC {
+                    let variant = if (self.rail.signal_variant)(tile, track).0 == SIG_ELECTRIC {
                         SIG_SEMAPHORE
                     } else {
                         SIG_ELECTRIC
@@ -1311,7 +1301,7 @@ impl<'a> Ctx<'a> {
             w::hit(w::RAIL_CMD_SIGNAL_PBS_STATE);
             let mask = u32::from((self.rail.present_signals)(tile) & on_track);
             let reserved = (self.rail.rail_reservation)(tile).0 >> track & 1 != 0 && {
-                (self.s.no_vehicle)(ret.0, tile);
+                // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.                unsafe { (self.command.no_vehicle)(ret.0, tile) };
                 ret.ok()
             };
             let states = u32::from((self.rail.signal_states)(tile));
@@ -1327,7 +1317,15 @@ impl<'a> Ctx<'a> {
                 let parked = (p.status & STOPPED != 0 && p.speed == 0) || p.order == OT_LOADING;
                 if !parked || {
                     let at = (self.s.train_position)(v);
-                    !(self.shared.safe_waiting_position)(v, at.tile, at.trackdir)
+                    // SAFETY: The reservation train remains live through this synchronous check.
+                    !unsafe {
+                        (self.shared.safe_waiting_position)(
+                            v,
+                            at.tile,
+                            at.trackdir,
+                            (self.shared.forbid_90_deg)(),
+                        )
+                    }
                 } {
                     w::hit(w::RAIL_CMD_SIGNAL_RESERVE);
                     (self.shared.try_path_reserve)(v, true, false);
@@ -1443,7 +1441,7 @@ impl<'a> Ctx<'a> {
         }
         let signals = if self.has_signal(tile, track) {
             let signals = (self.rail.present_signals)(tile) & SIGNAL_ON_TRACK[usize::from(track)];
-            sigvar = (self.rail.signal_variant)(tile, track);
+            sigvar = (self.rail.signal_variant)(tile, track).0;
             sigtype = self.signal_type(tile, track);
             if sigtype == SIGTYPE_ENTRY || sigtype == SIGTYPE_EXIT {
                 sigtype = SIGTYPE_BLOCK;
@@ -1626,7 +1624,7 @@ impl<'a> Ctx<'a> {
             return cost.error(self.s.strings.no_signals);
         }
         if self.current() != OWNER_WATER {
-            (self.s.tile_ownership)(cost.0, tile);
+            // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.            unsafe { (self.command.tile_ownership)(cost.0, tile) };
             if !cost.ok() {
                 return;
             }
@@ -1771,13 +1769,13 @@ impl<'a> Ctx<'a> {
             }
             _ => return false,
         }
-        let kind = (self.rail.rail_type)(tile);
+        let kind = (self.rail.rail_type)(tile).0;
         if kind == totype
             || ((self.s.disable_elrails)() && totype == RAILTYPE_RAIL && kind == RAILTYPE_ELECTRIC)
         {
             return false;
         }
-        (self.s.tile_ownership)(ret.0, tile);
+        // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.        unsafe { (self.command.tile_ownership)(ret.0, tile) };
         if !ret.ok() {
             error.take(ret);
             return false;
@@ -1786,9 +1784,9 @@ impl<'a> Ctx<'a> {
         if tt != MP_TUNNELBRIDGE {
             if !(self.s.compatible_rail)(kind, totype) {
                 if (self.shared.is_plain_rail)(tile) {
-                    (self.s.no_train)(ret.0, tile, self.tracks(tile));
+                    // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.                    unsafe { (self.command.no_train)(ret.0, tile, self.tracks(tile)) };
                 } else {
-                    (self.s.no_vehicle)(ret.0, tile);
+                    // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.                    unsafe { (self.command.no_vehicle)(ret.0, tile) };
                 }
                 if !ret.ok() {
                     error.take(ret);
@@ -1824,7 +1822,7 @@ impl<'a> Ctx<'a> {
         let convert = (self.s.rail_convert_cost)(kind, totype);
         match tt {
             MP_RAILWAY => {
-                if (self.rail.rail_tile_type)(tile) == RAIL_TILE_DEPOT {
+                if (self.rail.rail_tile_type)(tile).0 == RAIL_TILE_DEPOT {
                     if execute {
                         w::hit(w::RAIL_CMD_CONVERT_DEPOT);
                         let dir = (self.rail.rail_depot_direction)(tile).0;
@@ -1854,8 +1852,8 @@ impl<'a> Ctx<'a> {
                 {
                     return false;
                 }
-                if !(self.s.compatible_rail)((self.rail.rail_type)(tile), totype) {
-                    (self.s.wormhole_free)(ret.0, tile, endtile);
+                if !(self.s.compatible_rail)((self.rail.rail_type)(tile).0, totype) {
+                    // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.                    unsafe { (self.command.wormhole_free)(ret.0, tile, endtile, std::ptr::null()) };
                     if !ret.ok() {
                         error.take(ret);
                         return false;
@@ -1872,7 +1870,7 @@ impl<'a> Ctx<'a> {
                         .wrapping_add(2)
                         .wrapping_mul(TUNNELBRIDGE_TRACKBIT_FACTOR);
                     let owner = (self.shared.tile_owner)(tile);
-                    self.rail_infra(owner, (self.rail.rail_type)(tile), num.wrapping_neg());
+                    self.rail_infra(owner, (self.rail.rail_type)(tile).0, num.wrapping_neg());
                     self.rail_infra(owner, totype, num);
                     (self.s.infrastructure_dirty)(owner);
                     (self.rail.set_rail_type)(tile, totype);
@@ -1882,7 +1880,7 @@ impl<'a> Ctx<'a> {
                     (self.s.layout_changed)(tile, track);
                     (self.s.layout_changed)(endtile, track);
                     if (self.shared.is_bridge)(tile) {
-                        (self.s.bridge_dirty)(tile);
+                        (self.shared.mark_bridge_dirty)(tile);
                     } else {
                         (self.shared.mark_dirty)(tile);
                         (self.shared.mark_dirty)(endtile);
@@ -1922,12 +1920,12 @@ impl<'a> Ctx<'a> {
     /// `RemoveTrainDepot`.
     fn remove_depot(&self, cost: Cost<'_>, flags: u16, tile: u32) {
         if self.current() != OWNER_WATER {
-            (self.s.tile_ownership)(cost.0, tile);
+            // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.            unsafe { (self.command.tile_ownership)(cost.0, tile) };
             if !cost.ok() {
                 return;
             }
         }
-        (self.s.no_vehicle)(cost.0, tile);
+        // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.        unsafe { (self.command.no_vehicle)(cost.0, tile) };
         if !cost.ok() {
             return;
         }
@@ -1942,7 +1940,7 @@ impl<'a> Ctx<'a> {
                     (self.shared.free_train_reservation)(v);
                 }
             }
-            self.rail_infra(owner, (self.rail.rail_type)(tile), 1_u32.wrapping_neg());
+            self.rail_infra(owner, (self.rail.rail_type)(tile).0, 1_u32.wrapping_neg());
             (self.s.infrastructure_dirty)(owner);
             (self.s.delete_depot)(tile);
             (self.shared.clear_square)(tile);
@@ -1968,12 +1966,12 @@ impl<'a> Ctx<'a> {
                 self.s.strings.demolish_building
             });
         }
-        match (self.rail.rail_tile_type)(tile) {
+        match (self.rail.rail_tile_type)(tile).0 {
             RAIL_TILE_SIGNALS | RAIL_TILE_NORMAL => {
                 w::hit(w::RAIL_CMD_CLEAR_RAIL);
                 let tileh = (self.shared.tile_slope)(tile);
-                let water_ground =
-                    (self.rail.rail_ground)(tile) == GROUND_HALF_WATER && one_corner_raised(tileh);
+                let water_ground = (self.rail.rail_ground)(tile).0 == GROUND_HALF_WATER
+                    && one_corner_raised(tileh);
                 let mut tracks = self.tracks(tile);
                 while tracks != 0 {
                     let track = tracks.trailing_zeros() as u8;
@@ -1988,7 +1986,7 @@ impl<'a> Ctx<'a> {
                     && flags & BANKRUPT == 0
                     && (self.shared.company_valid)(self.current())
                 {
-                    (self.s.no_vehicle)(ret.0, tile);
+                    // SAFETY: The entry supplies live native cost slots and source-valid map/train inputs.                    unsafe { (self.command.no_vehicle)(ret.0, tile) };
                     if !ret.ok() {
                         return cost.take(ret);
                     }
@@ -2019,7 +2017,7 @@ impl<'a> Ctx<'a> {
         } else {
             1
         };
-        let railtype = (self.rail.rail_type)(tile);
+        let railtype = (self.rail.rail_type)(tile).0;
         self.rail_infra(old_owner, railtype, num.wrapping_neg());
         self.rail_infra(new_owner, railtype, num);
         if (self.rail.has_signals)(tile) {
@@ -2076,7 +2074,8 @@ impl<'a> Ctx<'a> {
         }
         cost.set(price(PR_BUILD_FOUNDATION));
         if tileh_old != tileh_new {
-            if (self.rail.rail_ground)(tile) == GROUND_HALF_WATER && one_corner_raised(tileh_old) {
+            if (self.rail.rail_ground)(tile).0 == GROUND_HALF_WATER && one_corner_raised(tileh_old)
+            {
                 cost.add_money(price(PR_CLEAR_WATER));
             }
             if flags & EXECUTE != 0 {
@@ -2091,8 +2090,8 @@ impl<'a> Ctx<'a> {
         let z_old = (self.shared.tile_z)(tile);
         if (self.shared.is_plain_rail)(tile) {
             let bits = self.tracks(tile);
-            let was_water =
-                (self.rail.rail_ground)(tile) == GROUND_HALF_WATER && one_corner_raised(tileh_old);
+            let was_water = (self.rail.rail_ground)(tile).0 == GROUND_HALF_WATER
+                && one_corner_raised(tileh_old);
             if was_water && (self.s.ship_on_tile)(tile) {
                 return cost.error(self.s.strings.ship_in_way);
             }

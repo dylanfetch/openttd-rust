@@ -3155,11 +3155,6 @@ static void RailConvert(OpenTTDCommandCost *out, uint16_t flags, uint32_t tile, 
 {
 	RailCost(out) = Command<CMD_CONVERT_RAIL>::Do(DoCommandFlags{flags}, TileIndex{tile}, TileIndex{area_start}, static_cast<RailType>(rt), diagonal);
 }
-static void RailTileOwnership(OpenTTDCommandCost *out, uint32_t tile) noexcept { RailCost(out) = CheckTileOwnership(TileIndex{tile}); }
-static void RailOwnership(OpenTTDCommandCost *out, uint8_t owner) noexcept { RailCost(out) = CheckOwnership(Owner(owner)); }
-static void RailNoVehicle(OpenTTDCommandCost *out, uint32_t tile) noexcept { RailCost(out) = EnsureNoVehicleOnGround(TileIndex{tile}); }
-static void RailNoTrain(OpenTTDCommandCost *out, uint32_t tile, uint8_t bits) noexcept { RailCost(out) = EnsureNoTrainOnTrackBits(TileIndex{tile}, static_cast<TrackBits>(bits)); }
-static void RailWormholeFree(OpenTTDCommandCost *out, uint32_t tile, uint32_t end) noexcept { RailCost(out) = TunnelBridgeIsFree(TileIndex{tile}, TileIndex{end}); }
 static bool RailShipOnTile(uint32_t tile) noexcept
 {
 	for (const Vehicle *v : VehiclesOnTile(TileIndex{tile})) {
@@ -3177,16 +3172,6 @@ static OpenTTDSlopeZ RailApplyFoundation(uint8_t f, uint8_t tileh) noexcept
 static OpenTTDRailTrainParking RailParking(Train *v) noexcept
 {
 	return {.track = v->GetTrack(), .status = RustVehicleStatus(v), .speed = RustVehicleSpeed(v), .order = RustVehicleOrderType(v)};
-}
-static OpenTTDNormalRoad RailNormalRoad(uint32_t tile) noexcept
-{
-	TileIndex t{tile};
-	return {.works = HasRoadWorks(t), .disallowed = GetDisallowedRoadDirections(t), .road_type = GetRoadTypeRoad(t), .tram_type = GetRoadTypeTram(t), .road_bits = GetRoadBits(t, RTT_ROAD), .tram_bits = GetRoadBits(t, RTT_TRAM)};
-}
-static OpenTTDCrossingRoad RailCrossingRoad(uint32_t tile) noexcept
-{
-	TileIndex t{tile};
-	return {.bits = GetCrossingRoadBits(t), .road_type = GetRoadTypeRoad(t), .tram_type = GetRoadTypeTram(t), .town = GetTownIndex(t).base(), .road_owner = GetRoadOwner(t, RTT_ROAD).base(), .tram_owner = GetRoadOwner(t, RTT_TRAM).base()};
 }
 static void RailMakeRoad(uint32_t tile, OpenTTDCrossingRoad r) noexcept
 {
@@ -3271,11 +3256,6 @@ const OpenTTDRailCommandServices &GetRustRailCommandServices() noexcept
 		.slope_z_in_corner = [](uint8_t tileh, uint8_t corner) noexcept -> int32_t { return GetSlopeZInCorner(static_cast<Slope>(tileh), static_cast<Corner>(corner)); },
 		.flooding = [](uint32_t tile) noexcept -> uint8_t { return GetFloodingBehaviour(TileIndex{tile}); },
 		.entrance_edge = [](uint32_t tile, int32_t z, uint8_t tileh, uint8_t dir) noexcept { return AutoslopeCheckForEntranceEdge(TileIndex{tile}, z, static_cast<Slope>(tileh), static_cast<DiagDirection>(dir)); },
-		.tile_ownership = RailTileOwnership,
-		.ownership = RailOwnership,
-		.no_vehicle = RailNoVehicle,
-		.no_train = RailNoTrain,
-		.wormhole_free = RailWormholeFree,
 		.ship_on_tile = RailShipOnTile,
 		.build_rail = RailBuildSingle,
 		.remove_rail = RailRemoveSingle,
@@ -3288,14 +3268,10 @@ const OpenTTDRailCommandServices &GetRustRailCommandServices() noexcept
 		.infrastructure_dirty = [](uint8_t owner) noexcept { DirtyCompanyInfrastructureWindows(CompanyID(owner)); },
 		.reserving_train = [](uint32_t tile, uint8_t track) noexcept { return GetTrainForReservation(TileIndex{tile}, static_cast<Track>(track)); },
 		.parking = RailParking,
-		.train_position = [](Train *v) noexcept -> OpenTTDRailTrainPosition { return {.tile = RustVehicleTile(v), .trackdir = v->GetVehicleTrackdir()}; },
+		.train_position = [](Train *v) noexcept -> OpenTTDRailTrainPosition { return {.tile = RustVehicleTile(v), .trackdir = GetRustSharedServices().train_trackdir(v)}; },
 		.layout_changed = [](uint32_t tile, uint8_t track) noexcept { YapfNotifyTrackLayoutChange(TileIndex{tile}, static_cast<Track>(track)); },
-		.update_crossing = [](uint32_t tile) noexcept { UpdateLevelCrossing(TileIndex{tile}, false); },
 		.mark_crossings = [](uint32_t tile, uint8_t axis) noexcept { MarkDirtyAdjacentLevelCrossingTiles(TileIndex{tile}, static_cast<Axis>(axis)); },
 		.crossing_removed = [](uint32_t tile, uint8_t axis) noexcept { UpdateAdjacentLevelCrossingTilesOnLevelCrossingRemoval(TileIndex{tile}, static_cast<Axis>(axis)); },
-		.normal_road = RailNormalRoad,
-		.tram_owner = [](uint32_t tile) noexcept { return GetRoadOwner(TileIndex{tile}, RTT_TRAM).base(); },
-		.crossing_road = RailCrossingRoad,
 		.make_crossing = RailMakeCrossing,
 		.make_road = RailMakeRoad,
 		.depot_available = []() noexcept { return Depot::CanAllocateItem(); },
@@ -3306,7 +3282,6 @@ const OpenTTDRailCommandServices &GetRustRailCommandServices() noexcept
 		.close_inspect = [](uint32_t tile) noexcept { DeleteNewGRFInspectWindow(GSF_RAILTYPES, tile); },
 		.make_shore = RailMakeShore,
 		.docking_check = RailDockingCheck,
-		.bridge_dirty = [](uint32_t tile) noexcept { MarkBridgeDirty(TileIndex{tile}); },
 		.area_begin = [](OpenTTDRailConvertFrame *frame, uint32_t start, uint32_t end, bool diagonal) noexcept { frame->iter = TileIterator::Create(TileIndex{start}, TileIndex{end}, diagonal); },
 		.area_tile = [](OpenTTDRailConvertFrame *frame) noexcept { return (**frame->iter).base(); },
 		.area_next = [](OpenTTDRailConvertFrame *frame) noexcept { ++(*frame->iter); },

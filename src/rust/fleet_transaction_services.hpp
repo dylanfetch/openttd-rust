@@ -27,7 +27,6 @@ static void FleetTransaction_cost_amount(void *out, int64_t amount) noexcept { G
 static bool FleetTransaction_success(void *out) noexcept { return GetRustCommandCostServices().success(RustCommandCost(static_cast<CommandCost *>(out))); }
 static uint32_t FleetTransaction_error(void *out) noexcept { return GetRustCommandCostServices().error_message(RustCommandCost(static_cast<CommandCost *>(out))); }
 static int64_t FleetTransaction_money(void *out) noexcept { return GetRustCommandCostServices().money(RustCommandCost(static_cast<CommandCost *>(out))); }
-static void FleetTransaction_ownership(void *out, uint8_t owner) noexcept { *static_cast<CommandCost *>(out) = CheckOwnership(CompanyID(owner)); }
 static bool FleetTransaction_rear(void *shell) noexcept { auto *v = static_cast<Vehicle *>(shell); return Train::From(v)->IsRearDualheaded(); }
 static bool FleetTransaction_articulated(void *shell) noexcept { auto *v = static_cast<Vehicle *>(shell); return v->IsArticulatedPart(); }
 static bool FleetTransaction_crashed(void *shell) noexcept { auto *v = static_cast<Vehicle *>(shell); return v->vehstatus.Test(VehState::Crashed); }
@@ -96,7 +95,7 @@ static const OpenTTDFleetTransactionServices _fleet_transaction_services{
 	.success = FleetTransaction_success,
 	.error = FleetTransaction_error,
 	.money = FleetTransaction_money,
-	.ownership = FleetTransaction_ownership,
+	.commands = &GetRustCommandServices(),
 	.rear = FleetTransaction_rear,
 	.articulated = FleetTransaction_articulated,
 	.crashed = FleetTransaction_crashed,

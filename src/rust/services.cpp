@@ -24,6 +24,7 @@
 #include "../core/random_func.hpp"
 #include "../depot_map.h"
 #include "../bridge.h"
+#include "../road_func.h"
 #include "../water_map.h"
 #include "../pbs.h"
 #include "../train.h"
@@ -32,6 +33,8 @@
 #include "../command_type.h"
 #include "../command_func.h"
 #include "../landscape_cmd.h"
+#include "../vehicle_func.h"
+#include "../tunnelbridge.h"
 #include "../town.h"
 #include "../timer/timer_game_calendar.h"
 #include "../safeguards.h"
@@ -75,9 +78,18 @@ static void LandscapeClear(OpenTTDCommandCost *out, uint32_t tile, uint16_t flag
 {
 	*NativeCost(out) = Command<CMD_LANDSCAPE_CLEAR>::Do(DoCommandFlags(flags), TileIndex{tile});
 }
+static void CommandTileOwnership(OpenTTDCommandCost *out, uint32_t tile) noexcept { *NativeCost(out) = CheckTileOwnership(TileIndex{tile}); }
+static void CommandOwnership(OpenTTDCommandCost *out, uint8_t owner) noexcept { *NativeCost(out) = CheckOwnership(Owner(owner)); }
+static void CommandNoVehicle(OpenTTDCommandCost *out, uint32_t tile) noexcept { *NativeCost(out) = EnsureNoVehicleOnGround(TileIndex{tile}); }
+static void CommandNoTrain(OpenTTDCommandCost *out, uint32_t tile, uint8_t bits) noexcept { *NativeCost(out) = EnsureNoTrainOnTrackBits(TileIndex{tile}, static_cast<TrackBits>(bits)); }
+static void CommandWormholeFree(OpenTTDCommandCost *out, uint32_t tile, uint32_t end, const Train *ignore) noexcept { *NativeCost(out) = TunnelBridgeIsFree(TileIndex{tile}, TileIndex{end}, ignore); }
 const OpenTTDCommandServices &GetRustCommandServices() noexcept
 {
-	static const OpenTTDCommandServices services{.landscape_clear = LandscapeClear};
+	static const OpenTTDCommandServices services{
+		.landscape_clear = LandscapeClear,
+		.tile_ownership = CommandTileOwnership, .ownership = CommandOwnership,
+		.no_vehicle = CommandNoVehicle, .no_train = CommandNoTrain, .wormhole_free = CommandWormholeFree,
+	};
 	return services;
 }
 
@@ -110,7 +122,7 @@ static void SharedMarkDirty(uint32_t tile) noexcept { MarkTileDirtyByTile(TileIn
 static void SharedClearSquare(uint32_t tile) noexcept { DoClearSquare(TileIndex{tile}); }
 static void SharedFreeTrainReservation(const Train *v) noexcept { FreeTrainTrackReservation(v); }
 static bool SharedTryPathReserve(Train *v, bool mark_as_stuck, bool first_tile_okay) noexcept { return TryPathReserve(v, mark_as_stuck, first_tile_okay); }
-static bool SharedSafeWaitingPosition(const Train *v, uint32_t tile, uint8_t trackdir) noexcept { return IsSafeWaitingPosition(v, TileIndex{tile}, static_cast<Trackdir>(trackdir), true, RustForbid90Deg()); }
+static bool SharedSafeWaitingPosition(const Train *v, uint32_t tile, uint8_t trackdir, bool forbid_90_deg) noexcept { return IsSafeWaitingPosition(v, TileIndex{tile}, static_cast<Trackdir>(trackdir), true, forbid_90_deg); }
 static void SharedSetTropicZone(uint32_t tile, uint8_t zone) noexcept { SetTropicZone(TileIndex{tile}, static_cast<TropicZone>(zone)); }
 
 /** Pure map query; no allocation, reentry or C++ exception crosses into Rust. */
@@ -170,6 +182,14 @@ static bool Shared_has_road_type(uint32_t tile) noexcept { return HasTileRoadTyp
 static uint8_t Shared_road_owner(uint32_t tile) noexcept { return GetRoadOwner(TileIndex{tile}, RTT_ROAD).base(); }
 static uint16_t Shared_town_index(uint32_t tile) noexcept { return GetTownIndex(TileIndex{tile}).base(); }
 static uint8_t Shared_road_bits(uint32_t tile, uint8_t type, bool straight) noexcept { return GetAnyRoadBits(TileIndex{tile}, static_cast<RoadTramType>(type), straight); }
+static void SharedUpdateLevelCrossing(uint32_t tile, bool sound) noexcept { UpdateLevelCrossing(TileIndex{tile}, sound); }
+static void SharedMarkBridgeDirty(uint32_t tile) noexcept { MarkBridgeDirty(TileIndex{tile}); }
+static Trackdir SharedTrainTrackdir(const Train *v) noexcept { return v->GetVehicleTrackdir(); }
+static bool SharedHasRoadWorks(uint32_t tile) noexcept { return HasRoadWorks(TileIndex{tile}); }
+static RoadType SharedTramType(uint32_t tile) noexcept { return GetRoadTypeTram(TileIndex{tile}); }
+static uint8_t SharedTramOwner(uint32_t tile) noexcept { return GetRoadOwner(TileIndex{tile}, RTT_TRAM).base(); }
+static RoadBits SharedNormalRoadBits(uint32_t tile, uint8_t type) noexcept { return GetRoadBits(TileIndex{tile}, static_cast<RoadTramType>(type)); }
+static RoadBits SharedCrossingRoadBits(uint32_t tile) noexcept { return GetCrossingRoadBits(TileIndex{tile}); }
 static uint32_t SharedMapMaxX() noexcept { return Map::MaxX(); }
 static uint32_t SharedMapMaxY() noexcept { return Map::MaxY(); }
 static uint8_t SharedPlaneSpeed() noexcept { return RustPlaneSpeed(); }
@@ -247,6 +267,15 @@ const OpenTTDSharedServices &GetRustSharedServices() noexcept
 		.free_train_reservation = SharedFreeTrainReservation,
 		.try_path_reserve = SharedTryPathReserve,
 		.safe_waiting_position = SharedSafeWaitingPosition,
+		.has_road_works = SharedHasRoadWorks,
+		.tram_type = SharedTramType,
+		.tram_owner = SharedTramOwner,
+		.normal_road_bits = SharedNormalRoadBits,
+		.crossing_road_bits = SharedCrossingRoadBits,
+		.forbid_90_deg = RustForbid90Deg,
+		.update_level_crossing = SharedUpdateLevelCrossing,
+		.mark_bridge_dirty = SharedMarkBridgeDirty,
+		.train_trackdir = SharedTrainTrackdir,
 	};
 	return services;
 }

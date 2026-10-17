@@ -353,7 +353,6 @@ pub struct Services {
     pub signal_tile: extern "C" fn(u32) -> SignalTile,
     pub has_signal_on_track: extern "C" fn(u32, u8) -> bool,
     pub add_track_to_signal_buffer: extern "C" fn(u32, u8, u8),
-    pub update_level_crossing: extern "C" fn(u32),
     pub update_signals_in_buffer: extern "C" fn(),
     pub add_airport_infrastructure: extern "C" fn(u8, u8),
     pub station_next_owned: extern "C" fn(u8, u32) -> u32,
@@ -1151,7 +1150,7 @@ fn transfer(s: &Services, old: u8, new: u8) {
                     }
                 }
             } else if t.crossing && t.owner == new {
-                (s.update_level_crossing)(tile);
+                (s.shared.update_level_crossing)(tile, true);
             }
         }
     }
@@ -2017,7 +2016,6 @@ pub fn abi_layout(type_id: u16, item: u8) -> usize {
             signal_tile,
             has_signal_on_track,
             add_track_to_signal_buffer,
-            update_level_crossing,
             update_signals_in_buffer,
             add_airport_infrastructure,
             station_next_owned,

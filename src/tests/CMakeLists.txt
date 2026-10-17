@@ -31,7 +31,6 @@ add_test_files(
     string_consumer.cpp
     string_consumer_bytes.cpp
     string_inplace.cpp
-    rail_command.cpp
     string_func.cpp
     test_main.cpp
     test_network_crypto.cpp

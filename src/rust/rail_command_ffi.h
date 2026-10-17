@@ -23,7 +23,6 @@ struct OpenTTDRailConvertFrame; ///< Caller-owned TileIterator and ordered affec
 struct OpenTTDSlopeZ { int32_t z; uint8_t slope; };
 struct OpenTTDRailTrainParking { uint8_t track; uint8_t status; uint16_t speed; uint8_t order; };
 struct OpenTTDRailTrainPosition { uint32_t tile; uint8_t trackdir; };
-struct OpenTTDNormalRoad { bool works; uint8_t disallowed, road_type, tram_type, road_bits, tram_bits; };
 struct OpenTTDCrossingRoad { uint8_t bits, road_type, tram_type; uint16_t town; uint8_t road_owner, tram_owner; };
 struct OpenTTDRailCommandStrings {
 	uint32_t impossible_combination, already_built, build_on_water, sloped_wrong, remove_signals_first;
@@ -55,11 +54,6 @@ struct OpenTTDRailCommandServices {
 	int32_t (*slope_z_in_corner)(uint8_t, uint8_t) noexcept;
 	uint8_t (*flooding)(uint32_t) noexcept;
 	bool (*entrance_edge)(uint32_t, int32_t, uint8_t, uint8_t) noexcept;
-	void (*tile_ownership)(OpenTTDCommandCost *, uint32_t) noexcept;
-	void (*ownership)(OpenTTDCommandCost *, uint8_t) noexcept;
-	void (*no_vehicle)(OpenTTDCommandCost *, uint32_t) noexcept;
-	void (*no_train)(OpenTTDCommandCost *, uint32_t, uint8_t) noexcept;
-	void (*wormhole_free)(OpenTTDCommandCost *, uint32_t, uint32_t) noexcept;
 	bool (*ship_on_tile)(uint32_t) noexcept;
 	void (*build_rail)(OpenTTDCommandCost *, uint16_t, uint32_t, uint8_t, uint8_t, bool) noexcept;
 	void (*remove_rail)(OpenTTDCommandCost *, uint16_t, uint32_t, uint8_t) noexcept;
@@ -74,12 +68,8 @@ struct OpenTTDRailCommandServices {
 	OpenTTDRailTrainParking (*parking)(Train *) noexcept;
 	OpenTTDRailTrainPosition (*train_position)(Train *) noexcept;
 	void (*layout_changed)(uint32_t, uint8_t) noexcept;
-	void (*update_crossing)(uint32_t) noexcept;
 	void (*mark_crossings)(uint32_t, uint8_t) noexcept;
 	void (*crossing_removed)(uint32_t, uint8_t) noexcept;
-	OpenTTDNormalRoad (*normal_road)(uint32_t) noexcept;
-	uint8_t (*tram_owner)(uint32_t) noexcept;
-	OpenTTDCrossingRoad (*crossing_road)(uint32_t) noexcept;
 	void (*make_crossing)(uint32_t, uint8_t, uint8_t, uint8_t, uint8_t, uint8_t, uint8_t, uint8_t, uint16_t) noexcept;
 	void (*make_road)(uint32_t, OpenTTDCrossingRoad) noexcept;
 	bool (*depot_available)() noexcept;
@@ -90,7 +80,6 @@ struct OpenTTDRailCommandServices {
 	void (*close_inspect)(uint32_t) noexcept;
 	void (*make_shore)(uint32_t) noexcept;
 	void (*docking_check)(uint32_t) noexcept;
-	void (*bridge_dirty)(uint32_t) noexcept;
 	void (*area_begin)(OpenTTDRailConvertFrame *, uint32_t, uint32_t, bool) noexcept;
 	uint32_t (*area_tile)(OpenTTDRailConvertFrame *) noexcept;
 	void (*area_next)(OpenTTDRailConvertFrame *) noexcept;

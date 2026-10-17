@@ -106,7 +106,6 @@ struct OpenTTDTrainReservationLeaves {
 	uint64_t (*is_tunnel)(void *, OpenTTDTrainHandle, uint32_t) noexcept;
 	uint64_t (*is_waypoint)(void *, OpenTTDTrainHandle, uint32_t) noexcept;
 	uint64_t (*line_reverse)(void *, OpenTTDTrainHandle) noexcept;
-	void (*mark_bridge)(void *, OpenTTDTrainHandle, uint32_t) noexcept;
 	void (*mark_tile)(void *, OpenTTDTrainHandle, uint32_t) noexcept;
 	uint64_t (*needs_service)(void *, OpenTTDTrainHandle) noexcept;
 	uint64_t (*oneway)(void *, OpenTTDTrainHandle, uint32_t, uint8_t) noexcept;

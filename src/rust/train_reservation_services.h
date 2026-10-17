@@ -6,6 +6,7 @@
 	*/
 
 #include "services_ffi.h"
+#include "command_services.h"
 #include "services_rail.h"
 
 /** @file train_reservation_services.h Direct map/PBS/follower services. */
@@ -147,11 +148,6 @@ static uint64_t TrainReservationLineReverse(void *, OpenTTDTrainHandle) noexcept
 {
 	return _settings_game.difficulty.line_reverse_mode;
 }
-static void TrainReservationMarkBridge(void *, OpenTTDTrainHandle, uint32_t a) noexcept
-{
-	TileIndex t(static_cast<uint32_t>(a));
-	MarkBridgeDirty(t);
-}
 static uint64_t TrainReservationNeedsService(void *, OpenTTDTrainHandle id) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
@@ -280,7 +276,7 @@ static uint64_t TrainReservationTileOffset(void *, OpenTTDTrainHandle, uint8_t a
 static uint64_t TrainReservationTrackdir(void *, OpenTTDTrainHandle id) noexcept
 {
 	Train *v = static_cast<Train *>(id.shell);
-	return v->GetVehicleTrackdir();
+	return GetRustSharedServices().train_trackdir(v);
 }
 static uint64_t TrainReservationTrackStatus(void *, OpenTTDTrainHandle, uint32_t a) noexcept
 {
@@ -295,7 +291,9 @@ static uint64_t TrainReservationTunnelFree(void *, OpenTTDTrainHandle id, uint32
 {
 	Train *v = static_cast<Train *>(id.shell);
 	TileIndex t(static_cast<uint32_t>(a));
-	return TunnelBridgeIsFree(t, TileIndex(static_cast<uint32_t>(b)), v).Succeeded();
+	CommandCost result;
+	GetRustCommandServices().wormhole_free(RustCommandCost(&result), t.base(), b, v);
+	return result.Succeeded();
 }
 static void TrainReservationUnreserve(void *, OpenTTDTrainHandle, uint32_t a, uint8_t b) noexcept
 {

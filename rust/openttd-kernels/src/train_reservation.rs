@@ -175,7 +175,6 @@ pub struct Leaves {
     pub is_tunnel: extern "C" fn(*mut std::ffi::c_void, Handle, u32) -> u64,
     pub is_waypoint: extern "C" fn(*mut std::ffi::c_void, Handle, u32) -> u64,
     pub line_reverse: extern "C" fn(*mut std::ffi::c_void, Handle) -> u64,
-    pub mark_bridge: extern "C" fn(*mut std::ffi::c_void, Handle, u32),
     pub mark_tile: extern "C" fn(*mut std::ffi::c_void, Handle, u32),
     pub needs_service: extern "C" fn(*mut std::ffi::c_void, Handle) -> u64,
     pub oneway: extern "C" fn(*mut std::ffi::c_void, Handle, u32, u8) -> u64,
@@ -367,10 +366,6 @@ impl Game<'_> {
     }
     fn svc_line_reverse(&self, id: Handle) -> u64 {
         (self.leaves.line_reverse)(self.context, id)
-    }
-    fn svc_mark_bridge(&self, id: Handle, a: u64) -> u64 {
-        (self.leaves.mark_bridge)(self.context, id, a as u32);
-        0
     }
     fn svc_mark_tile(&self, id: Handle, a: u64) -> u64 {
         (self.leaves.mark_tile)(self.context, id, a as u32);
@@ -619,7 +614,7 @@ fn clear(g: &Game, id: Handle, tile: u32, td: u8) {
                 g.svc_set_tunnel(id, u64::from(end), 0);
                 if g.svc_show_res(id) != 0 {
                     if g.svc_is_bridge(id, u64::from(tile)) != 0 {
-                        g.svc_mark_bridge(id, u64::from(tile));
+                        (g.shared().mark_bridge_dirty)(tile);
                     } else {
                         g.svc_mark_tile(id, u64::from(tile));
                         g.svc_mark_tile(id, u64::from(end));
@@ -758,7 +753,15 @@ fn extend(g: &Game, id: Handle, new_tracks: &mut u8, enterdir: &mut u8) -> Pbs {
         tile = ft.new_tile;
         td = first(ft.dirs);
         let rev = td ^ 8;
-        if (g.shared().safe_waiting_position)(id.shell.cast(), tile, td) {
+        // SAFETY: The entry keeps the native train live; no owner borrow spans the callback.
+        if unsafe {
+            (g.shared().safe_waiting_position)(
+                id.shell.cast(),
+                tile,
+                td,
+                (g.shared().forbid_90_deg)(),
+            )
+        } {
             if !((g.svc_free(id, u64::from(tile), u64::from(td)) != 0)
                 && g.reserve_bounded(id, tile, td))
             {
@@ -1041,7 +1044,15 @@ fn choose(
         return (best, got);
     }
     got = true;
-    while !(g.shared().safe_waiting_position)(id.shell.cast(), dest.tile, dest.td) {
+    // SAFETY: The entry keeps the native train live through reservation traversal.
+    while !unsafe {
+        (g.shared().safe_waiting_position)(
+            id.shell.cast(),
+            dest.tile,
+            dest.td,
+            (g.shared().forbid_90_deg)(),
+        )
+    } {
         let exit = g.dir(id, dest.td);
         let next = g.add(id, dest.tile, exit);
         let mut reachable = tracks(g.svc_track_status(id, u64::from(next)) as u16)
@@ -1457,7 +1468,6 @@ mod tests {
             is_tunnel: unused!((*mut std::ffi::c_void, Handle, u32); u64),
             is_waypoint: unused!((*mut std::ffi::c_void, Handle, u32); u64),
             line_reverse: unused!((*mut std::ffi::c_void, Handle); u64),
-            mark_bridge: unused!((*mut std::ffi::c_void, Handle, u32); ()),
             mark_tile: unused!((*mut std::ffi::c_void, Handle, u32); ()),
             needs_service: unused!((*mut std::ffi::c_void, Handle); u64),
             oneway: unused!((*mut std::ffi::c_void, Handle, u32, u8); u64),
@@ -1577,7 +1587,7 @@ mod tests {
             1
         }
     }
-    extern "C" fn safe(v: *const crate::services::Train, tile: u32, _: u8) -> bool {
+    extern "C" fn safe(v: *const crate::services::Train, tile: u32, _: u8, _: bool) -> bool {
         // SAFETY: The train shell is the live mock for this synchronous scalar callback.
         unsafe { (*v.cast::<Mock>()).stop == 2 && tile == 2 }
     }

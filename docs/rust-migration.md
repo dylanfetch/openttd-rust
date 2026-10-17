@@ -1417,32 +1417,23 @@ source comparisons and final-head CI/speed results.
 
 ### Rail track, depot and signal commands (#265)
 
-Rust (`rail_cmd.rs`) owns the following, with test/execute partial effects, error order and costs:
+Rust (`rail_cmd.rs`) owns single-track build/remove and drag, depot build/removal,
+single/drag signal commands and autofill, rail conversion, and rail tile clear,
+owner-change, autoslope/terraform and build-above policy. Test/execute partial
+effects, error precedence, costs and wrapping remain source-ordered; none draws RNG.
+Original bodies remain portable-only.
 
-- `CmdBuild/RemoveSingleRail` and the rail drag helper;
-- train depot build and removal;
-- single signal build/remove, autofill and the signal drag helper;
-- `CmdConvertRail`;
-- the rail clear, owner change, terraform/autoslope and build-above tile procs.
+C++ retains stack `CommandCost` slots, nested commands, crossing/depot map writes,
+PBS, and the conversion iterator/ordered affected-train list. Shared command checks
+serve rail, fleet and industry; canonical road/rail map services supply reads.
+Shared services also provide slope settings, `DoClearSquare` for trees/rail,
+reservation release/path requests and one safe-waiting service for train/YAPF/rail.
+Native enum return types retain their widths through transparent Rust carriers.
+No owner borrow spans reentry. Rail tile loops, track status and drawing stay native.
 
-No entry draws Random. C++ keeps a thin facade and one typed `noexcept` table (ABI 980-985) for:
-
-- `CommandCost` slots and nested commands;
-- ownership and vehicle checks;
-- PBS reservations;
-- crossing, road and depot map writes;
-- the conversion `TileIterator` and affected-train list.
-
-Rail map leaves extend the shared `OpenTTDRailMapServices`. `build_on_slopes` and `AutoslopeEnabled` live in `OpenTTDSharedServices` for town, industry and rail, `DoClearSquare` for trees and rail, and `FreeTrainTrackReservation`, `TryPathReserve` and `IsSafeWaitingPosition` for rail commands, trains and train reservation. `TileLoop_Track`/`FloodHalftile`, track status and drawing stay native.
-
-`python3 tools/migration.py simulate signals-rail-commands --jobs 2` compares every command result, the semantic saves and the required `rail_cmd.*` witnesses. It covers:
-
-- drags with obstacles;
-- crossings, depots and slopes;
-- signal cycle/convert/copy/autofill through a bridge;
-- conversion including stations, bridges, crossings and reroutes;
-- clearing and terraforming;
-- merger transfer and company deletion;
-- live reservations.
-
-Coast/half-tile water and PBS path-end removal remain #156 gaps.
+`python3 tools/migration.py simulate signals-rail-commands --jobs 2` compares
+command results, semantic saves and required `rail_cmd.*` witnesses: obstacle drags,
+crossings/depots/slopes, signal cycling/conversion/copy/autofill through a bridge,
+conversion/reroutes, clearing/terraforming, company transfer/deletion and reservations.
+Coast/half-tile water and PBS path-end removal remain #156 gaps. PR #270 records
+exact-head checks and outstanding full-simulation, speed and CI gates.
