@@ -20,7 +20,6 @@ using OpenTTDNativeCargoPayment = CargoPayment;
 #else
 #define OPENTTD_CARGO_CALL
 #endif
-struct OpenTTDCargoPayment;
 struct OpenTTDCargoDelivery;
 struct OpenTTDCargoSpec {
 	int64_t payment;
@@ -30,6 +29,11 @@ struct OpenTTDCargoPaymentFields {
 	void *front;
 	int64_t route_profit, visual_profit, visual_transfer;
 };
+/* Rust-allocated repr(C) payment (ABI layout 60); C++ aliases address fields in place. */
+struct OpenTTDCargoPayment {
+	OpenTTDCargoPaymentFields fields;
+	uint16_t station;
+};
 /* All leaves are synchronous noexcept, cannot reenter payment/delivery owners,
  * retain arguments or destroy the world objects supplied by the caller. NewGRF
  * resolvers execute sprite-group programs rather than script VMs; cargo profit,
@@ -37,14 +41,14 @@ struct OpenTTDCargoPaymentFields {
  * not invoke arbitrary game commands or mutate payment/destination storage.
  * Pool/world pointers are opaque handles, never Rust references. Returned fields
  * are copied scalars. Environmental exceptions terminate inside the wrappers.
- * Save/load operates on call-local Fields staging outside Rust (including errors
- * and pointer fixups); import/export do not run simulation. Panics abort.
+ * Save/load and pointer fixups write the fields in place between Rust calls and
+ * do not run simulation. Panics abort.
  * Money add/sub/neg/multiply saturate; shifts retain the source bit operations.
  * Each shell owns exactly one new/destroy payment; the delivery owner is process
  * lifetime. Calls are serialized, with live nonnull owner/table/output pointers
  * and exclusive mutation access. Every function-table entry must be nonnull and
  * have the declared native C ABI; destroy permits a null table only when cleaning.
- * Import/export copy the unresolved front reference without dereferencing it.
+ * Rust never dereferences a front reference that load has not yet fixed up.
  * Integer argument widths, slot bounds and pool lifetimes are caller preconditions.
  */
 /* Leaf selectors: station read0 owner,1 always-accepted(cargo); industry read
@@ -78,8 +82,6 @@ struct OpenTTDCargoServices {
 extern "C" {
 OpenTTDCargoPayment *OPENTTD_CARGO_CALL openttd_rust_cargo_payment_new(void *, uint16_t);
 void OPENTTD_CARGO_CALL openttd_rust_cargo_payment_destroy(OpenTTDCargoPayment *, const OpenTTDCargoServices *, uint8_t);
-void OPENTTD_CARGO_CALL openttd_rust_cargo_payment_export(const OpenTTDCargoPayment *, OpenTTDCargoPaymentFields *);
-void OPENTTD_CARGO_CALL openttd_rust_cargo_payment_import(OpenTTDCargoPayment *, const OpenTTDCargoPaymentFields *);
 void *OPENTTD_CARGO_CALL openttd_rust_cargo_payment_front(const OpenTTDCargoPayment *);
 void OPENTTD_CARGO_CALL openttd_rust_cargo_payment_afterload(OpenTTDCargoPayment *, const OpenTTDCargoServices *);
 int64_t OPENTTD_CARGO_CALL openttd_rust_cargo_payment_transfer(OpenTTDCargoPayment *, const OpenTTDCargoServices *, uint8_t, const void *, uint32_t, uint32_t, uint16_t);

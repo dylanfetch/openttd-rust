@@ -244,8 +244,7 @@ struct CAPAChunkHandler : ChunkHandler {
 		for (CargoPacket *cp : CargoPacket::Iterate()) {
 			SlSetArrayIndex(cp->index);
 #ifdef WITH_RUST
-			auto fields = cp->Export();
-			SlObject(&fields, GetCargoPacketDesc());
+			SlObject(static_cast<OpenTTDCargoPacketFields *>(cp->RustOwner()), GetCargoPacketDesc());
 #else
 			SlObject(cp, GetCargoPacketDesc());
 #endif
@@ -261,9 +260,7 @@ struct CAPAChunkHandler : ChunkHandler {
 		while ((index = SlIterateArray()) != -1) {
 			CargoPacket *cp = new (CargoPacketID(index)) CargoPacket();
 #ifdef WITH_RUST
-			auto fields = cp->Export();
-			SlObject(&fields, slt);
-			cp->Import(fields);
+			SlObject(static_cast<OpenTTDCargoPacketFields *>(cp->RustOwner()), slt);
 #else
 			SlObject(cp, slt);
 #endif

@@ -150,9 +150,7 @@ static int CheckCargoDestinationGap(OpenTTDCargoServices s)
 			spec = {Money(6000), {20, 20}, true, false, {false}};
 			openttd_rust_cargo_payment_final(payment, delivery, &s, 1, nullptr, 12, 250, 45, 7);
 			openttd_rust_cargo_payment_final(payment, delivery, &s, 1, nullptr, 3, 250, 45, 7);
-			OpenTTDCargoPaymentFields fields{};
-			openttd_rust_cargo_payment_export(payment, &fields);
-			if (fields.route_profit != (GetTransportedGoodsIncome(12, 250, 45, 1) + GetTransportedGoodsIncome(3, 250, 45, 1)).base() || accepted != 15) return 2;
+			if (payment->fields.route_profit != (GetTransportedGoodsIncome(12, 250, 45, 1) + GetTransportedGoodsIncome(3, 250, 45, 1)).base() || accepted != 15) return 2;
 			openttd_rust_cargo_delivery_flush(delivery, &s);
 			if (destination_industries != expected || destination_events != events) return 3;
 			openttd_rust_cargo_delivery_flush(delivery, &s);
