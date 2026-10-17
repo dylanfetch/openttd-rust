@@ -7,7 +7,12 @@
 
 //! Live base-vehicle scheduling prototype. Owners stay opaque and call-local;
 //! no Rust world/owner reference survives a service that can mutate or reenter.
-#![allow(unsafe_code, clippy::too_many_lines, clippy::verbose_bit_mask)]
+#![allow(
+    unsafe_code,
+    clippy::too_many_lines,
+    clippy::verbose_bit_mask,
+    clippy::cast_ptr_alignment
+)]
 use super::{CALLBACK_FAILED, VS_CRASHED, VS_HIDDEN, VS_STOPPED, VehicleRef};
 use crate::{cargo_storage, fleet, station_service};
 
@@ -83,6 +88,7 @@ pub struct Tables {
     pub pending: *const fleet::pending::Services,
     pub transaction: *const fleet::transactions::Services,
     pub group: *const fleet::GroupServices,
+    pub raw: *const RawServices,
 }
 // Select counted/plain implementations once at entry. In the plain monomorph,
 // COUNTED=false erases every new per-visit witness branch/load/update.
@@ -327,6 +333,157 @@ unsafe fn post_tick<const COUNTED: bool>(
     }
 }
 
+// #274 throwaway measurement. Metadata describes actual fields in the current
+// native binary, never a Rust Vehicle/bitset/container layout or a world reference.
+#[repr(C)]
+pub struct ReadLayout {
+    pub period: usize,
+    pub counter: usize,
+    pub motion: usize,
+    pub speed: usize,
+    pub kind: usize,
+    pub subtype: usize,
+    pub tick: usize,
+    pub status: usize,
+    pub first: usize,
+}
+#[repr(C)]
+pub struct RawServices {
+    pub layout: ReadLayout,
+    pub tick: unsafe extern "C" fn(VehicleRef) -> bool,
+    pub write_counter: unsafe extern "C" fn(VehicleRef, u16),
+    pub write_motion: unsafe extern "C" fn(VehicleRef, u32),
+}
+/// Constructor is the surviving Tick and its original native lifetime rules.
+/// C++ pins offset, width, alignment and bitset storage identity. A field access
+/// completes here before any callback; this never creates a Vehicle reference.
+unsafe fn raw_read<T: Copy, const COUNTED: bool>(v: VehicleRef, offset: usize) -> T {
+    unsafe { scalar_read::<T, COUNTED>(v.0.as_ptr().cast::<u8>().add(offset).cast::<T>()) }
+}
+
+unsafe fn raw_post_tick<const COUNTED: bool>(
+    schedule: &PostTickServices,
+    raw: &RawServices,
+    vehicle: VehicleRef,
+) {
+    if COUNTED {
+        crate::witness::hit(crate::witness::VEHICLE_POST_TICK);
+    }
+    let layout = &raw.layout;
+    let vehicle_type = unsafe { raw_read::<VehicleType, COUNTED>(vehicle, layout.kind) };
+    if COUNTED {
+        crate::witness::hit(
+            crate::witness::VEHICLE_VISITS
+                + match vehicle_type.0 {
+                    0..=6 => usize::from(vehicle_type.0),
+                    _ => 7,
+                },
+        );
+    }
+    if vehicle_type.0 > AIRCRAFT.0 {
+        return;
+    }
+    // As the previous named bundle, First is acquired only after Tick survives.
+    let front = unsafe { raw_read::<VehicleRef, COUNTED>(vehicle, layout.first) };
+    let period = unsafe { raw_read::<u16, COUNTED>(vehicle, layout.period) };
+    if period != 0 {
+        let counter = unsafe { raw_read::<u16, COUNTED>(vehicle, layout.counter) }.min(period);
+        unsafe {
+            (raw.write_counter)(vehicle, counter);
+        }
+        let counter = counter.wrapping_sub(1);
+        unsafe {
+            (raw.write_counter)(vehicle, counter);
+        }
+        if COUNTED {
+            crate::witness::add(crate::witness::VEHICLE_CROSSINGS, 2);
+            crate::witness::add(crate::witness::VEHICLE_SCALAR_WRITE_BYTES, 4);
+        }
+        if counter == 0 {
+            let owner = post_svc!(
+                COUNTED,
+                crate::witness::VEHICLE_CARGO_OWNER,
+                schedule.cargo_owner,
+                vehicle
+            );
+            if COUNTED {
+                crate::witness::hit(crate::witness::VEHICLE_CARGO_AGES);
+            }
+            unsafe {
+                cargo_storage::age::<COUNTED>(owner, schedule.cargo);
+            }
+            let period = unsafe { raw_read::<u16, COUNTED>(vehicle, layout.period) };
+            unsafe {
+                (raw.write_counter)(vehicle, period);
+            }
+            if COUNTED {
+                crate::witness::hit(crate::witness::VEHICLE_CROSSINGS);
+                crate::witness::add(crate::witness::VEHICLE_SCALAR_WRITE_BYTES, 2);
+            }
+        }
+    }
+    let front_status = unsafe { raw_read::<u8, COUNTED>(front, layout.status) };
+    if front_status & VS_CRASHED != 0 {
+        return;
+    }
+    if unsafe { raw_read::<u8, COUNTED>(vehicle, layout.status) } & VS_HIDDEN != 0 {
+        return;
+    }
+    if unsafe { raw_read::<u8, COUNTED>(front, layout.status) } & VS_STOPPED != 0
+        && (unsafe { raw_read::<VehicleType, COUNTED>(front, layout.kind) } != TRAIN
+            || unsafe { raw_read::<u16, COUNTED>(front, layout.speed) } == 0)
+    {
+        return;
+    }
+    if COUNTED {
+        crate::witness::hit(crate::witness::VEHICLE_MOTION);
+    }
+    let speed = unsafe { raw_read::<u16, COUNTED>(front, layout.speed) };
+    let counter =
+        unsafe { raw_read::<u32, COUNTED>(vehicle, layout.motion) }.wrapping_add(u32::from(speed));
+    unsafe {
+        (raw.write_motion)(vehicle, counter);
+    }
+    if COUNTED {
+        crate::witness::hit(crate::witness::VEHICLE_CROSSINGS);
+        crate::witness::add(crate::witness::VEHICLE_SCALAR_WRITE_BYTES, 4);
+    }
+    match vehicle_type {
+        TRAIN if unsafe { raw_read::<u8, COUNTED>(vehicle, layout.subtype) } & ENGINE == 0 => {
+            return;
+        }
+        ROAD if unsafe { raw_read::<u8, COUNTED>(vehicle, layout.subtype) } & FRONT == 0 => return,
+        AIRCRAFT
+            if unsafe { raw_read::<u8, COUNTED>(vehicle, layout.subtype) } > NORMAL_AIRCRAFT =>
+        {
+            return;
+        }
+        _ => {}
+    }
+    if unsafe { raw_read::<u32, COUNTED>(vehicle, layout.motion) } & 0xff < u32::from(speed) {
+        post_svc!(
+            COUNTED,
+            crate::witness::VEHICLE_RUNNING_SOUND,
+            schedule.running_sound,
+            vehicle
+        );
+    }
+    // Running sound may mutate these fields: read each only after it returns.
+    if unsafe { raw_read::<u8, COUNTED>(vehicle, layout.tick) } & 15 == 0 {
+        let running = unsafe { raw_read::<u16, COUNTED>(front, layout.speed) } > 0
+            && unsafe { raw_read::<u8, COUNTED>(front, layout.status) }
+                & (VS_STOPPED | TRAIN_SLOWING)
+                == 0;
+        post_svc!(
+            COUNTED,
+            crate::witness::VEHICLE_PERIODIC_SOUND,
+            schedule.periodic_sound,
+            vehicle,
+            running
+        );
+    }
+}
+
 /// # Safety
 /// Immutable native tables and serialized pools remain valid until return.
 /// No selected callback resets pools, loads a game or yields the game-state mutex.
@@ -356,9 +513,21 @@ pub unsafe extern "C" fn openttd_rust_vehicle_ticks(
     cost: *mut (),
 ) {
     if crate::witness::enabled() {
-        unsafe { run_ticks::<true>(&*tables, normal, date_fract, cost) };
+        unsafe {
+            if (*tables).raw.is_null() {
+                run_ticks::<true, false>(&*tables, normal, date_fract, cost);
+            } else {
+                run_ticks::<true, true>(&*tables, normal, date_fract, cost);
+            }
+        };
     } else {
-        unsafe { run_ticks::<false>(&*tables, normal, date_fract, cost) };
+        unsafe {
+            if (*tables).raw.is_null() {
+                run_ticks::<false, false>(&*tables, normal, date_fract, cost);
+            } else {
+                run_ticks::<false, true>(&*tables, normal, date_fract, cost);
+            }
+        };
     }
 }
 // The native RAII scope invokes this synchronous callback without retaining it.
@@ -386,7 +555,7 @@ unsafe extern "C" fn load_stations<const COUNTED: bool>(tables: *const Tables) {
         };
     }
 }
-unsafe fn run_ticks<const COUNTED: bool>(
+unsafe fn run_ticks<const COUNTED: bool, const RAW: bool>(
     tables: &Tables,
     normal: bool,
     date_fract: usize,
@@ -425,7 +594,12 @@ unsafe fn run_ticks<const COUNTED: bool>(
             // The bundle is written only on survival and read only after the assertion.
             let mut bundle = std::mem::MaybeUninit::<PostTick>::uninit();
             // SAFETY: bundle is aligned writable storage, unused until success.
-            let survives = unsafe { svc!(COUNTED, s.tick, vehicle, bundle.as_mut_ptr()) };
+            let survives = if RAW {
+                // SAFETY: Entry-live table, no shell reference spans Tick.
+                unsafe { svc!(COUNTED, (*tables.raw).tick, vehicle) }
+            } else {
+                unsafe { svc!(COUNTED, s.tick, vehicle, bundle.as_mut_ptr()) }
+            };
             if s.assertions {
                 let _ = unsafe { extent::<COUNTED>(s, &mut pool) };
                 let actual = unsafe { scalar_read::<_, COUNTED>(pool.slots.add(current_id)) };
@@ -437,14 +611,18 @@ unsafe fn run_ticks<const COUNTED: bool>(
                 }
                 continue;
             }
-            if COUNTED {
-                crate::witness::add(
-                    crate::witness::VEHICLE_OBSERVED_BYTES,
-                    std::mem::size_of::<PostTick>() as u64,
-                );
+            if RAW {
+                unsafe { raw_post_tick::<COUNTED>(&post, &*tables.raw, vehicle) };
+            } else {
+                if COUNTED {
+                    crate::witness::add(
+                        crate::witness::VEHICLE_OBSERVED_BYTES,
+                        std::mem::size_of::<PostTick>() as u64,
+                    );
+                }
+                // SAFETY: A surviving legacy fixture Tick initialized its bundle.
+                unsafe { post_tick::<COUNTED>(&post, vehicle, bundle.assume_init_ref()) };
             }
-            // SAFETY: a surviving Tick initialized every bundle field.
-            unsafe { post_tick::<COUNTED>(&post, vehicle, bundle.assume_init_ref()) };
         }
     } // Every pool/scalar descriptor is discarded before commands in fleet drain.
     unsafe {

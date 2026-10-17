@@ -375,6 +375,30 @@ static bool OPENTTD_VEHICLE_CALL VehicleSchedulerTick(OpenTTDVehicle *shell, Ope
 	*out = {.type = type, .period = RustVehicleCargoPeriodAddress(v), .counter = RustVehicleCargoCounterAddress(v), .motion = RustVehicleMotionAddress(v), .speed = RustVehicleSpeedAddress(front), .front_type = RustVehicleVehicleTypeAddress(front), .subtype = RustVehicleSubtypeAddress(v), .tick = RustVehicleTickAddress(v), .front_status = RustVehicleStatusAddress(front), .status = RustVehicleStatusAddress(v)};
 	return true;
 }
+// GCC/Clang's supported non-standard-layout offsetof extension is deliberately
+// local to this measurement. No STL or bitset layout cast crosses the boundary.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Winvalid-offsetof"
+struct OpenTTDVehicleReadOffsets {
+	static OpenTTDVehicleReadLayout Acquire() noexcept
+	{
+		static_assert(sizeof(decltype(Vehicle::cargo_age_counter)) == sizeof(uint16_t));
+		static_assert(sizeof(decltype(Vehicle::motion_counter)) == sizeof(uint32_t));
+		static_assert(sizeof(decltype(Vehicle::cur_speed)) == sizeof(uint16_t));
+		static_assert(sizeof(decltype(Vehicle::type)) == sizeof(uint8_t));
+		static_assert(std::is_same_v<decltype(std::declval<VehStates>().base_address()), const uint8_t *>);
+		return {.period = offsetof(Vehicle, vcache) + offsetof(VehicleCache, cached_cargo_age_period), .counter = offsetof(Vehicle, cargo_age_counter), .motion = offsetof(Vehicle, motion_counter), .speed = offsetof(Vehicle, cur_speed), .kind = offsetof(Vehicle, type), .subtype = offsetof(Vehicle, subtype), .tick = offsetof(Vehicle, tick_counter), .status = offsetof(Vehicle, vehstatus) + VehStates::base_offset(), .first = offsetof(Vehicle, first)};
+	}
+};
+#pragma GCC diagnostic pop
+static bool OPENTTD_VEHICLE_CALL VehicleRawTick(OpenTTDVehicle *shell) noexcept { return VehicleOf(shell)->Tick(); }
+static void OPENTTD_VEHICLE_CALL VehicleRawWriteCounter(OpenTTDVehicle *shell, uint16_t value) noexcept { *RustVehicleCargoCounterAddress(VehicleOf(shell)) = value; }
+static void OPENTTD_VEHICLE_CALL VehicleRawWriteMotion(OpenTTDVehicle *shell, uint32_t value) noexcept { *RustVehicleMotionAddress(VehicleOf(shell)) = value; }
+const OpenTTDVehicleRawServices &GetRustVehicleRawServices() noexcept
+{
+	static const OpenTTDVehicleRawServices services{.layout = OpenTTDVehicleReadOffsets::Acquire(), .tick = VehicleRawTick, .write_counter = VehicleRawWriteCounter, .write_motion = VehicleRawWriteMotion};
+	return services;
+}
 static void OPENTTD_VEHICLE_CALL VehicleSchedulerCalendarDay(OpenTTDVehicle *shell) noexcept { VehicleOf(shell)->OnNewCalendarDay(); }
 static void OPENTTD_VEHICLE_CALL VehicleSchedulerEconomyDay(OpenTTDVehicle *shell) noexcept { VehicleOf(shell)->OnNewEconomyDay(); }
 static OpenTTDCargoList *OPENTTD_VEHICLE_CALL VehicleSchedulerCargoOwner(OpenTTDVehicle *shell) noexcept { return RustVehicleCargoOwner(VehicleOf(shell)); }

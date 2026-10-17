@@ -252,6 +252,16 @@ struct OpenTTDVehicleSchedulerServices {
 	void (OPENTTD_VEHICLE_CALL *with_loading_timer)(const OpenTTDVehicleSchedulerTables *, void (OPENTTD_VEHICLE_CALL *)(const OpenTTDVehicleSchedulerTables *)) noexcept;
 	void (OPENTTD_VEHICLE_CALL *reset_accumulators)() noexcept;
 };
+struct OpenTTDVehicleReadLayout {
+	size_t period, counter, motion, speed, kind, subtype, tick, status, first;
+};
+struct OpenTTDVehicleRawServices {
+	OpenTTDVehicleReadLayout layout;
+	bool (OPENTTD_VEHICLE_CALL *tick)(OpenTTDVehicle *) noexcept;
+	void (OPENTTD_VEHICLE_CALL *write_counter)(OpenTTDVehicle *, uint16_t) noexcept;
+	void (OPENTTD_VEHICLE_CALL *write_motion)(OpenTTDVehicle *, uint32_t) noexcept;
+};
+const OpenTTDVehicleRawServices &GetRustVehicleRawServices() noexcept;
 struct OpenTTDVehicleSchedulerTables {
 	const OpenTTDVehicleSchedulerServices *scheduler;
 	const OpenTTDCargoStorageServices *cargo;
@@ -260,6 +270,7 @@ struct OpenTTDVehicleSchedulerTables {
 	const OpenTTDFleetPendingServices *pending;
 	const OpenTTDFleetTransactionServices *transaction;
 	const OpenTTDFleetGroupServices *group;
+	const OpenTTDVehicleRawServices *raw;
 };
 const OpenTTDVehicleSchedulerServices &GetRustVehicleSchedulerServices() noexcept;
 extern "C" {

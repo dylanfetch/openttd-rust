@@ -940,7 +940,7 @@ static void VehicleEnteredDepotThisTick(Vehicle *v)
 #include "rust/station_service_ffi.h"
 static OpenTTDVehicleSchedulerTables VehicleSchedulerTables() noexcept
 {
-	return {.scheduler = &GetRustVehicleSchedulerServices(), .cargo = CargoStorageServices(), .station = &GetRustStationServices(), .loading = &GetRustStationLoading(), .pending = &_fleet_pending_services, .transaction = &FleetTransactionServices(), .group = &FleetGroupServices()};
+	return {.scheduler = &GetRustVehicleSchedulerServices(), .cargo = CargoStorageServices(), .station = &GetRustStationServices(), .loading = &GetRustStationLoading(), .pending = &_fleet_pending_services, .transaction = &FleetTransactionServices(), .group = &FleetGroupServices(), .raw = &GetRustVehicleRawServices()};
 }
 void RunVehicleCalendarDayProc()
 {

@@ -14,6 +14,7 @@
 #define BASE_BITSET_TYPE_HPP
 
 #include "bitmath_func.hpp"
+#include <cstddef>
 
 /**
  * Base for bit set wrapper.
@@ -222,6 +223,7 @@ public:
 	}
 
 	/** Read-only address of the actual storage member; valid for this object lifetime. */
+	static constexpr size_t base_offset() noexcept { return offsetof(BaseBitSet, data); }
 	inline constexpr const Tstorage *base_address() const noexcept { return &this->data; }
 
 	/**

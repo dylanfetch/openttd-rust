@@ -226,6 +226,7 @@ public:
 	friend bool LoadOldVehicle(LoadgameState &ls, int num);       ///< So we can set the proper next pointer while loading
 	/* So we can use private/protected variables in the saveload code */
 	friend class SlVehicleCommon;
+	friend struct OpenTTDVehicleReadOffsets; // #274 throwaway layout measurement.
 	friend class SlVehicleDisaster;
 	friend void Ptrs_VEHS();
 
