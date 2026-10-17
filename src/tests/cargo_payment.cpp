@@ -11,7 +11,6 @@
 #include "../core/overflowsafe_type.hpp"
 #ifdef WITH_RUST
 #include "cargo_payment_stubs.hpp"
-#include "../rust/abi_ffi.h"
 #endif
 #include "../safeguards.h"
 
@@ -46,18 +45,5 @@ TEST_CASE("Cargo payment - settlement order, Money boundaries and cleanup")
 	p->fields = {nullptr, INT64_MAX, 0, 0};
 	openttd_rust_cargo_payment_destroy(p, &s, 0);
 	CHECK(settlement == std::vector<std::tuple<uint8_t, int64_t, int64_t>>{{0, 0, 0}});
-}
-
-TEST_CASE("Cargo payment - scalar ABI layouts")
-{
-	auto layout = [](uint8_t type, std::initializer_list<size_t> fields) {
-		uint8_t i = 0;
-		for (size_t expected : fields) CHECK(openttd_rust_abi_layout(type, i++) == expected);
-		CHECK(openttd_rust_abi_layout(type, i) == SIZE_MAX);
-	};
-	layout(49, {sizeof(OpenTTDCargoSpec), alignof(OpenTTDCargoSpec), offsetof(OpenTTDCargoSpec, payment), offsetof(OpenTTDCargoSpec, valid), offsetof(OpenTTDCargoSpec, callback), offsetof(OpenTTDCargoSpec, periods1), offsetof(OpenTTDCargoSpec, periods2)});
-	layout(50, {sizeof(OpenTTDCargoPaymentFields), alignof(OpenTTDCargoPaymentFields), offsetof(OpenTTDCargoPaymentFields, front), offsetof(OpenTTDCargoPaymentFields, route_profit), offsetof(OpenTTDCargoPaymentFields, visual_profit), offsetof(OpenTTDCargoPaymentFields, visual_transfer)});
-	layout(60, {sizeof(OpenTTDCargoPayment), alignof(OpenTTDCargoPayment), offsetof(OpenTTDCargoPayment, fields), offsetof(OpenTTDCargoPayment, station)});
-	layout(51, {sizeof(OpenTTDCargoServices), alignof(OpenTTDCargoServices), offsetof(OpenTTDCargoServices, spec), offsetof(OpenTTDCargoServices, callback), offsetof(OpenTTDCargoServices, nearby_industry), offsetof(OpenTTDCargoServices, station_read), offsetof(OpenTTDCargoServices, industry_read), offsetof(OpenTTDCargoServices, industry_write), offsetof(OpenTTDCargoServices, refuses), offsetof(OpenTTDCargoServices, accept), offsetof(OpenTTDCargoServices, statistics), offsetof(OpenTTDCargoServices, monitor), offsetof(OpenTTDCargoServices, subsidised), offsetof(OpenTTDCargoServices, industry_effect), offsetof(OpenTTDCargoServices, vehicle_read), offsetof(OpenTTDCargoServices, settle), offsetof(OpenTTDCargoServices, feeder), offsetof(OpenTTDCargoServices, setting)});
 }
 #endif

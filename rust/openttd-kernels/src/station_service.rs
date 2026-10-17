@@ -158,14 +158,6 @@ pub unsafe extern "C" fn openttd_rust_station_queue_size(state: *const Service) 
     unsafe { (*state).queue.len() }
 }
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_station_queue_get(
-    state: *const Service,
-    index: usize,
-) -> *mut c_void {
-    let entry = unsafe { (&(*state).queue)[index] };
-    unsafe { (&raw const (*entry).vehicle).read() }
-}
-#[unsafe(no_mangle)]
 pub unsafe extern "C" fn openttd_rust_station_queue_push(
     state: *mut Service,
     vehicle: *mut c_void,
@@ -179,14 +171,6 @@ pub unsafe extern "C" fn openttd_rust_station_queue_push(
             (&raw mut (*last).next).write(entry);
         }
         (*state).queue.push(entry);
-    }
-}
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openttd_rust_station_queue_erase(state: *mut Service, index: usize) {
-    unsafe {
-        let entry = (*state).queue.remove(index);
-        drop(Box::from_raw(entry));
-        queue_relink(state);
     }
 }
 #[unsafe(no_mangle)]
@@ -254,7 +238,9 @@ pub unsafe extern "C" fn openttd_rust_station_queue_erase_node(
             .unwrap_unchecked()
     };
     unsafe {
-        openttd_rust_station_queue_erase(state, index);
+        let entry = (*state).queue.remove(index);
+        drop(Box::from_raw(entry));
+        queue_relink(state);
     }
     successor
 }
@@ -1029,6 +1015,7 @@ unsafe fn stale(from: *mut BaseStation, w: &World, l: &Links) {
             } else {
                 let unrestricted = (l.edge_unrestricted)(graph, node, index);
                 if unrestricted != -1 && date.wrapping_sub(unrestricted) > timeout {
+                    crate::witness::hit(crate::witness::STATION_STALE_RESTRICT);
                     (l.restrict_edge)(graph, node, index);
                     let to_id = (l.station_id)(edge.destination);
                     (l.restrict_flows)(from, cargo, to_id);
@@ -1038,6 +1025,7 @@ unsafe fn stale(from: *mut BaseStation, w: &World, l: &Links) {
                 } else {
                     let restricted = (l.edge_restricted)(graph, node, index);
                     if restricted != -1 && date.wrapping_sub(restricted) > timeout {
+                        crate::witness::hit(crate::witness::STATION_STALE_RELEASE);
                         (l.release_edge)(graph, node, index);
                     }
                 }

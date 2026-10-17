@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """Check evidence joins, partial scopes and malformed receipt diagnostics."""
 
+import contextlib
 import copy
+import io
 import json
-import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import evidence
 
@@ -323,74 +325,62 @@ class EvidenceTests(unittest.TestCase):
         sim["binaries"]["candidate"] = copy.deepcopy(sim["binaries"]["reference"])
         self.assertIn("self comparison only", self.render(sims=[sim]))
 
-    def test_cli_exports_valid_explicit_receipts_without_mutation(self):
+    def run_cli(self, *args):
+        """Run main() in-process with git and port-metrics stubbed out."""
+        stdout, stderr = io.StringIO(), io.StringIO()
+        outputs = iter([HEAD + "\n", json.dumps(METRICS)])
+        self.commands = []
+
+        def check_output(command, **_):
+            self.commands.append(command[1:])
+            return next(outputs)
+
+        argv = ["evidence.py", *args]
+        with (
+            mock.patch.object(sys, "argv", argv),
+            mock.patch.object(evidence.subprocess, "check_output", check_output),
+            contextlib.redirect_stdout(stdout),
+            contextlib.redirect_stderr(stderr),
+        ):
+            try:
+                evidence.main()
+                code = 0
+            except SystemExit as error:
+                code = error.code
+        return code, stdout.getvalue(), stderr.getvalue()
+
+    def test_cli_exports_receipts_and_diagnoses_bad_receipt(self):
+        code, _, stderr = self.run_cli()
+        self.assertEqual(code, 2)
+        self.assertIn("--verification", stderr)
+        explicit = (
+            *("--base", "BASE", "--head", "HEAD", "--agent", "/root/test"),
+            *("--model", "gpt-6.1-sol", "--effort", "high"),
+        )
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "verify.json"
             payload = json.dumps(verification())
             path.write_text(payload)
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    evidence.__file__,
-                    "--verification",
-                    str(path),
-                    "--base",
-                    "HEAD",
-                    "--head",
-                    "HEAD",
-                    "--agent",
-                    "/root/test",
-                    "--model",
-                    "gpt-6.1-sol",
-                    "--effort",
-                    "high",
-                ],
-                capture_output=True,
-                text=True,
-            )
+            code, stdout, stderr = self.run_cli("--verification", str(path), *explicit)
             self.assertEqual(path.read_text(), payload)
             self.assertEqual(list(Path(directory).iterdir()), [path])
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("Port metrics", result.stdout)
-        self.assertIn(
-            "Rust 0 / tooling 0 / C++ glue added 0 / original C++ retired 0",
-            result.stdout,
-        )
-        self.assertIn("/root/test", result.stdout)
-
-    def test_cli_requires_explicit_selection_and_diagnoses_bad_receipt(self):
-        script = Path(evidence.__file__)
-        result = subprocess.run(
-            [sys.executable, str(script)], capture_output=True, text=True
-        )
-        self.assertEqual(result.returncode, 2)
-        self.assertIn("--verification", result.stderr)
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "broken.json"
-            path.write_text(json.dumps({"passed": False}))
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(script),
-                    "--verification",
-                    str(path),
-                    "--base",
-                    "HEAD",
-                    "--head",
-                    "HEAD",
-                    "--agent",
-                    "/root/test",
-                    "--model",
-                    "gpt-6.1-sol",
-                    "--effort",
-                    "high",
-                ],
-                capture_output=True,
-                text=True,
+            self.assertEqual(code, 0, stderr)
+            # The head is resolved once and both revisions reach port-metrics.
+            self.assertEqual(
+                self.commands[0], ["rev-parse", "--verify", "HEAD^{commit}"]
             )
-        self.assertEqual(result.returncode, 1)
-        self.assertIn("verification failed or incomplete", result.stderr)
-        self.assertNotIn("Traceback", result.stderr)
+            self.assertEqual(
+                self.commands[1][1:], ["--target", "BASE", "--head", HEAD, "--json"]
+            )
+            self.assertIn(
+                "Rust 1 / tooling 2 / C++ glue added 3 / original C++ retired 4", stdout
+            )
+            self.assertIn("/root/test", stdout)
+            path.write_text(json.dumps({"passed": False}))
+            code, _, stderr = self.run_cli("--verification", str(path), *explicit)
+        self.assertEqual(code, 1)
+        self.assertIn("verification failed or incomplete", stderr)
+        self.assertNotIn("Traceback", stderr)
 
 
 if __name__ == "__main__":
