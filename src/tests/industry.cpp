@@ -335,7 +335,7 @@ TEST_CASE("Industry - borrowed stack resolver shell and callback policy")
 		.map = {},
 		.builder = nullptr, .production = &production, .generation = &generation,
 		.construction = &construction, .lifecycle = &lifecycle, .tiles = &tiles,
-		.tile_policy = &policy, .commands = &commands, .costs = &costs,
+		.tile_policy = &policy, .commands = &commands, .command_checks = nullptr, .costs = &costs,
 		.transaction = &transaction, .errors = &errors,
 		.clear_areas = nullptr, .restore_clear_areas = nullptr,
 	};
