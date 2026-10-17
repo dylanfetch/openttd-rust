@@ -59,7 +59,7 @@ static inline uint8_t TownProtocol_road_flags(uint8_t) noexcept { return 0; }
 static inline OpenTTDTownHouseAvailability TownProtocol_house_availability(uint16_t) noexcept { return {.zones = 0xFFFF, .override_id = UINT16_MAX, .class_id = town_protocol_world->house_class, .probability = 1, .enabled = true}; }
 static inline uint8_t TownProtocol_house_flags(uint16_t id) noexcept { return id == 0 || id == 2 ? 1 : 16; }
 static inline OpenTTDTownHousePlacement TownProtocol_house_placement(uint16_t) noexcept { return {.min_year = 0, .max_year = 5000}; }
-static inline uint8_t TownProtocol_house_population(uint16_t) noexcept { return 10; }
+static inline uint8_t TownProtocol_house_population(uint16_t house) noexcept { return house == 2 ? 0 : 10; }
 static inline uint8_t TownProtocol_house_extra_flags(uint16_t) noexcept { return 0; }
 static inline OpenTTDTownRoadChoice TownProtocol_road_info(uint8_t) noexcept { return {}; }
 static inline void TownProtocol_dirty_town(uint32_t town) noexcept { TownProtocolLeaf(1, town, 0, 0, 0); }
@@ -90,7 +90,7 @@ static inline bool TownProtocol_allow_construction(uint32_t, uint32_t, uint32_t,
 {
 	openttd_rust_town_growth(town_protocol_world->owner)->flags = 0x88; return true;
 }
-/* The map holds one completed, old 1x1 house 2 whose rebuild reaches TryBuildTownHouse. */
+/* House 2 is an unpopulated, completed old 1x1 house; its rebuild reaches TryBuildTownHouse. */
 static inline OpenTTDHouseLoopTile TownProtocol_house_tile(uint32_t) noexcept { return {.age = 255, .completed = true}; }
 static inline uint16_t TownProtocol_house_callbacks(uint16_t) noexcept { return (1U << 3) | (town_protocol_world->house_callback ? 1U : 0U); }
 static inline void TownProtocol_change_frame(uint16_t, uint16_t, Town *, uint32_t, uint32_t, uint32_t, uint64_t) noexcept { town_protocol_world->animations++; }
@@ -123,7 +123,7 @@ static inline OpenTTDHouseServices TownProtocolHouses()
 	houses.house_type = [](uint32_t) noexcept -> uint16_t { return 2; };
 	houses.completed = [](uint32_t) noexcept { return true; };
 	houses.town = [](uint32_t) noexcept -> OpenTTDTownRef { town_protocol_world->owner_reads++; return {nullptr, town_protocol_world->owner, 0}; };
-	houses.loop_spec = [](uint16_t id) noexcept -> OpenTTDHouseLoopSpec { return {.callbacks = TownProtocol_house_callbacks(id), .flags = TownProtocol_house_flags(id)}; };
+	houses.loop_spec = [](uint16_t id) noexcept -> OpenTTDHouseLoopSpec { return {.callbacks = TownProtocol_house_callbacks(id), .flags = TownProtocol_house_flags(id), .population = TownProtocol_house_population(id)}; };
 	houses.delete_inspect = [](uint32_t) noexcept {};
 	houses.change_frame = TownProtocol_change_frame;
 	houses.next_near_station = [](Town *, OpenTTDStation *) noexcept -> OpenTTDStation * { return nullptr; };
