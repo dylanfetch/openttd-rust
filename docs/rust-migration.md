@@ -1208,6 +1208,9 @@ scripts, mutates/reenters the search or canonical road owner, or throws during
 ordinary play. Short owner access ends before leaves. RNG is unchanged (neither
 search draws); integer narrowing/wrapping, exit-key replacement, strict ties and
 follow-before-limit timing retain source behavior. Panics/OOM abort.
+Arena, lookup maps and heap retain process-wide scratch capacity between searches
+(#278). Each active search owns the scratch; the cache keeps no native pointers.
+Inputs, destination state and counters reset per call under the game-state mutex.
 
 `python3 tools/migration.py simulate roads` covers the controller's original eight
 cases, actual station-area prefix trimming and a forced cache miss with competing
